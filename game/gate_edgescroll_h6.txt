@@ -1,0 +1,24 @@
+# RIGHT EDGE SCROLLING, THE 640x480 HUD AND ITS DRAWER.
+#
+# The same fault as the DOS bar arm, plus the two things only this HUD has: the bar can
+# slide out of the way, and it keeps a handle plate pinned to the window edge when it
+# does. Run at 1280x960, where the bar is 160 wide, so the map ends at x=1120 deployed
+# and at the window edge once the drawer is hidden.
+#
+#   1  deployed: the map's right edge scrolls EAST
+#   2  deployed: the window's right edge is on the bar and moves nothing
+#   3  hidden: the map now reaches the window edge, and that edge scrolls EAST the same
+#      distance, so the drawer no longer changes the answer
+#   4  hidden: the handle plate still owns its own rows, and scrolling is still refused
+#      there, or reaching for the control that brings the bar back would pan the map
+cam 45 38
+edge R 20
+cam 45 38
+edgeat 1278 400 20
+sbslide hide
+sbslide settle
+cam 45 38
+edge R 20
+cam 45 38
+edgeat 1278 17 20
+quit

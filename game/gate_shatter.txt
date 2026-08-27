@@ -1,0 +1,74 @@
+# G91. A DESTROYED BUILDING COMES APART INTO ITS OWN PIECES, WHICH LAND ON THE TERRAIN.
+#
+# The death SHED (G90) drops a killed building's display-list sections one by one, which
+# makes the building dissolve where it stands. It is the right event and the wrong
+# picture: sections VANISH, so what the player sees is holes opening in a building that
+# never moves. Reported: "instead of a bunch of cut out triangles
+# appearing, the actual pieces of the building fall and collapse with a physics pulse
+# applied from the center outwards".
+#
+# So each section now LAUNCHES at the tick the shed would have dropped it, radially from
+# the footprint centre, and falls, bounces, rolls downhill, settles and fades. The two
+# are one event by construction: same observation, same clock, same section order.
+#
+# WHY THIS KILLS THE PLAYER'S OWN POWER PLANT. There is no verb that damages an object,
+# so a real death needs real combat, and CTRL-click is force fire -- which works on your
+# OWN buildings. The Power Plant is two cells from the start view and has NINE pieces
+# where the Guard Tower has three, so it actually exercises the weld rule, the mass
+# proxy and the flat-piece settle. The order is one shot, so it has to be re-issued.
+#
+# THE CAMERA MUST NOT MOVE between the order and the target: lclickobj and actclickobj
+# click a SCREEN POSITION. An earlier script used `look` and spent an hour looking like
+# an engine bug.
+#
+# WHAT THE SUITE ASSERTS off this run, and what each would catch:
+#
+#   1  pieces=9 on the NUKE header. The count comes from the PACK's own section table,
+#      so this one line catches a broken weld rule, a shadow plate leaking into the
+#      piece list, and a pack that lost its sections.
+#   2  every SHATTER|rest line has y == ground + low to within 0.01 cells. This is the
+#      assertion that fails if a piece sinks through the terrain or floats above it, and
+#      it is why the resting height is the piece's UNDERSIDE and not its bounding
+#      sphere -- the sphere floated the widest panel 1.48 cells into the air.
+#   3  to=0 on every rest line: every piece settled by PHYSICS and none of them ran out
+#      the four-second backstop. The backstop exists for genuinely steep ground; if it
+#      starts catching pieces on ordinary terrain the friction model has regressed, and
+#      the whole pool going to=1 is exactly what a bad elasticity looks like (measured:
+#      at the chunk pool's 0.7 every piece bounced its whole window away and the roll
+#      arm was reached literally never).
+#   4  live=0 at the end. Pieces leave the pool. A piece that never rests never fades
+#      and never leaves, so this is the leak assertion.
+#   5  the A/B: --noshatter must reproduce the shed-only picture, proving the feature is
+#      inert when off.
+tick 20
+cam 51 52
+zoom max
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 122
+shot shots/g91_0.png
+tick 20
+shot shots/g91_1.png
+tick 40
+shot shots/g91_2.png
+tick 250
+shatterdump
+quit

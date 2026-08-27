@@ -1,0 +1,22 @@
+# THE STRUCTURES' TEXTURE BOOKS, measured on a building that HAS one.
+#
+# The Construction Yard's fans were the first of these; the other five are the refinery's
+# warning triangle and chimney strip, the HELIPAD's landing markers, the repair bay's lamp
+# and the silo's fill strip. Two of the six are NOT uniformly spaced -- the refinery's
+# triangle is lit for 1600 units of 16000 -- so the baker emits one type code per TIME
+# SLOT and the cartridge's own schedule rides in the data.
+#
+# WHY THIS MOVED FROM SCG90EA TO SCG41EA. G56 announced "the 60-slot helipad table" in its
+# PASS text and then measured a whole-frame pixel difference on SCG90EA, a map with NO
+# HELIPAD ON IT. Whatever it was counting, it was not the thing it named. It also proved
+# the table's existence by grepping the PACK for the string HPADT59, which says a name is
+# in a file and nothing whatever about a running program; that leg is deleted.
+#
+# So: a map with a helipad, the camera on it, and the count taken INSIDE the helipad's own
+# silhouette as clickobj reports it in this same run.
+tick 40
+cam 54 58
+zoom max
+clickobj HPAD:GoodGuy 0
+shot shots/texbook_on.png
+quit

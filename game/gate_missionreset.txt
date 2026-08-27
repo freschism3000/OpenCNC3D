@@ -1,0 +1,51 @@
+# G104. A NEW MISSION STARTS FRESH: THE CLOCK AND THE RUBBLE.
+#
+# Reported: "When winning a skirmish map, and starting a new match, it starts
+# when the last one ended, instead of starting a fresh map."
+#
+# TWO DEFECTS THAT COMPOSED, which is why this reached him.
+#
+# 1. THE ENGINE'S CLOCK NEVER RESTARTED. Clear_Scenario empties the world but leaves the
+#    Frame global where the last mission stopped, because in 1995 that reset lives in
+#    Select_Game (init.cpp:737), the DOS main menu, and a host with its own menu never
+#    calls it. Measured: pristine boot dumps frame=0, after 300 ticks 300, and the NEXT
+#    mission dumped 300 before a tick of its own had run. Frame is the master clock for
+#    build timers, AI think intervals, tiberium growth, trigger times and superweapon
+#    recharge, so the new match came up with its clock already running.
+#
+# 2. game_shutdown CLEARED ONE OF NINE mission-scoped death and debris globals.
+#    game_load_slot has had the whole set since it was written; game_shutdown had only
+#    efx_mesh_reset. Measured: thirteen pieces and 155 triangles of a Construction Yard
+#    destroyed on one map were still in the live pool at the NEXT map's first frame, and
+#    drawn on it -- slabs and a girder lying on a beach that never had a building.
+#
+# AND THE FIRST HID THE SECOND. shatter_step's only defence is "if the frame went
+# backwards, clear the pool", which assumes a new mission restarts the clock. It did not,
+# so that arm was dead code on exactly the path it was written for.
+#
+# THE SCRIPT kills a Guard Tower the only way the harness can -- force fire, four rounds
+# of 200 ticks, the camera pinned because actclickobj clicks a SCREEN position -- then
+# changes mission with `remission` and asks twice whether anything came across.
+tick 20
+cam 54 47
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 200
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 200
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 200
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 90
+echo ===MATCH1-AFTER-THE-KILL===
+shatterdump
+remission
+echo ===MATCH2-ZERO-TICKS===
+shatterdump
+tick 3
+echo ===MATCH2-AFTER-3===
+shatterdump
+quit

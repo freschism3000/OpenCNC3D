@@ -1,0 +1,50 @@
+# THE CONTROL SCHEME (v0.5.9): the LEFT button selects AND orders, the RIGHT one cancels.
+#
+# WHY THIS GATE HAD TO BE WRITTEN. Every existing order gate drives ui_order_at through
+# the `order` / `rclick` script verbs, which call the order function DIRECTLY. That is
+# deliberate and stays that way -- it is what lets a gate aim at a cell rather than at a
+# pixel -- but it means not one of them can tell which mouse button is wired to what. The
+# whole suite stayed green through the button change, because the suite never presses a
+# button. G37 (--autoplay) does push real SDL events and now proves the LEFT click move,
+# but nothing proved the part that is easy to get wrong: WHICH HALF of the click you get.
+#
+# The decision under test is ui_click_action's, and it is the engine's own: ask
+# Best_Object_Action, and take the selection half only when it answers ACTION_SELECT
+# (7) or ACTION_TOGGLE_SELECT (8). That mirrors display.cpp:3492 Command_Object, which
+# refuses to act on exactly those two and leaves them to Selection_At_Mouse.
+#
+# SCG90EA with --noshroud, because it has a Medium Tank and a Power Plant of the
+# player's own in one view: the two objects needed to tell "select" from "order" apart.
+
+tick 20
+cam 54 51
+zoom max
+
+# ---- 1. the selection half: a bare left click picks a unit up ----------------------
+lclickobj MTNK 0
+expectsel 1
+
+# ---- 2. THE ANTI-FRATRICIDE CASE, and the reason the probe is consulted at all -----
+# A left click on ANOTHER OF YOUR OWN THINGS must SELECT it, not order the tank to
+# shoot it. Best_Object_Action answers 7 here. If ui_click_action ever stops asking,
+# this click becomes an attack order on the player's own Power Plant and the CLICK line
+# below says ORDER instead of SELECT.
+actclickobj NUKE 0
+expectsel 1
+
+# ---- 3. CTRL is force fire, and it must beat the probe -----------------------------
+# Same object, same answer from the probe (7, select), but ctrl means the player has
+# said "shoot it anyway". An override that can be talked out of it by the probe is not
+# an override. This is the case that caught the first version of ui_click_action.
+lclickobj MTNK 0
+expectsel 1
+actclickobj NUKE 0 c
+
+# ---- 4. the right button cancels, and gives no orders ------------------------------
+# 1995's Mouse_Right_Press: cancel whatever is active, otherwise unselect.
+cancel
+expectsel 0
+
+# One frame so the shot below is a real one rather than an undrawn buffer.
+tick 2
+shot shots/controls_01.png

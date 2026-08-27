@@ -1,0 +1,59 @@
+# G97. THE NUCLEAR STRIKE GROWS A MUSHROOM CLOUD.
+#
+# The cartridge's mushroom is four ANIMATED SCRIPT MODELS (model-table slots 6 dome,
+# 7 stem, 8 collar, 9 ground cloud), not sprite art. None of them was baked, so a nuke
+# landed as a light and some sparks and nothing else. They are now one four-part mesh,
+# NUKEFX, driven by a 31-frame clip.
+#
+# WHY THIS SCRIPT IS SO LONG BEFORE ANYTHING HAPPENS. A nuclear strike in Tiberian Dawn
+# is not an anim at the target: house.cpp:2662 Place_Special_Blast searches for a
+# STRUCT_TEMPLE launch site and, in single player with none, does `return false` and
+# the weapon silently does nothing. With a Temple the launcher assigns MISSION_MISSILE,
+# an ATOMICUP bullet climbs off the north edge, an ATOMICDN comes back down, and only on
+# ITS impact is ANIM_ATOM_BLAST created. Measured: detonation lands on tick 356.
+#
+# SCB70EA is used because it is one of exactly two shipped missions carrying a
+# BadGuy-owned Temple (the other is SCB35EA) -- `grep TMPL missions/SCB*.INI`. On any GDI
+# map this gate would pass its cheat leg and then measure nothing at all, which is the
+# failure mode worth naming here rather than rediscovering.
+#
+# THE ASSERTION IS THE EFXNUKE LINE, not a pixel count, and that is the whole point. The
+# blast throws fireballs, burn anims and debris around the target, so "the picture changed
+# where the nuke landed" is true on a build where the mesh is never drawn at all -- which
+# is exactly the state before this work. EFXNUKE is emitted from inside the draw, once per
+# strike per clip frame, so it cannot be produced by anything except the mesh reaching
+# draw_mesh.
+#
+# WHY THIS SCRIPT TAKES SCREENSHOTS IT NEVER LOOKS AT. The EFXION / EFXNUKE line is
+# emitted from inside the DRAW, which is the whole point of it -- a line printed from the
+# anim update would be true on a build where the mesh never reached draw_mesh. But `tick`
+# advances the simulation without necessarily rendering a frame, so a script made only of
+# ticks produces no draw and therefore no line, and the gate reads zero on a build that is
+# working perfectly. The `shot` calls are here to force a frame at each step. Measured the
+# hard way: the identical script with the shots removed emitted nothing at all.
+tick 60
+cheatset super 1
+tick 15
+sbclickitem SW_Nuke
+actclick 640 400
+cam 14 56
+tick 274
+shot shots/g97_0.png
+tick 4
+shot shots/g97_1.png
+tick 4
+shot shots/g97_2.png
+tick 4
+shot shots/g97_3.png
+tick 4
+shot shots/g97_4.png
+tick 4
+shot shots/g97_5.png
+tick 6
+shot shots/g97_6.png
+tick 6
+shot shots/g97_7.png
+tick 6
+efxdump
+shot shots/g97_8.png
+quit

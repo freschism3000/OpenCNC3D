@@ -1,0 +1,34 @@
+# THE PIP ROW (v0.5.9): the cartridge's storage strip, not the 1995 PIPS.SHP blit.
+#
+# The console's own answer is used rather than the DOS shortcut. It is decoded end
+# to end in docs/pip-row.md, whose eighteen load-bearing numbers re-derive straight from
+# the cartridge with no disassembler (18/18 when last re-run).
+#
+# WHAT THIS GATE PINS, and why each number is the one that would go wrong:
+#
+#   maxpips 7 for a HARVESTER   UnitTypeClass::Max_Pips is FULL_LOAD_CREDITS/100. If the
+#                               brain's field pair ever stops being read this goes to -1
+#                               and the row vanishes rather than drawing wrong.
+#   the strip is max*48 leptons The pitch is *0x80097AF4 = 48 on BOTH axes and the pips
+#                               TOUCH, so height is exactly max*48/256 cells = 1.3125 for
+#                               a harvester. A row that is any other height is using a
+#                               pitch nobody derived.
+#   the strip is 48 wide        Same constant, the other axis.
+#   the fill is count*48        Not a fraction of the total: the console tiles one 4x4
+#                               texel tile per pip (tMax = count<<11), so the boundary
+#                               lands on a pip edge and never between two.
+#   it is WEST of the health    The health bar occupies X1-16..X1 (stand-off *0x80097AEC);
+#   bar and does not overlap    the pips are the next 48 leptons west, X1-64..X1-16.
+#
+# THE LAST ARM IS THE ANTI-VACUITY ONE. Every number above can be right in a dump while
+# nothing reaches the glass, so the gate also runs the SAME frame with --nopips and
+# requires the two pictures to differ. Without that this passes on a renderer that
+# computes a perfect strip and draws none of it.
+
+tick 60
+cam 26 32
+zoom max
+lclickobj HARV 0
+pipdump
+tick 2
+shot shots/piprow_off.png

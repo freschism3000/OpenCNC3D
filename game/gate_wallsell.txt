@@ -1,0 +1,27 @@
+# WALLS CAN BE SOLD. 20 Aug: "Walls cannot be sold." They could not, because walls
+# are OVERLAY cells and live in no heap the picker walks, so a sell click fell through to
+# "no own building here" and never asked the engine anything. 1995 falls through to the
+# CELL instead (display.cpp:3306-3313 -> HouseClass::Sell_Wall).
+# The run builds one, sells it, then tries a wall the SCENARIO painted, which must refuse:
+# CellClass::Owner is HOUSE_NONE for those and they are unsellable in 1995 too.
+tick 20
+cam 49 47
+build SBAG
+ready SBAG 2000
+startplace SBAG
+place 49 46
+tick 10
+echo WALL-BUILT
+walldump
+player
+sbclick 1150 335
+lclickcell 49 46
+tick 6
+echo WALL-SOLD
+walldump
+player
+lclickcell 48 54
+tick 6
+echo MAPWALL-REFUSED
+player
+quit

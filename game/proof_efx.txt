@@ -1,0 +1,47 @@
+tick 2
+look BGGY 0
+lclickobj BGGY 0
+addobj BGGY 1
+tick 1
+expectsel 2
+look JEEP 0
+order 25 17
+tick 350
+cam 40 29
+efxdump
+shot fx3_muzzle_f353.png
+tick 225
+cam 36 32
+efxdump
+shot fx3_muzzle_f578.png
+tick 102
+cam 36 32
+efxdump
+shot fx3_boom_f680.png
+tick 6
+efxdump
+shot fx3_boom_f686.png
+tick 6
+efxdump
+shot fx3_boom_f692.png
+tick 8
+efxdump
+shot fx3_piff_f700.png
+tick 6
+cam 36 33
+efxdump
+shot fx3_dying_f706.png
+tick 4
+efxdump
+shot fx3_dying_f710.png
+tick 4
+efxdump
+shot fx3_dying_f714.png
+tick 46
+efxdump
+shot fx3_after_f760.png
+expectefx MINIGUN
+expectefx PIFF
+expectefx FRAG1
+expectdeath 1
+quit

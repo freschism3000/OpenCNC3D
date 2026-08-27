@@ -1,0 +1,63 @@
+# DOS cursor + honest order feedback: main proof. SCG01EB, 1280x720.
+tick 5
+
+# ---- 1. nothing selected, bare ground: the plain DOS arrow -----------------
+cursorcell 47 47
+expectcursor normal
+shot p1_normal.png
+
+# ---- 2. nothing selected, over the player's own MCV: select brackets -------
+look MCV
+cursorobj MCV
+expectcursor select
+shot p2_select.png
+
+# ---- 3. an armed own unit selected: minigunner E1 ---------------------------
+lclickobj E1:GoodGuy
+expectsel 1
+
+cursorcell 52 51
+expectcursor move
+shot p3_move.png
+
+cursorobj MCV
+expectcursor select
+
+cursorcell 54 58
+expectcursor no-move
+shot p4_nomove.png
+
+# ---- 4. SHROUD HONESTY ------------------------------------------------------
+# ADAPTED AT ASSEMBLY: with the shroud module integrated, the enemy on the
+# unexplored cell 41,39 is no longer drawn AT ALL (shroud culling), so he can
+# no longer be hovered or clicked as an object -- which is the DOS truth. The
+# assertions now: the object is undrawable, and hovering/ordering on his CELL
+# promises the plain MOVE the engine will actually perform.
+shroudat 41 39
+look E1:BadGuy
+cursorcell 41 39
+expectcursor move
+shot p5_shroudhover.png
+
+# an order into shroud: green move diamond, |shroud tag, and the engine
+# verdict is a move (nav set, no target) -- exactly what it does with the click
+order 41 39
+expecttar none
+tick 2
+seldump
+shot p5b_shroudorder.png
+
+# ---- 5. HONEST ORDER FEEDBACK ----------------------------------------------
+look E1:GoodGuy
+lclickobj E1:GoodGuy
+expectsel 1
+order 54 58
+expecttar none
+shot p7_refused.png
+
+order 52 55
+shot p8_confirm.png
+watch E1:GoodGuy 0 170
+expectcell E1:GoodGuy 0 52 55
+
+quit

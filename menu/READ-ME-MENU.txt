@@ -1,0 +1,40 @@
+C&C 3D: THE MAIN MENU
+=====================
+
+Double-click PLAY-MENU.command.
+
+The Westwood logo animation plays first and ends on the title screen, then the menu
+fades up out of black and the music starts. Any key or mouse button skips a movie.
+
+  Arrow keys        move the highlight
+  Return, or click  activate
+  Intro & Sneak Peek plays the full C&C intro (about two minutes, skippable)
+  Exit Game, or ESC  quit
+
+WHAT IS AND IS NOT WIRED UP
+---------------------------
+Start New Game, Load Mission and Multiplayer Game print their name and do nothing yet.
+There is no faction select and no mission list behind them. Exit works.
+
+To play an actual mission, use PLAY-GDI.command or PLAY-NOD.command as before: the
+menu is not yet the way into the game.
+
+WHERE IT ALL COMES FROM
+-----------------------
+This screen is pure MS-DOS, no N64 content, except the title plate, which is the
+CNC3D artwork. Layout, colours and draw order are taken from the GPL Tiberian Dawn
+sources line by line, and the art, fonts and button labels are decoded out of the
+1995 discs. The movies are the 1995 CD's own VQA files (dosdata/movies/), decoded by
+our own player; the music is the original .AUD score. Nothing on this screen, movies
+and audio included, comes from the N64 cartridge.
+
+FILES THIS ADDS
+---------------
+  cnc_menu            the menu (SDL2 + OpenGL 1.1, same as cnc_eyes)
+  dosmenu.pack        title plate, fonts, filigree, mouse pointer
+  movies/LOGO.VQA     the logo animation that plays before the menu
+  movies/INTRO2.VQA   the intro film
+  music/*.AUD         the score. MAP1 is the menu theme the engine asks for
+
+Nothing else in the folder is touched. Everything is path relative: keep the folder
+together and it runs from anywhere.

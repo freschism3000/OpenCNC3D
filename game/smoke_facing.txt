@@ -1,0 +1,14 @@
+cam 16 16
+tick 2
+lclickobj E1 0
+expectsel 1
+order 20 16
+tick 30
+shot smoke_E1_E.png
+facewatch E1 0 300
+expectcell E1 0 20 16
+order 16 16
+tick 30
+facewatch E1 0 300
+expectcell E1 0 16 16
+quit

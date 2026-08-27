@@ -1,0 +1,45 @@
+# G98. THE ION CANNON'S BEAM AND SHOCK RINGS.
+#
+# The whole visible ion cannon is GEOMETRY: a thin bright column dropping out of the sky
+# while three blue-white shock rings fire top down 320 ticks apart at descending heights
+# and expand and dissolve, the event over by clip tick 1600. None of it was baked, which
+# is why G85 used to assert the strike painted zero map pixels -- a description of missing
+# work that read like a specification. Its PARTICLE recipe really is empty (index 52 is
+# 160 bytes of zero in the ROM) and still is; that half was never the gap.
+#
+# Ten snapshot meshes ION0..ION9, one per 160-tick clip slot, each carrying the motion AND
+# the texture for that instant. The engine's own stage indexes them, DOUBLED: the console's
+# arm maps stage s to clip tick s*320, so s*2 is the snapshot. Measured on a live strike:
+# ANIM_ION_CANNON reports stage=n/15 with biggest=11 and keeps counting past 31 long after
+# the tracks have ended, so the last two thirds of the anim's life is the finished pose
+# holding -- which is why the snapshot index clamps at 9 rather than running off the end.
+#
+# THE ASSERTION IS EFXION, not a pixel count, for the same reason G97's is EFXNUKE: the
+# strike also throws a light and a cameo change, so "the picture changed" is true on a
+# build where no ion geometry is drawn at all. EFXION is emitted from inside the draw.
+#
+# WHY THIS SCRIPT TAKES SCREENSHOTS IT NEVER LOOKS AT. The EFXION / EFXNUKE line is
+# emitted from inside the DRAW, which is the whole point of it -- a line printed from the
+# anim update would be true on a build where the mesh never reached draw_mesh. But `tick`
+# advances the simulation without necessarily rendering a frame, so a script made only of
+# ticks produces no draw and therefore no line, and the gate reads zero on a build that is
+# working perfectly. The `shot` calls are here to force a frame at each step. Measured the
+# hard way: the identical script with the shots removed emitted nothing at all.
+tick 40
+cam 18 47
+superrecharge
+tick 5
+sbclickitem SW_Ion
+actclick 500 400
+shot shots/g98_0.png
+tick 2
+shot shots/g98_1.png
+tick 2
+shot shots/g98_2.png
+tick 2
+shot shots/g98_3.png
+tick 4
+shot shots/g98_4.png
+tick 8
+shot shots/g98_5.png
+quit

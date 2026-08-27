@@ -1,0 +1,6 @@
+# G108's other half: the same button test for Instant Lose. See gate_verdict.txt.
+tick 40
+cheats
+optclick Instant Lose
+tick 30
+quit

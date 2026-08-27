@@ -1,0 +1,107 @@
+# G62 SELLING A STRUCTURE. The arm that had never once been executed in a recorded run.
+# 1280x800 IS REQUIRED: sbclick 1150 335 only lands on the SELL button at that size.
+# At 1280x720 it maps to DOS (276,91), past the button, and MISSES SILENTLY -- sb_click
+# returns true for any pixel over the panel. gate_wallsell.txt has the same requirement.
+tick 20
+sidebar
+build NUKE
+ready NUKE 400
+startplace NUKE
+place auto
+tick 90
+player
+sbclick 1150 335
+lclickcell 51 51
+smoothmove 1
+tickalpha 0.5
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+tick 1
+stagepos NUKE 0
+quit

@@ -1,0 +1,76 @@
+# G88. CONTROL GROUPS ARE THE ENGINE'S, AND THIS PROVES THE ROUND TRIP.
+#
+# The renderer owns no group list. Every one of these lines goes through
+# CNC_Handle_ControlGroup_Request into Handle_Team (conquer.cpp:2987) and the answer is
+# read back out of CNC3D_Dump_Selection, so a green run here means the engine's own state
+# is what the number keys move, not a shadow copy that could drift from it.
+#
+# SCG90EA at max zoom on 54,51, because it has a Medium Tank and a Jeep of the player's
+# own in one view. Two units of DIFFERENT types is the point: it is what makes the
+# re-assignment leg and the additive leg say something.
+#
+# THE FOUR LEGS, and what each one would catch:
+#
+#   1. assign, deselect, recall     the basic round trip. Catches a request enum wired to
+#                                   the wrong action, which is the easy mistake here:
+#                                   ControlGroupRequestEnum is CREATE, TOGGLE, ADDITIVE
+#                                   (dllinterface.h:386-391) while Handle_Team's actions
+#                                   are 0 toggle, 1 additive, 2 create. The two do not
+#                                   line up and nothing but a test says so.
+#
+#   2. re-assign to a second group  the engine drops a unit out of its old group when it
+#                                   joins a new one (conquer.cpp:3088-3095). If we ever
+#                                   grew our own group list this leg is the one that would
+#                                   fail, because a private list would leave the unit in
+#                                   both. It is the anti-shadow-copy assertion.
+#
+#   3. additive SELECT              SHIFT adds the GROUP'S MEMBERS TO THE SELECTION. It
+#                                   does not put the held units into the group. Measured
+#                                   while writing this: with the jeep held, SHIFT on a
+#                                   group of one tank selects two, and recalling that
+#                                   group afterwards still gives ONE. The first version of
+#                                   this code called that action "add" and was wrong.
+#
+#   4. recall and centre            ALT recalls and moves the camera onto the group. The
+#                                   camera half is OURS: Handle_Team's own arm calls
+#                                   Map.Center_Map, which moves the ENGINE's tactical
+#                                   rectangle, and this renderer does not use that
+#                                   rectangle for anything. The CAM| lines either side are
+#                                   what the suite differences.
+tick 20
+cam 54 51
+zoom max
+
+echo G88-1 assign, deselect, recall
+lclickobj MTNK 0
+expectsel 1
+group 1 2
+deselect
+expectsel 0
+group 1 0
+expectsel 1
+
+echo G88-2 re-assigning to another group empties the first
+group 2 2
+deselect
+group 1 0
+expectsel 0
+group 2 0
+expectsel 1
+
+echo G88-3 additive selects the group ALONGSIDE what is held
+deselect
+lclickobj JEEP 0
+expectsel 1
+group 2 1
+expectsel 2
+deselect
+group 2 0
+expectsel 1
+
+echo G88-4 recall and centre moves the camera
+cam 40 40
+state
+group 2 3
+state
+quit

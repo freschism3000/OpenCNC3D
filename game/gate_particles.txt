@@ -1,0 +1,19 @@
+cam 49 55
+tick 26
+efxdump
+shot part_boom_a.png
+tick 8
+efxdump
+shot part_boom_b.png
+tick 8
+efxdump
+shot part_boom_c.png
+expectefx FRAG1 1
+tick 300
+cam 51 52
+efxdump
+shot part_fire.png
+tick 40
+efxdump
+shot part_trail.png
+quit

@@ -1,0 +1,52 @@
+# G96. A FACTORY SENDS WHAT IT BUILDS TO A RALLY POINT, SET ON THE LEFT BUTTON.
+#
+# A rally point is NOT a new mechanism. ArchiveTarget on a BuildingClass already is one and
+# is wired end to end -- but only for the Construction Yard. What was added is letting a
+# FACTORY answer the click and letting the unit it produces read the same field.
+#
+# THAT IS ADDITIVE, NOT A BEHAVIOUR FORK, and the argument is checkable: nothing in vanilla
+# ever writes a barracks' or a war factory's ArchiveTarget. Every writer in the tree is a
+# FootClass, the Units/Infantry heaps, plain initialisation, or the ARCHIVE event posted
+# from exactly one place gated to STRUCT_CONST. So Target_Legal(ArchiveTarget) on a factory
+# is provably false in a vanilla run and every added clause is inert unless our export
+# fires -- the same shape as the accepted CNC3D_InvincibleHouses precedent.
+#
+# FOUR GATES HAD TO MOVE, NOT THREE. Beyond the two What_Action overloads and
+# Active_Click_With, TechnoClass::What_Action only reaches its ACTION_MOVE arm behind
+# Can_Player_Move(), and BuildingClass::Can_Player_Move is "a Construction Yard with
+# MCVDeploy" -- so for a factory the base class never returns MOVE and a clause that only
+# DEMOTES it can never fire. The rally arms FILL IN where the engine had nothing instead.
+#
+# THE A/B IS THE WHOLE POINT: without a rally the unit stops at the factory's exit cell,
+# with one it walks to the rally cell. Asserting only "the rally was stored" would pass on
+# a build where the produced unit ignored it completely.
+tick 30
+cam 57 52
+zoom max
+
+echo G96-1 LEFT-clicking the ground with a factory selected sets a rally point
+lclickobj PYLE 0
+expectsel 1
+actclick 693 657
+tick 3
+rallydump
+
+echo G96-2 and RIGHT-click does NOT -- it still cancels, which is its one meaning here
+# Right-click was asked for first, delivered, and then reversed once he had
+# tried it: "Should only be left click". This leg is the regression guard for that. Every
+# other arm of the right button's ladder is a MODE BEING LEFT, and putting a rally point
+# there cost right-click its ability to deselect a factory -- for a gesture that was
+# already available on the left button. The rally set above must SURVIVE this click
+# unchanged, and the selection must be gone.
+rbutton 640 400
+tick 3
+expectsel 0
+rallydump
+
+echo G96-3 the unit it builds walks there
+count E1
+build E1
+tick 140
+count E1
+obj E1 10
+quit

@@ -1,0 +1,6 @@
+tick 5
+lclickobj MCV:@me
+actclickobj MCV:@me
+tick 2500
+shatterdump
+quit

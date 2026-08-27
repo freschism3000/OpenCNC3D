@@ -1,0 +1,47 @@
+# LINE ENDINGS, DECLARED RATHER THAN LEFT TO EACH MACHINE.
+#
+# This repo is worked from both macOS and Windows, and GitHub is the only thing between
+# them. Left undeclared, a Windows checkout commits CRLF into shell scripts and headers:
+# a small addition arrives as a whole-file rewrite git cannot merge, and CI is handed a
+# build-win.sh whose shebang ends in a carriage return. Declaring it here fixes it once
+# for both platforms.
+
+# Everything authored here is LF on every platform.
+*.c        text eol=lf
+*.h        text eol=lf
+*.cpp      text eol=lf
+*.hpp      text eol=lf
+*.sh       text eol=lf
+*.py       text eol=lf
+*.md       text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+*.json     text eol=lf
+*.txt      text eol=lf
+
+# ...except the one .txt that is opened in Notepad on Windows. This rule MUST stay below
+# the *.txt line above: in .gitattributes the LAST matching rule wins, and when it sat
+# above it, git checked the file out with LF and the eol=crlf was silently ignored.
+# (Editor.bat needs no rule of its own; the *.bat line further down already does it.)
+tools/win/editor-bundle-README.txt  text eol=crlf
+*.command  text eol=lf
+*.script   text eol=lf
+
+# Windows batch files are CRLF, because that is what they are.
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+
+# The 1995 discs and the cartridge are BYTES, not text. Nothing may touch these: the
+# briefings, missions and localisations are CRLF in the original data and stay that way.
+*.INI      -text
+*.BRF      -text
+*.GER      -text
+*.ENG      -text
+*.FRE      -text
+*.MIX      -text
+*.SHP      -text
+*.VQA      -text
+*.AUD      -text
+*.IMG      -text
+*.PAL      -text
+*.pack     -text

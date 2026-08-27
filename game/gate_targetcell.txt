@@ -1,0 +1,60 @@
+# THE TARGET CELL, arm 1: does an attack order aimed at a building actually reach it?
+#
+# Two reports that are one bug: the damage flashes did not always fire, and did not fire
+# at all when attacking the Hand of Nod or the Refinery; and the hitboxes varied widely
+# between buildings -- on the Hand of Nod and the Refinery the target seemed to sit in the
+# top-left corner, whereas on the Construction Yard and Power Plant it was in the
+# center".
+#
+# The cause is one line. A building's ANCHOR cell (Coord_Cell(Coord), the top-left of the
+# footprint rectangle) is not always a cell the engine has the building filed under:
+# fifteen structure types have an Occupy_List that does not contain offset 0 --
+# bdata.cpp:137 ListHand = {MCW, MCW+1, MCW*2+1} and bdata.cpp:150 List010111000 =
+# {1, MCW, MCW+1, MCW+2} are the Hand of Nod's and the Refinery's -- so Best_Object_Action
+# on that cell answers on BARE GROUND and the attack order degrades into a move. The brain
+# now exports tcx/tcy = Coord_Cell(Target_Coord()) and ui_right_click aims at that.
+#
+# WHAT THIS ARM ASSERTS, and why it is a sweep rather than one case: every enemy structure
+# TYPE on the map, because the defect is per-type (it depends on the type's Occupy_List)
+# and nothing else in the suite reads a probe by type. Measured 9 of 12 types
+# answered ACTION_ATTACK before the fix and all 12 answer it after. The three that did not
+# were OBLI, HAND and TMPL -- and only two of them.
+#
+# `look` before each `orderobj` because orderobj refuses an aim outside the frame, which
+# is the right refusal: a cell a player cannot see is a cell a player cannot click.
+# The MTNK is selected ONCE and stays selected; nothing ticks in between, so all twelve
+# orders are issued against the same world state.
+#
+# objdump at the end is the join: gates.sh matches each ORDER line's cell against the
+# tcx/tcy the BRAIN printed for that same building in this same run, so this arm fails if
+# the brain ever stops exporting the field instead of quietly reading it as zero.
+tick 20
+look MTNK 0
+lclickobj MTNK 0
+expectsel 1
+look OBLI:BadGuy 0
+orderobj OBLI:BadGuy 0
+look GUN:BadGuy 0
+orderobj GUN:BadGuy 0
+look NUK2:BadGuy 0
+orderobj NUK2:BadGuy 0
+look FACT:BadGuy 0
+orderobj FACT:BadGuy 0
+look HPAD:BadGuy 0
+orderobj HPAD:BadGuy 0
+look SAM:BadGuy 0
+orderobj SAM:BadGuy 0
+look HQ:BadGuy 0
+orderobj HQ:BadGuy 0
+look NUKE:BadGuy 0
+orderobj NUKE:BadGuy 0
+look HAND:BadGuy 0
+orderobj HAND:BadGuy 0
+look SILO:BadGuy 0
+orderobj SILO:BadGuy 0
+look AFLD:BadGuy 0
+orderobj AFLD:BadGuy 0
+look TMPL:BadGuy 0
+orderobj TMPL:BadGuy 0
+objdump
+quit

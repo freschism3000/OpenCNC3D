@@ -1,0 +1,9 @@
+tick 2
+look BGGY 0
+lclickobj BGGY 0
+addobj BGGY 1
+tick 1
+expectsel 2
+obj BGGY 1
+shroudat 53 17
+quit

@@ -1,0 +1,12 @@
+# THE JUKEBOX. sounddlg.cpp's SoundControlsClass: the 1995 score player. 20 Aug:
+# "Jukebox is missing and should be implemented." Reached the way 1995 reached it, from
+# Game Controls, and driven here by the same labels a player clicks.
+tick 10
+options
+optclick Game Controls
+optclick Sound Controls
+shot shots/jukebox.png
+optclick Track List
+optclick Play
+optclick Stop
+quit

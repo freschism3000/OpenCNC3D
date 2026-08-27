@@ -1,0 +1,42 @@
+# G107. BUILD ANYWHERE, measured on the overlay the player actually sees.
+#
+# WHAT THIS ASSERTS, and why it is the placement OVERLAY rather than a placement.
+# SCG01EC is used because it is the only shipped scenario that hands the player a
+# Construction Yard and a full 29 entry build list; most campaign missions give no
+# build list at all. The script enters placement mode for a Power Plant and dumps the
+# decoded GAME_STATE_PLACEMENT grid with the switch off, then again with it on.
+#
+# THREE NUMBERS COME OUT OF placemap AND ALL THREE MATTER:
+#   prox   cells whose PassesProximityCheck flag is set -- the base adjacency rule
+#   clear  cells whose ground will take a foundation   -- the TERRAIN rule
+#   legal  origins where the whole footprint is both
+# Build Anywhere must move prox and legal a long way UP and must leave clear EXACTLY
+# where it was. That last one is the whole of the constraint, in one number: "so the
+# user can build anywhere they want (but not on rivers, cliffs etc. for obvious
+# reasons)". If a future change lifted terrain legality too, clear would move and this
+# gate would fail, which is the only cheap way to keep that promise honest.
+#
+# WHY NOT ASSERT AN ACTUAL PLACEMENT. Because a placement proves nothing here:
+# DLLExportClass::Place in the vanilla Remaster DLL has its proximity check commented
+# out behind `#if (0)` with the note "Need to check for proximity again here?", and our
+# sidebar reports legality without refusing on it. So the click has ALWAYS been honoured
+# whatever the cursor said, and a build-and-place test comes out identical with the
+# switch off and on -- measured, 26 Aug 2026: NUKE went 1 to 2 both ways. The overlay is
+# what the rule actually reaches, so the overlay is what this gate reads.
+#
+# The first version of this gate queried DisplayClass::Passes_Proximity_Check through a
+# purpose-built export and went green while the cheat was hooked into a routine the
+# placement path never calls. A gate that certifies a broken feature is worse than none.
+tick 60
+cheats
+cheatset money 1
+cheatset instant 1
+tick 20
+build NUKE
+ready NUKE
+startplace NUKE
+placemap
+cheatset buildany 1
+tick 5
+placemap
+quit

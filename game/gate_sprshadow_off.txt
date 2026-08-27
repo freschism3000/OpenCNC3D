@@ -1,0 +1,20 @@
+# THE OFF ARM of the infantry shadow gate: the same frame, the same tick, the same
+# camera, with `shadow_on 0` in its preset so NOTHING casts.
+#
+# IT IS NOT --nospriteshadow, and that is measured rather than assumed. g_spriteShadowPass
+# is set from g_spriteShadowOn and the caster loop then runs REGARDLESS, so the flag swaps
+# the sun-turned card for the camera-facing one -- which casts a BIGGER shadow. G52 used
+# that flag as its off arm for a whole release. Until the flag is wrapped in
+# `if (g_spriteShadowOn)` no A/B built on it means anything; left open deliberately.
+#
+# The cost of a global off arm is that the whole scene loses its shadows, so the counts
+# only mean something INSIDE the men's own boxes. That is exactly where gates.sh counts.
+tick 30
+cam 56 55
+zoom max
+clickobj E1:GoodGuy 0
+clickobj E1:GoodGuy 1
+clickobj E1:GoodGuy 2
+clickobj E1:GoodGuy 3
+shot shots/sprshadow_off.png
+quit

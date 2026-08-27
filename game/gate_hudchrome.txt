@@ -1,0 +1,23 @@
+# THE THREE WINDOW-PINNED PLATES. Three symptoms at once:
+#   the OPTIONS button cannot be clicked, and the mouse cursor goes behind it;
+#   the SIDEBAR text is baked into the texture instead of being real text;
+#   the SIDEBAR does not act as a button that slides the whole panel to the right.
+# All three failed for one reason: sb_over_panel defined the panel as the right-hand
+# column, and these plates are pinned to the WINDOW. The click fell through to the map and
+# the 1995 pointer was suppressed, so the cartridge's 3-D cursor drew in the world -- under
+# the sidebar overlay, which is literally "the cursor goes behind it".
+tick 20
+sbhit 160 17
+sbhit 800 17
+sbhit 1120 17
+panelprobe 160 17
+sbclick 160 17
+shot shots/hud_open.png
+sbslide hide
+sbslide settle
+shot shots/hud_hidden.png
+sbhit 1120 17
+sbslide show
+sbslide settle
+shot shots/hud_back.png
+quit

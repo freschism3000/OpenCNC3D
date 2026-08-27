@@ -1,0 +1,29 @@
+# G81 arm A: THE INTERPOLATOR'S DISCONTINUITY RULE.
+#
+# SCG01EA's GDIR1 wave is three riflemen aboard an LST. A passenger is LIMBOED, which
+# takes it off the map but not out of the engine's dump, and a reinforcement passenger is
+# never Unlimbo'd on the way in, so every tick of the voyage it reports the object
+# constructor's sentinel coordinate: cell 255.996 on both axes. Frame 242 is the last tick
+# with three men aboard and 243 the first with none.
+#
+# On 243 the drawn position must BE the engine's position. It used to be a filtered slide
+# that started 254 cells away and took the length of the filter to arrive, which is a man
+# flying in from off the map instead of stepping onto the beach.
+smoothmove 1
+tickalpha 0.5
+tick 242
+cargodump
+tick 1
+cargodump
+drawpos E1 14
+drawpos E1 15
+drawpos E1 16
+tick 1
+drawpos E1 14
+tick 1
+drawpos E1 14
+tick 1
+drawpos E1 14
+tick 1
+drawpos E1 14
+quit

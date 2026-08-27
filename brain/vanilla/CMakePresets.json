@@ -1,0 +1,212 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "release",
+            "displayName": "Vanilla Release build",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL",
+                "CMAKE_FIND_FRAMEWORK": "LAST",
+                "DSOUND": "OFF",
+                "DDRAW": "OFF",
+                "SDL2": "ON",
+                "OPENAL": "ON"
+            }
+        },
+        {
+            "name": "remaster",
+            "inherits": "release",
+            "displayName": "Vanilla Remaster build",
+            "cacheVariables": {
+                "BUILD_REMASTERTD": "ON",
+                "BUILD_REMASTERRA": "ON",
+                "BUILD_VANILLATD": "OFF",
+                "BUILD_VANILLARA": "OFF",
+                "MAP_EDITORTD": "OFF",
+                "MAP_EDITORRA": "OFF",
+                "BUILD_TOOLS": "OFF"
+            }
+        },
+        {
+            "name": "internal",
+            "inherits": "release",
+            "displayName": "Vanilla Internal build",
+            "cacheVariables": {
+                "MAP_EDITORTD": "ON",
+                "MAP_EDITORRA": "ON",
+                "BUILD_TOOLS": "ON"
+            }
+        },
+        {
+            "name": "testing",
+            "inherits": "release",
+            "displayName": "Vanilla build with tests",
+            "cacheVariables": {
+                "BUILD_VANILLATD": "OFF",
+                "BUILD_VANILLARA": "OFF",
+                "BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "nonet",
+            "inherits": "internal",
+            "displayName": "Vanilla build no networking",
+            "cacheVariables": {
+                "NETWORKING": "OFF"
+            }
+        },
+        {
+            "name": "msvc2019-i686-remaster",
+            "inherits": "remaster",
+            "binaryDir": "${sourceDir}/build_remaster",
+            "displayName": "MSVC 2019 32bit Remaster build",
+            "generator": "Visual Studio 16 2019",
+            "architecture": "Win32"
+        },
+        {
+            "name": "msvc2019-i686-vanilla",
+            "inherits": "release",
+            "binaryDir": "${sourceDir}/build_msvc32",
+            "displayName": "MSVC 2019 32bit Vanilla build",
+            "generator": "Visual Studio 16 2019",
+            "architecture": "Win32"
+        },
+        {
+            "name": "msvc2019-x86-64-vanilla",
+            "inherits": "release",
+            "binaryDir": "${sourceDir}/build_msvc64",
+            "displayName": "MSVC 2019 64bit Vanilla build",
+            "architecture": "x64"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "remaster",
+            "configurePreset": "remaster",
+            "displayName": "Vanilla Game Build",
+            "description": "Vanilla Game Build",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "displayName": "Vanilla Game Build",
+            "description": "Vanilla Game Build",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "internal",
+            "configurePreset": "internal",
+            "displayName": "Vanilla Game Build",
+            "description": "Vanilla Game Build",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "testing",
+            "configurePreset": "testing",
+            "displayName": "Vanilla Game Build",
+            "description": "Vanilla Game Build",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "nonet",
+            "configurePreset": "nonet",
+            "displayName": "Vanilla Game Build",
+            "description": "Vanilla Game Build",
+            "configuration": "RelWithDebInfo"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "testing",
+            "configurePreset": "testing",
+            "configuration": "RelWithDebInfo",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "release",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "release"
+                },
+                {
+                    "type": "build",
+                    "name": "release"
+                }
+            ]
+        },
+        {
+            "name": "remaster",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "remaster"
+                },
+                {
+                    "type": "build",
+                    "name": "remaster"
+                }
+            ]
+        },
+        {
+            "name": "internal",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "internal"
+                },
+                {
+                    "type": "build",
+                    "name": "internal"
+                }
+            ]
+        },
+        {
+            "name": "testing",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "testing"
+                },
+                {
+                    "type": "build",
+                    "name": "testing"
+                },
+                {
+                    "type": "test",
+                    "name": "testing"
+                }
+            ]
+        },
+        {
+            "name": "nonet",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "nonet"
+                },
+                {
+                    "type": "build",
+                    "name": "nonet"
+                }
+            ]
+        }
+    ]
+}

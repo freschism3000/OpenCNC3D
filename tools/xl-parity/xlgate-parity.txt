@@ -1,0 +1,29 @@
+# XL PARITY ORACLE script (docs/design-xl-brain.md, determinism (a)): run
+# IDENTICALLY on the classic dylib and on TiberianDawnXL. Warm-up, then the
+# brain's own OBJ| enumeration at tick 10, 300 and every 300 through 3000,
+# with a tick-1500 screenshot for the draw-path tally. The comparator
+# (tools/xl-parity/compare.py) normalizes only the stride-derived fields.
+tick 10
+objdump
+tick 290
+objdump
+tick 300
+objdump
+tick 300
+objdump
+tick 300
+objdump
+tick 300
+shot xlpar_shot.png
+objdump
+tick 300
+objdump
+tick 300
+objdump
+tick 300
+objdump
+tick 300
+objdump
+tick 300
+objdump
+quit

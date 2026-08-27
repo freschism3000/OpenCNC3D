@@ -1,0 +1,31 @@
+# Full proof pass: shroud states, object culling, all three bar colours.
+tick 30
+cam 53 17
+shroudstat
+expectshroud 400 20
+# an enemy jeep sits at 24,17 in unexplored land: the shroud must make it undrawable
+shroudat 24 17
+lclickobj JEEP:GoodGuy 0
+# force-fire on the near buggy, fine-grained dumps to catch the yellow window
+band 400 200 1000 450
+order 53 16 c
+tick 40
+hbdump
+shot hb_g.png
+tick 8
+hbdump
+shot hb_y1.png
+tick 8
+hbdump
+shot hb_y2.png
+tick 8
+hbdump
+shot hb_y3.png
+tick 10
+hbdump
+shot hb_r.png
+# the synthetic DARK pass photograph (engine cannot produce DARK, see NOTES)
+bandoff
+shrouddarktest
+shot shroud_darktest.png
+quit

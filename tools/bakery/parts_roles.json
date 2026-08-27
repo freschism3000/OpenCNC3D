@@ -1,0 +1,1597 @@
+{
+ "AFLD": {
+  "mesh": "dl_014E060",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 113,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 113,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     6.53,
+     457.2,
+     -547.65
+    ]
+   },
+   {
+    "tri0": 129,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     1603.69,
+     3.0,
+     250.29
+    ]
+   },
+   {
+    "tri0": 131,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     1603.69,
+     3.0,
+     198.46
+    ]
+   }
+  ]
+ },
+ "APC": {
+  "mesh": "dl_0149FF8",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 46,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 46,
+    "ntris": 13,
+    "role": "static",
+    "pivot": [
+     0.64,
+     231.5,
+     19.7
+    ]
+   }
+  ]
+ },
+ "APCDOOR": {
+  "mesh": "dl_014A500",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 1,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -0.56,
+     29.39,
+     -259.16
+    ]
+   }
+  ]
+ },
+ "ATWR": {
+  "mesh": "dl_0143178",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 50,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 50,
+    "ntris": 8,
+    "role": "static",
+    "pivot": [
+     -199.38,
+     1141.58,
+     -126.24
+    ]
+   },
+   {
+    "tri0": 58,
+    "ntris": 25,
+    "role": "static",
+    "pivot": [
+     211.88,
+     266.29,
+     440.05
+    ]
+   }
+  ]
+ },
+ "BGGY": {
+  "mesh": "dl_0153FA0",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 90,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 90,
+    "ntris": 11,
+    "role": "turret",
+    "pivot": [
+     -0.21,
+     219.58,
+     -71.94
+    ]
+   }
+  ]
+ },
+ "BOAT": {
+  "mesh": "dl_00CB5F0",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 84,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 84,
+    "ntris": 10,
+    "role": "turret",
+    "pivot": [
+     -436.17,
+     350.5,
+     13.21
+    ]
+   }
+  ]
+ },
+ "CUR03": {
+  "mesh": "dl_013B078",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 1,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     236.09,
+     117.49,
+     -321.59
+    ]
+   },
+   {
+    "tri0": 17,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     -289.1,
+     117.49,
+     -321.59
+    ]
+   },
+   {
+    "tri0": 33,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     -289.1,
+     117.49,
+     298.2
+    ]
+   },
+   {
+    "tri0": 49,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     235.61,
+     117.49,
+     298.2
+    ]
+   }
+  ]
+ },
+ "CUR04": {
+  "mesh": "dl_013A370",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 37,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 37,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     2.24,
+     235.51,
+     -366.02
+    ]
+   },
+   {
+    "tri0": 38,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     356.17,
+     235.51,
+     -2.44
+    ]
+   },
+   {
+    "tri0": 39,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     4.26,
+     235.51,
+     385.06
+    ]
+   },
+   {
+    "tri0": 40,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     -369.45,
+     235.51,
+     -1.8
+    ]
+   }
+  ]
+ },
+ "CUR06": {
+  "mesh": "dl_0139100",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 2,
+    "ntris": 8,
+    "role": "static",
+    "pivot": [
+     274.41,
+     -13.28,
+     -10.04
+    ]
+   },
+   {
+    "tri0": 10,
+    "ntris": 8,
+    "role": "static",
+    "pivot": [
+     2.82,
+     -13.28,
+     261.11
+    ]
+   },
+   {
+    "tri0": 18,
+    "ntris": 8,
+    "role": "static",
+    "pivot": [
+     -256.74,
+     -13.28,
+     0.6
+    ]
+   },
+   {
+    "tri0": 26,
+    "ntris": 8,
+    "role": "static",
+    "pivot": [
+     9.56,
+     -13.28,
+     -265.78
+    ]
+   }
+  ]
+ },
+ "CUR08": {
+  "mesh": "dl_01399E8",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 53,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 53,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     -364.3,
+     210.64,
+     -3.35
+    ]
+   },
+   {
+    "tri0": 54,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     9.13,
+     210.64,
+     386.48
+    ]
+   },
+   {
+    "tri0": 55,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     9.13,
+     210.64,
+     -350.3
+    ]
+   },
+   {
+    "tri0": 56,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     388.46,
+     210.64,
+     3.46
+    ]
+   }
+  ]
+ },
+ "CUR09": {
+  "mesh": "dl_013F938",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 1,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     0.42,
+     450.59,
+     4.01
+    ]
+   },
+   {
+    "tri0": 17,
+    "ntris": 24,
+    "role": "static",
+    "pivot": [
+     5.15,
+     406.54,
+     -384.32
+    ]
+   },
+   {
+    "tri0": 41,
+    "ntris": 24,
+    "role": "static",
+    "pivot": [
+     -330.65,
+     406.54,
+     233.5
+    ]
+   },
+   {
+    "tri0": 65,
+    "ntris": 24,
+    "role": "static",
+    "pivot": [
+     346.0,
+     406.54,
+     222.87
+    ]
+   }
+  ]
+ },
+ "CURCIRC": {
+  "mesh": "dl_0102DC0",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 1,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     2.88,
+     10.66,
+     -2.9
+    ]
+   },
+   {
+    "tri0": 17,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     2.88,
+     16.84,
+     -2.9
+    ]
+   }
+  ]
+ },
+ "EYE": {
+  "mesh": "dl_0141DC8",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 34,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 34,
+    "ntris": 39,
+    "role": "static",
+    "pivot": [
+     230.16,
+     650.57,
+     522.94
+    ]
+   },
+   {
+    "tri0": 73,
+    "ntris": 6,
+    "role": "static",
+    "pivot": [
+     269.82,
+     -8.76,
+     -770.37
+    ]
+   },
+   {
+    "tri0": 79,
+    "ntris": 24,
+    "role": "static",
+    "pivot": [
+     269.51,
+     631.99,
+     -642.8
+    ]
+   },
+   {
+    "tri0": 103,
+    "ntris": 6,
+    "role": "static",
+    "pivot": [
+     -557.79,
+     4.74,
+     -613.3
+    ]
+   },
+   {
+    "tri0": 109,
+    "ntris": 24,
+    "role": "static",
+    "pivot": [
+     -492.26,
+     1069.63,
+     -534.65
+    ]
+   },
+   {
+    "tri0": 133,
+    "ntris": 24,
+    "role": "static",
+    "pivot": [
+     -747.53,
+     631.99,
+     -662.67
+    ]
+   }
+  ]
+ },
+ "FACT": {
+  "mesh": "dl_00D2B90",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 69,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 69,
+    "ntris": 20,
+    "role": "static",
+    "pivot": [
+     -744.73,
+     244.64,
+     161.76
+    ]
+   },
+   {
+    "tri0": 89,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     -655.86,
+     893.85,
+     299.59
+    ]
+   },
+   {
+    "tri0": 99,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     -194.72,
+     817.07,
+     567.66
+    ]
+   },
+   {
+    "tri0": 109,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     -168.9,
+     447.13,
+     562.8
+    ]
+   },
+   {
+    "tri0": 119,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     -165.22,
+     460.72,
+     587.77
+    ]
+   },
+   {
+    "tri0": 129,
+    "ntris": 6,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 135,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     -751.52,
+     94.91,
+     45.88
+    ]
+   },
+   {
+    "tri0": 139,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     232.01,
+     100.52,
+     -8.15
+    ]
+   },
+   {
+    "tri0": 149,
+    "ntris": 14,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  ]
+ },
+ "GUN": {
+  "mesh": "dl_0151F98",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 19,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 19,
+    "ntris": 32,
+    "role": "turret",
+    "pivot": [
+     0.03,
+     244.83,
+     0.08
+    ]
+   }
+  ]
+ },
+ "HAND": {
+  "mesh": "dl_0150630",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 160,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 160,
+    "ntris": 64,
+    "role": "static",
+    "pivot": [
+     -62.56,
+     1534.69,
+     3.73
+    ]
+   }
+  ]
+ },
+ "HARV": {
+  "mesh": "dl_012F5B8",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 112,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 112,
+    "ntris": 12,
+    "role": "static",
+    "pivot": [
+     -247.47,
+     62.39,
+     580.7
+    ]
+   },
+   {
+    "tri0": 124,
+    "ntris": 7,
+    "role": "static",
+    "pivot": [
+     241.11,
+     63.09,
+     578.15
+    ]
+   }
+  ]
+ },
+ "HELI": {
+  "mesh": "dl_0152FE0",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 72,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 72,
+    "ntris": 4,
+    "role": "rotor",
+    "pivot": [
+     1.44,
+     194.47,
+     105.79
+    ]
+   }
+  ]
+ },
+ "HQ": {
+  "mesh": "dl_010C488",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 46,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 46,
+    "ntris": 28,
+    "role": "static",
+    "pivot": [
+     316.41,
+     499.96,
+     433.72
+    ]
+   },
+   {
+    "tri0": 74,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     -302.93,
+     353.77,
+     -295.12
+    ]
+   }
+  ]
+ },
+ "HTNK": {
+  "mesh": "dl_00D7610",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 62,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 62,
+    "ntris": 76,
+    "role": "turret",
+    "pivot": [
+     3.52,
+     130.07,
+     0.73
+    ]
+   }
+  ]
+ },
+ "JEEP": {
+  "mesh": "dl_014AF68",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 58,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 58,
+    "ntris": 13,
+    "role": "turret",
+    "pivot": [
+     1.84,
+     275.8,
+     -0.12
+    ]
+   }
+  ]
+ },
+ "LTNK": {
+  "mesh": "dl_0155728",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 30,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 30,
+    "ntris": 23,
+    "role": "turret",
+    "pivot": [
+     2.77,
+     181.67,
+     -10.26
+    ]
+   }
+  ]
+ },
+ "MCVANIM": {
+  "mesh": "dl_01356F0",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 1,
+    "ntris": 90,
+    "role": "static",
+    "pivot": [
+     131.35,
+     -0.0,
+     58.1
+    ]
+   },
+   {
+    "tri0": 91,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     -173.72,
+     95.87,
+     365.81
+    ]
+   },
+   {
+    "tri0": 95,
+    "ntris": 22,
+    "role": "static",
+    "pivot": [
+     -225.01,
+     127.02,
+     402.82
+    ]
+   },
+   {
+    "tri0": 117,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -57.23,
+     328.11,
+     -143.84
+    ]
+   },
+   {
+    "tri0": 119,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     332.76,
+     328.11,
+     248.98
+    ]
+   },
+   {
+    "tri0": 121,
+    "ntris": 19,
+    "role": "static",
+    "pivot": [
+     181.52,
+     -64.94,
+     -236.46
+    ]
+   },
+   {
+    "tri0": 140,
+    "ntris": 20,
+    "role": "static",
+    "pivot": [
+     181.52,
+     -172.51,
+     -236.46
+    ]
+   },
+   {
+    "tri0": 160,
+    "ntris": 12,
+    "role": "static",
+    "pivot": [
+     181.52,
+     -268.18,
+     -236.63
+    ]
+   },
+   {
+    "tri0": 172,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     206.56,
+     -221.15,
+     -291.55
+    ]
+   },
+   {
+    "tri0": 174,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     206.56,
+     -192.78,
+     -291.55
+    ]
+   },
+   {
+    "tri0": 176,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     206.56,
+     -159.8,
+     -291.55
+    ]
+   },
+   {
+    "tri0": 178,
+    "ntris": 8,
+    "role": "static",
+    "pivot": [
+     181.52,
+     -247.47,
+     -236.63
+    ]
+   },
+   {
+    "tri0": 186,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     181.52,
+     -215.64,
+     -236.63
+    ]
+   },
+   {
+    "tri0": 190,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     131.85,
+     -130.25,
+     -223.46
+    ]
+   },
+   {
+    "tri0": 192,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     283.09,
+     -130.6,
+     -139.36
+    ]
+   },
+   {
+    "tri0": 194,
+    "ntris": 8,
+    "role": "static",
+    "pivot": [
+     127.66,
+     -133.69,
+     -350.7
+    ]
+   },
+   {
+    "tri0": 202,
+    "ntris": 34,
+    "role": "static",
+    "pivot": [
+     181.52,
+     -225.04,
+     -236.46
+    ]
+   },
+   {
+    "tri0": 236,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     88.71,
+     -360.44,
+     -286.05
+    ]
+   },
+   {
+    "tri0": 246,
+    "ntris": 30,
+    "role": "static",
+    "pivot": [
+     148.94,
+     -340.02,
+     -321.74
+    ]
+   },
+   {
+    "tri0": 276,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     104.54,
+     -237.17,
+     -232.22
+    ]
+   }
+  ]
+ },
+ "MTNK": {
+  "mesh": "dl_014C148",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 50,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 50,
+    "ntris": 41,
+    "role": "turret",
+    "pivot": [
+     3.75,
+     212.76,
+     -34.04
+    ]
+   }
+  ]
+ },
+ "NUK2": {
+  "mesh": "dl_0106F60",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 174,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 174,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     885.27,
+     -19.11,
+     934.71
+    ]
+   },
+   {
+    "tri0": 176,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -15.66,
+     -19.11,
+     -3.44
+    ]
+   }
+  ]
+ },
+ "NUKE": {
+  "mesh": "dl_0115348",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 132,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 132,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -7.83,
+     -9.55,
+     -1.72
+    ]
+   }
+  ]
+ },
+ "PROC": {
+  "mesh": "dl_0116D00",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 109,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 109,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -308.29,
+     0.0,
+     62.87
+    ]
+   }
+  ]
+ },
+ "PROCANIM": {
+  "mesh": "dl_0118A58",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 79,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 79,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -638.05,
+     131.2,
+     424.08
+    ]
+   },
+   {
+    "tri0": 81,
+    "ntris": 35,
+    "role": "static",
+    "pivot": [
+     -623.47,
+     235.52,
+     396.74
+    ]
+   },
+   {
+    "tri0": 116,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     -775.96,
+     177.37,
+     842.5
+    ]
+   },
+   {
+    "tri0": 120,
+    "ntris": 6,
+    "role": "static",
+    "pivot": [
+     -788.97,
+     229.46,
+     875.4
+    ]
+   },
+   {
+    "tri0": 126,
+    "ntris": 6,
+    "role": "static",
+    "pivot": [
+     -788.95,
+     106.24,
+     875.48
+    ]
+   }
+  ]
+ },
+ "PYLE": {
+  "mesh": "dl_0144718",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 83,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 83,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     -639.08,
+     916.05,
+     123.69
+    ]
+   },
+   {
+    "tri0": 87,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     -517.95,
+     916.05,
+     183.94
+    ]
+   },
+   {
+    "tri0": 91,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     -389.24,
+     916.05,
+     248.12
+    ]
+   }
+  ]
+ },
+ "SAM": {
+  "mesh": "dl_00CE380",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 30,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 30,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     -1.8,
+     -278.36,
+     -50.85
+    ]
+   },
+   {
+    "tri0": 40,
+    "ntris": 12,
+    "role": "static",
+    "pivot": [
+     -4.29,
+     -169.93,
+     28.4
+    ]
+   },
+   {
+    "tri0": 52,
+    "ntris": 12,
+    "role": "static",
+    "pivot": [
+     -4.24,
+     -169.85,
+     -167.04
+    ]
+   },
+   {
+    "tri0": 64,
+    "ntris": 12,
+    "role": "static",
+    "pivot": [
+     -4.24,
+     48.74,
+     -167.09
+    ]
+   },
+   {
+    "tri0": 76,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     372.65,
+     135.24,
+     98.59
+    ]
+   },
+   {
+    "tri0": 78,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -359.26,
+     138.25,
+     98.59
+    ]
+   }
+  ]
+ },
+ "SILO": {
+  "mesh": "dl_011C500",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 121,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 121,
+    "ntris": 24,
+    "role": "static",
+    "pivot": [
+     -0.0,
+     10.93,
+     0.0
+    ]
+   }
+  ]
+ },
+ "TRAN": {
+  "mesh": "dl_00D5698",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 73,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 73,
+    "ntris": 4,
+    "role": "rotor",
+    "pivot": [
+     4.24,
+     291.61,
+     281.64
+    ]
+   },
+   {
+    "tri0": 77,
+    "ntris": 4,
+    "role": "rotor",
+    "pivot": [
+     4.24,
+     353.64,
+     -532.7
+    ]
+   }
+  ]
+ },
+ "TRANRMP": {
+  "mesh": "dl_00D5FB0",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 1,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 1,
+    "ntris": 2,
+    "role": "static",
+    "pivot": [
+     -15.62,
+     1.57,
+     -435.76
+    ]
+   }
+  ]
+ },
+ "V19": {
+  "mesh": "dl_0123D20",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 47,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 47,
+    "ntris": 6,
+    "role": "static",
+    "pivot": [
+     63.78,
+     386.32,
+     -47.09
+    ]
+   },
+   {
+    "tri0": 53,
+    "ntris": 14,
+    "role": "static",
+    "pivot": [
+     270.29,
+     405.33,
+     82.54
+    ]
+   },
+   {
+    "tri0": 67,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     290.26,
+     378.01,
+     72.53
+    ]
+   },
+   {
+    "tri0": 71,
+    "ntris": 16,
+    "role": "static",
+    "pivot": [
+     312.6,
+     120.2,
+     103.1
+    ]
+   },
+   {
+    "tri0": 87,
+    "ntris": 4,
+    "role": "static",
+    "pivot": [
+     -180.29,
+     370.59,
+     -176.69
+    ]
+   }
+  ]
+ },
+ "WEAP": {
+  "mesh": "dl_0147DC0",
+  "parts": [
+   {
+    "tri0": 0,
+    "ntris": 109,
+    "role": "static",
+    "pivot": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "tri0": 109,
+    "ntris": 10,
+    "role": "static",
+    "pivot": [
+     617.43,
+     495.81,
+     180.94
+    ]
+   },
+   {
+    "tri0": 119,
+    "ntris": 28,
+    "role": "static",
+    "pivot": [
+     -618.65,
+     970.01,
+     703.65
+    ]
+   },
+   {
+    "tri0": 147,
+    "ntris": 29,
+    "role": "static",
+    "pivot": [
+     -604.66,
+     157.6,
+     707.13
+    ]
+   }
+  ]
+ }
+}

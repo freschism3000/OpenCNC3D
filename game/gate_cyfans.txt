@@ -1,0 +1,11 @@
+# The Construction Yard's cooling fans spin. the console capture (18 Aug) shows the two
+# vent grilles rotating; the fans are a static two-triangle part, so the console spins the
+# TEXTURE, and we reproduce that by rotating the grille UV under a fixed triangle. Two shots
+# a few ticks apart must differ in the fan region and NOWHERE the fan is absent.
+tick 20
+cam 53 51
+zoom max
+shot shots/cyfan_a.png
+tick 3
+shot shots/cyfan_b.png
+quit

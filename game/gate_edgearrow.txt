@@ -1,0 +1,18 @@
+# THE SCREEN-EDGE SCROLL ARROWS, cursor model code 0x0E. Playtest item 18: "the eight
+# screen-edge scroll arrows are not baked ... the bakery only bakes CUR00 to CUR0D." The
+# bakery stopped there because unit_models.json simply had no CUR0E key -- nothing in the
+# code was in the way. And it is ONE arrow model, not eight: the cartridge applies eight
+# pure Y rotations from the constants at RAM 0x80004964+.
+# SCG01EA's map rect is origin 35,38 size 28x25, so 35 and 38 are its west and north edges.
+tick 20
+cam 40 45
+zoom max
+cursorcell 45 45
+shot shots/edge_mid.png
+cursorcell 35 45
+shot shots/edge_w.png
+cursorcell 40 38
+shot shots/edge_n.png
+cursorcell 35 38
+shot shots/edge_nw.png
+quit

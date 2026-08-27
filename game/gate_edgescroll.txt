@@ -1,0 +1,26 @@
+# RIGHT EDGE SCROLLING, THE DEFAULT DOS BAR.
+#
+# The fault this covers: the right-hand scroll strip used to be measured from the WINDOW
+# edge, so it sat entirely underneath the sidebar, and the panel guard refuses to scroll
+# from over the panel. Right edge scrolling was therefore unreachable at every window
+# size while the bar was out, and no gate saw it because the `edge` verb used to call the
+# scroller raw, bypassing the very guard that killed it.
+#
+# Run at 1280x720. The DOS bar is 240 wide there, so the map ends at x=1040 and the strip
+# is [1028,1040). Four probes:
+#   1  the map's right edge scrolls EAST
+#   2  the map's left edge scrolls WEST by the same distance
+#   3  the window's right edge, which is on the bar, moves nothing
+#   4  a pixel just LEFT of the strip moves nothing, so the fix did not turn the whole
+#      map into a scroll zone
+# Run again with --nosidebar and probe 1 lands on the window edge instead; the distance
+# must come out the same, which is what says the bar no longer changes the answer.
+cam 45 38
+edge R 20
+cam 45 38
+edge L 20
+cam 45 38
+edgeat 1278 360 20
+cam 45 38
+edgeat 1020 360 20
+quit

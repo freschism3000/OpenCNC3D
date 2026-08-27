@@ -1,0 +1,22 @@
+# The attack proof, on an enemy the engine can SEE. Hunter E1 #0 walks from
+# 41,39 into the base's explored ground at ~tick 455 (measured; deterministic
+# because this script issues no orders before then).
+tick 455
+obj E1:BadGuy 0
+lclickobj E1:GoodGuy
+expectsel 1
+look E1:BadGuy
+cursorobj E1:BadGuy
+expectcursor attack
+shot p5_attack.png
+cursorstate
+cursoranim 140
+shot p5_attack_f2.png
+cursorstate
+
+# the real red attack mark, and the engine's own verdict: TarCom set
+orderobj E1:BadGuy
+shot p9_attackmark.png
+tick 2
+seldump
+quit

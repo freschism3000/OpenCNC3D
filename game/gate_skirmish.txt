@@ -1,0 +1,9 @@
+tick 5
+lclickobj MCV:@me
+cursorobj MCV:@me
+actclickobj MCV:@me
+tick 1500
+seldump
+objdump
+shot gate_skirmish.png
+quit

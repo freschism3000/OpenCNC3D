@@ -1,0 +1,31 @@
+# THE POWER INDICATOR (v0.5.9): the colour is a WATT test, not a pixel one.
+#
+# TWO DEFECTS, one per sidebar.
+#
+#   THE DOS BAR compared bar PIXELS where 1995 compares watts:
+#       power.cpp:475-482   if (PlayerPtr->Drain > PlayerPtr->Power)     YELLOW
+#                           if (PlayerPtr->Drain > PlayerPtr->Power * 2) RED
+#   Our db_draw_power tested `dh > ph` and `dh > ph * 2` on the heights. Those heights
+#   come from Power_Height (power.cpp:425), which adds a SIXTH OF WHAT IS LEFT per 100
+#   units, so it saturates: 200 watts against 500 is 33 pixels against 63. The watt rule
+#   calls that RED and the pixel rule calls it YELLOW. Red was very nearly unreachable.
+#
+#   THE 640x480 ART HUD had no warning at all: one green channel however bad the drain
+#   was, so the two sidebars in the same build disagreed about whether the base was in
+#   trouble. It now takes the same watt rule.
+#
+# SCB35EA is the scenario because the Brotherhood there starts genuinely overdrawn --
+# 430 produced against 475 drained -- so the live arm reads a real YELLOW rather than a
+# synthesised one. A base that is comfortably in credit proves nothing here.
+#
+# WHAT THIS GATE DOES NOT PROVE, said plainly: no shipped scenario starts with drain above
+# TWICE production, so the RED threshold is exercised arithmetically in gates.sh against
+# the transcribed Power_Height rather than in a live mission. That arm is a calculation,
+# not a measurement, and it is labelled as one.
+
+tick 120
+powerdump
+tick 30
+powerdump
+tick 2
+shot shots/power_01.png

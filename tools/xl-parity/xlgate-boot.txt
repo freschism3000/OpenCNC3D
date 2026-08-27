@@ -1,0 +1,37 @@
+# XL BOOT GATE (docs/design-xl-brain.md, phase 1): a classic 64x64 mission,
+# confined into the XL brain's 1024 stride, survives 3000 headless ticks.
+# Thirty tick-100 steps rather than one tick-3000, so a crash or an early
+# verdict names its tick window in the TICK| lines. One objdump at the end
+# proves the world is still enumerable.
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+tick 100
+objdump
+quit

@@ -1,0 +1,40 @@
+# THE TARGET CELL, arm 2: the CURSOR half, on the player's own base.
+#
+# The same substitution that turned an attack order into a move also told the cursor the
+# wrong thing, because update_cursor probes the same cell ui_right_click orders. Over the
+# player's OWN Refinery and War Factory the pointer read `move` -- the shape for bare
+# ground -- instead of `select`. This is visible before the click; it is the half of the
+# "hitbox" report that is visible without firing a shot.
+#
+# WHY SCG90EA AND NOT SCG41EA. The probe is shroud-blind but the ORDER verdict is not, so
+# on the enemy base every cell reads `|shroud` and the pointer answers for unexplored
+# ground. On the player's own base the cells are lit and the cursor answers for what is
+# actually there. Own buildings answer `select`, not `attack`, and that is correct: the
+# 1995 engine's Best_Object_Action over your own building is ACTION_SELECT.
+#
+# THE ANTI-VACUITY LEG IS THE LAST THREE LINES. FACT, NUKE and PYLE are the families whose
+# Occupy_List contains offset 0 (bdata.cpp List32 and List1011), so they answered `select`
+# BEFORE the fix as well. If a build ever breaks the cursor outright, they go red with the
+# other two and the gate cannot be mistaken for "the fix regressed". Measured:
+# PROC move -> select, WEAP move -> select, FACT/NUKE/PYLE select -> select.
+tick 20
+cam 53 48
+zoom max
+lclickobj MTNK
+expectsel 1
+look PROC 0
+cursorobj PROC 0
+expectcursor select
+look WEAP 0
+cursorobj WEAP 0
+expectcursor select
+look FACT 0
+cursorobj FACT 0
+expectcursor select
+look NUKE 0
+cursorobj NUKE 0
+expectcursor select
+look PYLE 0
+cursorobj PYLE 0
+expectcursor select
+quit

@@ -1,0 +1,64 @@
+# G92. A DESTROYED VEHICLE COMES APART, AND NOTHING ELSE DOES.
+#
+# The second half of that sentence is the hard half and the reason this gate is shaped the
+# way it is. A building announces its own death: it sits in the engine heap for eight ticks
+# with str <= 0 (CountDown = 8) and the renderer can simply watch for it. A VEHICLE DOES
+# NOT. Measured at one-tick resolution, a Jeep goes from "str=12/150" in one dump straight
+# to MISSING in the next; str <= 0 is never observed. So the only observable is that the
+# unit LEFT THE DUMP -- and leaving the dump is not the same as dying:
+#
+#   died          a real kill
+#   docked        a harvester at a refinery: limbo=1, and it STAYS in the dump for 599
+#                 ticks, so it never even reaches the test
+#   boarded       infantry in an APC, vehicles in an LST: same limbo behaviour -- but when
+#                 the TRANSPORT dies it deletes its cargo, and those passengers vanish
+#                 WHILE LIMBOED, which is the one case where the limbo clause is the only
+#                 thing standing between us and a bug
+#   left the map  an A-10 flying off to rearm
+#   deployed      an MCV becoming a Construction Yard
+#
+# A STRENGTH TEST CANNOT DO THIS and was the first thing tried. Two measured deaths
+# happened at FULL health -- an Artillery at 75/75 to an Obelisk, an Orca at 125/125 to a
+# nuclear strike -- so a health-ratio test has a 100% false-negative rate on one-shot
+# kills, not a small one. What actually separates a death from the rest is the EXPLOSION:
+# a destroyed vehicle spawns its own UnitTypeClass::Explosion anim, free-standing, at its
+# own coord, on the very tick it leaves the dump.
+#
+# EVERY CANDIDATE PRINTS A VERDICT, REJECTIONS INCLUDED, and that is what stops the guard
+# legs being vacuous. A gate that only asserts "no harvester exploded" passes equally well
+# on a build where the sweep never ran. The rejections let the suite assert the stronger
+# claim: the MCV WAS considered and WAS refused, with the reason named.
+#
+# THE CAMERA MUST NOT MOVE between an order and its target: lclickobj and actclickobj click
+# a SCREEN POSITION. The attack order is one shot and has to be re-issued.
+tick 20
+cam 57 51
+zoom max
+
+echo G92 kill a Medium Tank with another Medium Tank
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 60
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 60
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 60
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 60
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 60
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 60
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 60
+lclickobj MTNK 0
+actclickobj MTNK 3 c
+tick 500
+shatterdump
+quit

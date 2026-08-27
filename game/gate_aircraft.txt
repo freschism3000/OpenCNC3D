@@ -1,0 +1,90 @@
+# AIRCRAFT (v0.6.0): the heap the dump walked past for the whole life of the project.
+#
+# WHAT WAS WRONG, and it was one missing loop. CNC3D_Dump_Objects walked Infantry, Units,
+# Buildings and Terrains and stopped. The Aircraft heap was never exported, so no aircraft
+# of any kind had EVER reached the renderer, and ObjKind had no member to hold one. Four
+# player-visible symptoms came out of that single omission:
+#
+#   * an Orca built on a helipad was simulated and invisible   (BUG-20260821-E2E6A1)
+#   * the Airstrike's A-10s arrived and were invisible          (BUG-20260821-C8383B)
+#   * the pip row could not show Orca ammo, though the ROM decode had it at 5
+#   * a Chinook could carry cargo that no CARGO| line could name
+#
+# SCB70EA is the scenario because it carries FOUR parked aircraft at tick 120 -- two GDI
+# Orcas and two Nod Apaches -- and the Brotherhood there has a READY Air Strike, so the
+# same run can prove the parked case and the flying case without a second mission.
+#
+# THE ARMS, and what each would catch:
+#
+#   1. THE HEAP ARRIVES AT ALL. Four aircraft, each with a resolved mesh. Before v0.6.0
+#      this list was empty in every mission ever played. A mesh of -1 would mean the
+#      aircraft reached us but the pack has no model, which is a different bug.
+#
+#   2. ORCA AMMO. maxpips 5, which is AircraftTypeClass::Max_Pips, decoded from the ROM
+#      long before anything could carry it. This is the number that proves the pip work
+#      from v0.5.9 now reaches aircraft rather than just harvesters.
+#
+#   3. PARKED AIRCRAFT SIT ON THE GROUND. alt 0 gives lift 0. A non-zero lift here would
+#      mean a helicopter hovering off its own pad.
+#
+#   4. THE AIRSTRIKE ARRIVES. Firing it adds THREE A-10s (Bound(BuildLevel/3, 1, 3)) and
+#      each flies at alt 24, which is AircraftClass::FLIGHT_LEVEL (aircraft.h:83). This is
+#      the arm that closes "Airstrike never comes": v0.5.9 proved only that the engine
+#      SPENT the weapon, and the aircraft it created were still invisible.
+#
+#   5. THE ALTITUDE IS THE CARTRIDGE'S OWN CONVERSION. lift = alt * 10 / 256 cells, so
+#      FLIGHT_LEVEL is 0.9375 of a cell. The console multiplies Altitude by TEN LEPTONS
+#      when it lifts the health bar and the pip row (ROM 0x1727B8 and 0x17645C); the mesh
+#      and both overlays take the same number from one helper so they cannot drift apart.
+
+tick 120
+airdump
+
+cam 30 40
+zoom max
+
+# the flying case: fire the strike and watch the A-10s come in
+sbclickitem SW_AirStrike
+actclick 450 300
+tick 6
+airdump
+
+# ---- v0.6.1: a parked aircraft must WIN the pick against the pad under it ----------
+# pick_class ranked K_AIRCRAFT in the default bucket, "terrain: last resort", BELOW
+# buildings, because aircraft did not exist when it was written. Clicking an Orca on a
+# helipad selected the HELIPAD every time. The engine's own picker measures a
+# non-building to its Center_Coord and a building only to its cell, rejecting the
+# building past 192 leptons (map.cpp:1899-1904), so 1995 prefers the aircraft too.
+cam 12 57
+zoom max
+lclickobj HELI 1
+expectsel 1
+
+# ---- and once selected it carries its AMMO, which is the pip row reaching aircraft ----
+pipdump
+
+tick 2
+shot shots/aircraft_01.png
+
+# ---- WHICH WAY IS IT POINTING, which nothing in this suite ever asked ---------------
+# draw_facing() admitted only K_UNIT, so every aircraft was handed -1, which facing_rot
+# reads as "leave the model unrotated". Every aircraft mesh is authored nose-south, so
+# the whole air force was drawn pointing south whatever heading it was flying, and the
+# eight arms above all passed anyway: they ask that aircraft exist, have meshes, have
+# ammo and fly at the right height, and never once which way one is facing.
+#
+# The A-10 is the sample because it is the only aircraft in this mission that MOVES:
+# a parked Orca or Apache in SCB70EA does not accept a move order from a script, which
+# is a separate gap. Fixed-wing, so the engine keeps its body facing locked to its
+# flight path and the drawn nose must simply agree with the direction it travelled.
+# Measured on this run: 0 of 40 moving ticks before the fix, 40 of 40 after, with the
+# mean angle between the direction flown and the direction drawn going from 101 degrees
+# to 1.9. The residual is the one rate-of-turn step SecondaryFacing leads by while
+# turning, which is the 1995 engine's own arithmetic and not an error here.
+facewatch A10 0 40
+
+# And the state behind the picture: for every aircraft the drawn direction must be the
+# BODY facing (SecondaryFacing, exported as tface), not the flight path (face). The two
+# differ by the rate of turn whenever an aircraft is turning, so a run that ends with
+# renderdir equal to face rather than tface has taken the wrong field.
+airdump

@@ -1,0 +1,1882 @@
+{
+  "120MM": {
+    "confidence": "high",
+    "dl_rom": "0x0102848",
+    "evidence": "code-derived. The N64 bullet-type table (CodeOverlay ROM 0x1693B0, 40-byte records) stores per bullet name a unified-enum type id: 120MM=0x52, DRAGON=0x53, MISSILE=0x54, BOMBLET=0x55, and -1 for 50CAL/FLAME (never drawn). model_index = type_id + 10, the same rule as units/structures. Slot 93's 2x16 CI texture at ROM 0xF6C30 decodes to a missile body: dark nosecone, white body, red band.",
+    "kind": "bullet",
+    "mesh": "dl_0102848",
+    "model_index": 92,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 82
+  },
+  "A10": {
+    "confidence": "high",
+    "dl_rom": "0x0148F98",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=40 so model_index=50. Shape check: slot 50 has straight wings, twin tails and twin engine nacelles: the A-10 Warthog.",
+    "mesh": "dl_0148F98",
+    "model_index": 50,
+    "segment": "GameModelsGeometry",
+    "tris": 103,
+    "type_id": 40
+  },
+  "AFLD": {
+    "confidence": "high",
+    "dl_rom": "0x014E060",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=15 so model_index=25. Shape check: slot 25 is a long flat runway with a pointed end: the Airstrip.",
+    "mesh": "dl_014E060",
+    "model_index": 25,
+    "segment": "GameModelsGeometry",
+    "tris": 113,
+    "type_id": 15
+  },
+  "APC": {
+    "confidence": "high",
+    "dl_rom": "0x0149FF8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=38 so model_index=48.",
+    "mesh": "dl_0149FF8",
+    "model_index": 48,
+    "segment": "GameModelsGeometry",
+    "tris": 46,
+    "type_id": 38
+  },
+  "ARTY": {
+    "confidence": "high",
+    "dl_rom": "0x0156120",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=31 so model_index=41. Shape check: slot 41 is a chassis carrying a single long barrel raised at an angle: Artillery.",
+    "mesh": "dl_0156120",
+    "model_index": 41,
+    "segment": "GameModelsGeometry",
+    "tris": 50,
+    "type_id": 31
+  },
+  "ATOMICUP": {
+    "confidence": "high",
+    "dl_rom": "0x0100250",
+    "evidence": "code-derived, N64 bullet table CodeOverlay ROM 0x1693B0: record 9 BOMB=0x56 (the DOS grenade's image name), records 11/12 ATOMICUP/ATOMICDN=0x57. model_index = id + 10.",
+    "kind": "bullet",
+    "mesh": "dl_0100250",
+    "model_index": 97,
+    "segment": "GameModelsGeometry",
+    "tris": 26,
+    "type_id": 87
+  },
+  "ATWR": {
+    "confidence": "high",
+    "dl_rom": "0x0143178",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=4 so model_index=14. Shape check: slot 14 is a taller tower with a thin antenna mast: the Advanced Guard Tower.",
+    "mesh": "dl_0143178",
+    "model_index": 14,
+    "segment": "GameModelsGeometry",
+    "tris": 50,
+    "type_id": 4
+  },
+  "BARB": {
+    "confidence": "high",
+    "dl_rom": "0x0107F40",
+    "evidence": "model-table slot 184. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_0107F40",
+    "model_index": 184
+  },
+  "BARB_L": {
+    "confidence": "high",
+    "dl_rom": "0x0108358",
+    "evidence": "model-table slot 185. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_0108358",
+    "model_index": 185
+  },
+  "BARB_T": {
+    "confidence": "high",
+    "dl_rom": "0x0108200",
+    "evidence": "model-table slot 186. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_0108200",
+    "model_index": 186
+  },
+  "BARB_X": {
+    "confidence": "high",
+    "dl_rom": "0x0108090",
+    "evidence": "model-table slot 187. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_0108090",
+    "model_index": 187
+  },
+  "BGGY": {
+    "confidence": "high",
+    "dl_rom": "0x0153FA0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=35 so model_index=45. Shape check: slot 45 is an open buggy with four large exposed wheels, a roll cage and a dark windscreen.",
+    "mesh": "dl_0153FA0",
+    "model_index": 45,
+    "segment": "GameModelsGeometry",
+    "tris": 90,
+    "type_id": 35
+  },
+  "BIKE": {
+    "confidence": "high",
+    "dl_rom": "0x0156CB0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=36 so model_index=46. Shape check: slot 46 is a narrow low body with two forward forks and a single rear wheel in top view: the Recon Bike.",
+    "mesh": "dl_0156CB0",
+    "model_index": 46,
+    "segment": "GameModelsGeometry",
+    "tris": 72,
+    "type_id": 36
+  },
+  "BIO": {
+    "confidence": "high",
+    "dl_rom": "0x01095F8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=19 so model_index=29.",
+    "mesh": "dl_01095F8",
+    "model_index": 29,
+    "segment": "GameModelsGeometry",
+    "tris": 103,
+    "type_id": 19
+  },
+  "BOAT": {
+    "confidence": "high",
+    "dl_rom": "0x00CB5F0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=39 so model_index=49. Shape check: slot 49 is unmistakably a naval hull with a pointed bow, superstructure and mast: the gunboat. It is a cut unit, which is why this slot never appears in play.",
+    "mesh": "dl_00CB5F0",
+    "model_index": 49,
+    "segment": "ScriptModels",
+    "tris": 84,
+    "type_id": 39
+  },
+  "BOMB": {
+    "confidence": "high",
+    "dl_rom": "0x0102848",
+    "evidence": "code-derived, N64 bullet table CodeOverlay ROM 0x1693B0: record 9 BOMB=0x56 (the DOS grenade's image name), records 11/12 ATOMICUP/ATOMICDN=0x57. model_index = id + 10.",
+    "kind": "bullet",
+    "mesh": "dl_0102848",
+    "model_index": 96,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 86
+  },
+  "BOMBLET": {
+    "confidence": "high",
+    "dl_rom": "0x01051A0",
+    "evidence": "code-derived. The N64 bullet-type table (CodeOverlay ROM 0x1693B0, 40-byte records) stores per bullet name a unified-enum type id: 120MM=0x52, DRAGON=0x53, MISSILE=0x54, BOMBLET=0x55, and -1 for 50CAL/FLAME (never drawn). model_index = type_id + 10, the same rule as units/structures. Slot 93's 2x16 CI texture at ROM 0xF6C30 decodes to a missile body: dark nosecone, white body, red band.",
+    "kind": "bullet",
+    "mesh": "dl_01051A0",
+    "model_index": 95,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 85
+  },
+  "BRIK": {
+    "confidence": "high",
+    "dl_rom": "0x010E7F8",
+    "evidence": "model-table slot 176. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010E7F8",
+    "model_index": 176
+  },
+  "BRIKD": {
+    "confidence": "high",
+    "dl_rom": "0x010D0D0",
+    "evidence": "model-table slot 206. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010D0D0",
+    "model_index": 206
+  },
+  "BRIKD_L": {
+    "confidence": "high",
+    "dl_rom": "0x010D530",
+    "evidence": "model-table slot 207. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010D530",
+    "model_index": 207
+  },
+  "BRIKD_T": {
+    "confidence": "high",
+    "dl_rom": "0x010CC98",
+    "evidence": "model-table slot 208. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010CC98",
+    "model_index": 208
+  },
+  "BRIKD_X": {
+    "confidence": "high",
+    "dl_rom": "0x010DA60",
+    "evidence": "model-table slot 209. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010DA60",
+    "model_index": 209
+  },
+  "BRIKS": {
+    "confidence": "high",
+    "dl_rom": "0x010EF90",
+    "evidence": "model-table slot 180. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010EF90",
+    "model_index": 180
+  },
+  "BRIKS_L": {
+    "confidence": "high",
+    "dl_rom": "0x010F0F8",
+    "evidence": "model-table slot 181. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010F0F8",
+    "model_index": 181
+  },
+  "BRIKS_T": {
+    "confidence": "high",
+    "dl_rom": "0x010F280",
+    "evidence": "model-table slot 182. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010F280",
+    "model_index": 182
+  },
+  "BRIKS_X": {
+    "confidence": "high",
+    "dl_rom": "0x010EE88",
+    "evidence": "model-table slot 183. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010EE88",
+    "model_index": 183
+  },
+  "BRIK_L": {
+    "confidence": "high",
+    "dl_rom": "0x010EAF8",
+    "evidence": "model-table slot 177. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010EAF8",
+    "model_index": 177
+  },
+  "BRIK_T": {
+    "confidence": "high",
+    "dl_rom": "0x010E458",
+    "evidence": "model-table slot 178. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010E458",
+    "model_index": 178
+  },
+  "BRIK_X": {
+    "confidence": "high",
+    "dl_rom": "0x010DFA8",
+    "evidence": "model-table slot 179. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010DFA8",
+    "model_index": 179
+  },
+  "C17": {
+    "confidence": "high",
+    "dl_rom": "0x0154898",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=44 so model_index=54. Shape check: slot 54 is a four-engine swept-wing jet transport: the C-17 reinforcement plane.",
+    "mesh": "dl_0154898",
+    "model_index": 54,
+    "segment": "GameModelsGeometry",
+    "tris": 70,
+    "type_id": 44
+  },
+  "CUR00": {
+    "confidence": "high",
+    "dl_rom": "0x013CBF0",
+    "evidence": "N64 cursor model code 0x00. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. arrow / normal pointer",
+    "kind": "cursor",
+    "mesh": "dl_013CBF0",
+    "node_ram": "0x801BBCC0",
+    "parts": 1
+  },
+  "CUR01": {
+    "confidence": "high",
+    "dl_rom": "0x013D1E8",
+    "evidence": "N64 cursor model code 0x01. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. four-way move arrows with bars",
+    "kind": "cursor",
+    "mesh": "dl_013D1E8",
+    "node_ram": "0x801BBCDC",
+    "parts": 1
+  },
+  "CUR02": {
+    "confidence": "high",
+    "dl_rom": "0x013BF10",
+    "evidence": "N64 cursor model code 0x02. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. red no-entry ring with slash (the +3 overlay model)",
+    "kind": "cursor",
+    "mesh": "dl_013BF10",
+    "node_ram": "0x801BBC08",
+    "parts": 1
+  },
+  "CUR03": {
+    "confidence": "high",
+    "dl_rom": "0x013B078",
+    "evidence": "N64 cursor model code 0x03. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. four corner brackets (select)",
+    "kind": "cursor",
+    "mesh": "dl_013B078",
+    "node_ram": "0x801BBBD0",
+    "parts": 5
+  },
+  "CUR04": {
+    "confidence": "high",
+    "dl_rom": "0x013A370",
+    "evidence": "N64 cursor model code 0x04. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. hexagon reticle, red wedges",
+    "kind": "cursor",
+    "mesh": "dl_013A370",
+    "node_ram": "0x801BB850",
+    "parts": 5
+  },
+  "CUR05": {
+    "confidence": "high",
+    "dl_rom": "0x013B668",
+    "evidence": "N64 cursor model code 0x05. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. wrench (repair)",
+    "kind": "cursor",
+    "mesh": "dl_013B668",
+    "node_ram": "0x801BBBEC",
+    "parts": 1
+  },
+  "CUR06": {
+    "confidence": "high",
+    "dl_rom": "0x0139100",
+    "evidence": "N64 cursor model code 0x06. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. grey four-way diamond",
+    "kind": "cursor",
+    "mesh": "dl_0139100",
+    "node_ram": "0x801BB150",
+    "parts": 5
+  },
+  "CUR07": {
+    "confidence": "high",
+    "dl_rom": "0x01403E0",
+    "evidence": "N64 cursor model code 0x07. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. gold dollar sign (sell)",
+    "kind": "cursor",
+    "mesh": "dl_01403E0",
+    "node_ram": "0x801BC3F4",
+    "parts": 1
+  },
+  "CUR08": {
+    "confidence": "high",
+    "dl_rom": "0x01399E8",
+    "evidence": "N64 cursor model code 0x08. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. spiked hexagon, blue wedges",
+    "kind": "cursor",
+    "mesh": "dl_01399E8",
+    "node_ram": "0x801BB4D0",
+    "parts": 5
+  },
+  "CUR09": {
+    "confidence": "high",
+    "dl_rom": "0x013F938",
+    "evidence": "N64 cursor model code 0x09. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. three-wedge rosette",
+    "kind": "cursor",
+    "mesh": "dl_013F938",
+    "node_ram": "0x801BC3A0",
+    "parts": 5
+  },
+  "CUR0A": {
+    "confidence": "high",
+    "dl_rom": "0x013EA70",
+    "evidence": "N64 cursor model code 0x0A. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. flat ground ring",
+    "kind": "cursor",
+    "mesh": "dl_013EA70",
+    "node_ram": "0x801BBED0",
+    "parts": 1
+  },
+  "CUR0B": {
+    "confidence": "high",
+    "dl_rom": "0x013C680",
+    "evidence": "N64 cursor model code 0x0B. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. two stacked down-arrows, tall",
+    "kind": "cursor",
+    "mesh": "dl_013C680",
+    "node_ram": "0x801BBC88",
+    "parts": 1
+  },
+  "CUR0C": {
+    "confidence": "high",
+    "dl_rom": "0x013C920",
+    "evidence": "N64 cursor model code 0x0C. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. flat slab",
+    "kind": "cursor",
+    "mesh": "dl_013C920",
+    "node_ram": "0x801BBCA4",
+    "parts": 1
+  },
+  "CUR0D": {
+    "confidence": "high",
+    "dl_rom": "0x013C350",
+    "evidence": "N64 cursor model code 0x0D. NOT a model-table slot: the node comes from the cursor node table at RAM 0x80099750 + code*16 + 0x0C (ROM 0x9A350), which the draw site at ROM 0x4D790 indexes with a code taken from the 20-entry cursor state table at RAM 0x80099920 (ROM 0x9A520). Reached by bake5's node_ram branch through objgraph2.parts_of_node/cursor_node. shield blob",
+    "kind": "cursor",
+    "mesh": "dl_013C350",
+    "node_ram": "0x801BBC24",
+    "parts": 1
+  },
+  "CUR0E": {
+    "confidence": "high",
+    "dl_rom": "0x013FC68",
+    "kind": "cursor",
+    "mesh": "dl_013FC68",
+    "node_ram": "0x801BC3D8",
+    "parts": 1,
+    "evidence": "N64 cursor model code 0x0E, the SCREEN-EDGE SCROLL ARROW. NOT reachable from the 20-entry state table: the type-2 cursor handler at RAM 0x8004C890 tests the cursor's LEPTON position against the map bounds at RAM 0x80091EF0 +0x38/+0x3C/+0x40/+0x44 with a 16-lepton margin (ROM 0x4D504..0x4D620) and, when it trips, binds &cursorNodeTable[0x0E] (a1 = 0x80099830, ROM 0x4D76C) and applies a pure Y rotation via 0x8007C800(param, 0, f20, 0). f20 comes from the eight constants at RAM 0x80004964+: 0 N, 0.785398 NW, 1.5708 W, 2.35619 SW, 3.14159 S, 3.92699 SE, 4.71239 E, 5.49779 NE. ONE arrow model, not eight. One node, no pose record, 20 triangles, static: 19 untextured under PRIM_SHADE plus the shared 2x2 ground marker every other cursor carries. Arrow points -Z (north) unrotated."
+  },
+  "CURCIRC": {
+    "confidence": "high",
+    "dl_rom": "0x0102DC0",
+    "evidence": "NAMED BY THE CARTRIDGE. The model-table name-pointer array at ROM 0x1DE924, entry 97, points at ROM 0x1B7178 'CURSOR_CIRCLES', and 97 + the +10 bias the draw-command interpreter at RAM 0x8004C108 applies is model-table slot 107. Structure matches the name and the job: three geometry-bearing nodes -- a flat 3-vertex, 1-face ground triangle at ROM 0x0102DC0 (bbox 130 x 0 x 150, i.e. an eighth of a cell and perfectly flat) and two ring meshes at 0x0102A60 and 0x0102C98 whose ONLY tracks are SCALE (FEEB000B, 4 and 5 keys) over a one-shot t = 0..3200, i.e. 21 frames of two rings growing on the ground and nothing else moving. That is a destination marker. Keyed CURCIRC here rather than by the cartridge's full name because the pack's type-name field is 8 bytes and CURSOR_CIRCLES truncates to CURSOR_C, which is a name that only looks deliberate.",
+    "kind": "marker",
+    "mesh": "dl_0102DC0",
+    "model_index": 107,
+    "segment": "GameModelsGeometry",
+    "tris": null,
+    "type_id": 97
+  },
+  "CYCL": {
+    "confidence": "high",
+    "dl_rom": "0x010A228",
+    "evidence": "model-table slot 161. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010A228",
+    "model_index": 161
+  },
+  "CYCLS0": {
+    "confidence": "high",
+    "dl_rom": "0x010A7B0",
+    "evidence": "model-table slot 165. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010A7B0",
+    "model_index": 165
+  },
+  "CYCLS1": {
+    "confidence": "high",
+    "dl_rom": "0x010ACE0",
+    "evidence": "model-table slot 166. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010ACE0",
+    "model_index": 166
+  },
+  "CYCLS10": {
+    "confidence": "high",
+    "dl_rom": "0x010A900",
+    "evidence": "model-table slot 175. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010A900",
+    "model_index": 175
+  },
+  "CYCLS2": {
+    "confidence": "high",
+    "dl_rom": "0x010B0E0",
+    "evidence": "model-table slot 167. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010B0E0",
+    "model_index": 167
+  },
+  "CYCLS3": {
+    "confidence": "high",
+    "dl_rom": "0x010AF80",
+    "evidence": "model-table slot 168. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010AF80",
+    "model_index": 168
+  },
+  "CYCLS4": {
+    "confidence": "high",
+    "dl_rom": "0x010AA60",
+    "evidence": "model-table slot 169. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010AA60",
+    "model_index": 169
+  },
+  "CYCLS5": {
+    "confidence": "high",
+    "dl_rom": "0x010AE10",
+    "evidence": "model-table slot 170. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010AE10",
+    "model_index": 170
+  },
+  "CYCLS6": {
+    "confidence": "high",
+    "dl_rom": "0x010ABC0",
+    "evidence": "model-table slot 171. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010ABC0",
+    "model_index": 171
+  },
+  "CYCLS7": {
+    "confidence": "high",
+    "dl_rom": "0x010B240",
+    "evidence": "model-table slot 172. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010B240",
+    "model_index": 172
+  },
+  "CYCLS8": {
+    "confidence": "high",
+    "dl_rom": "0x010B3A0",
+    "evidence": "model-table slot 173. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010B3A0",
+    "model_index": 173
+  },
+  "CYCLS9": {
+    "confidence": "high",
+    "dl_rom": "0x010B500",
+    "evidence": "model-table slot 174. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_010B500",
+    "model_index": 174
+  },
+  "CYCL_L": {
+    "confidence": "high",
+    "dl_rom": "0x010A530",
+    "evidence": "model-table slot 162. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010A530",
+    "model_index": 162
+  },
+  "CYCL_T": {
+    "confidence": "high",
+    "dl_rom": "0x010A3C0",
+    "evidence": "model-table slot 163. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010A3C0",
+    "model_index": 163
+  },
+  "CYCL_X": {
+    "confidence": "high",
+    "dl_rom": "0x010A690",
+    "evidence": "model-table slot 164. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_010A690",
+    "model_index": 164
+  },
+  "DRAGON": {
+    "confidence": "high",
+    "dl_rom": "0x01051A0",
+    "evidence": "code-derived. The N64 bullet-type table (CodeOverlay ROM 0x1693B0, 40-byte records) stores per bullet name a unified-enum type id: 120MM=0x52, DRAGON=0x53, MISSILE=0x54, BOMBLET=0x55, and -1 for 50CAL/FLAME (never drawn). model_index = type_id + 10, the same rule as units/structures. Slot 93's 2x16 CI texture at ROM 0xF6C30 decodes to a missile body: dark nosecone, white body, red band.",
+    "kind": "bullet",
+    "mesh": "dl_01051A0",
+    "model_index": 93,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 83
+  },
+  "EYE": {
+    "confidence": "high",
+    "dl_rom": "0x0141DC8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=1 so model_index=11.",
+    "mesh": "dl_0141DC8",
+    "model_index": 11,
+    "segment": "GameModelsGeometry",
+    "tris": 34,
+    "type_id": 1
+  },
+  "FACT": {
+    "confidence": "high",
+    "dl_rom": "0x00D2B90",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=7 so model_index=17. Shape check: slot 17 is a large massed structure on the biggest footprint slab in the block: the Construction Yard.",
+    "mesh": "dl_00D2B90",
+    "model_index": 17,
+    "segment": "ScriptModels",
+    "tris": 69,
+    "type_id": 7
+  },
+  "FIX": {
+    "confidence": "high",
+    "dl_rom": "0x01198D8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=22 so model_index=32. Shape check: slot 32 is a flat octagonal pad with a raised rim: the Repair Facility.",
+    "mesh": "dl_01198D8",
+    "model_index": 32,
+    "segment": "GameModelsGeometry",
+    "tris": 74,
+    "type_id": 22
+  },
+  "FTNK": {
+    "confidence": "high",
+    "dl_rom": "0x00CF090",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=24 so model_index=34. Shape check: slot 34 is a bulbous rounded tracked hull with a dark nozzle at the front: the Flame Tank.",
+    "mesh": "dl_00CF090",
+    "model_index": 34,
+    "segment": "ScriptModels",
+    "tris": 105,
+    "type_id": 24
+  },
+  "GTWR": {
+    "confidence": "high",
+    "dl_rom": "0x0145B78",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=3 so model_index=13. Shape check: slot 13 is a small box on four splayed legs: the Guard Tower.",
+    "mesh": "dl_0145B78",
+    "model_index": 13,
+    "segment": "GameModelsGeometry",
+    "tris": 35,
+    "type_id": 3
+  },
+  "GUN": {
+    "confidence": "high",
+    "dl_rom": "0x0151F98",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=6 so model_index=16. Shape check: slot 16 is a squat hexagonal turret block: the Gun Turret.",
+    "mesh": "dl_0151F98",
+    "model_index": 16,
+    "segment": "GameModelsGeometry",
+    "tris": 19,
+    "type_id": 6
+  },
+  "HAND": {
+    "confidence": "high",
+    "dl_rom": "0x0150630",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=21 so model_index=31. Shape check: slot 31 is a tall structure with a rounded clawed top: the Hand of Nod.",
+    "mesh": "dl_0150630",
+    "model_index": 31,
+    "segment": "GameModelsGeometry",
+    "tris": 160,
+    "type_id": 21
+  },
+  "HARV": {
+    "confidence": "high",
+    "dl_rom": "0x012F5B8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=32 so model_index=42. Shape check: slot 42 is a large rounded-cab hauler with a protruding intake arm at the front: the Harvester.",
+    "mesh": "dl_012F5B8",
+    "model_index": 42,
+    "segment": "GameModelsGeometry",
+    "tris": 112,
+    "type_id": 32
+  },
+  "HELI": {
+    "confidence": "high",
+    "dl_rom": "0x0152FE0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=42 so model_index=52. Shape check: slot 52 has a slender fuselage, a long thin main-rotor bar and a tail rotor: the Apache.",
+    "mesh": "dl_0152FE0",
+    "model_index": 52,
+    "segment": "GameModelsGeometry",
+    "tris": 72,
+    "type_id": 42
+  },
+  "HOSP": {
+    "confidence": "high",
+    "dl_rom": "0x010FBE0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=18 so model_index=28.",
+    "mesh": "dl_010FBE0",
+    "model_index": 28,
+    "segment": "GameModelsGeometry",
+    "tris": 47,
+    "type_id": 18
+  },
+  "HPAD": {
+    "confidence": "high",
+    "dl_rom": "0x01461C0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=12 so model_index=22.",
+    "mesh": "dl_01461C0",
+    "model_index": 22,
+    "segment": "GameModelsGeometry",
+    "tris": 28,
+    "type_id": 12
+  },
+  "HQ": {
+    "confidence": "high",
+    "dl_rom": "0x010C488",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=13 so model_index=23.",
+    "mesh": "dl_010C488",
+    "model_index": 23,
+    "segment": "GameModelsGeometry",
+    "tris": 46,
+    "type_id": 13
+  },
+  "HTNK": {
+    "confidence": "high",
+    "dl_rom": "0x00D7610",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=28 so model_index=38. Shape check: slot 38 is by far the widest tank, a double-bodied hull with paired turret masses: the Mammoth.",
+    "mesh": "dl_00D7610",
+    "model_index": 38,
+    "segment": "ScriptModels",
+    "tris": 62,
+    "type_id": 28
+  },
+  "JEEP": {
+    "confidence": "high",
+    "dl_rom": "0x014AF68",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=34 so model_index=44. Shape check: slot 44 is a four-wheel car with a continuous dark window band around the greenhouse: the Humvee.",
+    "mesh": "dl_014AF68",
+    "model_index": 44,
+    "segment": "GameModelsGeometry",
+    "tris": 58,
+    "type_id": 34
+  },
+  "LST": {
+    "confidence": "high",
+    "dl_rom": "0x0130D70",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=30 so model_index=40. Shape check: slot 40 is a flat rectangular deck with rails and ramps at both ends: the landing craft.",
+    "mesh": "dl_0130D70",
+    "model_index": 40,
+    "segment": "GameModelsGeometry",
+    "tris": 138,
+    "type_id": 30
+  },
+  "LTNK": {
+    "confidence": "high",
+    "dl_rom": "0x0155728",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=26 so model_index=36. Shape check: slot 36 is the smallest single-barrel tank hull: the Light Tank.",
+    "mesh": "dl_0155728",
+    "model_index": 36,
+    "segment": "GameModelsGeometry",
+    "tris": 30,
+    "type_id": 26
+  },
+  "MCV": {
+    "confidence": "high",
+    "dl_rom": "0x0136230",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=33 so model_index=43. Shape check: slot 43 is a big rectangular flatbed truck with a cab at one end and dual rear wheels: the MCV.",
+    "mesh": "dl_0136230",
+    "model_index": 43,
+    "segment": "GameModelsGeometry",
+    "tris": 116,
+    "type_id": 33
+  },
+  "MCVANIM": {
+    "confidence": "high",
+    "dl_rom": "0x01356F0",
+    "evidence": "code-derived, and NOT an object type: model slot 18 is the MCV -> Construction Yard DEPLOY RIG, a separately authored 21-node rigged model with 25 keyframed TRS tracks. The model-table slot is named by the cartridge itself: the name pointer array at ROM 0x1DE924 (pointer delta 0x8000BE30, derived here by landing entry 8 on a NUL-terminated string and checked across the whole array) reads entry 7 -> ROM 0x1B750C 'ANY_STR_CONYARDZ1', entry 8 -> ROM 0x1B74F8 'ANY_UNIT_MCVANIMZ1', entry 9 -> ROM 0x1B74E4 'ANY_STR_REFINERYZ1', i.e. exactly the +10 bias the draw-command interpreter at RAM 0x8004C108 applies (slots 17, 18, 19 = FACT, the deploy rig, PROC). Scene-graph root RAM 0x801BA324, root display list ROM 0x01356F0, 21 geometry-bearing nodes, clip t = 0..16048, ONE-SHOT (the only one-shot track sets in the whole table are slots 18 and 20). Two subtrees: 0x801B9060 is the MCV hull (scale falls 1.0 -> 0.116 at t = 6400..6560) and 0x801BA2FC is the yard pad (scale rises 0.152 -> 1.0 at t = 6720..6880), which is what the MCV.mov shows. Reaching all 21 nodes needs objgraph2.DEPTH_CAP >= 6; at the old cap of 4 nodes 0x801B9210, 0x801B9134 and 0x801B9418 were baked nowhere.",
+    "mesh": "dl_01356F0",
+    "model_index": 18,
+    "segment": "GameModelsGeometry",
+    "tris": null,
+    "type_id": 8
+  },
+  "MHQ": {
+    "confidence": "high",
+    "dl_rom": "0x0149FF8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. MHQ stores type_id 38, the SAME id as APC, i.e. this cut unit is aliased onto the APC model (slot 48). It has no model of its own. Slot 39 (a plain box truck) is left orphaned by that aliasing and is the only unclaimed slot in the 34-54 vehicle range.",
+    "mesh": "dl_0149FF8",
+    "model_index": 48,
+    "segment": "GameModelsGeometry",
+    "tris": 46,
+    "type_id": 38
+  },
+  "MISS": {
+    "confidence": "high",
+    "dl_rom": "0x0111758",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=23 so model_index=33. Shape check: slot 33 is a flat base carrying two circular dish rings: the Communications/Technology Center.",
+    "mesh": "dl_0111758",
+    "model_index": 33,
+    "segment": "GameModelsGeometry",
+    "tris": 158,
+    "type_id": 23
+  },
+  "MISSILE": {
+    "confidence": "high",
+    "dl_rom": "0x01051A0",
+    "evidence": "code-derived. The N64 bullet-type table (CodeOverlay ROM 0x1693B0, 40-byte records) stores per bullet name a unified-enum type id: 120MM=0x52, DRAGON=0x53, MISSILE=0x54, BOMBLET=0x55, and -1 for 50CAL/FLAME (never drawn). model_index = type_id + 10, the same rule as units/structures. Slot 93's 2x16 CI texture at ROM 0xF6C30 decodes to a missile body: dark nosecone, white body, red band.",
+    "kind": "bullet",
+    "mesh": "dl_01051A0",
+    "model_index": 94,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 84
+  },
+  "MSAM": {
+    "confidence": "high",
+    "dl_rom": "0x014CB50",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=37 so model_index=47. Shape check: slot 47 carries a green H-shaped launcher rack on a flat bed: the SSM/MSAM launcher. (Earlier reads mistook the green rack for a tiberium load and called this HARV.)",
+    "mesh": "dl_014CB50",
+    "model_index": 47,
+    "segment": "GameModelsGeometry",
+    "tris": 38,
+    "type_id": 37
+  },
+  "MTNK": {
+    "confidence": "high",
+    "dl_rom": "0x014C148",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=27 so model_index=37. Shape check: slot 37 is a mid-size single-barrel tank hull: the Medium Tank.",
+    "mesh": "dl_014C148",
+    "model_index": 37,
+    "segment": "GameModelsGeometry",
+    "tris": 50,
+    "type_id": 27
+  },
+  "NUK2": {
+    "confidence": "high",
+    "dl_rom": "0x0106F60",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=17 so model_index=27. Shape check: slot 27 has TWO cooling cylinders where NUKE (26) has one: the Advanced Power Plant.",
+    "mesh": "dl_0106F60",
+    "model_index": 27,
+    "segment": "GameModelsGeometry",
+    "tris": 174,
+    "type_id": 17
+  },
+  "NUKE": {
+    "confidence": "high",
+    "dl_rom": "0x0115348",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=16 so model_index=26. Shape check: slot 26 has ONE cooling cylinder with green pipes; NUK2 (27) is the same design with TWO cylinders, exactly the Power Plant / Advanced Power Plant pair.",
+    "mesh": "dl_0115348",
+    "model_index": 26,
+    "segment": "GameModelsGeometry",
+    "tris": 132,
+    "type_id": 16
+  },
+  "OBLI": {
+    "confidence": "high",
+    "dl_rom": "0x01513D8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=5 so model_index=15. Shape check: slot 15 is a single tall tapering spire: the Obelisk of Light.",
+    "mesh": "dl_01513D8",
+    "model_index": 15,
+    "segment": "GameModelsGeometry",
+    "tris": 20,
+    "type_id": 5
+  },
+  "ORCA": {
+    "confidence": "high",
+    "dl_rom": "0x00CC9D8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=43 so model_index=53. Shape check: slot 53 has two large boxy engine nacelles flanking the fuselage and a V-tail: the Orca VTOL. (Earlier reads had put ORCA at 46, which is the Recon Bike.)",
+    "mesh": "dl_00CC9D8",
+    "model_index": 53,
+    "segment": "ScriptModels",
+    "tris": 139,
+    "type_id": 43
+  },
+  "PROC": {
+    "confidence": "high",
+    "dl_rom": "0x0116D00",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=9 so model_index=19.",
+    "mesh": "dl_0116D00",
+    "model_index": 19,
+    "segment": "GameModelsGeometry",
+    "tris": 109,
+    "type_id": 9
+  },
+  "PROCANIM": {
+    "confidence": "high",
+    "dl_rom": "0x0118A58",
+    "evidence": "code-derived, and NOT an object type: model slot 20 is the REFINERY'S SECOND DRAW COMMAND. PROC's arm in the 59-entry per-StructType jump table (RAM 0x8003DFD8, reached from BuildingClass's 3-D draw virtual at 0x8003DB94) is the only arm in the table that emits TWO model commands: model 9 -> slot 19, the refinery itself, and -- for stages 12 through 28 of the engine's own refinery animation -- model 10 -> slot 20, at RAM 0x8003E0C0 'addiu $a0, $zero, 0xa'. Slot 19's two nodes carry a translation track that evaluates to the SAME value on all 111 frames, i.e. the refinery's own model does not move at all; slot 20 carries 6 geometry-bearing nodes and 6 keyframed tracks over a one-shot t = 0..12800. So the refinery's docking animation was never in PROC's clip, which is why 'PROC bakes to an identity clip' looked like an extractor bug. The name array at ROM 0x1DE924 has an EMPTY string for this entry, so the cartridge does not name it; PROCANIM follows MCVANIM's convention for the same kind of thing, an unnamed rig slot drawn as a second command. Slots 18 and 20 are the only two one-shot track sets in the whole model table, which is consistent: both are event animations, not idles.",
+    "kind": "structure-extra",
+    "mesh": "dl_0118A58",
+    "model_index": 20,
+    "segment": "GameModelsGeometry",
+    "tris": null,
+    "type_id": 10
+  },
+  "PYLE": {
+    "confidence": "high",
+    "dl_rom": "0x0144718",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=20 so model_index=30. Shape check: slot 30 is two barrack blocks beside a ramp: the GDI Barracks.",
+    "mesh": "dl_0144718",
+    "model_index": 30,
+    "segment": "GameModelsGeometry",
+    "tris": 83,
+    "type_id": 20
+  },
+  "ROAD": {
+    "confidence": "low",
+    "dl_rom": "0x0102848",
+    "evidence": "model-table slot 92; PC StructType puts ROAD right after V37. Mesh is a short post, not obviously a road.",
+    "mesh": "dl_0102848",
+    "model_index": 92,
+    "tris": 12
+  },
+  "ROCK1": {
+    "confidence": "high",
+    "dl_rom": "0x00FEE70",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 124 (table.json slot 134). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_00FEE70",
+    "model_index": 134,
+    "n64_model_index": 124,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "ROCK2": {
+    "confidence": "high",
+    "dl_rom": "0x00FF120",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 125 (table.json slot 135). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_00FF120",
+    "model_index": 135,
+    "n64_model_index": 125,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "ROCK3": {
+    "confidence": "high",
+    "dl_rom": "0x00FF590",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 126 (table.json slot 136). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_00FF590",
+    "model_index": 136,
+    "n64_model_index": 126,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "ROCK4": {
+    "confidence": "high",
+    "dl_rom": "0x00FF980",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 127 (table.json slot 137). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_00FF980",
+    "model_index": 137,
+    "n64_model_index": 127,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "ROCK5": {
+    "confidence": "high",
+    "dl_rom": "0x00FFB68",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 128 (table.json slot 138). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_00FFB68",
+    "model_index": 138,
+    "n64_model_index": 128,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "ROCK6": {
+    "confidence": "high",
+    "dl_rom": "0x00FFD50",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 129 (table.json slot 139). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_00FFD50",
+    "model_index": 139,
+    "n64_model_index": 129,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "ROCK7": {
+    "confidence": "high",
+    "dl_rom": "0x00FFF38",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 130 (table.json slot 140). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_00FFF38",
+    "model_index": 140,
+    "n64_model_index": 130,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "SAM": {
+    "confidence": "high",
+    "dl_rom": "0x00CE380",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=14 so model_index=24. Shape check: slot 24 is a flat recessed rectangular hatch, matching the SAM Site whose roof doors open to launch.",
+    "mesh": "dl_00CE380",
+    "model_index": 24,
+    "segment": "ScriptModels",
+    "tris": 30,
+    "type_id": 14
+  },
+  "SBAG": {
+    "confidence": "high",
+    "dl_rom": "0x011A0C0",
+    "evidence": "model-table slot 153. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_011A0C0",
+    "model_index": 153
+  },
+  "SBAGS": {
+    "confidence": "high",
+    "dl_rom": "0x011ACD0",
+    "evidence": "model-table slot 157. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_011ACD0",
+    "model_index": 157
+  },
+  "SBAGS_L": {
+    "confidence": "high",
+    "dl_rom": "0x011B118",
+    "evidence": "model-table slot 158. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_011B118",
+    "model_index": 158
+  },
+  "SBAGS_T": {
+    "confidence": "high",
+    "dl_rom": "0x011AE28",
+    "evidence": "model-table slot 159. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_011AE28",
+    "model_index": 159
+  },
+  "SBAGS_X": {
+    "confidence": "high",
+    "dl_rom": "0x011AFD0",
+    "evidence": "model-table slot 160. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_011AFD0",
+    "model_index": 160
+  },
+  "SBAG_L": {
+    "confidence": "high",
+    "dl_rom": "0x011AAB8",
+    "evidence": "model-table slot 154. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_011AAB8",
+    "model_index": 154
+  },
+  "SBAG_T": {
+    "confidence": "high",
+    "dl_rom": "0x011A3A8",
+    "evidence": "model-table slot 155. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_011A3A8",
+    "model_index": 155
+  },
+  "SBAG_X": {
+    "confidence": "high",
+    "dl_rom": "0x011A748",
+    "evidence": "model-table slot 156. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_011A748",
+    "model_index": 156
+  },
+  "SILO": {
+    "confidence": "high",
+    "dl_rom": "0x011C500",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=11 so model_index=21.",
+    "mesh": "dl_011C500",
+    "model_index": 21,
+    "segment": "GameModelsGeometry",
+    "tris": 121,
+    "type_id": 11
+  },
+  "SPLIT2": {
+    "confidence": "high",
+    "dl_rom": "0x012E120",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 122 (table.json slot 132). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012E120",
+    "model_index": 132,
+    "n64_model_index": 122,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "SPLIT3": {
+    "confidence": "high",
+    "dl_rom": "0x012E120",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert/temperate/winter carries model index 122 (table.json slot 132). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012E120",
+    "model_index": 132,
+    "n64_model_index": 122,
+    "theaters": [
+      "desert",
+      "temperate",
+      "winter"
+    ]
+  },
+  "STNK": {
+    "confidence": "high",
+    "dl_rom": "0x00D0658",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=25 so model_index=35. Shape check: slot 35 is an angular faceted tracked hull: the Stealth Tank.",
+    "mesh": "dl_00D0658",
+    "model_index": 35,
+    "segment": "ScriptModels",
+    "tris": 106,
+    "type_id": 25
+  },
+  "T01": {
+    "confidence": "high",
+    "dl_rom": "0x012BF70",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 103 (table.json slot 113). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012BF70",
+    "model_index": 113,
+    "n64_model_index": 103,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T02": {
+    "confidence": "high",
+    "dl_rom": "0x012C2C0",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 104 (table.json slot 114). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C2C0",
+    "model_index": 114,
+    "n64_model_index": 104,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T03": {
+    "confidence": "high",
+    "dl_rom": "0x012C660",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 105 (table.json slot 115). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C660",
+    "model_index": 115,
+    "n64_model_index": 105,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T04": {
+    "confidence": "high",
+    "dl_rom": "0x012C968",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 106 (table.json slot 116). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C968",
+    "model_index": 116,
+    "n64_model_index": 106,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "T05": {
+    "confidence": "high",
+    "dl_rom": "0x012CC30",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 107 (table.json slot 117). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012CC30",
+    "model_index": 117,
+    "n64_model_index": 107,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T06": {
+    "confidence": "high",
+    "dl_rom": "0x012CFD8",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 108 (table.json slot 118). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012CFD8",
+    "model_index": 118,
+    "n64_model_index": 108,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T07": {
+    "confidence": "high",
+    "dl_rom": "0x012D2C0",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 109 (table.json slot 119). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012D2C0",
+    "model_index": 119,
+    "n64_model_index": 109,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T08": {
+    "confidence": "high",
+    "dl_rom": "0x012D570",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert/temperate/winter carries model index 110 (table.json slot 120). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012D570",
+    "model_index": 120,
+    "n64_model_index": 110,
+    "theaters": [
+      "desert",
+      "temperate",
+      "winter"
+    ]
+  },
+  "T09": {
+    "confidence": "high",
+    "dl_rom": "0x012C2C0",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 112 (table.json slot 122). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C2C0",
+    "model_index": 122,
+    "n64_model_index": 112,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "T10": {
+    "confidence": "high",
+    "dl_rom": "0x012C660",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 113 (table.json slot 123). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C660",
+    "model_index": 123,
+    "n64_model_index": 113,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T11": {
+    "confidence": "high",
+    "dl_rom": "0x012C968",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 114 (table.json slot 124). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C968",
+    "model_index": 124,
+    "n64_model_index": 114,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T12": {
+    "confidence": "high",
+    "dl_rom": "0x012CC30",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 115 (table.json slot 125). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012CC30",
+    "model_index": 125,
+    "n64_model_index": 115,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T13": {
+    "confidence": "high",
+    "dl_rom": "0x012CFD8",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 116 (table.json slot 126). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012CFD8",
+    "model_index": 126,
+    "n64_model_index": 116,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T14": {
+    "confidence": "high",
+    "dl_rom": "0x012D2C0",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 117 (table.json slot 127). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012D2C0",
+    "model_index": 127,
+    "n64_model_index": 117,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T15": {
+    "confidence": "high",
+    "dl_rom": "0x012D570",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 118 (table.json slot 128). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012D570",
+    "model_index": 128,
+    "n64_model_index": 118,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T16": {
+    "confidence": "high",
+    "dl_rom": "0x012BF70",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 119 (table.json slot 129). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012BF70",
+    "model_index": 129,
+    "n64_model_index": 119,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T17": {
+    "confidence": "high",
+    "dl_rom": "0x012C2C0",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; temperate/winter carries model index 120 (table.json slot 130). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C2C0",
+    "model_index": 130,
+    "n64_model_index": 120,
+    "theaters": [
+      "temperate",
+      "winter"
+    ]
+  },
+  "T18": {
+    "confidence": "high",
+    "dl_rom": "0x012C660",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; desert carries model index 121 (table.json slot 131). Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132).",
+    "mesh": "dl_012C660",
+    "model_index": 131,
+    "n64_model_index": 121,
+    "theaters": [
+      "desert"
+    ]
+  },
+  "TC01": {
+    "confidence": "none",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; this type registers NO model index in any theater. Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132). TC01..TC05 are the only types in that state: they are registered as real multi-cell terrain (occupy lists of 2,3,4,5 and 6 cells respectively, strength 600) but the N64 build ships no clump mesh for them, so there is nothing to draw. The earlier guess that they owned the NULL slots 108-112 and 133 was wrong: those NULLs are game indices 98-102 and 123, which no terrain type references.",
+    "mesh": null,
+    "model_index": null
+  },
+  "TC02": {
+    "confidence": "none",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; this type registers NO model index in any theater. Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132). TC01..TC05 are the only types in that state: they are registered as real multi-cell terrain (occupy lists of 2,3,4,5 and 6 cells respectively, strength 600) but the N64 build ships no clump mesh for them, so there is nothing to draw. The earlier guess that they owned the NULL slots 108-112 and 133 was wrong: those NULLs are game indices 98-102 and 123, which no terrain type references.",
+    "mesh": null,
+    "model_index": null
+  },
+  "TC03": {
+    "confidence": "none",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; this type registers NO model index in any theater. Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132). TC01..TC05 are the only types in that state: they are registered as real multi-cell terrain (occupy lists of 2,3,4,5 and 6 cells respectively, strength 600) but the N64 build ships no clump mesh for them, so there is nothing to draw. The earlier guess that they owned the NULL slots 108-112 and 133 was wrong: those NULLs are game indices 98-102 and 123, which no terrain type references.",
+    "mesh": null,
+    "model_index": null
+  },
+  "TC04": {
+    "confidence": "none",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; this type registers NO model index in any theater. Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132). TC01..TC05 are the only types in that state: they are registered as real multi-cell terrain (occupy lists of 2,3,4,5 and 6 cells respectively, strength 600) but the N64 build ships no clump mesh for them, so there is nothing to draw. The earlier guess that they owned the NULL slots 108-112 and 133 was wrong: those NULLs are game indices 98-102 and 123, which no terrain type references.",
+    "mesh": null,
+    "model_index": null
+  },
+  "TC05": {
+    "confidence": "none",
+    "evidence": "LOOKED UP, not inferred. The TerrainTypeClass registration chain at ROM 0x018CE30 names all 32 terrain types (string pool 0x169668) and stores a model index in three per-theater fields; this type registers NO model index in any theater. Model index -> work/table.json slot needs +10, because the game's array base is RAM 0x80099A38 (the init loop at ROM 0x00571D8 walks 219 16-byte records from there) while table.json was enumerated ten records earlier at 0x80099998. The bias is corroborated at both ends: ROCK1..ROCK7 land exactly on the seven boulder meshes (slots 134-140, bracketed by NULL slots 133 and 141) and SPLIT2/SPLIT3 land exactly on the one golden-crowned blossom tree (slot 132). TC01..TC05 are the only types in that state: they are registered as real multi-cell terrain (occupy lists of 2,3,4,5 and 6 cells respectively, strength 600) but the N64 build ships no clump mesh for them, so there is nothing to draw. The earlier guess that they owned the NULL slots 108-112 and 133 was wrong: those NULLs are game indices 98-102 and 123, which no terrain type references.",
+    "mesh": null,
+    "model_index": null
+  },
+  "TMPL": {
+    "confidence": "high",
+    "dl_rom": "0x00D4158",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=0 so model_index=10. Shape check: slot 10 is a cluster of tall spiky spires on a base: the Temple of Nod, the most distinctive silhouette in the set.",
+    "mesh": "dl_00D4158",
+    "model_index": 10,
+    "segment": "ScriptModels",
+    "tris": 101,
+    "type_id": 0
+  },
+  "TRAN": {
+    "confidence": "high",
+    "dl_rom": "0x00D5698",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=41 so model_index=51. Shape check: slot 51 is a bulky rounded rotorcraft fuselage with a stubby tail: the Chinook transport.",
+    "mesh": "dl_00D5698",
+    "model_index": 51,
+    "segment": "ScriptModels",
+    "tris": 73,
+    "type_id": 41
+  },
+  "V01": {
+    "confidence": "high",
+    "dl_rom": "0x011D950",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=45 so model_index=55. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_011D950",
+    "model_index": 55,
+    "segment": "GameModelsGeometry",
+    "tris": 22,
+    "type_id": 45
+  },
+  "V02": {
+    "confidence": "high",
+    "dl_rom": "0x011DE00",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=46 so model_index=56. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_011DE00",
+    "model_index": 56,
+    "segment": "GameModelsGeometry",
+    "tris": 24,
+    "type_id": 46
+  },
+  "V03": {
+    "confidence": "high",
+    "dl_rom": "0x011E498",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=47 so model_index=57. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_011E498",
+    "model_index": 57,
+    "segment": "GameModelsGeometry",
+    "tris": 31,
+    "type_id": 47
+  },
+  "V04": {
+    "confidence": "high",
+    "dl_rom": "0x011EA60",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=48 so model_index=58. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_011EA60",
+    "model_index": 58,
+    "segment": "GameModelsGeometry",
+    "tris": 18,
+    "type_id": 48
+  },
+  "V05": {
+    "confidence": "high",
+    "dl_rom": "0x011F080",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=49 so model_index=59. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_011F080",
+    "model_index": 59,
+    "segment": "GameModelsGeometry",
+    "tris": 32,
+    "type_id": 49
+  },
+  "V06": {
+    "confidence": "high",
+    "dl_rom": "0x011F7C8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=50 so model_index=60. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_011F7C8",
+    "model_index": 60,
+    "segment": "GameModelsGeometry",
+    "tris": 32,
+    "type_id": 50
+  },
+  "V07": {
+    "confidence": "high",
+    "dl_rom": "0x011FEA8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=51 so model_index=61. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_011FEA8",
+    "model_index": 61,
+    "segment": "GameModelsGeometry",
+    "tris": 26,
+    "type_id": 51
+  },
+  "V08": {
+    "confidence": "high",
+    "dl_rom": "0x01202D8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=52 so model_index=62. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01202D8",
+    "model_index": 62,
+    "segment": "GameModelsGeometry",
+    "tris": 13,
+    "type_id": 52
+  },
+  "V09": {
+    "confidence": "high",
+    "dl_rom": "0x01207B8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=53 so model_index=63. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01207B8",
+    "model_index": 63,
+    "segment": "GameModelsGeometry",
+    "tris": 25,
+    "type_id": 53
+  },
+  "V10": {
+    "confidence": "high",
+    "dl_rom": "0x0120BD0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=54 so model_index=64. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0120BD0",
+    "model_index": 64,
+    "segment": "GameModelsGeometry",
+    "tris": 13,
+    "type_id": 54
+  },
+  "V11": {
+    "confidence": "high",
+    "dl_rom": "0x01210A0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=55 so model_index=65. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01210A0",
+    "model_index": 65,
+    "segment": "GameModelsGeometry",
+    "tris": 25,
+    "type_id": 55
+  },
+  "V12": {
+    "confidence": "high",
+    "dl_rom": "0x0121798",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=56 so model_index=66. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0121798",
+    "model_index": 66,
+    "segment": "GameModelsGeometry",
+    "tris": 30,
+    "type_id": 56
+  },
+  "V13": {
+    "confidence": "high",
+    "dl_rom": "0x0121AD8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=57 so model_index=67. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0121AD8",
+    "model_index": 67,
+    "segment": "GameModelsGeometry",
+    "tris": 15,
+    "type_id": 57
+  },
+  "V14": {
+    "confidence": "high",
+    "dl_rom": "0x0121CF8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=58 so model_index=68. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0121CF8",
+    "model_index": 68,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 58
+  },
+  "V15": {
+    "confidence": "high",
+    "dl_rom": "0x0122028",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=59 so model_index=69. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0122028",
+    "model_index": 69,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 59
+  },
+  "V16": {
+    "confidence": "high",
+    "dl_rom": "0x0122390",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=60 so model_index=70. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0122390",
+    "model_index": 70,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 60
+  },
+  "V17": {
+    "confidence": "high",
+    "dl_rom": "0x01226D0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=61 so model_index=71. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01226D0",
+    "model_index": 71,
+    "segment": "GameModelsGeometry",
+    "tris": 10,
+    "type_id": 61
+  },
+  "V18": {
+    "confidence": "high",
+    "dl_rom": "0x0122A78",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=62 so model_index=72. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0122A78",
+    "model_index": 72,
+    "segment": "GameModelsGeometry",
+    "tris": 12,
+    "type_id": 62
+  },
+  "V19": {
+    "confidence": "high",
+    "dl_rom": "0x0123D20",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=63 so model_index=73. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0123D20",
+    "model_index": 73,
+    "segment": "GameModelsGeometry",
+    "tris": 47,
+    "type_id": 63
+  },
+  "V20": {
+    "confidence": "high",
+    "dl_rom": "0x01244C0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=64 so model_index=74. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01244C0",
+    "model_index": 74,
+    "segment": "GameModelsGeometry",
+    "tris": 31,
+    "type_id": 64
+  },
+  "V21": {
+    "confidence": "high",
+    "dl_rom": "0x0124C98",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=65 so model_index=75. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0124C98",
+    "model_index": 75,
+    "segment": "GameModelsGeometry",
+    "tris": 38,
+    "type_id": 65
+  },
+  "V22": {
+    "confidence": "high",
+    "dl_rom": "0x01252B0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=66 so model_index=76. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01252B0",
+    "model_index": 76,
+    "segment": "GameModelsGeometry",
+    "tris": 18,
+    "type_id": 66
+  },
+  "V23": {
+    "confidence": "high",
+    "dl_rom": "0x0125688",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=67 so model_index=77. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0125688",
+    "model_index": 77,
+    "segment": "GameModelsGeometry",
+    "tris": 17,
+    "type_id": 67
+  },
+  "V24": {
+    "confidence": "high",
+    "dl_rom": "0x0125CE8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=68 so model_index=78. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0125CE8",
+    "model_index": 78,
+    "segment": "GameModelsGeometry",
+    "tris": 41,
+    "type_id": 68
+  },
+  "V25": {
+    "confidence": "high",
+    "dl_rom": "0x0126860",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=69 so model_index=79. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0126860",
+    "model_index": 79,
+    "segment": "GameModelsGeometry",
+    "tris": 43,
+    "type_id": 69
+  },
+  "V26": {
+    "confidence": "high",
+    "dl_rom": "0x01270B0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=70 so model_index=80. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01270B0",
+    "model_index": 80,
+    "segment": "GameModelsGeometry",
+    "tris": 26,
+    "type_id": 70
+  },
+  "V27": {
+    "confidence": "high",
+    "dl_rom": "0x01275F8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=71 so model_index=81. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_01275F8",
+    "model_index": 81,
+    "segment": "GameModelsGeometry",
+    "tris": 22,
+    "type_id": 71
+  },
+  "V28": {
+    "confidence": "high",
+    "dl_rom": "0x0127AC0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=72 so model_index=82. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0127AC0",
+    "model_index": 82,
+    "segment": "GameModelsGeometry",
+    "tris": 14,
+    "type_id": 72
+  },
+  "V29": {
+    "confidence": "high",
+    "dl_rom": "0x0127EE0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=73 so model_index=83. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0127EE0",
+    "model_index": 83,
+    "segment": "GameModelsGeometry",
+    "tris": 14,
+    "type_id": 73
+  },
+  "V30": {
+    "confidence": "high",
+    "dl_rom": "0x0128550",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=74 so model_index=84. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0128550",
+    "model_index": 84,
+    "segment": "GameModelsGeometry",
+    "tris": 28,
+    "type_id": 74
+  },
+  "V31": {
+    "confidence": "high",
+    "dl_rom": "0x0128D38",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=75 so model_index=85. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0128D38",
+    "model_index": 85,
+    "segment": "GameModelsGeometry",
+    "tris": 53,
+    "type_id": 75
+  },
+  "V32": {
+    "confidence": "high",
+    "dl_rom": "0x0129550",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=76 so model_index=86. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0129550",
+    "model_index": 86,
+    "segment": "GameModelsGeometry",
+    "tris": 34,
+    "type_id": 76
+  },
+  "V33": {
+    "confidence": "high",
+    "dl_rom": "0x0129EE0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=77 so model_index=87. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_0129EE0",
+    "model_index": 87,
+    "segment": "GameModelsGeometry",
+    "tris": 51,
+    "type_id": 77
+  },
+  "V34": {
+    "confidence": "high",
+    "dl_rom": "0x012A5F8",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=78 so model_index=88. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_012A5F8",
+    "model_index": 88,
+    "segment": "GameModelsGeometry",
+    "tris": 17,
+    "type_id": 78
+  },
+  "V35": {
+    "confidence": "high",
+    "dl_rom": "0x012AA88",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=79 so model_index=89. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_012AA88",
+    "model_index": 89,
+    "segment": "GameModelsGeometry",
+    "tris": 17,
+    "type_id": 79
+  },
+  "V36": {
+    "confidence": "high",
+    "dl_rom": "0x012AF18",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=80 so model_index=90. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_012AF18",
+    "model_index": 90,
+    "segment": "GameModelsGeometry",
+    "tris": 17,
+    "type_id": 80
+  },
+  "V37": {
+    "confidence": "high",
+    "dl_rom": "0x012B828",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=81 so model_index=91. This block (V01..V37 -> 55..91) is the calibration that fixed the +10 offset: the 37 civilian type_ids 45..81 are consecutive and land exactly on the 37-slot civilian block that had already been identified by shape.",
+    "mesh": "dl_012B828",
+    "model_index": 91,
+    "segment": "GameModelsGeometry",
+    "tris": 56,
+    "type_id": 81
+  },
+  "WEAP": {
+    "confidence": "high",
+    "dl_rom": "0x0147DC0",
+    "evidence": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. type_id=2 so model_index=12.",
+    "mesh": "dl_0147DC0",
+    "model_index": 12,
+    "segment": "GameModelsGeometry",
+    "tris": 109,
+    "type_id": 2
+  },
+  "WOOD": {
+    "confidence": "high",
+    "dl_rom": "0x0112FE8",
+    "evidence": "model-table slot 188. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_0112FE8",
+    "model_index": 188
+  },
+  "WOODS0": {
+    "confidence": "high",
+    "dl_rom": "0x0113600",
+    "evidence": "model-table slot 192. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0113600",
+    "model_index": 192
+  },
+  "WOODS1": {
+    "confidence": "high",
+    "dl_rom": "0x0113B20",
+    "evidence": "model-table slot 193. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0113B20",
+    "model_index": 193
+  },
+  "WOODS10": {
+    "confidence": "high",
+    "dl_rom": "0x0113750",
+    "evidence": "model-table slot 202. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0113750",
+    "model_index": 202
+  },
+  "WOODS2": {
+    "confidence": "high",
+    "dl_rom": "0x0114070",
+    "evidence": "model-table slot 194. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0114070",
+    "model_index": 194
+  },
+  "WOODS3": {
+    "confidence": "high",
+    "dl_rom": "0x01141D0",
+    "evidence": "model-table slot 195. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_01141D0",
+    "model_index": 195
+  },
+  "WOODS4": {
+    "confidence": "high",
+    "dl_rom": "0x01138B0",
+    "evidence": "model-table slot 196. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_01138B0",
+    "model_index": 196
+  },
+  "WOODS5": {
+    "confidence": "high",
+    "dl_rom": "0x0114330",
+    "evidence": "model-table slot 197. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0114330",
+    "model_index": 197
+  },
+  "WOODS6": {
+    "confidence": "high",
+    "dl_rom": "0x0113A00",
+    "evidence": "model-table slot 198. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0113A00",
+    "model_index": 198
+  },
+  "WOODS7": {
+    "confidence": "high",
+    "dl_rom": "0x0113DC0",
+    "evidence": "model-table slot 199. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0113DC0",
+    "model_index": 199
+  },
+  "WOODS8": {
+    "confidence": "high",
+    "dl_rom": "0x0113C70",
+    "evidence": "model-table slot 200. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0113C70",
+    "model_index": 200
+  },
+  "WOODS9": {
+    "confidence": "high",
+    "dl_rom": "0x0113F10",
+    "evidence": "model-table slot 201. Wall SHADOW art: flat (all vertices within a few model units of y=0), no height, drawn in the blended shadow pass. See tools/romdump/wall_models_notes.md.",
+    "kind": "wall",
+    "mesh": "dl_0113F10",
+    "model_index": 201
+  },
+  "WOOD_L": {
+    "confidence": "high",
+    "dl_rom": "0x01134A0",
+    "evidence": "model-table slot 189. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_01134A0",
+    "model_index": 189
+  },
+  "WOOD_T": {
+    "confidence": "high",
+    "dl_rom": "0x0113300",
+    "evidence": "model-table slot 190. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_0113300",
+    "model_index": 190
+  },
+  "WOOD_X": {
+    "confidence": "high",
+    "dl_rom": "0x0113160",
+    "evidence": "model-table slot 191. Wall art, settled by RENDERING every candidate slot textured off the ROM (sandbag stacks, chain-link X-braces, concrete blocks, barbed strands, wooden rails are each unmistakable) and by ground-footprint geometry: each wall type is a FOUR-mesh rotatable set, base+0 straight (spans x only, east-west), +1 an L joining EAST and SOUTH, +2 a T joining WEST-EAST-SOUTH, +3 a cross. See tools/romdump/wall_models_notes.md. The old 93-97 guess was wrong: those slots are the proven BULLET meshes (DRAGON/MISSILE/BOMBLET, 120MM, ATOMICUP), which is why a naive lookup drew missiles standing on end.",
+    "kind": "wall",
+    "mesh": "dl_0113160",
+    "model_index": 191
+  },
+  "_meta": {
+    "_note": "CNC3D N64 type-code -> mesh mapping. Meshes are OBJs in share/CNC3D/assets/models_table/, named dl_<ROMoffset>.",
+    "counts": {
+      "high": 182,
+      "low": 1,
+      "none": 5
+    },
+    "gfx_delta": "ROM_offset = RAM_addr - 0x8005C590 for GameModelsGeometry (ROM 0x00FE210 -> RAM 0x8015A7A0)",
+    "method": "code-derived. The game keeps ONE unified object-type enum shared by structures, units, aircraft and civilian buildings, and model_index = type_id + 10. Structures read their type_id straight out of a static 64-record array in the CodeOverlay (records 0xAC bytes, name inline, type_id is the byte 5 before the name, first record TMPL at ROM 0x165FDC). Units and aircraft get theirs as the first stack argument (sp+0x10) to their type-class constructors: UnitTypeClass ctor 0x801E92F0 called 16x from ROM 0x18B8A8, AircraftTypeClass ctor 0x801F3C70 called 5x from ROM 0x196058. Verified by rendering every slot from four angles; see work/vmap_struct2.png, work/vmap_units2.png, work/angles.png, work/angles2.png.",
+    "negative_results": [
+      "Spawn_Model at RAM 0x8004BB9C is NOT the unit path and is a dead end for this mapping. Whole-ROM scans: the model table 0x80099998 has exactly 2 code references (Spawn_Model's index at ROM 0x004C7CC and an init loop at 0x0057160); there are exactly 7 jal sites to Spawn_Model, all with constant indices 1,3,4,5,6,7,8,9; and there are ZERO literal function pointers to it, so it is never called indirectly. Spawn_Model only ever places menu/intro models.",
+      "The unit ctor argument at sp+0x14 looks like a model index (32-49, with 255 for MHQ/LST/BOAT/A10/C17) but is NOT one: it fails the pixel test, since it puts models at empty slots 34/35/49 and claims A10 has no model when slot 50 is plainly an A-10. It is a cameo/build-list index; 255 means 'not buildable'.",
+      "There is no type->modelIndex lookup ARRAY anywhere in the ROM. A whole-ROM scan for an ascending byte run 55..91 (any stride) and 134..140 returns nothing usable. The mapping is arithmetic (id+10), not a table.",
+      "CodeOverlay (ROM 0x01643F0-0x01B67D0) contains ZERO data pointers and zero lui/addiu-built addresses into GameModelsGeometry, so the string pools next to 0x1690D0 are not adjacent to any model pointer table.",
+      "GAME_STATE_LAYERS-style scene graph in the tail of GameModelsGeometry (class tags CAFEDEAD/DEADCAFE/BEEFED02/FEEB000n at 0x800AC2C0..0x800AC3A0) is a serialized object graph, but it carries no names.",
+      "The second table at 0x80099750 (29 entries) is the UI cursor set (arrows, wrench, Nod logo, dollar sign), not turrets.",
+      "The earlier tree mapping (T01=113..T18=130, SPLIT2=131) was off by one from T09 onward because it assumed the tree ids were contiguous. Id 111 is skipped, so T09 starts at slot 122 and SPLIT2 shares slot 132 with SPLIT3 rather than owning 131. The visual anchors (rock block, golden crown) could not detect that, since the mis-assigned slots hold look-alike trees."
+    ],
+    "segments_note": "Nine of these models live in the ScriptModels segment (RAM 0x80122B60-0x801360E0, ROM = RAM - 0x8005BCC0), not GameModelsGeometry: TMPL, FACT, SAM, FTNK, STNK, HTNK, BOAT, TRAN, ORCA. They are exactly the models with moving parts. Earlier passes used 0x80130830 as the end of ScriptModels, which is wrong (that is ReplayMission's RAM base); with the correct bound these nine stop rendering blank.",
+    "table_blocks": {
+      "0-9": "menu / intro models. Confirmed independently: these are the ONLY indices Spawn_Model (RAM 0x8004BB9C) is ever called with (constants 1,3,4,5,6,7,8,9 at ROM 0x004ED74-0x004EE54). This is why the unified type enum is offset by +10.",
+      "10-33": "combat structures TMPL..MISS (type_id 0-23) - RESOLVED",
+      "108-112": "NULL (game type ids 98-102). Unclaimed: no terrain, structure, unit or civilian type registers these. They are NOT the tree clumps.",
+      "113-132": "terrain trees, RESOLVED by lookup. TerrainTypeClass registration chain at ROM 0x018CE30: T01..T08 = ids 103-110 (slots 113-120), T09..T18 = ids 112-121 (slots 122-131), SPLIT2 and SPLIT3 BOTH = id 122 (slot 132, the blossom tree). Id 111 / slot 121 is unclaimed. Only 8 distinct tree meshes exist and the ROM's own record array repeats their 8 Gfx pointers with period 8 from slot 113, so T01/T16, T02/T09/T17, T03/T10/T18 etc. share a mesh. That repetition is read out of the ROM, not synthesised by the exporter.",
+      "133": "NULL (game type id 123). Unclaimed, and it bounds the rock block.",
+      "134-140": "ROCK1..ROCK7 = ids 124-130, CONFIRMED by the same registration chain. Desert only.",
+      "142-152": "flat green tiberium overlay quads",
+      "34-54": "vehicles + aircraft FTNK..C17 (type_id 24-44) - RESOLVED",
+      "55-91": "civilian buildings V01..V37 (type_id 45-81) - CONFIRMED, and the calibration for the +10 offset",
+      "92-97": "ROAD + the 5 wall types (SBAG/CYCL/BRIK/BARB/WOOD). NOT part of the unified enum: their records store 232-236, which is out of table range, consistent with walls being drawn as terrain overlays.",
+      "98-107": "placeholder cubes / misc"
+    },
+    "terrain_lookup": {
+      "TC01_TC05": "registered as real multi-cell terrain (occupy lists of 2,3,4,5,6 cells; strength 600) but with NO model index in ANY theater. The N64 build ships no tree-clump mesh, so there is nothing to draw and they stay fallbacks. This is a property of the ROM, not a gap in the dump.",
+      "bias": "slot = id + 10, the same +10 that already applied to structures, vehicles and civilians. Independently re-confirmed here: the init loop at ROM 0x00571D8 walks 219 16-byte records from RAM 0x80099A38, which is exactly ten records past the 0x80099998 that work/table.json was enumerated from.",
+      "model_index_fields": "three ints at sp+0x38 / sp+0x3C / sp+0x40 = the per-theater model index (desert / temperate / winter), -1 where the type does not exist in that theater. Where more than one is set they always hold the SAME index, so one mesh serves all theaters. ROCK1-7 and T04/T09/T18 are desert-only; T08 and SPLIT3 exist in all three. That matches Tiberian Dawn.",
+      "source": "TerrainTypeClass registration chain, ROM 0x018CE30-0x018DE00, 32 calls to 0x801EAC0C, one per terrain type.",
+      "string_pool": "ROM 0x169668 (CodeOverlay, RAM 0x801C7878): T01..T18, SPLIT2, SPLIT3, TC01..TC05, ROCK1..ROCK7 - 32 names, all 32 materialised by lui/addiu inside the chain, one block each."
+    },
+    "unresolved": [
+      "Model slots 18 and 20 (type_id 8 and 10) are real geometry but no named record claims them. They sit immediately after FACT (id 7) and PROC (id 9), so they are most likely secondary/animated parts of those two buildings. Slot 18 is a single degenerate green triangle; slot 20 is a set of scattered angular pieces. NOT named.",
+      "Model slot 39 is an orphan: a plain box truck left unclaimed because MHQ aliases to APC's id 38. NOT named."
+    ],
+    "wall_and_cursor_note": "Added. 54 wall/shadow entries (SBAG/CYCL/BRIK/BARB/WOOD bodies 153-156/161-164/176-179/184-187/188-191, BRIK damaged 206-209, SBAG+BRIK shadow 4-sets 157-160/180-183, CYCL+WOOD 11-piece shadow sets 165-175/192-202) and the 14 N64 CURSOR models CUR00..CUR0D. The five keys SBAG/CYCL/BRIK/BARB/WOOD were RETARGETED: they used to alias the bullet meshes dl_01051A0 / dl_0102848 / dl_0100250, so a renderer looking a wall up by name got a missile. The cursor entries carry node_ram instead of model_index because the cursor models are not in the model table at all -- see tools/bakery/objgraph2.py cursor_node. Slot->DL was read from the ROM by objgraph2.display_lists, never typed by hand, and every mesh was rendered and looked at before landing. See tools/romdump/wall_models_notes.md."
+  },
+  "APCDOOR": {
+    "confidence": "high",
+    "dl_rom": "0x014A500",
+    "kind": "door",
+    "mesh": "dl_014A500",
+    "model_index": 203,
+    "evidence": "Code-derived. The APC's draw arm (resident ROM 0x0014BD4 / RAM 0x80013FD4) tests UnitType == 5 -- APC, read off the cartridge's own sixteen UnitTypeClass ctor calls at ROM 0x18B9EC..0x18C8D8 -- calls DoorClass::Door_Stage() at RAM 0x801D3C70 and issues a SECOND model command with model index 193 (ROM 0x0014BEC) before drawing the hull at the same position and yaw. 193 plus the +10 bias is model-table slot 203. Geometry corroborates: the child quad (+-107, 25.4, -259.2)-(+-107, 176.4, -271.2) is the APC hull's own rear face inset about 6.5 units and standing 13-15 proud, and its 16x16 CI8 texture at ROM 0x0F9D30 is used by no other slot in the ROM."
+  },
+  "TRANRMP": {
+    "confidence": "high",
+    "dl_rom": "0x00D5FB0",
+    "kind": "door",
+    "mesh": "dl_00D5FB0",
+    "model_index": 204,
+    "evidence": "Code-derived. The transport-helicopter draw arm (CodeOverlay ROM 0x0182358 / RAM 0x801E0568) gates on AircraftType == 0 -- TRAN, from the five AircraftTypeClass ctor calls at ROM 0x196164..0x1964AC -- calls Door_Stage() and issues model index 194 (ROM 0x0182360) before drawing the hull. 194 plus 10 is slot 204. The child quad fills the Chinook's tail under-slope."
+  }
+}

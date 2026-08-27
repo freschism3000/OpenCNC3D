@@ -1,0 +1,88 @@
+; ---------------------------------------------------------------------------------------
+; regression.script -- the standing Windows 98 / Voodoo 2 regression.
+;
+; Copy it beside w98glide.exe AS input.script and run:
+;
+;     w98glide.exe 4000            with sound
+;     w98glide.exe 4000 recwav     record the mix to mix.wav instead of playing it
+;
+; Every screenshot it takes is a thing that has broken at least once. Read them; a pass
+; that draws nothing looks exactly like a pass that is switched off.
+; ---------------------------------------------------------------------------------------
+
+; --- the TITLE SCREEN, which the game now boots to. Everything after this is offset by
+;     the menu click, so the frame numbers below moved when the menu landed.
+20    shot r00_menu.bmp
+30    move 320 100
+34    lb 1
+44    lb 0
+; --- the briefing movie plays next. Let a few frames of it run, photograph it, then
+;     skip it the way a player would.
+120   shot r00b_briefing.bmp
+150   key SPACE 3
+
+; --- the opening frame: HUD chassis, radar plate, empty wells, shroud over an unexplored map
+200   shot r01_start.bmp
+
+; --- select the MCV and deploy it. The engine decides what "the default action here"
+;     means, and for an MCV on its own cell that is deploy.
+230    move 340 150
+232    lb 1
+240    lb 0
+270   key D 3
+570   shot r02_deployed.bmp
+
+; --- click the first build cameo. The cell should show the cameo under a build clock,
+;     the credits should start falling and the power meter should light.
+600   move 528 232
+604   lb 1
+612   lb 0
+870   shot r03_building.bmp
+
+; --- hover REPAIR, then SELL, then the scroll arrows: every control has a hover frame
+;     and the bar only recomposes when one of them changes.
+910   move 514 195
+950   shot r04_hover_repair.bmp
+970   move 568 195
+1010   shot r05_hover_sell.bmp
+
+; --- the minimap. Clicking it moves the camera, which is the only quick way across a
+;     64 cell map with no edge scroll.
+1050   move 550 90
+1054   lb 1
+1062   lb 0
+1110   shot r06_radar_click.bmp
+
+; --- a band select over the field, then a right-click order.
+1170  move 260 150
+1174  lb 1
+1190  move 400 260
+1210  shot r07_band.bmp
+1230  lb 0
+1270  move 200 300
+1274  rb 1
+1282  rb 0
+1370  shot r08_ordered.bmp
+
+; --- scroll hard in every direction and through the zoom range. This is the pattern
+;     that wedged the card twice; it must survive it.
+1420  key LEFT 90
+1520  key UP 90
+1620  key RIGHT 120
+1750  key DOWN 120
+1880  key LEFT 60
+1950  key PGUP 2
+1990  key PGDN 2
+2070  shot r09_scrolled.bmp
+
+; --- back to the base and let the mission run: sound events, tiberium growth, the AI.
+2120  cam 56 56
+3570  shot r10_late.bmp
+
+; --- both mission-end banners. A scripted run cannot play a mission to its real end, so
+;     these are forced; the banner is still the engine's own art through the real path.
+3670  over 1
+3730  shot r11_won.bmp
+3770  over 0
+3830  shot r12_lost.bmp
+3870  quit

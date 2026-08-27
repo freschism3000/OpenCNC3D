@@ -1,0 +1,25 @@
+# G24: the MCV deploy rig. Deploy the SCG01EC MCV and shoot the clip at four points.
+# The camera must NOT be zoomed: the deploy order is a right-click on the MCV's own
+# cell, and a changed pitch moves that screen point onto the next cell (which is a
+# MOVE, and the gate then proves nothing).
+tick 2
+player
+cam 57 49
+shot mcvrig_0_pre.png
+lclickobj MCV 0
+expectsel 1
+order 57 49
+tick 22
+echo MCVRIG-GATE-DEPLOYED
+objdump
+shot mcvrig_1_early.png
+tick 12
+shot mcvrig_2_mid.png
+tick 40
+echo MCVRIG-GATE-LATE
+shot mcvrig_3_late.png
+tick 30
+echo MCVRIG-GATE-DONE
+objdump
+shot mcvrig_4_yard.png
+quit

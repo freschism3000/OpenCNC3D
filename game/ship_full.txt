@@ -1,0 +1,209 @@
+# r030 ship self-play, SCG01EC: the whole loop in one run.
+# Order matters: the EC sandbox's Nod guns start chewing the base early, so the
+# MTNK is built first (like finale.txt) while the WEAP is still standing; then
+# deploy MCV -> build+place NUKE -> produce E1 -> SELL the PYLE -> drive the
+# tank with the turret tracking on the move -> kill a Nod GUN with the
+# cartridge explosion art.
+tick 2
+sidebar BOOT
+player
+cam 55 49
+shot full1_boot.png
+# ---- 1. war factory unit first: medium tank, before the WEAP takes fire
+build MTNK
+ready MTNK 4000
+tick 80
+echo TANK-OUT
+objdump
+# ---- 2. deploy the MCV into a second construction yard
+lclickobj MCV 0
+expectsel 1
+order 57 49
+tick 120
+echo AFTER-DEPLOY
+objdump
+cam 56 49
+shot full2_deployed.png
+# ---- 3. structure: NUKE power plant, build -> ready -> place
+build NUKE
+ready NUKE 4000
+startplace NUKE
+place auto
+tick 40
+echo AFTER-NUKE
+objdump
+shot full3_nuke.png
+# ---- 4. unit: minigunner from the barracks, real cameo click
+sbitem E1
+sbclickitem E1
+sidebar E1STARTED
+tick 200
+echo AFTER-E1
+objdump
+shot full4_e1.png
+player
+# ---- 5. SELL the barracks (E1 already produced, we no longer need it)
+cam 53 48
+sbclick 1176 310
+lclickobj PYLE
+tick 60
+echo SELLING
+objdump
+shot full5_selling.png
+player
+tick 200
+echo AFTER-SELL
+player
+objdump
+shot full6_sold.png
+sbclick 1176 310
+# ---- 6. drive the tank out southeast, hull on the motion vector
+cam 50 48
+lclickobj MTNK 0
+expectsel 1
+order 55 52
+tick 16
+facedump
+tick 16
+facedump
+shot full7_drive.png
+tick 16
+facedump
+# ---- 7. attack a Nod GUN while still displacing: turret leads onto the
+#         target (tface) while the hull keeps the path facing (face)
+orderobj GUN:BadGuy 0
+tick 10
+facedump
+seldump
+tick 10
+facedump
+seldump
+shot full8_track.png
+tick 10
+facedump
+tick 30
+facedump
+echo APPROACH
+objdump
+tick 60
+facedump
+efxdump
+cam 45 53
+tick 60
+efxdump
+tick 30
+efxdump
+tick 30
+efxdump
+echo GUNFIGHT
+objdump
+tick 30
+efxdump
+cam 42 54
+shot full9_boom.png
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+echo GUNCHECK
+objdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 3
+efxdump
+cam 42 55
+shot full9b_deathblast.png
+tick 27
+efxdump
+shot full9c_hitflash.png
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+echo GUNDEAD
+player
+objdump
+efxdump
+look MTNK 0
+shot full10_after.png
+expectefx FRAG1 1
+expectdeath 1
+quit

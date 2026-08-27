@@ -1,0 +1,126 @@
+# The refinery's SECOND draw command. PROC's arm is the only one in the cartridge's table
+# that emits two models: the refinery itself, whose own tracks are flat, and slot 20, a
+# 6-node rig with its own one-shot clip, for the middle of the engine's refinery animation.
+# Harvesting on the test map must reach those stages and put the rig on screen, and must
+# NOT draw it during idle or the flashing-lights FULL phase.
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+tick 60
+anims
+quit

@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CNC3D mission editor</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#151b24; --panel2:#1c2430; --panel3:#242e3c;
+  --line:#2a3543; --line2:#374557;
+  --ink:#d5dee9; --dim:#96a1ad; --dimmer:#7f8d9e; --faint:#5f6c7b;
+  --gold:#e0b070; --cyan:#8fe4ff; --green:#7ee0a0;
+  --danger:#ff6a5a; --ok:#5ad46a;
+  --mode:#e0b070;                     /* recoloured per edit mode */
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --ui:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font:12px/1.4 var(--mono);
+     -webkit-font-smoothing:antialiased}
+svg{display:block}
+.ic{width:20px;height:20px;stroke:currentColor;stroke-width:1.8;fill:none;
+    stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.ic.f{fill:currentColor;stroke:none}
+.ic.s24{width:24px;height:24px;stroke-width:1.5}
+.ic.s16{width:16px;height:16px;stroke-width:2.25}
+.ic.s14{width:14px;height:14px;stroke-width:2.55}
+.ic.s12{width:12px;height:12px;stroke-width:3}
+
+/* ============ metal bevel, the one borrowed texture ============ */
+.bev{box-shadow:inset 0 1px 0 rgba(255,255,255,.075),
+                inset -1px 0 0 rgba(0,0,0,.42),
+                inset 0 -1px 0 rgba(0,0,0,.55),
+                inset 1px 0 0 rgba(255,255,255,.028)}
+.hatch{background-image:repeating-linear-gradient(45deg,
+        rgba(255,255,255,.016) 0 2px, transparent 2px 6px)}
+
+#app{display:grid;grid-template-rows:48px minmax(0,1fr);height:100%}
+
+/* ================= top strip ================= */
+#top{display:flex;align-items:center;gap:14px;padding:0 12px 0 14px;
+     background:linear-gradient(#1a222d,#121820);border-bottom:1px solid #000;
+     box-shadow:0 1px 0 rgba(255,255,255,.05) inset}
+.mark{display:flex;align-items:center;gap:8px;color:var(--gold);letter-spacing:.16em;
+      font-size:11px;font-weight:600}
+.mark .sub{color:var(--dimmer);letter-spacing:.14em;font-weight:400}
+.vr{width:1px;height:26px;background:var(--line);flex:0 0 1px}
+.mapchip{display:flex;align-items:center;gap:10px;height:30px;padding:0 8px 0 10px;
+  background:var(--panel2);border:1px solid var(--line2);border-radius:4px;cursor:pointer}
+.mapchip:hover{border-color:#4a5c72;background:var(--panel3)}
+.mapchip .id{color:var(--gold);font-size:13px;letter-spacing:.06em}
+.mapchip .nm{color:var(--ink);font-style:italic;font-family:var(--ui);font-size:12px}
+.mapchip .mt{color:var(--dim);font-size:11px}
+.mapchip .car{color:var(--dim)}
+.dotside{width:7px;height:7px;border-radius:50%;background:var(--gold);
+  box-shadow:0 0 0 2px rgba(224,176,112,.18)}
+#top .right{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--dim);font-size:11px}
+.save-state{display:flex;align-items:center;gap:6px;color:var(--ok)}
+.pill{border:1px solid var(--line);border-radius:3px;padding:3px 7px;color:var(--dim);font-size:10px;
+  letter-spacing:.08em}
+
+/* ================= body ================= */
+#body{display:flex;min-height:0;min-width:0;overflow:hidden}
+
+/* ---------------- left tool rail ---------------- */
+#rail{width:56px;flex:0 0 56px;background:linear-gradient(90deg,#141a23,#101620);
+  border-right:1px solid #05080c;display:flex;flex-direction:column;align-items:center;
+  padding:8px 0;gap:2px}
+.tool{width:42px;height:42px;border-radius:5px;display:grid;place-items:center;
+  color:var(--dim);position:relative;cursor:pointer;background:transparent;border:1px solid transparent}
+.tool:hover{background:var(--panel2);color:var(--ink);border-color:var(--line)}
+.tool.on{background:var(--panel3);color:var(--mode);border-color:var(--mode);
+  box-shadow:0 0 0 1px rgba(0,0,0,.6), 0 0 16px -6px var(--mode)}
+.tool.on::before{content:"";position:absolute;left:-8px;top:9px;bottom:9px;width:3px;
+  border-radius:0 2px 2px 0;background:var(--mode)}
+.tool .kk{position:absolute;right:4px;bottom:2px;font-size:9px;color:var(--faint)}
+.tool.on .kk{color:var(--mode);opacity:.8}
+.railsep{width:26px;height:1px;background:var(--line);margin:7px 0}
+.railspacer{flex:1}
+
+/* ---------------- stage ---------------- */
+#stage{flex:1;min-width:0;display:flex;flex-direction:column}
+#view{flex:1;position:relative;overflow:hidden;
+  background:
+    radial-gradient(120% 90% at 50% 8%, #1b2735 0%, #121a25 42%, #0a0e14 100%);
+  border-top:2px solid var(--mode);border-left:1px solid #05080c}
+/* faint isometric suggestion of terrain */
+#iso{position:absolute;inset:-20%;opacity:.5;
+  background-image:
+    repeating-linear-gradient(27deg, rgba(143,228,255,.055) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(-27deg, rgba(143,228,255,.055) 0 1px, transparent 1px 26px);
+  mask-image:radial-gradient(58% 52% at 50% 46%, #000 30%, transparent 100%)}
+#horizon{position:absolute;left:0;right:0;top:0;height:150px;
+  background:linear-gradient(#0d1a26,rgba(13,26,38,0))}
+#terrainblob{position:absolute;left:50%;top:47%;width:820px;height:430px;
+  transform:translate(-50%,-50%) rotate(-27deg) skewX(20deg);
+  background:linear-gradient(150deg,#22303f,#1a2634 55%,#16202c);
+  border:1px solid rgba(143,228,255,.12);border-radius:2px;opacity:.75;
+  box-shadow:0 30px 60px -20px #000}
+#riverblob{position:absolute;left:50%;top:47%;width:820px;height:430px;
+  transform:translate(-50%,-50%) rotate(-27deg) skewX(20deg);opacity:.55}
+
+.vp-badge{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:9px;
+  background:rgba(10,14,20,.82);border:1px solid var(--mode);border-left-width:3px;
+  border-radius:4px;padding:6px 11px 6px 9px;backdrop-filter:blur(3px)}
+.vp-badge .m{color:var(--mode);letter-spacing:.18em;font-size:11px;font-weight:600}
+.vp-badge .o{color:var(--dim);font-size:11px}
+.vp-badge .o b{color:var(--ink);font-weight:400}
+.vp-note{position:absolute;right:14px;top:13px;color:var(--dimmer);font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase}
+.vp-nav{position:absolute;right:14px;bottom:14px;display:flex;gap:6px}
+.navbtn{width:32px;height:32px;border-radius:4px;background:rgba(16,22,30,.85);
+  border:1px solid var(--line2);color:var(--dim);display:grid;place-items:center}
+
+/* the ghost + the status card wired to it */
+#ghost-lo,#ghost-hi{position:absolute;left:452px;top:404px;width:186px;height:112px;
+  transform:rotate(-27deg) skewX(20deg);pointer-events:none}
+.gcell{position:absolute;width:60px;height:36px;border:1px solid}
+.gc-ok{background:rgba(90,212,106,.16);border-color:rgba(90,212,106,.7)}
+.gc-bad{background:rgba(255,106,90,.28);border-color:#ff6a5a;
+  box-shadow:0 0 0 1px rgba(255,106,90,.35)}
+#ghostbody{position:absolute;left:452px;top:352px;width:186px;height:120px;
+  transform:rotate(-27deg) skewX(20deg);
+  background:linear-gradient(160deg,rgba(224,176,112,.34),rgba(224,176,112,.10));
+  border:1px solid rgba(224,176,112,.85);border-bottom:none;
+  box-shadow:0 0 30px -6px rgba(224,176,112,.5)}
+#leader{position:absolute;left:566px;top:462px;width:1px;height:96px;
+  background:linear-gradient(var(--mode),rgba(224,176,112,.15))}
+#leader::after{content:"";position:absolute;left:-3px;top:-3px;width:7px;height:7px;
+  border-radius:50%;background:var(--mode)}
+#status{position:absolute;left:50%;bottom:18px;top:auto;
+  transform:translateX(-50%);width:min(560px,calc(100% - 32px));
+  background:rgba(9,13,18,.94);border:1px solid var(--mode);border-radius:5px;
+  padding:10px 12px;box-shadow:0 18px 42px -14px #000;backdrop-filter:blur(4px)}
+#status .l1{display:flex;align-items:center;gap:8px;font-size:13px}
+#status .l1 .nm{color:var(--gold);font-weight:600}
+#status .l1 .sz{color:var(--dim)}
+#status .l1 .bib{color:var(--dimmer);font-size:11px}
+#status .l2{margin-top:5px;color:var(--dim);font-size:12px;display:flex;gap:7px;
+  align-items:flex-start;line-height:1.45}
+#status .l3{margin-top:7px;padding-top:6px;border-top:1px solid var(--line);
+  color:var(--dimmer);font-size:10.5px;display:flex;gap:14px;white-space:nowrap}
+#status kbd{font:inherit;color:var(--dim);background:var(--panel2);border:1px solid var(--line);
+  border-radius:3px;padding:0 4px}
+
+/* ---------------- the view bar ---------------- */
+/* The bar wraps rather than clips. At 1280 it needs more width than it has, and
+   overflow:hidden silently amputated the whole vertical-scale group -- and, because
+   the class popup is positioned inside it, that too. */
+#viewbar{min-height:44px;flex:0 0 auto;display:flex;align-items:center;gap:8px;
+  flex-wrap:wrap;row-gap:4px;
+  padding:5px 10px;background:linear-gradient(#161d26,#10161e);border-top:1px solid #05080c;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.vlab{color:var(--dimmer);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;flex:0 0 auto}
+.seg4{display:flex;background:#0b1016;border:1px solid var(--line);border-radius:4px;padding:2px;gap:2px}
+.seg4 button{display:flex;align-items:center;gap:5px;background:none;border:none;border-radius:3px;
+  color:var(--dim);font:11px var(--mono);padding:4px 8px;cursor:pointer;white-space:nowrap}
+.seg4 button:hover{color:var(--ink)}
+.seg4 button.on{background:var(--panel3);color:var(--cyan);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px #0008}
+.vtog{display:flex;align-items:center;gap:5px;height:28px;padding:0 8px;border-radius:4px;
+  background:var(--panel);border:1px solid var(--line);color:var(--dim);cursor:pointer;
+  font-size:11px;white-space:nowrap;flex:0 0 auto}
+.vtog.io{padding:0;width:32px;justify-content:center;position:relative}
+.vtog.io .k{position:absolute;right:2px;bottom:0;font-size:8.5px;line-height:1.4;
+  margin:0;color:var(--faint)}
+.vtog.io.on .k{color:#6f9fb2}
+.vtog:hover{border-color:var(--line2);color:var(--ink)}
+.vtog.on{background:#17262f;border-color:#3c5f6e;color:var(--cyan)}
+.vtog .k{color:var(--dimmer);font-size:9.5px;margin-left:1px}
+.vtog.warn.on{background:#2a1c1c;border-color:#6b3c34;color:#ff9a8c}
+.vtog .cnt{color:var(--dimmer);font-variant-numeric:tabular-nums;font-size:10.5px}
+.haspop{position:relative}
+.pop{display:none;position:absolute;left:-4px;bottom:34px;z-index:40;
+  background:#101822;border:1px solid var(--line2);border-radius:5px;padding:7px;
+  box-shadow:0 -14px 40px -12px #000;width:250px}
+.haspop:hover .pop,.haspop.open .pop{display:block}
+.pop .ph{color:var(--faint);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  padding:0 2px 6px}
+.pop .pg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.pop .pc{display:flex;align-items:center;gap:6px;height:24px;padding:0 7px;border-radius:3px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:10.5px;
+  cursor:pointer}
+.pop .pc svg:first-child{opacity:0}
+.pop .pc.on{background:#17262f;border-color:#3c5f6e;color:var(--cyan)}
+.pop .pc.on svg:first-child{opacity:1}
+.pop .pc .gi{opacity:.75}
+.iogroup{display:flex;gap:3px;background:#0b1016;border:1px solid var(--line);
+  border-radius:4px;padding:2px}
+.iogroup .vtog{border-color:transparent;background:transparent;height:24px}
+.iogroup .vtog.on{background:var(--panel3);border-color:transparent;color:var(--cyan)}
+.scale{margin-left:auto;display:flex;align-items:center;gap:7px;flex:0 0 auto}
+.scale input{width:98px;accent-color:var(--cyan)}
+.scale .v{color:var(--cyan);font-variant-numeric:tabular-nums;width:32px;text-align:right}
+
+/* ================= the sidebar ================= */
+#side{width:400px;flex:0 0 400px;display:flex;flex-direction:column;gap:7px;padding:7px;
+  background:linear-gradient(#131922,#0e141c);border-left:1px solid #05080c;
+  box-shadow:inset 1px 0 0 rgba(255,255,255,.05)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:5px}
+.box.grow{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+body.browsing #modes,body.browsing .pane{display:none!important}
+.face{display:none;min-height:0}
+.face.on{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+
+/* --- map browser face --- */
+.srch{display:flex;align-items:center;gap:7px;margin:7px 7px 0;height:30px;padding:0 9px;
+  background:#0b1016;border:1px solid var(--line2);border-radius:4px;color:var(--dim)}
+.srch input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--ink);
+  font:12px var(--mono)}
+.srch input::placeholder{color:var(--faint)}
+.srch .hits{color:var(--gold);font-variant-numeric:tabular-nums;font-size:11px}
+.filters{padding:7px 7px 0;display:flex;flex-direction:column;gap:5px}
+.fgrp{display:flex;align-items:flex-start;gap:6px}
+.fgrp .fl{flex:0 0 46px;color:var(--faint);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;padding-top:6px}
+.fgrp .fw{flex:1;display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:flex;align-items:center;gap:5px;height:22px;padding:0 7px;border-radius:3px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:10.5px;
+  cursor:pointer;white-space:nowrap}
+.chip:hover{border-color:var(--line2);color:var(--ink)}
+.chip .n{color:var(--faint);font-size:9.5px;font-variant-numeric:tabular-nums}
+.chip.on{background:color-mix(in srgb,var(--gold) 18%,#131a24);border-color:var(--gold);color:var(--gold)}
+.chip.on .n{color:color-mix(in srgb,var(--gold) 62%,#000)}
+.chip .sd{width:6px;height:6px;border-radius:50%;background:var(--c,#8b949e)}
+.mlist{flex:1 1 auto;min-height:0;overflow-y:auto;margin:7px 7px 0;background:#0c1119;
+  border:1px solid var(--line);border-radius:4px}
+.mlist::-webkit-scrollbar{width:9px}
+.mlist::-webkit-scrollbar-thumb{background:#2c384a;border-radius:5px;border:2px solid #0c1119}
+.mhd{position:sticky;top:0;background:#111823;border-bottom:1px solid var(--line);
+  padding:4px 8px;color:var(--faint);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  display:flex;justify-content:space-between}
+.mrow{display:flex;align-items:center;gap:8px;height:25px;padding:0 8px;cursor:pointer;
+  border-bottom:1px solid #131a24}
+.mrow:hover{background:#141d29}
+.mrow .sd{width:7px;height:7px;border-radius:50%;background:var(--c);flex:0 0 7px}
+.mrow .mid{color:var(--ink);font-size:11px;letter-spacing:.05em;flex:0 0 76px}
+.mrow .mnm{flex:1;min-width:0;font-family:var(--ui);font-style:italic;font-size:11px;
+  color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow .mrl{color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums}
+.mrow .nohg{color:var(--faint);font-size:9px;letter-spacing:.06em}
+.mrow.on{background:color-mix(in srgb,var(--gold) 16%,#0c1119);
+  box-shadow:inset 3px 0 0 var(--gold)}
+.mrow.on .mid{color:var(--gold)}
+.mrow.on .mnm{color:var(--ink)}
+.brief{flex:0 0 auto;margin:7px;background:#0c1119;border:1px solid var(--line);
+  border-radius:4px;padding:8px 9px;max-height:132px;overflow-y:auto}
+.brief::-webkit-scrollbar{width:9px}
+.brief::-webkit-scrollbar-thumb{background:#2c384a;border-radius:5px;border:2px solid #0c1119}
+.brief .bh{display:flex;align-items:center;gap:7px;color:var(--gold);font-size:10px;
+  letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px}
+.brief .bh .sub{margin-left:auto;color:var(--faint);letter-spacing:.06em;text-transform:none;
+  font-size:9.5px}
+.brief p{margin:0 0 6px;font-family:var(--ui);font-size:11px;line-height:1.5;color:var(--dim)}
+.brief p:last-child{margin-bottom:0}
+
+/* --- map info face: the long factual readout --- */
+.readout{flex:1 1 auto;min-height:0;overflow-y:auto;margin:7px;padding-right:3px}
+.readout::-webkit-scrollbar{width:9px}
+.readout::-webkit-scrollbar-thumb{background:#2c384a;border-radius:5px;border:2px solid var(--panel)}
+.rsec{margin-bottom:9px}
+.rsec .rh{display:flex;align-items:center;gap:7px;color:var(--faint);font-size:9px;
+  letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+.rsec .rh::after{content:"";flex:1;height:1px;background:var(--line)}
+.rsec p{margin:0 0 5px;font-family:var(--ui);font-size:11px;line-height:1.5;color:var(--dim)}
+.rsec p b{color:var(--ink);font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11px;margin-bottom:5px}
+.kv dt{color:var(--faint)}
+.kv dd{margin:0;color:var(--ink);font-variant-numeric:tabular-nums}
+.bars{display:flex;gap:3px;align-items:flex-end;height:34px;margin:4px 0 6px}
+.bars i{flex:1;background:linear-gradient(#3f5064,#22303f);border-radius:1px 1px 0 0}
+
+/* --- radar box --- */
+.boxtabs{display:flex;border-bottom:1px solid var(--line);background:#0e141c;
+  border-radius:4px 4px 0 0;overflow:hidden}
+.boxtab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:27px;
+  color:var(--dimmer);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+  border-right:1px solid var(--line)}
+.boxtab:last-child{border-right:none}
+.boxtab:hover{color:var(--dim);background:#121a24}
+.boxtab.on{color:var(--gold);background:var(--panel);box-shadow:inset 0 -2px 0 var(--gold)}
+.boxtab .n{color:var(--dimmer);font-size:9px}
+.radarrow{display:flex;gap:8px;padding:7px}
+#radar{width:172px;height:172px;flex:0 0 172px;position:relative;background:#070a0e;
+  border:1px solid #000;border-radius:3px;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(143,228,255,.10), inset 0 0 34px rgba(0,0,0,.9)}
+#radar svg{width:172px;height:172px;image-rendering:pixelated}
+#rframe{position:absolute;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.7),0 0 12px rgba(255,255,255,.25);
+  left:72px;top:78px;width:54px;height:43px;cursor:move}
+#rframe::after{content:"";position:absolute;inset:-1px;border:1px solid rgba(255,255,255,.25)}
+.radarfoot{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;
+  padding:3px 5px;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.8));
+  color:var(--dimmer);font-size:9px;letter-spacing:.06em}
+.surfcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.surfcol .cap{color:var(--dimmer);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  padding:1px 2px 2px}
+.sbtn{display:flex;align-items:center;gap:7px;height:29px;padding:0 8px;border-radius:4px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:11px}
+.sbtn:hover{border-color:var(--line2);color:var(--ink)}
+.sbtn.on{background:#17262f;border-color:#3c5f6e;color:var(--cyan)}
+.mini{margin-top:auto;color:var(--dimmer);font-size:10px;line-height:1.5}
+.mini b{color:var(--dim);font-weight:400}
+
+/* --- mode tabs: the loudest thing on the page --- */
+#modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.mtab{height:54px;border-radius:5px;background:linear-gradient(#1b232e,#151b24);
+  border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;color:var(--dim);cursor:pointer;position:relative;overflow:hidden}
+.mtab:hover{border-color:var(--line2);color:var(--ink)}
+.mtab .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:600}
+.mtab .s{font-size:9.5px;color:var(--dimmer)}
+.mtab .kk{position:absolute;top:4px;right:6px;font-size:9px;color:var(--dimmer)}
+.mtab.on{color:#0e1218;border-color:var(--mode);
+  background:linear-gradient(var(--mode), color-mix(in srgb,var(--mode) 78%, #000));
+  box-shadow:0 0 0 1px rgba(0,0,0,.7), 0 6px 18px -8px var(--mode)}
+.mtab.on .s,.mtab.on .kk{color:rgba(12,16,22,.80)}
+.mtab.on .t{font-weight:700}
+
+/* --- panes --- */
+.pane{flex:1;min-height:0;display:none;flex-direction:column;gap:7px}
+.pane.on{display:flex}
+
+/* owner strip */
+.owners{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.ow{height:38px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);
+  border-top:3px solid var(--c);color:var(--dim);cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1px;font-size:10.5px}
+.ow .h{font-size:9px;color:var(--dimmer);letter-spacing:.08em}
+.ow:hover{border-color:var(--line2);color:var(--ink)}
+.ow.on{background:color-mix(in srgb,var(--c) 22%, #10161e);border-color:var(--c);color:#fff}
+.ow.on .h{color:var(--c)}
+
+/* category tabs */
+.cats{display:flex;gap:3px;background:#0b1016;border:1px solid var(--line);border-radius:4px;padding:3px}
+.cat{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0 3px;
+  border-radius:3px;color:var(--dim);cursor:pointer;font-size:9.5px}
+.cat:hover{color:var(--ink);background:#121a24}
+.cat .n{color:var(--dimmer);font-size:9px;font-variant-numeric:tabular-nums}
+.cat.on{background:var(--panel3);color:var(--mode);box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.cat.on .n{color:color-mix(in srgb,var(--mode) 70%, #8b949e)}
+
+/* the cameo grid — the heart of it */
+.gridwrap{flex:1;min-height:0;overflow-y:auto;background:#0c1119;border:1px solid var(--line);
+  border-radius:5px;padding:7px}
+.gridwrap::-webkit-scrollbar{width:9px}
+.gridwrap::-webkit-scrollbar-thumb{background:#2c384a;border-radius:5px;border:2px solid #0c1119}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.tile{border-radius:4px;background:var(--panel2);border:1px solid var(--line);padding:3px 3px 4px;
+  cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative}
+.tile:hover{border-color:var(--line2);background:var(--panel3)}
+.tile.on{border-color:var(--mode);background:color-mix(in srgb,var(--mode) 14%, #131a24);
+  box-shadow:0 0 0 1px var(--mode), 0 6px 18px -10px var(--mode)}
+.cam{position:relative;width:100%;aspect-ratio:32/24;border-radius:2px;overflow:hidden;
+  background:#0a0c10;image-rendering:pixelated}
+.cam.mesh::after{content:"3D";position:absolute;right:2px;top:2px;font-size:7.5px;
+  line-height:11px;padding:0 3px;border-radius:2px;color:#bfe8fb;
+  background:rgba(20,44,58,.9);letter-spacing:.06em}
+.tile .code.nod{background:rgba(208,138,106,.9)}
+.tile .code.mesh{background:rgba(154,167,180,.88)}
+.cam svg{width:100%;height:100%}
+.tile .code{position:absolute;left:2px;top:2px;font-size:8px;letter-spacing:.06em;color:#0d1117;
+  background:rgba(224,176,112,.88);border-radius:2px;padding:0 3px;line-height:12px}
+.tile .fp{position:absolute;right:2px;bottom:2px;font-size:8px;color:#dfe8f2;
+  background:rgba(0,0,0,.62);border-radius:2px;padding:0 3px;line-height:12px}
+.tile .nm{font-family:var(--ui);font-size:9.5px;line-height:1.15;color:var(--dim);
+  height:22px;overflow:hidden;text-align:center}
+.tile.on .nm{color:var(--ink)}
+
+/* terrain pane */
+.drawers{display:flex;flex-wrap:wrap;gap:4px}
+.dw{display:flex;align-items:center;gap:6px;height:28px;padding:0 9px;border-radius:4px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:11px}
+.dw:hover{border-color:var(--line2);color:var(--ink)}
+.dw.on{background:color-mix(in srgb,var(--mode) 16%, #131a24);border-color:var(--mode);color:var(--mode)}
+.dw .n{font-size:9.5px;color:var(--dimmer);font-variant-numeric:tabular-nums}
+.dw.on .n{color:color-mix(in srgb,var(--mode) 70%, #000)}
+.blocks{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+.blk{cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:center}
+.blk .art{border:1px solid var(--line);border-radius:2px;overflow:hidden;background:#0a0c10;
+  image-rendering:pixelated}
+.blk:hover .art{border-color:var(--line2)}
+.blk.on .art{border-color:var(--mode);box-shadow:0 0 0 1px var(--mode),0 6px 16px -8px var(--mode)}
+.blk{width:var(--bw,54px)}
+.blk .lb{font-family:var(--mono);font-size:9px;color:var(--dim);text-align:center;
+  line-height:1.25;letter-spacing:.02em}
+.blk .lb i{display:block;font-style:normal;color:var(--faint);font-size:8.5px}
+.blk.on .lb{color:var(--mode)}
+.blk.on .lb i{color:var(--dim)}
+
+/* elevation pane */
+.tiers{display:flex;gap:5px;align-items:flex-end}
+.tr{flex:1;border-radius:4px 4px 3px 3px;background:var(--panel2);border:1px solid var(--line);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+  gap:4px;padding:5px 0 6px;color:var(--dim);font-size:10.5px}
+.tr .bar{width:60%;background:linear-gradient(#3d4c60,#26313f);border:1px solid #4b5c72;border-radius:1px}
+.tr:hover{border-color:var(--line2);color:var(--ink)}
+.tr.on{border-color:var(--mode);background:color-mix(in srgb,var(--mode) 15%, #131a24);color:#fff}
+.tr.on .bar{background:linear-gradient(var(--mode),color-mix(in srgb,var(--mode) 55%,#000));
+  border-color:var(--mode)}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.tbtn{height:46px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;font-size:10.5px}
+.tbtn:hover{border-color:var(--line2);color:var(--ink)}
+.tbtn.on{border-color:var(--mode);color:var(--mode);background:color-mix(in srgb,var(--mode) 14%,#131a24)}
+.bsz{height:40px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px}
+.bsz.on{border-color:var(--mode);color:var(--mode);background:color-mix(in srgb,var(--mode) 14%,#131a24)}
+.bsz .sq{border:1px solid currentColor;opacity:.85}
+.derived{display:flex;gap:7px;align-items:flex-start;color:var(--dimmer);font-size:10px;
+  line-height:1.45;font-family:var(--ui);padding:1px 2px}
+.derived b{color:var(--dim);font-weight:600}
+.derived .ic{flex:0 0 14px;margin-top:1px}
+.gate{border:1px solid #6b5326;background:linear-gradient(#221c11,#1a160e);border-radius:5px;
+  padding:8px 9px;display:flex;gap:8px;align-items:center}
+.gate .tt{color:#f0c070;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.gate p{margin:3px 0 0;color:var(--dim);font-size:10px;line-height:1.4;font-family:var(--ui)}
+.gate button{flex:0 0 auto;align-self:stretch;background:#4a3a1a;border:1px solid #8a6a2c;
+  color:#f5d9a0;border-radius:4px;padding:0 11px;font:10.5px var(--mono);cursor:pointer;
+  line-height:1.3;max-width:96px}
+.gate button:hover{background:#5c4820}
+.secline{display:flex;align-items:center;gap:8px;color:var(--dimmer);font-size:9.5px;
+  letter-spacing:.16em;text-transform:uppercase;margin-top:2px}
+.secline::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* --- foot: lint + actions, always visible --- */
+#foot{flex:0 0 auto;display:flex;flex-direction:column;gap:5px}
+.lint{background:var(--panel);border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.lint .hd{display:flex;align-items:center;gap:8px;padding:6px 9px;background:#0e141c;
+  border-bottom:1px solid var(--line);cursor:pointer}
+.lint .hd .t{color:var(--dim);font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+.tally{display:flex;align-items:center;gap:4px;font-size:11px;font-variant-numeric:tabular-nums}
+.tally.ok{color:var(--ok)} .tally.bad{color:var(--danger)}
+.lrow{display:flex;gap:8px;padding:4px 9px;border-top:1px solid #1a222c;align-items:flex-start}
+.lrow:first-of-type{border-top:none}
+.lrow .k{width:60px;flex:0 0 60px;color:var(--ink);font-size:10.5px}
+.lrow .d{flex:1;color:var(--dim);font-size:10px;line-height:1.35;font-family:var(--ui)}
+.lrow.bad .k{color:var(--danger)}
+.lrow.note .k{color:var(--dim)}
+.lmore{padding:5px 9px;color:var(--dimmer);font-size:10.5px;display:flex;align-items:center;gap:6px;
+  cursor:pointer;border-top:1px solid #1a222c}
+.lmore:hover{color:var(--dim)}
+.acts{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px}
+.act{height:32px;border-radius:4px;background:linear-gradient(#1c242f,#161d26);border:1px solid var(--line);
+  color:var(--dim);display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:10.5px}
+.act:hover{border-color:var(--line2);color:var(--ink)}
+.act.dis{opacity:.38;cursor:default}
+.act .k{font-size:9px;color:var(--dimmer)}
+#savebtn{height:42px;border-radius:5px;border:1px solid #c79a5c;cursor:pointer;
+  background:linear-gradient(#e8bd80,#c9944d);color:#1a1206;display:flex;align-items:center;
+  justify-content:center;gap:9px;font-size:13px;font-weight:700;letter-spacing:.1em;
+  box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 -2px 0 rgba(0,0,0,.28) inset,0 8px 22px -10px #e0b07088}
+#savebtn:hover{background:linear-gradient(#f2c98d,#d6a058)}
+#savebtn .k{font-size:10px;font-weight:500;opacity:.6;letter-spacing:.04em}
+#savebtn .ext{font-size:9.5px;font-weight:400;opacity:.65;letter-spacing:.04em}
+
+  /* ---- the real canvas, and the bits the mockup faked ---- */
+  #view canvas{display:block;width:100%;height:100%}
+  #view{position:relative;overflow:hidden;background:#0a0d11}
+  #err{position:absolute;inset:0;display:none;place-items:center;text-align:center;
+       padding:40px;color:#ffb3a8;background:rgba(10,13,17,.92);font-size:13px;z-index:40}
+  #status{pointer-events:none}
+  #status:empty{display:none}
+  /* the map list is data-driven now, so its rows are built by app.js */
+  .mlist .row{display:flex;align-items:center;gap:8px;padding:4px 8px;cursor:pointer;
+    border-left:2px solid transparent}
+  .mlist .row:hover{background:var(--panel2)}
+  .mlist .row.on{background:var(--panel2);border-left-color:var(--gold)}
+  .mlist .row .dot{width:6px;height:6px;border-radius:50%;flex:0 0 6px}
+  .mlist .row .id{color:var(--ink);font-size:11px}
+  .mlist .row .nm{flex:1;min-width:0;color:var(--dim);font-size:11px;font-style:italic;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mlist .row .rl{color:var(--dimmer);font-size:10px}
+  .mlist .grp{padding:8px 8px 3px;color:var(--dimmer);font-size:10px;letter-spacing:.08em;
+    text-transform:uppercase;position:sticky;top:0;background:var(--panel);z-index:1}
+  #radar{position:relative}
+  #radarcv{width:100%;height:100%;display:block;image-rendering:pixelated}
+
+  #legend{position:absolute;left:12px;bottom:12px;z-index:12;display:none;
+    background:rgba(12,17,23,.88);border:1px solid var(--line);border-radius:6px;
+    padding:7px 9px;font-size:10px;line-height:1.7;color:var(--dim);
+    backdrop-filter:blur(6px)}
+  #legend .li{display:flex;align-items:center;gap:6px;white-space:nowrap}
+  #legend .sw{width:9px;height:9px;border-radius:2px;flex:0 0 9px}
+  .vp-note .out{color:var(--danger)}
+  .vp-note .sub{color:var(--faint)}
+  #facts .bars{display:flex;align-items:flex-end;gap:3px;height:40px;margin:8px 0 2px}
+  #facts .bars i{flex:1;background:linear-gradient(var(--gold),#8a6a3f);border-radius:1px 1px 0 0}
+  #facts .barlab{color:var(--faint);font-size:9px;letter-spacing:.04em}
+
+  .inibox{display:none;max-height:200px;overflow:auto;background:var(--bg);
+    border:1px solid var(--line);border-radius:5px;margin-bottom:6px}
+  .inibox.open{display:block}
+  .inibox pre{margin:0;padding:8px;font:10px/1.45 var(--mono);color:var(--dim);
+    white-space:pre}
+  .lrest{display:none}
+  .lrest.open{display:block}
+  .lmore{cursor:pointer}
+  .lmore.open svg{transform:rotate(180deg)}
+  .lrow.ok .k{color:var(--ok)}
+  .save-state.bad{color:var(--danger)}
+  .act.dis{opacity:.35;pointer-events:none}
+  .derived.bad{border-left-color:var(--danger);color:#ffb3a8}
+
+  /* THE GDI EAGLE, turning on its axis.
+     The emblem is the cartridge's own art (data/gdi.png, cropped square by
+     export_editor.py). Two faces back to back with a gold rim between them, spun on
+     Y: a flat sprite rotated in 3D reads as a struck coin, which is what the emblem
+     is, and costs one image and no geometry. */
+  .coin{width:34px;height:34px;flex:0 0 34px;perspective:260px}
+  .coin i{position:absolute;inset:0;border-radius:50%;background:url(data/gdi.png)
+    center/contain no-repeat;backface-visibility:hidden;
+    box-shadow:0 0 0 1px rgba(224,176,112,.55) inset, 0 0 10px -2px rgba(224,176,112,.5)}
+  .coin i.b{transform:rotateY(180deg)}
+  /* The edge. Without it the coin vanishes to a hairline twice per turn and reads as
+     a flicker; a struck medal has thickness, so give it some. This slab sits
+     perpendicular to the two faces and is only face-on at exactly the moment they
+     are not. */
+  .coin i.e{transform:rotateY(90deg);width:5px;left:calc(50% - 2.5px);
+    background:linear-gradient(180deg,#3a2b17,#e8c98f 18%,#8a6a3c 50%,#e8c98f 82%,#3a2b17);
+    border-radius:1px;box-shadow:none}
+  .coin{position:relative;transform-style:preserve-3d;animation:coinspin 7s linear infinite}
+  @keyframes coinspin{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
+  @media (prefers-reduced-motion:reduce){ .coin{animation:none} }
+
+  /* ---- fixes over the mockup's stylesheet, which was authored at a fixed
+          1600x1000 and for faked content ---- */
+  #status .l2.bad{color:var(--danger)}
+  #status .l2 svg{color:var(--ok)}
+  #status .l2.bad svg{color:var(--danger)}
+  /* the sidebar breathes with the window instead of taking 31% of a laptop */
+  #side{width:clamp(340px,24vw,460px);flex:0 0 auto;overflow:hidden}
+  /* the top box is bounded in every face, not only while browsing; Map info used to
+     push the save button off the bottom of the screen with no scrollbar to reach it */
+  /* Bounded against the SIDEBAR, not the viewport: a percentage on a flex child
+     resolves against its container, so this holds however the window is sized and
+     does not depend on vh. Without a cap the Map info face grew until it pushed the
+     save button off the bottom of the screen with no scrollbar to reach it. */
+  #topbox{display:flex;flex-direction:column;min-height:0;flex:0 1 auto;max-height:40%}
+  #topbox.grow{flex:1 1 auto;max-height:none}
+  #modes{flex:0 0 auto}
+  .readout{flex:1 1 auto;min-height:0;overflow-y:auto}
+  /* the elevation pane scrolls like the other two */
+  #elevBody{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;
+    flex-direction:column;gap:7px}
+  /* and the palette keeps a floor when the .INI preview opens */
+  .gridwrap{min-height:120px}
+  .inibox{max-height:min(200px,22vh)}
+  /* the probe reads as a readout, not a caption, and keeps clear of the mode badge */
+  .vp-note{text-transform:none;letter-spacing:.02em;font-size:11px;max-width:52%;
+    text-align:right;line-height:1.5}
+  .vp-note b{color:var(--ink);font-weight:400}
+  /* map list details the rebuild dropped */
+  .mlist .row.flat .dot{opacity:.35}
+  .mlist .row .nm.lbl{opacity:.6;font-style:normal}
+  #empty{padding:18px 10px;text-align:center;color:var(--faint);font-size:11px}
+  #chipclear{padding:3px 2px 0;color:var(--cyan);font-size:10px;cursor:pointer;
+    letter-spacing:.04em}
+  #chipclear:hover{text-decoration:underline}
+  /* the elevation warning's red rail needs a border to colour */
+  .derived.bad{border-left:2px solid var(--danger);padding-left:7px;color:#ffb3a8}
+  /* editing has a crosshair, as it did before */
+  body.editing #view canvas{cursor:crosshair}
+  /* a disabled action must not swallow the click that would re-enable it */
+  .act.dis{opacity:.35}
+  .lint .hd{cursor:pointer}
+
+  /* play in editor: bake this map and start the game on it */
+  .playrow{display:grid;grid-template-columns:auto 1fr;gap:5px}
+  #playbtn{display:flex;align-items:center;justify-content:center;gap:6px;height:42px;
+    padding:0 14px;border-radius:5px;cursor:pointer;font-size:12px;letter-spacing:.1em;
+    color:#0d1117;background:linear-gradient(#8fe4ff,#4aa8cc);
+    border:1px solid #b6efff;box-shadow:0 1px 0 rgba(255,255,255,.35) inset,
+    0 8px 20px -10px #4aa8cc;font-weight:700}
+  #playbtn:hover{filter:brightness(1.08)}
+  #playbtn.busy{filter:grayscale(.6);cursor:progress}
+  #playbtn .k{font-size:9px;opacity:.55;letter-spacing:.04em;font-weight:400}
+  .joblog{display:none;margin-top:6px;background:var(--bg);border:1px solid var(--line);
+    border-radius:5px;overflow:hidden}
+  .joblog.open{display:block}
+  .joblog .jh{display:flex;align-items:center;gap:8px;padding:5px 9px;background:#0e141c;
+    border-bottom:1px solid var(--line);font-size:10px;color:var(--dim);
+    letter-spacing:.06em;text-transform:uppercase}
+  .joblog .jh .x{margin-left:auto;cursor:pointer;color:var(--faint);text-transform:none;
+    letter-spacing:0}
+  .joblog .jh .x:hover{color:var(--ink)}
+  .joblog pre{margin:0;padding:7px 9px;max-height:170px;overflow:auto;
+    font:10px/1.5 var(--mono);color:var(--dim);white-space:pre-wrap;word-break:break-word}
+  .joblog.bad .jh{color:var(--danger)}
+</style>
+</head>
+<body>
+
+<!-- ============ icon sheet ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-select" viewBox="0 0 24 24"><path d="M5.5 2.8v16.4l4.1-4 2.5 5.6 2.8-1.3-2.5-5.5h5.6z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+<symbol id="i-move" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3 9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/></symbol>
+<symbol id="i-brush" viewBox="0 0 24 24"><path d="M15.5 3.5 20.5 8.5 11 18H6v-5z"/><path d="M13.5 5.5 18.5 10.5"/><path d="M6 18c-1.6.6-2.2 1.7-2.6 3.2 1.7-.2 2.9-.7 3.6-2"/></symbol>
+<symbol id="i-drop" viewBox="0 0 24 24"><path d="m16.5 3.5 4 4-2 2-1-1-6.4 6.4.4 1.6-4.6 4.6-3-3 4.6-4.6 1.6.4L16.5 7.5l-1-1z"/></symbol>
+<symbol id="i-erase" viewBox="0 0 24 24"><path d="m8 20-4.5-4.5a1.6 1.6 0 0 1 0-2.3l9-9a1.6 1.6 0 0 1 2.3 0l5.5 5.5a1.6 1.6 0 0 1 0 2.3L14 20z"/><path d="M8 20h11M9.5 8.5l6 6"/></symbol>
+<symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3.7 14.3 14.3 3.7l6 6L9.7 20.3z"/><path d="m7 11 2 2M10 8l2 2M13 5l2 2"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.6l1.3-2h6.2l1.3 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><path d="M3.5 3.5h17v17h-17z"/><path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="1.6"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H8"/><path d="m8 4.5-4 4.5 4 4.5"/></symbol>
+<symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H16"/><path d="m16 4.5 4 4.5-4 4.5"/></symbol>
+<symbol id="i-revert" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20.5 4v4.5H16"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5 19.5 12 7 19.5z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M4.5 4.5h11.6L19.5 8v11.5h-15z"/><path d="M8 4.5v5h7v-5M8 19.5V14h8v5.5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5 10-11"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5"/></symbol>
+<symbol id="i-dash" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20H2.5z"/><path d="M12 9.5v5M12 17.3v.2"/></symbol>
+<symbol id="i-caret" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+<symbol id="i-caretup" viewBox="0 0 24 24"><path d="m6 14.5 6-6 6 6"/></symbol>
+<symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.6"/><path d="M12 12 19 7"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h12M8.5 12h12M8.5 17.5h12M4 6.5h.2M4 12h.2M4 17.5h.2"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></symbol>
+<symbol id="i-house" viewBox="0 0 24 24"><path d="M3.5 10.5 12 4l8.5 6.5V20h-17z"/><path d="M9.5 20v-6h5v6"/></symbol>
+<symbol id="i-tank" viewBox="0 0 24 24"><path d="M3 14.5h13.5v4H3z" /><circle cx="5.6" cy="18.6" r="1.4"/><circle cx="10" cy="18.6" r="1.4"/><circle cx="14.4" cy="18.6" r="1.4"/><path d="M6 14.5v-3h7v3M13 12.6h8"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="6.5" r="2.8"/><path d="M12 9.3v7M12 16.3 8.5 21M12 16.3 15.5 21M8 12h8"/></symbol>
+<symbol id="i-tree" viewBox="0 0 24 24"><path d="M12 3 5.5 12.5h13z"/><path d="M12 8 7.5 16h9z"/><path d="M12 16v5"/></symbol>
+<symbol id="i-crystal" viewBox="0 0 24 24"><path d="m12 3 5.5 6.5L12 21 6.5 9.5z"/><path d="M6.5 9.5h11M12 3v18"/></symbol>
+<symbol id="i-wall" viewBox="0 0 24 24"><path d="M3.5 6.5h17v11h-17z"/><path d="M3.5 12h17M9 6.5V12M15 6.5V12M6 12v5.5M12 12v5.5M18 12v5.5"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="8" cy="8.5" r="2.2"/><circle cx="16" cy="12" r="3"/><circle cx="9" cy="16.5" r="1.6"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.6"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m4 17 5-5 4.5 4.5 3-3 4 4"/></symbol>
+<symbol id="i-flat" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-tiles" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
+<symbol id="i-stairs" viewBox="0 0 24 24"><path d="M3.5 20.5h4v-5h5v-5h5v-5h5"/></symbol>
+<symbol id="i-cliff" viewBox="0 0 24 24"><path d="M2.5 19h6l3-5h4l2.5-4h4"/><path d="M8.5 19v-5h3M15.5 14v-4h4"/></symbol>
+<symbol id="i-water" viewBox="0 0 24 24"><path d="M2.5 8.5c2.4-2 4.7-2 7 0s4.7 2 7 0 4.7-2 5 0"/><path d="M2.5 13.5c2.4-2 4.7-2 7 0s4.7 2 7 0 4.7-2 5 0"/><path d="M2.5 18.5c2.4-2 4.7-2 7 0s4.7 2 7 0 4.7-2 5 0"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M1.8 12S5.6 5.5 12 5.5 22.2 12 22.2 12 18.4 18.5 12 18.5 1.8 12 1.8 12z"/><circle cx="12" cy="12" r="3.2"/></symbol>
+<symbol id="i-frame" viewBox="0 0 24 24"><path d="M3.5 7.5v-4h4M16.5 3.5h4v4M20.5 16.5v4h-4M7.5 20.5h-4v-4"/></symbol>
+<symbol id="i-mesh" viewBox="0 0 24 24"><path d="M12 3 21 18H3z"/><path d="M12 3v15M3 18l9-7.5M21 18l-9-7.5"/></symbol>
+<symbol id="i-pad" viewBox="0 0 24 24"><path d="M3.5 12 12 7l8.5 5-8.5 5z"/><path d="m3.5 12 8.5 5 8.5-5"/></symbol>
+<symbol id="i-hatch" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M4 12 12 4M4 18 18 4M8 20 20 8M14 20 20 14"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5M3 17.5 12 22l9-4.5"/></symbol>
+<symbol id="i-raise" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M12 16V5"/><path d="m7.5 9.5 4.5-4.5 4.5 4.5"/></symbol>
+<symbol id="i-grade" viewBox="0 0 24 24"><path d="M3 18h18"/><path d="M4.5 14.5 10 10l4 3 5.5-6"/><path d="M3 21h18"/></symbol>
+<symbol id="i-ramp" viewBox="0 0 24 24"><path d="M3.5 19.5h17"/><path d="M4.5 19.5 12 8h8v11.5"/><path d="M20.5 12h-6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.4 15.4 5 5"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3.5h7.5L18 8v12.5H6z"/><path d="M13.5 3.5V8H18"/><path d="M9 12.5h6M9 16h6"/></symbol>
+<symbol id="i-brief" viewBox="0 0 24 24"><path d="M4.5 4h15v16h-15z"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 20V9M12 20v-7M16 20v-12M20 20V6"/></symbol>
+<symbol id="i-del" viewBox="0 0 24 24"><path d="M4.5 6.5h15"/><path d="M8.5 6.5V4h7v2.5"/><path d="M6.5 6.5 7.6 20.5h8.8L17.5 6.5"/><path d="M10.5 10v7M13.5 10v7"/></symbol>
+<symbol id="i-trees" viewBox="0 0 24 24"><path d="M8 3.5 3.5 11h9z"/><path d="M8 8 4.5 14h7z"/><path d="M8 14v6.5"/><path d="M17 8.5 13.5 15h7z"/><path d="M17 15v5.5"/></symbol>
+<symbol id="i-side" viewBox="0 0 24 24"><path d="M12 3.5 20 7v6.2c0 4-3.2 6.6-8 7.3-4.8-.7-8-3.3-8-7.3V7z"/></symbol>
+</defs></svg>
+
+<div id="app">
+
+  <!-- ============ TOP STRIP ============ -->
+  <header id="top" class="bev">
+    <div class="mark">
+      <div class="coin" title="Global Defense Initiative"><i class="f"></i><i class="e"></i><i class="b"></i></div>
+      CNC3D <span class="sub">MISSION EDITOR</span></div>
+    <div class="vr"></div>
+    <div class="mapchip bev" id="mapchip" title="Pick a different mission">
+      <span class="dotside" id="mcdot"></span>
+      <span class="id" id="mcid">&mdash;</span>
+      <span class="nm" id="mcname"></span>
+      <span class="mt" id="mcmeta"></span>
+      <svg class="ic s16 car"><use href="#i-caret"/></svg>
+    </div>
+    <div class="right">
+      <span class="save-state" id="savestate"><svg class="ic s14"><use href="#i-check"/></svg><span>No edits yet</span></span>
+      <span class="pill">RIGHT-DRAG ORBIT &middot; WHEEL ZOOM &middot; WASD PAN</span>
+    </div>
+  </header>
+
+  <div id="body">
+
+    <!-- ============ LEFT TOOL RAIL ============ -->
+    <nav id="rail">
+      <div class="tool on" data-t="place" title="Select and place &mdash; V"><svg class="ic"><use href="#i-select"/></svg><span class="kk">V</span></div>
+      <div class="tool" data-t="move" title="Move a placed object &mdash; M"><svg class="ic"><use href="#i-move"/></svg><span class="kk">M</span></div>
+      <div class="tool" data-t="pick" title="Pick up what is under the cursor and arm it &mdash; I"><svg class="ic"><use href="#i-drop"/></svg><span class="kk">I</span></div>
+      <div class="tool" data-t="erase" title="Erase what is under the cursor &mdash; X"><svg class="ic"><use href="#i-erase"/></svg><span class="kk">X</span></div>
+      <div class="railspacer"></div>
+      <div class="tool" data-t="camera" title="Frame the playable rectangle &mdash; 0"><svg class="ic"><use href="#i-camera"/></svg><span class="kk">0</span></div>
+    </nav>
+
+    <!-- ============ STAGE ============ -->
+    <main id="stage">
+      <div id="view">
+        <div class="vp-badge" id="vpbadge">
+          <svg class="ic s16" style="color:var(--mode)"><use href="#i-house"/></svg>
+          <span class="m">OBJECTS</span>
+          <span class="o" id="vpowner"></span>
+        </div>
+        <div class="vp-note" id="vpnote"></div>
+
+        <div id="status"></div>
+
+        <div class="vp-nav">
+          <div class="navbtn bev" id="prevmap" title="Previous map">
+            <svg class="ic s16" style="transform:rotate(90deg)"><use href="#i-caret"/></svg></div>
+          <div class="navbtn bev" id="nextmap" title="Next map">
+            <svg class="ic s16" style="transform:rotate(-90deg)"><use href="#i-caret"/></svg></div>
+        </div>
+        <div id="legend"></div>
+        <div id="err"></div>
+      </div>
+
+      <!-- ---------- view bar ---------- -->
+      <div id="viewbar">
+        <span class="vlab">Surface</span>
+        <div class="seg4" id="modesSurface">
+          <button class="on" data-mode="tex"><svg class="ic s14"><use href="#i-image"/></svg>Texture</button>
+          <button data-mode="white"><svg class="ic s14"><use href="#i-flat"/></svg>White</button>
+          <button data-mode="fam"><svg class="ic s14"><use href="#i-tiles"/></svg>Tile type</button>
+          <button data-mode="tier"><svg class="ic s14"><use href="#i-stairs"/></svg>Tiers</button>
+        </div>
+        <span class="vr"></span>
+        <span class="vlab">Show</span>
+        <div class="haspop">
+          <div class="vtog on" id="tAssets" title="3D assets &mdash; O">
+            <svg class="ic s16"><use href="#i-eye"/></svg>3D assets
+            <span class="cnt" id="assetCount">7/7</span>
+            <svg class="ic s14"><use href="#i-caretup"/></svg></div>
+          <div class="pop">
+            <div class="ph">Draw which classes</div>
+            <div class="pg" id="assetGroups"></div>
+          </div>
+        </div>
+        <div class="iogroup">
+          <div class="vtog io on" id="tPads" title="Level building pads &mdash; L">
+            <svg class="ic s16"><use href="#i-pad"/></svg><span class="k">L</span></div>
+          <div class="vtog io" id="tWire" title="Wireframe &mdash; R">
+            <svg class="ic s16"><use href="#i-mesh"/></svg><span class="k">R</span></div>
+          <div class="vtog io on" id="tBorder" title="Show map border &mdash; B">
+            <svg class="ic s16"><use href="#i-frame"/></svg><span class="k">B</span></div>
+          <div class="vtog io on" id="tWater" title="Sea plane &mdash; P">
+            <svg class="ic s16"><use href="#i-water"/></svg><span class="k">P</span></div>
+        </div>
+        <div class="vtog warn" id="edNogo" title="Hatch every cell nothing can be built on &mdash; N">
+          <svg class="ic s16"><use href="#i-hatch"/></svg>No-go
+          <span class="cnt" id="edNogoCount">0</span><span class="k">N</span></div>
+        <div class="scale">
+          <span class="vlab">Scale</span>
+          <span class="v" style="width:auto;color:var(--faint)">0.2&times;</span>
+          <input type="range" min="0" max="60" value="10" id="exag" title="Vertical scale">
+          <span class="v" style="width:auto;color:var(--faint)">5.0&times;</span>
+          <span class="v" id="exagV">1.0&times;</span>
+          <div class="vtog" id="trueScale" title="Snap to the cartridge's own geometry: 64 height bytes = one cell width">Snap true</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ============ THE SIDEBAR ============ -->
+    <aside id="side" class="hatch">
+
+      <div class="box bev" id="topbox">
+        <div class="boxtabs">
+          <div class="boxtab on" data-f="radar"><svg class="ic s14"><use href="#i-radar"/></svg>Radar</div>
+          <div class="boxtab" data-f="miss"><svg class="ic s14"><use href="#i-list"/></svg>Missions <span class="n" id="missCount">100</span></div>
+          <div class="boxtab" data-f="info"><svg class="ic s14"><use href="#i-info"/></svg>Map info</div>
+        </div>
+
+        <div class="face on" data-f="radar">
+          <div class="radarrow">
+            <div id="radar">
+              <canvas id="radarcv" width="64" height="64"></canvas>
+              <div id="rframe" title="Drag to fly the camera there"></div>
+              <div class="radarfoot"><span id="radarPlay"></span><span>64&times;64</span></div>
+            </div>
+            <div class="surfcol">
+              <div class="cap">Jump to</div>
+              <div class="sbtn" id="jumpGdi"><svg class="ic s16"><use href="#i-house"/></svg>Your base</div>
+              <div class="sbtn" id="jumpNod"><svg class="ic s16" style="color:#ff6a5a"><use href="#i-side"/></svg>Enemy base</div>
+              <div class="sbtn" id="jumpTib"><svg class="ic s16" style="color:#7ee0a0"><use href="#i-crystal"/></svg>Tiberium</div>
+              <div class="mini" id="radarMini"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="face" data-f="miss">
+          <div class="srch">
+            <svg class="ic s16"><use href="#i-search"/></svg>
+            <input type="text" id="filter" placeholder="Filter 100 maps by id or name">
+            <span class="hits" id="hits">100</span>
+          </div>
+          <div class="filters" id="chips"></div>
+          <div class="mlist" id="list"></div>
+          <div class="brief" id="briefSec">
+            <div class="bh"><svg class="ic s14"><use href="#i-brief"/></svg>Briefing
+              <span class="sub" id="briefSub"></span></div>
+            <div id="brief"></div>
+          </div>
+        </div>
+
+        <div class="face" data-f="info">
+          <div class="readout" id="facts"></div>
+        </div>
+      </div>
+
+      <div id="modes">
+        <div class="mtab on" data-m="objects" data-c="#e0b070">
+          <svg class="ic s24"><use href="#i-house"/></svg>
+          <span class="t">Objects</span><span class="s" id="mcObjects">5 palettes</span><span class="kk">1</span></div>
+        <div class="mtab" data-m="terrain" data-c="#7ee0a0">
+          <svg class="ic s24"><use href="#i-water"/></svg>
+          <span class="t">Terrain</span><span class="s" id="mcTerrain">7 drawers</span><span class="kk">2</span></div>
+        <div class="mtab" data-m="elevation" data-c="#8fe4ff">
+          <svg class="ic s24"><use href="#i-cliff"/></svg>
+          <span class="t">Elevation</span><span class="s" id="mcElev">5 tiers &middot; 3 tools</span><span class="kk">3</span></div>
+      </div>
+
+      <section class="pane on" data-p="objects">
+        <div class="owners" id="edOwners"></div>
+        <div class="cats" id="cats"></div>
+        <div class="gridwrap"><div class="grid5" id="palgrid"></div></div>
+      </section>
+
+      <section class="pane" data-p="terrain">
+        <div class="drawers" id="drawers"></div>
+        <div class="derived"><svg class="ic s14"><use href="#i-brush"/></svg>
+          Drag to paint &mdash; <b>one block per cell crossed</b>, never smeared.
+          Bridges are click-only; they have to land whole.</div>
+        <div class="gridwrap"><div class="blocks" id="blockgrid"></div></div>
+      </section>
+
+      <section class="pane" data-p="elevation">
+        <div id="elevBody"></div>
+      </section>
+
+      <div id="foot">
+        <div class="lint bev" id="lintbox">
+          <div class="hd">
+            <svg class="ic s16" style="color:var(--dim)"><use href="#i-check"/></svg>
+            <span class="t">Mission check</span>
+            <span style="margin-left:auto" class="tally ok" id="tallyOk"><svg class="ic s14"><use href="#i-check"/></svg>&ndash;</span>
+            <span class="tally bad" id="tallyBad"><svg class="ic s14"><use href="#i-x"/></svg>&ndash;</span>
+          </div>
+          <div id="edLint"></div>
+        </div>
+        <div class="acts">
+          <div class="act bev" id="edUndo" title="Undo"><svg class="ic s16"><use href="#i-undo"/></svg>Undo<span class="k">^Z</span></div>
+          <div class="act bev dis" id="edRedo" title="Redo"><svg class="ic s16"><use href="#i-redo"/></svg>Redo<span class="k">^Y</span></div>
+          <div class="act bev" id="edReset" title="Throw away every edit and reload the map as it shipped"><svg class="ic s16"><use href="#i-revert"/></svg>Revert</div>
+          <div class="act bev" id="edIniBtn" title="Preview the .INI text before it is written"><svg class="ic s16"><use href="#i-doc"/></svg>.INI<span class="k">&#9656;</span></div>
+        </div>
+        <div class="inibox" id="inibox"><pre></pre></div>
+        <div class="playrow">
+          <div id="playbtn" title="Bake this map and start the game on it">
+            <svg class="ic s16"><use href="#i-play"/></svg>PLAY<span class="k">^P</span></div>
+          <div id="savebtn">
+          <svg class="ic s24"><use href="#i-save"/></svg>
+          CHECK AND SAVE
+          <span class="ext">.INI &middot; .BIN &middot; .HGT</span>
+          <span class="k">^S</span>
+          </div>
+        </div>
+        <div class="joblog" id="joblog"><div class="jh"><span id="jobtitle"></span>
+          <span class="x" id="jobclose">close</span></div><pre id="joblines"></pre></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+
+<script>
+// Every asset on this page is fetched RELATIVE to the document, so the page has to
+// live at a URL that ends in a slash. Served at /maps (no slash) a relative
+// "data/index.json" would resolve to /data/index.json and 404. One redirect fixes it
+// wherever the page is mounted, root or subdirectory, without hardcoding a base path.
+(function () {
+  var p = location.pathname;
+  if (!p.endsWith('/') && !/\.html?$/.test(p)) {
+    location.replace(p + '/' + location.search + location.hash);
+  }
+})();
+</script>
+<script type="importmap">
+{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/"}}
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

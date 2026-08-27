@@ -1,0 +1,47 @@
+tick 40
+objdump
+look BOAT 1
+lclickobj BOAT 1
+seldump
+# CENTRE ON THE DESTINATION BEFORE ORDERING IT. Cell 30,30 is 29 cells west and 16 south
+# of the boat, far outside a 13-cell view, so this order used to be issued from screen
+# pixel (-14802, 6952) and the unprojection landed on cell 33,29 instead. The gate has
+# been testing a move to a cell it never asked for. Centring first makes the pixel land
+# on 30,30 and the order reach it.
+cam 30 30
+order 30 30
+look BOAT 1
+tick 5
+objdump
+facewatch BOAT 1 260
+look BOAT 1
+shot gb_teamboat_entry.png
+facewatch BOAT 1 300
+look BOAT 1
+shot gb_teamboat_S.png
+facedump
+objdump
+facewatch BOAT 0 200
+look BOAT 0
+shot gb_laneboat_E.png
+objdump
+facewatch BOAT 1 300
+objdump
+facewatch BOAT 1 300
+look BOAT 1
+shot gb_teamboat_N.png
+facedump
+objdump
+facewatch BOAT 1 400
+objdump
+facewatch BOAT 0 120
+objdump
+look BOAT 0
+shot gb_laneboat_fire.png
+tick 40
+look BOAT 0
+shot gb_laneboat_fire2.png
+objdump
+tick 120
+objdump
+quit

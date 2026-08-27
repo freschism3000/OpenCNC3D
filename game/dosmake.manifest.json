@@ -1,0 +1,306 @@
+{
+ "bytes": 4067140,
+ "frame_rule": "frame = engine Fetch_Stage(); Deconstruction draws frames-1-stage (building.cpp:500 Draw_It, transcribed)",
+ "houses": "#0 identity (everyone), #1 RemapRed (Nod BUILDINGS only, house.cpp:2186); red rewrites indices 176..191 (const.cpp:293)",
+ "magic": "DOSMAKE1",
+ "pack": "dosmake.pack",
+ "paging": "frame f -> sheet f // (cols*rows), slot f %% (cols*rows); sheets are all <= 256x256 for the Voodoo 2, no frame subsampling",
+ "shadow": "index 4 kept in data, renderer maps it (and 0) to alpha 0",
+ "types": {
+  "AFLD": {
+   "cells": [
+    4,
+    2
+   ],
+   "fh": 48,
+   "frames": 14,
+   "fw": 96,
+   "sheets": 2,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "ATWR": {
+   "cells": [
+    1,
+    2
+   ],
+   "fh": 48,
+   "frames": 14,
+   "fw": 24,
+   "sheets": 1,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "BIO": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 16,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "EYE": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "FACT": {
+   "cells": [
+    3,
+    2
+   ],
+   "fh": 48,
+   "frames": 32,
+   "fw": 72,
+   "sheets": 3,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "FIX": {
+   "cells": [
+    3,
+    3
+   ],
+   "fh": 72,
+   "frames": 20,
+   "fw": 72,
+   "sheets": 3,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "GTWR": {
+   "cells": [
+    1,
+    1
+   ],
+   "fh": 24,
+   "frames": 20,
+   "fw": 24,
+   "sheets": 1,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "GUN": {
+   "cells": [
+    1,
+    1
+   ],
+   "fh": 24,
+   "frames": 20,
+   "fw": 24,
+   "sheets": 1,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "HAND": {
+   "cells": [
+    2,
+    3
+   ],
+   "fh": 72,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 2,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "HOSP": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "HPAD": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "HQ": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "NUK2": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "NUKE": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "OBLI": {
+   "cells": [
+    1,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 24,
+   "sheets": 1,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "PROC": {
+   "cells": [
+    3,
+    3
+   ],
+   "fh": 72,
+   "frames": 20,
+   "fw": 72,
+   "sheets": 3,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "PYLE": {
+   "cells": [
+    2,
+    2
+   ],
+   "fh": 48,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "SAM": {
+   "cells": [
+    2,
+    1
+   ],
+   "fh": 24,
+   "frames": 30,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "SILO": {
+   "cells": [
+    2,
+    1
+   ],
+   "fh": 24,
+   "frames": 20,
+   "fw": 48,
+   "sheets": 1,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "TMPL": {
+   "cells": [
+    3,
+    3
+   ],
+   "fh": 72,
+   "frames": 36,
+   "fw": 72,
+   "sheets": 4,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "WEAP": {
+   "cells": [
+    3,
+    3
+   ],
+   "fh": 72,
+   "frames": 20,
+   "fw": 72,
+   "sheets": 3,
+   "tex": [
+    256,
+    256
+   ]
+  }
+ },
+ "version": 1
+}

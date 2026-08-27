@@ -1,0 +1,18 @@
+tick 5
+lclickobj MCV:@me
+actclickobj MCV:@me
+tick 220
+cheatdump
+sbdump
+cheatset money 1
+cheatset tech 1
+cheatset fog 0
+cheatset instant 1
+tick 5
+build NUKE
+tick 30
+cheatdump
+sbdump
+cheats
+shot shots/gate_cheats.png
+quit

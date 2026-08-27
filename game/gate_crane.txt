@@ -1,0 +1,21 @@
+# THE CONSTRUCTION YARD'S CRANE. 20 Aug: "the Construction Yard is not playing its
+# Crane Moving animation, when a building is being placed." It was not, because the fix for
+# the detached fan plate (v0.5.5) disabled the yard's whole clip, and that clip's SECOND
+# segment is the crane. Two claims here: the yard is STILL while idle (which is what put the
+# plate back on the vault), and it MOVES while something is under construction.
+tick 20
+cam 53 51
+zoom max
+shot shots/crane_i0.png
+tick 6
+shot shots/crane_i1.png
+sidebar
+build NUKE
+ready NUKE 400
+startplace NUKE
+place auto
+tick 4
+shot shots/crane_a0.png
+tick 4
+shot shots/crane_a1.png
+quit

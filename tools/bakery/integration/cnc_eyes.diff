@@ -1,0 +1,291 @@
+--- a/game/cnc_eyes.cpp 12:06:29
++++ b/game/cnc_eyes.cpp 13:00:42
+@@ -252,6 +252,10 @@
+    rows treated as clockwise/east-half) so before/after can be measured with one binary. */
+ static bool g_nofacefix = false;
+ 
++/* --turtest N (with --posetest): aim every pose's turret N DirType units clockwise off
++   the hull, so one still screenshot proves the turret part rotates independently. */
++static int g_turTest = -1;
++
+ /* Diagnostics. --legacy reproduces the pre-fix draw (top-left cell centre, 1/512, no
+    rotation) so before/after can be measured with the same instrument. */
+ static bool g_legacy = false;
+@@ -262,7 +266,17 @@
+ 
+ struct PackVert { float x, y, z, u, v; unsigned char r, g, b, a; };
+ struct PackTri  { int tex; unsigned char mode, wrap; PackVert v[3]; };
+-struct PackMesh { char name[17]; std::vector<PackTri> tris; };
++
++/* A part is a contiguous run of a mesh's triangles plus the mount pivot the run
++   may rotate about. The triangles already carry the ROM's mount transform (the
++   bake applies it); the pivot exists so the renderer can rotate the part FURTHER:
++   a TURRET part turns to the engine's turret facing, a ROTOR part spins. Roles
++   are derived in bake5.py from engine truth (udata/bdata turret flags) plus the
++   part's mount geometry, and documented per model in parts_roles.json. */
++enum PartRole { ROLE_STATIC = 0, ROLE_TURRET = 1, ROLE_ROTOR = 2 };
++struct PackPart { int tri0, ntris, role; float px, py, pz; };
++
++struct PackMesh { char name[17]; std::vector<PackTri> tris; std::vector<PackPart> parts; };
+ struct PackTex  { int w, h, uw, uh; GLuint gl; };
+ /* mr/mg/mb is the cell's average colour, taken off the N64 tile atlas at load time.
+    The minimap paints with it, so the radar shows the theatre's real palette (sand,
+@@ -322,8 +336,8 @@
+     }
+     char magic[8];
+     uint32_t ver = 0;
+-    if (fread(magic, 1, 8, f) != 8 || memcmp(magic, "CNC3DPK4", 8) != 0) {
+-        fprintf(stderr, "pack: bad magic in %s (want CNC3DPK4 -- re-run bake.py)\n", path);
++    if (fread(magic, 1, 8, f) != 8 || memcmp(magic, "CNC3DPK5", 8) != 0) {
++        fprintf(stderr, "pack: bad magic in %s (want CNC3DPK5 -- re-run bake5.py)\n", path);
+         fclose(f);
+         return false;
+     }
+@@ -368,7 +382,33 @@
+                 PackVert& v = tr.v[k];
+                 v.x = q[0]; v.y = q[1]; v.z = q[2]; v.u = q[3]; v.v = q[4];
+                 v.r = c[0]; v.g = c[1]; v.b = c[2]; v.a = c[3];
++            }
++        }
++        /* PK5: the part table. Ranges must tile 0..ntris exactly; a malformed
++           table would silently mis-rotate geometry, so it is rejected here. */
++        uint32_t np = 0;
++        rd(f, np);
++        p.mesh[i].parts.resize(np);
++        int covered = 0;
++        for (uint32_t k = 0; k < np; k++) {
++            PackPart& pp = p.mesh[i].parts[k];
++            uint32_t t0, tn, role;
++            float piv[3];
++            rd(f, t0); rd(f, tn); rd(f, role);
++            if (fread(piv, sizeof(float), 3, f) != 3) { return pack_short(f, path); }
++            pp.tri0 = (int)t0; pp.ntris = (int)tn; pp.role = (int)role;
++            pp.px = piv[0]; pp.py = piv[1]; pp.pz = piv[2];
++            if (pp.tri0 != covered) {
++                fprintf(stderr, "pack: %s mesh %s part %u not contiguous\n", path, p.mesh[i].name, k);
++                fclose(f);
++                return false;
+             }
++            covered += pp.ntris;
++        }
++        if (np > 0 && covered != (int)nt) {
++            fprintf(stderr, "pack: %s mesh %s parts cover %d of %u tris\n", path, p.mesh[i].name, covered, nt);
++            fclose(f);
++            return false;
+         }
+     }
+ 
+@@ -1591,18 +1631,42 @@
+ 
+    The yaw is applied per-vertex on the CPU rather than through glRotatef, because the Glide
+    port has no matrix stack to push: there, every glBegin block becomes grDrawTriangle with a
+-   hand-built transform, and this is that transform. */
+-static void draw_mesh(int mi, float cx, float cz, int face, int pass)
++   hand-built transform, and this is that transform.
++
++   turyaw: extra yaw, DirType units, applied to TURRET parts only, rotating them about
++   their own mount pivot BEFORE the hull yaw. For a unit this is (tface - face): the hull
++   keeps the movement heading while the turret tracks the target. 0 = turret centred,
++   nothing moves. rotor: same idea for ROTOR parts, an angle in radians (a deterministic
++   function of the engine frame, never wall clock, so --shot stays reproducible). */
++static void draw_mesh(int mi, float cx, float cz, int face, int pass,
++                      int turyaw = 0, float rotor = 0.0f)
+ {
+     if (mi < 0 || mi >= (int)g_pack.mesh.size())
+         return;
+     float rs, rc;
+     facing_rot(face, &rs, &rc);
+-    const std::vector<PackTri>& tris = g_pack.mesh[mi].tris;
++    const PackMesh& mesh = g_pack.mesh[mi];
++    const std::vector<PackTri>& tris = mesh.tris;
++    /* per-part extra rotation about the part's own pivot; identity when unused */
++    const float tura = -((float)turyaw) * (2.0f * (float)M_PI / 256.0f);
++    const float tsn = sinf(tura), tcs = cosf(tura);
++    const float rsn = sinf(-rotor), rcs = cosf(-rotor);
+     int curtex = -2;
+     int curwrap = -1;
+     bool began = false;
++    const size_t nparts = mesh.parts.size();
++    size_t pi = 0;
+     for (size_t i = 0; i < tris.size(); i++) {
++        while (pi + 1 < nparts && (int)i >= mesh.parts[pi].tri0 + mesh.parts[pi].ntris)
++            pi++;
++        const PackPart* part = nparts ? &mesh.parts[pi] : NULL;
++        float psn = 0.0f, pcs = 1.0f;
++        bool spin = false;
++        if (part && part->role == ROLE_TURRET && turyaw != 0) {
++            psn = tsn; pcs = tcs; spin = true;
++        } else if (part && part->role == ROLE_ROTOR && rotor != 0.0f) {
++            psn = rsn; pcs = rcs; spin = true;
++        }
+         const PackTri& t = tris[i];
+         if ((int)t.mode != pass)
+             continue;
+@@ -1633,8 +1697,15 @@
+                              v.v * (float)tx.uh / (float)tx.h);
+             }
+             glColor4ub(v.r, v.g, v.b, v.a);
+-            const float mx = v.x * rc + v.z * rs;
+-            const float mz = -v.x * rs + v.z * rc;
++            float vx = v.x, vz = v.z;
++            if (spin) {
++                /* rotate about the part's mount pivot, same sense as facing_rot */
++                const float dx = vx - part->px, dz = vz - part->pz;
++                vx = part->px + dx * pcs + dz * psn;
++                vz = part->pz - dx * psn + dz * pcs;
++            }
++            const float mx = vx * rc + vz * rs;
++            const float mz = -vx * rs + vz * rc;
+             glVertex3f(cx + mx * MODEL_SCALE,
+                        v.y * MODEL_SCALE + ybias,
+                        cz + mz * MODEL_SCALE);
+@@ -1644,6 +1715,18 @@
+         glEnd();
+ }
+ 
++/* Does a mesh carry a part with the given role. */
++static bool mesh_has_role(int mi, int role)
++{
++    if (mi < 0 || mi >= (int)g_pack.mesh.size())
++        return false;
++    const std::vector<PackPart>& ps = g_pack.mesh[mi].parts;
++    for (size_t i = 0; i < ps.size(); i++)
++        if (ps[i].role == role)
++            return true;
++    return false;
++}
++
+ /* How big one sprite texel is on the ground.
+ 
+    A terrain cell is a 24x24 texel tile (terrain_*.json tileSize) and covers one world
+@@ -1965,17 +2048,52 @@
+ {
+     if (o.kind != K_UNIT || o.face < 0)
+         return -1;
+-    /* A standing turreted unit turns its whole (rigid, turretless) model to the
+-       engine's turret facing, so the art points at what the gun points at; see the
+-       UnitAim comment for why this is the honest option. A driving unit keeps the
+-       hull facing so the art stays on the movement vector. */
++    /* A standing turreted unit whose MESH HAS NO TURRET PART turns its whole (rigid)
++       model to the engine's turret facing, so the art points at what the gun points
++       at; see the UnitAim comment for why that is the honest fallback. Meshes that DO
++       carry a real turret part (PK5 role table: MTNK, LTNK, HTNK, JEEP, BGGY, BOAT)
++       keep the hull on the movement heading always -- the turret part itself is
++       rotated to tface by draw_mesh, moving or not. */
+     int face = o.face;
+-    if (o.tface >= 0 && o.tface != o.face && o.id >= 0 && !g_legacy && unit_is_still(o.id))
++    if (o.tface >= 0 && o.tface != o.face && o.id >= 0 && !g_legacy && unit_is_still(o.id)
++        && !mesh_has_role(mesh_for(o), ROLE_TURRET))
+         face = o.tface;
+     const int bias = g_nofacefix ? (((int)g_faceBias) & 255) : model_face_bias(o.type);
+     return (face + bias) & 255;
++}
++
++/* The extra yaw draw_mesh applies to a TURRET part for this object, DirType units.
++   Units: the turret tracks tface while the hull keeps face, so the offset is their
++   difference. Buildings are drawn unrotated (face -1 to draw_mesh), so the turret's
++   rest pose points the mesh's authored forward; the offset from THERE to the engine
++   facing aims it. GUN and SAM are the only building types whose face the engine
++   turns (bdata.cpp "rotating turret"), and SAM's launcher is baked static
++   (retracted rest pose), so in practice this rotates GUN's barrel assembly. */
++static int turret_delta(const SimObject& o)
++{
++    const int mi = mesh_for(o);
++    if (mi < 0 || !mesh_has_role(mi, ROLE_TURRET))
++        return 0;
++    if (o.kind == K_UNIT) {
++        if (o.face < 0 || o.tface < 0 || g_legacy)
++            return 0;
++        return (o.tface - o.face) & 255;
++    }
++    if (o.kind == K_BUILDING && o.face >= 0 && !g_legacy)
++        return (o.face - model_forward(o.type)) & 255;
++    return 0;
+ }
+ 
++/* ROTOR spin angle in radians. A deterministic function of the ENGINE frame (never
++   wall clock: --shot must stay byte-reproducible), fast enough to read as motion at
++   the 15 fps cadence. Note the honesty limit: the object dump does not carry the
++   Aircraft heap yet, so no live object reaches this path today; it is exercised by
++   --posetest with --turtest and will light up when aircraft are exported. */
++static float rotor_spin(void)
++{
++    return (float)(g_engineFrame & 1023) * 0.9f;
++}
++
+ /* ---------------------------------------------------------------------------------- *
+  *  The facing audit (facewatch / facedump / --dumpfacing)
+  *
+@@ -2046,8 +2164,20 @@
+             continue;
+         char desc[64];
+         const int rd = object_render_dir(o, desc, sizeof(desc));
+-        printf("FACEDUMP|%s|id=%d|cell=%d,%d|face=%d|renderdir=%d|%s\n",
+-               o.type, o.id, o.cx, o.cy, o.face, rd, desc);
++        /* Meshes with a real TURRET part report both barrels of the claim: the hull's
++           drawn direction (renderdir, = face for a driving unit) AND the turret part's
++           drawn direction (turretdir = renderdir + the extra part yaw, = tface). The
++           new fields are appended so existing FACEDUMP parsers keep working. */
++        const int mi = mesh_for(o);
++        if (mi >= 0 && mesh_has_role(mi, ROLE_TURRET) && o.kind == K_UNIT && o.tface >= 0) {
++            const int td = turret_delta(o);
++            printf("FACEDUMP|%s|id=%d|cell=%d,%d|face=%d|renderdir=%d|%s|tface=%d|turretdir=%d\n",
++                   o.type, o.id, o.cx, o.cy, o.face, rd, desc, o.tface,
++                   rd < 0 ? -1 : ((rd + td) & 255));
++        } else {
++            printf("FACEDUMP|%s|id=%d|cell=%d,%d|face=%d|renderdir=%d|%s\n",
++                   o.type, o.id, o.cx, o.cy, o.face, rd, desc);
++        }
+     }
+ }
+ 
+@@ -3542,7 +3672,8 @@
+         const SimObject& o = g_objects[order[k]];
+         int mi = mesh_for(o);
+         if (mi >= 0)
+-            draw_mesh(mi, o.wx, o.wz, draw_facing(o), MODE_SHADOW);
++            draw_mesh(mi, o.wx, o.wz, draw_facing(o), MODE_SHADOW,
++                      turret_delta(o), rotor_spin());
+     }
+     glDepthMask(GL_TRUE);
+     glDisable(GL_BLEND);
+@@ -3552,7 +3683,8 @@
+         const SimObject& o = g_objects[order[k]];
+         int mi = mesh_for(o);
+         if (mi >= 0) {
+-            draw_mesh(mi, o.wx, o.wz, draw_facing(o), MODE_OPAQUE);
++            draw_mesh(mi, o.wx, o.wz, draw_facing(o), MODE_OPAQUE,
++                      turret_delta(o), rotor_spin());
+             g_nMesh++;
+         } else if (o.kind == K_TERRAIN) {
+             draw_terrain_billboard(o.wx, o.wz);
+@@ -3576,7 +3708,8 @@
+         const SimObject& o = g_objects[order[k]];
+         int mi = mesh_for(o);
+         if (mi >= 0)
+-            draw_mesh(mi, o.wx, o.wz, draw_facing(o), MODE_CUTOUT);
++            draw_mesh(mi, o.wx, o.wz, draw_facing(o), MODE_CUTOUT,
++                      turret_delta(o), rotor_spin());
+     }
+ 
+     /* 6: infantry sprites */
+@@ -4956,6 +5089,7 @@
+         else if (!strcmp(argv[i], "--nofacefix"))               g_nofacefix = true;
+         else if (!strcmp(argv[i], "--dumpfacing"))              g_dumpfacing = true;
+         else if (!strcmp(argv[i], "--posetest") && i + 1 < argc) posetest = argv[++i];
++        else if (!strcmp(argv[i], "--turtest") && i + 1 < argc)  g_turTest = atoi(argv[++i]);
+         else if (!strcmp(argv[i], "--diamonds"))                g_diamonds = true;
+         else if (!strcmp(argv[i], "--measure"))                 g_measure = true;
+         else if (!strcmp(argv[i], "--legacy"))                  { g_legacy = true; MODEL_SCALE = 1.0f / 512.0f; }
+@@ -5147,7 +5281,10 @@
+             o.wz = o.ez = (float)o.cy + 0.5f;
+             o.fw = o.fh = 1;
+             o.face = k * 32;                     /* N, NE, E, SE, S, SW, W, NW */
+-            o.tface = -1;
++            /* --turtest N: every pose also aims its turret part N DirType units
++               clockwise OFF the hull, so one screenshot shows hull and turret
++               decoupled at all eight facings. -1 (default) = turret centred. */
++            o.tface = (g_turTest >= 0) ? ((o.face + g_turTest) & 255) : -1;
+             o.str = o.maxstr = 100;
+             g_objects.push_back(o);
+         }

@@ -1,0 +1,60 @@
+# SCG01EC self-play: deploy, build a structure, build a unit, fight.
+tick 2
+sidebar BOOT
+player
+cam 55 49
+shot sp1_boot.png
+# ---- 1. deploy the MCV into a second construction yard (ACTION_SELF path)
+lclickobj MCV 0
+expectsel 1
+order 57 49
+tick 120
+echo AFTER-DEPLOY
+objdump
+cam 56 49
+shot sp2_deployed.png
+# ---- 2. structure: NUKE power plant, sidebar build -> ready -> place auto
+build NUKE
+ready NUKE 4000
+startplace NUKE
+place auto
+tick 40
+echo AFTER-NUKE
+objdump
+shot sp3_nuke.png
+# ---- 3. unit: minigunner from the barracks, real cameo click
+sbitem E1
+sbclickitem E1
+sidebar E1STARTED
+tick 260
+echo AFTER-E1
+objdump
+shot sp4_e1.png
+# ---- 4. fight: engage the Nod area-guard infantry SW of the base
+player
+# LOOK FIRST. This click used to aim at row 828.5 of a 720-tall frame -- 108 px below
+# the bottom of the window -- and the selection still "passed", because the assertion
+# proved the ENGINE accepted an id rather than that anything on screen was touched.
+look E1:GoodGuy 0
+lclickobj E1:GoodGuy 0
+expectsel 1
+orderobj E1:BadGuy 4
+tick 80
+cam 49 47
+efxdump
+shot sp5_fight.png
+tick 240
+efxdump
+shot sp6_fight2.png
+# ART-EXP1, not FRAG1: the cartridge's bullet table points rocket impacts at
+# ART_EXP1 (no debris chunks); FRAG1 is reserved for deaths. See gates.sh G19.
+expectefx ART-EXP1 1
+expectefx PIFF 2
+tick 500
+expectdeath 1
+cam 52 50
+hbdump
+shot sp7_late.png
+sidebar END
+player
+quit

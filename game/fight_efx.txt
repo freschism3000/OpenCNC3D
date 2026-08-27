@@ -1,0 +1,99 @@
+tick 249
+look BGGY 0
+tick 1
+efxdump
+shot fx_muzzle_f250.png
+tick 50
+clickobj BGGY 0
+addobj BGGY 1
+look JEEP 0
+orderobj JEEP 0
+tick 25
+efxdump
+shot fx_poll_0325.png
+tick 25
+efxdump
+shot fx_poll_0350.png
+tick 25
+efxdump
+shot fx_poll_0375.png
+tick 25
+efxdump
+shot fx_poll_0400.png
+tick 25
+efxdump
+shot fx_poll_0425.png
+tick 25
+efxdump
+shot fx_poll_0450.png
+tick 25
+efxdump
+shot fx_poll_0475.png
+tick 25
+efxdump
+shot fx_poll_0500.png
+tick 25
+efxdump
+shot fx_poll_0525.png
+tick 25
+efxdump
+shot fx_poll_0550.png
+tick 25
+efxdump
+shot fx_poll_0575.png
+tick 25
+efxdump
+shot fx_poll_0600.png
+tick 25
+efxdump
+shot fx_poll_0625.png
+tick 25
+efxdump
+shot fx_poll_0650.png
+tick 25
+efxdump
+shot fx_poll_0675.png
+tick 25
+efxdump
+shot fx_poll_0700.png
+tick 25
+efxdump
+shot fx_poll_0725.png
+tick 25
+efxdump
+shot fx_poll_0750.png
+tick 25
+efxdump
+shot fx_poll_0775.png
+tick 25
+efxdump
+shot fx_poll_0800.png
+tick 25
+efxdump
+shot fx_poll_0825.png
+tick 25
+efxdump
+shot fx_poll_0850.png
+tick 25
+efxdump
+shot fx_poll_0875.png
+tick 25
+efxdump
+shot fx_poll_0900.png
+tick 25
+efxdump
+shot fx_poll_0925.png
+tick 25
+efxdump
+shot fx_poll_0950.png
+tick 25
+efxdump
+shot fx_poll_0975.png
+tick 25
+efxdump
+shot fx_poll_1000.png
+expectefx MINIGUN
+expectefx PIFF
+expectefx FRAG1
+expectdeath 1
+quit

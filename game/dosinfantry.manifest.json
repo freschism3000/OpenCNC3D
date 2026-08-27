@@ -1,0 +1,8279 @@
+{
+ "anchor": "crop symmetric about frame column 27 (Draw_It ground x); quad bottom = crop bottom = feet line (STAND/WALK unified per type)",
+ "bytes": 4973856,
+ "death_dotype": {
+  "17_20_punch_kick": "fallback D_GUN",
+  "22": "D_GUN",
+  "23": "D_EXPL",
+  "24": "D_EXPL2",
+  "25": "D_GREN",
+  "26": "D_FIRE"
+ },
+ "facing_order": "facing-major, facenum 0..7 CCW from N per HumanShape[32]",
+ "fire": "the v2 live-combat slots are idata.cpp's own DO rows; the renderer picks them per tick from doing/dostage. E6 has no FIRE/FIRE_PRONE (-1). src_stages is the engine Count; == stages unless subsampled to fit the Voodoo 2 256x256 limit.",
+ "live_dotype": {
+  "2": "PRONE",
+  "4": "FIRE",
+  "5": "LIE_DOWN",
+  "6": "CRAWL",
+  "7": "GET_UP",
+  "8": "FIRE_PRONE"
+ },
+ "magic": "DOSINF01",
+ "pack": "dosinfantry.pack",
+ "palette": "TEMPERAT.PAL from the 1995 LOCAL.MIX (every index the strips use is byte-identical in DESERT.PAL; content/TEMPERAT.MIX is repacked and carries a wrong palette, never source it)",
+ "shadow": "index 4 kept in data, renderer maps it to alpha 0",
+ "slots": [
+  "STAND",
+  "WALK",
+  "D_GUN",
+  "D_EXPL",
+  "D_EXPL2",
+  "D_GREN",
+  "D_FIRE",
+  "FIRE",
+  "PRONE",
+  "FPRONE",
+  "LIEDOWN",
+  "CRAWL",
+  "GETUP",
+  "IDLE1",
+  "IDLE2"
+ ],
+ "strips": {
+  "C10_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C10_D_EXPL#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C10_D_EXPL2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C10_D_FIRE#0": {
+   "cols": 9,
+   "facings": 1,
+   "fh": 19,
+   "frames": 18,
+   "fw": 27,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C10_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 19,
+   "frames": 12,
+   "fw": 29,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C10_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C10_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C10_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C10_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C10_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C10_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C10_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C10_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C10_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C10_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C1_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C1_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 18,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C1_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 18,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C1_D_FIRE#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 12,
+   "frames": 18,
+   "fw": 33,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C1_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 22,
+   "frames": 12,
+   "fw": 31,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C1_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 12,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C1_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C1_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C1_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C1_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C1_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C1_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C1_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C1_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C1_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C2_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C2_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 31,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C2_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 31,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C2_D_FIRE#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 12,
+   "frames": 18,
+   "fw": 33,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C2_D_GREN#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 39,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C2_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 12,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C2_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C2_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C2_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C2_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C2_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C2_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C2_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C2_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C2_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C3_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C3_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 17,
+   "frames": 8,
+   "fw": 31,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C3_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 17,
+   "frames": 8,
+   "fw": 31,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C3_D_FIRE#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 12,
+   "frames": 18,
+   "fw": 33,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C3_D_GREN#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 20,
+   "frames": 12,
+   "fw": 41,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C3_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 12,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C3_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C3_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C3_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C3_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C3_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C3_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C3_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C3_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C3_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C4_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C4_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 22,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C4_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 22,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C4_D_FIRE#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 18,
+   "frames": 18,
+   "fw": 25,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C4_D_GREN#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 20,
+   "frames": 12,
+   "fw": 33,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C4_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 15,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C4_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C4_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C4_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C4_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C4_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C4_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C4_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C4_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C4_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C5_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C5_D_EXPL#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C5_D_EXPL2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C5_D_FIRE#0": {
+   "cols": 9,
+   "facings": 1,
+   "fh": 19,
+   "frames": 18,
+   "fw": 27,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C5_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 19,
+   "frames": 12,
+   "fw": 29,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C5_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C5_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C5_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C5_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C5_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C5_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C5_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C5_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C5_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C5_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C6_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C6_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 23,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C6_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 23,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C6_D_FIRE#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 18,
+   "frames": 18,
+   "fw": 25,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C6_D_GREN#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 20,
+   "frames": 12,
+   "fw": 33,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C6_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 15,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C6_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C6_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C6_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C6_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C6_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C6_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C6_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C6_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C6_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C7_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C7_D_EXPL#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C7_D_EXPL2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C7_D_FIRE#0": {
+   "cols": 9,
+   "facings": 1,
+   "fh": 19,
+   "frames": 18,
+   "fw": 27,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C7_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 19,
+   "frames": 12,
+   "fw": 29,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C7_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C7_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C7_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C7_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C7_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C7_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C7_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C7_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C7_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C7_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C8_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C8_D_EXPL#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C8_D_EXPL2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C8_D_FIRE#0": {
+   "cols": 9,
+   "facings": 1,
+   "fh": 19,
+   "frames": 18,
+   "fw": 27,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C8_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 19,
+   "frames": 12,
+   "fw": 29,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C8_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C8_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C8_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C8_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C8_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C8_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C8_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C8_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C8_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C8_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C9_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C9_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 18,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C9_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 18,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "C9_D_FIRE#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 12,
+   "frames": 18,
+   "fw": 33,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C9_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 22,
+   "frames": 12,
+   "fw": 31,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "C9_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 12,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "C9_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C9_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "C9_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C9_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C9_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C9_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C9_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C9_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "C9_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "CHAN_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 15,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "CHAN_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 23,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "CHAN_D_EXPL2#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 20,
+   "frames": 12,
+   "fw": 33,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "CHAN_D_FIRE#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 18,
+   "frames": 17,
+   "fw": 25,
+   "src_stages": 17,
+   "stages": 17,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "CHAN_D_GREN#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 20,
+   "frames": 12,
+   "fw": 33,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "CHAN_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 15,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "CHAN_FIRE#0": {
+   "cols": 7,
+   "facings": 8,
+   "fh": 24,
+   "frames": 32,
+   "fw": 35,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "CHAN_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 9,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "CHAN_IDLE1#0": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 10,
+   "frames": 16,
+   "fw": 11,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "CHAN_IDLE2#0": {
+   "cols": 19,
+   "facings": 1,
+   "fh": 10,
+   "frames": 20,
+   "fw": 13,
+   "src_stages": 20,
+   "stages": 20,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "CHAN_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 9,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "CHAN_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 9,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "CHAN_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 15,
+   "frames": 8,
+   "fw": 9,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "CHAN_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 16,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "DELPHI_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "DELPHI_D_EXPL#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "DELPHI_D_EXPL2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 37,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "DELPHI_D_FIRE#0": {
+   "cols": 9,
+   "facings": 1,
+   "fh": 19,
+   "frames": 18,
+   "fw": 27,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "DELPHI_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 19,
+   "frames": 12,
+   "fw": 29,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "DELPHI_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "DELPHI_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "DELPHI_FPRONE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 19,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "DELPHI_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "DELPHI_IDLE1#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 10,
+   "frames": 10,
+   "fw": 11,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "DELPHI_IDLE2#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 10,
+   "frames": 6,
+   "fw": 13,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "DELPHI_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "DELPHI_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "DELPHI_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "DELPHI_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_CRAWL#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_CRAWL#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_D_EXPL#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_D_EXPL2#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_D_FIRE#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_D_FIRE#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_D_GREN#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 41,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_D_GREN#1": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 41,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 17,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_D_GUN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 17,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_FIRE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 15,
+   "frames": 64,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E1_FIRE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 15,
+   "frames": 64,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E1_FPRONE#0": {
+   "cols": 7,
+   "facings": 8,
+   "fh": 18,
+   "frames": 48,
+   "fw": 33,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E1_FPRONE#1": {
+   "cols": 7,
+   "facings": 8,
+   "fh": 18,
+   "frames": 48,
+   "fw": 33,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E1_GETUP#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_GETUP#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_IDLE1#0": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_IDLE1#1": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_IDLE2#0": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_IDLE2#1": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_LIEDOWN#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_LIEDOWN#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E1_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_PRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_STAND#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E1_WALK#0": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 25,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E1_WALK#1": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 25,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_CRAWL#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 21,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_CRAWL#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 21,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_D_EXPL#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_D_EXPL2#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_D_FIRE#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 29,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_D_FIRE#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 29,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_D_GREN#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 25,
+   "frames": 12,
+   "fw": 41,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_D_GREN#1": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 25,
+   "frames": 12,
+   "fw": 41,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_D_GUN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_FIRE#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 14,
+   "frames": 160,
+   "fw": 21,
+   "src_stages": 20,
+   "stages": 20,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E2_FIRE#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 14,
+   "frames": 160,
+   "fw": 21,
+   "src_stages": 20,
+   "stages": 20,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E2_FPRONE#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 11,
+   "frames": 64,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E2_FPRONE#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 11,
+   "frames": 64,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E2_GETUP#0": {
+   "cols": 15,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E2_GETUP#1": {
+   "cols": 15,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E2_IDLE1#0": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E2_IDLE1#1": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E2_IDLE2#0": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_IDLE2#1": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_LIEDOWN#0": {
+   "cols": 16,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_LIEDOWN#1": {
+   "cols": 16,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_PRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E2_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "E2_STAND#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "E2_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E2_WALK#1": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_CRAWL#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 14,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_CRAWL#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 14,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 24,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_D_EXPL#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 24,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 24,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_D_EXPL2#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 24,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_D_FIRE#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 21,
+   "frames": 18,
+   "fw": 25,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_D_FIRE#1": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 21,
+   "frames": 18,
+   "fw": 25,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_D_GREN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 31,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_D_GREN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 31,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 19,
+   "frames": 8,
+   "fw": 27,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_D_GUN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 19,
+   "frames": 8,
+   "fw": 27,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_FIRE#0": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 17,
+   "frames": 64,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E3_FIRE#1": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 17,
+   "frames": 64,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E3_FPRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 17,
+   "frames": 80,
+   "fw": 31,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E3_FPRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 17,
+   "frames": 80,
+   "fw": 31,
+   "src_stages": 10,
+   "stages": 10,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E3_GETUP#0": {
+   "cols": 13,
+   "facings": 8,
+   "fh": 14,
+   "frames": 16,
+   "fw": 19,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_GETUP#1": {
+   "cols": 13,
+   "facings": 8,
+   "fh": 14,
+   "frames": 16,
+   "fw": 19,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_IDLE1#0": {
+   "cols": 12,
+   "facings": 1,
+   "fh": 15,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_IDLE1#1": {
+   "cols": 12,
+   "facings": 1,
+   "fh": 15,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_IDLE2#0": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E3_IDLE2#1": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E3_LIEDOWN#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_LIEDOWN#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E3_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 11,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E3_PRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 11,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E3_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 15,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "E3_STAND#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 15,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "E3_WALK#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 14,
+   "frames": 48,
+   "fw": 21,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E3_WALK#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 14,
+   "frames": 48,
+   "fw": 21,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E4_CRAWL#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E4_CRAWL#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E4_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_D_EXPL#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_D_EXPL2#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_D_FIRE#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E4_D_FIRE#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E4_D_GREN#0": {
+   "cols": 5,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 45,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E4_D_GREN#1": {
+   "cols": 5,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 45,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E4_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_D_GUN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_FIRE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 18,
+   "frames": 64,
+   "fw": 31,
+   "src_stages": 16,
+   "stages": 8,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E4_FIRE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 18,
+   "frames": 64,
+   "fw": 31,
+   "src_stages": 16,
+   "stages": 8,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E4_FPRONE#0": {
+   "cols": 7,
+   "facings": 8,
+   "fh": 18,
+   "frames": 64,
+   "fw": 35,
+   "src_stages": 16,
+   "stages": 8,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E4_FPRONE#1": {
+   "cols": 7,
+   "facings": 8,
+   "fh": 18,
+   "frames": 64,
+   "fw": 35,
+   "src_stages": 16,
+   "stages": 8,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E4_GETUP#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_GETUP#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_IDLE1#0": {
+   "cols": 12,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_IDLE1#1": {
+   "cols": 12,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_IDLE2#0": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_IDLE2#1": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_LIEDOWN#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_LIEDOWN#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E4_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_PRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_STAND#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E4_WALK#0": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 25,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E4_WALK#1": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 13,
+   "frames": 48,
+   "fw": 25,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "E5_CRAWL#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E5_CRAWL#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 23,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E5_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_D_EXPL#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_D_EXPL2#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_D_FIRE#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E5_D_FIRE#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E5_D_GREN#0": {
+   "cols": 5,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 45,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E5_D_GREN#1": {
+   "cols": 5,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 45,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E5_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_D_GUN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_FIRE#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 128,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E5_FIRE#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 128,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E5_FPRONE#0": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 10,
+   "frames": 128,
+   "fw": 25,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E5_FPRONE#1": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 10,
+   "frames": 128,
+   "fw": 25,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    256
+   ]
+  },
+  "E5_GETUP#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_GETUP#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_IDLE1#0": {
+   "cols": 12,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_IDLE1#1": {
+   "cols": 12,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_IDLE2#0": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_IDLE2#1": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 11,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_LIEDOWN#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_LIEDOWN#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 21,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E5_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_PRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 10,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_STAND#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E5_WALK#0": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 25,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E5_WALK#1": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 25,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_CRAWL#0": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 21,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_CRAWL#1": {
+   "cols": 12,
+   "facings": 8,
+   "fh": 12,
+   "frames": 32,
+   "fw": 21,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_D_EXPL#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_D_EXPL2#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_D_FIRE#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 29,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_D_FIRE#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 29,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_D_GREN#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 25,
+   "frames": 12,
+   "fw": 41,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_D_GREN#1": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 25,
+   "frames": 12,
+   "fw": 41,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_D_GUN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 15,
+   "frames": 8,
+   "fw": 21,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_GETUP#0": {
+   "cols": 16,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 13,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_GETUP#1": {
+   "cols": 16,
+   "facings": 8,
+   "fh": 12,
+   "frames": 16,
+   "fw": 13,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_IDLE1#0": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E6_IDLE1#1": {
+   "cols": 15,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 17,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E6_LIEDOWN#0": {
+   "cols": 16,
+   "facings": 8,
+   "fh": 17,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E6_LIEDOWN#1": {
+   "cols": 16,
+   "facings": 8,
+   "fh": 17,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "E6_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_PRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 19,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "E6_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "E6_STAND#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "E6_WALK#0": {
+   "cols": 15,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 17,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "E6_WALK#1": {
+   "cols": 15,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 17,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "MOEBIUS_CRAWL#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 16,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "MOEBIUS_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 23,
+   "frames": 8,
+   "fw": 29,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "MOEBIUS_D_EXPL2#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 22,
+   "frames": 12,
+   "fw": 33,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "MOEBIUS_D_FIRE#0": {
+   "cols": 10,
+   "facings": 1,
+   "fh": 19,
+   "frames": 17,
+   "fw": 25,
+   "src_stages": 17,
+   "stages": 17,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "MOEBIUS_D_GREN#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 22,
+   "frames": 12,
+   "fw": 33,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "MOEBIUS_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 8,
+   "fw": 15,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "MOEBIUS_FIRE#0": {
+   "cols": 7,
+   "facings": 8,
+   "fh": 24,
+   "frames": 32,
+   "fw": 35,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "MOEBIUS_GETUP#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "MOEBIUS_IDLE1#0": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 12,
+   "frames": 16,
+   "fw": 11,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "MOEBIUS_IDLE2#0": {
+   "cols": 17,
+   "facings": 1,
+   "fh": 12,
+   "frames": 20,
+   "fw": 15,
+   "src_stages": 20,
+   "stages": 20,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "MOEBIUS_LIEDOWN#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "MOEBIUS_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    16
+   ]
+  },
+  "MOEBIUS_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 17,
+   "frames": 8,
+   "fw": 11,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    128,
+    32
+   ]
+  },
+  "MOEBIUS_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 18,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_CRAWL#0": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 13,
+   "frames": 32,
+   "fw": 25,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_CRAWL#1": {
+   "cols": 10,
+   "facings": 8,
+   "fh": 13,
+   "frames": 32,
+   "fw": 25,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_D_EXPL#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_D_EXPL#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_D_EXPL2#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_D_EXPL2#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 25,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_D_FIRE#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_D_FIRE#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 13,
+   "frames": 18,
+   "fw": 31,
+   "src_stages": 18,
+   "stages": 18,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_D_GREN#0": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 37,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_D_GREN#1": {
+   "cols": 6,
+   "facings": 1,
+   "fh": 21,
+   "frames": 12,
+   "fw": 37,
+   "src_stages": 12,
+   "stages": 12,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_D_GUN#0": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_D_GUN#1": {
+   "cols": 8,
+   "facings": 1,
+   "fh": 16,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 8,
+   "stages": 8,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_FIRE#0": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 18,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "RMBO_FIRE#1": {
+   "cols": 9,
+   "facings": 8,
+   "fh": 18,
+   "frames": 32,
+   "fw": 27,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "RMBO_FPRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 21,
+   "frames": 32,
+   "fw": 29,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "RMBO_FPRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 21,
+   "frames": 32,
+   "fw": 29,
+   "src_stages": 4,
+   "stages": 4,
+   "tex": [
+    256,
+    128
+   ]
+  },
+  "RMBO_GETUP#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 13,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "RMBO_GETUP#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 13,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "RMBO_IDLE1#0": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 21,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "RMBO_IDLE1#1": {
+   "cols": 16,
+   "facings": 1,
+   "fh": 21,
+   "frames": 16,
+   "fw": 15,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "RMBO_IDLE2#0": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 21,
+   "frames": 16,
+   "fw": 33,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_IDLE2#1": {
+   "cols": 7,
+   "facings": 1,
+   "fh": 21,
+   "frames": 16,
+   "fw": 33,
+   "src_stages": 16,
+   "stages": 16,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_LIEDOWN#0": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 13,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "RMBO_LIEDOWN#1": {
+   "cols": 11,
+   "facings": 8,
+   "fh": 13,
+   "frames": 16,
+   "fw": 23,
+   "src_stages": 2,
+   "stages": 2,
+   "tex": [
+    256,
+    32
+   ]
+  },
+  "RMBO_PRONE#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_PRONE#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 12,
+   "frames": 8,
+   "fw": 23,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_STAND#0": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_STAND#1": {
+   "cols": 8,
+   "facings": 8,
+   "fh": 13,
+   "frames": 8,
+   "fw": 17,
+   "src_stages": 1,
+   "stages": 1,
+   "tex": [
+    256,
+    16
+   ]
+  },
+  "RMBO_WALK#0": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  },
+  "RMBO_WALK#1": {
+   "cols": 17,
+   "facings": 8,
+   "fh": 12,
+   "frames": 48,
+   "fw": 15,
+   "src_stages": 6,
+   "stages": 6,
+   "tex": [
+    256,
+    64
+   ]
+  }
+ },
+ "types": {
+  "C1": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      13,
+      4,
+      41,
+      21
+     ],
+     "fh": 18,
+     "fw": 29
+    },
+    "D_EXPL2": {
+     "box": [
+      13,
+      4,
+      41,
+      21
+     ],
+     "fh": 18,
+     "fw": 29
+    },
+    "D_FIRE": {
+     "box": [
+      11,
+      8,
+      43,
+      19
+     ],
+     "fh": 12,
+     "fw": 33
+    },
+    "D_GREN": {
+     "box": [
+      12,
+      3,
+      42,
+      24
+     ],
+     "fh": 22,
+     "fw": 31
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      19
+     ],
+     "fh": 12,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C1.SHP",
+   "shp_frames": 375
+  },
+  "C10": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_EXPL2": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_FIRE": {
+     "box": [
+      14,
+      9,
+      40,
+      27
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "D_GREN": {
+     "box": [
+      13,
+      5,
+      41,
+      23
+     ],
+     "fh": 19,
+     "fw": 29
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      20
+     ],
+     "fh": 13,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C10.SHP",
+   "shp_frames": 375
+  },
+  "C2": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      12,
+      5,
+      42,
+      20
+     ],
+     "fh": 16,
+     "fw": 31
+    },
+    "D_EXPL2": {
+     "box": [
+      12,
+      5,
+      42,
+      20
+     ],
+     "fh": 16,
+     "fw": 31
+    },
+    "D_FIRE": {
+     "box": [
+      11,
+      7,
+      43,
+      18
+     ],
+     "fh": 12,
+     "fw": 33
+    },
+    "D_GREN": {
+     "box": [
+      8,
+      4,
+      46,
+      24
+     ],
+     "fh": 21,
+     "fw": 39
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      19
+     ],
+     "fh": 12,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C2.SHP",
+   "shp_frames": 375
+  },
+  "C3": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      12,
+      3,
+      42,
+      19
+     ],
+     "fh": 17,
+     "fw": 31
+    },
+    "D_EXPL2": {
+     "box": [
+      12,
+      3,
+      42,
+      19
+     ],
+     "fh": 17,
+     "fw": 31
+    },
+    "D_FIRE": {
+     "box": [
+      11,
+      6,
+      43,
+      17
+     ],
+     "fh": 12,
+     "fw": 33
+    },
+    "D_GREN": {
+     "box": [
+      7,
+      3,
+      47,
+      22
+     ],
+     "fh": 20,
+     "fw": 41
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      7,
+      36,
+      18
+     ],
+     "fh": 12,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C3.SHP",
+   "shp_frames": 375
+  },
+  "C4": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      13,
+      0,
+      41,
+      21
+     ],
+     "fh": 22,
+     "fw": 29
+    },
+    "D_EXPL2": {
+     "box": [
+      13,
+      0,
+      41,
+      21
+     ],
+     "fh": 22,
+     "fw": 29
+    },
+    "D_FIRE": {
+     "box": [
+      15,
+      0,
+      39,
+      17
+     ],
+     "fh": 18,
+     "fw": 25
+    },
+    "D_GREN": {
+     "box": [
+      11,
+      4,
+      43,
+      23
+     ],
+     "fh": 20,
+     "fw": 33
+    },
+    "D_GUN": {
+     "box": [
+      20,
+      7,
+      34,
+      19
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C4.SHP",
+   "shp_frames": 375
+  },
+  "C5": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_EXPL2": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_FIRE": {
+     "box": [
+      14,
+      9,
+      40,
+      27
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "D_GREN": {
+     "box": [
+      13,
+      5,
+      41,
+      23
+     ],
+     "fh": 19,
+     "fw": 29
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      20
+     ],
+     "fh": 13,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C5.SHP",
+   "shp_frames": 375
+  },
+  "C6": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      13,
+      0,
+      41,
+      22
+     ],
+     "fh": 23,
+     "fw": 29
+    },
+    "D_EXPL2": {
+     "box": [
+      13,
+      0,
+      41,
+      22
+     ],
+     "fh": 23,
+     "fw": 29
+    },
+    "D_FIRE": {
+     "box": [
+      15,
+      1,
+      39,
+      18
+     ],
+     "fh": 18,
+     "fw": 25
+    },
+    "D_GREN": {
+     "box": [
+      11,
+      5,
+      43,
+      24
+     ],
+     "fh": 20,
+     "fw": 33
+    },
+    "D_GUN": {
+     "box": [
+      20,
+      8,
+      34,
+      20
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C6.SHP",
+   "shp_frames": 375
+  },
+  "C7": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_EXPL2": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_FIRE": {
+     "box": [
+      14,
+      9,
+      40,
+      27
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "D_GREN": {
+     "box": [
+      13,
+      5,
+      41,
+      23
+     ],
+     "fh": 19,
+     "fw": 29
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      20
+     ],
+     "fh": 13,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C7.SHP",
+   "shp_frames": 375
+  },
+  "C8": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_EXPL2": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_FIRE": {
+     "box": [
+      14,
+      9,
+      40,
+      27
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "D_GREN": {
+     "box": [
+      13,
+      5,
+      41,
+      23
+     ],
+     "fh": 19,
+     "fw": 29
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      20
+     ],
+     "fh": 13,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C8.SHP",
+   "shp_frames": 375
+  },
+  "C9": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      13,
+      4,
+      41,
+      21
+     ],
+     "fh": 18,
+     "fw": 29
+    },
+    "D_EXPL2": {
+     "box": [
+      13,
+      4,
+      41,
+      21
+     ],
+     "fh": 18,
+     "fw": 29
+    },
+    "D_FIRE": {
+     "box": [
+      11,
+      8,
+      43,
+      19
+     ],
+     "fh": 12,
+     "fw": 33
+    },
+    "D_GREN": {
+     "box": [
+      12,
+      3,
+      42,
+      24
+     ],
+     "fh": 22,
+     "fw": 31
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      19
+     ],
+     "fh": 12,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "C9.SHP",
+   "shp_frames": 375
+  },
+  "CHAN": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      7,
+      34,
+      21
+     ],
+     "fh": 15,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      13,
+      1,
+      41,
+      23
+     ],
+     "fh": 23,
+     "fw": 29
+    },
+    "D_EXPL2": {
+     "box": [
+      11,
+      6,
+      43,
+      25
+     ],
+     "fh": 20,
+     "fw": 33
+    },
+    "D_FIRE": {
+     "box": [
+      15,
+      2,
+      39,
+      19
+     ],
+     "fh": 18,
+     "fw": 25
+    },
+    "D_GREN": {
+     "box": [
+      11,
+      6,
+      43,
+      25
+     ],
+     "fh": 20,
+     "fw": 33
+    },
+    "D_GUN": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "FIRE": {
+     "box": [
+      10,
+      1,
+      44,
+      24
+     ],
+     "fh": 24,
+     "fw": 35
+    },
+    "GETUP": {
+     "box": [
+      23,
+      10,
+      31,
+      19
+     ],
+     "fh": 10,
+     "fw": 9
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      23,
+      10,
+      31,
+      19
+     ],
+     "fh": 10,
+     "fw": 9
+    },
+    "PRONE": {
+     "box": [
+      23,
+      10,
+      31,
+      19
+     ],
+     "fh": 10,
+     "fw": 9
+    },
+    "STAND": {
+     "box": [
+      23,
+      10,
+      31,
+      24
+     ],
+     "fh": 15,
+     "fw": 9
+    },
+    "WALK": {
+     "box": [
+      20,
+      9,
+      34,
+      24
+     ],
+     "fh": 16,
+     "fw": 15
+    }
+   },
+   "shp": "CHAN.SHP",
+   "shp_frames": 257
+  },
+  "DELPHI": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_EXPL2": {
+     "box": [
+      9,
+      6,
+      45,
+      21
+     ],
+     "fh": 16,
+     "fw": 37
+    },
+    "D_FIRE": {
+     "box": [
+      14,
+      9,
+      40,
+      27
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "D_GREN": {
+     "box": [
+      13,
+      5,
+      41,
+      23
+     ],
+     "fh": 19,
+     "fw": 29
+    },
+    "D_GUN": {
+     "box": [
+      18,
+      8,
+      36,
+      20
+     ],
+     "fh": 13,
+     "fw": 19
+    },
+    "FIRE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      14,
+      4,
+      40,
+      22
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "GETUP": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      21,
+      10,
+      33,
+      19
+     ],
+     "fh": 10,
+     "fw": 13
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      10,
+      32,
+      19
+     ],
+     "fh": 10,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      10,
+      32,
+      22
+     ],
+     "fh": 13,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      10,
+      34,
+      22
+     ],
+     "fh": 13,
+     "fw": 15
+    }
+   },
+   "shp": "DELPHI.SHP",
+   "shp_frames": 375
+  },
+  "E1": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      16,
+      14,
+      38,
+      25
+     ],
+     "fh": 12,
+     "fw": 23
+    },
+    "D_EXPL": {
+     "box": [
+      15,
+      8,
+      39,
+      22
+     ],
+     "fh": 15,
+     "fw": 25
+    },
+    "D_EXPL2": {
+     "box": [
+      15,
+      8,
+      39,
+      22
+     ],
+     "fh": 15,
+     "fw": 25
+    },
+    "D_FIRE": {
+     "box": [
+      12,
+      7,
+      42,
+      19
+     ],
+     "fh": 13,
+     "fw": 31
+    },
+    "D_GREN": {
+     "box": [
+      7,
+      3,
+      47,
+      23
+     ],
+     "fh": 21,
+     "fw": 41
+    },
+    "D_GUN": {
+     "box": [
+      17,
+      6,
+      37,
+      22
+     ],
+     "fh": 17,
+     "fw": 21
+    },
+    "FIRE": {
+     "box": [
+      13,
+      6,
+      41,
+      20
+     ],
+     "fh": 15,
+     "fw": 29
+    },
+    "FPRONE": {
+     "box": [
+      11,
+      9,
+      43,
+      26
+     ],
+     "fh": 18,
+     "fw": 33
+    },
+    "GETUP": {
+     "box": [
+      16,
+      9,
+      38,
+      20
+     ],
+     "fh": 12,
+     "fw": 23
+    },
+    "IDLE1": {
+     "box": [
+      19,
+      9,
+      35,
+      19
+     ],
+     "fh": 11,
+     "fw": 17
+    },
+    "IDLE2": {
+     "box": [
+      19,
+      9,
+      35,
+      19
+     ],
+     "fh": 11,
+     "fw": 17
+    },
+    "LIEDOWN": {
+     "box": [
+      17,
+      9,
+      37,
+      20
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "PRONE": {
+     "box": [
+      16,
+      14,
+      38,
+      23
+     ],
+     "fh": 10,
+     "fw": 23
+    },
+    "STAND": {
+     "box": [
+      19,
+      9,
+      35,
+      20
+     ],
+     "fh": 12,
+     "fw": 17
+    },
+    "WALK": {
+     "box": [
+      15,
+      9,
+      39,
+      20
+     ],
+     "fh": 12,
+     "fw": 25
+    }
+   },
+   "shp": "E1.SHP",
+   "shp_frames": 532
+  },
+  "E2": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      17,
+      14,
+      37,
+      25
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "D_EXPL": {
+     "box": [
+      15,
+      7,
+      39,
+      21
+     ],
+     "fh": 15,
+     "fw": 25
+    },
+    "D_EXPL2": {
+     "box": [
+      15,
+      7,
+      39,
+      21
+     ],
+     "fh": 15,
+     "fw": 25
+    },
+    "D_FIRE": {
+     "box": [
+      13,
+      7,
+      41,
+      19
+     ],
+     "fh": 13,
+     "fw": 29
+    },
+    "D_GREN": {
+     "box": [
+      7,
+      3,
+      47,
+      27
+     ],
+     "fh": 25,
+     "fw": 41
+    },
+    "D_GUN": {
+     "box": [
+      17,
+      7,
+      37,
+      21
+     ],
+     "fh": 15,
+     "fw": 21
+    },
+    "FIRE": {
+     "box": [
+      17,
+      7,
+      37,
+      20
+     ],
+     "fh": 14,
+     "fw": 21
+    },
+    "FPRONE": {
+     "box": [
+      17,
+      13,
+      37,
+      23
+     ],
+     "fh": 11,
+     "fw": 21
+    },
+    "GETUP": {
+     "box": [
+      19,
+      9,
+      35,
+      20
+     ],
+     "fh": 12,
+     "fw": 17
+    },
+    "IDLE1": {
+     "box": [
+      19,
+      9,
+      35,
+      19
+     ],
+     "fh": 11,
+     "fw": 17
+    },
+    "IDLE2": {
+     "box": [
+      20,
+      9,
+      34,
+      19
+     ],
+     "fh": 11,
+     "fw": 15
+    },
+    "LIEDOWN": {
+     "box": [
+      20,
+      9,
+      34,
+      20
+     ],
+     "fh": 12,
+     "fw": 15
+    },
+    "PRONE": {
+     "box": [
+      17,
+      14,
+      37,
+      23
+     ],
+     "fh": 10,
+     "fw": 21
+    },
+    "STAND": {
+     "box": [
+      22,
+      9,
+      32,
+      20
+     ],
+     "fh": 12,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      9,
+      34,
+      20
+     ],
+     "fh": 12,
+     "fw": 15
+    }
+   },
+   "shp": "E2.SHP",
+   "shp_frames": 660
+  },
+  "E3": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      16,
+      12,
+      38,
+      25
+     ],
+     "fh": 14,
+     "fw": 23
+    },
+    "D_EXPL": {
+     "box": [
+      15,
+      0,
+      39,
+      23
+     ],
+     "fh": 24,
+     "fw": 25
+    },
+    "D_EXPL2": {
+     "box": [
+      15,
+      0,
+      39,
+      23
+     ],
+     "fh": 24,
+     "fw": 25
+    },
+    "D_FIRE": {
+     "box": [
+      15,
+      1,
+      39,
+      21
+     ],
+     "fh": 21,
+     "fw": 25
+    },
+    "D_GREN": {
+     "box": [
+      12,
+      4,
+      42,
+      24
+     ],
+     "fh": 21,
+     "fw": 31
+    },
+    "D_GUN": {
+     "box": [
+      14,
+      6,
+      40,
+      24
+     ],
+     "fh": 19,
+     "fw": 27
+    },
+    "FIRE": {
+     "box": [
+      15,
+      4,
+      39,
+      20
+     ],
+     "fh": 17,
+     "fw": 25
+    },
+    "FPRONE": {
+     "box": [
+      12,
+      9,
+      42,
+      25
+     ],
+     "fh": 17,
+     "fw": 31
+    },
+    "GETUP": {
+     "box": [
+      18,
+      9,
+      36,
+      22
+     ],
+     "fh": 14,
+     "fw": 19
+    },
+    "IDLE1": {
+     "box": [
+      17,
+      6,
+      37,
+      20
+     ],
+     "fh": 15,
+     "fw": 21
+    },
+    "IDLE2": {
+     "box": [
+      20,
+      9,
+      34,
+      20
+     ],
+     "fh": 12,
+     "fw": 15
+    },
+    "LIEDOWN": {
+     "box": [
+      17,
+      9,
+      37,
+      20
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "PRONE": {
+     "box": [
+      17,
+      13,
+      37,
+      23
+     ],
+     "fh": 11,
+     "fw": 21
+    },
+    "STAND": {
+     "box": [
+      20,
+      9,
+      34,
+      20
+     ],
+     "fh": 12,
+     "fw": 15
+    },
+    "WALK": {
+     "box": [
+      17,
+      7,
+      37,
+      20
+     ],
+     "fh": 14,
+     "fw": 21
+    }
+   },
+   "shp": "E3.SHP",
+   "shp_frames": 548
+  },
+  "E4": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      16,
+      14,
+      38,
+      25
+     ],
+     "fh": 12,
+     "fw": 23
+    },
+    "D_EXPL": {
+     "box": [
+      15,
+      7,
+      39,
+      22
+     ],
+     "fh": 16,
+     "fw": 25
+    },
+    "D_EXPL2": {
+     "box": [
+      15,
+      7,
+      39,
+      22
+     ],
+     "fh": 16,
+     "fw": 25
+    },
+    "D_FIRE": {
+     "box": [
+      12,
+      7,
+      42,
+      19
+     ],
+     "fh": 13,
+     "fw": 31
+    },
+    "D_GREN": {
+     "box": [
+      5,
+      3,
+      49,
+      23
+     ],
+     "fh": 21,
+     "fw": 45
+    },
+    "D_GUN": {
+     "box": [
+      16,
+      6,
+      38,
+      21
+     ],
+     "fh": 16,
+     "fw": 23
+    },
+    "FIRE": {
+     "box": [
+      12,
+      4,
+      42,
+      21
+     ],
+     "fh": 18,
+     "fw": 31
+    },
+    "FPRONE": {
+     "box": [
+      10,
+      9,
+      44,
+      26
+     ],
+     "fh": 18,
+     "fw": 35
+    },
+    "GETUP": {
+     "box": [
+      16,
+      9,
+      38,
+      20
+     ],
+     "fh": 12,
+     "fw": 23
+    },
+    "IDLE1": {
+     "box": [
+      17,
+      9,
+      37,
+      20
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "IDLE2": {
+     "box": [
+      19,
+      9,
+      35,
+      19
+     ],
+     "fh": 11,
+     "fw": 17
+    },
+    "LIEDOWN": {
+     "box": [
+      17,
+      9,
+      37,
+      20
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "PRONE": {
+     "box": [
+      16,
+      14,
+      38,
+      23
+     ],
+     "fh": 10,
+     "fw": 23
+    },
+    "STAND": {
+     "box": [
+      19,
+      9,
+      35,
+      21
+     ],
+     "fh": 13,
+     "fw": 17
+    },
+    "WALK": {
+     "box": [
+      15,
+      9,
+      39,
+      21
+     ],
+     "fh": 13,
+     "fw": 25
+    }
+   },
+   "shp": "E4.SHP",
+   "shp_frames": 660
+  },
+  "E5": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      16,
+      14,
+      38,
+      25
+     ],
+     "fh": 12,
+     "fw": 23
+    },
+    "D_EXPL": {
+     "box": [
+      15,
+      7,
+      39,
+      22
+     ],
+     "fh": 16,
+     "fw": 25
+    },
+    "D_EXPL2": {
+     "box": [
+      15,
+      7,
+      39,
+      22
+     ],
+     "fh": 16,
+     "fw": 25
+    },
+    "D_FIRE": {
+     "box": [
+      12,
+      7,
+      42,
+      19
+     ],
+     "fh": 13,
+     "fw": 31
+    },
+    "D_GREN": {
+     "box": [
+      5,
+      3,
+      49,
+      23
+     ],
+     "fh": 21,
+     "fw": 45
+    },
+    "D_GUN": {
+     "box": [
+      16,
+      6,
+      38,
+      21
+     ],
+     "fh": 16,
+     "fw": 23
+    },
+    "FIRE": {
+     "box": [
+      17,
+      9,
+      37,
+      20
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "FPRONE": {
+     "box": [
+      15,
+      14,
+      39,
+      23
+     ],
+     "fh": 10,
+     "fw": 25
+    },
+    "GETUP": {
+     "box": [
+      16,
+      9,
+      38,
+      20
+     ],
+     "fh": 12,
+     "fw": 23
+    },
+    "IDLE1": {
+     "box": [
+      17,
+      9,
+      37,
+      20
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "IDLE2": {
+     "box": [
+      19,
+      9,
+      35,
+      19
+     ],
+     "fh": 11,
+     "fw": 17
+    },
+    "LIEDOWN": {
+     "box": [
+      17,
+      9,
+      37,
+      20
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "PRONE": {
+     "box": [
+      16,
+      14,
+      38,
+      23
+     ],
+     "fh": 10,
+     "fw": 23
+    },
+    "STAND": {
+     "box": [
+      19,
+      9,
+      35,
+      20
+     ],
+     "fh": 12,
+     "fw": 17
+    },
+    "WALK": {
+     "box": [
+      15,
+      9,
+      39,
+      20
+     ],
+     "fh": 12,
+     "fw": 25
+    }
+   },
+   "shp": "E5.SHP",
+   "shp_frames": 660
+  },
+  "E6": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      17,
+      14,
+      37,
+      25
+     ],
+     "fh": 12,
+     "fw": 21
+    },
+    "D_EXPL": {
+     "box": [
+      13,
+      7,
+      41,
+      21
+     ],
+     "fh": 15,
+     "fw": 29
+    },
+    "D_EXPL2": {
+     "box": [
+      15,
+      7,
+      39,
+      21
+     ],
+     "fh": 15,
+     "fw": 25
+    },
+    "D_FIRE": {
+     "box": [
+      13,
+      7,
+      41,
+      19
+     ],
+     "fh": 13,
+     "fw": 29
+    },
+    "D_GREN": {
+     "box": [
+      7,
+      3,
+      47,
+      27
+     ],
+     "fh": 25,
+     "fw": 41
+    },
+    "D_GUN": {
+     "box": [
+      17,
+      7,
+      37,
+      21
+     ],
+     "fh": 15,
+     "fw": 21
+    },
+    "GETUP": {
+     "box": [
+      21,
+      9,
+      33,
+      20
+     ],
+     "fh": 12,
+     "fw": 13
+    },
+    "IDLE1": {
+     "box": [
+      19,
+      9,
+      35,
+      20
+     ],
+     "fh": 12,
+     "fw": 17
+    },
+    "LIEDOWN": {
+     "box": [
+      20,
+      9,
+      34,
+      25
+     ],
+     "fh": 17,
+     "fw": 15
+    },
+    "PRONE": {
+     "box": [
+      18,
+      14,
+      36,
+      25
+     ],
+     "fh": 12,
+     "fw": 19
+    },
+    "STAND": {
+     "box": [
+      22,
+      9,
+      32,
+      20
+     ],
+     "fh": 12,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      19,
+      9,
+      35,
+      20
+     ],
+     "fh": 12,
+     "fw": 17
+    }
+   },
+   "shp": "E6.SHP",
+   "shp_frames": 248
+  },
+  "MOEBIUS": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      20,
+      6,
+      34,
+      21
+     ],
+     "fh": 16,
+     "fw": 15
+    },
+    "D_EXPL": {
+     "box": [
+      13,
+      1,
+      41,
+      23
+     ],
+     "fh": 23,
+     "fw": 29
+    },
+    "D_EXPL2": {
+     "box": [
+      11,
+      4,
+      43,
+      25
+     ],
+     "fh": 22,
+     "fw": 33
+    },
+    "D_FIRE": {
+     "box": [
+      15,
+      1,
+      39,
+      19
+     ],
+     "fh": 19,
+     "fw": 25
+    },
+    "D_GREN": {
+     "box": [
+      11,
+      4,
+      43,
+      25
+     ],
+     "fh": 22,
+     "fw": 33
+    },
+    "D_GUN": {
+     "box": [
+      20,
+      9,
+      34,
+      21
+     ],
+     "fh": 13,
+     "fw": 15
+    },
+    "FIRE": {
+     "box": [
+      10,
+      1,
+      44,
+      24
+     ],
+     "fh": 24,
+     "fw": 35
+    },
+    "GETUP": {
+     "box": [
+      22,
+      8,
+      32,
+      19
+     ],
+     "fh": 12,
+     "fw": 11
+    },
+    "IDLE1": {
+     "box": [
+      22,
+      8,
+      32,
+      19
+     ],
+     "fh": 12,
+     "fw": 11
+    },
+    "IDLE2": {
+     "box": [
+      20,
+      8,
+      34,
+      19
+     ],
+     "fh": 12,
+     "fw": 15
+    },
+    "LIEDOWN": {
+     "box": [
+      22,
+      8,
+      32,
+      19
+     ],
+     "fh": 12,
+     "fw": 11
+    },
+    "PRONE": {
+     "box": [
+      22,
+      8,
+      32,
+      19
+     ],
+     "fh": 12,
+     "fw": 11
+    },
+    "STAND": {
+     "box": [
+      22,
+      8,
+      32,
+      24
+     ],
+     "fh": 17,
+     "fw": 11
+    },
+    "WALK": {
+     "box": [
+      20,
+      7,
+      34,
+      24
+     ],
+     "fh": 18,
+     "fw": 15
+    }
+   },
+   "shp": "MOEBIUS.SHP",
+   "shp_frames": 257
+  },
+  "RMBO": {
+   "crops": {
+    "CRAWL": {
+     "box": [
+      15,
+      13,
+      39,
+      25
+     ],
+     "fh": 13,
+     "fw": 25
+    },
+    "D_EXPL": {
+     "box": [
+      15,
+      6,
+      39,
+      21
+     ],
+     "fh": 16,
+     "fw": 25
+    },
+    "D_EXPL2": {
+     "box": [
+      15,
+      6,
+      39,
+      21
+     ],
+     "fh": 16,
+     "fw": 25
+    },
+    "D_FIRE": {
+     "box": [
+      12,
+      7,
+      42,
+      19
+     ],
+     "fh": 13,
+     "fw": 31
+    },
+    "D_GREN": {
+     "box": [
+      9,
+      3,
+      45,
+      23
+     ],
+     "fh": 21,
+     "fw": 37
+    },
+    "D_GUN": {
+     "box": [
+      16,
+      6,
+      38,
+      21
+     ],
+     "fh": 16,
+     "fw": 23
+    },
+    "FIRE": {
+     "box": [
+      14,
+      3,
+      40,
+      20
+     ],
+     "fh": 18,
+     "fw": 27
+    },
+    "FPRONE": {
+     "box": [
+      13,
+      7,
+      41,
+      27
+     ],
+     "fh": 21,
+     "fw": 29
+    },
+    "GETUP": {
+     "box": [
+      16,
+      8,
+      38,
+      20
+     ],
+     "fh": 13,
+     "fw": 23
+    },
+    "IDLE1": {
+     "box": [
+      20,
+      0,
+      34,
+      20
+     ],
+     "fh": 21,
+     "fw": 15
+    },
+    "IDLE2": {
+     "box": [
+      11,
+      0,
+      43,
+      20
+     ],
+     "fh": 21,
+     "fw": 33
+    },
+    "LIEDOWN": {
+     "box": [
+      16,
+      8,
+      38,
+      20
+     ],
+     "fh": 13,
+     "fw": 23
+    },
+    "PRONE": {
+     "box": [
+      16,
+      13,
+      38,
+      24
+     ],
+     "fh": 12,
+     "fw": 23
+    },
+    "STAND": {
+     "box": [
+      19,
+      8,
+      35,
+      20
+     ],
+     "fh": 13,
+     "fw": 17
+    },
+    "WALK": {
+     "box": [
+      20,
+      9,
+      34,
+      20
+     ],
+     "fh": 12,
+     "fw": 15
+    }
+   },
+   "shp": "RMBO.SHP",
+   "shp_frames": 468
+  }
+ },
+ "version": 4
+}

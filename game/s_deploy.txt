@@ -1,0 +1,14 @@
+# Deploy cursor proof: fresh boot, march the MCV onto open grass at 51,49 well
+# before the Nod hunter reaches that corridor (~tick 455), then hover it.
+tick 5
+lclickobj MCV
+expectsel 1
+order 51 49
+watch MCV 0 250
+lclickobj MCV
+expectsel 1
+look MCV
+cursorobj MCV
+expectcursor deploy
+shot p6_deploy.png
+quit

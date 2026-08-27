@@ -1,0 +1,5 @@
+# The upstream Vanilla-Conquer commit that brain/vanilla is a checkout of.
+# tools/check-brain-checkout.sh fetches exactly this commit, applies our patch to it, and
+# demands the result equal the committed checkout byte for byte. Bump it only together with
+# a regenerated brain/patches/vanilla-cnc3d.patch, in one commit.
+ce83b59edd99cccac6cebaae054ca04962c744b7

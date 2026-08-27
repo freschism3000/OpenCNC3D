@@ -1,0 +1,26 @@
+# Force-fire proof: the Nod squad shoots its own buggy at 53,16 (ctrl right-click).
+# The buggy's bar must appear once damaged, walk green -> yellow -> red by the
+# engine's thresholds, and keep showing after everything is deselected.
+tick 30
+cam 53 17
+band 400 200 1000 450
+seldump
+obj BGGY:BadGuy 0
+order 53 16 c
+tick 40
+hbdump
+shot hb_ff1.png
+tick 60
+hbdump
+shot hb_ff2.png
+# deselect everything: a damaged unit must show its bar with sel=0
+lclick 200 550
+tick 2
+seldump
+hbdump
+shot hb_unsel.png
+tick 120
+hbdump
+obj BGGY:BadGuy 0
+shot hb_late.png
+quit

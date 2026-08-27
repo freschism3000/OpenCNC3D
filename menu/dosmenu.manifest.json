@@ -1,0 +1,85 @@
+{
+ "bytes": 397182,
+ "clocktab": "zeroed; sidebar-only construct",
+ "fonts": {
+  "3POINT": {
+   "cell": [
+    5,
+    4
+   ],
+   "nchars": 226
+  },
+  "6POINT": {
+   "cell": [
+    8,
+    8
+   ],
+   "nchars": 226
+  },
+  "8POINT": {
+   "cell": [
+    10,
+    11
+   ],
+   "nchars": 226
+  },
+  "GRAD6FNT": {
+   "cell": [
+    8,
+    8
+   ],
+   "nchars": 226
+  },
+  "SCOREFNT": {
+   "cell": [
+    6,
+    6
+   ],
+   "nchars": 226
+  }
+ },
+ "magic": "DOSBAR01",
+ "pack": "dosmenu.pack",
+ "palette": "embedded in TITLE.CPS (LOCAL.MIX)",
+ "palette_widening": "v << 2 (video_sdl2.cpp:653)",
+ "shapes": {
+  "MOUSE": {
+   "frames": 1,
+   "h": 24,
+   "w": 30
+  },
+  "OPTIONS": {
+   "frames": 32,
+   "h": 79,
+   "w": 103
+  },
+  "TITLE": {
+   "frames": 1,
+   "h": 200,
+   "w": 320
+  }
+ },
+ "strings": {
+  "TXT_EXIT_GAME": "Exit Game",
+  "TXT_INTRO": "Intro & Sneak Peek",
+  "TXT_LOAD_MISSION": "Load Mission",
+  "TXT_MULTIPLAYER_GAME": "Multiplayer Game",
+  "TXT_NEW_MISSIONS": "New Missions",
+  "TXT_START_NEW_GAME": "Start New Game"
+ },
+ "title_override": {
+  "align_residual_top55pct": 3.31,
+  "copyright_strip_blanked_from": 186,
+  "crop_bottom": 13,
+  "crop_top": 0,
+  "quantise_error_mean": 1.32,
+  "rows_changed_vs_original": 49,
+  "source": "art/title.png",
+  "source_size": [
+   1024,
+   656
+  ],
+  "wordmark_top": 138
+ },
+ "version": 1
+}

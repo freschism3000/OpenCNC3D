@@ -1,0 +1,54 @@
+/* Windows resources for C&C3D.exe.
+ *
+ * The ICON is the same composed image the Mac .icns is made from, so the two platforms
+ * cannot drift into different emblems: tools/launchers/make_icon.py writes both from the
+ * cartridge's own GDI eagle medallion in one run. IDI_ICON1 is the conventional first
+ * icon id, and Explorer shows the lowest-numbered one, so this is the file's face.
+ *
+ * THIS FILE IS A TEMPLATE. The two @VER placeholders are substituted by
+ * tools/win/build-win.sh, which reads the number through tools/version.sh, so the version
+ * in the executable comes from the VERSION file at the repo root like every other copy of
+ * it. Handing this file to windres directly is not meaningful and it will be rejected.
+ *
+ * WHY THE VERSION IS HERE AT ALL. It used to be left out deliberately, on the grounds
+ * that VERSION owns the number and a second copy would be one to forget. The rule was
+ * right and the conclusion was wrong: generating the block keeps one source of truth and
+ * gives the file a version at the same time. Without one, the Properties tab shows a
+ * blank where the build number should be, and which build was running is the first thing
+ * a crash report has to settle. Asking a player for it after they have closed the game is
+ * a round trip that a field in the file removes.
+ *
+ * FILEVERSION and PRODUCTVERSION are four 16-bit numbers, so they can carry the release
+ * number and nothing else. Neither they nor the string form can hold the "+sha-dirty"
+ * stamp a non-release build puts on the menu plate, so the plate stays the authority on
+ * exactly which tree a binary came from and this is the coarse answer Explorer can show.
+ */
+IDI_ICON1 ICON "cnc3d.ico"
+
+1 VERSIONINFO
+FILEVERSION    @VER_COMMA@
+PRODUCTVERSION @VER_COMMA@
+FILEFLAGSMASK  0x3fL
+FILEFLAGS      0x0L
+FILEOS         0x40004L
+FILETYPE       0x1L
+FILESUBTYPE    0x0L
+{
+  BLOCK "StringFileInfo"
+  {
+    BLOCK "040904B0"
+    {
+      VALUE "CompanyName",     "Slipgate Ironworks"
+      VALUE "FileDescription", "C&C3D"
+      VALUE "FileVersion",     "@VER_STRING@"
+      VALUE "InternalName",    "C&C3D"
+      VALUE "OriginalFilename","C&C3D.exe"
+      VALUE "ProductName",     "C&C3D"
+      VALUE "ProductVersion",  "@VER_STRING@"
+    }
+  }
+  BLOCK "VarFileInfo"
+  {
+    VALUE "Translation", 0x409, 1200
+  }
+}

@@ -1,0 +1,25 @@
+# The Construction Yard's SECOND clip segment must play while a building is being
+# placed, and only then. Frames 0..49 are the crane idling; 50..100 are the
+# "something is being built" animation. BState 2 is BSTATE_ACTIVE, which the engine
+# gives the yard for exactly the duration of a placed building's construction
+# (building.cpp Mission_Repair / RADIO_BUILDING).
+tick 2
+sidebar BOOT
+player
+build NUKE
+ready NUKE 4000
+startplace NUKE
+place auto
+tick 3
+anims
+tick 5
+anims
+tick 5
+anims
+tick 10
+anims
+tick 20
+anims
+tick 60
+anims
+quit

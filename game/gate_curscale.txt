@@ -1,0 +1,9 @@
+tick 30
+cam 48 58
+cursor 660 500
+cursor 1150 400
+shot shots/g80_a.png
+cam 48 18
+cursor 1150 400
+shot shots/g80_b.png
+quit

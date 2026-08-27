@@ -1,0 +1,4 @@
+tick 5
+lclickobj MCV:@me
+cursorobj MCV:@me
+quit

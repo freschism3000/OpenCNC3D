@@ -1,0 +1,56 @@
+# THE --noflash ARM of the gate above: the same run, the same tick, the same
+# camera, with the blush switched off in the renderer. The gate differences the
+# two series FRAME BY FRAME inside the object's own silhouette, so every pixel it
+# counts is the blush and nothing else -- the world is identical in both runs.
+#
+# THE TARGET BLUSH, arm 1 of 3: the POWER PLANT, the family that always worked.
+#
+# an earlier note called this the "white damage flash"; it is not one. Nothing in this
+# engine sets FlashCount on Take_Damage. TechnoClass::Clicked_As_Target sets it to 7 on
+# the object an order is aimed at, and FlasherClass::Process lights IsBlushing on the ODD
+# values, so the thing whitens on three alternating ticks out of seven.
+#
+# THIS ARM IS THE ANTI-VACUITY CONTROL, and that is why it is still here unchanged in
+# aim. The Power Plant's occupy list (bdata.cpp List1011) contains offset 0, so an order
+# aimed at its anchor cell reaches it, and its texture book does not overdraw the mesh,
+# so nothing repaints the whitened faces. It blushed before the fixes and it
+# blushes after them. If THIS arm ever goes red the instrument is broken and the other
+# two arms' silence means nothing.
+#
+# G51 used to be this arm ALONE, which is exactly how it stayed green through a bug that
+# had killed the flash outright on the Helipad, the Refinery and the Repair Bay.
+#
+# clickobj FIRST, so the crop the gate measures inside is read from THIS run rather than
+# from a rectangle typed into gates.sh that goes stale the day the camera moves. It also
+# leaves the plant selected, which is why the lclickobj has to come after it.
+tick 20
+cam 54 51
+zoom max
+clickobj NUKE 0
+lclickobj MTNK
+order 50 51 c
+tick 1
+shot shots/noflash_01.png
+tick 1
+shot shots/noflash_02.png
+tick 1
+shot shots/noflash_03.png
+tick 1
+shot shots/noflash_04.png
+tick 1
+shot shots/noflash_05.png
+tick 1
+shot shots/noflash_06.png
+tick 1
+shot shots/noflash_07.png
+tick 1
+shot shots/noflash_08.png
+tick 1
+shot shots/noflash_09.png
+tick 1
+shot shots/noflash_10.png
+tick 1
+shot shots/noflash_11.png
+tick 1
+shot shots/noflash_12.png
+quit

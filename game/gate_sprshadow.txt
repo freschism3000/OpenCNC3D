@@ -1,0 +1,26 @@
+# INFANTRY CAST SHADOWS, and the shadow is AT THE MAN'S FEET.
+#
+# Reported against v0.5.7, where this was believed fixed and G52 was green: infantry
+# sprites still cast no shadow in Enhanced mode. They were being cast;
+# they were being cast in the wrong PLACE. fx_emit_sprite_shadow pushed the caster's base
+# up by `side + 0.02` to keep the card off the ground plane, so the blob started a whole
+# sprite-width away from the boots and read as "no shadow" at the sun the game ships with.
+#
+# THE SQUAD, NOT THE FRAME. This shoots the four-man GDI squad standing on cell 56,55 and
+# gates.sh measures inside each man's OWN silhouette, read from the four clickobj lines
+# below. G52 used to count darkened pixels over the WHOLE 1000x650 frame against a floor
+# of 400, so a tree shadow moving by a few pixels could pay for four missing men -- and
+# for a whole release, it did.
+#
+# THE SAME FOUR clickobj LINES ARE IN THE --off SCRIPT, deliberately. clickobj leaves its
+# object SELECTED and a selected man draws a bracket, so an off-arm without them differs
+# from the on-arm by the bracket as well as by the shadow. Measured: it moves the count.
+tick 30
+cam 56 55
+zoom max
+clickobj E1:GoodGuy 0
+clickobj E1:GoodGuy 1
+clickobj E1:GoodGuy 2
+clickobj E1:GoodGuy 3
+shot shots/sprshadow_on.png
+quit

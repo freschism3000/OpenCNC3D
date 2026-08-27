@@ -1,0 +1,206 @@
+{
+  "_meta": {
+    "title": "Command & Conquer (N64, EU) in-game camera, recovered from the ROM",
+    "rom": "share/CNC3D/rom/cnc_eu.z64",
+    "rom_md5": "42da4c7d040f9e7cd046a42ec3e68027",
+    "resident_mapping": "ram = 0x80000400 + (rom - 0x1000)",
+    "camera_struct_ram": "0x80092D30",
+    "camera_struct_layout": {
+      "+0x00": "float near        (rewritten every frame = 0.1 * dist)",
+      "+0x04": "float far         (rewritten every frame = 2*dist + 2096)",
+      "+0x08": "float fovy_deg",
+      "+0x0C": "float aspect",
+      "+0x10": "float guPerspective 'scale'",
+      "+0x14": "int   mode (2 = look-at camera)",
+      "+0x24..+0x2C": "float eye  x,y,z",
+      "+0x40..+0x48": "float at   x,y,z (look-at target)",
+      "+0x4C": "float dist  (printf 'Dist')",
+      "+0x50": "float angle (printf 'Angle', RADIANS, negative)",
+      "+0x54..+0x5C": "float up x,y,z"
+    },
+    "printf_arg_order_correction": "The debug string ' Camera: Dist=%0.2f Angle=%0.2f Pos.y=%0.2f' at ROM 0x3E94 takes Dist from $f4 = cam+0x4C, Angle from cam+0x50 and Pos.y from cam+0x28. The earlier note had Angle and Pos.y swapped: at ROM 0x030840 'lwc1 $f0,0x50($s2); sdc1 $f0,0x10($sp)' is vararg 3 (Angle) and 'lwc1 $f2,0x28($s2); sdc1 $f2,0x18($sp)' is vararg 4 (Pos.y). Pos.y is the EYE height, a derived value, not an input.",
+    "note_on_minus100_plus100": "The float constants -100.0 / +100.0 at RAM 0x80003320 / 0x80003324 (ROM 0x3F20) are the per-frame ZOOM step, not an angle. ROM 0x030868 'jal 0x8002F85C' with $f12 = that value, and 0x8002F85C does zoom = 0x800D2034 + $f12 then calls SetZoom."
+  },
+  "world_units": {
+    "unit": "lepton",
+    "units_per_cell": 256,
+    "confidence": "certain",
+    "evidence": [
+      "The camera target is clamped against the map bounds at RAM 0x80091EF0+0x3C / +0x44, and those fields are written at ROM 0x032A90 / 0x032AC4 as (mapCell << 8), i.e. 256 units per cell. The clamp is at ROM 0x19A74C-0x19A78C (RAM 0x801F895C).",
+      "cam.at is loaded straight from the scroll floats at RAM 0x80091F58/0x80091F5C with no scaling: ROM 0x032B6C 'swc1 $f2,0x40($s0)' and 0x032B88 'swc1 $f4,0x48($s0)'.",
+      "Meshes are 1024 units per cell (FACT 3x3 spans 3031 x 2977 = 1010 x 992 per cell; WEAP 3x3 spans 3079 x 2901; the one-cell tiberium quads in slots 151/152 span 1030 x 1030), but EVERY model is drawn with a 0.25 scale. Per-model 16-byte records at RAM 0x800989A0 (ROM 0x995A0) are (offX, offY, offZ, scale) and 199 of 236 slots hold scale = 0x3E800000 = 0.25 exactly; the rest are 0.16..0.56. Terrain/shroud takes the same 0.25 as an immediate: ROM 0x04ADD0 'lui $a1,0x3e80' then ROM 0x04ADE0 'jal 0x8007C81C' (Node_SetScale, which is just 'sw $a1,0x24($a0)').",
+      "1024 mesh units * 0.25 = 256 world units per cell, matching the camera exactly."
+    ]
+  },
+  "projection": "PERSPECTIVE. guPerspectiveF(mtx, &perspNorm, fovy=50.0 deg, aspect=1.3333333, near=0.1*dist, far=2*dist+2096, scale=1.0). Not orthographic.",
+  "projection_detail": {
+    "type": "perspective",
+    "fovy_deg": 50.0,
+    "fovy_is_vertical": true,
+    "aspect": 1.3333333730697632,
+    "near": "0.1 * dist  (240 .. 380; 300 at default zoom)",
+    "far": "2 * dist + 2096  (6896 .. 9696; 8096 at default zoom)",
+    "gu_scale": 1.0,
+    "confidence": "certain",
+    "evidence": [
+      "guPerspectiveF is at RAM 0x8007D4A0 (ROM 0x7E0A0), identified by its libultra body: ROM 0x07E0EC 'ldc1 $f2,0x71C0($at)' loads the double 0.017453292222222222 (ROM 0x7DC0) = 3.1415926/180, ROM 0x07E104 'div.s $f20,$f24,$f20' halves the fovy, then cosf (0x8005C0E0) / sinf (0x80060760) give the cotangent, ROM 0x07E120-0x07E134 build (near+far)/(near-far) and 2*near*far/(near-far), ROM 0x07E13C 'lui $at,0xbf80' writes m[2][3] = -1.0, and the perspNorm branch at ROM 0x07E1C4 divides the double 131072.0 (= 2*65536, ROM 0x7DD0). guOrtho is never called: 0 call sites.",
+      "Camera_Apply at RAM 0x8007CBFC (ROM 0x7D7FC) feeds it the camera struct: ROM 0x07D818 'lw $a2,8($s0)' fovy, 'lw $a3,0xc($s0)' aspect, 'lwc1 $f0,($s0)' near, 'lwc1 $f2,4($s0)' far, 'lwc1 $f4,0x10($s0)' scale, then ROM 0x07D838 'jal 0x8007D4A0'.",
+      "Camera_Init at RAM 0x8007CB30 (ROM 0x7D730) seeds those five fields from RAM 0x80006538 (ROM 0x7138): 41000000 45800000 42480000 3FAAAAAB 3F800000 = 8.0, 4096.0, 50.0, 1.3333333, 1.0. Called once for the game camera at ROM 0x032B44 with $a0 = 0x80092D30 and $a1 = 2.",
+      "near and far are overwritten from the distance every frame at ROM 0x0307B8 ('swc1 $f6,0x2d30($s4)', f6 = dist * 0.1, const 0x3DCCCCCD at ROM 0x3F18) and ROM 0x0307C0 ('swc1 $f0,4($s2)', f0 = dist + dist + 2096.0, const 0x45030000 at ROM 0x3F1C). fovy and aspect are never rewritten."
+    ]
+  },
+  "yawDeg": "0.0 - the map is AXIS-ALIGNED on screen. It is NOT rotated 45 degrees and is not a diamond. Screen X is world X, screen 'up' is world -Z.",
+  "yaw_detail": {
+    "value_deg": 0.0,
+    "confidence": "certain",
+    "evidence": [
+      "eye.x is copied verbatim from at.x once per frame: ROM 0x0307A0 'lwc1 $f4,0x40($s2)' then ROM 0x0307B4 'swc1 $f4,0x24($s2)'. The eye-to-target vector therefore has ZERO x component, so the view direction lies entirely in the world YZ plane.",
+      "The only other eye components are eye.y = at.y - dist*sinf(angle) (ROM 0x0307C4-0x0307DC) and eye.z = at.z + dist*cosf(angle) (ROM 0x0307E0-0x030800). No yaw term exists anywhere.",
+      "up is (0,1,0): Camera_Init writes cam+0x54 = 0 (ROM 0x07D7D8), cam+0x58 = 1.0 (ROM 0x07D7E8, const 0x3F800000 at RAM 0x80006548) and cam+0x5C = 0 (ROM 0x07D7EC). With a zero-x offset and a +Y up vector, the camera right vector is exactly world +X.",
+      "guLookAtF (RAM 0x8007CD90) is fed exactly those: ROM 0x07D868-0x07D8A0 loads eye from cam+0x24/0x28/0x2C, at from cam+0x40/0x44/0x48, up from cam+0x54/0x58/0x5C.",
+      "VISUAL PROOF: a software render of SCG01EA with the recovered camera. The road, a straight run of cells along the map X axis, comes out as a HORIZONTAL band. A contrast render shows the same map with the renderer's present Ry(45)+Rx(26.565) orthographic camera and the same road comes out DIAGONAL."
+    ]
+  },
+  "pitchDeg": "44.691 .. 52.712 below horizontal, 48.128 at the default zoom. Stored as cam+0x50 in radians and NEGATED: angle = -pitch.",
+  "pitch_detail": {
+    "default_deg": 48.1285,
+    "default_angle_rad": -0.84,
+    "min_deg": 44.6907,
+    "max_deg": 52.7121,
+    "coupled_to_zoom": true,
+    "formula": "angle_rad = -0.78 + (-0.92 - -0.78) * (dist - 2400) / (3800 - 2400);  pitch = -angle_rad",
+    "confidence": "certain",
+    "evidence": [
+      "SetZoom at RAM 0x8002F6FC (ROM 0x302FC) lerps the angle from the distance: ROM 0x0303D4-0x030418 reads distMax 0x80093740, distMin 0x8009373C, angleAtMin 0x80093744, angleAtMax 0x80093748, computes t = (dist-min)/(max-min) and angle = angleAtMin + (angleAtMax-angleAtMin)*t, then 'swc1 $f6,0x4c($v1)' (dist) and 'swc1 $f2,0x50($v1)' (angle), then clamps angle into the pair.",
+      "ROM 0x09433C: 45160000 456d8000 bf47ae14 bf6b851f = 2400.0, 3800.0, -0.78, -0.92 (RAM 0x8009373C..0x80093748).",
+      "The sign convention follows from eye = at + (0, -D*sin(angle), +D*cos(angle)). With angle = -0.84 the eye sits ABOVE (+0.7446*D in y) and at +Z from the target, so the elevation of the camera above the target plane is -angle."
+    ]
+  },
+  "distance": "cam+0x4C, in leptons. Default 3000 (11.719 cells). Range 2400 (9.375 cells) .. 3800 (14.844 cells).",
+  "distance_detail": {
+    "default": 3000.0,
+    "min": 2400.0,
+    "max": 3800.0,
+    "units": "leptons (256 per cell)",
+    "default_cells": 11.7188,
+    "step_per_frame_while_held": 100.0,
+    "eye_height_above_ground": {
+      "formula": "dist * sin(pitch)",
+      "at_2400": 1687.9,
+      "at_3000": 2233.9,
+      "at_3800": 3023.3,
+      "at_3000_cells": 8.726
+    },
+    "eye_horizontal_offset_from_target_along_+Z": {
+      "at_2400": 1706.2,
+      "at_3000": 2002.4,
+      "at_3800": 2302.1
+    },
+    "at_y": -1.0,
+    "confidence": "certain",
+    "evidence": [
+      "Mission start calls ResetZoomLimits() then SetDefaultZoom(): ROM 0x0491CC 'jal 0x8002F6D0' and ROM 0x0491D4 'jal 0x8002F880', both inside the mission entry at RAM 0x80048574.",
+      "ResetZoomLimits (RAM 0x8002F6D0, ROM 0x302D0) writes 0x800D2038 = 2400.0 (const 0x80003278) and 0x800D203C = 3800.0 (const 0x8000327C). ROM 0x003E78: 45160000 456d8000.",
+      "SetDefaultZoom (RAM 0x8002F880, ROM 0x030480) is 'lwc1 $f12,0x328C($at)' then 'jal 0x8002F6FC'; RAM 0x8000328C (ROM 0x3E8C) = 453B8000 = 3000.0.",
+      "The zoom step is +/-100.0 per frame while the button is held: ROM 0x030814/0x030824 select the constants at RAM 0x80003320 / 0x80003324 (ROM 0x3F20: c2c80000 42c80000 = -100.0, +100.0) into $f20, then ROM 0x030868 'jal 0x8002F85C' adds it to the current zoom. RAM 0x8000476C = -100.0 is the same step from the other input handler at ROM 0x0499C4.",
+      "A separate debug/free-camera path (gated on RAM 0x8009797C) widens the clamp to 10.0 .. 20000.0 (RAM 0x80003280 / 0x80003284, ROM 0x3E80: 41200000 469c4000). That path is not the normal game.",
+      "cam.at.y is the constant -1.0 written at ROM 0x032B7C from RAM 0x8000342C (ROM 0x402C = bf800000). The ground plane is y = 0."
+    ]
+  },
+  "zoomRange": "2400 .. 3800 leptons, i.e. 9.375 .. 14.844 cells, a 1.583x range. Default 3000. The Expansion Pak does NOT change the zoom - it only doubles the framebuffer height.",
+  "zoom_detail": {
+    "min": 2400.0,
+    "max": 3800.0,
+    "default": 3000.0,
+    "ratio": 1.5833,
+    "runtime_state": {
+      "current": "RAM 0x800D2034",
+      "soft_min": "RAM 0x800D2038",
+      "hard_max": "RAM 0x800D203C"
+    },
+    "confidence": "certain"
+  },
+  "resolution": {
+    "framebuffer_normal": [
+      640,
+      240
+    ],
+    "framebuffer_high": [
+      640,
+      480
+    ],
+    "selector": "RAM 0x80090694, set by SetVideoMode (RAM 0x8007CAAC). 2 = high, otherwise normal.",
+    "display_aspect": "4:3 in both modes; in 640x240 the pixels are 2:1 tall, which is why the projection aspect stays 1.3333.",
+    "confidence": "high",
+    "evidence": [
+      "ROM 0x03D3F0 'jal 0x80007AB8' (GetVideoMode), then ROM 0x03D404 'addiu $v0,$zero,0x280' -> 0x80096A24 = 640 and ROM 0x03D414 'addiu $v0,$zero,0x1e0' = 480 when mode == 2, else ROM 0x03D424 'addiu $v0,$zero,0xf0' = 240. Width is 640 in BOTH branches. The same pair repeats at ROM 0x03D4E4-0x03D508 in the in-game variant (RAM 0x8003C8B0), which is the one the game path calls from ROM 0x02C538.",
+      "The mode value comes from a saved option: ROM 0x21B02C-0x21B03C picks 2 or 1 from a config field, then ROM 0x21B0E4 'jal 0x80007AAC'.",
+      "The HUD reserves 200 px of the 640: ROM 0x03D550 'addiu $v0,$a2,-0xc8' -> RAM 0x80096768 = 440. That is the 2D sidebar layout; the 3D projection's aspect is a fixed 4:3 and is never rewritten, so the pixel figures below are quoted for the full 640-wide 4:3 frame."
+    ]
+  },
+  "unitsPerCell": "256 world/camera units per cell (leptons). Mesh vertices are 1024 per cell and every model carries a 0.25 scale factor.",
+  "pixels_per_cell": {
+    "measured_by": "analytic projection plus a full software render of SCG01EA (an independent software renderer); the two agree to 0.1 px",
+    "horizontal_formula": "px = frameWidth * 256 / (2 * dist * tan(25deg) * 1.3333333)",
+    "at_default_zoom_3000": {
+      "horizontal_px_per_cell_640_wide": 43.93,
+      "vertical_px_per_cell_at_screen_centre_640x480": "30.9 (far edge) .. 34.7 (near edge)",
+      "vertical_px_per_cell_at_screen_centre_640x240": "15.5 .. 17.3 scanlines",
+      "cells_across_the_centre_row": 14.572,
+      "cells_top_to_bottom_on_the_ground": 17.776
+    },
+    "at_min_dist_2400": {
+      "horizontal_px_per_cell_640_wide": 54.92,
+      "vertical_px_per_cell_640x480": "35.9 .. 41.8",
+      "cells_across": 11.658,
+      "cells_tall": 15.974
+    },
+    "at_max_dist_3800": {
+      "horizontal_px_per_cell_640_wide": 34.68,
+      "vertical_px_per_cell_640x480": "26.5 .. 28.8",
+      "cells_across": 18.458,
+      "cells_tall": 19.904
+    },
+    "vertical_to_horizontal_ratio": "sin(pitch) = 0.7446 at default zoom. A cell is 25.5% shorter than it is wide, in square-pixel terms. Nothing like the 2:1 of an isometric diamond.",
+    "confidence": "high (exact for the full-width 4:3 frame; if the 3D is scissored to the 440 px tactical strip the horizontal count is unchanged per cell, only fewer cells are visible)"
+  },
+  "art_corroboration": {
+    "verdict": "SQUARE, top-down, axis-aligned. Not diamonds.",
+    "detail": "Terrain art is 24x24 pixel square tiles, one per cell, in <THEATER>.DA4 (4bpp, 288 B/tile) and .DA8 (8bpp, 576 B/tile). A mission .MAP is 64x64 u16 tile IDs indexing those banks directly. The tiles fill their full 24x24 square edge to edge - roads and cliffs run straight out of one edge and into the neighbour, and there is no diamond mask, no transparent corner wedge, no 2:1 aspect. Alpha 0 appears only as water holes inside water-capable templates. Proof sheet: the contrast render (50 temperate tiles at 6x).",
+    "geometry_corroboration": "Terrain and overlays are square quads in world space too: model slots 151/152 (tiberium) are 4-vertex quads spanning x,z = -515..+515, i.e. one 1024-unit cell plus a 3-unit bleed, and the road strip spans -512..+511. A diamond camera would need diamond-shaped or rotated art; there is none in the ROM.",
+    "confidence": "certain"
+  },
+  "reconstruction": {
+    "how_to_build_the_matrix": [
+      "world: X right, Y up, Z 'down the screen'. cellX -> x = cellX * 256, cellY -> z = cellY * 256, ground at y = 0.",
+      "dist D in [2400, 3800], default 3000.",
+      "angle = -0.78 - 0.14 * (D - 2400) / 1400;  pitch = -angle  (radians)",
+      "at   = (scrollCentreX_leptons, -1.0, scrollCentreZ_leptons)",
+      "eye  = at + (0, D*sin(pitch), D*cos(pitch))",
+      "up   = (0, 1, 0)",
+      "view = lookAt(eye, at, up)",
+      "proj = perspective(fovy = 50 deg vertical, aspect = 4/3, near = 0.1*D, far = 2*D + 2096)",
+      "final = proj * view   (the ROM cats them the other way round because libultra matrices are row-vector)"
+    ]
+  },
+  "what_must_change_in_our_renderer": [
+    "DROP THE 45 DEGREE YAW ENTIRELY. Ry(45) is wrong; the N64 uses yaw 0. The map must draw as an axis-aligned square grid, not a diamond. This is the single biggest readability change and the ROM is unambiguous: eye.x is assigned from at.x (ROM 0x0307A0 / 0x0307B4).",
+    "CHANGE THE PITCH from 26.565 deg to 48.128 deg at the default zoom (44.691 at closest, 52.712 at furthest). Our 26.565 is the PC/isometric 2:1 convention and does not appear anywhere in this ROM.",
+    "SWITCH FROM ORTHOGRAPHIC TO PERSPECTIVE: 50 deg vertical FOV, aspect 4:3, near = 0.1*dist, far = 2*dist + 2096. The console really does have perspective divergence; parallel map rows converge toward the top of the screen. If we keep an orthographic camera for gameplay reasons, say so explicitly rather than calling it the console camera.",
+    "COUPLE PITCH TO ZOOM. It is not a free parameter: pitch is a linear function of distance over 2400..3800. Zooming out also tilts the camera further over.",
+    "USE 256 UNITS PER CELL for camera space, not 1024. Our meshes are correct at 1024/cell but they must be drawn with a 0.25 scale (the per-model table at RAM 0x800989A0 gives 0.25 for 199 of 236 slots, with a handful of exceptions worth honouring: 0.21, 0.20, 0.24, 0.23, 0.19, 0.22, 0.18, 0.16, and one 0.56).",
+    "REPLACE THE ZOOM RANGE. Ours is expressed as 20..40 px per cell; the console's is distance 2400..3800 leptons, which at a 640-wide 4:3 frame is 54.9 .. 34.7 px per cell horizontally, default 43.9. Note the direction: bigger distance = fewer pixels per cell.",
+    "TARGET FRAME 640x240 (or 640x480 with the high-res option), displayed 4:3. If we render square pixels, use 640x480 and keep the 4:3 projection aspect."
+  ],
+  "negative_results": [
+    "guOrtho / guOrthoF: present in the libultra link but ZERO call sites anywhere in the ROM. The game is perspective only.",
+    "The fixed-point guPerspective wrapper at RAM 0x8007D650 also has zero call sites; only the float form guPerspectiveF is used.",
+    "There is no yaw field in the camera struct and no rotation applied to the world about Y. The debug printf exposes exactly three numbers (Dist, Angle, Pos.y) and Angle is the pitch.",
+    "The Expansion Pak / high-res option changes only the framebuffer height (240 -> 480). It does not touch dist, angle, fovy or aspect.",
+    "cam+0x08 (fovy) and cam+0x0C (aspect) are written once by Camera_Init and never again; there is no per-viewport aspect fixup in the game path.",
+    "I could not pin down the exact gSPViewport rectangle for the 3D pass: the scissor is built at ROM 0x049FA0-0x04A06C from RAM 0x80097150+0x1A4..0x1B0, and those four fields are only ever written through a pointer, so no static xref resolves them. The pixel-per-cell figures are therefore quoted against the full 640-wide 4:3 frame. The HUD reserves 200 px of width (RAM 0x80096768 = 440), so if the 3D is scissored to that strip the number of VISIBLE cells drops to about 10 across, but the px-per-cell figure itself is unchanged."
+  ],
+  "artifacts": {
+    "note": "The recovered camera was checked against a software render of SCG01EA at 640x480 and 640x240, at both zoom limits, and against a tile-art proof. Those renders were working output and are not part of this repository; every number they confirmed is recorded above."
+  }
+}

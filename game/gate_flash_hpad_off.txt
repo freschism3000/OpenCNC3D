@@ -1,0 +1,52 @@
+# THE --noflash ARM of the gate above: the same run, the same tick, the same
+# camera, with the blush switched off in the renderer. The gate differences the
+# two series FRAME BY FRAME inside the object's own silhouette, so every pixel it
+# counts is the blush and nothing else -- the world is identical in both runs.
+#
+# THE TARGET BLUSH, arm 3 of 3: the HELIPAD, the victim nobody reported.
+#
+# The Hand of Nod and the Refinery were reported. The Helipad's blush was dead too, and
+# on this one the target cell is INNOCENT: HPAD's occupy list contains offset 0, so the
+# order always reached the building (the ORDER line reads target=HPAD on both builds).
+# What killed it was the flash clear alone -- the helipad's 60-slot texture book redraws
+# the same triangles one line after g_meshFlash was cleared, at glPolygonOffset(-1,-1),
+# so it wins the depth test and repaints the white faces in the building's own colours.
+#
+# That makes this arm the one that isolates the flash-clear fix from the target-cell fix,
+# and it is the arm that must run WITH THE TEXTURE BOOKS ON. A --notexbook measurement
+# passes with the bug present, which is precisely the shape of gate that fooled everyone
+# here; there is deliberately no --notexbook on this run.
+#
+# HPAD:GoodGuy 0, not HPAD 0: SCG41EA holds four helipads and the first three in the dump
+# are BadGuy's, off in the far corner of the map and not drawn from this camera.
+tick 20
+cam 54 58
+zoom max
+clickobj HPAD:GoodGuy 0
+lclickobj JEEP 0
+order 54 58 c
+tick 1
+shot shots/noflashh_01.png
+tick 1
+shot shots/noflashh_02.png
+tick 1
+shot shots/noflashh_03.png
+tick 1
+shot shots/noflashh_04.png
+tick 1
+shot shots/noflashh_05.png
+tick 1
+shot shots/noflashh_06.png
+tick 1
+shot shots/noflashh_07.png
+tick 1
+shot shots/noflashh_08.png
+tick 1
+shot shots/noflashh_09.png
+tick 1
+shot shots/noflashh_10.png
+tick 1
+shot shots/noflashh_11.png
+tick 1
+shot shots/noflashh_12.png
+quit

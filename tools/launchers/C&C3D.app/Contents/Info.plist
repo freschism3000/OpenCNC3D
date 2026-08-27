@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>              <string>C&amp;C3D</string>
+    <key>CFBundleDisplayName</key>       <string>C&amp;C3D</string>
+    <key>CFBundleIdentifier</key>        <string>com.slipgate.cnc3d</string>
+    <key>CFBundleVersion</key>           <string>1.0</string>
+    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundlePackageType</key>       <string>APPL</string>
+    <key>CFBundleExecutable</key>        <string>cnc3d-launch</string>
+    <key>CFBundleIconFile</key>          <string>AppIcon</string>
+    <key>NSHighResolutionCapable</key>   <true/>
+    <key>LSMinimumSystemVersion</key>    <string>10.13</string>
+</dict>
+</plist>

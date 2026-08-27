@@ -1,0 +1,59 @@
+# G60 MOVEMENT SMOOTHING. Two parts in one run.
+# PART 1, inside ONE tick: identity with the filter off, then three phases with it on.
+# PART 2, across 20 ticks at a FIXED phase: the engine pulses, the drawn track must not.
+# The gunboat on SCG01EC is on Hunt and therefore actually moving, which both need.
+tick 60
+smoothmove 0
+drawpos BOAT 0
+smoothmove 1
+tickalpha 0.0
+drawpos BOAT 0
+tickalpha 0.5
+drawpos BOAT 0
+tickalpha 0.999
+drawpos BOAT 0
+smoothmove 0
+drawpos BOAT 0
+smoothmove 1
+tickalpha 0.0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+tick 1
+drawpos BOAT 0
+quit

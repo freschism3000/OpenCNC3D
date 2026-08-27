@@ -1,0 +1,84 @@
+# G61 STRUCTURE STAGE SMOOTHING and the BUILDUP REVEAL.
+# Place a power plant and sample, every tick: the engine stage counter, its smoothed
+# twin, and the number of triangles of the building that exist yet. The last is the one
+# It was reported twice, and it cannot be measured in pixels -- the building shares its
+# screen space with terrain, scaffolding, the yard crane and passing infantry.
+tick 20
+sidebar
+build NUKE
+ready NUKE 400
+startplace NUKE
+place auto
+smoothmove 0
+stagepos NUKE 1
+smoothmove 1
+tickalpha 0.5
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+tick 1
+stagepos NUKE 1
+quit

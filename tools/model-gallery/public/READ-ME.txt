@@ -1,0 +1,79 @@
+CNC3D MODEL GALLERY
+===================
+
+Every 3D asset on the Command & Conquer (Nintendo 64) cartridge: 202 models,
+11,080 triangles, with the cartridge's own textures, names and pivots.
+
+
+RUNNING IT
+----------
+
+This is a website, not a document. It has to be SERVED, because it loads its
+geometry as a binary file and a browser refuses that over file://.
+
+Open a terminal in this folder and run:
+
+    python3 -m http.server 8110
+
+then open http://localhost:8110 in a browser.
+
+(On Windows without Python: any static web server will do, or drag the folder
+into VS Code and use its Live Server extension.)
+
+
+WHAT IS IN IT
+-------------
+
+Click a thumbnail to open a model. Drag to orbit, wheel to zoom, shift+drag to
+pan, left/right arrows to step through the category, Esc to close.
+
+The buttons under the model:
+
+  textured       the cartridge's own texture sheets on or off
+  vertex colour  the baked shading on or off (this IS the cartridge's lighting;
+                 the N64 never lit these meshes at run time)
+  wireframe      the raw triangles
+  GDI palette    decode through the cartridge's GDI colour table instead of the
+                 Nod/neutral one. Sand and gold instead of blue-grey and red.
+                 Only lights up on models that actually differ between the two.
+  spin           turntable
+
+The panel on the right is the model's paperwork: where its name came from, its
+parts and the exact pivot each one rotates about, its textures, its animation
+clip, and how many pieces it assembles from while it is being built.
+
+
+EXPORTING
+---------
+
+EXPORT      the model you are looking at
+EXPORT ALL  all 202, or only the ones the category chip and the search box are
+            currently showing
+
+Both ask for a format:
+
+  FBX 7.4 binary (default)  Keeps the node hierarchy and the cartridge's own
+                            pivots, so a turret still rotates about the point
+                            the game rotates it about. Blender reads binary FBX
+                            only. This is the format to use if a model is going
+                            to an artist and coming back.
+  OBJ + MTL                 Universal. Carries no pivots: a turret arrives as
+                            loose geometry.
+  glTF 2.0                  Web-native, with the baked vertex colours as COLOR_0
+                            and an unlit material, which is what the cartridge
+                            actually is.
+
+and two options: whether to include the texture PNGs, and which house palette
+to decode them through. Anything more than a single file arrives as a .zip.
+
+
+A NOTE ON HOW THINGS LOOK
+-------------------------
+
+The models are dark. That is correct: the cartridge bakes its shading into the
+vertex colours and a vehicle averages about RGB 60. The gallery lightens the
+BACKDROP rather than the model, so what you see is the game's own colour.
+
+Nothing here is animated. 22 models carry a real animation clip and the gallery
+draws their rest pose; the panel says so on those models. The clip does go out
+with the FBX.

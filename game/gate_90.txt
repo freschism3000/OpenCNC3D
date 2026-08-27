@@ -1,0 +1,14 @@
+# SCG90EA (Test Map) self-play: let the scripted attack waves run and watch the world.
+tick 2
+player
+objdump
+shot g90_boot.png
+tick 300
+echo AFTER-300
+objdump
+shot g90_mid.png
+tick 300
+echo AFTER-600
+objdump
+shot g90_late.png
+quit

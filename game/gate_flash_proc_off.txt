@@ -1,0 +1,56 @@
+# THE --noflash ARM of the gate above: the same run, the same tick, the same
+# camera, with the blush switched off in the renderer. The gate differences the
+# two series FRAME BY FRAME inside the object's own silhouette, so every pixel it
+# counts is the blush and nothing else -- the world is identical in both runs.
+#
+# THE TARGET BLUSH, arm 2 of 3: the REFINERY, which did not blush at all before 20 Aug
+# 2026 and which needs BOTH of that day's fixes to blush now.
+#
+#   1  the TARGET CELL. PROC's occupy list (bdata.cpp:150 List010111000 = {1, MCW,
+#      MCW+1, MCW+2}) does not contain offset 0, so the engine has nothing filed at the
+#      anchor cell 50,46 and the attack order aimed there was silently turned into a
+#      move -- no Clicked_As_Target, no FlashCount, no blush. The brain now exports
+#      tcx/tcy (Coord_Cell(Target_Coord())) and ui_right_click aims at that instead.
+#      Measured on this exact line: the ORDER line reads cell=50,46 probe=1 before the
+#      fix and cell=51,47 probe=7 after it.
+#   2  the FLASH CLEAR. g_meshFlash used to be cleared straight after the base mesh
+#      draw, so the refinery's texture book and its unload rig redrew the same triangles
+#      at glPolygonOffset(-1,-1), won the depth test, and painted the whitened faces
+#      back. Both together are why this arm reads 0 changed pixels on every one of the
+#      twelve frames on the shipped v0.5.7 binary.
+#
+# CAMERA 53,48 rather than the refinery's own cell: an MTNK has to be on the glass for
+# lclickobj to select it (the picker refuses an aim outside the frame), and from 50,46 at
+# zoom max the nearest one lands at x=1060 in an 800-wide window. The refinery is fully
+# inside the frame either way and the crop comes from the clickobj line below.
+tick 20
+cam 53 48
+zoom max
+clickobj PROC 0
+lclickobj MTNK
+order 50 46 c
+tick 1
+shot shots/noflashp_01.png
+tick 1
+shot shots/noflashp_02.png
+tick 1
+shot shots/noflashp_03.png
+tick 1
+shot shots/noflashp_04.png
+tick 1
+shot shots/noflashp_05.png
+tick 1
+shot shots/noflashp_06.png
+tick 1
+shot shots/noflashp_07.png
+tick 1
+shot shots/noflashp_08.png
+tick 1
+shot shots/noflashp_09.png
+tick 1
+shot shots/noflashp_10.png
+tick 1
+shot shots/noflashp_11.png
+tick 1
+shot shots/noflashp_12.png
+quit

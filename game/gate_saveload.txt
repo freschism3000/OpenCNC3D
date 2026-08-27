@@ -1,0 +1,17 @@
+# SAVE AND LOAD. 20 Aug: "Implement Save and load." The engine has always been able
+# to -- CNC_Save_Load is exported by the brain we ship -- and the renderer simply never
+# called it. The assertion is a ROUND TRIP: save at a known frame, advance past it, load,
+# and the world must be back exactly where it was. Not a hash of the file: two runs of the
+# identical deterministic simulation produce payloads differing in ~272 bytes, because
+# vtable pointers are written raw by file.Write(this, sizeof(*this)) and move with ASLR.
+# The placement-new in heap.h re-establishes them on load, which is why that is harmless --
+# but it means the FILE is not reproducible and only the STATE can be asserted on.
+tick 300
+objdump
+save 0 gate round trip
+tick 200
+objdump
+load 0
+objdump
+slots
+quit

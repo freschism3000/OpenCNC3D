@@ -1,0 +1,4 @@
+tick 2
+sidebar GATE
+shot gate_eb.png
+quit

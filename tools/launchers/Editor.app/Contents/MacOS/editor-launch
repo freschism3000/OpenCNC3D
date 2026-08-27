@@ -1,0 +1,237 @@
+#!/bin/bash
+# ============================================================================
+#  Editor -- the mission editor, for testing whatever is currently being built.
+#
+#  One app in playable/ was asked for that is ALWAYS the current thing, so that
+#  testing never means "which binary did I actually just run?". Three rules keep
+#  that promise, and each of them exists because the obvious version of this
+#  launcher would quietly break it:
+#
+#  1. THIS IS A SCRIPT, NOT A COPY OF THE GAME. The bundle holds no binary. It
+#     finds cnc_eyes at launch time, so a rebuild is picked up with no install
+#     step. A bundle with the binary inside it would be stale the moment anyone
+#     recompiled and would give no sign of it.
+#
+#  2. IT RUNS THE NEWEST BUILD, not whichever copy happens to sit beside it. The
+#     build writes game/cnc_eyes and a separate step stages it into playable/.
+#     Forget that step and playable/cnc_eyes is yesterday's code while the source
+#     says otherwise -- the exact failure this app exists to prevent. So the two
+#     are compared by mtime and the newer one wins, and it is staged forward so
+#     the rest of playable/ agrees with it.
+#
+#  3. IT UPDATES ITSELF. tools/launchers/Editor.app is the tracked master; this
+#     is a copy. If the master is newer, the copy is refreshed and re-run before
+#     anything else happens, so a fix to this file does not need anyone to be told
+#     to reinstall anything.
+#
+#  Everything it cannot do it SAYS, in a dialog, with the command that fixes it.
+#  A test tool that dies silently into the Dock is worse than no test tool: the
+#  failure gets read as "the editor is broken" when it is usually one missing
+#  terrain pack.
+#
+#  stderr goes to playable/Editor.log, and the tail of it is shown if the editor
+#  exits badly. When something breaks, that log is the thing to send back.
+# ============================================================================
+set -u
+
+BUNDLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HERE="$(dirname "$BUNDLE")"
+
+# ---- talking to the user -------------------------------------------------------------
+alert() {  # alert <title> <message>
+    osascript - "$1" "$2" >/dev/null 2>&1 <<'OSA'
+on run argv
+    display alert (item 1 of argv) message (item 2 of argv) as critical
+end run
+OSA
+}
+
+# ---- 1. find the game folder -----------------------------------------------------
+# The editor needs the mission INIs and the cameo pack; cnc_eyes itself may be here or
+# still only in game/. Testing for the binary alone would accept a folder that cannot
+# actually open a map.
+is_game_dir() {
+    [ -n "${1:-}" ] && [ -d "$1/missions" ] && [ -f "$1/cameos.pack" ] \
+        && { [ -x "$1/cnc_eyes" ] || [ -x "$1/../game/cnc_eyes" ]; }
+}
+
+DIR=""
+if is_game_dir "$HERE"; then
+    DIR="$HERE"
+else
+    # Run from somewhere else -- the tracked master in tools/launchers/, say, or a copy
+    # dragged onto the Desktop. The repo's own playable/ is the only sensible answer.
+    for cand in "$HERE/../../playable" "$HOME/CNC3D/playable" "$HERE/../playable"; do
+        if is_game_dir "$cand"; then DIR="$(cd "$cand" && pwd)"; break; fi
+    done
+fi
+
+if [ -z "$DIR" ]; then
+    alert "Editor" "Could not find the game folder.
+
+This app expects to sit in CNC3D/playable, beside missions/ and cameos.pack. It is in:
+$BUNDLE
+
+Reinstall it with:    sh tools/install-editor-app.sh"
+    exit 1
+fi
+
+REPO="$(cd "$DIR/.." && pwd)"
+LOG="$DIR/Editor.log"
+
+# ---- 2. self-update from the tracked master --------------------------------------
+MASTER="$REPO/tools/launchers/Editor.app"
+SELF="$BUNDLE"
+if [ -d "$MASTER" ] && [ "$MASTER" != "$SELF" ] \
+   && [ "$MASTER/Contents/MacOS/editor-launch" -nt "$SELF/Contents/MacOS/editor-launch" ]; then
+    # rsync writes a new inode and renames, so the copy of this script that is CURRENTLY
+    # RUNNING keeps its own open file and is not pulled out from under bash mid-parse.
+    if rsync -a --delete "$MASTER/" "$SELF/" >/dev/null 2>&1; then
+        exec "$SELF/Contents/MacOS/editor-launch" "$@"
+    fi
+fi
+
+# ---- 3. run the newest build -----------------------------------------------------
+BUILT="$REPO/game/cnc_eyes"
+STAGED="$DIR/cnc_eyes"
+FRESH=""
+if [ -x "$BUILT" ] && { [ ! -x "$STAGED" ] || [ "$BUILT" -nt "$STAGED" ]; }; then
+    cp -f "$BUILT" "$STAGED" 2>/dev/null && FRESH="  (staged a newer build from game/)"
+fi
+if [ ! -x "$STAGED" ]; then
+    alert "Editor" "There is no cnc_eyes to run.
+
+Build it with:    sh game/build.sh"
+    exit 1
+fi
+
+# HAS THE SOURCE CHANGED SINCE THIS BINARY WAS BUILT? Testing a stale binary while
+# believing it is current is the exact failure this app exists to prevent, so it is worth
+# checking -- but NOT by mtime. A script that reads a file, substitutes nothing and writes
+# it back leaves the content identical and the mtime new, and every edit tool here works
+# that way, so an mtime test cries wolf constantly and gets ignored. build.sh stamps a
+# hash of what it actually compiled; this compares against the same sources now.
+STALE=""
+STAMP="$REPO/game/.build-sources.sha"
+# THE FILE LIST COMES FROM THE STAMP, not from a copy here. This script used to carry its
+# own list, and the day a source file was added to build.sh and not to this one, the two
+# hashes could never agree and the launcher warned "rebuild" after every successful build.
+# A warning that is always on is a warning nobody reads.
+if [ -f "$STAMP" ]; then
+    WANT="$(head -1 "$STAMP")"
+    SRCS="$(sed -n '2,$p' "$STAMP" | tr '\n' ' ')"
+    if [ -n "$SRCS" ]; then
+        NOW="$(cd "$REPO/game" && cat $SRCS 2>/dev/null | shasum -a 1 | cut -d" " -f1)"
+        [ -n "$NOW" ] && [ "$NOW" != "$WANT" ] && STALE="yes"
+    fi
+fi
+
+# ---- 4. which map ----------------------------------------------------------------
+# Only maps with a terrain pack are offered. A map without one cannot open, and finding
+# that out from a dialog after choosing it is a worse experience than not being offered
+# it -- the count of what was left out is reported instead.
+pack_for() {
+    for p in "$DIR/$1.pack" "$REPO/tools/bakery/game/$1.pack"; do
+        [ -f "$p" ] && { echo "$p"; return 0; }
+    done
+    return 1
+}
+
+# A scenario named on the command line skips the picker. Finder cannot pass one on a
+# double-click, so this is for driving the app from a terminal -- which is also the only
+# way any of the logic above gets tested without a human clicking through a dialog.
+WANT="${1:-}"
+
+LAST="$(cat "$DIR/.editor-last" 2>/dev/null || echo SCG01EA)"
+LIST=""
+DEFAULT=""
+SKIPPED=0
+for ini in "$DIR"/missions/*.INI; do
+    [ -f "$ini" ] || continue
+    scen="$(basename "$ini" .INI)"
+    if ! pack_for "$scen" >/dev/null; then SKIPPED=$((SKIPPED + 1)); continue; fi
+    case "$scen" in
+        SCG*) side="GDI     " ;;
+        SCB*) side="Nod     " ;;
+        SCM*) side="Skirmish" ;;
+        *)    side="        " ;;
+    esac
+    row="$scen   $side"
+    LIST="$LIST$row
+"
+    [ "$scen" = "$LAST" ] && DEFAULT="$row"
+done
+
+if [ -z "$LIST" ]; then
+    alert "Editor" "No map has a terrain pack, so there is nothing to open.
+
+Bake one with:    sh tools/stage-skirmish-maps.sh SCG01EA"
+    exit 1
+fi
+[ -n "$DEFAULT" ] || DEFAULT="$(printf '%s' "$LIST" | head -1)"
+
+CHOICE=""
+if [ -n "$WANT" ]; then
+    pack_for "$WANT" >/dev/null || {
+        alert "Editor" "No terrain pack for $WANT.
+
+Bake one with:    sh tools/stage-skirmish-maps.sh $WANT"
+        exit 1
+    }
+    CHOICE="$WANT"
+fi
+
+# NO PICKER. A requirement: the map browser must not stand between double-clicking this
+# and seeing a map. The editor has a MAP menu of its own now -- New Map, Open Map, and
+# the singleplayer/multiplayer switch -- so this opens the last map straight away and
+# choosing a different one happens inside, where it belongs.
+#
+# The scenario list above is still built, because it is what decides the map this opens
+# on: the last one used if it still has a pack, and the first that does otherwise.
+[ -n "$CHOICE" ] || CHOICE="$DEFAULT"
+SCEN="${CHOICE%% *}"
+PACK="$(pack_for "$SCEN")" || { alert "Editor" "No terrain pack for $SCEN."; exit 1; }
+printf '%s' "$SCEN" > "$DIR/.editor-last"
+
+# ---- 5. go -----------------------------------------------------------------------
+cd "$DIR" || { alert "Editor" "Could not open $DIR."; exit 1; }
+
+# CNC3D_EDITOR_DRYRUN reports what would happen and stops. Everything above this line is
+# path resolution, staleness checks and list building, and all of it can be wrong in ways
+# that only show up as an app that bounces once and quits.
+if [ -n "${CNC3D_EDITOR_DRYRUN:-}" ]; then
+    echo "dir      $DIR"
+    echo "binary   $STAGED$FRESH"
+    echo "map      $SCEN"
+    echo "pack     $PACK"
+    echo "offered  $(printf '%s' "$LIST" | grep -c .) maps, $SKIPPED with no pack"
+    echo "stale    ${STALE:-no}"
+    exit 0
+fi
+{
+    echo "=============================================================="
+    echo "editor  $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "  map      $SCEN"
+    echo "  pack     $PACK"
+    echo "  binary   $STAGED$FRESH"
+    [ -n "$STALE" ] && echo "  WARNING  a source file is newer than this binary -- rebuild"
+    echo "=============================================================="
+} > "$LOG"
+
+./cnc_eyes --edit --scen "$SCEN" --pack "$PACK" --cameos cameos.pack \
+    --dospack dossidebar.pack --dosinf dosinfantry.pack \
+    --dylib TiberianDawn.dylib --dir missions/ --content content/ >> "$LOG" 2>&1
+RC=$?
+
+# ESC is how you leave the editor and it is not an error. Anything else is, and the log
+# is the only place the reason exists, so it comes to the front rather than being left
+# for someone to think of looking for.
+if [ $RC -ne 0 ]; then
+    TAIL="$(tail -n 14 "$LOG" 2>/dev/null)"
+    alert "Editor stopped (exit $RC)" "Map: $SCEN
+
+$TAIL
+
+Full log: playable/Editor.log"
+    exit $RC
+fi

@@ -1,0 +1,58 @@
+# G90. A DESTROYED BUILDING COMES APART INSTEAD OF STANDING THERE.
+#
+# BuildingClass::Take_Damage's RESULT_DESTROYED arm sets CountDown = 8
+# (brain/vanilla/tiberiandawn/building.cpp:1562) unless the building is being
+# deconstructed, so a killed structure sits in the engine's heap for eight ticks after its
+# strength reaches zero. It used to be drawn WHOLE for every one of them, still running its
+# idle loop, while the fireball, the debris and the crater landed around it. Then it popped
+# out of existence.
+#
+# It now sheds its display-list sections over that window, which is the cartridge's own
+# reveal grammar run backwards and exactly what a sold building already does. No new art.
+#
+# HOW THIS SCRIPT KILLS SOMETHING, and why it is written the awkward way it is. There is no
+# verb that damages an object, so the only way to a real death is real combat: select the
+# Medium Tank and CTRL-click a Guard Tower, which is force fire. The order is one shot, so
+# it has to be re-issued; four rounds of 200 ticks takes a 400-strength tower down.
+#
+# THE CAMERA MUST NOT MOVE. lclickobj and actclickobj click a SCREEN POSITION, so anything
+# that moves the camera between the order and the target breaks the order silently and the
+# tower simply never dies. `cam 54 47` is chosen because the tank and the tower are both in
+# frame from there. An earlier version of this script used `look` and spent a long time
+# looking like an engine bug.
+#
+# The eight shots at the end are the death window. gates.sh runs this twice, once plainly
+# and once with --nodeathshed, and differences the last frame of each: with the shed off
+# the tower's roof is still a solid intact pyramid inside its own explosion, and with it on
+# the roof is gone. That A/B is the whole assertion, because "the picture changed" during an
+# explosion proves nothing on its own.
+tick 20
+cam 54 47
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 200
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 200
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 200
+lclickobj MTNK 0
+actclickobj GTWR 0 c
+tick 85
+shot shots/g90_0.png
+tick 1
+shot shots/g90_1.png
+tick 1
+shot shots/g90_2.png
+tick 1
+shot shots/g90_3.png
+tick 1
+shot shots/g90_4.png
+tick 1
+shot shots/g90_5.png
+tick 1
+shot shots/g90_6.png
+tick 1
+shot shots/g90_7.png
+quit

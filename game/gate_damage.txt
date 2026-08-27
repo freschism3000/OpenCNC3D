@@ -1,0 +1,82 @@
+# G93. A BUILDING BELOW HALF HEALTH WEARS THE CARTRIDGE'S OWN DAMAGE ART.
+#
+# Every structure the console has a model for also has damage art, and the rule that picks
+# it is byte for byte the 1995 rule: BuildingClass::Draw3D calls Health_Ratio() and does
+# sltiu $v0,$v0,0x80 (ROM 0x03E934, word 2C420080), shifting the answer into draw-flag
+# bit 3, and the model draw handler tests that bit (ROM 0x04D3E0) and APPENDS an overlay
+# display list over the intact building. STRICT less-than: at ratio 0x80 nothing draws.
+#
+# WHY THIS WAS "MISSING" FOR MONTHS, and why the gate is shaped to prove the RULE rather
+# than one screenshot: two earlier sweeps looked for a damaged MESH and for a fourth
+# palette. Both were correct and both found nothing, because the art is neither -- it is a
+# standalone display list referenced by no scene-graph node, reachable only through one
+# 24-record table. A gate that asserts "the picture changed once" would have been just as
+# green for a build that drew the overlay on every building at every health.
+#
+# SELF-LOCATING. dmgdump prints the health ratio and the shot immediately after it is that
+# same frame, so the suite pairs sample k with shots/g93_k.png and never hardcodes how many
+# hits it takes to cross 0x80. THE CAMERA MUST NOT MOVE between an order and its target:
+# lclickobj and actclickobj click a SCREEN POSITION. The order is one shot and is re-issued.
+tick 20
+cam 52 51
+zoom max
+dmgdump
+shot shots/g93_0.png
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+dmgdump
+shot shots/g93_1.png
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+dmgdump
+shot shots/g93_2.png
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+dmgdump
+shot shots/g93_3.png
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+dmgdump
+shot shots/g93_4.png
+lclickobj MTNK 0
+actclickobj NUKE 0 c
+tick 150
+dmgdump
+shot shots/g93_5.png
+
+# AND A SECOND STRUCTURE, because the first version of this gate damaged ONLY the Power
+# Plant and was green while three other buildings drew rainbow garbage on screen. The
+# Construction Yard is the specific one that was broken -- its overlay inherits G_LIGHTING,
+# so an un-whitened bake modulates the damage texture by a direction vector and paints a
+# magenta smear across the roof. One structure is a sample, not a test.
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+lclickobj MTNK 0
+actclickobj FACT 0 c
+tick 130
+dmgdump
+shot shots/g93_6.png
+quit

@@ -1,0 +1,41 @@
+# G109. THE SAM SITE MAKES A NOISE WHEN IT FIRES.
+#
+# This was asked for and turned out to already work; the gate exists so it keeps
+# working, and so the next person to doubt it has a script that answers in 30 seconds.
+#
+# THREE THINGS ABOUT THIS SCRIPT ARE LOAD-BEARING. Each one, on its own, makes the run
+# report `sfx=0/0` and look exactly like a dead sound:
+#
+#  1. THE LENGTH. A SAM only fires at AIRCRAFT, and the A-10s take roughly 250 engine
+#     ticks from the strike request to reach the SAMs. The first version of this stopped
+#     160 ticks after the click and saw nothing at all. Do not trim the ticks.
+#  2. THE AIRCRAFT. SCG13EA carries four SAM sites and ZERO aircraft, so ticking it
+#     forever proves nothing. The A-10s have to be summoned, which is what the super
+#     weapon cheat and the air strike below are for. They are not decoration.
+#  3. THE CLICK POINT. 738,437 is the SAM's own silhouette with the camera at 38,33.
+#     A loose click puts the strike somewhere else and the SAMs never engage.
+#
+# The gate itself also passes --audiowav, for a fourth reason spelled out in gates.sh.
+tick 60
+cheatset super 1
+tick 10
+superrecharge
+tick 10
+cam 38 33
+tick 5
+sbclickitem SW_AirStrike
+actclick 738 437
+shot shots/g109_0.png
+tick 60
+shot shots/g109_1.png
+tick 60
+shot shots/g109_2.png
+tick 60
+shot shots/g109_3.png
+tick 60
+shot shots/g109_4.png
+tick 60
+shot shots/g109_5.png
+tick 60
+shot shots/g109_6.png
+quit

@@ -1,0 +1,179 @@
+C&C 3D -- macOS build
+=====================
+
+Command & Conquer with the Nintendo 64's camera and 3D models, running on the
+original 1995 Tiberian Dawn game logic (the GPL source, built here as
+TiberianDawn.dylib) with the original MS-DOS sidebar, infantry, music and
+speech. The build number is printed in the bottom right corner of the main
+menu dialog. That is the first thing to quote in a bug report.
+
+
+FIRST LAUNCH: MACOS GETS IN THE WAY ONCE
+----------------------------------------
+Nothing here is signed or notarised, and anything downloaded from GitHub
+arrives with macOS's quarantine flag set. That shows up in one of two ways.
+
+  "cannot be opened because the developer cannot be verified"
+      The plain refusal.
+
+  "Could not find the game."
+      Less obvious, and it is the same cause. macOS runs an unsigned,
+      quarantined app from a hidden temporary copy of the app ALONE, without
+      the files next to it, so the app opens and then cannot see the game.
+
+AS OF v0.5.9 C&C3D HANDLES BOTH ON ITS OWN. If it finds itself running from
+the temporary copy it goes looking for the real folder in the usual places
+(Downloads, Desktop, Applications, your home folder), starts the game from
+there, and clears the quarantine flag so it does not happen again. If it
+cannot find the folder it asks you to point at it, once.
+
+So the expected experience is: double-click C&C3D, approve one prompt if macOS
+shows one, and play. If you would rather clear the flag yourself first, this
+is still the route that works on every version of macOS -- in Terminal type
+the line below, then a SPACE, then drag the folder in from the Finder (which
+types its path for you), then press return:
+
+    xattr -dr com.apple.quarantine
+
+Through the Finder it is instead one approval per file, and recent versions of
+macOS moved where you give it: try right click -> Open first, and if that
+dialog offers no Open button, the approval is waiting in System Settings ->
+Privacy & Security, on a line naming whatever was just blocked.
+
+
+IT NEEDS macOS 14 OR NEWER
+--------------------------
+The binaries are built with a deployment target of macOS 14 (Sonoma). That is not a
+preference: the SDL libraries shipped beside them are themselves built for 14, so it
+is the lowest floor this build can have without different SDL binaries. On macOS 13
+or older the system refuses to load it before the game starts, and the message you
+get will not mention the version.
+
+APPLE SILICON NEEDS ROSETTA 2
+-----------------------------
+The binaries are x86_64 only. On an M-series Mac, macOS offers to install
+Rosetta 2 the first time you launch one; say yes and it works from then on.
+On an Intel Mac there is nothing to install.
+
+
+HOW TO START IT
+---------------
+TWO PROGRAMS SHIP HERE, and which one a launcher runs decides what the picture
+looks like before you touch anything.
+
+  cnc3d      the game: main menu, movies, campaign, score screens. It starts
+             with the ENHANCED picture on.
+  cnc_eyes   the renderer on its own, straight into one mission, no menu. It
+             starts with the CLASSIC picture, the one this project drew before
+             any of the enhancement existed.
+
+Both draw the same world. Either can be switched to the other picture while it
+is running, from the Visuals screen described below.
+
+    THERE IS ONE THING TO RUN
+
+    C&C3D.app             That is the game. START NEW GAME runs the GDI
+                          campaign; TEST MAP is the sandbox with the full
+                          build list. ESC opens Options.
+
+Enhanced Visuals are on, with the 640x480 sidebar HUD. Everything the old
+launchers used to pick for you is a setting inside the game now, under
+Options -> Visuals: CLASSIC for the 1995 presentation, ENHANCED for this one,
+and ADVANCED for the individual switches. Your choices are remembered.
+
+THE THIRTEEN .command LAUNCHERS ARE GONE, and if you have them from an older
+build you can delete them. They existed for one reason and it was a defect
+rather than a feature: two data paths defaulted to folders that exist only in
+the development tree, so nothing could be started without a script passing them
+in. The game now finds its own data and runs with no arguments at all.
+
+The two plain binaries beside the app, cnc3d and cnc_eyes, are what the app runs
+and what the verification suite drives. Neither is meant to be double-clicked.
+
+Keep the folder together and start the game from inside it. The packs, the
+missions/ folder, content/ and dosdata/ are all found relative to the app's own
+folder, which is why it should stay where it is; put an alias on the Desktop
+rather than moving it.
+Moving one launcher out on its own will not work.
+
+
+THE CONTROLS
+------------
+The mouse works the way the 1995 game's did, which as of v0.5.9 is also the way
+this build does. It is NOT the modern right-click-to-move scheme.
+
+  LEFT click        Selects what you click on. With something already selected,
+                    clicking bare ground MOVES there and clicking an enemy
+                    ATTACKS it. Clicking another of your own units selects that
+                    unit instead of ordering the first one to shoot it.
+  LEFT drag         Rubber-band select. SHIFT adds to the selection.
+  RIGHT click       Cancels. It leaves building placement, leaves repair or
+                    sell mode, and otherwise deselects. It never gives orders.
+  CTRL + LEFT       Force fire: attack whatever is under the pointer, including
+                    your own buildings and bare ground.
+  ALT + LEFT        Force move: go there without picking a fight on the way.
+
+The pointer itself always tells you which of these you are about to get: it is
+the game's own order preview, so the arrow, the move circle, the crosshair and
+the select brackets are the answer the engine would actually give.
+
+  S or X            Stop.       G or Z   Guard.      M   Radar on/off.
+  SPACE             Pause.      TAB      Step one frame while paused.
+  C                 Switch between the N64 camera and the flat 1995-style one.
+  F5                The Enhanced Visuals tuning panel.
+  ESC               Pause menu / options.
+
+
+THE ENHANCED VISUALS
+--------------------
+The Tier 2 presentation chain is supersampling, sun and shadows, bloom,
+ambient occlusion, dynamic light from explosions and gunfire, colour grading,
+and an optional CRT pass. Whether it is running when the window opens depends
+on which entry point you used, and the two lists above are that split. Three
+ways to change it:
+
+  * VISUALS. On the main menu it is its own button; in a mission, press ESC
+    and it is on the pause dialog. Classic or Enhanced, with a checkbox per
+    element behind Advanced. Live, in either program, either way round -- so
+    a cnc_eyes launcher can be turned Enhanced, and C&C3D.app back to Classic,
+    without restarting.
+
+  * TUNE-PRESENTATION.command boots with the F5 dial panel already open, every
+    slider live over the running game. Its SAVE button writes cnc3d-fx.cfg into
+    this folder. THAT FILE IS THE DELIVERABLE: send it back and its numbers
+    become the build's defaults.
+
+  * From Terminal, ./cnc3d --classic starts with the chain off entirely.
+
+WHAT A SAVED cnc3d-fx.cfg DOES, AND WHAT IT DOES NOT. Only cnc3d reads it, only
+at startup, only under that exact name, and only from the folder the game was
+launched in. So it reaches the four entry points in the first list and none of
+the ten in the second: a cnc_eyes launcher ignores the file completely, whether
+it is sitting there or not. And it changes WHICH numbers the chain uses, never
+whether the chain runs. cnc3d is enhanced with or without the file; cnc_eyes is
+classic with or without it. To see which happened, read the Terminal window
+behind the game: cnc3d prints either "FX|preset|cnc3d-fx.cfg: 60 applied" or
+"FX|no preset ...; enhanced with the shipped defaults", and cnc_eyes prints no
+FX line at all.
+
+No cnc3d-fx.cfg is included here on purpose, so this package and the Windows
+package of the same build start from the same numbers.
+
+
+IF IT DOES NOT START
+--------------------
+Open Terminal, drag the folder in after `cd `, press return, then run
+
+    ./cnc3d
+
+and send everything it prints. (Running it this way bypasses the app bundle,
+so it also tells you whether the problem is the game or the launcher.) The first few lines are the graphics driver
+answering what it can do, which is the first question worth asking on a machine
+this build has not run on before.
+
+
+WHAT IS NOT IN THIS FOLDER
+--------------------------
+The gate suite and its 400-odd proof screenshots. They are how the build is
+verified, they are more than a quarter of a gigabyte, and they are of no use to
+anyone playing the game. They stay in the developer's working copy.

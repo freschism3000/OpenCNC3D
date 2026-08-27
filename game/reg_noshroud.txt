@@ -1,0 +1,4 @@
+tick 1
+shroudstat
+shot noshroud_t0.png
+quit

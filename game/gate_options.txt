@@ -1,0 +1,17 @@
+# The 1995 pause dialog, driven through the same functions the mouse reaches.
+tick 30
+shot opt_0_game.png
+options
+shot opt_1_options.png
+optclick Game Controls
+shot opt_2_controls.png
+optslider Music Volume: 0.25
+optslider Sound Volume: 0.60
+optslider Scroll Rate: 1.00
+shot opt_3_sliders.png
+optclick Options Menu
+shot opt_4_back.png
+optclick Resume Mission
+shot opt_5_resumed.png
+tick 30
+quit

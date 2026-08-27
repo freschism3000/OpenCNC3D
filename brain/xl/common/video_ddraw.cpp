@@ -1,0 +1,1359 @@
+//
+// Copyright 2020 Electronic Arts Inc.
+//
+// TiberianDawn.DLL and RedAlert.dll and corresponding source code is free
+// software: you can redistribute it and/or modify it under the terms of
+// the GNU General Public License as published by the Free Software Foundation,
+// either version 3 of the License, or (at your option) any later version.
+
+// TiberianDawn.DLL and RedAlert.dll and corresponding source code is distributed
+// in the hope that it will be useful, but with permitted additional restrictions
+// under Section 7 of the GPL. See the GNU General Public License in LICENSE.TXT
+// distributed with this program. You should have received a copy of the
+// GNU General Public License along with permitted additional restrictions
+// with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+
+/***************************************************************************
+ **   C O N F I D E N T I A L --- W E S T W O O D   A S S O C I A T E S   **
+ ***************************************************************************
+ *                                                                         *
+ *                 Project Name : Westwood Win32 Library                   *
+ *                                                                         *
+ *                    File Name : DDRAW.CPP                                *
+ *                                                                         *
+ *                   Programmer : Philip W. Gorrow                         *
+ *                                                                         *
+ *                   Start Date : October 10, 1995                         *
+ *                                                                         *
+ *                  Last Update : October 10, 1995   []                    *
+ *                                                                         *
+ *-------------------------------------------------------------------------*
+ * Functions:                                                              *
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/*=========================================================================*/
+/* The following PRIVATE functions are in this file:                       */
+/*=========================================================================*/
+
+/*= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =*/
+
+#include "video_ddraw.h"
+#include "gbuffer.h"
+#include "palette.h"
+#include "video.h"
+#include "misc.h"
+#include <cstdio>
+
+LPDIRECTDRAW DirectDrawObject = NULL; // Pointer to the direct draw object
+
+PALETTEENTRY PaletteEntries[256]; // 256 windows palette entries
+LPDIRECTDRAWPALETTE PalettePtr;   // Pointer to direct draw palette object
+BOOL FirstPaletteSet = FALSE;     // Is this the first time 'Set_Palette' has been called?
+LPDIRECTDRAWSURFACE PaletteSurface = NULL;
+SurfaceMonitorClassDDraw AllSurfacesDDraw;           // List of all direct draw surfaces
+SurfaceMonitorClass& AllSurfaces = AllSurfacesDDraw; // List of all direct draw surfaces
+
+BOOL CanVblankSync = TRUE;
+
+/***********************************************************************************************
+ * Process_DD_Result -- Does a message box based on the result of a DD command                 *
+ *                                                                                             *
+ * INPUT:      HRESULT result           - the result returned from the direct draw command     *
+ *             int     display_ok_msg   - should a message be displayed if command ok          *
+ *                                                                                             *
+ * OUTPUT:     none                                                                            *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *   09/27/1995 PWG : Created.                                                                 *
+ *=============================================================================================*/
+void Process_DD_Result(HRESULT result, int display_ok_msg)
+{
+    switch (result) {
+    case DD_OK:
+        if (display_ok_msg) {
+            MessageBoxA(MainWindow, "Direct Draw request went ok.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        }
+        break;
+    case DDERR_ALREADYINITIALIZED:
+        MessageBoxA(MainWindow, "This object is already initialized ", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_BLTFASTCANTCLIP:
+        MessageBoxA(MainWindow,
+                    "Return if a clipper object is attached to the source surface passed into a BltFast call.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_CANNOTATTACHSURFACE:
+        MessageBoxA(MainWindow,
+                    "This surface can not be attached to the requested surface.	",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_CANNOTDETACHSURFACE:
+        MessageBoxA(MainWindow,
+                    "This surface can not be detached from the requested surface.	",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_CANTCREATEDC:
+        MessageBoxA(MainWindow, "Windows can not create any more DCs", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_CANTDUPLICATE:
+        MessageBoxA(MainWindow,
+                    "Can't duplicate primary & 3D surfaces, or surfaces that are implicitly created.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_CANTLOCKSURFACE:
+        MessageBoxA(MainWindow,
+                    "Unable to lock surface because no driver exists which can supply a pointer to the surface.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_CLIPPERISUSINGHWND:
+        MessageBoxA(MainWindow,
+                    "An attempt was made to set a cliplist for a clipper object that is already monitoring an hwnd.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_COLORKEYNOTSET:
+        MessageBoxA(MainWindow, "No src color key specified for this operation.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_CURRENTLYNOTAVAIL:
+        MessageBoxA(MainWindow, "Support is currently not available.	", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_DIRECTDRAWALREADYCREATED:
+        MessageBoxA(MainWindow,
+                    "A DirectDraw object representing this driver has already been created for this process.	",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_EXCEPTION:
+        MessageBoxA(MainWindow,
+                    "An exception was encountered while performing the requested operation.	",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_EXCLUSIVEMODEALREADYSET:
+        MessageBoxA(MainWindow,
+                    "An attempt was made to set the cooperative level when it was already set to exclusive.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_GENERIC:
+        MessageBoxA(MainWindow, "Generic failure.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_HEIGHTALIGN:
+        MessageBoxA(MainWindow,
+                    "Height of rectangle provided is not a multiple of reqd alignment.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_HWNDALREADYSET:
+        MessageBoxA(
+            MainWindow,
+            "The CooperativeLevel HWND has already been set. It can not be reset while the process has surfaces "
+            "or palettes created.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_HWNDSUBCLASSED:
+        MessageBoxA(MainWindow,
+                    "HWND used by DirectDraw CooperativeLevel has been subclassed, this prevents DirectDraw from "
+                    "restoring state.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_IMPLICITLYCREATED:
+        MessageBoxA(MainWindow,
+                    "This surface can not be restored because it is an implicitly created surface.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INCOMPATIBLEPRIMARY:
+        MessageBoxA(MainWindow,
+                    "Unable to match primary surface creation request with existing primary surface.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDCAPS:
+        MessageBoxA(MainWindow,
+                    "One or more of the caps bits passed to the callback are incorrect.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDCLIPLIST:
+        MessageBoxA(
+            MainWindow, "DirectDraw does not support the provided cliplist.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDDIRECTDRAWGUID:
+        MessageBoxA(MainWindow,
+                    "The GUID passed to DirectDrawCreate is not a valid DirectDraw driver identifier.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDMODE:
+        MessageBoxA(MainWindow, "DirectDraw does not support the requested mode.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDOBJECT:
+        MessageBoxA(MainWindow,
+                    "DirectDraw received a pointer that was an invalid DIRECTDRAW object.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDPARAMS:
+        MessageBoxA(MainWindow,
+                    "One or more of the parameters passed to the function are incorrect.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDPIXELFORMAT:
+        MessageBoxA(MainWindow, "The pixel format was invalid as specified.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDPOSITION:
+        MessageBoxA(
+            MainWindow,
+            "Returned when the position of the overlay on the destination is no longer legal for that destination.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_INVALIDRECT:
+        MessageBoxA(MainWindow, "Rectangle provided was invalid.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+
+    case DDERR_INVALIDSURFACETYPE:
+        MessageBoxA(MainWindow,
+                    "The requested action could not be performed because the surface was of the wrong type.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_LOCKEDSURFACES:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because one or more surfaces are locked.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NO3D:
+        MessageBoxA(MainWindow, "There is no 3D present.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOALPHAHW:
+        MessageBoxA(
+            MainWindow,
+            "Operation could not be carried out because there is no alpha accleration hardware present or available.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+#if (0)
+    case DDERR_NOANTITEARHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no hardware support for synchronizing blts to "
+                    "avoid tearing.	",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+#endif
+    case DDERR_NOBLTHW:
+        MessageBoxA(MainWindow, "No blter hardware present.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+#if (0)
+    case DDERR_NOBLTQUEUEHW:
+        MessageBoxA(
+            MainWindow,
+            "Operation could not be carried out because there is no hardware support for asynchronous blting.	",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+#endif
+    case DDERR_NOCLIPLIST:
+        MessageBoxA(MainWindow, "No cliplist available.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOCLIPPERATTACHED:
+        MessageBoxA(MainWindow, "No clipper object attached to surface object.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOCOLORCONVHW:
+        MessageBoxA(
+            MainWindow,
+            "Operation could not be carried out because there is no color conversion hardware present or available.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOCOLORKEY:
+        MessageBoxA(MainWindow, "Surface doesn't currently have a color key", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOCOLORKEYHW:
+        MessageBoxA(
+            MainWindow,
+            "Operation could not be carried out because there is no hardware support of the destination color key.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOCOOPERATIVELEVELSET:
+        MessageBoxA(MainWindow,
+                    "Create function called without DirectDraw object method SetCooperativeLevel being called.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NODC:
+        MessageBoxA(MainWindow, "No DC was ever created for this surface.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NODDROPSHW:
+        MessageBoxA(MainWindow, "No DirectDraw ROP hardware.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NODIRECTDRAWHW:
+        MessageBoxA(
+            MainWindow,
+            "A hardware-only DirectDraw object creation was attempted but the driver did not support any hardware.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NODIRECTDRAWSUPPORT:
+        MessageBoxA(MainWindow,
+                    "No DirectDraw support possible with current display driver.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOEMULATION:
+        MessageBoxA(MainWindow, "Software emulation not available.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOEXCLUSIVEMODE:
+        MessageBoxA(MainWindow,
+                    "Operation requires the application to have exclusive mode but the application does not have "
+                    "exclusive mode.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOFLIPHW:
+        MessageBoxA(MainWindow, "Flipping visible surfaces is not supported.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOGDI:
+        MessageBoxA(MainWindow, "There is no GDI present.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOHWND:
+        MessageBoxA(
+            MainWindow,
+            "Clipper notification requires an HWND or no HWND has previously been set as the CooperativeLevel HWND.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOMIRRORHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no hardware present or available.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOOVERLAYDEST:
+        MessageBoxA(MainWindow,
+                    "Returned when GetOverlayPosition is called on an overlay that UpdateOverlay has never been called "
+                    "on to establish a destination.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOOVERLAYHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no overlay hardware present or available.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOPALETTEATTACHED:
+        MessageBoxA(MainWindow, "No palette object attached to this surface.	", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOPALETTEHW:
+        MessageBoxA(
+            MainWindow, "No hardware support for 16 or 256 color palettes.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NORASTEROPHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no appropriate raster op hardware present or "
+                    "available.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOROTATIONHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no rotation hardware present or available.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOSTRETCHHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no hardware support for stretching.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOT4BITCOLOR:
+        MessageBoxA(
+            MainWindow,
+            "DirectDrawSurface is not in 4 bit color palette and the requested operation requires 4 bit color palette.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOT4BITCOLORINDEX:
+        MessageBoxA(MainWindow,
+                    "DirectDrawSurface is not in 4 bit color index palette and the requested operation requires 4 bit "
+                    "color index palette.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOT8BITCOLOR:
+        MessageBoxA(MainWindow,
+                    "DirectDrawSurface is not in 8 bit color mode and the requested operation requires 8 bit color.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOTAOVERLAYSURFACE:
+        MessageBoxA(MainWindow,
+                    "Returned when an overlay member is called for a non-overlay surface.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOTEXTUREHW:
+        MessageBoxA(
+            MainWindow,
+            "Operation could not be carried out because there is no texture mapping hardware present or available.",
+            "Note",
+            MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOTFLIPPABLE:
+        MessageBoxA(MainWindow,
+                    "An attempt has been made to flip a surface that is not flippable.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOTFOUND:
+        MessageBoxA(MainWindow, "Requested item was not found.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOTLOCKED:
+        MessageBoxA(MainWindow,
+                    "Surface was not locked.  An attempt to unlock a surface that was not locked at all, or by this "
+                    "process, has been attempted.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOTPALETTIZED:
+        MessageBoxA(
+            MainWindow, "The surface being used is not a palette-based surface.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOVSYNCHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no hardware support for vertical blank "
+                    "synchronized operations.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOZBUFFERHW:
+        MessageBoxA(MainWindow,
+                    "Operation could not be carried out because there is no hardware support for zbuffer blting.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_NOZOVERLAYHW:
+        MessageBoxA(MainWindow,
+                    "Overlay surfaces could not be z layered based on their BltOrder because the hardware does not "
+                    "support z layering of overlays.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_OUTOFCAPS:
+        MessageBoxA(MainWindow,
+                    "The hardware needed for the requested operation has already been allocated.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_OUTOFMEMORY:
+        MessageBoxA(MainWindow,
+                    "DirectDraw does not have enough memory to perform the operation.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_OUTOFVIDEOMEMORY:
+        MessageBoxA(MainWindow,
+                    "DirectDraw does not have enough memory to perform the operation.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_OVERLAYCANTCLIP:
+        MessageBoxA(MainWindow, "The hardware does not support clipped overlays.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_OVERLAYCOLORKEYONLYONEACTIVE:
+        MessageBoxA(MainWindow,
+                    "Can only have ony color key active at one time for overlays.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_OVERLAYNOTVISIBLE:
+        MessageBoxA(MainWindow,
+                    "Returned when GetOverlayPosition is called on a hidden overlay.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_PALETTEBUSY:
+        MessageBoxA(MainWindow,
+                    "Access to this palette is being refused because the palette is already locked by another thread.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_PRIMARYSURFACEALREADYEXISTS:
+        MessageBoxA(
+            MainWindow, "This process already has created a primary surface.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_REGIONTOOSMALL:
+        MessageBoxA(
+            MainWindow, "Region passed to Clipper::GetClipList is too small.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_SURFACEALREADYATTACHED:
+        MessageBoxA(MainWindow,
+                    "This surface is already attached to the surface it is being attached to.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_SURFACEALREADYDEPENDENT:
+        MessageBoxA(MainWindow,
+                    "This surface is already a dependency of the surface it is being made a dependency of.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_SURFACEBUSY:
+        MessageBoxA(MainWindow,
+                    "Access to this surface is being refused because the surface is already locked by another thread.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_SURFACEISOBSCURED:
+        MessageBoxA(MainWindow,
+                    "Access to surface refused because the surface is obscured.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_SURFACELOST:
+        MessageBoxA(MainWindow,
+                    "Access to this surface is being refused because the surface memory is gone. The DirectDrawSurface "
+                    "object representing this surface should have Restore called on it.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_SURFACENOTATTACHED:
+        MessageBoxA(MainWindow, "The requested surface is not attached.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_TOOBIGHEIGHT:
+        MessageBoxA(MainWindow, "Height requested by DirectDraw is too large.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_TOOBIGSIZE:
+        MessageBoxA(MainWindow,
+                    "Size requested by DirectDraw is too large --	the individual height and width are OK.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_TOOBIGWIDTH:
+        MessageBoxA(MainWindow, "Width requested by DirectDraw is too large.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_UNSUPPORTED:
+        MessageBoxA(MainWindow, "Action not supported.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_UNSUPPORTEDFORMAT:
+        MessageBoxA(
+            MainWindow, "FOURCC format requested is unsupported by DirectDraw.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_UNSUPPORTEDMASK:
+        MessageBoxA(MainWindow,
+                    "Bitmask in the pixel format requested is unsupported by DirectDraw.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_VERTICALBLANKINPROGRESS:
+        MessageBoxA(MainWindow, "Vertical blank is in progress.", "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_WASSTILLDRAWING:
+        MessageBoxA(MainWindow,
+                    "Informs DirectDraw that the previous Blt which is transfering information to or from this Surface "
+                    "is incomplete.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_WRONGMODE:
+        MessageBoxA(MainWindow,
+                    "This surface can not be restored because it was created in a different mode.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    case DDERR_XALIGN:
+        MessageBoxA(MainWindow,
+                    "Rectangle provided was not horizontally aligned on required boundary.",
+                    "Note",
+                    MB_ICONEXCLAMATION | MB_OK);
+        break;
+    default:
+        char string[256];
+        sprintf(string, "Unrecognised Direct Draw result code: %d", result & 0xffff);
+        MessageBoxA(MainWindow, string, "Note", MB_ICONEXCLAMATION | MB_OK);
+        break;
+    }
+}
+
+/***********************************************************************************************
+ * Check_Overlapped_Blit_Capability -- See if video driver supports blitting overlapped regions*
+ *                                                                                             *
+ *  We will check for this by drawing something to a video page and blitting it over itself.   *
+ * If we end up with the top line repeating then overlapped region blits dont work.            *
+ *                                                                                             *
+ * INPUT:    Nothing                                                                           *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    6/7/96 5:06PM ST : Created                                                               *
+ *=============================================================================================*/
+void Check_Overlapped_Blit_Capability(void)
+{
+
+    /*
+    ** Assume we can until we find out otherwise
+    */
+    OverlappedVideoBlits = true;
+
+    GraphicBufferClass test_buffer;
+
+    test_buffer.Init(64, 64, NULL, 0, (GBC_Enum)GBC_VIDEOMEM);
+
+    test_buffer.Clear();
+
+    /*
+    ** Plot a pixel in the top left corner of the buffer.
+    */
+    test_buffer.Put_Pixel(0, 0, 255);
+
+    /*
+    ** Blit the buffer down by one line. If we end up with a vertical strip of pixel 255's then
+    ** overlapped blits dont work
+    */
+
+    test_buffer.Blit(test_buffer, 0, 0, 0, 1, test_buffer.Get_Width(), test_buffer.Get_Height() - 1);
+
+    if (test_buffer.Get_Pixel(0, 5) == 255)
+        OverlappedVideoBlits = false;
+}
+
+/***********************************************************************************************
+ * Set_Video_Mode -- Initializes Direct Draw and sets the required Video Mode                  *
+ *                                                                                             *
+ * INPUT:           int width           - the width of the video mode in pixels                *
+ *                  int height          - the height of the video mode in pixels               *
+ *                  int bits_per_pixel  - the number of bits per pixel the video mode supports *
+ *                                                                                             *
+ * OUTPUT:     none                                                                            *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *   09/26/1995 PWG : Created.                                                                 *
+ *=============================================================================================*/
+bool Set_Video_Mode(int w, int h, int bits_per_pixel)
+{
+    HRESULT result;
+    //
+    // If there is not currently a direct draw object then we need to define one.
+    //
+    if (DirectDrawObject == NULL) {
+        result = DirectDrawCreate(NULL, &DirectDrawObject, NULL);
+        Process_DD_Result(result, FALSE);
+        if (result == DD_OK) {
+            if (w == 320) {
+                result = DirectDrawObject->SetCooperativeLevel(MainWindow,
+                                                               DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN | DDSCL_ALLOWMODEX);
+            } else {
+                result = DirectDrawObject->SetCooperativeLevel(MainWindow, DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);
+            }
+            Process_DD_Result(result, FALSE);
+        } else {
+            return false;
+        }
+    }
+
+    //
+    // Set the required display mode with 8 bits per pixel
+    //
+    result = DirectDrawObject->SetDisplayMode(w, h, bits_per_pixel);
+    if (result != DD_OK) {
+        DirectDrawObject->Release();
+        DirectDrawObject = NULL;
+        return false;
+    }
+
+    //
+    // Create a direct draw palette object
+    //
+    result = DirectDrawObject->CreatePalette(DDPCAPS_8BIT | DDPCAPS_ALLOW256, &PaletteEntries[0], &PalettePtr, NULL);
+    Process_DD_Result(result, FALSE);
+    if (result != DD_OK) {
+        return false;
+    }
+
+    Check_Overlapped_Blit_Capability();
+
+    /*
+    ** In legacy DirectDraw mode we clip the cursor for the duration of the session.
+    */
+    RECT region;
+
+    region.left = 0;
+    region.top = 0;
+    region.right = w;
+    region.bottom = h;
+
+    ClipCursor(&region);
+
+    return true;
+}
+
+/***********************************************************************************************
+ * Reset_Video_Mode -- Resets video mode and deletes Direct Draw Object                        *
+ *                                                                                             *
+ * INPUT:      none                                                                            *
+ *                                                                                             *
+ * OUTPUT:     none                                                                            *
+ *                                                                                             *
+ * WARNINGS:                                                                                   *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *   09/26/1995 PWG : Created.                                                                 *
+ *=============================================================================================*/
+void Reset_Video_Mode(void)
+{
+    HRESULT result;
+
+    //
+    // If a direct draw object has been declared and a video mode has been set
+    // then reset the video mode and release the direct draw object.
+    //
+    if (DirectDrawObject) {
+        result = DirectDrawObject->RestoreDisplayMode();
+        Process_DD_Result(result, FALSE);
+        result = DirectDrawObject->Release();
+        Process_DD_Result(result, FALSE);
+
+        DirectDrawObject = NULL;
+    }
+
+    /*
+    ** Release cursor on exit.
+    */
+    ClipCursor(NULL);
+}
+
+/***********************************************************************************************
+ * Get_Free_Video_Memory -- returns amount of free video memory                                *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    Nothing                                                                           *
+ *                                                                                             *
+ * OUTPUT:   bytes of available video RAM                                                      *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    11/29/95 12:52PM ST : Created                                                            *
+ *=============================================================================================*/
+unsigned int Get_Free_Video_Memory(void)
+{
+
+    DDCAPS video_capabilities;
+
+    if (DirectDrawObject) {
+
+        video_capabilities.dwSize = sizeof(video_capabilities);
+
+        // MessageBoxA(MainWindow, "In Get_Free_Video_Memory. About to call GetCaps","Note", MB_ICONEXCLAMATION|MB_OK);
+        if (DD_OK == DirectDrawObject->GetCaps(&video_capabilities, NULL)) {
+            char string[256];
+            sprintf(string, "In Get_Free_Video_Memory. About to return %d bytes", video_capabilities.dwVidMemFree);
+            // MessageBoxA(MainWindow, string,"Note", MB_ICONEXCLAMATION|MB_OK);
+            return (video_capabilities.dwVidMemFree);
+        }
+    }
+
+    // MessageBoxA(MainWindow, "In Get_Free_Video_Memory. About to return failure","Note", MB_ICONEXCLAMATION|MB_OK);
+    return (0);
+}
+
+/***********************************************************************************************
+ * Get_Video_Hardware_Caps -- returns bitmask of direct draw video hardware support            *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    Nothing                                                                           *
+ *                                                                                             *
+ * OUTPUT:   hardware flags                                                                    *
+ *                                                                                             *
+ * WARNINGS: Must call Set_Video_Mode 1st to create the direct draw object                     *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    1/12/96 9:14AM ST : Created                                                              *
+ *=============================================================================================*/
+unsigned Get_Video_Hardware_Capabilities(void)
+{
+    DDCAPS video_capabilities;
+    unsigned video;
+
+    /*
+    ** Fail if the direct draw object has not been initialised
+    */
+    if (!DirectDrawObject)
+        return (0);
+
+    /*
+    ** Get the capabilities of the direct draw object
+    */
+    video_capabilities.dwSize = sizeof(video_capabilities);
+    // MessageBoxA(MainWindow, "In Get_Video_Hardware_Capabilities. About to call GetCaps","Note",
+    // MB_ICONEXCLAMATION|MB_OK);
+    HRESULT result = DirectDrawObject->GetCaps(&video_capabilities, NULL);
+    if (result != DD_OK) {
+        Process_DD_Result(result, FALSE);
+        return (0);
+    }
+
+    /*
+    ** Set flags to indicate the presence of the features we are interested in
+    */
+    video = 0;
+
+    /* Hardware blits supported? */
+    if (video_capabilities.dwCaps & DDCAPS_BLT)
+        video |= VIDEO_BLITTER;
+
+    /* Hardware blits asyncronous? */
+    if (video_capabilities.dwCaps & DDCAPS_BLTQUEUE)
+        video |= VIDEO_BLITTER_ASYNC;
+
+    /* Can palette changes be synced to vertical refresh? */
+    if (video_capabilities.dwCaps & DDCAPS_PALETTEVSYNC)
+        video |= VIDEO_SYNC_PALETTE;
+
+    /* Is the video cards memory bank switched? */
+    if (video_capabilities.dwCaps & DDCAPS_BANKSWITCHED)
+        video |= VIDEO_BANK_SWITCHED;
+
+    /* Can the blitter do filled rectangles? */
+    if (video_capabilities.dwCaps & DDCAPS_BLTCOLORFILL)
+        video |= VIDEO_COLOR_FILL;
+
+    /* Is there no hardware assistance avaailable at all? */
+    if (video_capabilities.dwCaps & DDCAPS_NOHARDWARE)
+        video |= VIDEO_NO_HARDWARE_ASSIST;
+
+    // MessageBoxA(MainWindow, "In Get_Video_Hardware_Capabilities. About to return success.","Note",
+    // MB_ICONEXCLAMATION|MB_OK);
+    return (video);
+}
+
+/***********************************************************************************************
+ * Wait_Vert_Blank -- Waits for the start (leading edge) of a vertical blank                   *
+ *                                                                                             *
+ * INPUT:                                                                                      *
+ *                                                                                             *
+ * OUTPUT:                                                                                     *
+ *                                                                                             *
+ * WARNINGS:                                                                                   *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *=============================================================================================*/
+extern int ScreenWidth;
+void Wait_Vert_Blank(void)
+{
+    if (DirectDrawObject == NULL) {
+        return;
+    }
+    if (ScreenWidth != 320 && CanVblankSync) {
+        HRESULT result = DirectDrawObject->WaitForVerticalBlank(DDWAITVB_BLOCKBEGIN, 0);
+        if (result == E_NOTIMPL) {
+            CanVblankSync = FALSE;
+            return;
+        }
+        Process_DD_Result(result, FALSE);
+    }
+}
+
+/***********************************************************************************************
+ * Set_Palette -- set a direct draw palette                                                    *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    ptr to 768 rgb palette bytes                                                      *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    10/11/95 3:33PM ST : Created                                                             *
+ *=============================================================================================*/
+void Set_DD_Palette(void* palette)
+{
+
+    /*
+    ** Trap null ptr
+    */
+    if (!palette)
+        return;
+
+    int j;
+    int k;
+    char* palette_get;
+
+    if (DirectDrawObject && PaletteSurface) {
+
+        k = 0;
+
+        palette_get = (char*)palette;
+
+        for (j = 0; j < 768; j += 3) {
+            PaletteEntries[k].peRed = (unsigned char)((*palette_get++) << 2);
+            PaletteEntries[k].peGreen = (unsigned char)((*palette_get++) << 2);
+            PaletteEntries[k].peBlue = (unsigned char)((*palette_get++) << 2);
+            k++;
+        }
+
+        if (!FirstPaletteSet) {
+            // MessageBoxA(MainWindow, "In Set_DD_Palette. About to call SetPalette","Note", MB_ICONEXCLAMATION|MB_OK);
+            PaletteSurface->SetPalette(PalettePtr);
+            FirstPaletteSet = TRUE;
+        }
+
+        // MessageBoxA(MainWindow, "In Set_DD_Palette. About to call SetEntries","Note", MB_ICONEXCLAMATION|MB_OK);
+        PalettePtr->SetEntries(0, 0, 256, &PaletteEntries[0]);
+    }
+    // MessageBoxA(MainWindow, "Leaving Set_DD_Palette","Note", MB_ICONEXCLAMATION|MB_OK);
+}
+
+/***********************************************************************************************
+ * Wait_Blit -- waits for the DirectDraw blitter to become idle                                *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    Nothing                                                                           *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *   07-25-95 03:53pm ST : Created                                                             *
+ *=============================================================================================*/
+
+void Wait_Blit(void)
+{
+    HRESULT return_code;
+
+    do {
+        return_code = PaletteSurface->GetBltStatus(DDGBS_ISBLTDONE);
+    } while (return_code != DD_OK && return_code != DDERR_SURFACELOST);
+}
+
+void Set_Video_Cursor_Clip(bool clipped)
+{
+    /*
+    ** In DD mode we ignore the request and always clip.
+    */
+    clipped;
+}
+
+/***********************************************************************************************
+ * SMC::SurfaceMonitorClass -- constructor for surface monitor class                           *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    Nothing                                                                           *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    11/3/95 3:23PM ST : Created                                                              *
+ *=============================================================================================*/
+
+SurfaceMonitorClass::SurfaceMonitorClass()
+{
+    SurfacesRestored = false;
+}
+
+SurfaceMonitorClassDDraw::SurfaceMonitorClassDDraw()
+{
+    for (int i = 0; i < MAX_SURFACES; i++) {
+        Surface[i] = nullptr;
+    }
+    InFocus = false;
+}
+
+/***********************************************************************************************
+ * SMC::Add_DD_Surface -- add a new surface to the list                                        *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    ptr to surface                                                                    *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *                 11/3/95 3:24PM ST : Created                                                 *
+ *=============================================================================================*/
+void SurfaceMonitorClassDDraw::Add_DD_Surface(LPDIRECTDRAWSURFACE new_surface)
+{
+    if (!Got_Surface_Already(new_surface)) {
+        for (int i = 0; i < MAX_SURFACES; i++) {
+            if (Surface[i] == NULL) {
+                Surface[i] = new_surface;
+                return;
+            }
+        }
+    }
+}
+
+/***********************************************************************************************
+ * SMC::Remove_DD_Surface -- remove a direct draw surface from the list                        *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    ptr to Surface                                                                    *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    11/3/95 3:25PM ST : Created                                                              *
+ *=============================================================================================*/
+
+void SurfaceMonitorClassDDraw::Remove_DD_Surface(LPDIRECTDRAWSURFACE old_surface)
+{
+    for (int i = 0; i < MAX_SURFACES; i++) {
+        if (Surface[i] == old_surface) {
+            Surface[i] = NULL;
+            return;
+        }
+    }
+}
+
+/***********************************************************************************************
+ * SMC::Got_Surface_Already -- check if a surface is already in the list                       *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    ptr to surface                                                                    *
+ *                                                                                             *
+ * OUTPUT:   True if surface is in list                                                        *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    11/3/95 3:25PM ST : Created                                                              *
+ *=============================================================================================*/
+
+bool SurfaceMonitorClassDDraw::Got_Surface_Already(LPDIRECTDRAWSURFACE test_surface)
+{
+    for (int i = 0; i < MAX_SURFACES; i++) {
+        if (Surface[i] == test_surface) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/***********************************************************************************************
+ * SMC::Restore_Surfaces -- restore the direct draw surfaces in the list                       *
+ *                                                                                             *
+ *                                                                                             *
+ *                                                                                             *
+ * INPUT:    Nothing                                                                           *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    11/3/95 3:26PM ST : Created                                                              *
+ *=============================================================================================*/
+
+void SurfaceMonitorClassDDraw::Restore_Surfaces()
+{
+    if (InFocus) {
+        /*
+        ** Call restore for each Direct Draw surface
+        */
+        for (int i = 0; i < MAX_SURFACES; i++) {
+            if (Surface[i]) {
+                if (Surface[i]->Restore() != DD_OK) {
+                    if (Misc_Focus_Loss_Function) {
+                        Misc_Focus_Loss_Function();
+                    }
+                    return;
+                }
+            }
+        }
+
+        /*
+        ** PWG/ST: Now that we know all the surfaces are restored call
+        ** the function pointer to notify the program that it has
+        ** happened.  This function pointer is used to clear the pages,
+        ** etc.
+        */
+        if (Misc_Focus_Restore_Function) {
+            Misc_Focus_Restore_Function();
+        }
+
+        SurfacesRestored = true;
+
+        /*
+        ** Restore the palette
+        */
+        Set_DD_Palette(CurrentPalette);
+    }
+}
+
+/***********************************************************************************************
+ * SMC::Set_Surface_Focus -- set the InFocus flag to the given state                           *
+ *                                                                                             *
+ *  The InFocus flag is used to keep track of whether our application is currently in focus.   *
+ *  We dont want to be restoring video surfaces when we are supposed to be running in the      *
+ *  background.                                                                                *
+ *                                                                                             *
+ * INPUT:    bool in focus                                                                     *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    11/6/95 12:21PM ST : Created                                                             *
+ *=============================================================================================*/
+
+void SurfaceMonitorClassDDraw::Set_Surface_Focus(bool in_focus)
+{
+    InFocus = in_focus;
+}
+
+/***********************************************************************************************
+ * SMC::Release -- releases all direct draw surfaces                                           *
+ *                                                                                             *
+ *  Call this at the end of the game before called RestoreDisplayMode                          *
+ *                                                                                             *
+ * INPUT:    Nothing                                                                           *
+ *                                                                                             *
+ * OUTPUT:   Nothing                                                                           *
+ *                                                                                             *
+ * WARNINGS: None                                                                              *
+ *                                                                                             *
+ * HISTORY:                                                                                    *
+ *    6/6/96 12:23PM ST : Created                                                              *
+ *=============================================================================================*/
+
+void SurfaceMonitorClassDDraw::Release()
+{
+    /*
+    ** Call release for each Direct Draw surface
+    */
+    for (int i = 0; i < MAX_SURFACES; i++) {
+        if (Surface[i]) {
+            Surface[i]->Release();
+            Surface[i] = 0;
+        }
+    }
+}
+
+/*
+** VideoSurfaceDDraw
+*/
+
+class VideoSurfaceDDraw : public VideoSurface
+{
+public:
+    VideoSurfaceDDraw(int w, int h, GBC_Enum flags);
+    virtual ~VideoSurfaceDDraw();
+
+    virtual void* GetData() const;
+    virtual int GetPitch() const;
+    virtual bool IsAllocated() const;
+
+    virtual void AddAttachedSurface(VideoSurface* surface);
+    virtual bool IsReadyToBlit();
+    virtual bool LockWait();
+    virtual bool Unlock();
+    virtual void Blt(const Rect& destRect, VideoSurface* src, const Rect& srcRect, bool mask);
+    virtual void FillRect(const Rect& rect, unsigned char color);
+
+protected:
+    LPDIRECTDRAWSURFACE VideoSurfacePtr;   // Pointer to the related direct draw surface
+    DDSURFACEDESC VideoSurfaceDescription; // Description of the said surface
+};
+
+VideoSurfaceDDraw::VideoSurfaceDDraw(int w, int h, GBC_Enum flags)
+{
+    //
+    // Create the direct draw surface description
+    //
+    memset(&VideoSurfaceDescription, 0, sizeof(VideoSurfaceDescription));
+
+    VideoSurfaceDescription.dwSize = sizeof(VideoSurfaceDescription);
+    VideoSurfaceDescription.dwFlags = DDSD_CAPS;
+    VideoSurfaceDescription.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
+
+    if (!(flags & GBC_VISIBLE)) {
+        VideoSurfaceDescription.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+        VideoSurfaceDescription.dwFlags |= DDSD_HEIGHT | DDSD_WIDTH;
+        VideoSurfaceDescription.dwHeight = h;
+        VideoSurfaceDescription.dwWidth = w;
+    }
+
+    //
+    // Need to set the DDSCAPS_MODEX  flag if we want a 320 wide mode
+    //
+    if (w == 320) {
+        VideoSurfaceDescription.ddsCaps.dwCaps |= DDSCAPS_MODEX;
+    }
+
+    //
+    // Call CreateSurface
+    //
+    DirectDrawObject->CreateSurface(&VideoSurfaceDescription, &VideoSurfacePtr, nullptr);
+    AllSurfacesDDraw.Add_DD_Surface(VideoSurfacePtr);
+
+    if (GBC_VISIBLE & flags) {
+        PaletteSurface = VideoSurfacePtr;
+    }
+}
+
+VideoSurfaceDDraw::~VideoSurfaceDDraw()
+{
+    AllSurfacesDDraw.Remove_DD_Surface(VideoSurfacePtr);
+    VideoSurfacePtr->Release();
+    VideoSurfacePtr = nullptr;
+}
+
+void* VideoSurfaceDDraw::GetData() const
+{
+    return VideoSurfaceDescription.lpSurface;
+}
+
+int VideoSurfaceDDraw::GetPitch() const
+{
+    return VideoSurfaceDescription.lPitch;
+}
+
+bool VideoSurfaceDDraw::IsAllocated() const
+{
+    DDSCAPS surface_capabilities = {0};
+    VideoSurfacePtr->GetCaps(&surface_capabilities);
+    return (surface_capabilities.dwCaps == DDSCAPS_SYSTEMMEMORY);
+}
+
+void VideoSurfaceDDraw::AddAttachedSurface(VideoSurface* surface)
+{
+    VideoSurfaceDDraw* ddSurface = reinterpret_cast<VideoSurfaceDDraw*>(surface);
+    if (ddSurface == nullptr) {
+        return;
+    }
+
+    VideoSurfacePtr->AddAttachedSurface(ddSurface->VideoSurfacePtr);
+}
+
+bool VideoSurfaceDDraw::IsReadyToBlit()
+{
+    return (VideoSurfacePtr->GetBltStatus(DDGBS_CANBLT) == DD_OK);
+}
+
+extern void (*Gbuffer_Focus_Loss_Function)(void);
+
+bool VideoSurfaceDDraw::LockWait()
+{
+    int restore_attempts = 0;
+    while (restore_attempts < 2) {
+        HRESULT result = VideoSurfacePtr->Lock(nullptr, &VideoSurfaceDescription, DDLOCK_WAIT, nullptr);
+
+        switch (result) {
+        case DD_OK:
+            return true; // we locked it multiple times.
+
+        case DDERR_SURFACELOST:
+            if (Gbuffer_Focus_Loss_Function) {
+                Gbuffer_Focus_Loss_Function();
+            }
+            AllSurfaces.Restore_Surfaces();
+            restore_attempts++;
+            break;
+
+        default:
+            return false;
+        }
+    }
+
+    return false;
+}
+
+bool VideoSurfaceDDraw::Unlock()
+{
+    return (VideoSurfacePtr->Unlock(nullptr) == DD_OK);
+}
+
+void VideoSurfaceDDraw::Blt(const Rect& destRect, VideoSurface* src, const Rect& srcRect, bool mask)
+{
+    int key_source = mask ? DDBLT_KEYSRC : 0;
+
+    RECT dRect = {0};
+    dRect.left = destRect.X;
+    dRect.top = destRect.Y;
+    dRect.right = destRect.X + destRect.Width;
+    dRect.bottom = destRect.Y + destRect.Height;
+
+    RECT sRect = {0};
+    sRect.left = srcRect.X;
+    sRect.top = srcRect.Y;
+    sRect.right = srcRect.X + srcRect.Width;
+    sRect.bottom = srcRect.Y + srcRect.Height;
+
+    VideoSurfaceDDraw* srcSurface = reinterpret_cast<VideoSurfaceDDraw*>(src);
+    if (srcSurface == nullptr) {
+        return;
+    }
+
+    VideoSurfacePtr->Blt(&dRect, srcSurface->VideoSurfacePtr, &sRect, key_source | DDBLT_WAIT | DDBLT_ASYNC, NULL);
+}
+
+void VideoSurfaceDDraw::FillRect(const Rect& rect, unsigned char color)
+{
+    DDBLTFX blit_effects = {0};
+    blit_effects.dwSize = sizeof(blit_effects);
+    blit_effects.dwFillColor = color;
+
+    RECT destRect = {0};
+    destRect.left = rect.X;
+    destRect.top = rect.Y;
+    destRect.right = rect.X + rect.Width;
+    destRect.bottom = rect.Y + rect.Height;
+
+    VideoSurfacePtr->Blt(&destRect, NULL, NULL, DDBLT_WAIT | DDBLT_ASYNC | DDBLT_COLORFILL, &blit_effects);
+}
+
+/*
+** Video
+*/
+
+Video::Video()
+{
+}
+
+Video::~Video()
+{
+}
+
+Video& Video::Shared()
+{
+    static Video video;
+    return video;
+}
+
+VideoSurface* Video::CreateSurface(int w, int h, GBC_Enum flags)
+{
+    return new VideoSurfaceDDraw(w, h, flags);
+}

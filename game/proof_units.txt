@@ -1,0 +1,28 @@
+# SCG01EC: unit production end to end, through the REAL sidebar click path.
+# Column 1 (units) is clicked at its own drawn button rectangles; scrolling uses the
+# real down-arrow pixels (1280x720, scale 3: column-two arrow at DOS 301..317,188..200
+# -> screen 1247,642). Everything that mutates the game goes through sb_click.
+tick 5
+sidebar t5
+echo BASE
+objdump
+# ---- E1 from the barracks: click the E1 cameo button (column 1, slot 0)
+sbitem E1
+sbclickitem E1
+sidebar e1_started
+tick 220
+echo AFTER-E1
+objdump
+# ---- JEEP from the weapons factory: scroll column 1 down three rows so the JEEP
+#      button is on screen, then click it
+sbclick 1247 642
+sbclick 1247 642
+sbclick 1247 642
+sbitem JEEP
+sbclickitem JEEP
+sidebar jeep_started
+tick 650
+echo AFTER-JEEP
+objdump
+shot shot_ec_units.png
+quit

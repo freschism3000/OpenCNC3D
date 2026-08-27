@@ -1,0 +1,19 @@
+# THE OTHER HALF OF THE JUKEBOX GATE: STOP MUST STILL STOP.
+#
+# The fix for "the next track does not play" is two lines in the Play branch, and the
+# obvious wrong version of it -- arming the playlist unconditionally -- would make the
+# Stop button start the score again a moment later. This arm is the same run with Stop
+# instead of Play: exactly ONE MUSIC|play line (the mission's own opening track, which
+# Stop then silences) and a silent tail.
+#
+# It is not a mirror image of the Play arm and must not be read as one: a build that
+# never plays anything at all passes THIS leg and fails the other, which is why the two
+# are asserted together.
+tick 10
+options
+optclick Game Controls
+optclick Sound Controls
+optclick Track List
+optclick Stop
+tick 900
+quit

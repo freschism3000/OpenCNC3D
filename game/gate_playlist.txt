@@ -1,0 +1,4 @@
+# 45 seconds of sim: long enough for IND2 (38 s) to end and the next track to start.
+tick 2
+tick 680
+quit

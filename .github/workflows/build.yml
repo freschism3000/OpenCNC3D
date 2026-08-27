@@ -1,0 +1,187 @@
+name: build
+on: [push, pull_request]
+
+# issues: write is for the "ci-red" job at the bottom, which is the only thing here that
+# writes anything back to GitHub. Everything else only reads the checkout.
+permissions:
+  contents: read
+# ONE BUILD RECIPE PER BINARY, AND CI RUNS IT.
+#
+# This file deliberately carries no compile command of its own. A second copy of the
+# compile line drifts from game/build.sh the moment the renderer grows a source file, and
+# a red CI job verifies nothing at all -- including the guards below, which only work
+# while it is green.
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The hygiene guard below compares against what the remote already had, so it
+          # needs more than the single commit a default checkout fetches.
+          fetch-depth: 0
+
+      - name: Install SDL2
+        run: brew install sdl2
+
+      # brain/vanilla is COMMITTED SOURCE, not something to clone.
+      #
+      # Two guards, and they catch different things. This one proves the checkout we build
+      # and the patch beside it still describe the same engine: fetch upstream at the pinned
+      # commit, apply the patch, demand the result equals the checkout byte for byte.
+      - name: "Guard: the committed brain checkout is upstream plus our patch, exactly"
+        run: tools/check-brain-checkout.sh
+
+      # And this one proves that what they AGREE on is still the engine the renderer needs.
+      # The guard above passes happily if the patch and the checkout lose a field together.
+      - name: "Guard: the brain we build really carries our exports"
+        run: |
+          cd brain/vanilla/tiberiandawn
+          for field in dimw makecnt dostage sel nav tar act; do
+            grep -q "|$field=%d" dllinterface.cpp \
+              || { echo "brain checkout is stale: no $field= in the OBJ dump"; exit 1; }
+          done
+          echo "brain exports present"
+
+      # One recipe per binary, as above: no cmake line here.
+      #
+      # tools/mac/build-brain-mac.sh passes CMAKE_OSX_DEPLOYMENT_TARGET from the single
+      # number in tools/mac/deployment-target.sh and asserts the result with otool. A
+      # second copy of that line here could only drift, and the failure it drifts into is
+      # invisible at compile time: dyld refuses a Mach-O whose minos is newer than the
+      # running system, so the binary builds and then will not launch.
+      - name: Build the brain (TiberianDawn library)
+        run: tools/mac/build-brain-mac.sh
+
+      - name: Build the renderer (game/build.sh -> cnc_eyes)
+        run: cd game && ./build.sh
+
+      - name: Build the program (app/build.sh -> cnc3d)
+        run: cd app && ./build.sh
+
+      - name: "Sanity: both binaries start and report usage"
+        run: |
+          ./game/cnc_eyes --help | head -5
+          ./app/cnc3d --help | head -5 || true
+
+      # A binary that asks for a newer macOS than the player has is refused by dyld before
+      # main(), so "it compiled" is not the same claim as "it launches". The floor comes
+      # from tools/mac/deployment-target.sh, which game/make-build.sh also asserts over the
+      # assembled play folder, so CI and the release agree by construction.
+      - name: "Sanity: all three declare the macOS floor, not the runner's SDK"
+        run: |
+          . tools/mac/deployment-target.sh
+          rc=0
+          for f in game/cnc_eyes app/cnc3d game/TiberianDawn.dylib; do
+            min=$(otool -l "$f" | awk '/LC_BUILD_VERSION/{f=1} f&&/^ *minos/{print $2; exit}')
+            echo "$f minos ${min:-none}"
+            [ "$min" = "$CNC3D_MACOS_MIN" ] || rc=1
+          done
+          [ "$rc" = "0" ] || { echo "expected minos $CNC3D_MACOS_MIN on all three"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cnc3d-macos-${{ github.sha }}
+          path: |
+            game/cnc_eyes
+            app/cnc3d
+            game/TiberianDawn.dylib
+
+  # ------------------------------------------------------------------------------------
+  #  THE WINDOWS HALF.
+  #
+  #  Same rule as the macOS job above: no compile line of its own, it runs
+  #  tools/win/build-win.sh. That script starts with tools/win/check-sources.sh, which
+  #  fails with the filename in the message if the Mac build has grown a source the Windows
+  #  build does not compile. That guard is the entire reason a second recipe exists.
+  #
+  #  Cross compiled on Linux rather than on a Windows runner: mingw-w64 is one apt
+  #  package, the toolchain is then the same arrangement the Mac uses, and a green run
+  #  here means the local build-win.sh will work too. A Windows runner would prove
+  #  something slightly different from what ships.
+  # ------------------------------------------------------------------------------------
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 cmake zip
+
+      - name: Fetch SDL2 and zlib for mingw
+        run: tools/win/setup-toolchain.sh
+
+      # brain/vanilla is COMMITTED SOURCE, not something to clone.
+      #
+      # Two guards, and they catch different things. This one proves the checkout we build and
+      # the patch beside it still describe the same engine, by fetching upstream at the pinned
+      # commit, applying the patch and demanding the result equal the checkout byte for byte.
+      # It is the drift that started all of this.
+      - name: "Guard: the committed brain checkout is upstream plus our patch, exactly"
+        run: tools/check-brain-checkout.sh
+
+      # And this one proves that what they AGREE on is still the engine the renderer needs.
+      # The guard above passes happily if the patch and the checkout lose a field together.
+      - name: "Guard: the brain we build really carries our exports"
+        run: |
+          cd brain/vanilla/tiberiandawn
+          for field in dimw makecnt dostage sel nav tar act; do
+            grep -q "|$field=%d" dllinterface.cpp \
+              || { echo "brain checkout is stale: no $field= in the OBJ dump"; exit 1; }
+          done
+          echo "brain exports present"
+
+      - name: "Guard: the Windows build compiles the same sources as the Mac build"
+        run: tools/win/check-sources.sh
+
+      - name: Build for Windows (tools/win/build-win.sh -> build/win/)
+        run: tools/win/build-win.sh
+
+      # A cross build cannot be run here, so assert what can be asserted: the output is a
+      # 32-bit PE, the brain still exports the CNC3D_ entry points the patch adds, and
+      # nothing but SDL2.dll is needed beside the binary. The last one catches a link that
+      # pulls in something no stock Windows ships, such as libwinpthread-1.dll.
+      - name: "Sanity: the right kind of binary, with the right dependencies"
+        run: |
+          set -e
+          file build/win/cnc3d.exe | grep -q "PE32 executable" || { echo "not a PE32"; exit 1; }
+          file build/win/cnc3d.exe | grep -q "80386"          || { echo "not 32-bit"; exit 1; }
+          for sym in CNC_Advance_Instance CNC3D_Dump_Objects CNC3D_Sel_Info; do
+            x86_64-w64-mingw32-objdump -p build/win/TiberianDawn.dll | grep -q "$sym" \
+              || { echo "brain is missing $sym"; exit 1; }
+          done
+          for exe in build/win/cnc3d.exe build/win/cnc_eyes.exe; do
+            # msvcrt.dll is on this list because it IS a Windows system DLL, present on
+            # every Windows since NT, and because Ubuntu's mingw-w64 is the MSVCRT
+            # variant while Homebrew's is the UCRT one. So CI links against msvcrt and
+            # the shipping build links against api-ms-win-crt-*, and both are fine.
+            # Left open deliberately: it means this job proves the code compiles and that
+            # nothing exotic crept into the dependency list, NOT that it produced the
+            # same binary ships.
+            extra=$(x86_64-w64-mingw32-objdump -p $exe | grep "DLL Name" \
+                    | grep -viE "api-ms-win-crt|msvcrt|KERNEL32|USER32|SHELL32|OPENGL32|WINMM|OLEAUT32|ADVAPI32|GDI32|SDL2" || true)
+            [ -z "$extra" ] || { echo "$exe needs a DLL that Windows 11 does not ship:"; echo "$extra"; exit 1; }
+          done
+          echo "PE32 i686, brain exports present, SDL2.dll is the only extra dependency"
+
+      # The Win98 audio backend is not linked into anything yet: the renderer's Win98 and
+      # Glide port has not started, and the Windows 11 build uses SDL exactly as the Mac
+      # does. A file that nothing compiles is a file that will not compile on the day it
+      # is needed, so it is compiled here, alone, as 32-bit Windows code.
+      - name: "Guard: the Win98 audio backend still compiles"
+        run: |
+          i686-w64-mingw32-gcc -std=gnu89 -O2 -Wall -Wextra -Iaudio \
+            -c audio/audio_win98.c -o /tmp/audio_win98.o
+          echo "audio_win98.c compiles for 32-bit Windows"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cnc3d-windows-${{ github.sha }}
+          path: |
+            build/win/cnc3d.exe
+            build/win/cnc_eyes.exe
+            build/win/SDL2.dll
+            build/win/TiberianDawn.dll

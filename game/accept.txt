@@ -1,0 +1,26 @@
+# THE ACCEPTANCE RUN, recorded to one WAV so every claim about it can be measured.
+#
+# Timeline, in seconds of SIM time (1 tick = 1/15 s, and the tap renders exactly that
+# much audio per tick, so these are also seconds of the recording):
+#
+#   0 .. 20    combat with the score at full: AOI plus gunfire, EVA, explosions
+#  20 .. 20    ESC: the pause dialog opens and the world stops
+#  20 .. 20    Game Controls, music down to 10%, back out
+#  20 .. 40    resumed combat, same fight, quieter music
+#
+tick 2
+cam 50 43
+shot ac_1_combat.png
+tick 300
+echo COMBAT-AT-FULL-VOLUME
+options
+shot ac_2_options.png
+optclick Game Controls
+optslider Music Volume: 0.10
+shot ac_3_controls.png
+optclick Options Menu
+optclick Resume Mission
+shot ac_4_resumed.png
+tick 300
+echo COMBAT-WITH-THE-MUSIC-DOWN
+quit

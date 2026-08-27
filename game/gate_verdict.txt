@@ -1,0 +1,18 @@
+# G108. INSTANT WIN AND INSTANT LOSE, pressed as buttons.
+#
+# Driven with optclick through dopt_press/dopt_release on the rectangle the page draws,
+# so what is proved is the BUTTON and not the export behind it. A gate that called
+# CNC3D_Force_Verdict directly would stay green through a button that had fallen off
+# the page, lost its rectangle, or stopped being routed by dopt_activate.
+#
+# The assertion is GAMEOVER, not the CHEAT|verdict line. Flag_To_Win only raises the
+# engine's own flag; HouseClass::AI ends the scenario a tick or more later and takes the
+# ordinary road out through the score tally and the movie. So the ticks after the click
+# are load-bearing, and GAMEOVER|WIN is the proof that the whole chain ran rather than
+# just that a bit got set.
+tick 40
+cheats
+cheatdump
+optclick Instant Win
+tick 30
+quit

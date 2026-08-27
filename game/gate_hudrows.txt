@@ -1,0 +1,3 @@
+tick 200
+sbwalk
+quit

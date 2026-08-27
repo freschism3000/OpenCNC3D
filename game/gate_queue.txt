@@ -1,0 +1,32 @@
+# G95. CLICKING A CAMEO AGAIN QUEUES ANOTHER ONE.
+#
+# OURS IN FULL. Tiberian Dawn has no build queue and cannot cheaply be given one: a house
+# holds AT MOST ONE FactoryClass per RTTI category (house.h:359-363) and Begin_Production
+# refuses outright when that slot is taken (house.cpp:2353-2359). EA reserved four queue
+# verbs in the DLL interface and implemented NONE of them -- START_CONSTRUCTION_MULTI is a
+# bare fallthrough into plain START_CONSTRUCTION and there is no repeat-count parameter on
+# the export at all. The Remaster's queue lived in its closed C# UI. So the count lives in
+# the eyes, keyed on (btype,bid) rather than the strip index, because the strip is rebuilt
+# every poll and entries genuinely vanish when the building that makes them dies.
+#
+# WHY CREDITS ARE THE ASSERTION AND NOT A UNIT COUNT. SCG90EA has both sides in contact,
+# so infantry die faster than a queue builds them -- measured, the E1 count went DOWN from
+# 10 to 9 across a run that built three. Credits cannot be killed by a Nod buggy: three
+# Minigunners at 100 each is exactly 300 off the bank, whatever happens on the field.
+tick 30
+
+echo G95-1 the bank before
+cheatdump
+
+echo G95-2 one build plus two queued
+build E1
+queue E1 2
+queuedump
+
+echo G95-3 the pump empties the queue as the factory frees itself
+tick 400
+queuedump
+
+echo G95-4 and the bank is exactly three Minigunners lighter
+cheatdump
+quit

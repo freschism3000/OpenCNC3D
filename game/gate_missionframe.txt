@@ -1,0 +1,10 @@
+tick 300
+echo ===MATCH1===
+objdump
+remission
+echo ===MATCH2-ZERO-TICKS===
+objdump
+tick 5
+echo ===MATCH2-AFTER-5===
+objdump
+quit

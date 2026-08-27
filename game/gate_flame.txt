@@ -1,0 +1,24 @@
+# THE FLAMETHROWER'S TONGUE. Reported against v0.5.7, with G50 green: the Flame Trooper
+# still showed no real fire when shooting -- a small orange particle was visible, but not
+# the fire effect the N64 version draws.
+#
+# He was seeing exactly one particle per shot. The cartridge's FLAME-* animations have no
+# SHP art, so the engine drops them after a single tick and the renderer's emitter, which
+# is clocked off the anim's stage, fired once and stopped. The fix gives an art-less anim
+# a clock of its own out of the brain's `biggest` field: ten emissions per shot, stages
+# 0..9, all in ENGINE ticks so a replay stays byte-reproducible.
+#
+# WHY G50 COULD NOT SEE IT. It asserted `FLTHROW live >= 1` and `drawn >= live`. One
+# particle satisfies both. A count that is ten times low is invisible to a floor of one,
+# and it stayed green through the whole of this bug.
+#
+# The two clickobj lines are the pixel leg's anchors: the two troopers who fire in this
+# window, read out of THIS run so the box follows them. clickobj also proves they are on
+# the glass at all, which the particle counts alone would not.
+cam 11 55
+tick 449
+shot shots/flame.png
+clickobj E4 0
+clickobj E4 1
+efxdump
+quit

@@ -1,0 +1,40 @@
+# G103. THE RALLY POINT FLAG.
+#
+# Numbered 103, not 99: G99..G102 were already taken for the mission
+# editor, and two gates sharing a number makes every later report ambiguous.
+#
+# Reported: "Take the Flag Pole and Animated flag from the Barracks, seperate it,
+# and use it for the Rally Point for all buildings. Show the flag if you have set a rally
+# point, and have the building selected. Make the flag the player color."
+#
+# There is exactly one flag in the cartridge and it belongs to the Barracks: three chained
+# BEEFED nodes at y=916 with a real wave in slot 30's clip, plus a pole that is NOT a node
+# at all but the first three triangles of the building's own body. bake_rally_flag lifts
+# both out as RALLYFL.
+#
+# THE ASSERTION IS AN A/B ON PIXELS, not a diagnostic line, because everything this
+# feature is about is whether something is ON SCREEN and what colour it is. Two shots of
+# the same frame, one with the Barracks selected and one after deselect, differenced over
+# the patch of ground where the flag stands.
+#
+# WHY GOLD IS THE TEST. The flag's cartridge texture is a solid 4x4 of (132,16,8) -- red --
+# so a flag that still carries its texture comes out red on a GDI base whatever the
+# renderer multiplies through it, and that is exactly what the first build of this did.
+# The bake drops the texture so the authored greys survive as shading and the house colour
+# paints the cloth. Counting GOLD pixels therefore tests the whole chain at once: the mesh
+# is in the pack, it is drawn, it is drawn at the rally cell, and it took the player's
+# colour rather than the cartridge's red.
+tick 30
+cam 57 52
+zoom max
+lclickobj PYLE 0
+expectsel 1
+actclick 693 657
+tick 3
+rallydump
+shot shots/g103_sel.png
+deselect
+expectsel 0
+tick 3
+shot shots/g103_desel.png
+quit

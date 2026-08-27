@@ -1,0 +1,92 @@
+name: mingw-w64
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  vanilla_win_gcc:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [{win: Win32, lin: i686}, {win: Win64, lin: x86_64}]
+        preset: [release, internal, nonet]
+        
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
+        
+    - name: Set Git Info
+      id: gitinfo
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update -qq > /dev/null
+        sudo apt-get install -qq -y ninja-build mingw-w64 imagemagick > /dev/null
+        wget -q https://www.libsdl.org/release/SDL2-devel-2.0.12-mingw.tar.gz
+        wget -q --no-check-certificate https://openal-soft.org/openal-binaries/openal-soft-1.21.0-bin.zip
+        tar -xf SDL2-devel-2.0.12-mingw.tar.gz -C /tmp
+        unzip -qq openal-soft-1.21.0-bin.zip -d /tmp
+        mv /tmp/openal-soft-1.21.0-bin/bin/${{ matrix.arch.win }}/soft_oal.dll /tmp/openal-soft-1.21.0-bin/bin/${{ matrix.arch.win }}/OpenAL32.dll
+
+    - name: Build Vanilla Conquer
+      env:
+        CMAKE_FIND_ROOT_PATH: "/tmp/SDL2-2.0.12/${{ matrix.arch.lin }}-w64-mingw32;/tmp/openal-soft-1.21.0-bin"
+        CMAKE_TOOLCHAIN_FILE: "cmake/${{ matrix.arch.lin }}-mingw-w64-toolchain.cmake"
+        VC_CXX_FLAGS: "-w;-Wwrite-strings;-Werror=write-strings"
+      run: |
+        cmake --workflow --preset ${{ matrix.preset }}
+
+    - name: Create archives
+      if: ${{ matrix.preset != 'testing' &&  matrix.preset != 'nonet' }}
+      run: |
+        cp ./build/${{ matrix.preset }}/RelWithDebInfo/vanillatd.exe ./build/${{ matrix.preset }}/RelWithDebInfo/vanillatd.dbg
+        cp ./build/${{ matrix.preset }}/RelWithDebInfo/vanillara.exe ./build/${{ matrix.preset }}/RelWithDebInfo/vanillara.dbg
+        ${{ matrix.arch.lin }}-w64-mingw32-strip --strip-all ./build/${{ matrix.preset }}/RelWithDebInfo/vanillatd.exe
+        ${{ matrix.arch.lin }}-w64-mingw32-strip --strip-all ./build/${{ matrix.preset }}/RelWithDebInfo/vanillara.exe
+        ${{ matrix.arch.lin }}-w64-mingw32-objcopy --add-gnu-debuglink=./build/${{ matrix.preset }}/RelWithDebInfo/vanillatd.dbg ./build/${{ matrix.preset }}/RelWithDebInfo/vanillatd.exe
+        ${{ matrix.arch.lin }}-w64-mingw32-objcopy --add-gnu-debuglink=./build/${{ matrix.preset }}/RelWithDebInfo/vanillara.dbg ./build/${{ matrix.preset }}/RelWithDebInfo/vanillara.exe
+        mkdir artifact
+        7z a artifact/vanilla-conquer-${{ matrix.preset }}-win-gcc-${{ matrix.arch.lin }}-${{ steps.gitinfo.outputs.sha_short }}.zip ./build/${{ matrix.preset }}/RelWithDebInfo/vanillatd.exe ./build/${{ matrix.preset }}/RelWithDebInfo/vanillara.exe /tmp/SDL2-2.0.12/${{ matrix.arch.lin }}-w64-mingw32/bin/SDL2.dll /tmp/openal-soft-1.21.0-bin/bin/${{ matrix.arch.win }}/OpenAL32.dll
+        7z a artifact/vanilla-conquer-${{ matrix.preset }}-win-gcc-${{ matrix.arch.lin }}-${{ steps.gitinfo.outputs.sha_short }}-debug.zip ./build/${{ matrix.preset }}/RelWithDebInfo/vanillatd.dbg ./build/${{ matrix.preset }}/RelWithDebInfo/vanillara.dbg
+    
+    - name: Add internal tools to archive
+      if: ${{ matrix.preset == 'internal' }}
+      run: |
+        cp ./build/${{ matrix.preset }}/RelWithDebInfo/vanillamix.exe ./build/${{ matrix.preset }}/RelWithDebInfo/vanillamix.dbg
+        ${{ matrix.arch.lin }}-w64-mingw32-strip --strip-all ./build/${{ matrix.preset }}/RelWithDebInfo/vanillamix.exe
+        ${{ matrix.arch.lin }}-w64-mingw32-objcopy --add-gnu-debuglink=./build/${{ matrix.preset }}/RelWithDebInfo/vanillamix.dbg ./build/${{ matrix.preset }}/RelWithDebInfo/vanillamix.exe
+        7z a artifact/vanilla-conquer-${{ matrix.preset }}-win-gcc-${{ matrix.arch.lin }}-${{ steps.gitinfo.outputs.sha_short }}.zip ./build/${{ matrix.preset }}/RelWithDebInfo/vanillamix.exe
+        7z a artifact/vanilla-conquer-${{ matrix.preset }}-win-gcc-${{ matrix.arch.lin }}-${{ steps.gitinfo.outputs.sha_short }}-debug.zip ./build/${{ matrix.preset }}/RelWithDebInfo/vanillamix.dbg
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      if: ${{ matrix.preset != 'testing' &&  matrix.preset != 'nonet' }}
+      with:
+        name: vanilla-conquer-${{ matrix.preset }}-win-gcc-${{ matrix.arch.lin }}
+        path: artifact
+        
+    - name: Upload development release
+      if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/vanilla' && matrix.preset != 'testing' &&  matrix.preset != 'nonet' }}
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Development Build
+        tag_name: "latest"
+        prerelease: true
+        files: |
+          artifact/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload tagged release
+      if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.preset != 'testing' &&  matrix.preset != 'nonet' }}
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          artifact/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

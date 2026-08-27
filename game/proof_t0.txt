@@ -1,0 +1,15 @@
+# Shroud proof, tick 1: the map must be mostly unexplored, the Nod guard post clear.
+tick 1
+shroudstat
+# ground truth pins: the player's own E1 stands at 51,16 (clear); the far west of the
+# playable rect (21,14 is its top-left corner) has never been seen (hidden)
+shroudat 53 16
+shroudat 21 14
+shroudat 25 30
+# mostly dark, some explored: fail the run if either side of that is false
+expectshroud 400 20
+shot shroud_t0_wide.png
+# now look at the player's own corner: explored terrain + own units
+cam 51 18
+shot shroud_t0_base.png
+quit

@@ -1,0 +1,685 @@
+{
+ "bytes": 263716,
+ "count": 9,
+ "frame": [
+  120,
+  120
+ ],
+ "header_bytes": 1564,
+ "magic": "MAPPREV1",
+ "maps": [
+  {
+   "cell_rect": [
+    3,
+    11,
+    58,
+    49
+   ],
+   "cells_touching_water": 0,
+   "image_rect": [
+    0,
+    9,
+    120,
+    101
+   ],
+   "name": "GREEN ACRES",
+   "scenario": "SCM01EA",
+   "start_cells": [
+    [
+     5,
+     19
+    ],
+    [
+     18,
+     12
+    ],
+    [
+     57,
+     14
+    ],
+    [
+     40,
+     34
+    ],
+    [
+     33,
+     58
+    ],
+    [
+     58,
+     35
+    ],
+    [
+     53,
+     55
+    ],
+    [
+     8,
+     54
+    ]
+   ],
+   "starts": 8,
+   "theater": "TEMPERATE",
+   "tiberium_cells": 344
+  },
+  {
+   "cell_rect": [
+    3,
+    3,
+    57,
+    58
+   ],
+   "cells_touching_water": 467,
+   "image_rect": [
+    1,
+    0,
+    118,
+    120
+   ],
+   "name": "Sand Trap",
+   "scenario": "SCM02EA",
+   "start_cells": [
+    [
+     6,
+     16
+    ],
+    [
+     33,
+     16
+    ],
+    [
+     48,
+     58
+    ],
+    [
+     25,
+     58
+    ],
+    [
+     6,
+     52
+    ],
+    [
+     52,
+     35
+    ],
+    [
+     56,
+     5
+    ],
+    [
+     20,
+     5
+    ]
+   ],
+   "starts": 8,
+   "theater": "DESERT",
+   "tiberium_cells": 431
+  },
+  {
+   "cell_rect": [
+    2,
+    1,
+    59,
+    61
+   ],
+   "cells_touching_water": 282,
+   "image_rect": [
+    2,
+    0,
+    116,
+    120
+   ],
+   "name": "Lost Arena",
+   "scenario": "SCM03EA",
+   "start_cells": [
+    [
+     49,
+     4
+    ],
+    [
+     57,
+     59
+    ],
+    [
+     27,
+     39
+    ],
+    [
+     5,
+     59
+    ],
+    [
+     7,
+     31
+    ],
+    [
+     10,
+     4
+    ],
+    [
+     32,
+     25
+    ],
+    [
+     56,
+     31
+    ]
+   ],
+   "starts": 8,
+   "theater": "TEMPERATE",
+   "tiberium_cells": 379
+  },
+  {
+   "cell_rect": [
+    4,
+    2,
+    56,
+    59
+   ],
+   "cells_touching_water": 476,
+   "image_rect": [
+    3,
+    0,
+    114,
+    120
+   ],
+   "name": "River Raid",
+   "scenario": "SCM04EA",
+   "start_cells": [
+    [
+     7,
+     4
+    ],
+    [
+     56,
+     4
+    ],
+    [
+     56,
+     58
+    ],
+    [
+     7,
+     58
+    ],
+    [
+     17,
+     29
+    ],
+    [
+     50,
+     30
+    ],
+    [
+     44,
+     18
+    ]
+   ],
+   "starts": 7,
+   "theater": "TEMPERATE",
+   "tiberium_cells": 392
+  },
+  {
+   "cell_rect": [
+    4,
+    1,
+    57,
+    61
+   ],
+   "cells_touching_water": 255,
+   "image_rect": [
+    4,
+    0,
+    112,
+    120
+   ],
+   "name": "Eye of the Storm",
+   "scenario": "SCM05EA",
+   "start_cells": [
+    [
+     14,
+     26
+    ],
+    [
+     55,
+     18
+    ],
+    [
+     57,
+     59
+    ],
+    [
+     7,
+     52
+    ],
+    [
+     47,
+     4
+    ],
+    [
+     57,
+     39
+    ],
+    [
+     7,
+     10
+    ]
+   ],
+   "starts": 7,
+   "theater": "DESERT",
+   "tiberium_cells": 519
+  },
+  {
+   "cell_rect": [
+    1,
+    1,
+    62,
+    61
+   ],
+   "cells_touching_water": 671,
+   "image_rect": [
+    0,
+    1,
+    120,
+    118
+   ],
+   "name": "Lakefront Clash",
+   "scenario": "SCM06EA",
+   "start_cells": [
+    [
+     5,
+     4
+    ],
+    [
+     57,
+     4
+    ],
+    [
+     57,
+     57
+    ],
+    [
+     6,
+     58
+    ],
+    [
+     36,
+     27
+    ],
+    [
+     57,
+     38
+    ],
+    [
+     5,
+     37
+    ]
+   ],
+   "starts": 7,
+   "theater": "DESERT",
+   "tiberium_cells": 362
+  },
+  {
+   "cell_rect": [
+    1,
+    4,
+    62,
+    57
+   ],
+   "cells_touching_water": 189,
+   "image_rect": [
+    0,
+    5,
+    120,
+    110
+   ],
+   "name": "Desert Madness",
+   "scenario": "SCM07EA",
+   "start_cells": [
+    [
+     23,
+     33
+    ],
+    [
+     59,
+     8
+    ],
+    [
+     57,
+     52
+    ],
+    [
+     5,
+     58
+    ],
+    [
+     16,
+     6
+    ],
+    [
+     3,
+     6
+    ],
+    [
+     31,
+     14
+    ],
+    [
+     58,
+     27
+    ],
+    [
+     33,
+     57
+    ],
+    [
+     5,
+     29
+    ]
+   ],
+   "starts": 10,
+   "theater": "DESERT",
+   "tiberium_cells": 413
+  },
+  {
+   "cell_rect": [
+    1,
+    1,
+    62,
+    62
+   ],
+   "cells_touching_water": 200,
+   "image_rect": [
+    0,
+    0,
+    120,
+    120
+   ],
+   "name": "Pitfall",
+   "scenario": "SCM08EA",
+   "start_cells": [
+    [
+     37,
+     2
+    ],
+    [
+     6,
+     14
+    ],
+    [
+     6,
+     50
+    ],
+    [
+     46,
+     59
+    ],
+    [
+     51,
+     27
+    ],
+    [
+     58,
+     59
+    ],
+    [
+     24,
+     60
+    ],
+    [
+     22,
+     45
+    ]
+   ],
+   "starts": 8,
+   "theater": "TEMPERATE",
+   "tiberium_cells": 391
+  },
+  {
+   "cell_rect": [
+    1,
+    1,
+    62,
+    62
+   ],
+   "cells_touching_water": 534,
+   "image_rect": [
+    0,
+    0,
+    120,
+    120
+   ],
+   "name": "Moosehead Barrens",
+   "scenario": "SCM09EA",
+   "start_cells": [
+    [
+     20,
+     31
+    ],
+    [
+     6,
+     60
+    ],
+    [
+     30,
+     59
+    ],
+    [
+     59,
+     60
+    ],
+    [
+     36,
+     22
+    ],
+    [
+     8,
+     5
+    ],
+    [
+     58,
+     4
+    ],
+    [
+     58,
+     26
+    ]
+   ],
+   "starts": 8,
+   "theater": "DESERT",
+   "tiberium_cells": 360
+  }
+ ],
+ "margin_index": 0,
+ "marker": {
+  "fill_radius": 2,
+  "rim_index": 12,
+  "rim_radius": 3,
+  "shape": "diamond"
+ },
+ "max_starts": 26,
+ "not_drawn": [
+  "TERRAIN",
+  "SMUDGE",
+  "STRUCTURES",
+  "UNITS",
+  "INFANTRY"
+ ],
+ "pack": "mappreview.pack",
+ "palette": "embedded in TITLE.CPS (data/dosdata/LOCAL.MIX), the menu's own",
+ "palette_widening": "v << 2",
+ "quantiser": "cnc_eyes.cpp pal_index: nearest in RGB over a 5:5:5 cube, index 0 excluded",
+ "record_bytes": 29128,
+ "start_colour_ground_clearance": 90,
+ "start_colour_min_separation": 80.9,
+ "start_colours": [
+  {
+   "clearance_from_ground": {
+    "DESERT": 197,
+    "TEMPERAT": 250
+   },
+   "index": 5,
+   "label": "yellow",
+   "rgb": [
+    252,
+    252,
+    84
+   ],
+   "slot": 0
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 163,
+    "TEMPERAT": 203
+   },
+   "index": 127,
+   "label": "red",
+   "rgb": [
+    244,
+    0,
+    0
+   ],
+   "slot": 1
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 268,
+    "TEMPERAT": 316
+   },
+   "index": 15,
+   "label": "white",
+   "rgb": [
+    252,
+    252,
+    252
+   ],
+   "slot": 2
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 180,
+    "TEMPERAT": 155
+   },
+   "index": 2,
+   "label": "cyan",
+   "rgb": [
+    0,
+    168,
+    168
+   ],
+   "slot": 3
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 97,
+    "TEMPERAT": 142
+   },
+   "index": 57,
+   "label": "derived",
+   "rgb": [
+    156,
+    148,
+    148
+   ],
+   "slot": 4
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 99,
+    "TEMPERAT": 153
+   },
+   "index": 26,
+   "label": "derived",
+   "rgb": [
+    212,
+    120,
+    16
+   ],
+   "slot": 5
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 93,
+    "TEMPERAT": 114
+   },
+   "index": 191,
+   "label": "derived",
+   "rgb": [
+    156,
+    40,
+    0
+   ],
+   "slot": 6
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 176,
+    "TEMPERAT": 232
+   },
+   "index": 44,
+   "label": "derived",
+   "rgb": [
+    236,
+    196,
+    172
+   ],
+   "slot": 7
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 118,
+    "TEMPERAT": 184
+   },
+   "index": 242,
+   "label": "derived",
+   "rgb": [
+    236,
+    136,
+    112
+   ],
+   "slot": 8
+  },
+  {
+   "clearance_from_ground": {
+    "DESERT": 137,
+    "TEMPERAT": 184
+   },
+   "index": 158,
+   "label": "derived",
+   "rgb": [
+    204,
+    208,
+    36
+   ],
+   "slot": 9
+  }
+ ],
+ "theater_mean_ground": {
+  "DESERT": [
+   133,
+   96,
+   70
+  ],
+  "TEMPERAT": [
+   68,
+   85,
+   56
+  ]
+ },
+ "tiberium_frames": 12,
+ "tiberium_legend_index": 4,
+ "tiberium_legend_rgb": [
+  84,
+  252,
+  84
+ ],
+ "tiberium_mask_source": "playable/dostib.pack",
+ "tiberium_shapes": 12,
+ "version": 1,
+ "water_rgb": [
+  28,
+  51,
+  74
+ ]
+}

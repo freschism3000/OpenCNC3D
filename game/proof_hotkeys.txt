@@ -1,0 +1,22 @@
+# Guard/stop plumbing: the script verbs "stop" and "guard" call ui_stop()/ui_guard(),
+# which are EXACTLY the functions the S and G keys (and their X/Z aliases) call:
+# CNC_Handle_Unit_Request(INPUT_UNIT_STOP=5 / INPUT_UNIT_GUARD_MODE=4).
+tick 5
+lclickobj E1:GoodGuy 0
+expectsel 1
+seldump
+# send him somewhere far, so there is a navcell to clear
+order 45 45
+tick 8
+seldump
+# S: the unit must abandon the move (mission leaves Move, nav clears)
+stop
+tick 4
+seldump
+# order again, then G: guard mode
+order 45 45
+tick 8
+guard
+tick 4
+seldump
+quit

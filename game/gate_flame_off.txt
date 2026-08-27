@@ -1,0 +1,13 @@
+# THE OFF ARM of the flamethrower gate: the same frame with --efxscale 0, which sizes
+# every particle to nothing, so the difference inside a trooper's box is his flame and
+# not the terrain, the buildings or the men.
+#
+# There is no --noefx, and a whole-frame difference would be meaningless here: SCG36EA at
+# tick 449 is a firefight with 300 particles alive all over the map. Locality is the whole
+# point of this arm.
+cam 11 55
+tick 449
+shot shots/flame_off.png
+clickobj E4 0
+clickobj E4 1
+quit

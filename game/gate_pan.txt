@@ -1,0 +1,9 @@
+# Panning proof. The fight on SCG90EA happens around cell 50,43. Watch it from the
+# far WEST first, so every shot is off the right hand edge of the view, then from the
+# far EAST so the same fight is off the left. If the pan works, the two recordings are
+# mirror images of each other.
+cam 20 43
+tick 2
+echo WEST-OF-THE-FIGHT
+tick 400
+quit

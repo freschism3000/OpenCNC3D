@@ -1,0 +1,176 @@
+tick 2
+sidebar BOOT
+player
+build MTNK
+ready MTNK 4000
+tick 80
+echo TANK-OUT
+objdump
+cam 53 48
+sbclick 1176 310
+lclickobj PYLE
+tick 60
+echo SELLING
+objdump
+shot fin1_selling.png
+player
+tick 200
+echo AFTER-SELL
+player
+objdump
+shot fin2_sold.png
+sbclick 1176 310
+player
+cam 50 48
+lclickobj MTNK 0
+expectsel 1
+order 56 47
+tick 12
+facedump
+shot fin3_drive.png
+tick 12
+facedump
+shot fin4_drive2.png
+tick 12
+facedump
+echo MID-EAST
+objdump
+cam 51 50
+shroudat 46 55
+tick 6
+facedump
+tick 6
+facedump
+tick 6
+facedump
+tick 12
+facedump
+echo SWUNG
+objdump
+tick 12
+facedump
+tick 12
+facedump
+tick 24
+facedump
+echo TURNED
+objdump
+tick 30
+facedump
+efxdump
+tick 30
+facedump
+efxdump
+echo APPROACH
+objdump
+efxdump
+tick 16
+efxdump
+tick 16
+efxdump
+tick 8
+efxdump
+tick 8
+efxdump
+tick 8
+efxdump
+tick 8
+efxdump
+tick 8
+efxdump
+tick 8
+efxdump
+tick 8
+efxdump
+tick 8
+efxdump
+echo E1DEADQ
+objdump
+cam 45 52
+orderobj GUN:BadGuy 0
+tick 40
+facedump
+cam 54 48
+shot fin5_turn.png
+efxdump
+tick 40
+facedump
+efxdump
+echo GUNAPPROACH
+objdump
+tick 60
+efxdump
+cam 50 51
+facedump
+shot fin6_drivepast.png
+tick 20
+efxdump
+tick 20
+efxdump
+tick 20
+efxdump
+tick 20
+efxdump
+tick 20
+efxdump
+echo GUNFIGHT
+objdump
+tick 300
+echo FINAL2
+player
+objdump
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+cam 43 54
+shot fin7_boom.png
+tick 12
+efxdump
+shot fin8_boom2.png
+echo GUNDEAD1
+objdump
+tick 12
+efxdump
+shot fin9_kill.png
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+tick 12
+efxdump
+echo GUNDEAD2
+player
+objdump
+look MTNK 0
+shot fin10_after.png
+expectdeath 1
+expectefx FRAG1 2
+quit

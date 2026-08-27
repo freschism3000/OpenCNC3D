@@ -1,0 +1,65 @@
+# Infantry idle animations. DoTypes 9 and 10 carry 16 frames each in idata.cpp and the
+# 1995 engine plays them out of the guard state machine, but this baker never took them
+# until recently -- thirteen slots were baked and these two were not among them. A man
+# standing around long enough must therefore be seen WEARING one.
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+tick 80
+animdump
+quit

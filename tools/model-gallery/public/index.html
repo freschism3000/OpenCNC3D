@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CNC3D model gallery</title>
+<style>
+:root{
+  --bg:#0c0f13; --panel:#131820; --panel2:#0f141b; --line:#232c37; --line2:#2f3a48;
+  --fg:#dfe6ef; --dim:#8b97a6; --dim2:#66727f; --acc:#e2b857; --acc2:#f2d089;
+  --gdi:#d8b45c; --nod:#c2504a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+  font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:var(--fg);background:#1b222c;border:1px solid var(--line2);
+  border-radius:5px;padding:6px 11px;cursor:pointer}
+button:hover:not(:disabled){background:#26313f;border-color:#3d4a5b}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--acc);color:#191203;border-color:var(--acc);font-weight:600}
+button.primary:hover:not(:disabled){background:var(--acc2)}
+input[type=search],input[type=text]{font:inherit;color:var(--fg);background:#0b0f14;
+  border:1px solid var(--line2);border-radius:5px;padding:6px 10px}
+input[type=search]:focus{outline:none;border-color:var(--acc)}
+
+/* ------------------------------------------------------------------ header */
+header{flex:none;border-bottom:1px solid var(--line);background:var(--panel)}
+.bar{display:flex;align-items:center;gap:14px;padding:10px 16px}
+.brand{font-size:13px;letter-spacing:.14em;color:var(--acc);font-weight:600;white-space:nowrap}
+.brand small{display:block;letter-spacing:0;font-weight:400;color:var(--dim2);font-size:10px}
+.bar .sp{flex:1}
+#q{width:230px}
+#count{color:var(--dim);font-size:11px;white-space:nowrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 10px}
+.chip{padding:4px 10px;border:1px solid var(--line2);border-radius:99px;cursor:pointer;
+  color:var(--dim);font-size:11px;background:#0f141b;user-select:none}
+.chip:hover{color:var(--fg);border-color:#3d4a5b}
+.chip.on{background:var(--acc);color:#191203;border-color:var(--acc);font-weight:600}
+.chip b{font-weight:400;opacity:.65;margin-left:5px}
+
+/* ----------------------------------------------------------------- gallery */
+#gallery{flex:1;overflow-y:auto;padding:16px}
+.group{margin:0 0 26px}
+.group h2{margin:0 0 10px;font-size:11px;letter-spacing:.14em;color:var(--acc);
+  font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--line);
+  padding-bottom:6px}
+.group h2 span{color:var(--dim2);font-weight:400;letter-spacing:0;text-transform:none}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
+  overflow:hidden;cursor:pointer;transition:border-color .12s,transform .12s}
+.card:hover{border-color:var(--acc);transform:translateY(-1px)}
+.card.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+/* The models are DARK: the cartridge's baked vertex shading averages around RGB 60
+   on a vehicle, which is right and which is unreadable on a near-black card. The
+   backdrop is lifted rather than the model, so what you see is still the game's own
+   colour. */
+.thumb{aspect-ratio:1;background:
+  radial-gradient(circle at 50% 38%,#5b6878 0%,#39434f 55%,#222a34 100%);
+  display:block;width:100%}
+.card .cap{padding:6px 8px 8px;border-top:1px solid var(--line)}
+.card .nm{font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.card .mt{font-size:10px;color:var(--dim2);display:flex;justify-content:space-between;
+  gap:6px;margin-top:2px}
+.card .mt em{font-style:normal;color:var(--acc);opacity:.75}
+
+/* ------------------------------------------------------------------ detail */
+#detail{position:fixed;inset:0;background:rgba(6,8,11,.94);display:none;z-index:40}
+#detail.show{display:flex}
+#stage{flex:1;position:relative;min-width:0}
+#view{display:block;width:100%;height:100%;cursor:grab}
+#view:active{cursor:grabbing}
+#hud{position:absolute;left:16px;top:14px;pointer-events:none;font-size:11px;
+  color:var(--dim)}
+#hud b{display:block;font-size:14px;color:var(--acc);font-weight:600;letter-spacing:.05em}
+#tools{position:absolute;left:16px;bottom:14px;display:flex;gap:6px;flex-wrap:wrap}
+#tools button{padding:5px 9px;font-size:11px}
+#tools button.on{background:var(--acc);color:#191203;border-color:var(--acc)}
+#help{position:absolute;right:16px;bottom:14px;color:var(--dim2);font-size:10px}
+#side{width:330px;flex:none;background:var(--panel);border-left:1px solid var(--line);
+  display:flex;flex-direction:column}
+#side .top{display:flex;gap:8px;align-items:center;padding:12px 14px;
+  border-bottom:1px solid var(--line)}
+#side .top .sp{flex:1}
+#side .body{flex:1;overflow-y:auto;padding:12px 14px}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:3px 10px;font-size:11px;
+  margin-bottom:14px}
+.kv dt{color:var(--dim2)}
+.kv dd{margin:0;word-break:break-word}
+.sec{font-size:10px;letter-spacing:.12em;color:var(--acc);text-transform:uppercase;
+  border-bottom:1px solid var(--line);padding-bottom:5px;margin:0 0 8px}
+.note{font-size:11px;color:var(--dim);background:#0e131a;border:1px solid var(--line);
+  border-left:2px solid var(--acc);border-radius:4px;padding:8px 10px;margin-bottom:14px}
+table.parts{width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:14px}
+table.parts th{text-align:left;color:var(--dim2);font-weight:400;
+  border-bottom:1px solid var(--line);padding:3px 0}
+table.parts td{padding:3px 0;border-bottom:1px solid #1a212a;color:var(--dim)}
+table.parts td:first-child{color:var(--fg)}
+.texrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.texrow figure{margin:0;text-align:center}
+.texrow img{width:46px;height:46px;image-rendering:pixelated;background:#000;
+  border:1px solid var(--line);border-radius:3px;display:block}
+.texrow figcaption{font-size:9px;color:var(--dim2);margin-top:2px}
+.pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:99px;
+  border:1px solid var(--line2);color:var(--dim);margin:0 4px 4px 0}
+.pill.warn{border-color:#7a4a2a;color:#d59a63}
+
+/* ------------------------------------------------------------------- modal */
+#modal{position:fixed;inset:0;background:rgba(4,6,9,.78);display:none;z-index:60;
+  align-items:center;justify-content:center}
+#modal.show{display:flex}
+.dlg{width:520px;max-width:calc(100vw - 32px);max-height:calc(100vh - 40px);
+  overflow-y:auto;background:var(--panel);border:1px solid var(--line2);
+  border-radius:9px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.dlg h3{margin:0;padding:14px 18px;font-size:12px;letter-spacing:.12em;color:var(--acc);
+  border-bottom:1px solid var(--line);text-transform:uppercase}
+.dlg .in{padding:16px 18px}
+.dlg .ft{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;
+  align-items:center}
+.dlg .ft .sp{flex:1}
+fieldset{border:none;margin:0 0 16px;padding:0}
+legend{font-size:10px;letter-spacing:.12em;color:var(--dim2);text-transform:uppercase;
+  padding:0 0 7px}
+.opt{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border-radius:6px;
+  border:1px solid var(--line);margin-bottom:6px;cursor:pointer;background:var(--panel2)}
+.opt:hover{border-color:var(--line2)}
+.opt.on{border-color:var(--acc);background:#191b16}
+.opt input{margin:2px 0 0}
+.opt .t{font-size:12px}
+.opt .d{font-size:10.5px;color:var(--dim2);line-height:1.45}
+#prog{display:none;font-size:11px;color:var(--dim)}
+#prog.show{display:block}
+#bar{height:3px;background:#1b222c;border-radius:2px;overflow:hidden;margin-top:6px}
+#bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .15s}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="brand">CNC3D &middot; MODEL GALLERY
+      <small>every 3D asset on the Command &amp; Conquer cartridge</small></div>
+    <div class="sp"></div>
+    <input type="search" id="q" placeholder="filter by name or code…">
+    <span id="count"></span>
+    <button id="bExport" disabled>EXPORT</button>
+    <button id="bExportAll" class="primary">EXPORT ALL</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+
+<div id="gallery"></div>
+
+<div id="detail">
+  <div id="stage">
+    <canvas id="view"></canvas>
+    <div id="hud"><b id="dName"></b><span id="dSub"></span></div>
+    <div id="tools">
+      <button data-t="tex" class="on">textured</button>
+      <button data-t="shade" class="on">vertex colour</button>
+      <button data-t="wire">wireframe</button>
+      <button data-t="house">GDI palette</button>
+      <button data-t="spin">spin</button>
+      <button data-t="reset">reset view</button>
+    </div>
+    <div id="help">drag = orbit &middot; wheel = zoom &middot; shift+drag = pan &middot; &larr;/&rarr; = prev/next &middot; esc = close</div>
+  </div>
+  <div id="side">
+    <div class="top">
+      <button id="dPrev">&larr;</button><button id="dNext">&rarr;</button>
+      <div class="sp"></div>
+      <button id="dExport" class="primary">EXPORT</button>
+      <button id="dClose">&times;</button>
+    </div>
+    <div class="body" id="dBody"></div>
+  </div>
+</div>
+
+<div id="modal"><div class="dlg">
+  <h3 id="mTitle">Export</h3>
+  <div class="in">
+    <fieldset><legend>Format</legend><div id="mFmt"></div></fieldset>
+    <fieldset><legend>Include</legend><div id="mOpts"></div></fieldset>
+    <div id="prog">
+      <span id="progText">Preparing…</span>
+      <div id="bar"><i></i></div>
+    </div>
+  </div>
+  <div class="ft">
+    <span id="mNote" style="font-size:10.5px;color:var(--dim2)"></span>
+    <div class="sp"></div>
+    <button id="mCancel">Cancel</button>
+    <button id="mGo" class="primary">Export</button>
+  </div>
+</div></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+tick 455
+shroudstat
+shroudat 51 48
+shroudgate 51 48
+obj E1:BadGuy 0
+quit

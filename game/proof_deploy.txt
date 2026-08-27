@@ -1,0 +1,23 @@
+# SCG01EC: MCV deploy. Select the MCV, then issue the ordinary
+# COMMAND_AT_POSITION on its own cell (57,49): TechnoClass::What_Action returns
+# ACTION_SELF for one selected deployable MCV over itself, and the engine turns it
+# into a FACT with origin one cell NW = (56,48).
+tick 5
+echo BASE
+objdump
+count FACT 1
+count MCV 1
+# lclickobj, not clickobj: clickobj only exercises the renderer's picker and never
+# touches the engine selection; lclickobj is the real left click (CNC_Select_Object).
+lclickobj MCV
+expectsel 1
+seldump
+order 57 49
+tick 100
+echo AFTER-DEPLOY
+objdump
+count FACT 2
+count MCV 0
+expectgone MCV
+shot shot_ec_deployed.png
+quit

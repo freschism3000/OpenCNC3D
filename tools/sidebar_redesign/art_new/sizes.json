@@ -1,0 +1,74 @@
+{
+ "panel_body": {
+  "w": 681,
+  "h": 2115
+ },
+ "arrow_up": {
+  "w": 342,
+  "h": 325
+ },
+ "arrow_up_pressed": {
+  "w": 344,
+  "h": 325
+ },
+ "arrow_down": {
+  "w": 343,
+  "h": 325
+ },
+ "arrow_down_pressed": {
+  "w": 344,
+  "h": 325
+ },
+ "panel_header": {
+  "w": 634,
+  "h": 92
+ },
+ "meter_empty": {
+  "w": 108,
+  "h": 809
+ },
+ "meter_full": {
+  "w": 108,
+  "h": 809
+ },
+ "panel_radar_bezel": {
+  "w": 634,
+  "h": 638
+ },
+ "cell_frame": {
+  "w": 279,
+  "h": 298
+ },
+ "cell_well": {
+  "w": 279,
+  "h": 268
+ },
+ "button_repair": {
+  "w": 278,
+  "h": 167
+ },
+ "button_sell": {
+  "w": 274,
+  "h": 167
+ },
+ "button_map": {
+  "w": 253,
+  "h": 167
+ },
+ "text_sidebar": {
+  "w": 409,
+  "h": 77
+ },
+ "text_repair": {
+  "w": 339,
+  "h": 77
+ },
+ "text_sell": {
+  "w": 226,
+  "h": 77
+ },
+ "text_map": {
+  "w": 202,
+  "h": 77
+ }
+}

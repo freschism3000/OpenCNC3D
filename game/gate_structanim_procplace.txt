@@ -1,0 +1,278 @@
+# THE REFINERY'S UNLOAD RIG MUST NOT PLAY WHILE THE REFINERY IS BEING BUILT.
+#
+# Reported: placing a Refinery immediately played the Harvester unload animation,
+# which it should not.
+#
+# The refinery is the one type in the cartridge's table whose arm emits TWO model
+# commands: the building, and slot 20 -- a six-node rig with a one-shot clip -- for
+# stages 12..28 of the engine's refinery animation. Nothing in the arm asked whether the
+# building EXISTS yet. A building under construction is BState 0 (BSTATE_CONSTRUCTION),
+# its stage counter is already running, and so the rig played on top of the buildup.
+#
+# WHY G31d COULD NOT SEE THIS. G31d runs SCG90EA, where the refinery is already standing:
+# 39 samples, BStates 1, 3 and 4 only, not one sample in BState 0 -- and its awk never
+# reads the bstate field at all. A gate can only fail on a state its scenario reaches.
+# This script exists to reach that state: --build 6 gives the credits, and the refinery is
+# built, placed, and then watched tick by tick THROUGH its construction.
+#
+# THE WINDOW IS THE ANTI-VACUITY LEG. gates.sh counts the samples with bstate==0 AND
+# stage>=12 -- the samples where the arm's formula WOULD draw the rig -- and requires at
+# least one. Without that floor, a scenario, a build level or a credit change that stops
+# producing a placed refinery would leave zero samples, zero of them bad, and a green
+# gate measuring nothing. Measured 21 samples in the window, 21 of them
+# drawing the rig before the fix and 0 after it.
+#
+# `look` then `clickobj` pins the camera on the placed refinery and reads its silhouette
+# out of THIS run, which is the crop the pixel leg differences inside. Nothing moves the
+# camera after that: the pixel leg's whole claim is that those frames are IDENTICAL.
+tick 2
+sidebar BOOT
+player
+build PROC
+ready PROC 4000
+startplace PROC
+place auto
+tick 1
+look PROC 0
+clickobj PROC 0
+tick 1
+anims
+shot shots/pp_01.png
+tick 1
+anims
+shot shots/pp_02.png
+tick 1
+anims
+shot shots/pp_03.png
+tick 1
+anims
+shot shots/pp_04.png
+tick 1
+anims
+shot shots/pp_05.png
+tick 1
+anims
+shot shots/pp_06.png
+tick 1
+anims
+shot shots/pp_07.png
+tick 1
+anims
+shot shots/pp_08.png
+tick 1
+anims
+shot shots/pp_09.png
+tick 1
+anims
+shot shots/pp_10.png
+tick 1
+anims
+shot shots/pp_11.png
+tick 1
+anims
+shot shots/pp_12.png
+tick 1
+anims
+shot shots/pp_13.png
+tick 1
+anims
+shot shots/pp_14.png
+tick 1
+anims
+shot shots/pp_15.png
+tick 1
+anims
+shot shots/pp_16.png
+tick 1
+anims
+shot shots/pp_17.png
+tick 1
+anims
+shot shots/pp_18.png
+tick 1
+anims
+shot shots/pp_19.png
+tick 1
+anims
+shot shots/pp_20.png
+tick 1
+anims
+shot shots/pp_21.png
+tick 1
+anims
+shot shots/pp_22.png
+tick 1
+anims
+shot shots/pp_23.png
+tick 1
+anims
+shot shots/pp_24.png
+tick 1
+anims
+shot shots/pp_25.png
+tick 1
+anims
+shot shots/pp_26.png
+tick 1
+anims
+shot shots/pp_27.png
+tick 1
+anims
+shot shots/pp_28.png
+tick 1
+anims
+shot shots/pp_29.png
+tick 1
+anims
+shot shots/pp_30.png
+tick 1
+anims
+shot shots/pp_31.png
+tick 1
+anims
+shot shots/pp_32.png
+tick 1
+anims
+shot shots/pp_33.png
+tick 1
+anims
+shot shots/pp_34.png
+tick 1
+anims
+shot shots/pp_35.png
+tick 1
+anims
+shot shots/pp_36.png
+tick 1
+anims
+shot shots/pp_37.png
+tick 1
+anims
+shot shots/pp_38.png
+tick 1
+anims
+shot shots/pp_39.png
+tick 1
+anims
+shot shots/pp_40.png
+tick 1
+anims
+shot shots/pp_41.png
+tick 1
+anims
+shot shots/pp_42.png
+tick 1
+anims
+shot shots/pp_43.png
+tick 1
+anims
+shot shots/pp_44.png
+tick 1
+anims
+shot shots/pp_45.png
+tick 1
+anims
+shot shots/pp_46.png
+tick 1
+anims
+shot shots/pp_47.png
+tick 1
+anims
+shot shots/pp_48.png
+tick 1
+anims
+shot shots/pp_49.png
+tick 1
+anims
+shot shots/pp_50.png
+tick 1
+anims
+shot shots/pp_51.png
+tick 1
+anims
+shot shots/pp_52.png
+tick 1
+anims
+shot shots/pp_53.png
+tick 1
+anims
+shot shots/pp_54.png
+tick 1
+anims
+shot shots/pp_55.png
+tick 1
+anims
+shot shots/pp_56.png
+tick 1
+anims
+shot shots/pp_57.png
+tick 1
+anims
+shot shots/pp_58.png
+tick 1
+anims
+shot shots/pp_59.png
+tick 1
+anims
+shot shots/pp_60.png
+tick 1
+anims
+shot shots/pp_61.png
+tick 1
+anims
+shot shots/pp_62.png
+tick 1
+anims
+shot shots/pp_63.png
+tick 1
+anims
+shot shots/pp_64.png
+tick 1
+anims
+shot shots/pp_65.png
+tick 1
+anims
+shot shots/pp_66.png
+tick 1
+anims
+shot shots/pp_67.png
+tick 1
+anims
+shot shots/pp_68.png
+tick 1
+anims
+shot shots/pp_69.png
+tick 1
+anims
+shot shots/pp_70.png
+tick 1
+anims
+shot shots/pp_71.png
+tick 1
+anims
+shot shots/pp_72.png
+tick 1
+anims
+shot shots/pp_73.png
+tick 1
+anims
+shot shots/pp_74.png
+tick 1
+anims
+shot shots/pp_75.png
+tick 1
+anims
+shot shots/pp_76.png
+tick 1
+anims
+shot shots/pp_77.png
+tick 1
+anims
+shot shots/pp_78.png
+tick 1
+anims
+shot shots/pp_79.png
+tick 1
+anims
+shot shots/pp_80.png
+quit

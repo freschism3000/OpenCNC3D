@@ -1,0 +1,3 @@
+tick 200
+objdump
+quit

@@ -1,0 +1,32 @@
+# The War Factory door. Its clip frame is DoorClass::Door_Stage() * (59/9) and nothing
+# else -- no counter, no loop. Building a Medium Tank must drive the door 0 -> 9 (clip
+# frames 0 -> 59), hold it open while the tank leaves, and bring it back to 0. Clip
+# frames 60..100 are a second animation the cartridge's own arm can never reach.
+tick 6
+sidebar BOOT
+player
+build MTNK
+ready MTNK 3000
+tick 3
+anims
+tick 3
+anims
+tick 3
+anims
+tick 3
+anims
+tick 3
+anims
+tick 4
+anims
+tick 6
+anims
+tick 8
+anims
+tick 12
+anims
+tick 20
+anims
+tick 30
+anims
+quit

@@ -1,0 +1,16 @@
+# The move-order destination marker is the cartridge's own model, slot 107, which the
+# cartridge itself names CURSOR_CIRCLES: a flat ground wedge plus two rings whose only
+# tracks are SCALE, over a one-shot 21-frame clip. Ordering a unit to a visible cell must
+# put it on the ground and grow it, and it must be GONE once its life is up. Driven off
+# the engine tick, so the two shots of the same tick are byte-identical.
+tick 20
+cam 57 52
+zoom max
+lclickobj MCV 0
+shot shots/gm_before.png
+order 57 52
+tick 6
+shot shots/gm_mid.png
+tick 30
+shot shots/gm_after.png
+quit

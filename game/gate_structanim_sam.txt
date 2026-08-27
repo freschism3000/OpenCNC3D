@@ -1,0 +1,22 @@
+# The SAM site must SIT STILL while its launcher is underground. Before it had an arm it
+# fell through to the generic idle loop and ran all 501 frames on a timer, rising,
+# tracking and lowering in a continuous cycle whatever the engine was actually doing.
+# Status 0 is SAM_UNDERGROUND and stage 0 is the bottom of the travel, so the only
+# correct frame here is 0, over and over, for a long time.
+tick 60
+anims
+tick 200
+anims
+tick 200
+anims
+tick 300
+anims
+tick 300
+anims
+tick 400
+anims
+tick 400
+anims
+tick 500
+anims
+quit

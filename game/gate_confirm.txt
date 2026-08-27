@@ -1,0 +1,43 @@
+# G89. ABORT ASKS FIRST, AND ALL THREE ANSWERS GO WHERE THEY SHOULD.
+#
+# 1995 does not end the mission on the Abort click. goptions.cpp:421-447 raises
+#   WWMessageBox().Process(TXT_CONFIRM_EXIT, TXT_ABORT, TXT_CANCEL, TXT_RESTART)
+# and only queues the exit when the answer is Abort. This build ended the mission on the
+# click with nothing in between, which is what two players reported.
+#
+# The three answers are read off the act= field optclick already prints, so this gate needs
+# no new diagnostic line and disarms no existing pattern. DOPT_ACT_NONE is 0,
+# DOPT_ACT_ABORT is 2, DOPT_ACT_RESTART is 6, and DOPT_PAGE_CONFIRM is 6.
+#
+# What each leg would catch:
+#   1  Abort Mission opens the box instead of leaving. If the confirmation is ever
+#      bypassed this is the leg that goes red, and it is the whole point of the feature.
+#   2  Cancel goes back to the pause page. A Cancel wired to RESUME would close the dialog
+#      and drop the player into the mission they just asked to leave.
+#   3  Abort still ends the mission, so the confirmation did not break the old path.
+#   4  Restart returns its own action, and NOT abort's. These two differ by one enum value
+#      and land in adjacent arms, which is exactly the pair that gets crossed.
+#
+# NOT COVERED, deliberately, and said out loud rather than left to be discovered: the
+# script path has no way to press a KEY at the dialog, so Escape-is-Cancel is unproven
+# here. It is one line in dopt_key and it is the only part of this feature a gate does not
+# reach.
+tick 20
+options
+
+echo G89-1 the Abort button opens the confirmation rather than ending the mission
+optclick Abort Mission
+
+echo G89-2 Cancel returns to the pause page
+optclick Cancel
+
+echo G89-3 Abort on the confirmation still ends the mission
+optclick Abort Mission
+optclick Abort
+
+echo G89-4 Restart returns its own action
+tick 1
+options
+optclick Abort Mission
+optclick Restart
+quit

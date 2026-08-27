@@ -1,0 +1,25 @@
+# G58 SUB-TICK BLENDING. The Construction Yard's crane, because it is the animation the report named
+# judged by eye and the one G47 already proves MOVES between ticks. Get it into its active
+# segment, then sample ONE engine tick at three phases without advancing the brain, and
+# finally take the next whole tick for continuity.
+tick 20
+cam 53 51
+zoom max
+sidebar
+build NUKE
+ready NUKE 400
+startplace NUKE
+place auto
+tick 4
+tickalpha 0.0
+anims
+shot shots/g58_a0.png
+tickalpha 0.5
+anims
+shot shots/g58_a5.png
+tickalpha 0.999
+anims
+tickalpha 0.0
+tick 1
+anims
+quit

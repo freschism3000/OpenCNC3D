@@ -1,0 +1,19 @@
+# G81 arm B: A SELECTED VEHICLE'S BRACKET MOVES WITH ITS HULL.
+#
+# The same subject as G60, SCG01EC's gunboat, because it is on Hunt and therefore really
+# travelling. The SAME engine tick is drawn twice, at sub-tick phase 0.0 and 0.999, with
+# the boat selected. The hull is drawn at the interpolated position in both; the white
+# bracket used to be drawn at the engine's once-per-tick position and so did not move at
+# all between the two pictures.
+tick 60
+cam 51 59
+lclickobj BOAT 0
+expectsel 1
+smoothmove 1
+tickalpha 0.0
+shot shots/g81_a0.png
+drawpos BOAT 0
+tickalpha 0.999
+shot shots/g81_a9.png
+drawpos BOAT 0
+quit

@@ -1,0 +1,3322 @@
+{
+ "_meta": {
+  "provenance": "Decoded from cnc_eu.z64, read-only RE pass. See particle_recipes_notes.md for the full derivation and code addresses.",
+  "anim_table": "66 entries x 12B {char* name, SourceSlot* slots, u32 nslots} at CodeOverlay ROM 0x1B6444 / RAM 0x80214654 (n64specialeffect.c)",
+  "slot_layout": "16B: {u8 source_id, u8 fire_stage, u16 pad, s32 dx, s32 dy, s32 dz}; source_id 0 = empty slot",
+  "source_table": "65 records x 0x44B at CodeOverlay ROM 0x1B41C0 / RAM 0x802123D0; names are the ROM's own SOURCE_* strings",
+  "spawn_semantics": {
+   "when": "the effect driver runs per anim stage: a slot fires when stage >= fire_stage (continuous sources, burst_ticks==0, re-fire every stage) or exactly at stage == fire_stage (burst sources, burst_ticks>0)",
+   "emitter": "an emitter node is placed at anim world pos + offset; dy is relative to terrain height at (x,z), dx/dz are world units (cell = 256)",
+   "burst": "a burst action lives burst_ticks ticks; each tick it emits trunc(count) particles then count *= per_tick_multiplier, starting from particles_per_tick",
+   "per_particle": [
+    "angle_a = uniform(angle_a_min, angle_a_max)  [radians]",
+    "angle_b = uniform(angle_b_min, angle_b_max)  [radians]",
+    "speed   = speed_base + rand8/256 * speed_rand",
+    "velocity = speed * ( sin(angle_b), cos(angle_b)*cos(angle_a), sin(angle_a) )  [x, y-up, z]",
+    "spawn_pos = emitter_pos + 3.0 * velocity",
+    "life  = life_base + rand8/256 * life_rand   [ticks]",
+    "size  = size_base + rand8/256 * size_rand   [world units; for VehicleDamage/StructureDamage debris it scales the 3D chunk]",
+    "each tick: pos += velocity; velocity.y += visual.y_accel_per_tick"
+   ],
+   "debris": "sources on VehicleDamage/StructureDamage (SOURCE_Debris/Debris2) additionally build a ParticleExplosion object: chunk gravity -2/tick, elasticity 0.7, constants {2, 1, -2, 20, 5} at CodeOverlay ROM 0x16B3E0-0x16B3F0; each chunk carries a child emitter (smoke trail)"
+  },
+  "units": "positions/sizes in world units (1 cell = 256 -- CORRECTED; this field said 192, which is wrong and makes every particle offset, speed and size 33% too large. The cell pitch is 256 everywhere in the cartridge: the terrain vertex builder writes vtx.x = x*256 and vtx.z = y*256 (tools/romdump/heightmap_notes.md:12/:69) and the camera distance is in leptons at 256 per cell (docs/n64-camera-math.md:14/:18)); angles in radians; ticks = anim/effect ticks (the same tick the anim stage advances on)"
+ },
+ "systems": [
+  {
+   "index": 0,
+   "name": "Intensity",
+   "ram": "0x800EC1B0",
+   "init": {
+    "kind": "sprite",
+    "mode": 0,
+    "tex_ram": "0x8009B3A0",
+    "arg3": 4,
+    "draw_type": 1,
+    "tex_w": 32,
+    "tex_h": 32,
+    "frames": 1,
+    "tex_rom": "0x9BFA0"
+   }
+  },
+  {
+   "index": 1,
+   "name": "FireBall",
+   "ram": "0x800EC1E4",
+   "init": {
+    "kind": "sprite",
+    "mode": 1,
+    "tex_ram": "0x8009B7A0",
+    "arg3": 0,
+    "draw_type": 2,
+    "tex_w": 16,
+    "tex_h": 8,
+    "frames": 12,
+    "tex_rom": "0x9C3A0"
+   }
+  },
+  {
+   "index": 2,
+   "name": "VehicleDamage",
+   "ram": "0x800EC218",
+   "init": {
+    "kind": "explosion",
+    "chunk_table_ram": "0x800A1FA0",
+    "chunk_count": 7,
+    "chunk_table_rom": "0xA2BA0"
+   }
+  },
+  {
+   "index": 3,
+   "name": "StructureDamage",
+   "ram": "0x800EC24C",
+   "init": {
+    "kind": "explosion",
+    "chunk_table_ram": "0x800A1FBC",
+    "chunk_count": 7,
+    "chunk_table_rom": "0xA2BBC"
+   }
+  },
+  {
+   "index": 4,
+   "name": "Shock",
+   "ram": "0x800EC280",
+   "init": {
+    "kind": "sprite",
+    "mode": 1,
+    "tex_ram": "0x8009CFA0",
+    "arg3": 0,
+    "draw_type": 2,
+    "tex_w": 64,
+    "tex_h": 64,
+    "frames": 1,
+    "tex_rom": "0x9DBA0"
+   }
+  },
+  {
+   "index": 5,
+   "name": "Burn_Fire",
+   "ram": "0x800EC2B4",
+   "init": {
+    "kind": "sprite",
+    "mode": 1,
+    "tex_ram": "0x8009EFA0",
+    "arg3": 0,
+    "draw_type": 2,
+    "tex_w": 12,
+    "tex_h": 16,
+    "frames": 8,
+    "tex_rom": "0x9FBA0"
+   }
+  },
+  {
+   "index": 6,
+   "name": "Burn_Smoke",
+   "ram": "0x800EC2E8",
+   "init": {
+    "kind": "sprite",
+    "mode": 1,
+    "tex_ram": "0x8009C3A0",
+    "arg3": 0,
+    "draw_type": 2,
+    "tex_w": 16,
+    "tex_h": 16,
+    "frames": 6,
+    "tex_rom": "0x9CFA0"
+   }
+  },
+  {
+   "index": 7,
+   "name": "Ion_Spark",
+   "ram": "0x800EC31C",
+   "init": {
+    "kind": "sprite",
+    "mode": 1,
+    "tex_ram": "0x8009FBA0",
+    "arg3": 0,
+    "draw_type": 3,
+    "tex_w": 16,
+    "tex_h": 16,
+    "frames": 1,
+    "tex_rom": "0xA07A0"
+   }
+  },
+  {
+   "index": 8,
+   "name": "Debris",
+   "ram": "0x800EC350",
+   "init": {
+    "kind": "sprite",
+    "mode": 1,
+    "tex_ram": "0x8009FFA0",
+    "arg3": 0,
+    "draw_type": 3,
+    "tex_w": 8,
+    "tex_h": 16,
+    "frames": 8,
+    "tex_rom": "0xA0BA0"
+   }
+  },
+  {
+   "index": 9,
+   "name": "FlameThrower",
+   "ram": "0x800EC384",
+   "init": {
+    "kind": "sprite",
+    "mode": 1,
+    "tex_ram": "0x800A0FA0",
+    "arg3": 0,
+    "draw_type": 3,
+    "tex_w": 8,
+    "tex_h": 16,
+    "frames": 8,
+    "tex_rom": "0xA1BA0"
+   }
+  }
+ ],
+ "sources": [
+  {
+   "id": 0,
+   "name": "SOURCE_None",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 20.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 50.0,
+   "size_rand": 0.0,
+   "angle_a_min": -1.0,
+   "angle_a_max": 0.0,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 1,
+   "name": "SOURCE_Sam_N",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 70.599701,
+   "size_rand": 44.499901,
+   "angle_a_min": -1.0,
+   "angle_a_max": 0.0,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 2,
+   "name": "SOURCE_Sam_NE",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 70.599701,
+   "size_rand": 44.499901,
+   "angle_a_min": -1.0,
+   "angle_a_max": 0.0,
+   "angle_b_min": 0.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 3,
+   "name": "SOURCE_Sam_E",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 70.599701,
+   "size_rand": 44.499901,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": 0.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 4,
+   "name": "SOURCE_Sam_SE",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 70.599701,
+   "size_rand": 44.499901,
+   "angle_a_min": 0.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": 0.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 5,
+   "name": "SOURCE_Sam_S",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 2.618999,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 24.76841,
+   "size_rand": 60.424427,
+   "angle_a_min": 0.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 6,
+   "name": "SOURCE_Sam_SW",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 70.599701,
+   "size_rand": 44.499901,
+   "angle_a_min": 0.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": -1.0,
+   "angle_b_max": 0.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 7,
+   "name": "SOURCE_Sam_W",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 70.599701,
+   "size_rand": 44.499901,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -1.0,
+   "angle_b_max": 0.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 8,
+   "name": "SOURCE_Sam_NW",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 5,
+   "continuous": false,
+   "speed_base": 10.6,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 70.599701,
+   "size_rand": 44.499901,
+   "angle_a_min": -1.0,
+   "angle_a_max": 0.0,
+   "angle_b_min": -1.0,
+   "angle_b_max": 0.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 9,
+   "name": "SOURCE_Gun_N",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.599701,
+   "size_rand": 0.0,
+   "angle_a_min": -1.0,
+   "angle_a_max": 0.0,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 10,
+   "name": "SOURCE_Gun_NE",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 0.0,
+   "angle_a_min": -1.0,
+   "angle_a_max": 0.0,
+   "angle_b_min": 0.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 11,
+   "name": "SOURCE_Gun_E",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 2,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 0.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": 0.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 12,
+   "name": "SOURCE_Gun_SE",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 2,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 0.0,
+   "angle_a_min": 0.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": 0.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 13,
+   "name": "SOURCE_Gun_S",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 2,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 0.0,
+   "angle_a_min": 0.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 14,
+   "name": "SOURCE_Gun_SW",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 2,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 0.0,
+   "angle_a_min": 0.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": -1.0,
+   "angle_b_max": 0.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 15,
+   "name": "SOURCE_Gun_W",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 2,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 0.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -1.0,
+   "angle_b_max": 0.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 16,
+   "name": "SOURCE_Gun_NW",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 5.0,
+   "speed_rand": 4.0,
+   "life_base": 2,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 0.0,
+   "angle_a_min": -1.0,
+   "angle_a_max": 0.0,
+   "angle_b_min": -1.0,
+   "angle_b_max": 0.0,
+   "visual_ram": "0x800A20EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 17,
+   "name": "SOURCE_Flame_N",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": -2.0,
+   "angle_a_max": -0.01,
+   "angle_b_min": 0.01,
+   "angle_b_max": 0.0,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 18,
+   "name": "SOURCE_Flame_NE",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": -1.01,
+   "angle_a_max": -0.99,
+   "angle_b_min": 0.99,
+   "angle_b_max": 1.01,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 19,
+   "name": "SOURCE_Flame_E",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": -0.01,
+   "angle_a_max": 0.01,
+   "angle_b_min": 0.99,
+   "angle_b_max": 1.01,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 20,
+   "name": "SOURCE_Flame_SE",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": 0.99,
+   "angle_a_max": 1.01,
+   "angle_b_min": 0.99,
+   "angle_b_max": 1.01,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 21,
+   "name": "SOURCE_Flame_S",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": 0.99,
+   "angle_a_max": 1.01,
+   "angle_b_min": -0.01,
+   "angle_b_max": 0.01,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 22,
+   "name": "SOURCE_Flame_SW",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": 0.99,
+   "angle_a_max": 1.01,
+   "angle_b_min": -1.01,
+   "angle_b_max": -0.99,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 23,
+   "name": "SOURCE_Flame_W",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": -0.01,
+   "angle_a_max": 0.01,
+   "angle_b_min": -1.01,
+   "angle_b_max": -0.99,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 24,
+   "name": "SOURCE_Flame_NW",
+   "system": "FlameThrower",
+   "system_index": 9,
+   "particles_per_tick": 1.071499,
+   "per_tick_multiplier": 176.768173,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 11.974,
+   "speed_rand": 5.0,
+   "life_base": 15,
+   "life_rand": 5,
+   "size_base": 32.0,
+   "size_rand": 8.0,
+   "angle_a_min": -1.01,
+   "angle_a_max": -0.99,
+   "angle_b_min": -1.01,
+   "angle_b_max": -0.99,
+   "visual_ram": "0x800A21EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 25,
+   "name": "SOURCE_Debris",
+   "system": "VehicleDamage",
+   "system_index": 2,
+   "particles_per_tick": 5.0,
+   "per_tick_multiplier": 0.6,
+   "burst_ticks": 4,
+   "continuous": false,
+   "speed_base": 20.0,
+   "speed_rand": 5.0,
+   "life_base": 40,
+   "life_rand": 10,
+   "size_base": 0.25,
+   "size_rand": 0.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A202C",
+   "visual_variants": 2
+  },
+  {
+   "id": 26,
+   "name": "SOURCE_Debris2",
+   "system": "StructureDamage",
+   "system_index": 3,
+   "particles_per_tick": 10.0,
+   "per_tick_multiplier": 0.6,
+   "burst_ticks": 4,
+   "continuous": false,
+   "speed_base": 20.0,
+   "speed_rand": 5.0,
+   "life_base": 40,
+   "life_rand": 10,
+   "size_base": 0.25,
+   "size_rand": 0.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A202C",
+   "visual_variants": 2
+  },
+  {
+   "id": 27,
+   "name": "SOURCE_Sparks",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 10.5,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 1,
+   "continuous": false,
+   "speed_base": 10.0,
+   "speed_rand": 5.0,
+   "life_base": 7,
+   "life_rand": 3,
+   "size_base": 13.5,
+   "size_rand": 5.9,
+   "angle_a_min": -1.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": -1.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A226C",
+   "visual_variants": 1
+  },
+  {
+   "id": 28,
+   "name": "SOURCE_Dirt",
+   "system": "Intensity",
+   "system_index": 0,
+   "particles_per_tick": 7.1,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 4,
+   "continuous": false,
+   "speed_base": 20.000099,
+   "speed_rand": 9.1,
+   "life_base": 6,
+   "life_rand": 3,
+   "size_base": 20.0,
+   "size_rand": 6.6,
+   "angle_a_min": -1.0,
+   "angle_a_max": 1.0,
+   "angle_b_min": -1.0,
+   "angle_b_max": 1.0,
+   "visual_ram": "0x800A22EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 29,
+   "name": "SOURCE_Shock",
+   "system": "Shock",
+   "system_index": 4,
+   "particles_per_tick": 1.0,
+   "per_tick_multiplier": 0.0,
+   "burst_ticks": 1,
+   "continuous": false,
+   "speed_base": 10.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 65.399498,
+   "size_rand": 10.0,
+   "angle_a_min": 0.0,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A236C",
+   "visual_variants": 1
+  },
+  {
+   "id": 30,
+   "name": "SOURCE_Burn_Fire",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 1.2,
+   "per_tick_multiplier": 1.02,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 3.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 7.826155,
+   "size_rand": -2.07965,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A23EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 31,
+   "name": "SOURCE_Burn_Smoke",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.04,
+   "burst_ticks": 20,
+   "continuous": false,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 39.199902,
+   "size_rand": 3.4,
+   "angle_a_min": -0.65,
+   "angle_a_max": 0.4,
+   "angle_b_min": -0.4,
+   "angle_b_max": 0.35,
+   "visual_ram": "0x800A246C",
+   "visual_variants": 1
+  },
+  {
+   "id": 32,
+   "name": "SOURCE_Ion_Spark",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 20.4,
+   "per_tick_multiplier": 1.14,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 49.999802,
+   "speed_rand": 80.699303,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A24EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 33,
+   "name": "SOURCE_Burn_L",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 10.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 1,
+   "size_base": 30.0,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A256C",
+   "visual_variants": 1
+  },
+  {
+   "id": 34,
+   "name": "SOURCE_Burn_M",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 4.698749,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 10.0,
+   "speed_rand": 1.35475,
+   "life_base": 10,
+   "life_rand": 1,
+   "size_base": 5.292253,
+   "size_rand": 0.369751,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A25EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 35,
+   "name": "SOURCE_Burn_S",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 2.402,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 10.0,
+   "speed_rand": 5.0,
+   "life_base": 8,
+   "life_rand": 0,
+   "size_base": 14.23125,
+   "size_rand": 5.2325,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A266C",
+   "visual_variants": 1
+  },
+  {
+   "id": 36,
+   "name": "SOURCE_Flame_Spout",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 1.95,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 18.604752,
+   "speed_rand": 0.861751,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 26.721251,
+   "size_rand": 7.282501,
+   "angle_a_min": -0.003,
+   "angle_a_max": 0.006,
+   "angle_b_min": -0.001,
+   "angle_b_max": -0.001,
+   "visual_ram": "0x800A26EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 37,
+   "name": "SOURCE_Napalm_S",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 1.665,
+   "per_tick_multiplier": 1.02,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 3.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 2.627425,
+   "size_rand": 1.7371,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A286C",
+   "visual_variants": 1
+  },
+  {
+   "id": 38,
+   "name": "SOURCE_Napalm_M",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 2.2,
+   "per_tick_multiplier": 1.02,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 3.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 6.113922,
+   "size_rand": 6.59585,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A286C",
+   "visual_variants": 1
+  },
+  {
+   "id": 39,
+   "name": "SOURCE_Napalm_L",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 2.4,
+   "per_tick_multiplier": 1.02,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 3.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 74.099403,
+   "size_rand": 30.3001,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A286C",
+   "visual_variants": 1
+  },
+  {
+   "id": 40,
+   "name": "SOURCE_Fire_S",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 2.2322,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 4.499996,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A28EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 41,
+   "name": "SOURCE_Fire_M",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 2.17,
+   "per_tick_multiplier": 0.04,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 8.999996,
+   "speed_rand": 1.48,
+   "life_base": 10,
+   "life_rand": 2,
+   "size_base": 30.0,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A296C",
+   "visual_variants": 1
+  },
+  {
+   "id": 42,
+   "name": "SOURCE_Fire_L",
+   "system": "Burn_Fire",
+   "system_index": 5,
+   "particles_per_tick": 1.925749,
+   "per_tick_multiplier": 0.1,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 4.008001,
+   "speed_rand": 1.763999,
+   "life_base": 20,
+   "life_rand": 0,
+   "size_base": 24.088249,
+   "size_rand": 2.482251,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A29EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 43,
+   "name": "SOURCE_Smoke_L",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.1,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 14.699945,
+   "size_rand": 3.4,
+   "angle_a_min": -0.65,
+   "angle_a_max": 0.4,
+   "angle_b_min": -0.4,
+   "angle_b_max": 0.35,
+   "visual_ram": "0x800A246C",
+   "visual_variants": 1
+  },
+  {
+   "id": 44,
+   "name": "SOURCE_Smoke_M",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.1,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 9.399925,
+   "size_rand": 3.4,
+   "angle_a_min": -0.65,
+   "angle_a_max": 0.4,
+   "angle_b_min": -0.4,
+   "angle_b_max": 0.35,
+   "visual_ram": "0x800A246C",
+   "visual_variants": 1
+  },
+  {
+   "id": 45,
+   "name": "SOURCE_Smokey",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.1,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 2.29992,
+   "size_rand": 3.4,
+   "angle_a_min": -0.65,
+   "angle_a_max": 0.4,
+   "angle_b_min": -0.4,
+   "angle_b_max": 0.35,
+   "visual_ram": "0x800A246C",
+   "visual_variants": 1
+  },
+  {
+   "id": 46,
+   "name": "SOURCE_Smoke_Burn_L",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.1,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 37.545757,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 165.517227,
+   "size_rand": 3.4,
+   "angle_a_min": -0.065,
+   "angle_a_max": 0.04,
+   "angle_b_min": -0.11,
+   "angle_b_max": 0.17,
+   "visual_ram": "0x800A2BEC",
+   "visual_variants": 1
+  },
+  {
+   "id": 47,
+   "name": "SOURCE_Smoke_Burn_M",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.1,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 9.399925,
+   "size_rand": 3.4,
+   "angle_a_min": -0.65,
+   "angle_a_max": 0.4,
+   "angle_b_min": -0.4,
+   "angle_b_max": 0.35,
+   "visual_ram": "0x800A2C6C",
+   "visual_variants": 1
+  },
+  {
+   "id": 48,
+   "name": "SOURCE_Smoke_Burn_S",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.1,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 2.29992,
+   "size_rand": 3.4,
+   "angle_a_min": -0.65,
+   "angle_a_max": 0.4,
+   "angle_b_min": -0.4,
+   "angle_b_max": 0.35,
+   "visual_ram": "0x800A2CEC",
+   "visual_variants": 1
+  },
+  {
+   "id": 49,
+   "name": "SOURCE_Smoke_Spout",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.875749,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 9.270507,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 57.735996,
+   "size_rand": 10.0,
+   "angle_a_min": -0.112725,
+   "angle_a_max": 0.198125,
+   "angle_b_min": -0.197225,
+   "angle_b_max": 0.21825,
+   "visual_ram": "0x800A2D6C",
+   "visual_variants": 1
+  },
+  {
+   "id": 50,
+   "name": "SOURCE_Napalm_Smoke_S",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.04,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 39.199902,
+   "size_rand": 3.4,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A2EEC",
+   "visual_variants": 1
+  },
+  {
+   "id": 51,
+   "name": "SOURCE_Napalm_Smoke_M",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.04,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 39.199902,
+   "size_rand": 3.4,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A2EEC",
+   "visual_variants": 1
+  },
+  {
+   "id": 52,
+   "name": "SOURCE_Napalm_Smoke_L",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 1.6,
+   "per_tick_multiplier": 1.04,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 12.5,
+   "speed_rand": 3.4,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 189.376862,
+   "size_rand": 3.4,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A2EEC",
+   "visual_variants": 1
+  },
+  {
+   "id": 53,
+   "name": "SOURCE_Explode_S",
+   "system": "FireBall",
+   "system_index": 1,
+   "particles_per_tick": 2.000004,
+   "per_tick_multiplier": 1.01,
+   "burst_ticks": 3,
+   "continuous": false,
+   "speed_base": 10.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A2F6C",
+   "visual_variants": 1
+  },
+  {
+   "id": 54,
+   "name": "SOURCE_Explode_M",
+   "system": "FireBall",
+   "system_index": 1,
+   "particles_per_tick": 2.000004,
+   "per_tick_multiplier": 1.01,
+   "burst_ticks": 3,
+   "continuous": false,
+   "speed_base": 10.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A2FEC",
+   "visual_variants": 1
+  },
+  {
+   "id": 55,
+   "name": "SOURCE_Explode_L",
+   "system": "FireBall",
+   "system_index": 1,
+   "particles_per_tick": 2.000004,
+   "per_tick_multiplier": 1.24,
+   "burst_ticks": 3,
+   "continuous": false,
+   "speed_base": 26.300062,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.600002,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A306C",
+   "visual_variants": 1
+  },
+  {
+   "id": 56,
+   "name": "SOURCE_Explode_Debris",
+   "system": "Burn_Smoke",
+   "system_index": 6,
+   "particles_per_tick": 6.0,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 2,
+   "continuous": false,
+   "speed_base": 10.0,
+   "speed_rand": 5.0,
+   "life_base": 10,
+   "life_rand": 5,
+   "size_base": 30.0,
+   "size_rand": 10.0,
+   "angle_a_min": -0.5,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.5,
+   "angle_b_max": 0.5,
+   "visual_ram": "0x800A30EC",
+   "visual_variants": 1
+  },
+  {
+   "id": 57,
+   "name": "SOURCE_Lightning_1",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 9.200003,
+   "per_tick_multiplier": 1.699999,
+   "burst_ticks": 6,
+   "continuous": false,
+   "speed_base": 5.4,
+   "speed_rand": 5.0,
+   "life_base": 16,
+   "life_rand": 5,
+   "size_base": 24.499979,
+   "size_rand": 10.0,
+   "angle_a_min": -1.049999,
+   "angle_a_max": 1.459999,
+   "angle_b_min": -0.45,
+   "angle_b_max": 0.43,
+   "visual_ram": "0x800A316C",
+   "visual_variants": 1
+  },
+  {
+   "id": 58,
+   "name": "SOURCE_Lightning_2",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 9.200003,
+   "per_tick_multiplier": 1.699999,
+   "burst_ticks": 6,
+   "continuous": false,
+   "speed_base": 5.4,
+   "speed_rand": 5.0,
+   "life_base": 16,
+   "life_rand": 5,
+   "size_base": 24.499979,
+   "size_rand": 10.0,
+   "angle_a_min": -1.049999,
+   "angle_a_max": 1.459999,
+   "angle_b_min": -0.45,
+   "angle_b_max": 0.43,
+   "visual_ram": "0x800A316C",
+   "visual_variants": 1
+  },
+  {
+   "id": 59,
+   "name": "SOURCE_Lightning_3",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 9.200003,
+   "per_tick_multiplier": 1.699999,
+   "burst_ticks": 6,
+   "continuous": false,
+   "speed_base": 5.4,
+   "speed_rand": 5.0,
+   "life_base": 16,
+   "life_rand": 5,
+   "size_base": 24.499979,
+   "size_rand": 10.0,
+   "angle_a_min": -1.049999,
+   "angle_a_max": 1.459999,
+   "angle_b_min": -0.45,
+   "angle_b_max": 0.43,
+   "visual_ram": "0x800A316C",
+   "visual_variants": 1
+  },
+  {
+   "id": 60,
+   "name": "SOURCE_Lightning_4",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 9.200003,
+   "per_tick_multiplier": 1.699999,
+   "burst_ticks": 6,
+   "continuous": false,
+   "speed_base": 5.4,
+   "speed_rand": 5.0,
+   "life_base": 16,
+   "life_rand": 5,
+   "size_base": 24.499979,
+   "size_rand": 10.0,
+   "angle_a_min": -1.049999,
+   "angle_a_max": 1.459999,
+   "angle_b_min": -0.45,
+   "angle_b_max": 0.43,
+   "visual_ram": "0x800A316C",
+   "visual_variants": 1
+  },
+  {
+   "id": 61,
+   "name": "SOURCE_Lightning_5",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 9.200003,
+   "per_tick_multiplier": 1.699999,
+   "burst_ticks": 6,
+   "continuous": false,
+   "speed_base": 5.4,
+   "speed_rand": 5.0,
+   "life_base": 16,
+   "life_rand": 5,
+   "size_base": 24.499979,
+   "size_rand": 10.0,
+   "angle_a_min": -1.049999,
+   "angle_a_max": 1.459999,
+   "angle_b_min": -0.45,
+   "angle_b_max": 0.43,
+   "visual_ram": "0x800A316C",
+   "visual_variants": 1
+  },
+  {
+   "id": 62,
+   "name": "SOURCE_Lightning_6",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 9.200003,
+   "per_tick_multiplier": 1.699999,
+   "burst_ticks": 6,
+   "continuous": false,
+   "speed_base": 5.4,
+   "speed_rand": 5.0,
+   "life_base": 16,
+   "life_rand": 5,
+   "size_base": 24.499979,
+   "size_rand": 10.0,
+   "angle_a_min": -1.049999,
+   "angle_a_max": 1.459999,
+   "angle_b_min": -0.45,
+   "angle_b_max": 0.43,
+   "visual_ram": "0x800A316C",
+   "visual_variants": 1
+  },
+  {
+   "id": 63,
+   "name": "SOURCE_Lightning_7",
+   "system": "Ion_Spark",
+   "system_index": 7,
+   "particles_per_tick": 9.200003,
+   "per_tick_multiplier": 1.699999,
+   "burst_ticks": 6,
+   "continuous": false,
+   "speed_base": 5.4,
+   "speed_rand": 5.0,
+   "life_base": 16,
+   "life_rand": 5,
+   "size_base": 24.499979,
+   "size_rand": 10.0,
+   "angle_a_min": -1.049999,
+   "angle_a_max": 1.459999,
+   "angle_b_min": -0.45,
+   "angle_b_max": 0.43,
+   "visual_ram": "0x800A316C",
+   "visual_variants": 1
+  },
+  {
+   "id": 64,
+   "name": "SOURCE_LandingSmoke",
+   "system": "FireBall",
+   "system_index": 1,
+   "particles_per_tick": 2.75575,
+   "per_tick_multiplier": 0.8,
+   "burst_ticks": 0,
+   "continuous": true,
+   "speed_base": 10.7,
+   "speed_rand": 1.456001,
+   "life_base": 16,
+   "life_rand": 3,
+   "size_base": 64.869507,
+   "size_rand": 10.0,
+   "angle_a_min": -0.2,
+   "angle_a_max": 0.5,
+   "angle_b_min": -0.01,
+   "angle_b_max": -0.61,
+   "visual_ram": "0x800A34EC",
+   "visual_variants": 1
+  }
+ ],
+ "visuals": {
+  "0x800A202C": {
+   "rom": "0xA2C2C",
+   "records": [
+    {
+     "y_accel_per_tick": -2.0,
+     "f24": 0.0,
+     "damping": 0.7,
+     "f2C": -0.005,
+     "raw_30": "1410FFC5 6A000000 00000000 00000000"
+    },
+    {
+     "y_accel_per_tick": -2.0,
+     "f24": 0.0,
+     "damping": 0.7,
+     "f2C": -0.005,
+     "raw_30": "1410FFFF FFFF0000 00000100 00000000"
+    }
+   ]
+  },
+  "0x800A20EC": {
+   "rom": "0xA2CEC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 0.0,
+     "raw_30": "1410FF96 96960000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A21EC": {
+   "rom": "0xA2DEC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 2.0,
+     "raw_30": "1E10FFFF 7F660000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A226C": {
+   "rom": "0xA2E6C",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 0.1,
+     "raw_30": "1E104E2B CAFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A22EC": {
+   "rom": "0xA2EEC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 2.0,
+     "raw_30": "1E10FFFF 46000000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A236C": {
+   "rom": "0xA2F6C",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 14.2,
+     "raw_30": "1E10A4FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A23EC": {
+   "rom": "0xA2FEC",
+   "records": [
+    {
+     "y_accel_per_tick": 1.819999,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 8.799997,
+     "raw_30": "1E3288FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A246C": {
+   "rom": "0xA306C",
+   "records": [
+    {
+     "y_accel_per_tick": 2.01,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 15.700024,
+     "raw_30": "1E108CFF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A24EC": {
+   "rom": "0xA30EC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 2.0,
+     "raw_30": "1E10FF00 00000000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A256C": {
+   "rom": "0xA316C",
+   "records": [
+    {
+     "y_accel_per_tick": 1.819999,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 8.799997,
+     "raw_30": "1E3288FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A25EC": {
+   "rom": "0xA31EC",
+   "records": [
+    {
+     "y_accel_per_tick": 1.819999,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 6.070767,
+     "raw_30": "1E3288FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A266C": {
+   "rom": "0xA326C",
+   "records": [
+    {
+     "y_accel_per_tick": 1.819999,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 3.537393,
+     "raw_30": "1E3288FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A26EC": {
+   "rom": "0xA32EC",
+   "records": [
+    {
+     "y_accel_per_tick": 1.52585,
+     "f24": -0.9789,
+     "damping": 1.0,
+     "f2C": 2.0,
+     "raw_30": "1E30FFFF ADD50000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A286C": {
+   "rom": "0xA346C",
+   "records": [
+    {
+     "y_accel_per_tick": 1.10999,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 20.5,
+     "raw_30": "1E1088FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A28EC": {
+   "rom": "0xA34EC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.3,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 5.099998,
+     "raw_30": "1E2088FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A296C": {
+   "rom": "0xA356C",
+   "records": [
+    {
+     "y_accel_per_tick": 0.86,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 5.999997,
+     "raw_30": "1E3288FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A29EC": {
+   "rom": "0xA35EC",
+   "records": [
+    {
+     "y_accel_per_tick": 1.819999,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 5.429595,
+     "raw_30": "1E3288FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A2BEC": {
+   "rom": "0xA37EC",
+   "records": [
+    {
+     "y_accel_per_tick": 2.01,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 21.000044,
+     "raw_30": "1E108CFF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A2C6C": {
+   "rom": "0xA386C",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 20.300039,
+     "raw_30": "1E10B6FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A2CEC": {
+   "rom": "0xA38EC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 10.00002,
+     "raw_30": "1E10B6FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A2D6C": {
+   "rom": "0xA396C",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 2.0,
+     "raw_30": "1E10FF00 00000000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A2EEC": {
+   "rom": "0xA3AEC",
+   "records": [
+    {
+     "y_accel_per_tick": 2.009999,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 26.30064,
+     "raw_30": "1E108CFF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A2F6C": {
+   "rom": "0xA3B6C",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 8.899998,
+     "raw_30": "1E10D1FF C7650000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A2FEC": {
+   "rom": "0xA3BEC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 24.500057,
+     "raw_30": "1E10D1FF C7650000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A306C": {
+   "rom": "0xA3C6C",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 30.000076,
+     "raw_30": "3610D1FF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A30EC": {
+   "rom": "0xA3CEC",
+   "records": [
+    {
+     "y_accel_per_tick": 0.4,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 2.0,
+     "raw_30": "1E10FF00 00000000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A316C": {
+   "rom": "0xA3D6C",
+   "records": [
+    {
+     "y_accel_per_tick": 2.15998,
+     "f24": 0.0,
+     "damping": 1.0,
+     "f2C": 2.0,
+     "raw_30": "1E04FFFF FFFF0000 0000FF00 00000000"
+    }
+   ]
+  },
+  "0x800A34EC": {
+   "rom": "0xA40EC",
+   "records": [
+    {
+     "y_accel_per_tick": 1.94,
+     "f24": 1.23,
+     "damping": 1.0,
+     "f2C": 3.373189,
+     "raw_30": "1E21FF3C C1020000 0000FF00 00000000"
+    }
+   ]
+  }
+ },
+ "anims": [
+  {
+   "index": 0,
+   "anim": "ANIM_FBALL1",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 1,
+   "anim": "ANIM_GRENADE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Dirt",
+     "source_id": 28,
+     "fire_stage": 2,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Explode_S",
+     "source_id": 53,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "anim": "ANIM_FRAG1",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Debris",
+     "source_id": 25,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Fire_S",
+     "source_id": 40,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Sam_S",
+     "source_id": 5,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Explode_L",
+     "source_id": 55,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "anim": "ANIM_FRAG2",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Debris",
+     "source_id": 25,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Burn_Fire",
+     "source_id": 30,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Burn_Smoke",
+     "source_id": 31,
+     "fire_stage": 1,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Explode_M",
+     "source_id": 54,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "anim": "ANIM_FRAG3",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Debris2",
+     "source_id": 26,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Burn_Fire",
+     "source_id": 30,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Burn_Smoke",
+     "source_id": 31,
+     "fire_stage": 1,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Explode_M",
+     "source_id": 54,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 5,
+   "anim": "ANIM_VEH_HIT1",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Explode_S",
+     "source_id": 53,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Dirt",
+     "source_id": 28,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Sparks",
+     "source_id": 27,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 6,
+   "anim": "ANIM_VEH_HIT2",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Dirt",
+     "source_id": 28,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Explode_M",
+     "source_id": 54,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Sam_N",
+     "source_id": 1,
+     "fire_stage": 2,
+     "offset": [
+      0,
+      -10,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 7,
+   "anim": "ANIM_VEH_HIT3",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Explode_M",
+     "source_id": 54,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Dirt",
+     "source_id": 28,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 8,
+   "anim": "ANIM_ART_EXP1",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Explode_M",
+     "source_id": 54,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Sam_N",
+     "source_id": 1,
+     "fire_stage": 3,
+     "offset": [
+      0,
+      52,
+      -67
+     ]
+    },
+    {
+     "source": "SOURCE_Dirt",
+     "source_id": 28,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Explode_S",
+     "source_id": 53,
+     "fire_stage": 2,
+     "offset": [
+      56,
+      163,
+      169
+     ]
+    }
+   ]
+  },
+  {
+   "index": 9,
+   "anim": "ANIM_NAPALM1",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Napalm_S",
+     "source_id": 37,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Napalm_Smoke_S",
+     "source_id": 50,
+     "fire_stage": 1,
+     "offset": [
+      -8,
+      165,
+      -23
+     ]
+    }
+   ]
+  },
+  {
+   "index": 10,
+   "anim": "ANIM_NAPALM2",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Napalm_M",
+     "source_id": 38,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Napalm_Smoke_M",
+     "source_id": 51,
+     "fire_stage": 1,
+     "offset": [
+      -8,
+      165,
+      -58
+     ]
+    }
+   ]
+  },
+  {
+   "index": 11,
+   "anim": "ANIM_NAPALM3",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Napalm_L",
+     "source_id": 39,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Napalm_Smoke_L",
+     "source_id": 52,
+     "fire_stage": 1,
+     "offset": [
+      -8,
+      165,
+      -207
+     ]
+    }
+   ]
+  },
+  {
+   "index": 12,
+   "anim": "ANIM_SMOKE_PUFF",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_S",
+     "source_id": 5,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 13,
+   "anim": "ANIM_PIFF",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_E",
+     "source_id": 11,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 14,
+   "anim": "ANIM_PIFFPIFF",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_E",
+     "source_id": 11,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Gun_SE",
+     "source_id": 12,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 15,
+   "anim": "ANIM_FLAME_N",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_N",
+     "source_id": 17,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 16,
+   "anim": "ANIM_FLAME_NE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_NE",
+     "source_id": 18,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 17,
+   "anim": "ANIM_FLAME_E",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_E",
+     "source_id": 19,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 18,
+   "anim": "ANIM_FLAME_SE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_SE",
+     "source_id": 20,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 19,
+   "anim": "ANIM_FLAME_S",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_S",
+     "source_id": 21,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 20,
+   "anim": "ANIM_FLAME_SW",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_SW",
+     "source_id": 22,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 21,
+   "anim": "ANIM_FLAME_W",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_W",
+     "source_id": 23,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 22,
+   "anim": "ANIM_FLAME_NW",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Flame_NW",
+     "source_id": 24,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 23,
+   "anim": "ANIM_FIRE_SMALL",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_S",
+     "source_id": 40,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_M",
+     "source_id": 44,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 24,
+   "anim": "ANIM_FIRE_MED",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_M",
+     "source_id": 41,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_M",
+     "source_id": 44,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 25,
+   "anim": "ANIM_FIRE_MED2",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_M",
+     "source_id": 41,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_M",
+     "source_id": 47,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Burn_Smoke",
+     "source_id": 31,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 26,
+   "anim": "ANIM_FIRE_TINY",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_S",
+     "source_id": 40,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_S",
+     "source_id": 48,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 27,
+   "anim": "ANIM_MUZZLE_FLASH",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 28,
+   "anim": "ANIM_SMOKE_M",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 29,
+   "anim": "ANIM_BURN_SMALL",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_S",
+     "source_id": 40,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_S",
+     "source_id": 48,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 30,
+   "anim": "ANIM_BURN_MED",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_M",
+     "source_id": 41,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_M",
+     "source_id": 47,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 31,
+   "anim": "ANIM_BURN_BIG",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_L",
+     "source_id": 46,
+     "fire_stage": 3,
+     "offset": [
+      0,
+      152,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Burn_Fire",
+     "source_id": 30,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Burn_Smoke",
+     "source_id": 31,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 32,
+   "anim": "ANIM_ON_FIRE_SMALL",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_S",
+     "source_id": 40,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_S",
+     "source_id": 48,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 33,
+   "anim": "ANIM_ON_FIRE_MED",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_M",
+     "source_id": 41,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_M",
+     "source_id": 47,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 34,
+   "anim": "ANIM_ON_FIRE_BIG",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Smoke_Burn_L",
+     "source_id": 46,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 35,
+   "anim": "ANIM_SAM_N",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_N",
+     "source_id": 1,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 36,
+   "anim": "ANIM_SAM_NE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_NE",
+     "source_id": 2,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 37,
+   "anim": "ANIM_SAM_E",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_E",
+     "source_id": 3,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 38,
+   "anim": "ANIM_SAM_SE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_SE",
+     "source_id": 4,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 39,
+   "anim": "ANIM_SAM_S",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_S",
+     "source_id": 5,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 40,
+   "anim": "ANIM_SAM_SW",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_SW",
+     "source_id": 6,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 41,
+   "anim": "ANIM_SAM_W",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_W",
+     "source_id": 7,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 42,
+   "anim": "ANIM_SAM_NW",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Sam_NW",
+     "source_id": 8,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 43,
+   "anim": "ANIM_GUN_N",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_N",
+     "source_id": 9,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 44,
+   "anim": "ANIM_GUN_NE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_NE",
+     "source_id": 10,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 45,
+   "anim": "ANIM_GUN_E",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_E",
+     "source_id": 11,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 46,
+   "anim": "ANIM_GUN_SE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_SE",
+     "source_id": 12,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 47,
+   "anim": "ANIM_GUN_S",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_S",
+     "source_id": 13,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 48,
+   "anim": "ANIM_GUN_SW",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_SW",
+     "source_id": 14,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 49,
+   "anim": "ANIM_GUN_W",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_W",
+     "source_id": 15,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 50,
+   "anim": "ANIM_GUN_NW",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_Gun_NW",
+     "source_id": 16,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 51,
+   "anim": "ANIM_LZ_SMOKE",
+   "slot_capacity": 4,
+   "sources": [
+    {
+     "source": "SOURCE_LandingSmoke",
+     "source_id": 64,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "source": "SOURCE_Dirt",
+     "source_id": 28,
+     "fire_stage": 0,
+     "offset": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "index": 52,
+   "anim": "ANIM_ION_CANNON",
+   "slot_capacity": 10,
+   "sources": []
+  },
+  {
+   "index": 53,
+   "anim": "ANIM_ATOM_BLAST",
+   "slot_capacity": 10,
+   "sources": [
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 0,
+     "offset": [
+      548,
+      0,
+      279
+     ]
+    },
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 3,
+     "offset": [
+      -357,
+      0,
+      423
+     ]
+    },
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 5,
+     "offset": [
+      365,
+      0,
+      -234
+     ]
+    },
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 2,
+     "offset": [
+      -208,
+      0,
+      -345
+     ]
+    },
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 1,
+     "offset": [
+      245,
+      0,
+      455
+     ]
+    },
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 8,
+     "offset": [
+      -254,
+      0,
+      567
+     ]
+    },
+    {
+     "source": "SOURCE_Fire_L",
+     "source_id": 42,
+     "fire_stage": 9,
+     "offset": [
+      346,
+      0,
+      356
+     ]
+    }
+   ]
+  },
+  {
+   "index": 54,
+   "anim": "ANIM_CRATE_DEVIATOR",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 55,
+   "anim": "ANIM_CRATE_DOLLAR",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 56,
+   "anim": "ANIM_CRATE_EARTH",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 57,
+   "anim": "ANIM_CRATE_EMPULSE",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 58,
+   "anim": "ANIM_CRATE_INVUN",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 59,
+   "anim": "ANIM_CRATE_MINE",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 60,
+   "anim": "ANIM_CRATE_RAPID",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 61,
+   "anim": "ANIM_CRATE_STEALTH",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 62,
+   "anim": "ANIM_CRATE_MISSILE",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 63,
+   "anim": "ANIM_ATOM_DOOR",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 64,
+   "anim": "ANIM_MOVE_FLASH",
+   "slot_capacity": 4,
+   "sources": []
+  },
+  {
+   "index": 65,
+   "anim": "ANIM_OILFIELD_BURN",
+   "slot_capacity": 4,
+   "sources": []
+  }
+ ]
+}

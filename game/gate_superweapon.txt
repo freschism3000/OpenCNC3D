@@ -1,0 +1,49 @@
+# THE SUPERWEAPONS (v0.5.9): Airstrike, Ion Cannon and Nuclear Strike.
+#
+# TWO SEPARATE BREAKS, and this gate has an arm for each, because fixing one and not the
+# other leaves an icon that is visible and dead, or one that works and is invisible.
+#
+#   1. THE NAME COLLISION. The Remaster DLL names the specials by its own asset strings,
+#      "SW_Ion" / "SW_Nuke" / "SW_AirStrike" (dllinterface.cpp:4183-4199). Every cameo
+#      pack here is keyed by the 1995 stems, which sidebar.cpp:1146 gives in one line:
+#      {"ION", "ATOM", "BOMB"}. The art was never missing; the lookup asked for a name
+#      nothing is filed under, so all three drew an empty cell.
+#
+#   2. THE DEAD ICON. A click on a special went out as a CONSTRUCTION request, which the
+#      engine has nothing to do with. Every branch after `spc = buildable_id` was guarded
+#      by `if (spc == 0 && choice)` and there was no `else if (spc)` anywhere, so nothing
+#      fired. CNC_Handle_SuperWeapon_Request is present in the shipped brain and was
+#      referenced NOWHERE under game/ until now.
+#
+# SCB70EA is the scenario because the Brotherhood there owns both a Temple of Nod and the
+# airstrip prerequisite: the sidebar carries SW_Nuke (charging) AND SW_AirStrike (READY)
+# at tick 120, which is the one thing this gate cannot synthesise.
+#
+# THE ASSERTION THAT MATTERS IS THE LAST ONE. Sending the request proves nothing: the
+# renderer can post an event the engine drops on the floor and print a happy line about
+# it. The proof is that the ENGINE spent the weapon, i.e. the sidebar entry goes from
+# completed=1/progress=1.00 to constructing=1/progress=0.00 on its own.
+
+tick 120
+cam 30 40
+
+# ---- arm 1: both specials are listed, under the 1995 art stems ---------------------
+sbdump
+
+# ---- arm 2: clicking a READY special arms targeting rather than ordering a build ----
+sbclickitem SW_AirStrike
+sbdump
+
+# ---- arm 3: the right button disarms, and fires nothing -----------------------------
+cancel
+sbdump
+
+# ---- arm 4: re-arm, then a map click launches it ------------------------------------
+sbclickitem SW_AirStrike
+actclick 640 400
+
+# ---- arm 5: THE ENGINE SPENT IT. Recharging, not ready. -----------------------------
+tick 30
+sbdump
+tick 2
+shot shots/superweapon_01.png

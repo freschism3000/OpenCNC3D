@@ -1,0 +1,40 @@
+# SCG01EC: prove the 1995 construction animation, forwards on a placed NUKE and
+# REVERSED on a sold PYLE. The BUILDUP| lines are the frame-by-frame proof (printed
+# by dosmake_draw_card on every frame change); the shots are the pixel proof.
+tick 2
+sidebar BOOT
+player
+# ---- 1. build a NUKE from the starting conyard, place it, photograph the scaffold
+build NUKE
+ready NUKE 4000
+startplace NUKE
+place auto
+cam 56 49
+tick 8
+echo BUILDUP-EARLY
+objdump
+shot bu1_early.png
+tick 22
+echo BUILDUP-MID
+objdump
+shot bu2_mid.png
+tick 28
+echo BUILDUP-LATE
+shot bu3_late.png
+tick 40
+echo BUILDUP-DONE
+objdump
+shot bu4_done.png
+# ---- 2. sell the PYLE: the same scaffold, played backwards by the engine's rule
+cam 53 48
+sbclick 1176 310
+lclickobj PYLE
+tick 20
+echo SELL-MID
+objdump
+shot bu5_sellmid.png
+tick 120
+echo SELL-DONE
+objdump
+shot bu6_selldone.png
+quit

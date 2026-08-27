@@ -1,0 +1,11 @@
+*.pack
+*.png
+cnc_eyes
+*.o
+*.dSYM/
+*.dylib
+content/
+*.log
+*.out
+*.err
+dosdata/

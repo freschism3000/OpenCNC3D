@@ -1,0 +1,9 @@
+tick 30
+cam 51.0 51.0
+zoom max
+shot shots/fan0.png
+tick 2
+shot shots/fan1.png
+tick 2
+shot shots/fan2.png
+quit

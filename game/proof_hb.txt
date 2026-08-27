@@ -1,0 +1,22 @@
+# Health bar proof. Player is Nod (BadGuy); GDI Hunt units walk into the guard post
+# and a firefight follows. Selected units must show a bar; damaged units must show
+# one unselected, in the engine's colour for their ratio.
+tick 30
+cam 53 17
+# a selected, full-health unit: green bar (ratio 0x100, >= 0x7F)
+lclickobj E1:BadGuy 0
+seldump
+hbdump
+shot hb_selected.png
+# let the battle happen
+tick 220
+hbdump
+shot hb_fight1.png
+tick 150
+hbdump
+obj E1:BadGuy 0
+obj E1:BadGuy 1
+obj E1:GoodGuy 0
+shot hb_fight2.png
+shroudstat
+quit

@@ -1,0 +1,10 @@
+# THE BUILDING PAD. A building is a flat model at one ground height, so on sloping
+# ground its uphill edge sinks under the terrain. The test map stands the GDI base on
+# the beach ramp (corner heights 125/113/101/90 across the Construction Yard's three
+# cells), which buried the whole north-west quarter of the yard's concrete apron and
+# left the fan deck reading as a box floating on grass. This shot frames that quarter.
+tick 60
+cam 54 51
+dist 2900
+shot shots/pad.png
+quit

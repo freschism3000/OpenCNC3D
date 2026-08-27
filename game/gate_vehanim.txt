@@ -1,0 +1,39 @@
+# G82. A VEHICLE THAT IS NOT MOVING MUST NOT BE ANIMATING.
+#
+# SCB13EC at 2560x1440, N64 camera at maximum magnification. Two engine ticks, 180 and
+# 200, chosen because the subjects hold one cell and one facing across the whole window
+# and because the frames are 20 apart, which is half of the 41-frame loop the cartridge
+# baked onto the APC hull plate and the harvester arms. Three subjects, three cameras,
+# one picture each per tick.
+#
+# APC id 9 sits on Guard at cell 7,60 and never moves in this mission.
+# HARV id 29 holds cell 40,55 and facing 32 from engine frame 160 to 230.
+# PYLE id 43 is the control: a building whose clip IS driven, so it must keep animating.
+#
+# The obj and drawpos lines before each picture are the gate's own trap. If a subject
+# turned or rolled between the two ticks, the pictures differ for a reason that has
+# nothing to do with an animation clip and the assertions mean nothing.
+tick 180
+zoom max
+obj APC 0
+obj HARV 1
+drawpos APC 0
+drawpos HARV 1
+cam 8 61
+shot shots/g82_apc_a.png
+cam 40 56
+shot shots/g82_harv_a.png
+cam 36 4
+shot shots/g82_pyle_a.png
+tick 20
+obj APC 0
+obj HARV 1
+drawpos APC 0
+drawpos HARV 1
+cam 8 61
+shot shots/g82_apc_b.png
+cam 40 56
+shot shots/g82_harv_b.png
+cam 36 4
+shot shots/g82_pyle_b.png
+quit

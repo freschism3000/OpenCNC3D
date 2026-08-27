@@ -1,0 +1,15 @@
+# NOTHING HERE IS IGNORED ANY MORE, except caches that are worthless by definition.
+#
+# This file used to start with a bare `*` and then try to claw source back with `!*.py`.
+# That does not work, and it silently cost us 77 authored files: git will not re-include
+# a file if one of its PARENT DIRECTORIES is excluded, so `!*.py` only ever applied at
+# the top level of this directory and every hud.py, slice_ref.py and LAYOUT.md living in
+# a subdirectory was invisible to git. Only 16 of this tree's files were tracked.
+#
+# Checkouts share this repo through GitHub, so anything not committed does not
+# exist in the others. The original reference art is in here and is not reproducible
+# from anything; the derived slices are, but they are small and telling them apart by
+# eye is exactly the judgement call that loses work.
+__pycache__/
+*.pyc
+.DS_Store

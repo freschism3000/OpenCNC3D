@@ -1,0 +1,402 @@
+{
+ "bytes": 1058026,
+ "clock_translucent_table": {
+  "control": "TLucentType {GREEN=3, LTGREY=14, Fading=180, Frac=0}",
+  "layout": "u8 ghost_lookup[256] (0xFF=opaque) then u8 fade[256]",
+  "source": "sidebar.cpp:1307 + jshell.cpp:318 + fading.cpp:14"
+ },
+ "fonts": {
+  "6POINT": {
+   "cell": [
+    8,
+    8
+   ],
+   "nchars": 226
+  },
+  "8POINT": {
+   "cell": [
+    10,
+    11
+   ],
+   "nchars": 226
+  },
+  "GRAD6FNT": {
+   "cell": [
+    8,
+    8
+   ],
+   "nchars": 226
+  }
+ },
+ "known_blank_cameos": [
+  "PUMP",
+  "ROAD"
+ ],
+ "magic": "DOSBAR01",
+ "pack": "dossidebar.pack",
+ "palette": "TEMPERAT.PAL",
+ "palette_widening": "v << 2 (video_ddraw.cpp:910); NOT (v<<2)|(v>>4)",
+ "shapes": {
+  "A10": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "AFLD": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "APC": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "ARCO": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "ARTY": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "ATOM": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "ATWR": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "BARB": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "BGGY": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "BIKE": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "BIO": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "BOAT": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "BOMB": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "BRIK": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "C17": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "CLOCK": {
+   "frames": 109,
+   "h": 24,
+   "w": 32
+  },
+  "CYCL": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "E1": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "E2": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "E3": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "E4": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "E5": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "E6": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "EYE": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "FACT": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "FIX": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "FTNK": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "GTWR": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "GUN": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "HAND": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "HARV": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "HELI": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "HOSP": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "HPAD": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "HQ": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "HTNK": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "ION": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "JEEP": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "LST": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "LTNK": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "MCV": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "MHQ": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "MLRS": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "MOUSE": {
+   "frames": 178,
+   "h": 24,
+   "w": 30
+  },
+  "MSAM": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "MTNK": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "NUK2": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "NUKE": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "OBLI": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "OPTIONS": {
+   "frames": 32,
+   "h": 79,
+   "w": 103
+  },
+  "ORCA": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "PIPS": {
+   "frames": 8,
+   "h": 6,
+   "w": 34
+  },
+  "POWER": {
+   "frames": 1,
+   "h": 3,
+   "w": 8
+  },
+  "PROC": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "PUMP": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "PYLE": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "RADARGDI": {
+   "frames": 43,
+   "h": 69,
+   "w": 80
+  },
+  "RADARNOD": {
+   "frames": 43,
+   "h": 69,
+   "w": 80
+  },
+  "RMBO": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "ROAD": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "SAM": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "SBAG": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "SILO": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "STNK": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "STRIP": {
+   "frames": 2,
+   "h": 24,
+   "w": 32
+  },
+  "STRIPDN": {
+   "frames": 2,
+   "h": 12,
+   "w": 16
+  },
+  "STRIPUP": {
+   "frames": 2,
+   "h": 12,
+   "w": 16
+  },
+  "TABS": {
+   "frames": 1,
+   "h": 7,
+   "w": 80
+  },
+  "TMPL": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "TRAN": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "WEAP": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  },
+  "WOOD": {
+   "frames": 1,
+   "h": 24,
+   "w": 32
+  }
+ },
+ "version": 1
+}

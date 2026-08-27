@@ -1,0 +1,26 @@
+# THE JUKEBOX MUST HAND THE SCORE BACK when the track a player picked ends.
+#
+# Reported: playing a track by hand in the Jukebox left the next track on the list
+# unplayed when it finished. It did not play: sounddlg.cpp:407's Play button
+# calls Queue_Song, and theme.cpp:273-283's Queue_Song only sets Pending -- the ARM that
+# turns Pending into a playing track is the playlist, and the renderer armed the playlist
+# BEFORE starting the track, so starting the track cleared it again. The score went silent
+# for the rest of the mission.
+#
+# 900 ticks is 60 seconds of sim, and the pick has to be SHORTER than that or this run
+# cannot reach an end of track at all. That is leg (1) in gates.sh, the self-check: it
+# reads the duration the audio engine prints for the picked track and FAILS with "could
+# not test" if the row this click lands on ever becomes a longer one. A gate that quietly
+# stops being able to observe the thing it guards is the failure this whole round is about.
+#
+# --theme TARGET on the command line, not here, for the same reason: the mission's own
+# opening track must be a DIFFERENT one from the pick, so "the score advanced" cannot be
+# confused with "the opening track was still playing".
+tick 10
+options
+optclick Game Controls
+optclick Sound Controls
+optclick Track List
+optclick Play
+tick 900
+quit

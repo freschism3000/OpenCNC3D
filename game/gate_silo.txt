@@ -1,0 +1,37 @@
+# THE SILO FILL STRIP (v0.5.9): a state readout, not a 6.7-second idle loop.
+#
+# WHAT WAS WRONG. texbook_mesh_for had exactly one driver for all six texture books:
+#
+#     const int k = (g_engineFrame / 2) % n;
+#
+# The silo's book is not an animation on the cartridge at all. Its 50 slots are FIVE fill
+# images, and the console's arm (RAM 0x8003E0D4) reads the owning house's Tiberium at
+# house+0xE0 and Capacity at house+0xEC and writes
+#
+#     frame = clamp(tib * 5 / cap, 0, 4) * 10
+#
+# so a player reads his silos to see how much tiberium he has. We ran the five images end
+# to end every 100 engine ticks, which means the picture was wrong four fifths of the time
+# by accident and a full silo looked exactly like an empty one.
+#
+# WHY THIS GATE IS FAST rather than harvesting a full silo for two minutes. The tell does
+# not need a fill CHANGE, it needs the strip to stop following the clock: sample the same
+# silo at three different engine frames with the tiberium unchanged, and a readout gives
+# the same slot three times while a timer gives three different ones. `clock` is printed
+# beside `state` precisely so the gate can prove the clock really did move underneath.
+#
+# THE TRAP THE REGISTER WARNED ABOUT DOES NOT APPLY, and it is worth saying why rather
+# than leaving it looking unconsidered: the warning was that driving the silo off tiberium
+# would make it "a fourth overdrawing book" and kill its damage flash. The silo's payload
+# node already has a NULL gfx pointer, so its book was ALREADY drawn as a second command
+# on top of the building. Only the chosen frame index changed here, never the draw
+# structure, so no new overdraw exists and the v0.5.8 flash fix still covers it.
+
+tick 60
+silodump
+tick 7
+silodump
+tick 7
+silodump
+tick 2
+shot shots/silo_01.png

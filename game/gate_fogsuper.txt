@@ -1,0 +1,40 @@
+# G106. A SUPERWEAPON FIRES INTO THE SHROUD.
+#
+# THE DEFECT THIS PINS. Every effect in effects_mod.h used to be culled when its cell
+# was under shroud, superweapons included. That is right for an explosion -- showing one
+# in the fog leaks where the enemy is -- and wrong for a strike the player aimed at a
+# cell on purpose. The engine never agreed with the cull in the first place:
+# HouseClass::Place_Special_Blast has no visibility test of any kind, so the charge was
+# spent and the strike really happened, and only the PICTURE was missing. From the
+# player's side that is indistinguishable from a dead button, which is how it was found:
+# "When trying to use a Superweapon on Fog of War, it doesnt work."
+#
+# WHY THE EXISTING SUPERWEAPON GATES COULD NOT SEE IT. G97 (nuke) and G98 (ion) both run
+# with --noshroud, because they were written to measure the geometry rather than the
+# targeting rules. Under --noshroud no cell is ever hidden, so the cull they were meant
+# to catch could never fire. This gate deliberately runs WITH the shroud.
+#
+# THE SHROUDAT LINE IS PART OF THE ASSERTION, not decoration. If 30,47 ever stops being
+# hidden at tick 45 of this scenario -- a changed scenario, a changed start position, a
+# changed reveal radius -- then the gate would still see its EFXION lines and pass while
+# testing nothing at all. The gate checks the cell is HIDDEN first and fails loudly if it
+# is not, so the day this stops being a fog test it says so instead of going quietly green.
+#
+# The `shot` calls are here for the reason gate_ion.txt gives at length: EFXION is emitted
+# from inside the DRAW, and `tick` advances the simulation without necessarily rendering,
+# so a script of bare ticks produces no draw and no line on a build that works perfectly.
+tick 40
+cam 30 47
+superrecharge
+tick 5
+shroudat 30 47
+sbclickitem SW_Ion
+actclick 640 400
+shot shots/g106_0.png
+tick 2
+shot shots/g106_1.png
+tick 2
+shot shots/g106_2.png
+tick 4
+shot shots/g106_3.png
+quit

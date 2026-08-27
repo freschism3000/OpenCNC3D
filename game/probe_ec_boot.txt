@@ -1,0 +1,15 @@
+# SCG01EC first look: are the pre-placed PYLE/WEAP/NUKE standing (limbo=0) and
+# does the sidebar offer infantry and vehicles in column 1?
+tick 5
+sidebar t5
+echo EC-BOOT-DUMP
+objdump
+count E1:GoodGuy
+count JEEP:GoodGuy
+count MCV
+count FACT
+count PYLE 1
+count WEAP 1
+count NUKE 1
+shot shot_ec_boot.png
+quit

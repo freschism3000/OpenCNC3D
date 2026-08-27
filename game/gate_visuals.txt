@@ -1,0 +1,14 @@
+tick 30
+options
+optclick Visuals
+optvis
+optclick Classic
+optvis
+optclick Enhanced
+optvis
+optclick Advanced...
+optclick Bloom
+optvis
+optclick Supersampling
+optvis
+quit

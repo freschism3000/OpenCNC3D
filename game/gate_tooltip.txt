@@ -1,0 +1,50 @@
+# G94. THE SIDEBAR SAYS WHAT A THING IS AND WHAT IT COSTS.
+#
+# NOT A DEVIATION. 1995 shipped exactly this and the code is still in the tree:
+# sidebar.cpp:2343 calls Map.Help_Text(choice->Full_Name(), ..., choice->Cost_Of()) and
+# help.cpp:259-285 draws two lines -- the name, then "$%d" -- on black inside a one-pixel
+# coloured rect, right-aligned flush to the LEFT of the cameo. It was dead here only
+# because this renderer draws the sidebar instead of the brain.
+#
+# THE PRICE is the brain's, already exported. THE NAME cannot be: the export carries the
+# INI ident ("MTNK"), and the readable name is behind Full_Name(), which returns a TEXT ID
+# that only Text_String() resolves against a table the DLL front end never initialises. An
+# additive export would return NULL for all 113. So the join is BAKED, by
+# game/bake_dosnames.py, out of the game's own CONQUER.ENG.
+#
+# WHY sbtip AND NOT A SCREENSHOT. The two things that can be wrong are the NAME and the
+# PRICE, and both are strings the renderer looked up. A pixel test would pass on a
+# tooltip that drew the wrong building's name in the right font.
+#
+# THE HOVER ONLY UPDATES ON A DRAW, which is why each cursor move here is followed by a
+# shot. Found while building this: the DOS sidebar path never called sb_pointer_refresh at
+# all -- only the 640 HUD did -- so g_sbHover was whatever the last 640 frame left it.
+# Nothing depended on it before the tooltip.
+tick 20
+
+# TWO PROBES, because the DOS bar and the 640 HUD have DIFFERENT GEOMETRY, different row
+# counts and different scroll state -- measured, the same Medium Tank sits at 1200,370 on
+# one and 1230,230 on the other. One coordinate cannot serve both, and a gate that used
+# one would quietly test a single HUD. The suite runs this script against both, and each
+# run is expected to match on exactly one of the two probes.
+echo G94-1 a cameo gives its name and its price
+cursor 1200 370
+shot shots/g94_0.png
+sbtip
+cursor 1230 230
+shot shots/g94_0b.png
+sbtip
+
+echo G94-2 a chrome button gives a name and NO price
+cursor 1200 300
+shot shots/g94_1.png
+sbtip
+
+echo G94-3 off the panel gives nothing at all
+cursor 400 400
+shot shots/g94_2.png
+sbtip
+
+echo G94-4 the whole name table, not one lucky lookup
+sbtipnames
+quit

@@ -1,0 +1,13 @@
+# G63 THE NEW HUD CHECKBOX ACTUALLY SWITCHES THE SIDEBAR.
+# Run WITH CNC3D_HUD=new set, because that is the configuration that broke: the shipping
+# launcher sets it, and a hard override made the player's dial inert.
+tick 30
+options
+optclick Visuals
+optclick Advanced...
+optvis
+optclick New HUD
+optvis
+optclick OK
+tick 5
+quit

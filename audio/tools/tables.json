@@ -1,0 +1,1043 @@
+{
+ "voc": [
+  {
+   "name": "BOMBIT1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "CMON1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "GOTIT1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "KEEPEM1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "LAUGH1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "LEFTY1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NOPRBLM1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "ONIT1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "RAMYELL1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "ROKROLL1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "TUFFGUY1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "YEAH1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "YES1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "YO1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "GIRLOKAY",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "GIRLYEAH",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "GUYOKAY1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "GUYYEAH1",
+   "priority": 20,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "2DANGR1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "ACKNO",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "AFFIRM1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "AWAIT1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "MOVOUT1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "NEGATV1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "NOPROB",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "READY",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "REPORT1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "RITAWAY",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "ROGER",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "UGOTIT",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "UNIT1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "VEHIC1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "YESSIR1",
+   "priority": 10,
+   "where": "IN_VAR"
+  },
+  {
+   "name": "BAZOOK1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "BLEEP2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "BOMB1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "BUTTON",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "COMCNTR1",
+   "priority": 10,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "CONSTRU2",
+   "priority": 10,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "CRUMBLE",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "FLAMER2",
+   "priority": 4,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "GUN18",
+   "priority": 4,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "GUN19",
+   "priority": 4,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "GUN20",
+   "priority": 4,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "GUN5",
+   "priority": 4,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "GUN8",
+   "priority": 4,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "GUNCLIP1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "HVYDOOR1",
+   "priority": 5,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "HVYGUN10",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "ION1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "MGUN11",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "MGUN2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "NUKEMISL",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "NUKEXPLO",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "OBELRAY1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "OBELPOWR",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "POWRDN1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "RAMGUN2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "ROCKET1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "ROCKET2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "SAMMOTR2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "SCOLD2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "SIDBAR1C",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "SIDBAR2C",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "SQUISH2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TNKFIRE2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TNKFIRE3",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TNKFIRE4",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TNKFIRE6",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TONE15",
+   "priority": 0,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TONE16",
+   "priority": 0,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TONE2",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TONE5",
+   "priority": 10,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TOSS",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TRANS1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TREEBRN1",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "TURRFIR5",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "XPLOBIG4",
+   "priority": 5,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "XPLOBIG6",
+   "priority": 5,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "XPLOBIG7",
+   "priority": 5,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "XPLODE",
+   "priority": 1,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "XPLOS",
+   "priority": 4,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "XPLOSML2",
+   "priority": 5,
+   "where": "IN_JUV"
+  },
+  {
+   "name": "NUYELL1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL3",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL4",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL5",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL6",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL7",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL10",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL11",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "NUYELL12",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "YELL1",
+   "priority": 1,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MYES1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MCOMND1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MHELLO1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MHMMM1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MPLAN3",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MCOURSE1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MYESYES1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MTIBER1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "MTHANKS1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "CASHTURN",
+   "priority": 1,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "BLEEP2",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "DINOMOUT",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "DINOYES",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "DINOATK1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "DINODIE1",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  },
+  {
+   "name": "BEACON",
+   "priority": 10,
+   "where": "IN_NOVAR"
+  }
+ ],
+ "vox": [
+  "ACCOM1",
+  "FAIL1",
+  "BLDG1",
+  "CONSTRU1",
+  "UNITREDY",
+  "NEWOPT1",
+  "DEPLOY1",
+  "GDIDEAD1",
+  "NODDEAD1",
+  "CIVDEAD1",
+  "NOCASH1",
+  "BATLCON1",
+  "REINFOR1",
+  "CANCEL1",
+  "BLDGING1",
+  "LOPOWER1",
+  "NOPOWER1",
+  "MOCASH1",
+  "BASEATK1",
+  "INCOME1",
+  "ENEMYA",
+  "NUKE1",
+  "NOBUILD1",
+  "PRIBLDG1",
+  "NODCAPT1",
+  "GDICAPT1",
+  "IONCHRG1",
+  "IONREDY1",
+  "NUKAVAIL",
+  "NUKLNCH1",
+  "UNITLOST",
+  "STRCLOST",
+  "NEEDHARV",
+  "SELECT1",
+  "AIRREDY1",
+  "NOREDY1",
+  "TRANSSEE",
+  "TRANLOAD",
+  "ENMYAPP1",
+  "SILOS1",
+  "ONHOLD1",
+  "REPAIR1",
+  "ESTRUCX",
+  "GSTRUC1",
+  "NSTRUC1",
+  "ENMYUNIT"
+ ],
+ "themes": [
+  {
+   "name": "AIRSTRIK",
+   "fields": [
+    "TXT_THEME_AIRSTRIKE",
+    "0",
+    "200",
+    "false",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "80MX226M",
+   "fields": [
+    "TXT_THEME_80MX",
+    "0",
+    "248",
+    "false",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "CHRG226M",
+   "fields": [
+    "TXT_THEME_CHRG",
+    "0",
+    "256",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "CREP226M",
+   "fields": [
+    "TXT_THEME_CREP",
+    "0",
+    "222",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "DRIL226M",
+   "fields": [
+    "TXT_THEME_DRIL",
+    "0",
+    "272",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "DRON226M",
+   "fields": [
+    "TXT_THEME_DRON",
+    "0",
+    "275",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "FIST226M",
+   "fields": [
+    "TXT_THEME_FIST",
+    "0",
+    "212",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "RECN226M",
+   "fields": [
+    "TXT_THEME_RECON",
+    "0",
+    "261",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "VOIC226M",
+   "fields": [
+    "TXT_THEME_VOICE",
+    "0",
+    "306",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "HEAVYG",
+   "fields": [
+    "TXT_THEME_HEAVYG",
+    "0",
+    "180",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "J1",
+   "fields": [
+    "TXT_THEME_J1",
+    "4",
+    "187",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "JDI_V2",
+   "fields": [
+    "TXT_THEME_JDI_V2",
+    "5",
+    "183",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "RADIO",
+   "fields": [
+    "TXT_THEME_RADIO",
+    "6",
+    "183",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "RAIN",
+   "fields": [
+    "TXT_THEME_RAIN",
+    "7",
+    "156",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "AOI",
+   "fields": [
+    "TXT_THEME_AOI",
+    "0",
+    "168",
+    "true",
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "CCTHANG",
+   "fields": [
+    "TXT_THEME_CCTHANG",
+    "12",
+    "193",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "DIE",
+   "fields": [
+    "TXT_THEME_DIE",
+    "11",
+    "162",
+    "false",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "FWP",
+   "fields": [
+    "TXT_THEME_FWP",
+    "10",
+    "53",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "IND",
+   "fields": [
+    "TXT_THEME_IND",
+    "1",
+    "175",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "IND2",
+   "fields": [
+    "TXT_THEME_IND2",
+    "1",
+    "38",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "JUSTDOIT",
+   "fields": [
+    "TXT_THEME_JUSTDOIT",
+    "9",
+    "142",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "LINEFIRE",
+   "fields": [
+    "TXT_THEME_LINEFIRE",
+    "8",
+    "125",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "MARCH",
+   "fields": [
+    "TXT_THEME_MARCH",
+    "7",
+    "157",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "TARGET",
+   "fields": [
+    "TXT_THEME_TARGET",
+    "0",
+    "173",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "NOMERCY",
+   "fields": [
+    "TXT_THEME_NOMERCY",
+    "2",
+    "204",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "OTP",
+   "fields": [
+    "TXT_THEME_OTP",
+    "3",
+    "182",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "PRP",
+   "fields": [
+    "TXT_THEME_PRP",
+    "4",
+    "211",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "ROUT",
+   "fields": [
+    "TXT_THEME_ROUT",
+    "12",
+    "121",
+    "false",
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "HEART",
+   "fields": [
+    "TXT_THEME_HEART",
+    "5",
+    "206",
+    "false",
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "STOPTHEM",
+   "fields": [
+    "TXT_THEME_STOPTHEM",
+    "0",
+    "190",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "TROUBLE",
+   "fields": [
+    "TXT_THEME_TROUBLE",
+    "6",
+    "191",
+    "true",
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "WARFARE",
+   "fields": [
+    "TXT_THEME_WARFARE",
+    "0",
+    "182",
+    "true",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "BEFEARED",
+   "fields": [
+    "TXT_THEME_BEFEARED",
+    "13",
+    "164",
+    "false",
+    "true",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "I_AM",
+   "fields": [
+    "TXT_THEME_IAM",
+    "6",
+    "161",
+    "false",
+    "false",
+    "false",
+    "true"
+   ]
+  },
+  {
+   "name": "WIN1",
+   "fields": [
+    "TXT_THEME_WIN1",
+    "0",
+    "41",
+    "false",
+    "true",
+    "true",
+    "true"
+   ]
+  },
+  {
+   "name": "MAP1",
+   "fields": [
+    "TXT_THEME_WIN1",
+    "0",
+    "61",
+    "false",
+    "false",
+    "true",
+    "true"
+   ]
+  },
+  {
+   "name": "VALKYRIE",
+   "fields": [
+    "TXT_THEME_VALK",
+    "0",
+    "306",
+    "false",
+    "false",
+    "true",
+    "true"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,166 @@
+#!/bin/bash
+# ============================================================================
+#  C&C3D -- the default way to play. Double-click it.
+#
+#  As of 21 Aug 2026 this is the ONLY thing in the macOS package a player runs,
+#  by request. What it opens is the LAUNCHER
+#  (cnc3d-launcher, beside the game): which build is installed, what changed in
+#  it, an Update button when the host has a newer one, and Play. Play then boots
+#  the DOS main menu exactly as before: Start New Game runs the GDI campaign,
+#  Test Map is the sandbox with a full build list.
+#
+#  This file stays a script, and stays this long, for one reason: everything below
+#  about App Translocation is still true and is still the only thing standing
+#  between a downloaded zip and "Could not find the game." The launcher is a
+#  binary and cannot be committed, so the bundle is a tracked
+#  wrapper and the binary it runs is a build product beside the game.
+#
+#  Everything the old .command launchers chose for you is a setting in the game
+#  now. The HUD is a checkbox in Visuals, the presentation is CLASSIC or
+#  ENHANCED, and both are remembered. Nothing is forced from out here, because a
+#  launcher that forces a setting is a launcher that silently overrides the
+#  player every time they start the game.
+#
+#  The tracked masters of the old launchers stay in tools/launchers/ for
+#  development. They are simply not shipped.
+#
+#  ---- WHY THIS IS MORE THAN FOUR LINES NOW (v0.5.9, 21 Aug 2026) ------------
+#
+#  Players downloading the macOS zip from GitHub got "Could not find the game."
+#  with a message telling them to build it from source. The cause is macOS APP
+#  TRANSLOCATION (Gatekeeper path randomisation), and it is written down here
+#  because it is invisible on the machine that cuts the release:
+#
+#    Nothing here is signed or notarised, and a zip downloaded from GitHub
+#    carries com.apple.quarantine. When macOS launches an unsigned, quarantined
+#    .app from the folder it was unzipped into, it does NOT run it in place. It
+#    mounts a randomised READ-ONLY copy of the .app ALONE -- none of its sibling
+#    files come with it -- and runs that. The old code then looked next to
+#    itself, found no cnc3d, fell back to $HOME/CNC3D/playable (the developer's own
+#    development path, which no player has), and gave up.
+#
+#    On the machine that builds the release BOTH of those tests pass, which is
+#    precisely why this shipped broken.
+#
+#  A translocated app cannot recover its own original path -- that is the point
+#  of the mechanism -- so this goes looking for the real folder instead, and if
+#  it cannot find one it ASKS, with an ordinary folder picker rather than a
+#  Terminal instruction in a README nobody opens. The game is then run from the
+#  real folder, which also keeps saves and cnc3d-fx.cfg writable: the
+#  translocated mount is read-only and the game could not have written to it.
+#
+#  THE REAL FIX IS SIGNING AND NOTARISATION (the unsigned
+#  binaries entry). This makes the symptom survivable; it does not make the
+#  download trusted.
+# ============================================================================
+set -u
+
+BUNDLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HERE="$(dirname "$BUNDLE")"
+
+# A folder is "the game" only if it carries the binary AND two things only the real
+# package has. Testing for cnc3d alone would let a stray copy of the binary win.
+is_game_dir() {
+    [ -n "${1:-}" ] && [ -x "$1/cnc3d" ] && [ -f "$1/TiberianDawn.dylib" ] \
+        && [ -f "$1/dosmenu.pack" ]
+}
+
+alert() {  # alert <message>
+    osascript - "$1" >/dev/null 2>&1 <<'OSA'
+on run argv
+    display alert "C&C3D" message (item 1 of argv) as critical
+end run
+OSA
+}
+
+DIR=""
+if is_game_dir "$HERE"; then
+    DIR="$HERE"                       # normal: the app is in the folder it shipped in
+else
+    # Translocated, or copied out on its own. Look where people actually unzip
+    # things, and one level in as well, because the zip expands to a build-named
+    # folder. $HOME/CNC3D/playable stays on the list for development use.
+    for base in "$HOME/Downloads" "$HOME/Desktop" "$HOME/Applications" \
+                /Applications "$HOME" "$HOME/Documents" "$HOME/CNC3D/playable"; do
+        [ -d "$base" ] || continue
+        if is_game_dir "$base"; then DIR="$base"; break; fi
+        for cand in "$base"/CNC3D* "$base"/cnc3d* "$base"/*C\&C3D*; do
+            if is_game_dir "$cand"; then DIR="$cand"; break 2; fi
+        done
+    done
+fi
+
+if [ -z "$DIR" ]; then
+    case "$BUNDLE" in
+        */AppTranslocation/*)
+            MSG="macOS opened C&C3D from a temporary location, so the app cannot see the rest of the game. This is because the download is not signed by Apple -- it is not a damaged download.
+
+Choose the C&C3D folder (the one holding cnc3d and the .pack files) and it will start, and stay fixed for next time." ;;
+        *)
+            MSG="Could not find the game files next to this app.
+
+Choose the C&C3D folder (the one holding cnc3d and the .pack files) and it will start." ;;
+    esac
+
+    CHOICE=$(osascript - "$MSG" 2>/dev/null <<'OSA'
+on run argv
+    display alert "C&C3D" message (item 1 of argv) ¬
+        buttons {"Quit", "Choose Folder"} default button "Choose Folder" as critical
+    return button returned of result
+end run
+OSA
+)
+    [ "$CHOICE" = "Choose Folder" ] || exit 1
+
+    PICK=$(osascript -e 'try' \
+                     -e 'POSIX path of (choose folder with prompt "Select the C&C3D folder")' \
+                     -e 'end try' 2>/dev/null)
+    PICK="${PICK%/}"
+    if is_game_dir "$PICK"; then
+        DIR="$PICK"
+    else
+        alert "That folder does not contain the game.
+
+Look for the folder holding cnc3d, TiberianDawn.dylib and the .pack files. It is the folder the download unzipped into."
+        exit 1
+    fi
+fi
+
+cd "$DIR" || { alert "Could not open the game folder."; exit 1; }
+
+for f in dosmenu.pack cameos.pack dossidebar.pack dosinfantry.pack TiberianDawn.dylib; do
+    if [ ! -e "$f" ]; then
+        alert "Missing $f in $DIR."
+        exit 1
+    fi
+done
+
+# Quarantine is what caused the translocation, and it also makes macOS refuse the
+# unsigned binary and each dylib one at a time. Clearing it on the folder we are about
+# to run is safe -- the player either just pointed at it or it was sitting next to us --
+# and it stops this recurring on every launch. Quiet on failure: the game still gets its
+# chance below either way.
+xattr -dr com.apple.quarantine "$DIR" >/dev/null 2>&1 || true
+
+# NO ARGUMENTS. Every one of them is now the binary's own default: the data files are bare
+# names resolved against this directory, and --dir/--content probe for the shipped layout
+# before falling back to the development tree. Enhanced Visuals and the 640x480 HUD are
+# defaults in fx_defaults() rather than something a launcher forces, so the player's own
+# choices in the Visuals screen survive instead of being overridden on every launch.
+#
+# CNC3D_HUD is deliberately NOT set. It used to be, and once the HUD became a checkbox that
+# made the checkbox inert, which is exactly the bug reported. The dial owns
+# the HUD now.
+# THE LAUNCHER FIRST, the game behind it, and the window size passed THROUGH
+# rather than dropped. 1600x960 is not arbitrary and is not the launcher's to
+# know: the sidebar magnifies by whole numbers only, so the height has to be a
+# multiple of 480 or every second glyph stem comes out two pixels wide
+# Everything after `--` goes to the game when Play is pressed.
+#
+# If the launcher is not there -- an install from before it existed, or a build
+# where it failed to compile -- the game is still started directly. A missing
+# launcher must never be a Mac that cannot play.
+if [ -x ./cnc3d-launcher ]; then
+    exec ./cnc3d-launcher -- --w 1600 --h 960
+fi
+exec ./cnc3d --w 1600 --h 960

@@ -1,0 +1,12 @@
+# G64 SOFT DECAL EDGES. Three shots of one frame: the default path untouched, the same
+# frame with the dial explicitly at 0, and with it at 0.6. The first two must be identical
+# or the suite's own decal measurements have moved under it.
+tick 200
+cam 51.5 51.5
+zoom max
+shot shots/g64_default.png
+decalsoft 0.0
+shot shots/g64_hard.png
+decalsoft 0.6
+shot shots/g64_soft.png
+quit
