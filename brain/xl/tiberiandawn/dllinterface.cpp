@@ -915,7 +915,15 @@ void GlyphX_Assign_Houses(void)
     HousesType house2;
     HouseClass* housep2;
 
-    srand(timeGetTime());
+    /*
+    ** CNC3D lockstep: no wall clock seeds this function. The start-position shuffle
+    ** below now draws from Scen.RandomNumber (Random_Pick), the same synchronised
+    ** stream the house-selection loop already uses a few lines down. Every peer holds
+    ** the identical stream state here because Init_Random is never reached in the DLL
+    ** (init.cpp sits inside Select_Game, which returns early when RunningAsDLL), so
+    ** RandNumb keeps its static seed and Scen.RandomNumber keeps RandomClass(0).
+    ** No seed has to cross the wire.
+    */
 
     /*
     **	Init the 'used' flag for all houses & colors to 0
@@ -949,9 +957,29 @@ void GlyphX_Assign_Houses(void)
         }
     }
 
-    if (num_random_start_locations > 1) {
+    /*
+    ** Only shuffle if some seat actually asked for a random start. Today no lobby
+    ** writes RANDOM_START_POSITION, so this consumes ZERO draws and the synchronised
+    ** stream arrives at the house-selection loop below in exactly the state it does
+    ** now. That keeps every existing skirmish bit identical while making the random
+    ** start case correct rather than wall clock seeded.
+    */
+    bool any_random_start = false;
+    for (i = 0; i < MPlayerCount; i++) {
+        if (MPlayerStartLocations[i] == RANDOM_START_POSITION) {
+            any_random_start = true;
+            break;
+        }
+    }
+
+    if (any_random_start && num_random_start_locations > 1) {
         for (i = 0; i < num_random_start_locations - 1; i++) {
-            j = i + rand() / (RAND_MAX / (num_random_start_locations - i) + 1);
+            /*
+            ** Random_Pick is Scen.RandomNumber and is inclusive on both ends, so this
+            ** is the unbiased Durstenfeld draw and is strictly better than the
+            ** rand()/(RAND_MAX/...) form it replaces.
+            */
+            j = Random_Pick(i, num_random_start_locations - 1);
             int t = random_start_locations[j];
             random_start_locations[j] = random_start_locations[i];
             random_start_locations[i] = t;
@@ -1421,12 +1449,13 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Start_Custom_Instance(const ch
     ** is the DOS main menu. A host with its own menu never calls it, so a second mission
     ** in one process inherits the first one's clock.
     **
-    ** Measured 25 Aug 2026: a pristine boot dumps frame=0; after 300 ticks it dumps 300;
-    ** the NEXT mission dumps 300 before a single tick of its own has run, then 600.
-    ** Frame is this engine's master clock -- build timers, AI think intervals, tiberium
-    ** growth, trigger times and superweapon recharge all read it -- so the new mission
-    ** came up with its clock already running. It was seen as a skirmish that "starts when
-    ** the last one ended". It is not skirmish-specific; campaign missions do it too.
+    ** Measured: a pristine boot dumps frame=0; after 300 ticks it dumps 300; the NEXT
+    ** mission dumps 300 before a single tick of its own has run, then 600. Frame is this
+    ** engine's master clock -- build timers, AI think intervals, tiberium growth, trigger
+    ** times and superweapon recharge all read it -- so the new mission came up with its
+    ** clock already running. It presents as a match that starts partway through: build
+    ** timers short, superweapons part charged. It is not skirmish-specific; campaign
+    ** missions do it too.
     **
     ** This restores what the engine already does for a new scenario on the path it was
     ** written for. It is not a behaviour change: it is the line our integration skipped.
@@ -1751,7 +1780,26 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Advance_Instance(uint64 player
     /*
     ** Very rarely, the human players will get a message from the computer.
     */
-    if (GameToPlay != GAME_NORMAL && MPlayerGhosts && IRandom(0, 10000) == 1) {
+    /*
+    ** CNC3D lockstep: this used IRandom, which is libc rand(), so a Mac peer and a
+    ** Windows peer disagreed even from an identical seed.
+    **
+    ** It does NOT move to NonCriticalRandomNumber. That generator is not peer identical
+    ** either: its stream is advanced from inside the tick by draws whose COUNT depends
+    ** on local only state, behind the local music shuffle option, behind
+    ** Is_Selected_By_Player(), and behind the local player's own orders. Moving here
+    ** would have swapped a libc split for a local selection split and looked fixed.
+    **
+    ** It does NOT move to Scen.RandomNumber either: that is peer identical, but a draw
+    ** per tick on the SIMULATION stream would shift every later random event in every
+    ** skirmish, to decide a taunt.
+    **
+    ** So it consumes NOTHING. Frame is the engine's own clock, incremented once per tick
+    ** immediately above, reset to 0 per scenario, and identical on every peer. 10007 is
+    ** prime so the gate does not alias with the hash shifts below, and the expected
+    ** period is the same order as the ~10000 it replaces.
+    */
+    if (GameToPlay != GAME_NORMAL && MPlayerGhosts && ((unsigned)Frame % 10007u) == 1u) {
         DLLExportClass::Computer_Message(false);
     }
 
@@ -2952,7 +3000,10 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Get_Game_State(GameStateReques
         char cell_name[_MAX_PATH];
         char icon_number[32];
 
-        for (int y = 0; y < map_cell_height; y++) {
+        /* The inner break below stops WRITING; this stops LOOKING. Without it a 1024
+           map would go on calling Get_Template_Info for the remaining million cells
+           and throwing every answer away. */
+        for (int y = 0; y < map_cell_height && cell_index < MAX_EXPORT_CELLS; y++) {
             for (int x = 0; x < map_cell_width; x++) {
                 CELL cell = XY_Cell(map_cell_x + x, map_cell_y + y);
                 CellClass* cellptr = &Map[cell];
@@ -2967,6 +3018,24 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Get_Game_State(GameStateReques
                     strncat(cell_name, ".tga", 32);
                     cell_name[31] = 0;
 
+                    /*
+                    **	THE ARRAY IS A BUILD CONSTANT AND THE LOOP IS BOUNDED BY THE MAP,
+                    **	so past 128x128 this walked off the end of the struct. The guard
+                    **	above tests sizeof(CNCMapDataStruct), which does not move with the
+                    **	map, so it cannot catch it: a 256x256 map writes about 2.36 MB into
+                    **	a 590 KB object, and 1.77 MB of that is somebody else's memory.
+                    **
+                    **	Stopping is the honest answer here rather than growing the array.
+                    **	MAX_EXPORT_CELLS lives in a header the classic brain shares and is
+                    **	not allowed to change, and at 1024x1024 a grown array would be
+                    **	37 MB inside a by-value struct. Nothing in this project reads
+                    **	StaticCells at all -- the renderer draws terrain from its own pack
+                    **	-- so a truncated export costs nothing today and an overrun costs
+                    **	everything. Registered as a deliberate truncation.
+                    */
+                    if (cell_index >= MAX_EXPORT_CELLS) {
+                        break;
+                    }
                     CNCStaticCellStruct& cell_info = map_data->StaticCells[cell_index++];
                     strncpy(cell_info.TemplateTypeName, cell_name, 32);
                     cell_info.TemplateTypeName[31] = 0;
@@ -3161,7 +3230,17 @@ void DLLExportClass::DLL_Draw_Intercept(int shape_number,
 
         new_object.SortOrder = SortOrder++;
         new_object.IsSelectable = object->Class_Of().IsSelectable;
-        new_object.IsSelectedMask = object->IsSelectedMask;
+        /*
+        **	NARROWED ON PURPOSE, same boundary as Get_Ally_Flags: the engine's selection
+        **	mask is 64 bits so it can name 64 houses, and CNCObjectStruct's is 32 because
+        **	every struct the host reads stays byte-identical to the classic brain's. The
+        **	assertion is what keeps the narrowing honest.
+        */
+        static_assert(HOUSE_COUNT <= 32,
+                      "CNCObjectStruct::IsSelectedMask is 32 bits wide; growing the house "
+                      "roster past 32 means widening it and the host that reads it in the "
+                      "same change");
+        new_object.IsSelectedMask = (unsigned int)object->IsSelectedMask;
         new_object.MaxStrength = object->Class_Of().MaxStrength;
         new_object.Strength = object->Strength;
         new_object.CellX = (CurrentDrawCount > 0) ? root_object.CellX : Cell_X(cell);
@@ -3736,7 +3815,16 @@ extern "C" __declspec(dllexport) void __cdecl CNC_Handle_Input(InputRequestEnum 
         CELL cell = Coord_Cell(coord);
 
         if (Map.Pixel_To_Coord(x1, y1)) {
-            PlayerPtr->Sell_Wall(cell);
+            /*
+            **	CNC3D lockstep: a wall sale is a SELL event with a cell target, which is the
+            **	form display.cpp's Mouse_Left_Release always queued and the SELL arm already
+            **	understands (Is_Target_Cell). Direct only outside a match.
+            */
+            if (CNC3D_Lockstep) {
+                OutList.Add(EventClass(EventClass::SELL, ::As_Target(cell)));
+            } else {
+                PlayerPtr->Sell_Wall(cell);
+            }
         }
 
         break;
@@ -4468,7 +4556,25 @@ bool DLLExportClass::Get_Sidebar_State(uint64 player_id, unsigned char* buffer_i
     return true;
 }
 
-static const int _map_width_shift_bits = 7;
+/*
+**	THE ENGINE'S OWN CELL STRIDE, IN BITS, AND IT IS NOT SEVEN HERE.
+**
+**	Both users below build a cell number as `x + (y << _map_width_shift_bits)`, which is
+**	`XY_Cell` written out by hand. The classic brain's MAP_CELL_W is 128, so 7 is right
+**	there and the literal has stood since the DLL interface was written. This brain's
+**	MAP_CELL_W is 1024, and a 7 here computes every placement cell at a stride the map
+**	array does not have: Calculate_Placement_Distances marks the wrong cells as "near your
+**	base", and Get_Placement_State then asks the proximity check about a different set of
+**	wrong cells, so the placement cursor answers about ground nowhere near the building.
+**	It does not crash, because a 128-strided cell number is always small enough to index a
+**	1024-wide array, which is exactly why nothing noticed.
+**
+**	Derived from MAP_CELL_MAX_X_BITS rather than written as 10, so it can never drift from
+**	the address space again. This is the same defect as the host's four literal 128s in
+**	cnc_sidebar.h, in the brain, found the same day and for the same reason: a stride
+**	spelled as a constant is correct only while there is one brain.
+*/
+static const int _map_width_shift_bits = MAP_CELL_MAX_X_BITS;
 
 void DLLExportClass::Calculate_Placement_Distances(BuildingTypeClass* placement_type, unsigned char* placement_distance)
 {
@@ -4622,12 +4728,27 @@ bool DLLExportClass::Passes_Proximity_Check(CELL cell_in,
     */
     short const* occupy_list = placement_type->Occupy_List(true);
 
+    /*
+    ** CNC3D: the cheat menu's Build Anywhere. This routine is what fills in the
+    ** PassesProximityCheck flag the placement cursor reads, so it has to agree with
+    ** DisplayClass::Passes_Proximity_Check or the cursor would show red over ground
+    ** the engine would happily accept. In_Radar is still required of every cell the
+    ** foundation covers -- "anywhere" means anywhere ON THE MAP.
+    */
+    const bool anywhere =
+        DisplayClass::CNC3D_Build_Anywhere((PlayerPtr != NULL) ? PlayerPtr->Class->House
+                                                              : HOUSE_NONE);
+
     while (*occupy_list != REFRESH_EOL) {
 
         CELL center_cell = cell_in + *occupy_list++;
 
         if (!Map.In_Radar(center_cell)) {
             return false;
+        }
+
+        if (anywhere) {
+            return true;
         }
 
         if (placement_distance[center_cell] <= 1U) {
@@ -5090,8 +5211,17 @@ bool DLLExportClass::MP_Construction_Action(SidebarRequestEnum construction_acti
 
                                 /*
                                 ** Execute immediately so we get the sidebar feedback
+                                **
+                                **	CNC3D lockstep: NOT in a match. This pumps the queue from inside
+                                **	an input handler so the PRODUCE above executes now rather than at
+                                **	the frame boundary, on this machine only. Under lockstep the
+                                **	order goes out through the drain like every other and the sidebar
+                                **	link appears when it executes everywhere at once. The Sidebar
+                                **	recalc that follows the normal pump in the same tick still runs.
                                 */
-                                DLLExportClass::Glyphx_Queue_AI();
+                                if (!CNC3D_Lockstep) {
+                                    DLLExportClass::Glyphx_Queue_AI();
+                                }
                                 return true;
                             }
                         }
@@ -5241,8 +5371,25 @@ bool DLLExportClass::Place(uint64 player_id, int buildable_type, int buildable_i
 
             /*
             ** Call the place directly instead of queueing it, so we can evaluate the return code.
+            **
+            **	CNC3D lockstep: queue the PLACE event instead, the way DisplayClass::
+            **	Mouse_Left_Release always did, and clear the placement cursor at once the way
+            **	it always did too. The return code the comment above wants was only ever used
+            **	to clear PlacementType, which is presentation state the host re-reads on its
+            **	next poll, so nothing upstream is waiting on an answer. If the placement turns
+            **	out illegal when the event executes, the building stays completed in its
+            **	factory and the player starts placement again, which is the 1995 behaviour.
+            **
+            **	No double-submit latch is needed, and the reason is worth keeping: a second
+            **	PLACE queued in the frames before the first executes finds the factory no
+            **	longer holding a completed object, and HouseClass::Place_Object's own comment
+            **	says it ignores exactly that case. The only way round it is a second building
+            **	completing inside the same few frames, which needs the instant-build cheat.
             */
-            if (PlayerPtr->Place_Object(building->What_Am_I(), cell + Map.ZoneOffset)) {
+            if (CNC3D_Lockstep) {
+                OutList.Add(EventClass(EventClass::PLACE, building->What_Am_I(), (CELL)(cell + Map.ZoneOffset)));
+                PlacementType[CurrentLocalPlayerIndex] = NULL;
+            } else if (PlayerPtr->Place_Object(building->What_Am_I(), cell + Map.ZoneOffset)) {
                 PlacementType[CurrentLocalPlayerIndex] = NULL;
             }
         }
@@ -5580,8 +5727,18 @@ bool DLLExportClass::Get_Shroud_State(uint64 player_id, unsigned char* buffer_in
 
             CNCShroudEntryStruct& shroud_entry = shroud->Entries[entry_index];
 
-            shroud_entry.IsVisible = cellptr->Is_Visible(PlayerPtr);
-            shroud_entry.IsMapped = cellptr->Is_Mapped(PlayerPtr);
+            /*
+            ** CNC3D: THE UNSHROUD DEBUG FLAG REACHES THIS EXPORT TOO. Carried across from
+            ** the unforked engine, where the full account of why sits beside the same two
+            ** lines. In short: every other answer to "can the player see this" already
+            ** folds in Debug_Unshroud, and this one did not, so with the fog cheat on the
+            ** engine and its own shroud snapshot disagreed and anything gating on the
+            ** snapshot went on behaving as though the fog were up. A big map is exactly
+            ** where a player reaches for that cheat, so the fork needs it as much as the
+            ** engine it forked from.
+            */
+            shroud_entry.IsVisible = Debug_Unshroud || cellptr->Is_Visible(PlayerPtr);
+            shroud_entry.IsMapped = Debug_Unshroud || cellptr->Is_Mapped(PlayerPtr);
             shroud_entry.IsJamming = false;
             shroud_entry.ShadowIndex = -1;
 
@@ -5756,9 +5913,18 @@ bool DLLExportClass::Get_Player_Info_State(uint64 player_id, unsigned char* buff
             action_object = CurrentObject[0];
         }
 
+        /*
+        **	SAME SHAPE AS THE STATIC MAP ABOVE, same reason, and this one fires the
+        **	moment anything is selected. ActionWithSelected is MAX_EXPORT_CELLS long and
+        **	the loop walks the map's own rect, so a 256x256 map writes 65,536 bytes from
+        **	offset 493 of a 16,886 byte struct: it first overwrites the three fields that
+        **	follow it (one of which, ActionWithSelectedCount, is then written back over
+        **	data the loop already laid down) and then runs about 49 KB past the end.
+        **	Truncate rather than grow, for the reason at the static map.
+        */
         int index = 0;
-        for (int y = top; y <= bottom; ++y) {
-            for (int x = left; x <= right; ++x, ++index) {
+        for (int y = top; y <= bottom && index < MAX_EXPORT_CELLS; ++y) {
+            for (int x = left; x <= right && index < MAX_EXPORT_CELLS; ++x, ++index) {
                 Convert_Action_Type(action_object->What_Action(XY_Cell(x, y)),
                                     (CurrentObject.Count() == 1) ? action_object : NULL,
                                     As_Target(XY_Cell(x, y)),
@@ -6054,12 +6220,26 @@ void DLLExportClass::Glyphx_Queue_AI(void)
     //	Move events from the OutList (events generated by this player) into the
     //	DoList (the list of events to execute).
     //------------------------------------------------------------------------
-    while (OutList.Count) {
-        OutList.First().IsExecuted = false;
-        if (!DoList.Add(OutList.First())) {
-            ;
+    /*
+    **	CNC3D lockstep: in a match this loop MUST NOT RUN. An order that goes straight from
+    **	OutList to DoList here is an order that executes on this machine and nowhere else,
+    **	which is the whole desync in one statement. Under lockstep the host takes them out
+    **	with CNC3D_Drain_Events, sends them to every peer INCLUDING ITSELF, and puts them
+    **	back with CNC3D_Post_Event stamped for an agreed future frame.
+    **
+    **	Outside a match this is exactly the code that was always here, discard and all.
+    **	(The discard is EA's: a full DoList drops the order through an empty statement. It
+    **	is left alone here because making it loud is a separate change with its own gate,
+    **	and one that would fire in the campaign.)
+    */
+    if (!CNC3D_Lockstep) {
+        while (OutList.Count) {
+            OutList.First().IsExecuted = false;
+            if (!DoList.Add(OutList.First())) {
+                ;
+            }
+            OutList.Next();
         }
-        OutList.Next();
     }
 
     /*
@@ -6074,7 +6254,44 @@ void DLLExportClass::Glyphx_Queue_AI(void)
     ** ST - 3/12/2019 10:51AM
     */
 
-    for (int i = 0; i < MPlayerCount; i++) {
+    /*
+    **	CNC3D lockstep: execute in a CANONICAL order rather than in arrival order.
+    **
+    **	Arrival order is fine for one machine and fatal for several. Two peers receive the
+    **	same orders over UDP in whatever sequence the network hands them over, so executing
+    **	as they arrive makes two peers apply the same set in different orders, and two of
+    **	these events are order dependent the moment they touch the same object.
+    **
+    **	The key is (Frame, ID): the frame the order was stamped for, then the originating
+    **	house index. ID is the right tiebreak and MPlayerID is not: ID is the house ordinal,
+    **	unique by construction and now seven bits wide, while MPlayerID is packed as
+    **	(colour << 4) | house and collides once there are more than sixteen players. Every
+    **	peer computes the same key from the same bytes, so every peer runs the same sequence.
+    **
+    **	This is O(n squared) in the ready set. DoList holds 2048 and a tick's ready set is a
+    **	handful, so the simple version is the right one until something measures otherwise.
+    */
+    if (CNC3D_Lockstep) {
+        for (;;) {
+            int best = -1;
+            for (int j = 0; j < DoList.Count; j++) {
+                if (DoList[j].IsExecuted || (unsigned)Frame < DoList[j].Frame) {
+                    continue;
+                }
+                if (best < 0 || DoList[j].Frame < DoList[best].Frame
+                    || (DoList[j].Frame == DoList[best].Frame && DoList[j].ID < DoList[best].ID)) {
+                    best = j;
+                }
+            }
+            if (best < 0) {
+                break;
+            }
+            DoList[best].Execute();
+            DoList[best].IsExecuted = 1;
+        }
+    }
+
+    for (int i = 0; CNC3D_Lockstep == false && i < MPlayerCount; i++) {
 
         HousesType house;
         HouseClass* housep;
@@ -6529,7 +6746,20 @@ void DLLExportClass::Repair(uint64 player_id, int object_id)
 
                 if (building && building->Can_Repair() && building->House
                     && building->House->Class->House == PlayerPtr->Class->House) {
-                    building->Repair(-1);
+                    /*
+                    **	CNC3D lockstep: this click becomes an ORDER rather than an act. The
+                    **	direct call below changes this machine's world and no other, which is
+                    **	the whole desync in one line. Under lockstep the REPAIR event EA already
+                    **	compiled into event.cpp is queued instead, drained by the host, sent to
+                    **	every peer and executed on all of them at the same frame. The checks
+                    **	above still run here, at click time, exactly as before; the arm carries
+                    **	its own ownership test as well, added with this change.
+                    */
+                    if (CNC3D_Lockstep) {
+                        OutList.Add(EventClass(EventClass::REPAIR, building->As_Target()));
+                    } else {
+                        building->Repair(-1);
+                    }
                 }
             }
         }
@@ -6587,7 +6817,19 @@ void DLLExportClass::Sell(uint64 player_id, int object_id)
                 GlyphX_Debug_Print("DLLExportClass::Sell -- trying to sell a non-active building");
             } else {
                 if (building->House && building->House->Class->House == PlayerPtr->Class->House) {
-                    building->Sell_Back(1);
+                    /*
+                    **	CNC3D lockstep: queue the SELL event instead of selling here, for the
+                    **	reason given at Repair above. ONE DELIBERATE DIFFERENCE, confined to a
+                    **	match: the event arm calls Sell_Back(-1), which TOGGLES, where this direct
+                    **	call passes 1, which forces. So in a match a second click on a building
+                    **	being sold cancels the sale, which is the 1995 gesture; the campaign keeps
+                    **	the GlyphX behaviour where it does nothing.
+                    */
+                    if (CNC3D_Lockstep) {
+                        OutList.Add(EventClass(EventClass::SELL, building->As_Target()));
+                    } else {
+                        building->Sell_Back(1);
+                    }
                 }
             }
         }
@@ -7359,16 +7601,27 @@ void DLLExportClass::Computer_Message(bool last_player_taunt)
     }
 
     if (ai_player_count) {
+        /*
+        ** CNC3D lockstep: same reasoning as the caller. IRandom is libc rand(), which
+        ** does not agree across platforms, and neither of the alternatives is safe: the
+        ** non-critical generator's stream position is itself peer dependent, and the
+        ** synchronised one would shift every later random event in every skirmish to
+        ** pick a taunt. So this draws NOTHING. A cheap integer hash of the master clock
+        ** gives two uncorrelated picks that every peer computes identically.
+        */
+        unsigned int taunt_hash = (unsigned int)::Frame * 2654435761u;
+
         int ai_player_index = 0;
         if (ai_player_count > 1) {
-            ai_player_index = IRandom(0, ai_player_count - 1);
+            ai_player_index = (int)((taunt_hash >> 16) % (unsigned int)ai_player_count);
         }
 
         int taunt_index;
         if (last_player_taunt) {
             taunt_index = 13;
         } else {
-            taunt_index = IRandom(0, 12);
+            /* IRandom(0, 12) was thirteen taunts inclusive, so the modulus is 13. */
+            taunt_index = (int)((taunt_hash >> 8) % 13u);
         }
 
         On_Message(ai_players[ai_player_index], "", 15.0f, MESSAGE_TYPE_COMPUTER_TAUNT, taunt_index);
@@ -7850,7 +8103,7 @@ static void CNC3D_Print_One(const char* kind, ObjectClass* obj, int heapid)
     */
     int selected = 0;
     if (PlayerPtr != NULL && PlayerPtr->Class != NULL) {
-        selected = (obj->IsSelectedMask & (1 << (int)PlayerPtr->Class->House)) ? 1 : 0;
+        selected = (obj->IsSelectedMask & (1ULL << (int)PlayerPtr->Class->House)) ? 1 : 0;
     }
 
     /*
@@ -8040,15 +8293,15 @@ static void CNC3D_Print_One(const char* kind, ObjectClass* obj, int heapid)
     **	                       i.e. the OWNING HOUSE's total, out of Bound(Capacity/100,0,10).
     **	  transport occupancy  either Pip_Count arm's IsTransporter branch -> How_Many().
     **
-    **	The three ROM addresses above are the 20 Aug 2026 decode pass's, carried here rather
-    **	than re-derived: what was checked HERE is the C++ side, which is the half this
-    **	function actually calls.
+    **	The three ROM addresses above are carried from the decode pass rather than
+    **	re-derived: what was checked HERE is the C++ side, which is the half this function
+    **	actually calls.
     **
     **	EXPORT ONLY. Nothing is drawn from this yet: the cartridge's pip ART is unread ROM
     **	(the type-8 2-D command its Draw_Pips enqueues at 0x8004B638 has not been followed
-    **	to its consumer), so what the row looks like is a project decision and is registered in
-    **	the open questions. Exporting the numbers now is what lets that decision be made
-    **	without also having to re-derive the arithmetic.
+    **	to its consumer), so how the row should LOOK is still an open design question.
+    **	Exporting the numbers now is what lets that be settled without also having to
+    **	re-derive the arithmetic.
     **
     **	All three arms are const and free of side effects, and none of them adds a NULL
     **	dereference this function did not already have: BuildingClass::Pip_Count reads
@@ -8110,6 +8363,64 @@ static void CNC3D_Print_One(const char* kind, ObjectClass* obj, int heapid)
         }
     }
 
+    /*
+    **	CNC3D REPAIR FEEDBACK, so a structure that is repairing itself can SAY so. The
+    **	1995 game draws a wrench over such a building and blinks it, and a reader given
+    **	only the strength cannot reconstruct either half: a building whose health is
+    **	climbing might be repairing, or might be sitting on a repair bay, and neither of
+    **	those wears a wrench.
+    **
+    **	`repairing` is BuildingClass::IsRepairing (building.h:89). `wrench` is
+    **	BuildingClass::IsWrenchVisible (building.h:96), the blink the ENGINE drives: AI()
+    **	flips it every fifteen frames while the repair runs (building.cpp:1099-1102) and
+    **	Draw_It shows the overlay only while BOTH are set (building.cpp:685).
+    **
+    **	BOTH ARE NEEDED, and this is the trap. The same block clears IsRepairing by itself
+    **	when the building reaches MaxStrength or the house cannot afford the next step, and
+    **	it does NOT clear IsWrenchVisible with it. So the blink bit is left wherever the
+    **	last flip put it and means nothing on its own, while IsRepairing alone would draw a
+    **	steady wrench instead of a blinking one.
+    **
+    **	Read only, buildings only. Both members are public bitfields and nothing here
+    **	touches them. 0/0 for everything that is not a building, and 0/0 for a reader whose
+    **	brain predates the export, which reads as "not repairing" -- the behaviour before
+    **	this existed.
+    */
+    int repairing = 0;
+    int wrench = 0;
+    if (obj->What_Am_I() == RTTI_BUILDING) {
+        BuildingClass* repairer = (BuildingClass*)obj;
+        repairing = repairer->IsRepairing ? 1 : 0;
+        wrench = repairer->IsWrenchVisible ? 1 : 0;
+    }
+
+    /*
+    **	CNC3D PRIMARY FACTORY, so a reader can say WHICH of a house's factories the next
+    **	unit walks out of. Nothing already on this line answers it. The flag is not a
+    **	mission, not a status and not a strength, and a reader watching two barracks has no
+    **	way to derive it short of building a unit and seeing where it appears.
+    **
+    **	The member is TechnoClass::IsLeader (techno.h:78), and it carries two different
+    **	facts on one bit: for a BUILDING it means "this is the primary factory", for a unit
+    **	it means "team leader". Only the building half is exported, which is why the test is
+    **	RTTI_BUILDING rather than Is_Techno.
+    **
+    **	`primary` rather than `leader` because that is this file's own name for the same
+    **	bit: the GlyphX object struct is filled with IsPrimaryFactory = building->IsLeader
+    **	above. Toggle_Primary is what moves it, and it clears the flag on every other
+    **	factory of the same ToBuild owned by the same house before setting its own, so at
+    **	most one building per house per factory kind can ever answer 1.
+    **
+    **	Read only, buildings only. The member is a public bitfield and nothing here touches
+    **	it. 0 for anything that is not a building, and 0 for a reader whose brain predates
+    **	the export -- which reads as "no factory is primary", the behaviour before this
+    **	existed.
+    */
+    int primary = 0;
+    if (obj->What_Am_I() == RTTI_BUILDING) {
+        primary = ((BuildingClass*)obj)->IsLeader ? 1 : 0;
+    }
+
     printf("OBJ|%s|%s|%s|newcell=%d|x=%d|y=%d|inicell=%d|centercell=%d|str=%d|max=%d|limbo=%d|down=%d|mission=%s"
            "|lx=%d|ly=%d|clx=%d|cly=%d|fw=%d|fh=%d|face=%d|tface=%d|id=%d"
            "|sel=%d|nav=%d|tar=%d|doing=%d|dostage=%d|dying=%d|makecnt=%d|dimw=%d|door=%d|status=%d"
@@ -8117,7 +8428,7 @@ static void CNC3D_Print_One(const char* kind, ObjectClass* obj, int heapid)
               act=0 / act=1, so a field appended after it silently turns those assertions
               into no-ops rather than failing. New fields go BEFORE it. */
            "|blush=%d|flash=%d|tcx=%d|tcy=%d|pips=%d|maxpips=%d|alt=%d"
-           "|cloak=%d|cstage=%d|act=%d\n",
+           "|cloak=%d|cstage=%d|repairing=%d|wrench=%d|primary=%d|act=%d\n",
            kind,
            obj->Class_Of().IniName,
            owner,
@@ -8159,6 +8470,9 @@ static void CNC3D_Print_One(const char* kind, ObjectClass* obj, int heapid)
            alt,
            cloak,
            cstage,
+           repairing,
+           wrench,
+           primary,
            act);
 }
 
@@ -8754,6 +9068,171 @@ extern "C" __declspec(dllexport) int __cdecl CNC3D_Probe_Object_At(int x, int y)
 }
 
 /**************************************************************************************************
+ * CNC3D_Event_ABI -- fingerprint the order wire, so a mismatched peer is refused at the door
+ *                    rather than corrupting a match (project CNC3D).
+ *
+ * WHY A FINGERPRINT AND NOT A SIZE. EventClass IS the wire unit: lockstep copies it whole. Its
+ * size is asserted at 22 bytes beside the class, and that assertion passes in BOTH brains while
+ * their wires are NOT interchangeable. The classic brain has `typedef unsigned COORDINATE` and
+ * `typedef signed short CELL`; the Enhanced brain widened them to uint64_t and int32_t. The union
+ * arms are textually identical and both are packed, so three wire-eligible event types put their
+ * fields in different places: ANIMATION's arm is 10 bytes against 14 and its Visible field moves
+ * from Data+6 to Data+10, and PLACE and SPECIAL differ too. The total stays 22 only because
+ * Data.Options is the widest arm in both and hides the difference.
+ *
+ * So "the sizes match" is exactly the reassurance that would let two incompatible peers agree to
+ * play and then silently disagree about the world. What a host must compare is the LAYOUT, and the
+ * cheapest complete statement of the layout is EventLength[], which is computed per type from the
+ * real structure rather than written down. Hashing the whole table catches any arm that moved.
+ *
+ * FLAT u32 SLOTS, not a struct, deliberately. The host mirrors this across a C ABI and across two
+ * architectures; a struct would add its own padding question to the very thing being checked.
+ * The count grows at the end only, so an older host reading fewer slots still reads them correctly.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) int __cdecl CNC3D_Event_ABI(unsigned int* out, int count)
+{
+    unsigned int slot[CNC3D_EVENT_ABI_SLOTS];
+    int i;
+
+    /*
+    **	A 32 bit FNV-1a over the whole per-type length table. Any union arm that changes width on
+    **	any type changes this, which is the property the size alone does not have.
+    */
+    unsigned int hash = 2166136261u;
+    for (i = 0; i < (int)EventClass::LAST_EVENT; i++) {
+        hash ^= (unsigned int)EventClass::EventLength[i];
+        hash *= 16777619u;
+    }
+
+    slot[0] = 1;                                        /* fingerprint format version */
+    slot[1] = (unsigned int)sizeof(EventClass);         /* asserted 22 */
+    slot[2] = (unsigned int)offsetof(EventClass, Data); /* where the payload starts */
+    slot[3] = 24;                                       /* EventClass::Frame bit width */
+    slot[4] = 7;                                        /* EventClass::ID bit width */
+    slot[5] = 1;                                        /* EventClass::IsExecuted bit width */
+    slot[6] = (unsigned int)sizeof(COORDINATE);         /* the two typedefs that split the brains */
+    slot[7] = (unsigned int)sizeof(CELL);
+    slot[8] = (unsigned int)sizeof(TARGET);
+    slot[9] = (unsigned int)EventClass::LAST_EVENT;     /* number of event types */
+    slot[10] = hash;                                    /* the deciding value */
+
+    for (i = 0; i < count && i < CNC3D_EVENT_ABI_SLOTS; i++) {
+        out[i] = slot[i];
+    }
+    return (CNC3D_EVENT_ABI_SLOTS);
+}
+
+/**************************************************************************************************
+ * CNC3D_Drain_Events -- take this peer's pending orders out for the wire (project CNC3D).
+ *
+ * Copies up to `max` events out of OutList and REMOVES them, stamping each one the way the classic
+ * network path did before the GlyphX conversion replaced it: a frame far enough ahead that every
+ * peer can have received it by then, and the originating house index.
+ *
+ * THE TRAP THIS EXPORT IS BUILT AROUND. Removing the local copy is correct ONLY because the host
+ * sends these bytes to every peer INCLUDING ITSELF and posts them back through CNC3D_Post_Event. A
+ * host that drains and does not loop back loses every order the player gives, and it looks exactly
+ * like a network fault: the game runs, the other side moves, and your own clicks do nothing. That
+ * is a morning lost to tcpdump. So the drain REFUSES to run unless lockstep is on, and a host that
+ * has not called CNC3D_Set_Lockstep gets -1 rather than an empty queue that reads as "no orders".
+ *
+ * Returns the number of events written, or -1 if lockstep is off, or -2 on a bad argument.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) int __cdecl CNC3D_Drain_Events(void* out, int max, int frame_delay)
+{
+    if (!CNC3D_Lockstep) {
+        return (-1);
+    }
+    if (out == NULL || max <= 0 || frame_delay < 0) {
+        return (-2);
+    }
+
+    unsigned char* dest = (unsigned char*)out;
+    int written = 0;
+
+    while (OutList.Count && written < max) {
+        OutList.First().Frame = (unsigned)Frame + (unsigned)frame_delay;
+        OutList.First().ID = Houses.ID(PlayerPtr);
+        OutList.First().IsExecuted = 0;
+        memcpy(dest + ((size_t)written * sizeof(EventClass)), &OutList.First(), sizeof(EventClass));
+        OutList.Next();
+        written++;
+    }
+
+    return (written);
+}
+
+/**************************************************************************************************
+ * CNC3D_Post_Event -- inject a received order at its stamped frame (project CNC3D).
+ *
+ * The other half of the drain. Every peer posts every peer's orders, its own included, so all
+ * machines put the identical set into DoList and execute it at the identical frame.
+ *
+ * It validates rather than trusting, because these bytes came off a wire: an event stamped for a
+ * frame already executed can never run and would desynchronise this peer silently, and a house
+ * index outside the roster would index Houses.Raw_Ptr out of range inside Execute.
+ *
+ * Returns 1 on success, 0 if DoList is full, -1 if lockstep is off, -2 on a bad argument,
+ * -3 if the frame has already passed, -4 if the house index is out of range.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) int __cdecl CNC3D_Post_Event(const void* in)
+{
+    if (!CNC3D_Lockstep) {
+        return (-1);
+    }
+    if (in == NULL) {
+        return (-2);
+    }
+
+    EventClass event;
+    memcpy(&event, in, sizeof(EventClass));
+
+    if ((unsigned)event.Frame < (unsigned)Frame) {
+        return (-3);
+    }
+    if ((int)event.ID >= (int)HOUSE_COUNT) {
+        return (-4);
+    }
+
+    event.IsExecuted = 0;
+    if (!DoList.Add(event)) {
+        return (0);
+    }
+    return (1);
+}
+
+/**************************************************************************************************
+ * CNC3D_Set_Lockstep -- put this brain into deterministic lockstep mode (project CNC3D).
+ *
+ * WHY THIS EXPORT EXISTS. A network match needs every machine to compute one identical world.
+ * The campaign needs the behaviour players remember. In a handful of places those two wants
+ * disagree, because the 1995 simulation reads state that belongs to one machine: the camera,
+ * the viewport, the local player, a wall clock, libc rand(), the local selection. All of that
+ * is harmless in a game of one, and fatal in a game where every peer must agree.
+ *
+ * So the fixes are GATED rather than applied, and this is the gate. It is false until a host
+ * calls this, which means the shipped campaign and today's skirmish take the 1995 path and
+ * cannot be moved by anything behind the flag. Nothing in the engine sets it; only the netcode
+ * will, once there is a match to set it for.
+ *
+ * It is deliberately one global rather than a per-instance member: lockstep is a property of
+ * the whole simulation, and a per-player flag would invite exactly the split-brain state this
+ * exists to prevent.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) void __cdecl CNC3D_Set_Lockstep(bool on)
+{
+    CNC3D_Lockstep = on;
+}
+
+/**************************************************************************************************
+ * CNC3D_Get_Lockstep -- report the flag, so a host can assert what it asked for took.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) bool __cdecl CNC3D_Get_Lockstep(void)
+{
+    return CNC3D_Lockstep;
+}
+
+/**************************************************************************************************
  * CNC3D_Set_Invincible -- Damage immunity for one player, for the cheat menu (project CNC3D).
  *
  * WHY THIS EXPORT EXISTS. The exported debug interface covers everything a tester needs
@@ -8832,7 +9311,106 @@ extern "C" __declspec(dllexport) bool __cdecl CNC3D_Get_Invincible(uint64 player
     if (house == HOUSE_NONE || house >= HOUSE_COUNT) {
         return false;
     }
-    return ((ObjectClass::CNC3D_InvincibleHouses & (1 << house)) != 0);
+    return ((ObjectClass::CNC3D_InvincibleHouses & (1ULL << house)) != 0);
+}
+
+/**************************************************************************************************
+ * CNC3D_Set_Build_Anywhere -- Lifts the base adjacency rule for one player (project CNC3D).
+ *
+ * WHY THIS EXPORT EXISTS. The debug interface has no switch for placement at all. Its nearest
+ * relative, DEBUG_REQUEST_UNLOCK_BUILDABLES, unlocks WHAT you may build and says nothing about
+ * WHERE, which is a different rule enforced in a different place -- DisplayClass's proximity
+ * check, the routine that decides whether a foundation is close enough to something you own.
+ *
+ * WHAT IT DOES NOT DO: it does not make the ground buildable. Terrain legality lives in
+ * CellClass, is not consulted from the proximity check, and is untouched by this, so a player
+ * with the switch on can put a refinery on the far side of the map and still cannot put one in
+ * a river or up a cliff.
+ *
+ * SCOPE. Default off, and DisplayClass::Init_Clear drops it. Clear_Scenario() calls that, and
+ * Clear_Scenario() is on every path that begins a scenario, so the switch cannot follow the
+ * player out of one match and into another.
+ *
+ * Returns false when player_id names nobody in this match, in which case nothing changed.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) bool __cdecl CNC3D_Set_Build_Anywhere(uint64 player_id, bool on)
+{
+    HousesType house = CNC3D_House_Of_Player(player_id);
+    if (house == HOUSE_NONE) {
+        return false;
+    }
+
+    DisplayClass::CNC3D_Set_Build_Anywhere(house, on);
+    return true;
+}
+
+extern "C" __declspec(dllexport) bool __cdecl CNC3D_Get_Build_Anywhere(uint64 player_id)
+{
+    return DisplayClass::CNC3D_Build_Anywhere(CNC3D_House_Of_Player(player_id));
+}
+
+/**************************************************************************************************
+ * CNC3D_Proximity_Ok -- Would this building type pass the proximity check on this cell?
+ *
+ * A PURE QUERY. IT ANSWERS THE CURSOR ROUTINE, NOT THE COMMIT ROUTINE. There are THREE copies
+ * of the adjacency rule in this engine and they are not the same rule:
+ *   DisplayClass::Passes_Proximity_Check   -- colours the cursor. Accepts adjacency to any
+ *                                             TECHNO, units included. This is what this calls.
+ *   DLLExportClass::Passes_Proximity_Check -- fills PlacementCellInfo, the overlay the sidebar
+ *                                             draws and the only thing the player sees.
+ *   BuildingClass::Passes_Proximity_Check  -- HouseClass::Place_Object's gate. Requires a
+ *                                             BUILDING next door, not merely a techno.
+ *
+ * Returns false for an unknown type name or an unknown player, which are indistinguishable from
+ * "not allowed" on purpose: a caller that cannot spell the type has no business getting a yes.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) bool __cdecl CNC3D_Proximity_Ok(uint64 player_id,
+                                                                 const char* type_name,
+                                                                 int cell_x,
+                                                                 int cell_y)
+{
+    HousesType house = CNC3D_House_Of_Player(player_id);
+    if (house == HOUSE_NONE || type_name == NULL) {
+        return false;
+    }
+
+    StructType st = BuildingTypeClass::From_Name(type_name);
+    if (st == STRUCT_NONE) {
+        return false;
+    }
+
+    BuildingTypeClass const& btype = BuildingTypeClass::As_Reference(st);
+    CELL cell = XY_Cell(cell_x, cell_y);
+
+    return Map.Passes_Proximity_Check(&btype, house, btype.Occupy_List(true), cell);
+}
+
+/**************************************************************************************************
+ * CNC3D_Force_Verdict -- Ends the mission now, won or lost, for one player (project CNC3D).
+ *
+ * WHY IT IS Flag_To_Win / Flag_To_Lose AND NOT A SHORTCUT. Those two are the engine's own
+ * ending, the same pair every winning trigger and every "you have no buildings left" path
+ * reaches (house.cpp). They do not end the mission on the spot; they raise IsToWin / IsToDie,
+ * and HouseClass::AI acts on the flag a moment later, which is what runs the whole ending in
+ * its proper order. A cheat that fabricated a game-over event instead would skip all of that
+ * and would be testing a path the game never takes.
+ *
+ * Returns false when player_id names nobody in this match, or when the house is already
+ * flagged, in which case nothing changed.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) bool __cdecl CNC3D_Force_Verdict(uint64 player_id, bool win)
+{
+    HousesType house = CNC3D_House_Of_Player(player_id);
+    if (house == HOUSE_NONE) {
+        return false;
+    }
+
+    HouseClass* hptr = HouseClass::As_Pointer(house);
+    if (hptr == NULL) {
+        return false;
+    }
+
+    return win ? hptr->Flag_To_Win() : hptr->Flag_To_Lose();
 }
 
 /**************************************************************************************************
@@ -9051,6 +9629,44 @@ extern "C" __declspec(dllexport) bool __cdecl CNC3D_Trigger_Info(const char* nam
 }
 
 /**************************************************************************************************
+ * CNC3D_Building_By_Heapid -- resolves the id the object dump hands out (project CNC3D).
+ *
+ * TWO DIFFERENT NUMBERS ANSWER TO "id" IN THIS HEAP, and the rally exports had taken the wrong
+ * one. CNC3D_Dump_Objects prints Buildings.ID(p), and FixedHeapClass::ID (heap.cpp:248) is
+ * (pointer - Buffer) / Size: the object's RAW slot in the pool. Buildings.Ptr(index) does not
+ * index the pool at all, it indexes ActivePointers, the compacted list of LIVE objects.
+ *
+ * The two agree only until the first building leaves the game. FixedIHeapClass::Free deletes the
+ * pointer out of ActivePointers and closes the gap, and FixedHeapClass::Allocate then hands that
+ * freed RAW slot to the next building while appending it to the END of ActivePointers. One sold
+ * power plant is enough to put every later building's raw id one ahead of its active index, and
+ * the `building_id >= Buildings.Count()` guard these two used to carry compared a raw id against
+ * ActiveCount, so it rejected the highest ones outright.
+ *
+ * That is why a rally point set by a human click stopped flying its flag. The click path posts
+ * EventClass::ARCHIVE against the building itself and never touches an id, so the point landed on
+ * the right building; the renderer then asked CNC3D_Get_Rally about a DIFFERENT one, which had no
+ * archive target and answered "no rally point". A scripted run allocates its buildings in order
+ * and frees none, which is exactly why the gates only ever saw the working case.
+ *
+ * Walks the ACTIVE list and compares Buildings.ID, so only live objects are ever dereferenced.
+ * Raw_Ptr would be shorter and would hand back a freed slot for an id whose building has died.
+ **************************************************************************************************/
+static BuildingClass* CNC3D_Building_By_Heapid(int heapid)
+{
+    if (heapid < 0) {
+        return NULL;
+    }
+    for (int index = 0; index < Buildings.Count(); index++) {
+        BuildingClass* p = Buildings.Ptr(index);
+        if (p != NULL && Buildings.ID(p) == heapid) {
+            return p;
+        }
+    }
+    return NULL;
+}
+
+/**************************************************************************************************
  * CNC3D_Set_Rally -- Sets or clears a factory's rally point (project CNC3D).
  *
  * WHY THIS EXPORT EXISTS. The click path in BuildingClass::Active_Click_With already posts the
@@ -9079,10 +9695,7 @@ extern "C" __declspec(dllexport) bool __cdecl CNC3D_Set_Rally(uint64 player_id, 
     if (house == HOUSE_NONE) {
         return false;
     }
-    if (building_id < 0 || building_id >= Buildings.Count()) {
-        return false;
-    }
-    BuildingClass* b = Buildings.Ptr(building_id);
+    BuildingClass* b = CNC3D_Building_By_Heapid(building_id);
     if (b == NULL || b->House == NULL || b->House->Class->House != house) {
         return false;
     }
@@ -9113,10 +9726,7 @@ extern "C" __declspec(dllexport) bool __cdecl CNC3D_Get_Rally(int building_id, i
 {
     if (cell_x) *cell_x = -1;
     if (cell_y) *cell_y = -1;
-    if (building_id < 0 || building_id >= Buildings.Count()) {
-        return false;
-    }
-    BuildingClass* b = Buildings.Ptr(building_id);
+    BuildingClass* b = CNC3D_Building_By_Heapid(building_id);
     if (b == NULL || !Target_Legal(b->ArchiveTarget)) {
         return false;
     }

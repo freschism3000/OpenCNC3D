@@ -79,7 +79,7 @@ public:
     char ScenarioName[_MAX_FNAME + _MAX_EXT];
 
     /*
-    **	This is the full text of the briefing. This text will be
+    **	This is the full text of the mission briefing. This text will be
     **	displayed when the player commands the "restate mission
     **	objectives" operation.
     */

@@ -42,15 +42,24 @@
  *  project has had recorded against itself since wave 4.
  *
  *  DETERMINISM. Every pass is a pure function of the CURRENT frame: no temporal
- *  accumulation, no time-seeded noise, no history buffer. The occlusion pass's per
- *  pixel rotation is hashed from gl_FragCoord, which is the same value on every run.
- *  Two --shot runs stay byte identical with the chain on, and gate G32 proves it.
+ *  accumulation, no history buffer, and no clock the chain reads for itself. The
+ *  occlusion pass's per pixel rotation is hashed from gl_FragCoord, which is the same
+ *  value on every run. The cloud deck DOES move, and it is the one thing here that
+ *  advances with time: it is driven by g_fxTime, which the host sets from the engine
+ *  tick and not from the wall or from a frame count, so the same scenario at the same
+ *  tick is the same picture. Two --shot runs stay byte identical with the chain on,
+ *  and gate G36c proves it -- five runs, one digest.
+ *
+ *  (That reference used to read G32, which is the move-order marker and has nothing to
+ *  do with this file. Corrected rather than left standing: a cross-reference to the
+ *  wrong gate is worse than none, because it invites someone to trust a green G32.)
  * ==================================================================================== */
 #ifndef CNC3D_FX_POST_H
 #define CNC3D_FX_POST_H
 
 #include "fx_gl.h"
 #include "fx_state.h"
+#include "fx_cloud.h"
 
 /* ---- What the host hands us ------------------------------------------------------ */
 
@@ -77,6 +86,19 @@ static FxCasterFn g_fxCasters = 0;
    shadow texels dense no matter how far the player has zoomed out. */
 static float g_fxViewX0 = 0, g_fxViewX1 = 64, g_fxViewZ0 = 0, g_fxViewZ1 = 64;
 
+/* THE ONLY CLOCK THE CHAIN IS ALLOWED, in seconds, and it is the host's job to make it
+   a deterministic one. Nothing in here calls SDL_GetTicks or counts rendered frames.
+
+   THIS FIELD IS WHERE THE DETERMINISM PROMISE AT THE TOP OF THIS FILE IS KEPT OR LOST,
+   so it is worth being exact about. The cloud deck has to move, and a moving thing
+   needs a clock; the rule is not that the chain may not read time, it is that the
+   chain may not read a clock a second run of the same input cannot reproduce. The host
+   sets this from the ENGINE frame -- the brain's own Frame counter, which advances once
+   per simulated tick and not once per drawn frame -- so two --shot runs of the same
+   scenario at the same tick get the same number, and the clouds do not speed up on a
+   faster machine either. A rendered-frame counter would satisfy neither. */
+static float g_fxTime = 0.0f;
+
 /* ---- Internal state -------------------------------------------------------------- */
 
 static FxRT  g_fxScene;                 /* world colour + depth, ss resolution        */
@@ -86,6 +108,11 @@ static FxRT  g_fxNativeA, g_fxNativeB;  /* window resolution                    
 static FxRT  g_fxShadow;                /* depth only, square                         */
 
 static GLuint g_fxPLight, g_fxPBright, g_fxPBlur, g_fxPResolve, g_fxPCrt, g_fxPCopy;
+
+/* The cloud mask. One texture for the life of the process: it is generated arithmetic,
+   not art, so nothing a dial does can invalidate it -- scale, rotation, drift, coverage
+   and edge width are all applied when it is READ. See fx_cloud.h. */
+static GLuint g_fxCloudTex = 0;
 
 static int   g_fxBooted = 0;        /* programs compiled                              */
 static int   g_fxUsable = 0;        /* the chain can run at all                       */
@@ -146,6 +173,10 @@ static const char* FX_FS_LIGHT =
     "uniform int   uShadowOn;\n"
     "uniform float uSStrength, uSSoft, uSBias, uSTexel;\n"
     "uniform vec3  uSTint;\n"
+    "uniform sampler2D uCloudTex;\n"
+    "uniform int   uCloudOn;\n"
+    "uniform float uCStrength, uCEdge, uCWidth, uCInvScale, uCDrift, uCHeight;\n"
+    "uniform vec2  uCDir;\n"
     "uniform int   uAoOn, uAoSamples;\n"
     "uniform float uAoRadius, uAoIntensity, uAoBias, uAoPower;\n"
     "uniform int   uNLights;\n"
@@ -201,7 +232,51 @@ static const char* FX_FS_LIGHT_BODY =
     "            sh = max(sh, 1.0 - smoothstep(-0.10, 0.30, ndl));\n"
     "        }\n"
     "    }\n"
-    "    col *= mix(vec3(1.0), uSTint, sh * uSStrength);\n"
+    "\n"
+    /* ---- the weather ----------------------------------------------------------------
+       Where does the sun's ray through THIS pixel cross the cloud deck? Walk back from
+       the surface point along -uSunDir until y reaches uCHeight, and read the mask
+       there. That one step is the difference between a cloud shadow and a texture
+       pasted onto the ground: sampled at P.xz a roof would carry a different piece of
+       cloud from the ground it stands on, and the shadow would break at every wall.
+
+       THE CLAMP ON dy IS NOT DEFENSIVE, it is a design limit. sun_el goes down to 8
+       degrees, where 1/sin(el) is 7.2, and a 12-cell deck would then be sampled 86
+       cells away from the pixel being shaded -- two and a half screens. The pattern
+       stops being anchored to anything the player can see and simply swims. Holding
+       the ray no shallower than about 14 degrees keeps the slide bounded; the cost is
+       that at a very low sun the cloud shadows stop lengthening, which is a smaller
+       lie than the alternative and is written down as one.
+
+       This is a uniform branch, so the implicit derivative in texture2D below is taken
+       by every fragment or by none. That is the rule the note above P and n is about,
+       and it is why this block can afford to look like ordinary code. */
+    "    float cl = 0.0;\n"
+    "    if (uCloudOn == 1) {\n"
+    "        float dy = max(-uSunDir.y, 0.25);\n"
+    "        float t  = max(uCHeight - P.y, 0.0) / dy;\n"
+    "        vec2  g  = P.xz - uSunDir.xz * t;\n"
+    "        vec2  q  = vec2(dot(g, uCDir), dot(g, vec2(-uCDir.y, uCDir.x)))\n"
+    "                   * uCInvScale;\n"
+    "        q.x -= uCDrift;\n"
+    "        float m = texture2D(uCloudTex, q).r;\n"
+    "        cl = smoothstep(uCEdge - uCWidth, uCEdge + uCWidth, m);\n"
+    /* A cloud cannot darken what the sun is not reaching in the first place. The
+       shroud is drawn in the WORLD pass and writes no depth, so shrouded ground arrives
+       here looking to the depth buffer exactly like ground: without this gate a cloud
+       crossing the reveal edge modulates the fog's own grey and the fog appears to
+       drift. Keyed on the scene's luminance, which costs nothing and is the same
+       reasoning a real overcast follows. It does not close the case -- the 45% dark
+       band over bright grass is still bright enough to shadow -- and the remainder is
+       registered as a known gap rather than left to be discovered. */
+    "        cl *= smoothstep(0.015, 0.150, max(col.r, max(col.g, col.b)));\n"
+    "    }\n"
+    "\n"
+    /* MAX, not a sum and not a product. Ground already inside a hard cast shadow does
+       not get darker still when a cloud crosses it -- there is only so much sun to
+       take away, and taking it twice is what makes stacked shadow terms read as dirt.
+       One tint for both, for the same reason: they are the same sun. */
+    "    col *= mix(vec3(1.0), uSTint, max(sh * uSStrength, cl * uCStrength));\n"
     "\n"
     /* ---- occlusion ---- */
     "    float ao = 1.0;\n"
@@ -415,6 +490,45 @@ static const char* FX_FS_COPY =
 
 /* ---- Boot ------------------------------------------------------------------------ */
 
+/* Generate the cloud mask and hand it to GL, once.
+
+   THE MIP CHAIN IS UPLOADED LEVEL BY LEVEL rather than asked for, and that is a
+   deliberate refusal to widen this file's contract. fx_gl.h resolves its entry points
+   one at a time and treats a missing REQUIRED one as a reason to switch the entire
+   chain off; glGenerateMipmap is not among the ones it resolves, and adding it would
+   put shadows, occlusion, bloom, the grade and the CRT behind a pointer that only this
+   one texture needs. Everything used below is OpenGL 1.1 and cannot be absent.
+
+   A failure here is not fatal to anything else: g_fxCloudTex stays 0, the uniform
+   binding sees that and forces uCloudOn off, and the rest of the chain runs. */
+static void fx_cloud_boot(void)
+{
+    if (g_fxCloudTex) return;
+
+    int levels = 0, off[16];
+    unsigned char* tex = fxc_bake(&levels, off);
+    if (!tex) {
+        fprintf(stderr, "FX|cloud|the mask could not be generated; cloud shadows stay off\n");
+        return;
+    }
+
+    glGenTextures(1, &g_fxCloudTex);
+    glBindTexture(GL_TEXTURE_2D, g_fxCloudTex);
+    /* REPEAT is the whole point of the thing: the mask is periodic by construction
+       (fx_cloud.h), so the wrap is not a join, it is the continuation. */
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    for (int L = 0, s = FXC_SIZE; L < levels; L++, s >>= 1)
+        glTexImage2D(GL_TEXTURE_2D, L, GL_LUMINANCE, s, s, 0,
+                     GL_LUMINANCE, GL_UNSIGNED_BYTE, tex + off[L]);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    free(tex);
+    fprintf(stderr, "FX|cloud|mask generated, %dx%d, %d levels\n", FXC_SIZE, FXC_SIZE, levels);
+}
+
 static int fx_boot(void)
 {
     if (g_fxBooted) return g_fxUsable;
@@ -439,6 +553,10 @@ static int fx_boot(void)
 
     g_fxUsable = (g_fxPLight && g_fxPBright && g_fxPBlur &&
                   g_fxPResolve && g_fxPCrt && g_fxPCopy) ? 1 : 0;
+    /* After the programs, and only if they built: an unusable chain has no reader for
+       the mask, and generating a quarter of a megabyte of noise for nobody is a boot
+       cost paid on exactly the machines least able to afford it. */
+    if (g_fxUsable) fx_cloud_boot();
     if (!g_fxUsable)
         fprintf(stderr, "FX|unavailable|a program failed to build; the chain stays off\n");
     else
@@ -462,6 +580,7 @@ static void fx_shutdown(void)
         if (g_fxPCopy)    fx_glDeleteProgram(g_fxPCopy);
     }
     g_fxPLight = g_fxPBright = g_fxPBlur = g_fxPResolve = g_fxPCrt = g_fxPCopy = 0;
+    if (g_fxCloudTex) { glDeleteTextures(1, &g_fxCloudTex); g_fxCloudTex = 0; }
     g_fxBooted = 0; g_fxUsable = 0; g_fxActive = 0;
 }
 
@@ -726,6 +845,40 @@ static void fx_world_end(void)
                  g_fx.shadow_bias / (g_fxSunSpan > 0.001f ? g_fxSunSpan : 1.0f));
         fx_set1f(g_fxPLight, "uSTexel", g_fxShadow.w ? 1.0f / (float)g_fxShadow.w : 0.0f);
         fx_set3f(g_fxPLight, "uSTint", g_fx.shadow_r, g_fx.shadow_g, g_fx.shadow_b);
+
+        /* ---- the weather ----
+           Every one of these is a panel dial turned into the form the shader wants,
+           and the arithmetic is here rather than in the shader so it happens once a
+           frame instead of once a pixel. */
+        const int clOn = (g_fx.cloud_on && g_fxCloudTex) ? 1 : 0;
+        fx_set1i(g_fxPLight, "uCloudTex", 3);
+        fx_set1i(g_fxPLight, "uCloudOn", clOn);
+        fx_set1f(g_fxPLight, "uCStrength", g_fx.cloud_strength);
+        /* COVERAGE IS A THRESHOLD, and it can be one because the mask is histogram
+           equalised: the fraction of it above t is exactly 1-t. So the dial reads as
+           the fraction of ground in shadow and stays true when the edge width moves. */
+        fx_set1f(g_fxPLight, "uCEdge", 1.0f - fx_clampf(g_fx.cloud_cover, 0.0f, 1.0f));
+        /* Half-width of the ramp. Never zero: smoothstep is undefined when its two
+           edges meet, and the sharp end of the dial is one texel-ish, not a step. */
+        fx_set1f(g_fxPLight, "uCWidth",
+                 0.40f - 0.39f * fx_clampf(g_fx.cloud_sharp, 0.0f, 1.0f));
+        const float clScale = g_fx.cloud_scale > 1.0f ? g_fx.cloud_scale : 1.0f;
+        fx_set1f(g_fxPLight, "uCInvScale", 1.0f / clScale);
+        fx_set1f(g_fxPLight, "uCHeight", g_fx.cloud_height);
+        /* The bearing, read the same way sun_az is: a compass angle, and the deck
+           travels along it. The mask is turned with the wind rather than drifting
+           across a fixed pattern, so a change of bearing looks like the weather
+           turning rather than like the ground rotating under it. */
+        const float clRad = g_fx.cloud_rot * (3.14159265358979f / 180.0f);
+        fx_set2f(g_fxPLight, "uCDir", sinf(clRad), -cosf(clRad));
+        /* THE FOLD IS LOAD BEARING, not tidiness. The phase is in tile periods and the
+           mask repeats every 1.0 of them, so fmodf into [0,1) is exact -- it removes
+           nothing the shader could have seen. Without it the phase grows without bound
+           and a long session hands the sampler a float whose spacing has coarsened past
+           a texel, at which point the clouds stop drifting and start stepping. */
+        fx_set1f(g_fxPLight, "uCDrift",
+                 fmodf(g_fx.cloud_speed * g_fxTime / clScale, 1.0f));
+
         fx_set1i(g_fxPLight, "uAoOn", g_fx.ssao_on ? 1 : 0);
         fx_set1i(g_fxPLight, "uAoSamples", (int)(g_fx.ssao_samples + 0.5f));
         fx_set1f(g_fxPLight, "uAoRadius", g_fx.ssao_radius);
@@ -749,6 +902,9 @@ static void fx_world_end(void)
         }
         fx_set1f(g_fxPLight, "uLightFalloff", g_fx.light_falloff);
 
+        glActiveTexture(GL_TEXTURE3);
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, g_fxCloudTex);
         glActiveTexture(GL_TEXTURE2);
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, g_fxShadow.depth);
@@ -763,6 +919,9 @@ static void fx_world_end(void)
         fx_fullscreen_quad();
         fx_glUseProgram(0);
 
+        /* The unbind is not optional: the HUD is drawn with fixed-function state right
+           after this and a live unit 3 would modulate it. */
+        glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, 0); glDisable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, 0); glDisable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0); glDisable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE0);
@@ -810,7 +969,7 @@ static void fx_world_end(void)
        tests. With colour only there is no depth buffer to test against, so per the GL
        spec the test always passes, the model's six batches paint in array order, and
        its LAST batch -- an untextured, flat, full-radius disc -- covers the emblem.
-       That is the flat grey ellipse that was recorded.
+       That is the flat grey ellipse the project owner recorded on 26 Aug 2026.
 
        It hid from every gate because the app turns this chain on unconditionally
        (game_visuals_default_enhanced sets g_fx.enabled = 1, called on every non-classic

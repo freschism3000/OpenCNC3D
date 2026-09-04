@@ -14,9 +14,14 @@
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
 // MODIFIED for C&C 3D in August 2026. This is not EA's original file.
-// The change is additive and does not alter the game simulation; the complete
-// diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
-// lists every modified file.
+// Load_Alloc_Data now returns NULL when the file reports a size of zero or
+// less, instead of returning the non-null malloc(0) pointer that callers
+// treat as a successful load. This is a defensive fix for a crash when a
+// font or other asset is missing from disk and from every registered
+// mixfile.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
 //
 
 /* $Header: g:/library/wwlib32/file/rcs/load.cpp 1.4 1994/04/22 12:42:21 scott_bowen Exp $ */

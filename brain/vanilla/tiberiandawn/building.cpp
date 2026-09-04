@@ -12,6 +12,21 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Two separate changes. First, rally points for factories: a new
+// CNC3D_Can_Rally test (a player-owned IsFactory building that is not a
+// Construction Yard), a move click on such a building now posts the existing
+// ARCHIVE event to store a rally target, What_Action reports ACTION_MOVE for
+// it in both overloads, units leaving through Exit_Object and Mission_Unload
+// are sent to that rally target instead of the exit cell, and a captured
+// building's rally target is cleared. Second, the cheat menu's Build
+// Anywhere: Passes_Proximity_Check drops the base adjacency requirement for
+// a house that has the cheat on, keeping only the In_Radar on-map test.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\building.cpv   2.13   02 Aug 1995 17:00:14   JOE_BOSTIC  $ */
 /***********************************************************************************************

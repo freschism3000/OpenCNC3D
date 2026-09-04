@@ -160,7 +160,7 @@ def main():
     # fade to colour are the same for both houses -- and only the three that name a
     # continent differ: EARTH_A spins to Africa where EARTH_E spins to Europe, AFRICA is
     # the territory reel, CLICK_A the per-pixel click map.
-    # These were listed as needing CD-2 and they do not: all three sit
+    # These were listed in known-gap notes as needing CD-2 and they do not: all three sit
     # in the GENERAL.MIX we already ship, beside the GDI ones. Nobody had looked.
     add_wsa(general, "EARTH_A.WSA", "EARTH_A")
     add_wsa(general, "AFRICA.WSA", "AFRICA")

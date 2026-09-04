@@ -56,19 +56,65 @@ for f in "$REPO"/game/*.cpp "$REPO"/game/*.h "$REPO"/app/*.cpp "$REPO"/app/*.c \
     if [ "$t" -gt "$newest" ]; then newest="$t"; newest_name="$f"; fi
 done
 
+# THE NET SOURCES ARE A SECOND SET, kept separate from the newest above rather than folded
+# into it. Both game binaries link lockstep.o and net_udp.o, so both take the later of the
+# two numbers; what the split buys is the three standalone binaries in the run folder,
+# which are built from net/ and from nothing else and must not be called stale by an edit
+# to the renderer.
+#
+# It is here at all because the run folder now holds binaries the suite RUNS: G130 drives
+# gate_lockstep, gate_netloop and the shipped netcheck, and a stale copy of any of them is
+# a gate reporting on source that has since changed. That is precisely the failure this
+# file exists for, one directory over.
+net_newest=0
+net_newest_name=""
+for f in "$REPO"/net/*.c "$REPO"/net/*.h; do
+    [ -f "$f" ] || continue
+    t=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)
+    [ -n "$t" ] || continue
+    if [ "$t" -gt "$net_newest" ]; then net_newest="$t"; net_newest_name="$f"; fi
+done
+
 fail=0
 for bin in cnc_eyes cnc3d; do
     p="$RUNDIR/$bin"
+    # Both link the net objects (game/build.sh and app/build.sh compile them), so the
+    # threshold is the later of the two sets.
+    want="$newest"; want_name="$newest_name"
+    if [ "$net_newest" -gt "$want" ]; then
+        want="$net_newest"; want_name="$net_newest_name"
+    fi
     if [ ! -x "$p" ]; then
         echo "  $bin: MISSING from $RUNDIR"
         fail=1
         continue
     fi
     bt=$(stat -f %m "$p" 2>/dev/null || stat -c %Y "$p" 2>/dev/null)
-    if [ "$bt" -lt "$newest" ]; then
-        age=$(( (newest - bt) / 60 ))
-        echo "  $bin: STALE by ${age} min -- older than $(basename "$newest_name")."
+    if [ "$bt" -lt "$want" ]; then
+        age=$(( (want - bt) / 60 ))
+        echo "  $bin: STALE by ${age} min -- older than $(basename "$want_name")."
         echo "      rebuild it:  cd $REPO/$([ "$bin" = cnc3d ] && echo app || echo game) && ./build.sh && cp $bin $RUNDIR/"
+        fail=1
+    else
+        echo "  $bin: current"
+    fi
+done
+
+# The three binaries G130 runs. A missing one is NOT reported as a failure here, because
+# G130 already goes red for exactly that and two reds for one cause reads as two problems.
+# Staleness is the part only this file can see.
+for bin in gate_lockstep gate_netloop netcheck; do
+    p="$RUNDIR/$bin"
+    if [ ! -x "$p" ]; then
+        echo "  $bin: not deployed (G130 reports that; game/make-build.sh copies it)"
+        continue
+    fi
+    bt=$(stat -f %m "$p" 2>/dev/null || stat -c %Y "$p" 2>/dev/null)
+    if [ "$net_newest" -gt 0 ] && [ "$bt" -lt "$net_newest" ]; then
+        age=$(( (net_newest - bt) / 60 ))
+        echo "  $bin: STALE by ${age} min -- older than $(basename "$net_newest_name")."
+        echo "      rebuild it:  cd $REPO/game && ./build.sh && ./make-build.sh $RUNDIR"
+        echo "      G130 runs this binary, so a stale one is a green gate on old source"
         fail=1
     else
         echo "  $bin: current"

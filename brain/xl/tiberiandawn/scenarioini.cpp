@@ -472,7 +472,7 @@ bool Read_Scenario_Ini(char* root, bool fresh)
     ini.Get_TextBlock("Briefing", Scen.BriefingText, sizeof(Scen.BriefingText));
 
     /*
-    **	If the briefing text could not be found in the INI file, then search
+    **	If the mission briefing text could not be found in the INI file, then search
     **	the mission.ini file.
     */
     if (Scen.BriefingText[0] == '\0') {
@@ -866,7 +866,7 @@ bool Read_Scenario_Ini_File(char* scenario_file_name, char* bin_file_name, const
     ini.Get_TextBlock("Briefing", Scen.BriefingText, sizeof(Scen.BriefingText));
 
     /*
-    **	If the briefing text could not be found in the INI file, then search
+    **	If the mission briefing text could not be found in the INI file, then search
     **	the mission.ini file.
     */
     if (Scen.BriefingText[0] == '\0') {

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define LOGO3D_MAXLOGO   4
+#define LOGO3D_MAXLOGO   8
 #define LOGO3D_MAXTEX    8
 #define LOGO3D_MAXBATCH  8
 
@@ -20,6 +20,11 @@ extern "C" {
 #define LOGO3D_GDI   0
 #define LOGO3D_NOD   1
 #define LOGO3D_TITLE 2
+/* BRF_EVA_ROOT, the cartridge's own EVA wordmark, added for the DATABASE screen. Its
+   Vtx RGB bytes are grey COLOURS rather than packed normals, so bake_logos.py
+   synthesises face normals for it and the lighting on this one is OURS -- that file's
+   KIND table carries the statement. */
+#define LOGO3D_EVA   3
 
 /* The pitch the emblems shipped at before it became a dial. Callers with nothing to
    tune from should pass this rather than a bare number. */

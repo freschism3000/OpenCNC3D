@@ -5,7 +5,7 @@
 #   tools/win/build-launcher-win.sh          -> build/win/C&C3D.exe
 #
 # It reads launcher/sources.sh, the SAME list launcher/build.sh reads, so a file
-# added on one platform cannot be forgotten on the other. That is the repository's rule 4
+# added on one platform cannot be forgotten on the other. That is repository rules rule 4
 # expressed by construction rather than by a guard script: there is one list.
 #
 # THREE THINGS ARE DIFFERENT FROM THE GAME'S OWN WINDOWS BUILD, each for a reason:

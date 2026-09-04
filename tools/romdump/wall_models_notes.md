@@ -1,7 +1,7 @@
 # Wall model slots — SETTLED (visual proof + table archaeology)
 
 Read-only RE pass. ROM: `data/rom/cnc_eu.z64` (big-endian). This settles bug #13's
-open question: which model-table slots hold the five wall
+open question (docs/newbug-diagnosis.md): which model-table slots hold the five wall
 types. The old guesses (SBAG=93..WOOD=97) are WRONG — those are the proven bullet
 models. The true wall meshes live in the 150-209 range, four connectivity variants each.
 

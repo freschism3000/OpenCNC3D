@@ -56,7 +56,7 @@ import textures as TX                              # noqa: E402
 
 ROM_CANDIDATES = [
     os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "rom", "cnc_eu.z64")),
-    os.environ.get("CNC3D_ROM", ""),
+    os.path.expanduser("./data/rom/cnc_eu.z64"),
 ]
 
 # BriefingCode: rom = ram - delta. From the loader's own segment table (segments.py).
@@ -576,7 +576,7 @@ def main():
     table = briefing_models(rom)
     for name in wanted:
         if name not in table:
-            print("!! %s is not in the briefing name table (%s)"
+            print("!! %s is not in the mission briefing name table (%s)"
                   % (name, ", ".join(sorted(table))))
             continue
         path, size, mesh, texfiles = export(rom, name, table[name], outdir)

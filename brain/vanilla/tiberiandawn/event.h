@@ -92,15 +92,22 @@ public:
 
     /*
     ** 'Frame' is the frame that the command should execute on.
-    ** 27 bits gives over 25 days of playing time without wrapping,
-    ** at 30 frames per second, so it should be plenty!
+    ** CNC3D: was 27 bits, narrowed to 24 to pay for the wider ID below. 24 bits is
+    ** 6.4 days at 30 frames per second and 12.9 days at the 15 Hz this game runs at,
+    ** which is still absurdly more than any single match. Westwood made this exact
+    ** trade themselves: redalert/event.h is the same class at Frame:26 / ID:5.
     */
-    unsigned Frame : 27;
+    unsigned Frame : 24;
 
     /*
     ** House index of the player originating this event
+    ** CNC3D: was 4 bits, which names 16 houses, and four of those are the campaign
+    ** houses, so the classic wire tops out at twelve multiplayer slots. 7 bits names
+    ** 128 and is what lets the roster grow to sixteen players and beyond. The three
+    ** bits come out of Frame above, so the word is still 32 bits and the structure is
+    ** still the same size: see the static_assert below.
     */
-    unsigned ID : 4;
+    unsigned ID : 7;
 
     /*
     ** This bit tells us if we've already executed this event.
@@ -242,5 +249,17 @@ public:
     static const char* EventNames[LAST_EVENT];
 };
 #pragma pack(pop)
+
+/*
+**	CNC3D: the wire unit's size, pinned rather than remembered.
+**
+**	This structure IS the network wire unit: lockstep sends orders by copying it whole.
+**	Its three bitfields share one 32-bit word, so the Frame:24 / ID:7 respin is meant to
+**	be size neutral against the original Frame:27 / ID:4. "Meant to be" is not a fact,
+**	and packing rules differ between compilers and architectures, so it is asserted here
+**	and the build enforces it forever rather than a reader trusting this comment.
+*/
+static_assert(sizeof(EventClass) == 22, "EventClass is the network wire unit and must stay 22 bytes");
+
 
 #endif

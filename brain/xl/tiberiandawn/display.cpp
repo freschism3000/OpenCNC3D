@@ -269,6 +269,14 @@ void DisplayClass::Init_Clear(void)
     MapClass::Init_Clear();
 
     /*
+    ** CNC3D: drop Build Anywhere with the scenario, for the reason ObjectClass::Init
+    ** drops the invincibility mask -- Clear_Scenario() is on every path that begins a
+    ** scenario, so a switch cleared here cannot follow the player out of a skirmish
+    ** and into a campaign mission.
+    */
+    CNC3D_BuildAnywhereHouses = 0;
+
+    /*
     ** Clear any object being placed
     */
     PendingObjectPtr = 0;
@@ -862,6 +870,40 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object)
  *   06/07/1994 JLB : Handles concrete check.                                                  *
  *   10/11/1994 BWG : Added IsProximate check for ore refineries                               *
  *=============================================================================================*/
+uint64_t DisplayClass::CNC3D_BuildAnywhereHouses = 0;
+
+/***********************************************************************************************
+ * DisplayClass::CNC3D_Set_Build_Anywhere -- Lifts the base adjacency rule for one house.      *
+ *                                                                                             *
+ *    Sets or clears one house's bit. While the bit is set, that house's buildings no longer   *
+ *    have to touch its existing base. NOTHING ELSE is relaxed: the ground still has to be     *
+ *    buildable, so rivers, rock and cliffs refuse a foundation exactly as before.             *
+ *                                                                                             *
+ * INPUT:   house -- The house to change; HOUSE_NONE is ignored.                                *
+ *          on    -- True to let that house build anywhere, false for the normal rule.         *
+ *                                                                                             *
+ * OUTPUT:  none                                                                               *
+ *=============================================================================================*/
+void DisplayClass::CNC3D_Set_Build_Anywhere(HousesType house, bool on)
+{
+    if (house == HOUSE_NONE || house >= HOUSE_COUNT) {
+        return;
+    }
+    if (on) {
+        CNC3D_BuildAnywhereHouses |= (1ULL << house);
+    } else {
+        CNC3D_BuildAnywhereHouses &= ~(1ULL << house);
+    }
+}
+
+bool DisplayClass::CNC3D_Build_Anywhere(HousesType house)
+{
+    if (CNC3D_BuildAnywhereHouses == 0 || house == HOUSE_NONE || house >= HOUSE_COUNT) {
+        return (false);
+    }
+    return ((CNC3D_BuildAnywhereHouses & (1ULL << house)) != 0);
+}
+
 bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
                                           HousesType house,
                                           short const* list,
@@ -873,6 +915,23 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
     ** In editor mode, the proximity check always passes.
     */
     if (Debug_Map) {
+        return (true);
+    }
+
+    /*
+    ** CNC3D: the cheat menu's Build Anywhere.
+    **
+    ** IT LIFTS THE ADJACENCY RULE ONLY. This routine is the whole of the "must touch
+    ** your base" test and nothing else; whether the GROUND will take a foundation is
+    ** decided in CellClass (Is_Generally_Clear), which is not reached from here and is
+    ** not touched by this. So the player gets to build away from base and still cannot
+    ** build on a river, a cliff or rock.
+    **
+    ** IT BELONGS IN THIS OVERLOAD, not the single argument one. The first cut in the
+    ** classic brain put it in that one's #else arm, which USE_RA_AI compiles out: it
+    ** built clean, changed nothing, and only the measurement caught it.
+    */
+    if (CNC3D_Build_Anywhere(house)) {
         return (true);
     }
 
@@ -1294,7 +1353,19 @@ void DisplayClass::Read_INI(CCINIClass& ini)
     }
 
     MapBinaryVersion = ini.Get_Int("MAP", "Version", MAP_VERSION_NORMAL);
-    MapBinaryVersion = Bound(MapBinaryVersion, 0, 1); // Little hack to stop arbitrary values.
+    /*
+    **	The bound is right and its ceiling was one short. XL adds a third format, and a
+    **	clamp of 0..1 does not reject a Version=2 map -- it silently reads it AS THE MEGA
+    **	FORMAT, which is the one outcome worse than refusing it: every cell number is then
+    **	converted from a stride it was never written at, and the map lands scattered across
+    **	the array with nothing anywhere saying why. That is a segfault in the waypoint loop
+    **	twenty lines below, at a cell number past the end of the map.
+    **
+    **	Anything above the highest format we know is still clamped, deliberately: a future
+    **	format read as this one is the same failure again, and it is better to open such a
+    **	map as XL-native and be wrong about its contents than to be wrong about its stride.
+    */
+    MapBinaryVersion = Bound(MapBinaryVersion, 0, MAP_VERSION_XL);
 
     /*
     ** Remove any old theater specific uncompressed shapes
@@ -1333,11 +1404,9 @@ void DisplayClass::Read_INI(CCINIClass& ini)
         Scen.Waypoint[i] = ini.Get_Int("Waypoints", buf, -1);
         if (Scen.Waypoint[i] != -1) {
             /*
-            ** Convert the waypoints normal cell position to a new big map position.
+            ** Convert from the scenario's OWN stride into this build's (function.h).
             */
-            if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-                Scen.Waypoint[i] = Confine_Old_Cell(Scen.Waypoint[i]);
-            }
+            Scen.Waypoint[i] = Confine_Scenario_Cell(Scen.Waypoint[i], Map.MapBinaryVersion);
             (*this)[Scen.Waypoint[i]].IsWaypoint = 1;
         }
     }
@@ -1364,11 +1433,9 @@ void DisplayClass::Read_INI(CCINIClass& ini)
         char const* cellentry = ini.Get_Entry("CellTriggers", index);
         CELL cell = atoi(cellentry);
         /*
-        ** Convert the normal cell position to a big big map position.
+        ** Convert from the scenario's OWN stride into this build's (function.h).
         */
-        if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-            cell = Confine_Old_Cell(cell);
-        }
+        cell = Confine_Scenario_Cell(cell, Map.MapBinaryVersion);
         if (cell > 0 && cell < MAP_CELL_TOTAL && !(*this)[cell].IsTrigger) {
 
             /*
@@ -1417,13 +1484,33 @@ void DisplayClass::Write_INI(CCINIClass& ini)
     ini.Put_Int(NAME, "Height", MapCellHeight);
 
     /*
-    ** Unconditionally set it for now, need to conditionally write cell numbers to the ini file
-    ** to support being able to write either version.
+    **	KEEP THE FORMAT THE MAP CAME IN AS. This used to assign MAP_VERSION_MEGA
+    **	unconditionally, with a note saying the cell numbers would need to follow one day.
+    **	They do follow now -- every reader and writer converts through
+    **	Confine_Scenario_Cell / Scenario_Cell_Of against MapBinaryVersion -- so forcing the
+    **	version here would relabel a map as a format its own numbers are not in. A legacy
+    **	map re-saves as the legacy format it was, and an XL map as XL.
+    **
+    **	Version is omitted for MAP_VERSION_NORMAL because its absence IS that format; the
+    **	reader defaults to it.
     */
-    MapBinaryVersion = MAP_VERSION_MEGA;
+    /*
+    **	AND PROMOTE IT IF THE CONTENT NO LONGER FITS. Keeping the format the map came in
+    **	as is right until the map has outgrown it: a scenario read as the 64-wide format
+    **	whose rect now reaches past cell 63 would have every cell number written through
+    **	Scenario_Cell_Of at a stride of 64, where two different cells alias onto one INI
+    **	key and the map quietly loses content. Writing it as the wider format instead is
+    **	lossless and is what the reader will do the right thing with.
+    */
+    if (MapBinaryVersion == MAP_VERSION_NORMAL
+        && (MapCellX + MapCellWidth > OLD_MAP_CELL_W || MapCellY + MapCellHeight > OLD_MAP_CELL_W)) {
+        GlyphX_Debug_Print("Write_INI: this map no longer fits the 64-wide scenario format; "
+                           "writing it as the wider one rather than aliasing its cell numbers.");
+        MapBinaryVersion = MAP_VERSION_MEGA;
+    }
 
-    if (MapBinaryVersion == MAP_VERSION_MEGA) {
-        ini.Put_Int(NAME, "Version", 1);
+    if (MapBinaryVersion != MAP_VERSION_NORMAL) {
+        ini.Put_Int(NAME, "Version", MapBinaryVersion);
     }
 
     /*
@@ -1434,7 +1521,8 @@ void DisplayClass::Write_INI(CCINIClass& ini)
     for (int i = 0; i < WAYPT_COUNT; i++) {
         if (Scen.Waypoint[i] != -1) {
             sprintf(entry, "%d", i);
-            ini.Put_Int(WAYNAME, entry, Scen.Waypoint[i]);
+            /* the scenario's own stride, not ours -- see Scenario_Cell_Of */
+            ini.Put_Int(WAYNAME, entry, Scenario_Cell_Of(Scen.Waypoint[i], MapBinaryVersion));
         }
     }
 
@@ -1449,9 +1537,10 @@ void DisplayClass::Write_INI(CCINIClass& ini)
             if (tp != NULL) {
 
                 /*
-                **	Generate entry name.
+                **	Generate entry name, at the scenario's own stride rather than ours
+                **	-- see Scenario_Cell_Of.
                 */
-                sprintf(entry, "%d", cell);
+                sprintf(entry, "%d", Scenario_Cell_Of(cell, MapBinaryVersion));
 
                 /*
                 **	Save entry.
@@ -2829,7 +2918,23 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
         case SOURCE_AIR:
             cell = Scen.Waypoint[WAYPT_REINF];
             if (cell < 1) {
-                cell = Coord_Cell(TacticalCoord);
+                /*
+                **	CNC3D lockstep: the original fallback read Coord_Cell(TacticalCoord), a
+                **	DisplayClass view member, from inside the simulation. In this build that
+                **	expression is already peer invariant and always equals XY_Cell(MapCellX,
+                **	MapCellY): under REMASTER_BUILD, DisplayClass::Set_Tactical_Position
+                **	discards its argument (xx = yy = 0) and recomputes the playfield's top
+                **	left corner, and it only writes TacticalCoord while ScenarioInit is set,
+                **	so nothing after scenario load can move it. Writing the constant down
+                **	makes that a contract instead of an accident of the host's design, and
+                **	is value identical on every map -- no cell changes anywhere.
+                **
+                **	The early return is deliberate and must stay: the code after the switch
+                **	zeroes an occupied cell, and the enclosing while(cell == 0) loop would
+                **	then spin forever, because this arm returns a constant and draws no
+                **	random numbers to vary on the next pass.
+                */
+                cell = XY_Cell(MapCellX, MapCellY);
                 return (cell);
             } else {
                 if ((*this)[cell].Cell_Techno()) {
@@ -2848,7 +2953,50 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
         **	Dramatic entry point is somewhere on the visible screen as defined
         **	by the current tactical map position.
         */
+        /*
+        **	"Dramatic entry point somewhere on the visible screen" is REFUSED
+        **	UNDER LOCKSTEP and left exactly as 1995 wrote it everywhere else.
+        **	It was never deterministic and no shipped scenario has ever asked
+        **	for it, but a hand-written Edge=Visible map played on its own is
+        **	entitled to the behaviour it has always had.
+        **
+        **	It read three things that differ between peers. TacticalCoord, the
+        **	local camera, supplied both cell origins. TacLeptonWidth and
+        **	TacLeptonHeight, the local viewport, supplied the two Random_Pick
+        **	RANGES; DisplayClass::Set_View_Dimensions derives them from the local
+        **	framebuffer, so two peers running at different resolutions do not
+        **	get the same number. PlayerPtr, the local player, decided whether
+        **	the cell was thrown away. (In_Radar on that line was NOT one of them:
+        **	MapClass::In_Radar in map.cpp is a MapCellX/MapCellWidth bounds test,
+        **	which is shared scenario state.)
+        **
+        **	The ranges were the worst of the three. RandomClass's ranged operator
+        **	rejection samples against a mask derived from the range magnitude
+        **	(common/random.cpp:153-171), so a peer at a different resolution
+        **	advances Scen.RandomNumber a DIFFERENT NUMBER OF TIMES for the same
+        **	call. Matching the call count would not have been enough. And because
+        **	the PlayerPtr test could zero the cell and send control back around
+        **	the enclosing while (cell == 0), the skew was unbounded rather than
+        **	two draws, and the loop could fail to terminate at all.
+        **
+        **	Nothing can reach this. Edge= across the retail scenario INIs is only
+        **	North, East, South, West or None; the scenario editor writes only
+        **	those four (mapeddlg.cpp:2102-2161); and no code in this tree assigns
+        **	SOURCE_VISIBLE. The one route in is a hand-written Edge=Visible, since
+        **	"Visible" is SourceName[7] (const.cpp:37). Such a map is told so, and
+        **	gets no cell, exactly as SOURCE_ENEMYBASE and SOURCE_HOMEBASE below.
+        **	The supported way to land reinforcements near the player is SOURCE_AIR
+        **	with WAYPT_REINF, which is shared state.
+        */
         case SOURCE_VISIBLE:
+            if (CNC3D_Lockstep) {
+                GlyphX_Debug_Print("Calculated_Cell: Edge=Visible (SOURCE_VISIBLE) is not supported in "
+                                   "a network match and produced no reinforcement cell. It derives its "
+                                   "cell from the local camera and the local viewport, which are not "
+                                   "shared between peers. Use Edge=North/East/South/West, or a "
+                                   "Reinforcement waypoint with an air transport (SOURCE_AIR).");
+                return (0);
+            }
             cell = XY_Cell(Coord_XCell(TacticalCoord) + Random_Pick(0, Lepton_To_Cell(TacLeptonWidth) - 1),
                            Coord_YCell(TacticalCoord) + Random_Pick(0, Lepton_To_Cell(TacLeptonHeight) - 1));
             if (house == PlayerPtr->Class->House && !In_Radar(cell)) {

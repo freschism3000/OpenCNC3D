@@ -11,7 +11,7 @@
 #   clear  cells whose ground will take a foundation   -- the TERRAIN rule
 #   legal  origins where the whole footprint is both
 # Build Anywhere must move prox and legal a long way UP and must leave clear EXACTLY
-# where it was. That last one is the whole of the constraint, in one number: "so the
+# where it was. That last one is the whole of the project owner's constraint, in one number: "so the
 # user can build anywhere they want (but not on rivers, cliffs etc. for obvious
 # reasons)". If a future change lifted terrain legality too, clear would move and this
 # gate would fail, which is the only cheap way to keep that promise honest.

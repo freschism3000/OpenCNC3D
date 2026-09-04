@@ -1,8 +1,12 @@
 #
 # MODIFIED for C&C 3D in August 2026. This is not EA's original file.
-# The change is additive and does not alter the game simulation; the complete
-# diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
-# lists every modified file.
+# Selects the keyboard backend for the commonr library by platform:
+# wwkeyboard_win32.cpp on Windows, the already present wwkeyboard_null.cpp
+# everywhere else, so the headless library compiles off Windows. Build
+# configuration only, no engine code is added or altered.
+# It does not change the game simulation.
+# The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+# and NOTICE.md lists every modified file.
 #
 # Embed some git version information in the binary.
 set(GIT_PRE_CONFIGURE_FILE "gitinfo.cpp.in")

@@ -224,6 +224,30 @@ int hud640_meter_h(int rows)
     return H6_METER_H + (h6_clamp_rows(rows) - H6_ROWS) * H6_ROW_PITCH;
 }
 
+/* How many whole segments of a level are lit. The fill is tiled segments, so this is the
+   ONLY quantisation the meter has: 238 / 12 is 19 segments and 228 pixels of travel, ten
+   short of the channel's own 238, and every extra row adds 48 = 4 * 12 so the shortfall
+   stays ten whatever the bar height. A mark placed as a fraction of H6_METER_H would sit
+   up to a whole segment away from the fill it is there to be compared against. */
+static int h6_meter_on(int nseg, int level)
+{
+    if (level < 0) level = 0;
+    if (level > 100) level = 100;
+    return (nseg * level + 50) / 100;
+}
+
+int hud640_meter_segs(int rows)
+{
+    return hud640_meter_h(rows) / H6_METER_PITCH;
+}
+
+int hud640_meter_y(int rows, int level)
+{
+    const int meterH = hud640_meter_h(rows);
+    return H6_METER_Y0 + meterH
+         - h6_meter_on(meterH / H6_METER_PITCH, level) * H6_METER_PITCH;
+}
+
 int hud640_rows_for(int avail)
 {
     int rows;
@@ -333,8 +357,8 @@ void hud640_draw_bar(unsigned char *rgba, const H6_Pack *p, const H6_State *st)
      *    delivered art only carries green over part of the channel, so tiling a single
      *    segment is what lets 0% and 100% both render. */
     lit = hud640_asset(p, "meter_lit");
-    nseg = meterH / H6_METER_PITCH;
-    on = (nseg * (st->power_level < 0 ? 0 : st->power_level > 100 ? 100 : st->power_level) + 50) / 100;
+    nseg = hud640_meter_segs(rows);
+    on = h6_meter_on(nseg, st->power_level);
     for (k = 0; k < on; k++) {
         int y = H6_METER_Y0 + meterH - (k + 1) * H6_METER_PITCH;
         if (y < H6_METER_Y0) break;
@@ -364,6 +388,31 @@ void hud640_draw_bar(unsigned char *rgba, const H6_Pack *p, const H6_State *st)
                     q[2] = (unsigned char)(q[2] / 4);
                 }
             }
+        }
+    }
+
+    /* THE DRAIN MARKER, and it goes on AFTER the colour rotation above so the rotation
+       cannot eat it: the marker is blue, the one hue the fill never takes, so it reads
+       the same on green, on amber and on red.
+
+       It is placed by hud640_meter_y, not by a fraction of the channel height, because
+       the fill is whole segments tiled up from the floor and only travels
+       segs * H6_METER_PITCH of H6_METER_H. On its own lattice, drain equal to output puts
+       the marker exactly on the fill's top edge, which is the whole point of it.
+       `meter_drain` is an overlay the full width of the channel with its reading on its
+       CENTRE row, so the blit is offset by half its height; keep that height odd.
+       The art is the DOS gauge's own POWER shape redrawn at this scale, so both sidebars
+       mark one level with one mark. The `mark` test stays because an older pack does not
+       carry the asset, and such a pack must still draw a meter rather than nothing. */
+    if (st->power_drain_level > 0) {
+        const H6_Asset *mark = hud640_asset(p, "meter_drain");
+        if (mark) {
+            const int floory = H6_METER_Y0 + meterH;
+            const int ceily  = floory - nseg * H6_METER_PITCH;
+            int my = hud640_meter_y(rows, st->power_drain_level) - mark->h / 2;
+            if (my < ceily) my = ceily;
+            if (my > floory - mark->h) my = floory - mark->h;
+            h6_blit(rgba, H6_BAR_W, barh, mark, 0, H6_METER_X, my);
         }
     }
 
@@ -430,8 +479,9 @@ void hud640_draw_tab(unsigned char *rgba, const H6_Pack *p, const char *label,
            only word on screen -- the SIDEBAR word was baked into the chassis art. It is
            its own plate now, lettered from the same GRAD6FNT at the same size, because a
            word baked into the bar cannot survive the bar sliding away from under it. */
-        const char *asset = (strcmp(label, "SIDEBAR") == 0) ? "tab_sidebar"
-                                                            : "tab_options";
+        const char *asset = (strcmp(label, "SIDEBAR") == 0)  ? "tab_sidebar"
+                          : (strcmp(label, "DATABASE") == 0) ? "tab_database"
+                                                             : "tab_options";
         h6_blit(rgba, H6_BAR_W, H6_TAB_H, hud640_asset(p, asset), frame, 0, 0);
         return;
     }

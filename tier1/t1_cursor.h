@@ -1,7 +1,7 @@
 /*
  * t1_cursor.h -- the cartridge's 3D pointer, and the 2D one that belongs over the panel.
  *
- * Reported: "Cursors are not the correct mesh. Make sure the 2D cursor shows when moving it
+ * the project owner: "Cursors are not the correct mesh. Make sure the 2D cursor shows when moving it
  * over the HUD." Both halves of that are here.
  *
  * THE CONSOLE'S POINTER IS NOT A SPRITE. It is one of fourteen 3D MODELS drawn in the

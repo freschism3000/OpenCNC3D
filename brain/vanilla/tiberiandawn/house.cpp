@@ -12,6 +12,22 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Adds a static bitmask of houses whose super weapons were granted by the
+// cheat menu, with a setter and getter, cleared in HouseClass::Init so the
+// grant dies with the scenario. Uses it in two places: HouseClass::AI no
+// longer force-removes a cheat-granted nuke from a house that owns no Temple
+// of Nod, and Place_Special_Blast lets such a house launch the nuke off-map
+// in single player instead of refusing. Also adds an unconditional printf
+// tracing each nuke launch request, and a NULL-safe wrapper around
+// Text_String for the three defeat messages in MPlayer_Defeated, where a
+// missing string table previously passed a NULL format to sprintf and
+// crashed the process.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\house.cpv   2.13   02 Aug 1995 17:03:50   JOE_BOSTIC  $ */
 /***********************************************************************************************
@@ -1364,8 +1380,8 @@ void HouseClass::AI(void)
         ** still show it -- sampled between the enable and the remove -- while
         ** NukeStrike.Is_Ready() was false whenever the launch event actually landed.
         ** Measured: "CNC3D|nuke|request|ready=0|cheat=1" on a press the sidebar had
-        ** just reported as prog=1.000 ready=1. Reported: "I cannot use the
-        ** Nuke superweapon if I Unlock it using the cheat".
+        ** just reported as prog=1.000 ready=1. Reported as a nuke that cannot be fired
+        ** after being unlocked from the cheat menu.
         **
         ** With the switch off this reads exactly as it did before, so an ordinary game
         ** still loses its nuke the moment the Temple goes down.
@@ -2800,11 +2816,11 @@ bool HouseClass::Place_Special_Blast(SpecialWeaponType id, CELL cell)
                 */
                 /*
                 ** CNC3D: ... and in single player when the cheat menu handed the player
-                ** the super weapons. Reported: "I cannot use the Nuke
-                ** superweapon if I Unlock it using the cheat, but dont unlock anything
-                ** else (without a construction yard for instance)."
+                ** the super weapons: the nuke could not be fired after being unlocked
+                ** from the cheat menu with nothing else unlocked, and with no
+                ** construction yard standing.
                 **
-                ** He had the nuke and it was charged -- the sidebar listed SW_Nuke with
+                ** The nuke was there and it was charged -- the sidebar listed SW_Nuke with
                 ** prog=1.000 and ready=1 -- and pressing it did nothing at all, because
                 ** the launch-site search above found no Temple of Nod and this line
                 ** returned false before the charge was even spent. The Ion Cannon and

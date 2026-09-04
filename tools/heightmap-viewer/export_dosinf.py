@@ -45,7 +45,7 @@ WHAT COMES FROM WHERE
              palette indices 176..191 -- the gold uniform band -- to
              bake_dosinfantry.N64_BAND_NOD, the cartridge's desaturated blue-grey
              (ROM 0x99130 entries 16..31). Deliberately NOT const.cpp:404's
-             RemapLtBlue teal: the teal was looked at and rejected. See the
+             RemapLtBlue teal: the project owner looked at the teal and rejected it. See the
              long note at bake_dosinfantry.py:303-328 for why the two bands are
              the same sixteen slots.
   Shadow     display.cpp:357 UShadowCols: palette index 4 is a ghost colour the
@@ -115,7 +115,7 @@ from export import bleed_rgba                          # noqa: E402
 #       stored sprite facings, counter-clockwise from north.
 #   dosinf_mod.h:103    facenum = HumanShape[Facing32[dir & 255]]
 #
-# NOTE ON THE FIELD NAME: the requirement was "facing32" as 32 ints. The real
+# NOTE ON THE FIELD NAME: the requirement asked for "facing32" as 32 ints. The real
 # table is 256 entries long -- it is indexed by the 8-bit DirType, and its OUTPUT
 # is 0..31. Emitting a 32-entry slice would be unusable, so the full 256 go out
 # and the JSON carries a "facingNote" saying so.
@@ -135,7 +135,7 @@ DOSINF_HUMANSHAPE = [0, 0, 7, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 5, 5, 4,
 FACING_ORDER = ("counter-clockwise from north: N,NW,W,SW,S,SE,E,NE; "
                 "8 stored, no mirroring")
 
-# The twenty InfantryTypes, in the order the brief lists them.
+# The twenty InfantryTypes, in the order the requirement lists them.
 TYPE_ORDER = (["E1", "E2", "E3", "E4", "E5", "E6", "RMBO"]
               + ["C%d" % i for i in range(1, 11)]
               + ["CHAN", "DELPHI", "MOEBIUS"])

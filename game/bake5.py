@@ -164,6 +164,33 @@ so the renderer does no swapping), written directly BEFORE the PK9 heights.
 BEFORE, not after: every block from the heights down is read by an EOF-relative
 fseek, so anything inserted between the heights and the water tail moves those
 seeks and breaks them. Full decode trail: tools/romdump/terrain_cm_notes.md.
+
+Format, magic "CNC3DPKG" version 16: TWO changes, and one of them retires a header.
+
+  1. A second terrain atlas. One int32 is written directly after the existing
+     terrain-atlas bank index, holding the bank index of the SAME tiles drawn from
+     Tiberian Dawn's own theater art instead of the cartridge's (the cart's TL4/TL8
+     tables name the PC (template, icon) every bank slot came from, so the two sets
+     line up one for one). Enhanced Visuals binds it; -1 means the theater has no DOS
+     original -- SNOW and SAND -- and the switch has nowhere to go. The two atlases are
+     packed identically and are the same size, because every cell carries ONE set of
+     UVs that has to address both. WINTER's bank was built from that art already, so
+     its two atlases are byte-identical and share a single bank slot.
+     Why a second atlas rather than a second pack: the choice is a live toggle in the
+     Visuals dialog, so both have to be resident. Rationale and the measurements behind
+     it are recorded with the terrain bake.
+
+  2. PKE is gone. The grid (u32 mapW, mapH after the version) is now written ALWAYS.
+     PKE existed only to keep 64x64 packs byte-identical across the PKF change, and
+     since PKG rewrites every pack anyway that saving protects nothing -- while the
+     split was a live trap, because baking a big grid as PKE mis-read it with 64x64
+     tail offsets and nothing detected it. load_pack's `pkf` test is unaffected: it
+     asks magic[7] >= 'F' and 'G' satisfies it.
+
+  The insertion is in the SEQUENTIAL region, not the tail. That is safe here and is
+  not a repeat of the PKA regression: every tail block is found by an EOF-relative
+  fseek, so bytes added ahead of them do not move them, and the sequential reader is
+  version-gated on the magic. The water pair remains the file's last eight bytes.
 """
 import json
 import os
@@ -816,7 +843,7 @@ def bake_mesh_prim(off, bank):
         # MODE_SHADOW, anything with a zero alpha texel becomes MODE_CUTOUT, everything
         # else MODE_OPAQUE. A texture format cannot tell a canopy from a solid panel, so
         # 69 faces the cartridge draws see-through have been drawing as solid: the Recon
-        # Bike's and Jeep's windscreens, the Apache's canopy, the SSM launcher's, the
+        # Bike's and Jeep's windscreens, the Apache's canopy, the rocket launcher's, the
         # Weapons Factory's open bay, the sandbag and concrete wall shadows, and both
         # power plants' coolant pools, which is why one sees that water in the wrong
         # colour rather than as blue liquid.
@@ -929,7 +956,18 @@ XLU_EXPECT = {
     0x11ACD0: 4, 0x11AE28: 6, 0x11AFD0: 8, 0x11B118: 4,   # SBAG wall shadows
     0x147DC0: 3,                                          # WEAP, the open bay
     0x14AF68: 2,                                          # JEEP windscreen
-    0x14CB50: 2,                                          # MSAM
+    # MSAM is the ROCKET LAUNCHER, the vehicle a player calls the MRLS. Tiberian Dawn
+    # SWAPS the two rocket idents (udata.cpp declares UnitMLRS with the code string
+    # "MSAM"), so a search for MLRS examines the wrong vehicle and finds no mesh at all.
+    # These two faces are its WINDSCREEN: the raked front panel of the cab, running from
+    # the roof's front edge down to the nose. The cartridge draws them with combiner
+    # FC327E64/FFFFF7FB, rgb = SHADE * PRIM and alpha = PRIM_A, which has NO TEXEL0 term,
+    # over PRIM (49,79,139,135). Untextured translucent blue glass is the CORRECT result
+    # here. It has already been reported once as a missing texture, and the tile bound at
+    # that point still holds the I-format image from the two shadow faces just before it,
+    # which is exactly what makes a lost texture the tempting reading. The combiner is
+    # the authority, not the bound image.
+    0x14CB50: 2,                                          # MSAM windscreen
     0x152FE0: 4,                                          # HELI canopy
     0x156CB0: 6,                                          # BIKE
     # THE ION CANNON's three shock rings. Render mode 0x005049D8 with combiner
@@ -1534,7 +1572,7 @@ NUKE_SLOTS = [(6, 0x0100888, "dome"), (7, 0x0100E68, "stem"),
               (8, 0x01011F0, "collar"), (9, 0x0101E88, "cloud")]
 NUKE_MESH = "NUKEFX"
 NUKE_FRAMES = 31
-# 2.5x WAS ASKED FOR: at the cartridge's own 0.3 the mushroom is about a
+# the project owner ASKED FOR 2.5x, 25 Aug 2026: at the cartridge's own 0.3 the mushroom is about a
 # tile and a quarter across, which is faithful and reads as small on a modern screen at
 # this camera distance. 0.3 * 2.5 = 0.75. The cartridge's number is kept in the comment
 # rather than deleted, because it is the thing to return to if faithfulness ever wins.
@@ -1779,7 +1817,7 @@ def bake_ion_effect(bank, meshes, meshindex, meshparts, meshsections, verbose=Tr
     # clip would pulse through its eight images forever; the spec's own summary is that
     # the column "drops out of the sky" and that the event is over by 1600. Bounded at its
     # clip end. If the console really does hold a planted column there, this is the line to
-    # revisit --, registered as an open gap rather than left as a silent choice.
+    # revisit -- registered in known-gap notes rather than left as a silent choice.
     # The beam's bound is ONE SLOT PAST its clip end, because 1120 is the last frame it
     # actually shows (its 8-image book at 160 a frame spans t=0..1120) rather than the
     # point where it stops. The rings' bound is the opposite kind of number: times[-2] is
@@ -1921,7 +1959,7 @@ def bake_ion_effect(bank, meshes, meshindex, meshparts, meshsections, verbose=Tr
 # ---------------------------------------------------------------------------
 # THE RALLY POINT FLAG (PK4 mesh + PKB clip)
 # ---------------------------------------------------------------------------
-# Reported: "Take the Flag Pole and Animated flag from the Barracks, seperate it,
+# the project owner, 25 Aug 2026: "Take the Flag Pole and Animated flag from the Barracks, seperate it,
 # and use it for the Rally Point for all buildings."
 #
 # The Barracks has one, and it is the only flag in the cartridge. PYLE's scene graph is
@@ -2207,9 +2245,177 @@ def bake_struct_flipbooks(um, bank, meshes, meshindex, meshparts, meshsections,
     return extra
 
 
+# ---------------------------------------------------------------------------
+# THE DESERT FLORA SWAP
+# ---------------------------------------------------------------------------
+# The cartridge does not ship a separate desert tree TYPE. It ships one set of tree
+# types and REMAPS THE MODEL ID AT DRAW TIME when the theater is desert. The draw
+# command enqueue at RAM 0x8004A420 (resident ROM 0x04B020) reads the theater word at
+# RAM 0x80097150 and, when it is zero, adds 97 to any model id in [103,121]:
+#
+#     0x8004A430  lw    $v0, 0x7150($v0)      the theater word
+#     0x8004A454  bnez  $v0, ...              not theater 0: leave the id alone
+#     0x8004A45C  slti  $v0, $s0, 0x67        id < 103: leave it alone
+#     0x8004A468  slti  $v0, $s0, 0x7A        id < 122
+#     0x8004A470  addiu $s0, $s0, 0x61        +97, in a BRANCH-LIKELY delay slot
+#
+# Branch-likely means that add runs only when the branch is taken, so the input range
+# is exactly [103,121], which is exactly T01..T18. Model slot is id + 10, so the
+# outputs are slots 210..228, and those nineteen slots hold exactly FOUR distinct
+# scene-graph nodes: two cacti and two scrub trees.
+#
+# WHY IT IS RESOLVED HERE AND NOT IN THE RENDERER. A pack is baked for ONE scenario and
+# therefore for one theater, and the pack's type table is keyed by the INI name the
+# renderer already looks the object up by. Binding the name to the right mesh at bake
+# time computes the same answer the console computes at draw time, needs no renderer
+# change and no pack format change, and costs nothing per frame. The alternative -- a
+# theater test inside draw_terrain_object -- would have to re-derive the theater in the
+# view layer from a string the pack carries for a different purpose, which is the very
+# confusion the resolver below exists to prevent. So: BAKER SIDE, deliberately.
+#
+# T08 IS THE ONE THAT MUST STAY THEATER DEPENDENT. It is the only tree registered in
+# all three theater fields (id 110 in every one), it is placed on 558 desert cells
+# across 44 shipped missions AND on temperate cells too, so an unconditional swap would
+# put a desert scrub tree in the temperate campaign. T04, T09 and T18 are desert only.
+#
+# ALL EIGHTEEN ARE BOUND, not only the four a shipped desert mission actually places.
+# The cartridge's arithmetic covers the whole range and so does this: T01..T03, T05..T07
+# and T10..T17 register -1 in their desert field, so no shipped scenario can place one,
+# but the map editor can and the console would draw a cactus if it did. Binding only the
+# four would have left a hole that only an authored map could fall into.
+#
+# THE FOUR FAMILIES, straight off the primary model table (base ROM 0x9A598, stride 16,
+# scene-graph node pointer at +0x0C). Slot = n64 id + 97 + 10:
+#     210..213 -> node 0x801B46C8  dl_00FE360   tall columnar cactus, 12 tris
+#     214..218 -> node 0x801B46E4  dl_00FE660   scrub tree,            8 tris
+#     219..222 -> node 0x801B4700  dl_00FE918   small twin cactus,     8 tris
+#     223..228 -> node 0x801B471C  dl_00FEBD8   largest scrub tree,    8 tris
+# Four, five, four and six slots wide: nineteen slots for eighteen tree types, and the
+# one spare is id 111, which no TerrainTypeClass registers. It falls in the five-wide
+# family, the only family with room for it. That is the enumeration closing on itself.
+# Each family is named here after the one desert-legal tree in it.
+DESERT_TERRAIN_FAMILY = ((210, 213, "T04D"), (214, 218, "T08D"),
+                         (219, 222, "T09D"), (223, 228, "T18D"))
+# The N64 model id of each tree type, from the 32 TerrainTypeClass registrations (ctor
+# RAM 0x801EAC0C, jals ROM 0x18CEE0..0x18DD70): T01..T08 are 103..110, id 111 is unused,
+# T09..T18 are 112..121. check_terrain_ids below reads the same numbers back out of
+# unit_models.json's own n64_model_index fields, so the table and the data cannot drift
+# apart in silence.
+TERRAIN_N64_ID = dict(("T%02d" % n, (102 + n) if n <= 8 else (103 + n))
+                      for n in range(1, 19))
+DESERT_TERRAIN_MESH = {}
+for _code, _id in TERRAIN_N64_ID.items():
+    _slot = _id + 97 + 10
+    for _lo, _hi, _entry in DESERT_TERRAIN_FAMILY:
+        if _lo <= _slot <= _hi:
+            DESERT_TERRAIN_MESH[_code] = _entry
+            break
+assert len(DESERT_TERRAIN_MESH) == 18 and \
+    (DESERT_TERRAIN_MESH["T04"], DESERT_TERRAIN_MESH["T08"],
+     DESERT_TERRAIN_MESH["T09"], DESERT_TERRAIN_MESH["T18"]) == \
+    ("T04D", "T08D", "T09D", "T18D"), DESERT_TERRAIN_MESH
+
+
+def check_terrain_ids(um):
+    """The tree ids this file derives the swap from must be the ones the data carries.
+
+    A silent disagreement here would bind a tree to the wrong cactus family and nothing
+    downstream could tell, because every family is a legal mesh.
+    """
+    for code, want in sorted(TERRAIN_N64_ID.items()):
+        got = um.get(code, {}).get("n64_model_index")
+        assert got == want, ("unit_models.json %s has n64_model_index %r, but the "
+                             "desert flora swap was derived from %d. One of the two is "
+                             "wrong and the swap must not run until it is settled."
+                             % (code, got, want))
+
+# THE THEATER IDENTITY, and why it is not the string in the terrain JSON.
+#
+# There are TWO different theater words in this project and they legitimately disagree.
+# game/missions/SCA01EA.INI says Theater=DESERT (what the TD brain runs) and carries
+# CNC3DTheater=SAND (what we repaint it with), so its baked terrain JSON says "SAND".
+# A flora test keyed on the string "DESERT" therefore MISSES a genuine desert mission,
+# and the same hole swallows SNOW, which is our repaint of WINTER. The flora remap is a
+# property of the ENGINE theater, because the ids it moves come from the TerrainTypeClass
+# per-theater fields the brain itself indexes -- so the engine theater is what decides,
+# and the look name never is.
+#
+# LOOK_THEATER is deliberately EXHAUSTIVE and raises on anything it has not been told
+# about: adding a sixth repaint must be a decision, not a silent fall-through to "not
+# desert". TD_THEATER is the Tiberian Dawn theater enum, which is also the cartridge's:
+# its loader at RAM 0x801E5190 selects DESERT.TL4/.TL8 for 0 and TEMPERAT.TL4/.TL8 for 2
+# and prints "Illegal theater type: %d" for anything else.
+LOOK_THEATER = {"DESERT": "DESERT", "SAND": "DESERT",
+                "TEMPERAT": "TEMPERATE", "TEMPERATE": "TEMPERATE",
+                "WINTER": "WINTER", "SNOW": "WINTER"}
+TD_THEATER = {"DESERT": 0, "JUNGLE": 1, "TEMPERATE": 2, "WINTER": 3}
+THEATER_DESERT = 0
+
+
+def _ini_theater(scen):
+    """The scenario's ENGINE theater off its own INI, or None if no INI is staged.
+
+    USER01, USER50 and the XL test maps have no INI in the extracted tree; they are
+    authored maps whose terrain JSON is checked in. Returning None for them is honest,
+    and engine_theater below then has exactly one source instead of two.
+    """
+    path = os.path.join(B.ASSETS, "extracted", "INI", scen.upper() + ".INI")
+    if not os.path.isfile(path):
+        return None
+    for line in open(path, errors="ignore"):
+        t = line.strip().upper()
+        if t.startswith("THEATER="):
+            return t.split("=", 1)[1].strip()
+    return None
+
+
+def engine_theater(scen, look):
+    """-> (name, id) the TD theater this scenario runs in. Never guesses.
+
+    Two independent sources: the scenario INI's own Theater= key, and the look name the
+    terrain JSON carries. Where both exist they must AGREE through LOOK_THEATER, and a
+    disagreement aborts the bake rather than picking one. Where only the look name
+    exists it is mapped through the same exhaustive table. An unknown value on either
+    side is a hard error, because the failure this guards against is a new theater name
+    quietly defaulting to "not desert" and stripping the cacti out of a desert map.
+    """
+    lk = str(look or "").strip().upper()
+    if lk not in LOOK_THEATER:
+        raise SystemExit("bake5: %s: terrain JSON theater %r is not a known look name "
+                         "(%s). Add it to LOOK_THEATER with the ENGINE theater it "
+                         "repaints; do not let it default."
+                         % (scen, look, ", ".join(sorted(LOOK_THEATER))))
+    from_look = LOOK_THEATER[lk]
+    from_ini = _ini_theater(scen)
+    if from_ini is not None:
+        if from_ini not in TD_THEATER:
+            raise SystemExit("bake5: %s: INI Theater=%s is not a Tiberian Dawn theater "
+                             "(%s)" % (scen, from_ini, ", ".join(sorted(TD_THEATER))))
+        if from_ini != from_look:
+            raise SystemExit("bake5: %s: INI Theater=%s but the terrain JSON was "
+                             "resolved for look %s, which repaints %s. One of the two "
+                             "is stale; re-resolve the terrain JSON rather than baking "
+                             "a map whose flora and whose ground disagree."
+                             % (scen, from_ini, lk, from_look))
+    name = from_ini or from_look
+    return name, TD_THEATER[name]
+
+
+def terrain_source_code(code, theater_id):
+    """The unit_models entry whose MESH the INI name `code` draws in this theater."""
+    if theater_id == THEATER_DESERT:
+        return DESERT_TERRAIN_MESH.get(code, code)
+    return code
+
+
 def build(scen, outpath, verbose=True, heights=None, cmvals=None):
     um = json.load(open(os.path.join(B.SCR, "unit_models.json")))
     terr = json.load(open(os.path.join(B.ASSETS, "terrain", "terrain_%s.json" % scen)))
+    # The ENGINE theater, resolved once and used for every theater-dependent decision
+    # below. Not terr["theater"]: that is the LOOK name, and SAND is a repaint of
+    # DESERT (see engine_theater).
+    theater_name, theater_id = engine_theater(scen, terr["theater"])
+    check_terrain_ids(um)
     # Cell grid size, from the terrain JSON's own width/height fields. Older
     # JSONs carry no such fields: those are the legacy 64x64 bakes. The
     # per-corner blocks (PK9 heights, PKC tint) sit on a (W+1)x(H+1) grid.
@@ -2223,6 +2429,34 @@ def build(scen, outpath, verbose=True, heights=None, cmvals=None):
     atlas = Image.open(os.path.join(B.ASSETS, "terrain", terr["atlas"])).convert("RGBA")
     aw, ah = atlas.size
     terrain_tex = bank.add_rgba(("terrain", terr["atlas"]), aw, ah, atlas.tobytes())
+
+    # THE DOS ATLAS (PKG), the same tiles drawn from Tiberian Dawn's own theater art.
+    # Enhanced Visuals binds this instead of the cartridge one; the cells carry a single
+    # set of UVs for both, so the two MUST be the same size and packed identically.
+    # -1 means the theater has no DOS original (SNOW, SAND) and the switch has nowhere
+    # to go. WINTER's bank was BUILT from that art (tools/win_to_n64bank.py), so its two
+    # atlases come out byte-identical and share one bank slot rather than paying twice.
+    terrain_dos_tex = -1
+    dosname = terr.get("atlasDos")
+    if dosname:
+        dosatlas = Image.open(os.path.join(B.ASSETS, "terrain", dosname)).convert("RGBA")
+        dw, dh = dosatlas.size
+        # PROPORTIONAL, not equal. The cells carry NORMALISED uvs, so a second atlas
+        # addresses the same tiles whenever it is the first one scaled by a whole number
+        # in both axes -- tile, gutter and pitch all multiplied by the same k. That is
+        # what lets a higher-resolution atlas (k=4 gives a 96-texel cell, k=5 gives 120)
+        # ride in this slot with no change to a single uv. Equality is just k=1.
+        assert dw % aw == 0 and dh % ah == 0 and dw // aw == dh // ah, \
+            ("%s: the second atlas is %dx%d against the cartridge atlas %dx%d, which is "
+             "not a whole-number scale in both axes -- one set of uvs cannot address both"
+             % (dosname, dw, dh, aw, ah))
+        dosbytes = dosatlas.tobytes()
+        # dw/dh, NOT aw/ah. Passing the cartridge's dimensions here was harmless only
+        # while the two atlases were the same size: the bank would then pad and copy by
+        # the wrong stride and store a mangled sheet. It is the second atlas's own size
+        # that describes its bytes.
+        terrain_dos_tex = (terrain_tex if dosbytes == atlas.tobytes()
+                           else bank.add_rgba(("terrain", dosname), dw, dh, dosbytes))
 
     meshes, meshindex, meshparts, meshsections, meshanim = [], {}, {}, {}, {}
     roles_doc = {}
@@ -2438,20 +2672,17 @@ def build(scen, outpath, verbose=True, heights=None, cmvals=None):
         "water bake produced no bank indices"
     w32, wname = B.w32, B.wname
     with open(outpath, "wb") as f:
-        # A 64x64 map writes the PKE header it always wrote, byte-identical -- the
-        # existing packs and their gates never churn. ANY other grid writes PKF:
-        # the same header plus u32 mapW, mapH directly after the version, which is
-        # where load_pack's PKF reader expects them, and from which every tail
-        # offset derives. Baking a big grid as PKE would be mis-read with 64x64
-        # tail offsets and NOT detected -- that is the trap this branch closes.
-        if gw == 64 and gh == 64:
-            f.write(b"CNC3DPKE")
-            w32(f, 14)
-        else:
-            f.write(b"CNC3DPKF")
-            w32(f, 15)
-            w32(f, gw)
-            w32(f, gh)
+        # PKG writes the grid ALWAYS, and there is no longer a 64x64 special case.
+        # PKE existed to keep 64x64 packs byte-identical across the PKF change; PKG
+        # rewrites every pack anyway (it carries a second terrain atlas), so the saving
+        # has nothing left to protect and the split was a standing trap -- baking a big
+        # grid as PKE mis-read it with 64x64 tail offsets and nothing detected it.
+        # One header, one set of offsets, and load_pack's `pkf` test still holds because
+        # 'G' > 'F'.
+        f.write(b"CNC3DPKG")
+        w32(f, 16)
+        w32(f, gw)
+        w32(f, gh)
         wname(f, scen, 16)
         wname(f, terr["theater"], 16)
 
@@ -2511,10 +2742,31 @@ def build(scen, outpath, verbose=True, heights=None, cmvals=None):
 
         types = [k for k in sorted(um) if k != "_meta"]
         w32(f, len(types) + len(debris_types) + len(flip_types))
+        swapped = []
         for k in types:
+            # The theater swap (see DESERT_TERRAIN_MESH): the NAME the renderer looks
+            # up is always k, only the mesh behind it moves.
+            src = terrain_source_code(k, theater_id)
+            if src != k:
+                assert src in um, ("%s: the desert flora swap wants entry %s and "
+                                   "unit_models.json has no such entry" % (k, src))
+                swapped.append((k, src, um[src]["mesh"]))
             wname(f, k, 8)
-            f.write(struct.pack("<i", meshindex.get(um[k]["mesh"], -1)))
-            f.write(bytes((B.CONF[um[k]["confidence"]],)))
+            f.write(struct.pack("<i", meshindex.get(um[src]["mesh"], -1)))
+            f.write(bytes((B.CONF[um[src]["confidence"]],)))
+        if verbose:
+            if swapped:
+                fam = {}
+                for k, _s, m in swapped:
+                    fam.setdefault(m, []).append(k)
+                print("desert flora: theater %s (TD id %d), %d tree types onto %d "
+                      "meshes: %s"
+                      % (theater_name, theater_id, len(swapped), len(fam),
+                         "; ".join("%s <- %s" % (m, ",".join(sorted(fam[m])))
+                                   for m in sorted(fam))))
+            else:
+                print("desert flora: no swap, theater is %s (TD id %d)"
+                      % (theater_name, theater_id))
         # The debris chunks ride the type table too, so the renderer resolves them the
         # same way it resolves the cursor models and the pack format is untouched.
         for code in sorted(debris_types):
@@ -2530,6 +2782,8 @@ def build(scen, outpath, verbose=True, heights=None, cmvals=None):
             f.write(bytes((B.CONF["high"],)))
 
         w32(f, terrain_tex)
+        # PKG: the DOS atlas's bank index, signed so -1 survives the round trip.
+        f.write(struct.pack("<i", terrain_dos_tex))
         cells = terr["cells"]
         w32(f, len(cells))
         for c in cells:
@@ -2615,12 +2869,11 @@ def check_pk8_tail(path, corners=None, cmvals=None, vshadows=None):
         f.seek(-12, os.SEEK_END)
         seabed = struct.unpack("<i", f.read(4))[0]
         tail = f.read(8)
-    # Two headers are legal now: the byte-stable PKE (64x64, version 14) and PKF
-    # (any other grid, version 15, with u32 mapW/mapH after the version). The tail
-    # blocks this check reads are EOF-relative, so the header length difference
-    # does not move them.
+    # One header now: PKG (version 16, u32 mapW/mapH after the version, and a signed
+    # DOS-atlas bank index after the terrain one). The tail blocks this check reads are
+    # EOF-relative, so the header length plays no part in finding them.
     ver = struct.unpack("<I", head[8:])[0]
-    assert (head[:8], ver) in ((b"CNC3DPKE", 14), (b"CNC3DPKF", 15)), head
+    assert (head[:8], ver) == (b"CNC3DPKG", 16), head
     if vshadows is not None:
         # PKD sits at the FRONT of the tail, so its offset from EOF is the whole of
         # everything after it plus its own size -- read it back and compare byte for

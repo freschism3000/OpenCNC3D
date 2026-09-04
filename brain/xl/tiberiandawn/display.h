@@ -184,6 +184,19 @@ public:
     bool Passes_Proximity_Check(ObjectTypeClass const* object);
 #ifdef USE_RA_AI
     bool Passes_Proximity_Check(ObjectTypeClass const* object, HousesType house, short const* list, CELL trycell) const;
+    /*
+    ** CNC3D: the cheat menu's "Build Anywhere". A house bit here lifts the base
+    ** ADJACENCY rule for that house and nothing else -- see the comment at the
+    ** hook inside Passes_Proximity_Check for why terrain stays illegal.
+    **
+    ** XL: the mask is uint64_t rather than the classic build's unsigned, because the
+    ** 64-house phase widens every house mask and this one would otherwise be found by
+    ** a player at slot 32 rather than by a compiler. It costs nothing today: 1ULL is
+    ** the shift that is correct at both house counts.
+    */
+    static uint64_t CNC3D_BuildAnywhereHouses;
+    static void CNC3D_Set_Build_Anywhere(HousesType house, bool on);
+    static bool CNC3D_Build_Anywhere(HousesType house);
 #endif
     ObjectClass* Cell_Object(CELL cell, int x = 0, int y = 0);
     ObjectClass* Next_Object(ObjectClass* object);

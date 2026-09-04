@@ -1,0 +1,66 @@
+# G113. THE FOUR COMMAND SHORTCUTS, THROUGH THE SAME CALLS THE KEYS MAKE.
+#
+# scatter is ui_scatter (the X key), base is ui_base_jump (H), dbltapobj is
+# ui_select_same_type (the second left release) and rebuild is ui_rebuild_last (D). Not
+# one of them is a parallel copy, so a green run here is evidence about the keyboard.
+#
+# SCG90EA, because it is the scenario that carries all four subjects at once: a GoodGuy
+# Construction Yard AND a BadGuy one (SCG90EA.INI [STRUCTURES] 000 and 010), four GoodGuy
+# Medium Tanks in one view ([UNITS] 003..006) with a Jeep and two Harvesters beside them,
+# a GoodGuy MCV, and a sidebar that can build.
+#
+# zoom min, deliberately. Leg 2 asks for every Medium Tank IN VIEW; the widest view is the
+# one that makes the answer be about the type test rather than about the frustum.
+tick 20
+cam 54 51
+zoom min
+
+# LEG 1 IS THE POINT OF THE GATE. The UNITREQ line is OURS, so a scatter wired to
+# INPUT_UNIT_STOP by mistake -- which is exactly what X used to be -- would still print
+# the word "scatter". The engine's own answer is NavCom, and the two requests move it in
+# opposite directions: SCATTER assigns a destination (event.cpp:638-643 into
+# unit.cpp:3418-3419), IDLE clears it (event.cpp:626-632). Sampled five ticks after each,
+# which is inside the drive rather than after it.
+echo G113-1 X scatters and S takes it back
+lclickobj MTNK 0
+expectsel 1
+seldump
+scatter
+tick 5
+seldump
+stop
+tick 5
+seldump
+
+# Every selected object afterwards must be a Medium Tank. The Jeep and the two Harvesters
+# are in the same view, so a loop that forgot the type test fails here.
+echo G113-2 double tap takes every tank of that type in view
+deselect
+expectsel 0
+dbltapobj MTNK 0
+seldump
+
+# Both houses own a Construction Yard on this map, so this leg proves the ownership filter
+# as well as the jump. cell 40,34 is inside the map rectangle ([MAP] X=36 Y=30 W=26 H=32)
+# and well away from the GDI base, so the camera has somewhere to move from.
+echo G113-3 H selects the player's own Construction Yard and jumps to it
+deselect
+cam 40 34
+state
+base
+state
+expectsel 1
+seldump
+
+# All three arms of the ladder: nothing built yet, still building, and free to start.
+echo G113-4 D repeats the last build and refuses while it is still going
+rebuild
+build NUKE
+tick 5
+rebuild
+cancelbuild NUKE
+tick 5
+rebuild
+tick 10
+sidebar rebuilt
+quit

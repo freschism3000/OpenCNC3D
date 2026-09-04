@@ -14,7 +14,12 @@
  *  non-directional (facings == 1) and step on the engine's own dostage.
  *
  *  House colours were applied at bake time (house.cpp:2186: gold row for anyone
- *  who is not BadGuy, RemapLtBlue row for BadGuy; civilians one fixed row).
+ *  who is not BadGuy, RemapLtBlue row for BadGuy; civilians one fixed row), so the
+ *  pack holds exactly two colourways. It does NOT hold only two possible ones: the
+ *  uniform is palette indices 176..191 and nothing else, and the pack keeps its
+ *  frames as 8-bit indices, so a third, fourth or eighth colourway is an index
+ *  substitution away. dosinf_livery_build (in the renderer, where the seat colours
+ *  live) makes those extra sheets; this file keeps the 8-bit source alive for it.
  *
  *  Index 0 is transparent and index 4 is the DOS shadow-ghost colour
  *  (display.cpp:357 UShadowCols {LTGREEN=4, BLACK, 130}); both become alpha 0
@@ -29,10 +34,22 @@
 
 struct DosStrip {
     char name[25];   /* 24 on disk since pack v3, + the NUL this never had to spare */
+    /* The six team colours beyond the pack's own two, indexed by PlayerColorType minus
+       2 (colours 0 and 1 ARE the pack's gold and Nod rows and need no texture). 0 means
+       not built: a strip that is not a uniform never gets one, and neither does a colour
+       no seat is wearing, so a campaign holds six zeroes here for every strip. Kept a
+       plain array so DosStrip stays a POD and g_dosStrips.resize() still zeroes it. */
+    GLuint gl_extra[6];
     int frames, facings, stages, fw, fh, cols, texw, texh;
     int src_stages;   /* the engine's DoInfoStruct Count; > stages when the strip
                          was evenly subsampled to fit the Voodoo 2 256x256 limit
                          (v2: only E4's 16-stage FIRE and FPRONE are baked as 8) */
+    /* Texels per world unit for THIS strip, or 0 to use sprite_texels_per_unit(). The
+       pack's own strips leave it zero and nothing changes for them. A strip built from
+       art at a different resolution -- the Remastered sprites are about five times the
+       DOS ones -- carries its own, so infantry_quad_size puts the same sized man on the
+       ground out of a much bigger cell. */
+    float tpu;
     GLuint gl;
 };
 
@@ -80,6 +97,20 @@ static std::vector<DosStrip> g_dosStrips;
 static std::map<std::string, DosInfType> g_dosInfTypes;
 static bool g_dosinfOn = false;
 
+/* THE PACK'S 8-BIT SOURCE, KEPT PAST THE UPLOAD, so a second set of sheets can be made
+   in a player's own colour. It has to survive the loop that reads it because the answer
+   to "is this strip a uniform?" is in the TYPE table, and the type table is stored after
+   every strip: a type wears a uniform exactly when its two house rows point at different
+   strips, and until those rows have been read there is no way to tell E1's walk cycle
+   from a civilian's. About 4.7 MB, released by dosinf_livery_build the moment it is
+   spent, or by dosinf_free if nothing wants it. IT IS ONLY BUILT WHEN SOMETHING WILL
+   READ IT: dosinf_load takes keep_index, and a campaign boot passes false and reads every
+   strip through one reused scratch buffer instead. Building and freeing it regardless
+   cost a measured 10.6 MB of RSS per boot/shutdown cycle, because the allocator keeps
+   the pages, and that is what G6 measures. */
+static unsigned char g_dosPal8[768];
+static std::vector< std::vector<unsigned char> > g_dosIdx;
+
 /* const.cpp:211 Facing32[256] -- DirType 0..255 to the 32-facing wheel, including
    Westwood's 3D-Studio 45-degree distortion compensation. Transcribed verbatim. */
 static const unsigned char DOSINF_Facing32[256] = {
@@ -124,7 +155,14 @@ static bool dosinf_read(FILE* f, void* p, size_t n, const char* path)
     return false;
 }
 
-static bool dosinf_load(const char* path)
+/* keep_index says whether the 8-bit source survives the load. It is the input
+   dosinf_livery_build needs and NOTHING else reads it, so outside a skirmish it is
+   4.7 MB read, converted and thrown away. Allocating and freeing it anyway cost a
+   measured 10.6 MB of extra RSS on every boot/shutdown cycle -- the allocator does not
+   hand those pages back -- which took G6's round-trip growth from 19608 KiB to
+   30232 KiB against a 30000 limit. So the caller says up front whether it wants it, and
+   when it does not the strips are read through one reused scratch buffer instead. */
+static bool dosinf_load(const char* path, bool keep_index)
 {
     FILE* f = fopen(path, "rb");
     if (!f) {
@@ -153,15 +191,23 @@ static bool dosinf_load(const char* path)
         fclose(f);
         return false;
     }
-    unsigned char pal6[768], pal8[768];
+    unsigned char pal6[768];
     if (!dosinf_read(f, pal6, 768, path)) return false;
-    if (!dosinf_read(f, pal8, 768, path)) return false;
+    if (!dosinf_read(f, g_dosPal8, 768, path)) return false;
 
     g_dosStrips.resize(nstrip);
-    std::vector<unsigned char> idx, rgba;
+    g_dosIdx.clear();
+    if (keep_index) g_dosIdx.resize(nstrip);
+    std::vector<unsigned char> rgba;
+    std::vector<unsigned char> scratch;   /* one buffer, reused, when nothing keeps the index */
     for (uint32_t i = 0; i < nstrip; i++) {
         DosStrip& s = g_dosStrips[i];
         memset(s.name, 0, sizeof(s.name));
+        /* dosinf_free clears g_dosStrips, so resize() value-initialises and these are
+           already zero on every path today. Cleared explicitly anyway, because the cost
+           is nothing and the alternative is a live GL handle inherited by a strip that
+           did not upload it. */
+        memset(s.gl_extra, 0, sizeof(s.gl_extra));
         if (!dosinf_read(f, s.name, 24, path)) return false;
         uint32_t q[9];
         if (!dosinf_read(f, q, sizeof(q), path)) return false;
@@ -170,6 +216,7 @@ static bool dosinf_load(const char* path)
         s.texw = (int)q[6]; s.texh = (int)q[7];
         s.src_stages = (int)q[8];
         if (s.src_stages < s.stages) s.src_stages = s.stages;
+        std::vector<unsigned char>& idx = keep_index ? g_dosIdx[i] : scratch;
         idx.resize((size_t)s.texw * s.texh);
         if (!dosinf_read(f, &idx[0], idx.size(), path)) return false;
 
@@ -182,9 +229,9 @@ static bool dosinf_load(const char* path)
             if (v == 0 || v == 4) {
                 o[0] = o[1] = o[2] = o[3] = 0;
             } else {
-                o[0] = pal8[v * 3];
-                o[1] = pal8[v * 3 + 1];
-                o[2] = pal8[v * 3 + 2];
+                o[0] = g_dosPal8[v * 3];
+                o[1] = g_dosPal8[v * 3 + 1];
+                o[2] = g_dosPal8[v * 3 + 2];
                 o[3] = 255;
             }
         }
@@ -253,10 +300,16 @@ static bool dosinf_load(const char* path)
    shell keeps exactly one, for exactly this reason. */
 static void dosinf_free(void)
 {
-    for (size_t i = 0; i < g_dosStrips.size(); i++)
+    for (size_t i = 0; i < g_dosStrips.size(); i++) {
         if (g_dosStrips[i].gl)
             glDeleteTextures(1, &g_dosStrips[i].gl);
+        /* The team-colour sheets go back the same way and on the same context. */
+        for (int c = 0; c < 6; c++)
+            if (g_dosStrips[i].gl_extra[c])
+                glDeleteTextures(1, &g_dosStrips[i].gl_extra[c]);
+    }
     g_dosStrips.clear();
+    g_dosIdx.clear();
     g_dosInfTypes.clear();
     g_dosinfOn = false;
 }

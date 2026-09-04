@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Under the EIGHTPLAYERS build switch, adds two more multiplayer colour
+// entries (grey and brown) to MPlayerGColors and MPlayerTColors, and raises
+// MPlayerMax from 6 to 8. With the switch off the file reads as upstream.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\globals.cpv   2.17   16 Oct 1995 16:52:22   JOE_BOSTIC  $ */
 /***********************************************************************************************
@@ -38,6 +47,7 @@
 bool ForceEnglish = false;
 #endif
 
+bool CNC3D_Lockstep = false; /* see externs.h; only CNC3D_Set_Lockstep writes this */
 bool Debug_Quiet = false;
 bool Debug_Cheat = false;
 bool Debug_Remap = false;

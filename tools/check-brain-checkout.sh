@@ -22,7 +22,24 @@
 # re-verifies. That is the supported way to make the two agree again, and it exists so
 # that "regenerate the patch in the same commit" is a command rather than a discipline.
 # Done by hand, it is easy to file a hunk under the wrong file and not find out.
+#
+# RUN --regen BEFORE YOU BUILD THE BRAIN, NOT AFTER. This command TOUCHES
+# brain/patches/cnc3d_compat.h, and that header is one of the sources G30 times the built
+# dylib against. Regen after a build and G30 reports the brain STALE by however long the
+# two commands were apart, on a dylib that is perfectly current and a header whose content
+# did not change: measured 1 Sep 2026 at exactly one minute, with git diff on the header
+# empty. G30 is right to complain and must not be loosened; the order is what is wrong.
+# It is the same shape as app/build.sh regenerating game/cnc3d_build.h and making cnc_eyes
+# older than a header it compiles. Registered with the other staleness traps.
 set -euo pipefail
+
+# LINE ENDINGS ARE NOT A DIFFERENCE. Git for Windows installs with core.autocrlf=true
+# system wide, so the upstream fetched below materialises every file without an `eol`
+# attribute as CRLF while the committed checkout is LF, and this guard then named 25 to
+# 32 workflows, cmake files, icons and resource scripts as drift on a Windows checkout (3 Sep
+# 2026) with not one engine source among them. With conversion off it names exactly the
+# files that changed. Set for every git call this script makes, and nothing else.
+export GIT_CONFIG_PARAMETERS="'core.autocrlf=false'"
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo"

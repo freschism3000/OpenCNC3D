@@ -5,7 +5,7 @@
  *
  *  The editor was prototyped in a browser, which settled its design and -- far more
  *  valuably -- derived every placement rule against the cartridge and proved each one.
- *  What it could never be is the thing asked for: a native Windows and Mac
+ *  What it could never be is the thing the project owner asked for: a native Windows and Mac
  *  application where pressing Play starts the mission in the SAME window. That is what
  *  this is. docs/design-map-editor.md carries the rules and the measurements; this file
  *  carries none of the reasoning, only the code.
@@ -54,6 +54,39 @@
    may use them directly. The include site is the contract; see the bottom of this file
    for what it expects to exist. */
 
+/* THE ATLAS PACKING IS A COMPILE-TIME CONSTANT HERE AND A PROPERTY OF THE PACK THERE,
+   and until this nothing checked that the two agreed.
+
+   terrain_tiles.h is GENERATED against n64_terrain.build_atlas's layout: TT_COLS columns
+   on a TT_PITCH grid, each tile's TT_TS of art sitting inside a TT_GUTTER of its own
+   replicated edge. tt_slot_rect answers in THAT atlas's pixels, and every caller below
+   turns those pixels into UVs by dividing by the LOADED pack's used atlas size. Hand it a
+   pack baked to a different packing and it divides right pixels by a wrong width: the art
+   walks further sideways with every column, and past the last column u0 passes 1.0 and
+   wraps to the far side of the sheet. That is exactly a terrain tile at the wrong offset,
+   and it arrived in silence, because load_pack accepts every magic from PK5 to PKF and a
+   pre-gutter pack is still perfectly self-consistent for the WORLD, which carries its own
+   baked UVs and never consults this table. Only the editor reads it.
+
+   The test is the packing's own arithmetic and nothing else: a matching atlas is TT_COLS
+   tiles wide and a whole number of rows tall, both counted in TT_PITCH. The gutter packing
+   measures 32 * 26 = 832 across; the pre-gutter one measured 32 * 24 = 768, which fails on
+   both halves. Painting and the palette then refuse, rather than draw a lie. */
+static bool tt_atlas_matches(const PackTex& at)
+{
+    const bool ok = (at.uw == TT_COLS * TT_PITCH && at.uh > 0 && at.uh % TT_PITCH == 0);
+    static bool said = false;
+    if (!ok && !said) {
+        said = true;
+        fprintf(stderr, "edit: this pack's terrain atlas uses %dx%d, which is not the "
+                        "%d-column %d-pixel-pitch packing terrain_tiles.h was generated "
+                        "for. Terrain painting and the terrain palette are OFF rather "
+                        "than drawn from the wrong rectangles; re-bake the pack with "
+                        "bake5.py.\n", at.uw, at.uh, TT_COLS, TT_PITCH);
+    }
+    return ok;
+}
+
 /* ------------------------------------------------------------------------------------
  *  State
  * ---------------------------------------------------------------------------------- */
@@ -67,21 +100,31 @@ static bool g_editOn      = false;   /* --edit was given                        
    they are different facts:
      - the DOCUMENT grid: the pack's own cell dims, g_gridW x g_gridH.
      - the INI CELL stride: a mission file's flat cell numbers are y*64+x for a legacy
-       map and y*128+x when [MAP] says Version=1 -- the brain's own MEGAMAPS rule
-       (Confine_Old_Cell, function.h:871, and display.cpp:1297 reading the key).
-   For every map this editor makes the two agree (64 or 128); they are named apart so
-   the code says WHICH fact each index depends on. Declared up here because this file
-   is ordered drawing-first and the panels read them. */
+       map and y*128+x when [MAP] says Version=1 -- the engine's own rule for that format.
+   They are named apart because they are different facts, and on 27 Aug 2026 they stopped
+   being the same NUMBER as well: the storage ceiling went to 256 and the file stride did
+   not, because it cannot. A big map's cell numbers are y*128+x in every file that already
+   exists and in the engine that reads them, so deriving the stride from the ceiling would
+   have re-numbered every saved map the moment the renderer was given more room -- the same
+   file meaning different ground. C3D_INI_STRIDE is that frozen 128; C3D_MAP_MAX is only
+   how much room this build keeps. Declared up here because this file is ordered
+   drawing-first and the panels read them. */
 #define EDIT_GRID_MAX (C3D_MAP_MAX * C3D_MAP_MAX)
 static inline bool edit_map_big(void)   { return g_gridW > 64 || g_gridH > 64; }
-static inline int  edit_ini_w(void)     { return edit_map_big() ? C3D_MAP_MAX : 64; }
-static inline int  edit_ini_cells(void) { return edit_map_big() ? EDIT_GRID_MAX : 64 * 64; }
+static inline int  edit_ini_w(void)     { return edit_map_big() ? C3D_INI_STRIDE : 64; }
+static inline int  edit_ini_cells(void) { return edit_map_big() ? C3D_INI_CELLS : 64 * 64; }
 /* Which mode the editor is in: 0 objects, 1 terrain, 2 elevation, 3 starts, 4 script.
    Up here with g_editOn because the map overlays are drawn near the top of this file and
    several of them are object-mode furniture that must stand down in the others. */
 static int  g_editMode    = 0;
 static int  g_editCellX   = -1;      /* the cell under the pointer, -1 when off the map */
 static int  g_editCellY   = -1;
+/* WHERE INSIDE THAT CELL the pointer is, 0..1 from the cell's north-west corner. Only
+   infantry can use it: they are the one thing the engine lets stand somewhere other than
+   the middle of a cell, and the pointer is the only input this editor has that is finer
+   than a whole cell. Meaningless while g_editOverMap is false. */
+static float g_editCellFx = 0.5f;
+static float g_editCellFz = 0.5f;
 static bool g_editOverMap = false;
 static unsigned long g_editFrame = 0;   /* engine frames, not wallclock */
 
@@ -148,9 +191,32 @@ static const char* edit_map_title(void)
    layout it needs; declared here because the hover test and the engine's cursor picker
    both come earlier in the file. */
 static bool edit_over_chrome(float mx, float my, int fbw, int fbh);
+/* IS ONE OF THE EDITOR'S DIALOGS UP? Declared here and defined far below with the rest
+   of the modal state, because edit_over_chrome is defined before that state exists and
+   a static variable cannot be forward declared. A function rather than three copies of
+   the same comparison: the mouse half of this cage and the keyboard half drifted apart
+   once already, and the way they stay together is by reading one sentence. */
+static bool edit_modal_up(void);
 /* What is at this cell, topmost first. Defined with the tools, below; the status
    card needs it to say what ERASE would remove. */
 static int  edit_object_at(int cx, int cy);
+/* THE DELETE STACK'S RUNGS. A cell is not one thing, and DELETE takes one of them per
+   press from the top down, so both the press and the status card that describes it need
+   the same list. The enum is up here rather than beside the code because this file is
+   ordered drawing-first and the card is drawn a long way above the tools -- the same
+   reason EditPrior was hoisted. */
+enum EditLayer {
+    EDL_EMPTY = 0,    /* nothing on it and the ground is already clear */
+    EDL_OBJECT,       /* a unit, an infantryman, a building or a piece of scenery */
+    EDL_WALL,
+    EDL_SMUDGE,       /* an authored crater or scorch; the engine's bibs are not a rung */
+    EDL_TIBERIUM,
+    EDL_GROUND        /* the terrain template, which the last press puts back to clear */
+};
+/* What the next DELETE would take off this cell, and the noun to call it. Defined with
+   the tools, below; the status card reads it so the card and the press cannot promise
+   different things. */
+static int  edit_erase_peek(int cx, int cy, char* what, size_t n);
 /* The editor camera's own state, defined with the camera below. */
 static void edit_cam_release(void);
 /* How many cells a rule's zone covers. Defined with the zone model below. */
@@ -161,6 +227,9 @@ static int  edit_tagged_count(int t);
    Defined with the prior table, below the tools that call it. */
 static void edit_prior_rekey(const char* house, const char* type,
                              int fromCell, int toCell);
+/* And erasing an object has to take its entry with it, or the next one of the same type
+   dropped on the same cell inherits a dead object's orders. Defined beside the rekey. */
+static void edit_prior_drop(const char* house, const char* type, int cell);
 static const char* edit_trigger_for(const SimObject& o);
 /* The editor camera's readout, for the view bar. Defined with the camera below. */
 static void edit_cam_eye(float* ex, float* ey, float* ez);
@@ -186,6 +255,18 @@ static void edit_update_hover(float mouseC, float mouseR, int fbw, int fbh)
     g_editOverMap = onMap && screen_to_cell(mouseC, mouseR, fbw, fbh, &cx, &cy);
     g_editCellX = g_editOverMap ? cx : -1;
     g_editCellY = g_editOverMap ? cy : -1;
+    /* AND WHERE INSIDE THE CELL, which is the only thing that can say which of the five
+       sub-cell positions an infantryman being placed goes on. screen_to_cell throws the
+       fraction away, so the same unprojection is run a second time for it rather than a
+       second copy of "which cell is this pixel" being kept here. It costs one more march
+       down the heightfield per frame, and because both calls are pure functions of the
+       same pixel, the cell this floors to is the cell above by construction. */
+    if (g_editOverMap) {
+        float wx = 0.0f, wz = 0.0f;
+        screen_to_world(mouseC, mouseR, fbw, fbh, &wx, &wz);
+        g_editCellFx = wx - (float)g_editCellX;
+        g_editCellFz = wz - (float)g_editCellY;
+    }
 }
 
 /* Draw what the pointer is on.
@@ -303,12 +384,35 @@ static bool          g_editHaveBin = false;
    the pack loads (or edit_set_world_grid grows a borrowed one) the two agree. */
 static int g_editBinW = 64, g_editBinH = 64;
 
-/* [MAP] Version=, read straight from the file so the answer does not depend on boot
-   order. 0 = legacy 64-stride cells and a dense 8192-byte .BIN; 1 = the brain's
-   MEGAMAPS big-map form: 128-stride cells and the sparse record .BIN that
-   Read_Binary_Big (map.cpp:968) actually parses. */
-static int edit_ini_version(const char* dir, const char* scen)
+/* The XL-native .BIN, which is the brain's own format and is transcribed here rather
+   than shared, because the editor must not include an engine header. It is the one map
+   format that states the stride its cell numbers were written against, so it is the one
+   the reader below can REFUSE rather than misread. Kept byte-identical to
+   XLBinaryHeader / XLBinaryRecord in the XL brain's map.cpp; the size assertions are
+   that brain's, repeated here so a drift is a build error on this side too. */
+#define EDIT_MAP_VERSION_XL 2
+#define EDIT_XL_BIN_MAGIC   "C3XB"
+#define EDIT_XL_BIN_HDR     12   /* magic[4], u16 version, u16 stride, u32 count */
+#define EDIT_XL_BIN_REC      8   /* u32 cell, u8 ttype, u8 ticon, u16 pad        */
+
+/* [MAP] Version=, Width= and Height=, read straight from the file so the answer does not
+   depend on boot order. 0 = legacy 64-stride cells and a dense 8192-byte .BIN; 1 = the
+   brain's MEGAMAPS big-map form: 128-stride cells and the sparse record .BIN that
+   Read_Binary_Big (map.cpp:968) actually parses; 2 = MAP_VERSION_XL, the XL brain's own
+   format, whose cell numbers are against ITS stride and whose .BIN carries a header.
+
+   THE VERSION IS RETURNED AS WRITTEN. It used to come back as `ver == 1 ? 1 : 0`, which
+   folded every version this editor did not know into the legacy answer, so a Version=2
+   map was not rejected, it was read as a dense 64-wide one: the exact failure the XL
+   format was introduced to make impossible, reproduced one layer up. An unknown version
+   is the caller's to refuse, and it does.
+
+   Width and Height are optional out-params: an XL .BIN says which stride its cells are
+   in but not how much of that stride the map occupies, so its dims come from here. */
+static int edit_ini_map_info(const char* dir, const char* scen, int* w, int* h)
 {
+    if (w) *w = 0;
+    if (h) *h = 0;
     char path[1024];
     snprintf(path, sizeof path, "%s%s%s.INI",
              dir ? dir : "", (dir && *dir && dir[strlen(dir) - 1] != '/') ? "/" : "",
@@ -322,10 +426,13 @@ static int edit_ini_version(const char* dir, const char* scen)
         const char* q = line;
         while (*q == ' ' || *q == '\t') q++;
         if (*q == '[') { in = !strncasecmp(q, "[MAP]", 5); continue; }
-        if (in && !strncasecmp(q, "Version=", 8)) { ver = atoi(q + 8); break; }
+        if (!in) continue;
+        if (!strncasecmp(q, "Version=", 8))      ver = atoi(q + 8);
+        else if (w && !strncasecmp(q, "Width=", 6))  *w = atoi(q + 6);
+        else if (h && !strncasecmp(q, "Height=", 7)) *h = atoi(q + 7);
     }
     fclose(f);
-    return ver == 1 ? 1 : 0;
+    return ver;
 }
 
 /* The brain's own big-map .BIN record: {u16 cell, u8 template, u8 icon}, little-endian,
@@ -339,7 +446,7 @@ static bool edit_bin_parse_sparse(const unsigned char* raw, size_t n)
     long last = -1;
     for (size_t i = 0; i < n; i += 4) {
         const int cell = raw[i] | (raw[i + 1] << 8);
-        if (cell <= last || cell >= EDIT_GRID_MAX) return false;
+        if (cell <= last || cell >= C3D_INI_CELLS) return false;   /* the FORMAT's cell space */
         last = cell;
     }
     memset(g_editTmpl, 255, sizeof g_editTmpl);
@@ -349,8 +456,96 @@ static bool edit_bin_parse_sparse(const unsigned char* raw, size_t n)
         g_editTmpl[cell] = raw[i + 2];
         g_editIcon[cell] = raw[i + 3];
     }
-    g_editBinW = C3D_MAP_MAX;
-    g_editBinH = C3D_MAP_MAX;
+    /* A sparse .BIN is the 128-wide format and says so nowhere, so the document it
+       produces is 128 square -- the FORMAT's size, never this build's storage ceiling.
+       These read C3D_MAP_MAX until 27 Aug 2026, which was the same number by accident. */
+    g_editBinW = C3D_INI_STRIDE;
+    g_editBinH = C3D_INI_STRIDE;
+    return true;
+}
+
+/* The XL-native .BIN. Sparse like the big-map form, but with a header, and its cell
+   numbers are the XL BRAIN's own: cell = y * hdr.Stride + x, where the stride is 1024 at
+   every XL tier and is nothing to do with how wide the map is. So the two numbers have to
+   be kept apart here exactly as they are on the brain's side: the STRIDE decodes x and y,
+   the map's own WIDTH indexes this editor's grid.
+
+   Everything it cannot vouch for it refuses, and says which thing was wrong. A .BIN this
+   size read as the wrong thing is a map with its rows fanned out across the array, which
+   is the failure the format exists to prevent, and a reader that clamped or guessed here
+   would hand that failure straight back. */
+static bool edit_bin_parse_xl(const unsigned char* raw, size_t n, int iniW, int iniH)
+{
+    if (n < EDIT_XL_BIN_HDR) return false;
+    if (memcmp(raw, EDIT_XL_BIN_MAGIC, 4) != 0) return false;
+
+    const unsigned ver    = (unsigned)raw[4]  | ((unsigned)raw[5]  << 8);
+    const unsigned stride = (unsigned)raw[6]  | ((unsigned)raw[7]  << 8);
+    const unsigned count  = (unsigned)raw[8]  | ((unsigned)raw[9]  << 8)
+                          | ((unsigned)raw[10] << 16) | ((unsigned)raw[11] << 24);
+
+    if (ver != EDIT_MAP_VERSION_XL) {
+        fprintf(stderr, "edit: this .BIN carries the XL magic but version %u; refusing "
+                        "rather than reading it as a version this build knows.\n", ver);
+        return false;
+    }
+    if (stride == 0) {
+        fprintf(stderr, "edit: the XL .BIN declares a zero cell stride.\n");
+        return false;
+    }
+    if (n < (size_t)EDIT_XL_BIN_HDR + (size_t)count * EDIT_XL_BIN_REC) {
+        fprintf(stderr, "edit: the XL .BIN ends before the %u records its own header "
+                        "claims.\n", count);
+        return false;
+    }
+    /* HOW WIDE THE DOCUMENT IS, which the file does NOT state and which is not the
+       stride. The legacy sparse reader can store a cell at its own raw cell number
+       because that format's stride squared fits this editor's grid; 1024 squared is a
+       million cells and does not, so an XL map has to be re-indexed at a width of this
+       reader's choosing, and the only rule that matters is that the width used to STORE
+       is the width later used to READ (g_editBinW, further down).
+
+       The extent of the records is what the file itself asserts, so that is the floor.
+       [MAP] X/Y/Width/Height is the PLAYABLE RECT and not the map: a generated 256 map
+       declares 252 inside a two-cell border, so believing the INI alone would refuse
+       every border cell. Its far edge is used only to raise the answer, never to lower
+       it. A column of clear ground at the right edge simply is not stored, and the
+       bounds test in edit_land_at already answers rock outside the document. */
+    unsigned maxX = 0, maxY = 0;
+    for (unsigned r = 0; r < count; r++) {
+        const unsigned char* p = raw + EDIT_XL_BIN_HDR + (size_t)r * EDIT_XL_BIN_REC;
+        const unsigned cell = (unsigned)p[0] | ((unsigned)p[1] << 8)
+                            | ((unsigned)p[2] << 16) | ((unsigned)p[3] << 24);
+        const unsigned x = cell % stride, y = cell / stride;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+    }
+    int w = (int)maxX + 1, h = (int)maxY + 1;
+    if (iniW > w) w = iniW;
+    if (iniH > h) h = iniH;
+
+    /* CHECKED AGAINST THIS BUILD'S STORAGE, not clamped into it. The grids are static at
+       the ceiling, so a map wider than the ceiling has nowhere to go, and taking the
+       smaller number would load part of a map and say nothing. */
+    if (w > C3D_MAP_MAX || h > C3D_MAP_MAX) {
+        fprintf(stderr, "edit: this XL map reaches %dx%d and this build's editor holds %d "
+                        "square. Refusing rather than loading part of it.\n",
+                w, h, C3D_MAP_MAX);
+        return false;
+    }
+
+    memset(g_editTmpl, 255, sizeof g_editTmpl);
+    memset(g_editIcon, 0, sizeof g_editIcon);
+    for (unsigned r = 0; r < count; r++) {
+        const unsigned char* p = raw + EDIT_XL_BIN_HDR + (size_t)r * EDIT_XL_BIN_REC;
+        const unsigned cell = (unsigned)p[0] | ((unsigned)p[1] << 8)
+                            | ((unsigned)p[2] << 16) | ((unsigned)p[3] << 24);
+        const size_t idx = (size_t)(cell / stride) * (size_t)w + (size_t)(cell % stride);
+        g_editTmpl[idx] = p[4];
+        g_editIcon[idx] = p[5];
+    }
+    g_editBinW = w;
+    g_editBinH = h;
     return true;
 }
 
@@ -379,12 +574,34 @@ static bool edit_load_bin(const char* dir, const char* scen)
        their exact lengths (8192 = 64x64 legacy, 32768 = the tooling's dense 128
        interchange, tools/bin_to_n64map.py grid_width), then a validated sparse parse
        as the last resort for a big .BIN whose INI went missing. */
-    const int ver = edit_ini_version(dir, scen);
+    int iniW = 0, iniH = 0;
+    const int ver = edit_ini_map_info(dir, scen, &iniW, &iniH);
     bool ok = false;
-    if (ver == 1 && edit_bin_parse_sparse(raw, got)) {
+    if (ver == EDIT_MAP_VERSION_XL) {
+        /* NO FALLBACK FROM HERE. A map that says it is XL is read as XL or not at all:
+           every other arm below decodes cell numbers against a stride this file did not
+           write, so falling through would load the map as scattered rows and report
+           success. That is the whole reason the format carries a header. */
+        ok = edit_bin_parse_xl(raw, got, iniW, iniH);
+        if (!ok) {
+            fprintf(stderr, "edit: %s says [MAP] Version=%d, so it is not read as any "
+                            "other format.\n", path, ver);
+            return false;
+        }
+    } else if (ver < 0 || ver > EDIT_MAP_VERSION_XL) {
+        /* Versions 0, 1 and 2 are the whole universe today. A map declaring anything else
+           was written by something newer than this build, and the one thing that must not
+           happen is reading it against a stride it was not written in. */
+        fprintf(stderr, "edit: %s says [MAP] Version=%d, which this build does not know. "
+                        "Refusing rather than guessing which stride its cells are in.\n",
+                path, ver);
+        return false;
+    } else if (ver == 1 && edit_bin_parse_sparse(raw, got)) {
         ok = true;
-    } else if (got == 64 * 64 * 2 || got == (size_t)EDIT_GRID_MAX * 2) {
-        const int w = (got == 64 * 64 * 2) ? 64 : C3D_MAP_MAX;
+    } else if (got == 64 * 64 * 2 || got == (size_t)C3D_INI_CELLS * 2) {
+        /* A dense .BIN is recognised BY ITS LENGTH, so both the length tested and the
+           stride derived from it are the format's, not this build's. */
+        const int w = (got == 64 * 64 * 2) ? 64 : C3D_INI_STRIDE;
         for (int i = 0; i < w * w; i++) {
             g_editTmpl[i] = raw[i * 2];
             g_editIcon[i] = raw[i * 2 + 1];
@@ -445,10 +662,60 @@ static bool edit_cell_ok(int cx, int cy)
 }
 
 
+/* ------------------------------------------------------------------------------------
+ *  Tiberium, sized the way the engine sizes it
+ *
+ *  A tiberium cell's worth is not a property of the cell. CellClass::Tiberium_Adjust
+ *  counts the cell's eight tiberium neighbours, sets OverlayData to
+ *  {0,1,3,4,6,7,8,10,11}[count], and the cell is then worth (OverlayData + 1) * 25
+ *  credits -- TIBERIUM_STEP, of which a harvester carries 28 (cell.cpp:1901-1934,
+ *  type.h:897). So a cell standing alone is worth 25 and a cell buried inside a field is
+ *  worth 300, and the same number is the SHP frame the ground is drawn with. Deriving it
+ *  here rather than authoring it is what makes a field painted in this editor look and
+ *  pay like the field the engine will build out of the same file.
+ *
+ *  The engine's neighbour walk is over flat cell numbers and only skips what falls off
+ *  the array, so at column zero it counts the previous row's last cell as a neighbour.
+ *  This walks x and y and stops at the border. The two differ only on the first and last
+ *  columns, where nothing can be harvested anyway.
+ * ---------------------------------------------------------------------------------- */
+static const int EDIT_TIB_ADJ[9] = { 0, 1, 3, 4, 6, 7, 8, 10, 11 };
+
+static int edit_tib_index(int cx, int cy)
+{
+    for (size_t i = 0; i < g_tib.size(); i++)
+        if (g_tib[i].x == cx && g_tib[i].y == cy) return (int)i;
+    return -1;
+}
+
+static void edit_tib_stage(int cx, int cy)
+{
+    const int me = edit_tib_index(cx, cy);
+    if (me < 0) return;
+    int nb = 0;
+    for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            if (edit_tib_index(cx + dx, cy + dy) >= 0) nb++;
+        }
+    g_tib[me].stage = (unsigned char)EDIT_TIB_ADJ[nb];
+}
+
+/* One painted or erased cell changes its OWN stage and its eight neighbours' -- the same
+   shape as the wall mask further down, one ring wider because tiberium counts diagonals
+   and a wall does not. */
+static void edit_tib_restage(int cx, int cy)
+{
+    for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+            edit_tib_stage(cx + dx, cy + dy);
+}
+
+
 /* ====================================================================================
  *  THE SIDEBAR
  *
- *  A specific layout was approved and the editor did not look like it: a strip of eight
+ *  the project owner approved a specific layout and the editor did not look like it: a strip of eight
  *  cameos across the bottom is a placeholder, not a design. This is that layout, drawn
  *  natively.
  *
@@ -522,7 +789,7 @@ static const unsigned EUI_DANGER  = 0xff6a5a;
    headless path. */
 static float g_uiBacking = 1.0f;
 
-/* the original zoom, so the panel can be sized without resizing the window. */
+/* the project owner's own zoom, so the panel can be sized without resizing the window. */
 static float g_uiZoom = 1.0f;
 
 static float eui_scale(int fbw, int fbh)
@@ -534,7 +801,7 @@ static float eui_scale(int fbw, int fbh)
      * The first version multiplied the whole layout by the backing scale, so a Retina
      * display got a panel twice as BIG rather than twice as SHARP. On a small window
      * that made the type enormous and pushed the boxes through each other -- which is
-     * exactly what was reported: unreadable fonts and menus clipping into one another.
+     * exactly what the project owner reported: unreadable fonts and menus clipping into one another.
      *
      * A high-DPI display should give the same design more pixels, not a bigger design.
      * So the design size is chosen from the window in POINTS, and the backing scale is
@@ -551,19 +818,78 @@ static float eui_scale(int fbw, int fbh)
     return backing * byFrame * g_uiZoom;
 }
 
-/* The four houses, in the mockup's colours and the engine's own INI names. */
+/* THE ENGINE'S HOUSES, IN ITS OWN ORDER AND UNDER THEIR OWN NAMES.
+ *
+ * Two of these labels used to state a SIDE rather than a house, "Yours" and "Enemy",
+ * which is only true while the map being authored is a GDI mission. A map is not written
+ * from anybody's point of view, so a chip says which house it is.
+ *
+ * THE ROSTER IS THE ENGINE'S AND NOT A CHOICE. HousesType runs GoodGuy, BadGuy, Neutral,
+ * Special and then Multi1 upward, and the last two multiplayer houses exist only when the
+ * brain is compiled with its eight-player option (defines.h:658-678). That same option
+ * sets MAX_PLAYERS (defines.h:2591-2595), which this file already mirrors as
+ * EDIT_MAX_PLAYERS, so the house count is 4 + EDIT_MAX_PLAYERS and there is one number to
+ * keep in step instead of two. The table is written out to the eight-seat maximum and the
+ * count is derived from the mirror, so trimming the mirror stops the extra seats being
+ * offered without anybody editing rows out.
+ *
+ * THE INDEX IS HousesType. That is load-bearing: it is what lets a placed object state
+ * its own side instead of leaving the renderer to guess one from the owner's name.
+ *
+ * The multiplayer colours are the schemes the engine hands those houses by default
+ * (hdata.cpp:97-192), read through the remap ramp the lobby already measured against the
+ * game palette (menu/doslobby.c:50-59). A lobby seat can be moved off its default, so
+ * this is the house's colour and not a promise about any particular match. */
 struct EuiHouse { const char* key; const char* label; unsigned colour; };
-static const EuiHouse EUI_HOUSES[4] = {
-    { "GoodGuy", "Yours",   0xe0b070 },
-    { "BadGuy",  "Enemy",   0xff6a5a },
-    { "Neutral", "Neutral", 0x9aa7b4 },
-    { "Special", "Special", 0xb98fe4 },
+static const EuiHouse EUI_HOUSES[] = {
+    { "GoodGuy", "GDI",     0xe0b070 },
+    { "BadGuy",  "NOD",     0xff6a5a },
+    { "Neutral", "NEUTRAL", 0x9aa7b4 },
+    { "Special", "SPECIAL", 0xb98fe4 },
+    { "Multi1",  "MP1",     0xc3c3d3 },   /* light blue */
+    { "Multi2",  "MP2",     0xd77910 },   /* orange     */
+    { "Multi3",  "MP3",     0xa2e31c },   /* green      */
+    { "Multi4",  "MP4",     0x65828a },   /* blue       */
+    { "Multi5",  "MP5",     0xc7aa5d },   /* gold       */
+    { "Multi6",  "MP6",     0xc72814 },   /* red        */
+    { "Multi7",  "MP7",     0xa2a2a2 },   /* grey       */
+    { "Multi8",  "MP8",     0xaa714d },   /* brown      */
 };
+/* How many rows the table carries, and how many of them this brain actually has. Both are
+   expressions, so neither can drift from the other by hand. */
+#define EUI_HOUSE_MAX ((int)(sizeof EUI_HOUSES / sizeof EUI_HOUSES[0]))
+#define EUI_HOUSE_N   (4 + EDIT_MAX_PLAYERS)
+/* The two playable sides by their place in the table, for the code that has to name one.
+   The index is HousesType, so these are HOUSE_GOOD and HOUSE_BAD. */
+enum { EUI_HOUSE_GDI = 0, EUI_HOUSE_NOD = 1 };
+/* HOW MANY OF THEM THE MAP BEING AUTHORED IS OFFERED. Every house exists in every game
+   type -- the engine news the whole roster whether the file mentions a house or not
+   (house.cpp:1961-2010) -- but the Multi seats belong to the lobby, and a singleplayer
+   mission has no lobby to fill them. Offering them there would be four useful chips and
+   eight that do nothing.
+   A MACRO and not a function: the map's kind is declared a long way below this point and
+   the answer is wanted from everything in between. */
+#define EUI_HOUSES_OFFERED (g_mapIsMulti ? EUI_HOUSE_N : 4)
+/* WHICH HOUSE A NAME IS, as a place in the table, or -1 for one this build has never
+   heard of. An object states its owner as the engine's IniName and several things have to
+   turn that back into an index -- the radar, the eyedropper, the livery resolve -- so the
+   walk is written once. The bound is the TABLE and not the offered count: a map may carry
+   a house the kind it is filed under does not offer, and refusing to name it would draw
+   it as if it had no owner. */
+static int eui_house_index(const char* name)
+{
+    if (!name || !name[0]) return -1;
+    for (int i = 0; i < EUI_HOUSE_MAX; i++)
+        if (!strcmp(EUI_HOUSES[i].key, name)) return i;
+    return -1;
+}
 /* What the pointer can be over. Declared up here rather than beside eui_hit
    because the DRAW needs it too, for the hover states, and the draw comes first. */
 enum EuiHit { EUI_NONE = 0, EUI_MAP, EUI_ITEM, EUI_TABC, EUI_OWNER, EUI_MODE,
               EUI_SAVE, EUI_PLAY, EUI_RADAR, EUI_ACT, EUI_TOOL,
               EUI_ELEVRUNG, EUI_ELEVTOOL, EUI_ELEVBRUSH, EUI_ELEVGATE,
+              EUI_ELEVIMPORT, EUI_ELEVNEXT, EUI_ELEVAUTO,
+              EUI_SBRPAGE, EUI_SBRTOOL, EUI_SBRSLIDER,
               EUI_CLIFFITEM, EUI_VIEW,
               EUI_MENUBTN, EUI_MENUITEM, EUI_MODALBTN, EUI_MODALOPT, EUI_START,
               EUI_SCRIPTNODE, EUI_SCRIPTROW, EUI_SCRIPTVIEW,
@@ -611,10 +937,185 @@ static int g_elevBrush    = 1;      /* radius in blocks: 1, 2, 3 = 2x2, 4x4, 6x6
 /* The last refusal, so the status card can show it rather than only the log. */
 static char g_elevWhy[220] = "";
 
+/* ---- THE SMOOTH BRUSH: the elevation panel's second page ---------------------------
+ *
+ * The rung tool paints TIERS over 2x2 blocks and dresses the step it makes with cliff
+ * art. It cannot express a hill. This is the other half: a brush that writes
+ * g_pack.corner directly, one byte a corner, and dresses nothing at all.
+ *
+ * TUNING IN ONE PLACE. Every number the brush's feel depends on is here, so a balance
+ * pass edits this block and nothing else. The sliders' ranges are here for the same
+ * reason: a range that lives at the use site is a range the readout can disagree with.
+ *
+ * SBR_TICK_HZ IS WHY THE BRUSH IS FRAMERATE INDEPENDENT, and it is not decoration. A
+ * stroke is integrated at a FIXED timestep: the frame hands the brush its dt, the brush
+ * banks it and consumes whole ticks. So the number of ticks a stroke applies, and the
+ * order they are applied in, depend on how long the button was held and not on how many
+ * frames were drawn in that time -- which makes the resulting bytes identical, bit for
+ * bit, at any frame rate. An exponential whose per-step factor is linear in dt does NOT
+ * have that property: N small steps do not compose into one big step.
+ * ---------------------------------------------------------------------------------- */
+#define SBR_TICK_HZ     120.0f   /* the fixed integration rate, ticks per second       */
+#define SBR_SIZE_MIN      0.5f   /* CENTRE SIZE, in cells: the full-strength core      */
+#define SBR_SIZE_MAX     10.0f
+#define SBR_FALL_MIN      0.5f   /* FALLOFF, in cells: the ring that fades to nothing  */
+#define SBR_FALL_MAX     14.0f
+#define SBR_STR_MIN       0.05f  /* STRENGTH, a plain multiplier on the dose           */
+#define SBR_STR_MAX       1.00f
+#define SBR_RAISE_RATE   96.0f   /* raw height units per second, at weight 1, full str */
+/* ERASE'S RATE, in FULL-WEIGHT SECONDS TO ARRIVE rather than e-folds per second. The
+   first form was exp(-K * dose), which approaches the datum and never reaches it, so a
+   second identical erase over ground the first had "finished" moved it again: measured on
+   SCG01EA, a corner at the falloff edge went 117 to 103 to 96, still travelling. A tool
+   called ERASE has to settle, or holding it twice is not the same as holding it once for
+   longer. The ramp below is linear in dose and CLAMPED, so it lands on the datum exactly
+   and stays there. 1/3 second keeps the old form's initial slope (both are 1 - K*dose for
+   small dose), so the feel in the hand is unchanged and only the tail differs. */
+#define SBR_ERASE_K       3.0f   /* reciprocal seconds at full weight; 1/K to arrive  */
+#define SBR_MAX_DOSE     60.0f   /* a held button cannot integrate for ever            */
+#define SBR_TRACK_GAP     4.0f   /* design units between a slider's text and its track */
+#define SBR_TRACK_MIN    40.0f   /* the narrowest track a drag can still aim at        */
+/* THE FLAT IS A PROPERTY OF THE MAP, NOT A CONSTANT, and getting that wrong is what
+   turned ERASE into a digger.
+ *
+ * The director's line is that ERASE "paints the DEFAULT TERRAIN HEIGHT". The default is
+ * whatever height this map calls the ground, and on a shipped pack that is NOT the byte
+ * 64. load_pack re-zeroes the world on the MEDIAN corner byte over the playable rect and
+ * keeps it in g_terrainBase, so byte == round(g_terrainBase * 64) is exactly the corner
+ * whose drawn world y is 0.000. Measured on the packs that ship: SCG01EA 90, SCB01EA 108,
+ * SCG09EA 128. None of them is 64.
+ *
+ * So erasing to 64 did not erase, it EXCAVATED. Measured on SCG09EA, at cell 32,7 --
+ * flat, dry, and sitting exactly on that map's own ground -- a six second full-strength
+ * ERASE took the height query from 0.0000 to -1.0000: a cell-deep pit dug in ground the
+ * stroke was asked to leave alone.
+ *
+ * ERASE STILL DOES NOT GO THROUGH A TIER. It lands on the raw datum byte, because a
+ * round trip through the five-rung ladder (0/64/128/191/255, ties down) loses up to 32
+ * units a corner -- and on SCG01EA the datum, 90, is not on the ladder at all.
+ *
+ * ELEV_RUNG is declared with the elevation model further down and a new map really is
+ * flattened to rung 1, so that stays the answer when there is no heightmap to ask. */
+static unsigned char sbr_flat_byte(void);
+
+/* The three sliders, as data, so the draw, the hit test, the handler, the headless verb
+   and the readout all read one table instead of five copies of three ranges. */
+enum { SBR_SLIDER_N = 3 };
+static const struct SbrSlider {
+    const char* name;
+    float lo, hi;
+    const char* unit;
+} SBR_SLIDERS[SBR_SLIDER_N] = {
+    { "CENTRE SIZE", SBR_SIZE_MIN, SBR_SIZE_MAX, "cells" },
+    { "FALLOFF",     SBR_FALL_MIN, SBR_FALL_MAX, "cells" },
+    { "STRENGTH",    SBR_STR_MIN,  SBR_STR_MAX,  ""      },
+};
+
+static const char* const SBR_PAGE_NAME[2] = { "TIERS", "SMOOTH" };
+static const char* const SBR_TOOL_NAME[3] = { "RAISE", "LOWER", "ERASE" };
+
+static int   g_sbrPage = 0;        /* 0 the rung tool, 1 the smooth brush             */
+static int   g_sbrTool = 0;        /* 0 raise, 1 lower, 2 erase                       */
+static float g_sbrVal[SBR_SLIDER_N] = { 2.0f, 3.0f, 0.60f };
+static int   g_sbrDragSlider = -1; /* the slider the held button is dragging          */
+/* The last thing the brush refused, so the status card can say it rather than the log. */
+static char  g_sbrWhy[220] = "";
+
+/* THE UNLOCK, AND WHY IT IS ITS OWN FLAG rather than g_elevConverted.
+ *
+ * The director's rule is that the two tools share a map: the first smooth stroke makes
+ * the rung tool usable on it, and the rung tool then paints normally and never asks to
+ * CONVERT. That is exactly what elev_ready answers, so this is OR-ed into it.
+ *
+ * It is NOT g_elevConverted because CONVERT is a separate, deliberate, announced act
+ * with its own "it cannot be undone" contract, and folding the two together would put
+ * that act inside the undo stack by a side door. This flag IS in the undo snapshot --
+ * see EditSnap -- because a stroke that unlocks the map has to be undoable as one
+ * thing, heights and unlock together. */
+static bool  g_elevSmoothUnlock = false;
+/* AND IT LIVES IN THE FILE, WHICH IT DID NOT.
+ *
+ * THE DEFECT. The flag was in memory and in EditSnap and nowhere else: a stroke unlocked
+ * the rung tool, SAVE wrote the map, opening the map again locked it -- so the tool the
+ * player had just earned was taken back by saving their work. And nothing cleared it
+ * either, so the unlock from one map was still standing over the next one.
+ *
+ * WHY IT IS WRITTEN DOWN RATHER THAN DERIVED. Deriving it from the heights is the
+ * tempting answer -- "corners off the ladder mean somebody smoothed this" -- and it is
+ * wrong on the maps that matter: SCG01EA opens with 332 of its 728 counted corners off
+ * the ladder, as shipped, untouched. Deriving would unlock every cartridge map on sight
+ * and there would be nothing left for CONVERT to be.
+ *
+ * So it is a CNC3D-owned key in [Basic], written the way CNC3DKind and Enhanced are:
+ * any previous copy dropped, a fresh one written only when it is true, and the 1995
+ * engine ignoring a key it does not know. This holds what the map that is OPEN said, so
+ * the map-change reset has something honest to reset to. */
+static bool  g_elevIniUnlock = false;
+
 /* The elevation model lives further down, with the code that derives from it; the panel
    draws its state and comes first, as everything in this file does. */
 static bool elev_ready(void);
 static int  g_elevOffLadder, g_elevTotal;
+
+/* TUNING. Every number this feature turns on, in one place, because that is the rule
+   and because a balance sweep over any of them has to find them together. */
+#define AH_SLOPE_FIRST   13     /* TEMPLATE_SLOPE1, brain defines.h                 */
+#define AH_SLOPE_LAST    50     /* TEMPLATE_SLOPE38                                 */
+#define AH_SLOPE_N       (AH_SLOPE_LAST - AH_SLOPE_FIRST + 1)
+#define AH_PLACE_MAX     8192   /* placements one map may carry                     */
+#define AH_TOP_RUNG      4      /* ELEV_RUNG's last index                           */
+#define AH_GROUND_RUNG   1      /* the rung the ladder calls "ground"               */
+#define AH_ARM_FRAMES    900UL  /* how long the REPLACE warning stays armed, frames */
+
+/* THE AUTO HEIGHTMAP'S REPORT. Declared here for the same reason everything else on
+   this panel is: the draw needs it and the draw comes first in this file. The fit that
+   fills it in, and the overlay that draws it, live together far below.
+
+   offBefore / offAfter ARE THE FEATURE'S OWN SAFETY PROPERTY, not decoration. The fit
+   writes ground through the same ladder the rung tool derives from, so every corner it
+   touches lands exactly on a rung and every corner it declines to touch is left at the
+   byte it already had. offAfter can therefore never exceed offBefore, and a run where it
+   does is the fit having gone off the ladder -- which is what locks the panel. Carried on
+   the report so a gate reads one line instead of two readouts.
+
+   stray IS THE SAME PROPERTY WITHOUT THE EXCUSE. offAfter can legitimately be non-zero on
+   a map whose SHORELINE was already off the ladder, because the fit does not write the
+   sea's corners at all. stray counts the corners still off the ladder that the sea does
+   NOT touch, and there is no honest reason for one of those to exist: every corner the
+   fit writes goes through ELEV_RUNG. A gate that reads stray is reading the invariant
+   itself rather than a number with a caveat attached. */
+struct AhReport {
+    bool valid;
+    int  places;        /* SLOPE placements recovered                     */
+    int  orphans;       /* cliff cells no placement origin claimed        */
+    int  wrote;         /* corners rewritten                              */
+    int  moved;         /* corners whose byte actually changed            */
+    int  held;          /* corners the sea uses, left exactly as they were */
+    int  marked;        /* cells in the overlay, all reasons              */
+    int  disagree, clamped;
+    int  offBefore, offAfter;   /* playable corners off the ladder, either side */
+    int  stray;         /* of offAfter, the ones the sea does NOT touch  */
+    bool wetkept;       /* not one corner the sea uses moved             */
+    int  gridW, gridH;  /* the grid the marks were taken on               */
+};
+static AhReport      g_ah;
+static bool          g_ahArmed   = false;
+static unsigned long g_ahArmedAt = 0;
+/* Called from the undo funnel and the restore, both of which are far above the fit. */
+static void ah_report_clear(void);
+
+/* THE SEA'S OWN CORNERS AND THE SEA'S OWN CELLS. Both are defined far below, with the
+   smooth brush and with the crossing rules; they are forward-declared here because the
+   auto heightmap keeps off the water by exactly the same two rules, and a second copy of
+   a rule is a second thing to get wrong. The brush already refuses a corner any of whose
+   four cells is water, for the reason its own header gives: the water surface is built
+   from the terrain's own corners, so raising one lifts the sea into a hill. */
+static bool sbr_corner_wet(int gx, int gy);
+static bool edit_cell_is_water(int cx, int cy);
+/* Recount the two numbers above from the corners as they stand. Declared here because
+   the UNDO funnel calls it -- restoring a different set of heights changes the answer --
+   and the undo funnel is a long way above the smooth brush that defines it. */
+static void sbr_recount_ladder(void);
 
 /* Fly speed, declared here because the view bar prints it and the bar is drawn
    before the camera code that changes it. */
@@ -626,19 +1127,42 @@ static float g_camSpeed = 0.55f;
 #define EDIT_WAYPT_HOME  26
 #define EDIT_WAYPT_REINF 27
 #define EDIT_MAX_PLAYERS 8          /* MAX_PLAYERS, defines.h:2565 (EIGHTPLAYERS) */
+/* The house table above is written out to eight multiplayer seats. A brain with more of
+   them would have houses offered that the table does not carry, which is a read past its
+   end rather than a missing chip. */
+static_assert(EUI_HOUSE_MAX >= EUI_HOUSE_N,
+              "EUI_HOUSES is shorter than 4 + EDIT_MAX_PLAYERS");
 
 static int g_waypoint[EDIT_WAYPT_COUNT];
 static int g_waypointArmed = -1;    /* which one the next map click places */
 
+/* WHAT A WAYPOINT IS CALLED, AND WHICH NUMBER IT CARRIES.
+
+   26 and 27 are the two the engine reserves, so they are named rather than numbered. The
+   other twenty-six are general-purpose cells, and everything that refers to one refers to
+   it BY INDEX: the [Waypoints] key edit_emit_waypoints writes, a trigger, a TeamType order
+   argument (the order chip prints "goes to waypoint 5" straight from the raw argument),
+   and on a skirmish map the brain's own StartLocationIndex, which cnc_eyes.cpp defaults to
+   the seat's number counting from ZERO and which --starts takes as a raw index.
+
+   Labelling these rows starts and counting them from one disagreed with all of that. The
+   row picked as START 6 is the one written to the file as 5, reached with --starts 5, and
+   sent a team by order argument 5. While the row said START the number read as a seat
+   ordinal and nobody matched it against the file; a row that says WAYPOINT will be matched,
+   so it has to carry the number the file uses.
+
+   On a skirmish map the first eight ARE the seats, and the panel says so in its heading
+   (PLAYER STARTS) rather than in the number. That is deliberate: a seat number here would
+   have to be zero-based to agree with StartLocationIndex, at which point it says nothing
+   the heading did not already say. */
 static const char* edit_waypoint_label(int i)
 {
     static char b[32];
     if (i == EDIT_WAYPT_HOME)  return "HOME";
     if (i == EDIT_WAYPT_REINF) return "REINFORCE";
-    snprintf(b, sizeof b, "START %d", i + 1);
+    snprintf(b, sizeof b, "WAYPOINT %d", i);
     return b;
 }
-
 /* How many player starts this map offers. Every valid waypoint in 0..25 is a start as
    far as Create_Units is concerned, capped at MAX_PLAYERS. */
 static int edit_start_count(void)
@@ -658,7 +1182,7 @@ static int edit_start_count(void)
  *  So asking for 0.85x does not give a smaller glyph -- it gives the SAME glyph, rounded
  *  back up. Every "small" label in this panel was therefore drawn full size while the
  *  layout had budgeted the smaller width for it, and the two ran into each other. That
- *  is the text that could not be read.
+ *  is the text the project owner could not read.
  *
  *  There are two sizes, one step apart, and no others. Anything that wants to be smaller
  *  gets EUI_TS; anything bigger gets EUI_TL. Layout measures with sb_text_w, which snaps
@@ -672,7 +1196,7 @@ static int edit_start_count(void)
  * bitmap drawn at whole-number scales only, so a step down from body is a step to HALF.
  * On a Retina display the panel's body text lands at about 11 points, which makes the
  * small text about FIVE -- and 77 of the panel's 280 text draws used it. That is the
- * "uneven, and in many places unreadable" was reported three times, and no amount of
+ * "uneven, and in many places unreadable" the project owner reported three times, and no amount of
  * tuning the small size fixes it, because between 5pt and 11pt there is nothing to pick.
  *
  * So the panel now draws one size. It already leans hard on colour -- gold for what is
@@ -693,7 +1217,7 @@ static int edit_start_count(void)
  *  persistence (trigger.cpp:988). One event paired with one action -- no flow, no AND,
  *  no OR, no variables. That is the whole language the 1995 engine has.
  *
- *  TWO TIERS, which is a project decision and the right one.
+ *  TWO TIERS, which is the project owner's call and the right one.
  *
  *      NATIVE    only constructs the cartridge itself can run. Compiles to [Triggers]
  *                and [TeamTypes] exactly, so the mission plays on anything -- including
@@ -1193,10 +1717,121 @@ static void eui_panel(float x, float y, float w, float h, unsigned fill)
     eui_frame(x, y, w, h, EUI_LINE, 0.9f);
 }
 
-static void eui_cameo(float x, float y, float w, float h, const char* code)
+/* WHAT AN ITEM WITH NO CAMEO DRAWS INSTEAD OF A DARK BOX.
+ *
+ * Cameos are sidebar art: the cartridge pack is what the ROM's sidebar carried, which also
+ * includes UI plates, not only things a player can build. It holds fifty-three records
+ * (fifty-two at 32x25 plus RMBO at 32x24); the palette holds a hundred and forty-one placeable items, so
+ * ninety-eight tiles have no cartridge art and used to fill one flat rectangle each --
+ * thirty-two of thirty-two TERRAIN, forty-two of sixty-one BUILDING, thirteen of twenty
+ * INFANTRY, eight of twenty-two UNIT, two of five WALL and the one TIBERIUM field. A page
+ * of civilian buildings was a grid of identical dark squares with a serial number
+ * underneath.
+ *
+ * Four of those ninety-eight get a picture rather than a fallback. The two fences and the
+ * two boats were never buildable on the console, so the cartridge set never drew them, but
+ * the true-colour set does and sb_cameo_true hands it over. Ninety-four are left.
+ *
+ * No art is invented to close those. The fallback draws two facts the item's own row
+ * already carries and the palette never showed: its display NAME, which is what tells
+ * V01 from V02, and its FOOTPRINT -- the cells it occupies and which of them is the
+ * cell under the pointer. Those two separate seventy of the ninety-four on
+ * sight. The other twenty-four cannot be separated and it is worth being plain about
+ * why: they are all terrain, ten tree types share the name "Tree" and one cell at the
+ * same offset, and the table holds nothing else about them. For those the code strip
+ * under the tile stays the only distinguisher, and closing it needs a rendered preview
+ * of the model rather than a fallback. That gap is registered.
+ */
+static const EditItem* eui_item_by_code(const char* code)
+{
+    if (!code || !code[0]) return NULL;
+    for (int i = 0; i < EDIT_ITEM_N; i++)
+        if (!strcasecmp(EDIT_ITEMS[i].code, code)) return &EDIT_ITEMS[i];
+    return NULL;
+}
+
+/* One ground tone per kind, so the groups read apart before a word is read. Dark
+   enough that the armed and hovered treatments the tile draws behind still show. */
+static unsigned eui_kind_tone(int kind)
+{
+    switch (kind) {
+    case EDIT_KIND_BUILDING: return 0x16202c;
+    case EDIT_KIND_UNIT:     return 0x122630;
+    case EDIT_KIND_INFANTRY: return 0x241f18;
+    case EDIT_KIND_TERRAIN:  return 0x14241a;
+    case EDIT_KIND_WALL:     return 0x231e1c;
+    case EDIT_KIND_TIBERIUM: return 0x1c2a12;
+    case EDIT_KIND_SMUDGE:   return 0x2a1a14;
+    default:                 return 0x0d1520;
+    }
+}
+
+/* The occupy list as a plan, at ONE cell size for every item, so a three-by-three
+   construction yard reads bigger than a one-cell turret instead of merely different.
+   The anchor cell is forced into the bounds even when nothing stands on it: most tree
+   types occupy the cell one SOUTH of the one that was clicked, and that offset is the
+   difference between a tree that lands where it was put and one that does not. An
+   empty cell that is not the anchor draws nothing, which keeps a two-by-two bound
+   around a single tree down to two primitives. */
+static void eui_footprint_plan(float x, float y, float w, float h,
+                               const EditItem* it, float ts)
+{
+    int n = (int)it->n;
+    if (n > EDIT_CELL_MAX) n = EDIT_CELL_MAX;
+    int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    for (int k = 0; k < n; k++) {
+        if (it->dx[k] < x0) x0 = it->dx[k];
+        if (it->dx[k] > x1) x1 = it->dx[k];
+        if (it->dy[k] < y0) y0 = it->dy[k];
+        if (it->dy[k] > y1) y1 = it->dy[k];
+    }
+    const int gw = x1 - x0 + 1, gh = y1 - y0 + 1;
+    float c = w / (float)gw;
+    if (h / (float)gh < c) c = h / (float)gh;
+    if (c > 13.0f * ts) c = 13.0f * ts;
+    if (c < 4.0f * ts) return;          /* too small to read: the name carries the tile */
+    const float gut = ts > 1.0f ? ts : 1.0f;
+    const float ox = x + (w - c * gw) * 0.5f, oy = y + (h - c * gh) * 0.5f;
+    for (int gy = 0; gy < gh; gy++)
+        for (int gx = 0; gx < gw; gx++) {
+            const int cx = gx + x0, cy = gy + y0;
+            const bool anchor = (cx == 0 && cy == 0);
+            bool on = false;
+            for (int k = 0; k < n; k++)
+                if (it->dx[k] == cx && it->dy[k] == cy) { on = true; break; }
+            if (!on && !anchor) continue;
+            const float px = ox + gx * c, py = oy + gy * c, s = c - gut;
+            if (on) eui_rect(px, py, s, s, EUI_CYAN, 0.42f);
+            eui_frame(px, py, s, s, anchor ? EUI_GOLD : EUI_LINE, on ? 0.85f : 0.55f);
+        }
+}
+
+/* The scale comes in rather than being worked back out of the box. The box width is a
+   fixed multiple of the panel scale only while the sidebar is at its design width, and
+   it stops being one the moment a narrow window clamps the sidebar -- a size that is
+   right only because of how the caller happened to be laid out is the kind of thing
+   that goes quietly wrong later. */
+static void eui_cameo(float x, float y, float w, float h, const char* code, float ts)
 {
     const SbTex* t = sb_cameo(code);
-    if (!t || !t->gl) { eui_rect(x, y, w, h, 0x0d1520, 1.0f); return; }
+    /* The cartridge set first, then our own true-colour art where the cartridge has no
+       picture for that type at all. The two fences and the two boats were never buildable
+       on the console, so they fell through to the plate with usable art sitting in the
+       other pack. */
+    if (!t || !t->gl) t = sb_cameo_true(code);
+    if (!t || !t->gl) {
+        /* A linear walk of the item table, once per art-less tile. It is bounded by
+           the PAGE rather than by the table: a few dozen tiles are on screen, not a
+           hundred and forty. */
+        const EditItem* it = eui_item_by_code(code);
+        eui_rect(x, y, w, h, it ? eui_kind_tone((int)it->kind) : 0x0d1520, 1.0f);
+        if (!it) return;
+        const float nh = 11.0f * ts;
+        if (h > nh * 2.0f) eui_footprint_plan(x, y, w, h - nh, it, ts);
+        ef_text_fit(x + 2.0f * ts, y + h - nh, it->name, ts, w - 4.0f * ts,
+                    EUI_RGB(EUI_DIM));
+        return;
+    }
     const float u = (t->uw > 0 && t->w > 0) ? (float)t->uw / (float)t->w : 1.0f;
     const float v = (t->uh > 0 && t->h > 0) ? (float)t->uh / (float)t->h : 1.0f;
     glEnable(GL_TEXTURE_2D);
@@ -1227,8 +1862,10 @@ struct EuiLayout {
     float sideX, sideW;          /* the sidebar                                    */
     float radarX, radarY, radarW, radarH;
     float modeY, modeH, modeW;   /* three tabs across                              */
-    float ownerY, ownerH, ownerW;
-    float catY, catH, catW;      /* five category tabs                             */
+    float ownerY, ownerH, ownerW;   /* ONE chip: the strip is ownerRows of these     */
+    float ownerGap;                 /* between chips, across and down                */
+    int   ownerRows;
+    float catY, catH, catW;      /* the category tabs, seven in either mode        */
     float gridX, gridY, gridW, gridH;
     float tileW, tileH; int cols;
     float lintY, lintH;
@@ -1236,6 +1873,33 @@ struct EuiLayout {
     float saveY, saveH;
     float playY, playH;
 };
+
+/* HOW MANY CATEGORY TABS THE STRIP HAS, forward-declared because the layout needs the
+   count and this file is ordered drawing-first, which puts the answer two hundred lines
+   below. Note it BUILDS the terrain drawers on its first call in TERRAIN mode: that is
+   idempotent, pure over the loaded pack and the static template table, and unreachable
+   before the pack is loaded, so the layout is a safe caller. */
+static int eui_cat_count(void);
+
+/* THE OWNER CHIP STRIP IS FOUR COLUMNS AND AS MANY ROWS AS THE ROSTER NEEDS.
+ *
+ * Four and not twelve, measured rather than chosen by eye: at the eight window sizes and
+ * two backing scales the layout harness runs, twelve chips across leave each one 15 to 38
+ * device pixels wide, while the longest label the roster carries wants 51 to 79 in this
+ * panel's own face. One row of the whole roster cannot be read at any size this editor is
+ * tested at. A scrolling strip would fit but hides most of the houses, which is the one
+ * thing a strip of owner chips exists not to do; a dropdown fits and hides all of them.
+ * Four columns keeps every chip exactly the width it has always had, so a singleplayer
+ * map -- which offers four houses and takes one row -- lays out to the same numbers it
+ * did before this existed, and a skirmish map grows two rows downwards.
+ *
+ * Both counts are forward-declared for the same reason eui_cat_count is: the layout needs
+ * them, and the map's kind that decides them is declared a long way below this point in a
+ * file that is ordered drawing-first. */
+#define EUI_OWNER_COLS 4
+#define EUI_OWNER_GAP  4.0f     /* design units, the gap the chips already had */
+static int eui_owner_n(void);
+static int eui_owner_rows(void);
 
 static void eui_layout(int fbw, int fbh, EuiLayout* L)
 {
@@ -1253,7 +1917,9 @@ static void eui_layout(int fbw, int fbh, EuiLayout* L)
         const float fixed = EUI_TOP_H + EUI_PAD          /* title bar               */
                           + EUI_SIDE_W * 0.42f + EUI_PAD /* radar (square)          */
                           + 46 + EUI_PAD                 /* mode tabs               */
-                          + 30 + EUI_PAD                 /* owner chips             */
+                          + (float)eui_owner_rows() * 30 /* owner chips, every row  */
+                          + (float)(eui_owner_rows() - 1) * EUI_OWNER_GAP
+                          + EUI_PAD
                           + 32 + EUI_PAD                 /* category tabs           */
                           + 60 + EUI_PAD                 /* the grid's own minimum  */
                           + 96 + EUI_PAD                 /* the readout             */
@@ -1288,10 +1954,33 @@ static void eui_layout(int fbw, int fbh, EuiLayout* L)
     L->modeW = (L->sideW - pad * 2 - pad * 4) / 5.0f;
     L->modeY = y; L->modeH = 46 * S;  y += L->modeH + pad;
 
-    L->ownerW = (L->sideW - pad * 2 - 3 * 4 * S) / 4.0f;
-    L->ownerY = y; L->ownerH = 30 * S; y += L->ownerH + pad;
+    /* n columns have n-1 gaps and the last one ends at the panel's right margin --
+       the same arithmetic the category strip uses. With four columns this is the number
+       it always was, to the bit, which is why a mission map's panel does not move. */
+    L->ownerRows = eui_owner_rows();
+    L->ownerGap  = EUI_OWNER_GAP * S;
+    L->ownerW = (L->sideW - pad * 2 - (float)(EUI_OWNER_COLS - 1) * L->ownerGap)
+              / (float)EUI_OWNER_COLS;
+    L->ownerY = y; L->ownerH = 30 * S;
+    /* THE WHOLE STRIP, not one row. The fixed-height budget above counts the same rows;
+       if these two ever disagree the chips run into the category tabs, which is what the
+       layout harness measures rather than assumes. */
+    y += (float)L->ownerRows * L->ownerH
+       + (float)(L->ownerRows - 1) * L->ownerGap + pad;
 
-    L->catW = (L->sideW - pad * 2 - 4 * 3 * S) / 5.0f;
+    /* SEVEN TABS IN EITHER MODE NOW, and the WIDTH has to follow the count: n tabs have
+       n-1 gaps of 3*S between them, and the last one has to end at the panel's right
+       margin. Hard-coding five while the draw emitted seven is why the terrain strip ran
+       off the window -- measured at 1280x720 backing 1.0, ROCK was a 3.2 px sliver at the
+       frame edge and BRIDGE started 49 px past it, so bridges could not be authored at
+       all. OBJECTS was five until the SMUDGE group landed and is seven now, which is the
+       count this arithmetic was fixed for, so both strips ask the same question. The
+       count is still read rather than assumed: a group added later moves it again. */
+    {
+        int nc = eui_cat_count();
+        if (nc < 1) nc = 1;
+        L->catW = (L->sideW - pad * 2 - (float)(nc - 1) * 3 * S) / (float)nc;
+    }
     L->catY = y; L->catH = 32 * S;     y += L->catH + pad;
 
     /* Everything below is pinned to the bottom and the grid takes what is left: the
@@ -1313,11 +2002,34 @@ static void eui_layout(int fbw, int fbh, EuiLayout* L)
     L->tileH = L->tileW * 0.86f + 12 * S;   /* cameo is 32x24, plus a name strip */
 }
 
+/* WHERE ONE OWNER CHIP SITS. The draw, the hit test and the layout harness all call this
+   and none of them may work it out again. That is the whole defect this replaces: the
+   strip carried three separate copies of the arithmetic and every one of them counted to
+   four, so widening the roster in the data left the multiplayer houses drawn nowhere,
+   clickable nowhere, and unreachable from the keyboard cycle that already offered them. */
+static void eui_owner_chip_rect(const EuiLayout* L, int i,
+                                float* x, float* y, float* w, float* h)
+{
+    const float pad = EUI_PAD * L->s;
+    const int col = i % EUI_OWNER_COLS, row = i / EUI_OWNER_COLS;
+    *w = L->ownerW;
+    *h = L->ownerH;
+    *x = L->sideX + pad + (float)col * (L->ownerW + L->ownerGap);
+    *y = L->ownerY + (float)row * (L->ownerH + L->ownerGap);
+}
+
 
 static bool edit_over_chrome(float mx, float my, int fbw, int fbh)
 {
     if (!g_editOn) return false;
     if (mx < 0.0f) return true;              /* pointer is off the window entirely */
+    /* AND A DIALOG COUNTS AS CHROME, over the whole window rather than over its own
+       rectangle. Both callers want exactly that: the hover test stops resolving a cell,
+       so no cell outline and no brush footprint are painted on ground behind the dialog,
+       and the engine's cursor picker stops running a ray into the world, so the pointer
+       becomes the flat sprite it already is over the panels instead of the console's 3D
+       cursor standing somewhere the click cannot reach. */
+    if (edit_modal_up()) return true;
     EuiLayout L; eui_layout(fbw, fbh, &L);
     return (my < L.topH) || (mx < L.railW) || (mx >= L.sideX) || (my >= L.barY);
 }
@@ -1498,7 +2210,7 @@ static void eui_coin(float cx, float cy, float r, unsigned long frame)
 
 
 
-/* The category strip is mode-dependent: five object kinds, or seven terrain families.
+/* The category strip is mode-dependent: seven object kinds, or seven terrain families.
    One place answers, so the draw, the hit test and the test harness cannot disagree. */
 static void edit_terrain_build(void);
 
@@ -1637,6 +2349,9 @@ static void eui_template_thumb(float x, float y, float w, float h, int tid)
     const EditTemplate* e = &EDIT_TEMPLATES[tid];
     const PackTex& at = g_pack.tex[g_pack.terrainTex];
     if (!at.gl || at.uw <= 0 || at.uh <= 0) return;
+    /* Same reason the paint path refuses: a swatch cut from the wrong rectangle of a
+       mismatched atlas shows the player art that no click of theirs can produce. */
+    if (!tt_atlas_matches(at)) return;
 
     const int tw = e->w > 0 ? e->w : 1, th = e->h > 0 ? e->h : 1;
     /* Fit the whole block in the tile, square cells, centred. */
@@ -1732,13 +2447,287 @@ static int eui_cliff_list(int* out, int nmax)
     return n;
 }
 
+/* ------------------------------------------------------------------------------------
+   THE WAY IN TO THE HEIGHTMAP IMPORTER.
+
+   The importer itself is far below and has been provable for a while; what it had no
+   route from was a person. Three shapes were weighed.
+
+     A NATIVE FILE DIALOG is a new dependency on two desktop platforms and a third API
+     again on the retro box this has to build for, all for one button. Refused.
+     THE FILE BESIDE THE MAP -- one image named after the scenario -- needs no picker at
+     all, and the importer already carries that fallback. But it allows exactly ONE
+     heightmap per map, so comparing two drafts of a plateau means renaming files in
+     another program, which is the point at which an author gives up on the feature.
+     THE FOLDER IS THE PICKER. Every PNG and PCX in user_maps is offered, which is the
+     shape the Open dialog already uses on that same directory, and the image named
+     after the map is preselected so the beside-the-map convention still works without
+     being the only thing that works. Chosen.
+
+   The scan is LAZY AND CACHED, the way the map list's is -- a directory read every frame
+   for a control nobody is looking at is a hundred of them a second. That is also why the
+   chip looks again before it steps: a picture saved into the folder while the editor is
+   open is the normal case, not the odd one.
+
+   Geometry lives here, once, and the draw and the hit test both call it, exactly as the
+   cliff cells below do. The two cannot drift. */
+static void edit_userdir(char* out, int n);                  /* with the map list      */
+static void edit_toast(unsigned colour, const char* what, const char* detail);
+static int  elev_import_image(const char* path, char* why, int whyN);
+static inline int elev_bw(void);                             /* with the tier model    */
+static inline int elev_bh(void);
+
+#define ELEV_IMG_MAX  64
+#define ELEV_IMG_NAME 64
+#define ELEV_IMG_NONE "no PNG and no PCX in user_maps -- paint one, put it there, " \
+                      "and click again"
+static char g_elevImg[ELEV_IMG_MAX][ELEV_IMG_NAME];
+static char g_elevImgFor[32] = "";      /* the map the preselect below was made for */
+static int  g_elevImgN     = 0;
+static int  g_elevImgSel   = 0;
+static bool g_elevImgBuilt = false;
+
+/* Built, and built for THIS map. Opening another map does not change the folder, but it
+   does change which picture in it is the map's own, and an armed heightmap belonging to
+   the map before this one is the kind of wrong default that gets clicked. */
+static bool elev_imglist_current(void)
+{
+    return g_elevImgBuilt && !strcmp(g_elevImgFor, g_editScen);
+}
+
+static void elev_scan_images(void)
+{
+    g_elevImgN = 0;
+    g_elevImgBuilt = true;
+    snprintf(g_elevImgFor, sizeof g_elevImgFor, "%s", g_editScen);
+    char dir[1024];
+    edit_userdir(dir, sizeof dir);
+    DIR* d = opendir(dir);
+    if (d) {
+        struct dirent* e;
+        while ((e = readdir(d)) != NULL && g_elevImgN < ELEV_IMG_MAX) {
+            const char* nm = e->d_name;
+            const size_t L = strlen(nm);
+            if (L < 5 || L >= ELEV_IMG_NAME) continue;
+            if (strcasecmp(nm + L - 4, ".png") && strcasecmp(nm + L - 4, ".pcx"))
+                continue;
+            snprintf(g_elevImg[g_elevImgN++], ELEV_IMG_NAME, "%s", nm);
+        }
+        closedir(d);
+    }
+    /* Alphabetical, for the same reason the map list is: this list is read, not
+       scrolled past, and readdir hands them over in whatever order the filesystem
+       happens to hold them, which is not an order twice running. */
+    for (int i = 0; i + 1 < g_elevImgN; i++)
+        for (int j = i + 1; j < g_elevImgN; j++)
+            if (strcasecmp(g_elevImg[j], g_elevImg[i]) < 0) {
+                char t[ELEV_IMG_NAME];
+                snprintf(t, sizeof t, "%s", g_elevImg[i]);
+                snprintf(g_elevImg[i], ELEV_IMG_NAME, "%s", g_elevImg[j]);
+                snprintf(g_elevImg[j], ELEV_IMG_NAME, "%s", t);
+            }
+    /* THE MAP'S OWN NAME WINS THE FIRST SELECTION, so the convention the importer
+       already documents -- put the picture beside the map, under the map's name -- is
+       what the button offers before anybody touches the chip. */
+    g_elevImgSel = 0;
+    const size_t sl = strlen(g_editScen);
+    for (int i = 0; sl && i < g_elevImgN; i++) {
+        const size_t L = strlen(g_elevImg[i]);
+        if (L == sl + 4 && !strncasecmp(g_elevImg[i], g_editScen, sl)) {
+            g_elevImgSel = i;
+            break;
+        }
+    }
+}
+
+/* Where the import row starts: catY, the ladder, the three tools, the brush, then air.
+   One walk, called by everything below, so the row and the cliff drawer under it cannot
+   disagree about where the panel has got to. */
+#define ELEV_IMPORT_H 30.0f
+static float eui_elev_import_top(const EuiLayout* L)
+{
+    const float S = L->s, pad = EUI_PAD * S;
+    return L->catY + (32 * S + pad) + 3 * (34 * S + 4 * S) + pad + 30 * S + 8 * S;
+}
+
+/* which: 0 the import button, 1 the chip beside it. The chip is ABSENT when the folder
+   holds nothing -- there is no list to step through, so the whole row becomes the one
+   control that looks again -- and returning false is how both the draw and the hit test
+   are told so. The list is built here rather than in the draw because the hit test can
+   run first, on the frame the pointer arrives, and a hit test that thought the folder
+   was empty while the draw knew better is a chip that cannot be clicked.
+
+   FALSE ALSO MEANS TOO SHORT A WINDOW, and that guard is not optional. L->lintY is the
+   panel's usable bottom; below it are the status card and then UNDO / REDO / REVERT, and
+   the elevation branch of the hit test is tested BEFORE that row. Measured with the
+   layout prober: at a 640x360-point window on a 2x display this row lands at 571..606
+   and the action row is at 583..613, so an unguarded row swallowed all three actions at
+   four of the sixteen sizes the prober walks. The rectangle is still filled in when it
+   does not fit, the way the cliff cells' is, so a probe can aim at it and require that
+   NOTHING answers there. */
+static bool eui_elev_import_rect(const EuiLayout* L, int which,
+                                 float* x, float* y, float* w, float* h)
+{
+    if (!elev_imglist_current()) elev_scan_images();
+    const float S = L->s, pad = EUI_PAD * S;
+    const float full = L->sideW - pad * 2;
+    *y = eui_elev_import_top(L);
+    *h = ELEV_IMPORT_H * S;
+    const bool fits = (*y + *h <= L->lintY - 4 * S);
+    if (g_elevImgN <= 0) {
+        if (which != 0) return false;
+        *x = L->sideX + pad;
+        *w = full;
+        return fits;
+    }
+    const float chip = full * 0.30f;
+    if (which == 0) { *x = L->sideX + pad;               *w = full - chip - 4 * S; }
+    else            { *x = L->sideX + pad + full - chip; *w = chip; }
+    return fits;
+}
+
+/* ------------------------------------------------------------------------------------
+ *  THE AUTO HEIGHTMAP'S ROW, AND WHY IT IS BELOW THE IMPORT ROW RATHER THAN ABOVE IT
+ *
+ *  Above it costs the import button a window size, and that is measured rather than
+ *  guessed: --uitest walks sixteen size/backing pairs, IMPORT HEIGHTMAP answers a click
+ *  at twelve of them with this row absent, and at ELEVEN with a 36-unit row inserted
+ *  above it, because the shortest frames have about one row of slack between the brush
+ *  and the status card. Below it, eui_elev_import_top is not touched at all, so the
+ *  import row is byte-identical at all sixteen and stays at twelve. What moves instead
+ *  is the cliff drawer, which already drops the cells it cannot fit and already says
+ *  "+N MORE BELOW" when it does.
+ *
+ *  IT HAS TWO PLACES, BECAUSE THE PANEL HAS TWO STATES. On a map that is on the ladder
+ *  it is this row. On a map that is NOT, the panel draws the conversion gate INSTEAD of
+ *  the whole page -- and that map is precisely the one this feature exists for, so the
+ *  button lives on the gate card too, under CONVERT THIS MAP, as the reading alternative
+ *  to the erasing one. ONE rect function for both, so the draw, the hit test and
+ *  --uitest cannot disagree about which of the two is showing.
+ * ---------------------------------------------------------------------------------- */
+#define ELEV_AUTO_H   30.0f     /* the row's height on the tier page, design units   */
+#define ELEV_AUTO_GAP  6.0f     /* air between the import row and it                 */
+/* ITS TOP ON THE GATE CARD, AND THE CAPTION ABOVE IT. CONVERT THIS MAP is a 34-unit
+   button at 140, so it ends at 174, and the line that says what else is behind the gate
+   has to start below that or the button paints over it -- which is exactly what happened
+   the first time this row was fitted in, at a caption y of 168. The caption is a t1 line
+   and a t1 line on this card is 14 units tall (50, 64, 78, 92 above it), so 178 clears
+   the button by 4 and the row clears the caption by 8. Both numbers are constants rather
+   than literals in the draw because the harness reports the clearances and G192 reads
+   them, and a report computed from a different number than the draw uses is a report
+   that certifies nothing. */
+#define ELEV_GATE_CAPY 178.0f   /* the caption's y, under CONVERT THIS MAP           */
+#define ELEV_GATE_CAPH  14.0f   /* and the height a t1 line occupies on this card    */
+#define ELEV_AUTO_GATEY 200.0f  /* the fit's own top, under that caption             */
+#define ELEV_AUTO_GATEH  34.0f  /* and its height there, matching CONVERT's          */
+
+static float eui_elev_auto_top(const EuiLayout* L)
+{
+    const float S = L->s;
+    return eui_elev_import_top(L) + (ELEV_IMPORT_H + ELEV_AUTO_GAP) * S;
+}
+
+/* Same guard as the import row's, and not optional for the same reason: below L->lintY
+   are the status card and UNDO / REDO / REVERT, and the elevation branch of the hit test
+   runs BEFORE that row, so a row that does not fit must not answer. The rectangle is
+   still filled in when it does not fit, the way the cliff cells' is, so a probe can aim
+   at it and require that NOTHING answers there. */
+static bool eui_elev_auto_rect(const EuiLayout* L, float* x, float* y, float* w, float* h)
+{
+    const float S = L->s, pad = EUI_PAD * S;
+    if (!elev_ready()) {
+        *x = L->sideX + pad * 2;
+        *y = L->catY + ELEV_AUTO_GATEY * S;
+        *w = L->sideW - pad * 4;
+        *h = ELEV_AUTO_GATEH * S;
+    } else {
+        *x = L->sideX + pad;
+        *y = eui_elev_auto_top(L);
+        *w = L->sideW - pad * 2;
+        *h = ELEV_AUTO_H * S;
+    }
+    return (*y + *h <= L->lintY - 4 * S);
+}
+
+/* THE CHIP. It rescans before it steps, then lands back on whatever was showing so a
+   rescan that finds the same files does not shuffle the selection under the pointer. */
+static void elev_import_cycle(void)
+{
+    char had[ELEV_IMG_NAME] = "";
+    const int before = elev_imglist_current() ? g_elevImgN : -1;
+    if (elev_imglist_current() && g_elevImgN > 0)
+        snprintf(had, sizeof had, "%s", g_elevImg[g_elevImgSel]);
+    elev_scan_images();
+    if (g_elevImgN <= 0) {
+        snprintf(g_elevWhy, sizeof g_elevWhy, "%s", ELEV_IMG_NONE);
+        edit_toast(EUI_GOLD, "NO HEIGHTMAP IMAGE", ELEV_IMG_NONE);
+        return;
+    }
+    int at = 0;
+    for (int i = 0; i < g_elevImgN; i++)
+        if (!strcasecmp(g_elevImg[i], had)) { at = i; break; }
+    g_elevImgSel = (at + (had[0] ? 1 : 0)) % g_elevImgN;
+    g_elevWhy[0] = 0;
+    if (before != g_elevImgN) {
+        char sub[160];
+        snprintf(sub, sizeof sub, "%d in user_maps -- showing %s", g_elevImgN,
+                 g_elevImg[g_elevImgSel]);
+        edit_toast(EUI_CYAN, "HEIGHTMAP IMAGES", sub);
+    }
+}
+
+/* THE BUTTON. The importer states every refusal it makes and, until this existed, every
+   one of them went to the log and nowhere else. So the refusal is toasted AND kept in
+   the status card's own line, which is what a player looking at the panel reads. */
+static void elev_import_selected(void)
+{
+    if (!elev_imglist_current()) elev_scan_images();
+    if (g_elevImgN <= 0) {
+        /* The empty row IS the look-again control. If the look finds something, SAY so
+           and stop: importing a file the player has not yet seen named would be the one
+           surprise this whole row exists to avoid. */
+        elev_scan_images();
+        if (g_elevImgN <= 0) {
+            snprintf(g_elevWhy, sizeof g_elevWhy, "%s", ELEV_IMG_NONE);
+            edit_toast(EUI_GOLD, "NO HEIGHTMAP IMAGE", ELEV_IMG_NONE);
+        } else {
+            char sub[160];
+            snprintf(sub, sizeof sub, "%d in user_maps -- %s is armed, click again to "
+                     "import it", g_elevImgN, g_elevImg[g_elevImgSel]);
+            g_elevWhy[0] = 0;
+            edit_toast(EUI_CYAN, "HEIGHTMAP IMAGES", sub);
+        }
+        return;
+    }
+    /* BEHIND THE SAME GATE THE BRUSH IS. An import writes corners only where the image
+       disagrees with the ground, so on a map that is off the ladder it would legalise
+       the part it drew and leave the rest off it -- a half-converted map, and the panel
+       would still be showing the gate. The gate first, then the import. */
+    if (!elev_ready()) {
+        const char* w = "this map is not on the ladder -- CONVERT THIS MAP first";
+        snprintf(g_elevWhy, sizeof g_elevWhy, "%s", w);
+        edit_toast(EUI_GOLD, "HEIGHTMAP NOT IMPORTED", w);
+        return;
+    }
+    if (g_elevImgSel < 0 || g_elevImgSel >= g_elevImgN) g_elevImgSel = 0;
+    char dir[1024], path[1200], why[220] = { 0 };
+    edit_userdir(dir, sizeof dir);
+    snprintf(path, sizeof path, "%s/%s", dir, g_elevImg[g_elevImgSel]);
+    if (elev_import_image(path, why, sizeof why) > 0) {
+        g_elevWhy[0] = 0;               /* the importer toasts its own numbers */
+        return;
+    }
+    snprintf(g_elevWhy, sizeof g_elevWhy, "%s",
+             why[0] ? why : "the import did nothing and did not say why");
+    edit_toast(EUI_DANGER, "HEIGHTMAP NOT IMPORTED", g_elevWhy);
+}
+
 static float eui_cliff_top(const EuiLayout* L)
 {
     const float S = L->s, pad = EUI_PAD * S;
-    /* catY, then the ladder, the three tools, the brush -- the same walk
-       eui_draw_elev and the hit test make. */
-    return L->catY + (32 * S + pad) + 3 * (34 * S + 4 * S) + pad + 30 * S
-         + pad + 12 * S;
+    /* catY, the ladder, the three tools, the brush, the import row and the auto
+       heightmap row under it -- the same walk eui_draw_elev and the hit test make. */
+    return eui_elev_auto_top(L) + ELEV_AUTO_H * S + pad + 12 * S;
 }
 
 static bool eui_cliff_cell_rect(const EuiLayout* L, int k,
@@ -1756,10 +2745,272 @@ static bool eui_cliff_cell_rect(const EuiLayout* L, int k,
     return *y + *h <= L->lintY - 4 * S;
 }
 
+/* ------------------------------------------------------------------------------------
+ *  THE ELEVATION PANEL HAS TWO PAGES, AND THE FIRST ONE MAY NOT MOVE BY ONE PIXEL
+ *
+ *  The tier tool's page is the one this editor has always had, and it is not being
+ *  redesigned: it starts at L->catY, its RUNG caption sits 12*S above that, and every
+ *  row below is measured from there. So the page selector CANNOT be a tab strip laid
+ *  across the top of the page -- that pushes every row down by its own height, which
+ *  collides the caption with the tabs at every window size, walks the brush row into
+ *  the action row at the short ones, and is exactly the regression this arrangement
+ *  exists to avoid.
+ *
+ *  THE TABS GO IN THE OWNER-CHIP BAND INSTEAD, which ELEVATN does not use. The chip
+ *  strip is drawn for OBJECTS only (a tile has no house); TERRAIN puts a caption there
+ *  and SCRIPT puts its RULES / TEAMS / ENHANCED switch there -- so this is the panel's
+ *  own established place for a per-mode switch, and the precedent to copy is that one.
+ *  Vertically it costs the page NOTHING: eui_elev_top is L->catY, unchanged, so both
+ *  pages begin where the tier page has always begun.
+ *
+ *  It stops 14*S above catY rather than filling the band, because the page below draws
+ *  its own small caption at catY - 12*S and text is drawn from its TOP. Two design
+ *  units of air, measured against the caption rather than guessed at.
+ * ---------------------------------------------------------------------------------- */
+
+/* Where either page starts. One function, so the claim "the tier page did not move" is
+   a thing a gate can read rather than a thing a reader has to believe. */
+static float eui_elev_top(const EuiLayout* L) { return L->catY; }
+
+static bool eui_sbr_tab_rect(const EuiLayout* L, int i,
+                             float* x, float* y, float* w, float* h)
+{
+    const float S = L->s, pad = EUI_PAD * S;
+    *w = (L->sideW - pad * 2 - 4 * S) * 0.5f;
+    *x = L->sideX + pad + (float)i * (*w + 4 * S);
+    *y = L->ownerY;
+    *h = L->catY - 14 * S - L->ownerY;
+    /* A tab too short to aim at is not drawn and must not answer. The band is fixed
+       furniture in the layout's height budget, so this is true at every size the
+       harness walks -- but it is asked rather than assumed, the way the import row
+       and the cliff cells ask. */
+    return *h >= 8 * S;
+}
+
+/* ---- the smooth page's own walk ----------------------------------------------------
+ *
+ *  ONE running total, called by the draw, the hit test, the handler and the layout
+ *  harness, so none of them can work it out again and get a different answer. Every row
+ *  reports whether it FITS above the status card, because at four of the sixteen sizes
+ *  the harness walks there is only about 102 design units between eui_elev_top and
+ *  L->lintY, and a control drawn past that lands on the readout.
+ *
+ *  MEASURED, at the tightest of those four (1280x480 backing 2.0): lintY - catY is
+ *  82.49 px at S=0.7782, which is 106.0 design units, so the bound is 102 after the
+ *  4*S margin. The tool row and all three sliders come to 98 and fit; the help block
+ *  starts at 105 and is the row that gets cut. That is why the help text is LAST and
+ *  why its top is a different expression from any slider's -- the two resolving to the
+ *  same number is how help text ends up drawn over a slider. */
+#define SBR_TOOLH   28.0f      /* the RAISE / LOWER / ERASE row                       */
+#define SBR_SLIDH   18.0f      /* one slider track                                    */
+#define SBR_SLIDG    3.0f      /* between sliders                                     */
+#define SBR_HELPLN  11.0f      /* one line of help                                    */
+#define SBR_HELP_N  4
+
+static float eui_sbr_tools_top(const EuiLayout* L) { return eui_elev_top(L); }
+
+static float eui_sbr_sliders_top(const EuiLayout* L)
+{
+    const float S = L->s;
+    return eui_sbr_tools_top(L) + SBR_TOOLH * S + EUI_PAD * S;
+}
+
+static float eui_sbr_help_top(const EuiLayout* L)
+{
+    const float S = L->s;
+    return eui_sbr_sliders_top(L)
+         + (float)SBR_SLIDER_N * (SBR_SLIDH + SBR_SLIDG) * S + EUI_PAD * S;
+}
+
+/* Does a row of height h with its top at y clear the status card? The one bound, so a
+   row that the draw skips is a row the hit test skips. */
+static bool eui_sbr_fits(const EuiLayout* L, float y, float h)
+{
+    return y + h <= L->lintY - 4 * L->s;
+}
+
+static bool eui_sbr_tool_rect(const EuiLayout* L, int i,
+                              float* x, float* y, float* w, float* h)
+{
+    const float S = L->s, pad = EUI_PAD * S;
+    const float full = L->sideW - pad * 2;
+    *w = (full - 2 * 4 * S) / 3.0f;
+    *x = L->sideX + pad + (float)i * (*w + 4 * S);
+    *y = eui_sbr_tools_top(L);
+    *h = SBR_TOOLH * S;
+    return eui_sbr_fits(L, *y, *h);
+}
+
+static bool eui_sbr_slider_rect(const EuiLayout* L, int i,
+                                float* x, float* y, float* w, float* h)
+{
+    const float S = L->s, pad = EUI_PAD * S;
+    *x = L->sideX + pad;
+    *w = L->sideW - pad * 2;
+    *y = eui_sbr_sliders_top(L) + (float)i * (SBR_SLIDH + SBR_SLIDG) * S;
+    *h = SBR_SLIDH * S;
+    return eui_sbr_fits(L, *y, *h);
+}
+
+/* THE TRACK IS NOT THE WHOLE ROW, and this is the second half of "the knob cannot be
+   drawn somewhere the click does not mean".
+ *
+ * A slider row carries three things: its NAME on the left, its READOUT on the right, and
+ * the knob between them. While the fill and the knob spanned the whole row the knob was
+ * drawn straight through the name at the page's own defaults -- MEASURED at 1600x1000
+ * backing 1.0 with size 2.0, falloff 3.0, strength 0.60: CENTRE SIZE put its knob at
+ * x=1285.5 while the glyphs of "CENTRE SIZE" run to x=1311.3, and FALLOFF put its knob
+ * at x=1295.4 against a label ending at 1286.3. Two of the three rows, at the values the
+ * page opens with.
+ *
+ * THE RESERVE IS MEASURED, NOT ASSUMED. The panel font is picked from a discrete set of
+ * sizes, so a label that is 72.4 px wide at scale 0.625 is still 72.4 px wide at 1.1125
+ * and 85.5 px at 1.3375: a fixed number of design units is wrong at eleven of the sixteen
+ * window sizes. ef_text_w is asked instead, on both sides.
+ *
+ * THE READOUT IS RESERVED AT ITS WIDEST, not at the value showing. A right edge that
+ * moved as the number changed would put the knob under the digits at some values and not
+ * at others, which is a layout that is only correct while somebody is looking at it.
+ *
+ * ONE FUNCTION, because the draw, the hit test and the uitest all have to agree about
+ * this rectangle or the tool lies about where it is. */
+static void eui_sbr_track(const EuiLayout* L, int i, float x, float w,
+                          float* tx, float* tw)
+{
+    const float S = L->s, t1 = 1.0f * S;
+    char v[32];
+    if (SBR_SLIDERS[i].unit[0])
+        snprintf(v, sizeof v, "%.1f %s", SBR_SLIDERS[i].hi, SBR_SLIDERS[i].unit);
+    else
+        snprintf(v, sizeof v, "%.2f", SBR_SLIDERS[i].hi);
+    const float lw = 8 * S + ef_text_w(SBR_SLIDERS[i].name, t1) + SBR_TRACK_GAP * S;
+    const float rw = 8 * S + ef_text_w(v, t1) + SBR_TRACK_GAP * S;
+    float a = x + lw, b = x + w - rw;
+    /* A PANEL TOO NARROW FOR BOTH COLUMNS still has to be draggable. The floor takes the
+       space back from the READOUT side first, because the readout is the half a player
+       can reconstruct from where the knob is standing. */
+    if (b - a < SBR_TRACK_MIN * S) b = a + SBR_TRACK_MIN * S;
+    if (b > x + w) b = x + w;
+    if (b < a)     b = a;
+    *tx = a;
+    *tw = b - a;
+}
+
+/* The value a pointer at px means for slider i, and the value it is showing now. Both
+   sides of the same mapping, in one place, so the knob cannot be drawn somewhere the
+   click does not mean. */
+static float eui_sbr_slider_t(int i)
+{
+    const SbrSlider* d = &SBR_SLIDERS[i];
+    float t = (g_sbrVal[i] - d->lo) / (d->hi - d->lo);
+    return t < 0.0f ? 0.0f : t > 1.0f ? 1.0f : t;
+}
+
+static void eui_sbr_slider_drag(const EuiLayout* L, int i, float px)
+{
+    float x, y, w, h;
+    if (i < 0 || i >= SBR_SLIDER_N) return;
+    eui_sbr_slider_rect(L, i, &x, &y, &w, &h);
+    /* THE ROW IS THE HIT AREA AND THE TRACK IS THE MAPPING. Pressing anywhere on the row
+       takes the slider -- which is what makes it easy to grab -- and the value comes from
+       the track, clamped, so a press on the name means the low end and a press on the
+       readout means the high end rather than a value the knob cannot be drawn at. */
+    float tx, tw;
+    eui_sbr_track(L, i, x, w, &tx, &tw);
+    if (tw <= 0.0f) return;
+    float t = (px - tx) / tw;
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    g_sbrVal[i] = SBR_SLIDERS[i].lo + t * (SBR_SLIDERS[i].hi - SBR_SLIDERS[i].lo);
+}
+
+/* The page tabs. Drawn on BOTH pages and on the conversion gate as well: the gate is
+   exactly the state a player has to be able to leave, because a smooth stroke is what
+   unlocks the rung tool on a map that is off the ladder. */
+static void eui_draw_elev_tabs(const EuiLayout* L, float t1)
+{
+    const float S = L->s;
+    for (int i = 0; i < 2; i++) {
+        float x, y, w, h;
+        if (!eui_sbr_tab_rect(L, i, &x, &y, &w, &h)) return;
+        const bool on  = (i == g_sbrPage);
+        const bool hot = (g_euiHotKind == EUI_SBRPAGE && g_euiHotArg == i);
+        eui_panel(x, y, w, h, on ? EUI_PANEL3 : hot ? EUI_PANEL2 : EUI_PANEL);
+        eui_rect(x, y, w, 3 * S, on ? EUI_CYAN : EUI_LINE, on ? 1.0f : 0.3f);
+        const float tw = ef_text_w(SBR_PAGE_NAME[i], t1);
+        ef_text(x + (w - tw) * 0.5f, y + h * 0.5f - 3 * S, SBR_PAGE_NAME[i], t1,
+                EUI_RGB(on ? EUI_CYAN : EUI_FAINT));
+    }
+}
+
+/* The smooth page. No ladder, no rungs, no cliff art: three tools, three sliders and a
+   sentence about what the brush will not do. */
+static void eui_draw_sbr(const EuiLayout* L, float t1)
+{
+    const float S = L->s, pad = EUI_PAD * S;
+    ef_text(L->sideX + pad, eui_elev_top(L) - 12 * S,
+            "SMOOTH BRUSH   WRITES CORNERS, DRESSES NOTHING",
+            EUI_TS(t1), EUI_RGB(EUI_FAINT));
+
+    for (int i = 0; i < 3; i++) {
+        float x, y, w, h;
+        if (!eui_sbr_tool_rect(L, i, &x, &y, &w, &h)) break;
+        const bool on  = (i == g_sbrTool);
+        const bool hot = (g_euiHotKind == EUI_SBRTOOL && g_euiHotArg == i);
+        eui_panel(x, y, w, h, on ? EUI_PANEL3 : hot ? EUI_PANEL2 : EUI_PANEL);
+        if (on) eui_rect(x, y, w, 3 * S, EUI_CYAN, 1.0f);
+        const float tw = ef_text_w(SBR_TOOL_NAME[i], t1);
+        ef_text(x + (w - tw) * 0.5f, y + h * 0.5f - 3 * S, SBR_TOOL_NAME[i], t1,
+                EUI_RGB(on ? EUI_CYAN : EUI_DIM));
+    }
+
+    for (int i = 0; i < SBR_SLIDER_N; i++) {
+        float x, y, w, h;
+        if (!eui_sbr_slider_rect(L, i, &x, &y, &w, &h)) break;
+        const bool hot = (g_euiHotKind == EUI_SBRSLIDER && g_euiHotArg == i);
+        const float t = eui_sbr_slider_t(i);
+        float tx, tw;
+        eui_sbr_track(L, i, x, w, &tx, &tw);
+        eui_panel(x, y, w, h, hot ? EUI_PANEL2 : EUI_PANEL);
+        eui_rect(tx, y, tw * t, h, EUI_CYAN, 0.30f);
+        eui_rect(tx + tw * t - 1.5f * S, y, 3 * S, h, EUI_CYAN, 1.0f);
+        ef_text(x + 8 * S, y + h * 0.5f - 3 * S, SBR_SLIDERS[i].name, EUI_TS(t1),
+                EUI_RGB(EUI_DIM));
+        char v[32];
+        if (SBR_SLIDERS[i].unit[0])
+            snprintf(v, sizeof v, "%.1f %s", g_sbrVal[i], SBR_SLIDERS[i].unit);
+        else
+            snprintf(v, sizeof v, "%.2f", g_sbrVal[i]);
+        ef_text(x + w - ef_text_w(v, EUI_TS(t1)) - 8 * S, y + h * 0.5f - 3 * S, v,
+                EUI_TS(t1), EUI_RGB(EUI_CYAN));
+    }
+
+    {
+        /* FOUR LINES, and the count is a layout constant: SBR_HELP_N decides whether
+           the block fits above the status card at the four shortest window sizes. */
+        static const char* HELP[SBR_HELP_N] = {
+            "Hold the button and the ground keeps moving; the",
+            "rate is per SECOND, not per frame. ERASE eases the",
+            "ground back to THIS MAP's own level. Water is",
+            "refused: the sea reuses the ground's own corners.",
+        };
+        const float hy = eui_sbr_help_top(L);
+        if (eui_sbr_fits(L, hy, (float)SBR_HELP_N * SBR_HELPLN * S))
+            for (int i = 0; i < SBR_HELP_N; i++)
+                ef_text(L->sideX + pad, hy + (float)i * SBR_HELPLN * S, HELP[i],
+                        EUI_TS(t1), EUI_RGB(EUI_FAINT));
+    }
+}
+
 /* The elevation panel: the ladder, the three tools, the brush, and -- until the map is
    on the ladder -- the conversion gate instead of all of it. */
 static void eui_draw_elev(const EuiLayout* L, float t1)
 {
+    /* THE PAGE TABS FIRST, and in the band above the page, so nothing below this line
+       moves. The tier page's body is unchanged from here down. */
+    eui_draw_elev_tabs(L, t1);
+    if (g_sbrPage == 1) { eui_draw_sbr(L, t1); return; }
+
     const float S = L->s, pad = EUI_PAD * S;
     static const char* RUNGN[5] = { "LOW", "GROUND", "+1", "+2", "+3" };
     static const char* TOOLN[3] = { "RAISE / LOWER", "GRADED PASS", "RAMP" };
@@ -1788,6 +3039,37 @@ static void eui_draw_elev(const EuiLayout* L, float t1)
                 EUI_TS(t1), EUI_RGB(EUI_FAINT));
         ef_text(tx, y + 92 * S, "cliff from the compass.", EUI_TS(t1), EUI_RGB(EUI_FAINT));
         ef_text(tx, y + 114 * S, "IT CANNOT BE UNDONE.", t1, EUI_RGB(EUI_DANGER));
+        /* SAY WHAT ELSE IS BEHIND THE GATE, AND WHAT IS NOT. Importing a painted
+           heightmap is refused on an unconverted map for the reason set out where that
+           button lives. The fit below is NOT refused and never was meant to be: it reads
+           cliff art out of the .BIN and writes corner bytes, and neither of those needs
+           the ladder. A control that is simply absent teaches nobody why; a control
+           behind a gate it does not need is worse, because the gate it was put behind
+           REPAINTS every level block as plain ground and would erase the very art the
+           fit reads. */
+        {
+            float ax, ay, aw, ahh;
+            const bool afits = eui_elev_auto_rect(L, &ax, &ay, &aw, &ahh);
+            ef_text(tx, y + ELEV_GATE_CAPY * S,
+                    "Importing a painted heightmap waits on this.",
+                    EUI_TS(t1), EUI_RGB(EUI_FAINT));
+            if (afits) {
+                const bool ahot = (g_euiHotKind == EUI_ELEVAUTO);
+                eui_panel(ax, ay, aw, ahh, ahot ? EUI_PANEL3 : EUI_PANEL2);
+                eui_rect(ax, ay, 3 * S, ahh, EUI_CYAN, 1.0f);
+                ef_text_fit(ax + 10 * S, ay + ahh * 0.5f - 3 * S,
+                            "FIT THE GROUND TO THE CLIFF ART", EUI_TS(t1), aw - 20 * S,
+                            EUI_RGB(EUI_CYAN));
+                /* SHORT ENOUGH THAT THE LAST WORD SURVIVES. ef_text_fit ellipsises
+                   from the right, and the longer wording lost "Undoable." at the
+                   panel's own default width -- which is the one word on this line that
+                   answers the question the card's own IT CANNOT BE UNDONE raises about
+                   the button above it. */
+                ef_text_fit(tx, ay + ahh + 6 * S,
+                            "Reads the slope pieces on this map. Undoable.",
+                            EUI_TS(t1), L->sideW - pad * 2 - 20 * S, EUI_RGB(EUI_FAINT));
+            }
+        }
 
         const float bh = 34 * S, bw = L->sideW - pad * 4;
         const float bx = L->sideX + pad * 2, byy = y + 140 * S;
@@ -1846,14 +3128,98 @@ static void eui_draw_elev(const EuiLayout* L, float t1)
         }
     }
 
+    /* ---- the way in to the heightmap importer ---- */
+    {
+        float bx, by, bw, bh;
+        if (eui_elev_import_rect(L, 0, &bx, &by, &bw, &bh)) {
+            const bool have = (g_elevImgN > 0);
+            const bool hot  = (g_euiHotKind == EUI_ELEVIMPORT);
+            eui_panel(bx, by, bw, bh, hot ? EUI_PANEL3 : EUI_PANEL2);
+            eui_rect(bx, by, 3 * S, bh, have ? EUI_CYAN : EUI_GOLD, 1.0f);
+            ef_text(bx + 10 * S, by + 5 * S,
+                    have ? "IMPORT HEIGHTMAP" : "NO HEIGHTMAP IMAGE", t1,
+                    EUI_RGB(have ? EUI_CYAN : EUI_GOLD));
+            char sub[128];
+            if (have)
+                snprintf(sub, sizeof sub, "%s  ->  %d x %d blocks",
+                         g_elevImg[g_elevImgSel], elev_bw(), elev_bh());
+            else
+                snprintf(sub, sizeof sub, "put a PNG or PCX in user_maps, then click");
+            ef_text_fit(bx + 10 * S, by + 17 * S, sub, EUI_TS(t1), bw - 20 * S,
+                        EUI_RGB(EUI_FAINT));
+            float cx, cy, cw, ch;
+            if (eui_elev_import_rect(L, 1, &cx, &cy, &cw, &ch)) {
+                const bool chot = (g_euiHotKind == EUI_ELEVNEXT);
+                eui_panel(cx, cy, cw, ch, chot ? EUI_PANEL3 : EUI_PANEL2);
+                ef_text(cx + (cw - ef_text_w("NEXT", t1)) * 0.5f, cy + 5 * S, "NEXT",
+                        t1, EUI_RGB(EUI_DIM));
+                char cnt[24];
+                snprintf(cnt, sizeof cnt, "%d / %d", g_elevImgSel + 1, g_elevImgN);
+                ef_text(cx + (cw - ef_text_w(cnt, EUI_TS(t1))) * 0.5f, cy + 17 * S,
+                        cnt, EUI_TS(t1), EUI_RGB(EUI_FAINT));
+            }
+        }
+    }
+
+    /* ---- fit a heightmap to the cliff art this map already carries ---- */
+    {
+        float bx, by, bw, bh;
+        if (eui_elev_auto_rect(L, &bx, &by, &bw, &bh)) {
+            const bool hot   = (g_euiHotKind == EUI_ELEVAUTO);
+            const bool armed = g_ahArmed && (g_editFrame - g_ahArmedAt) < AH_ARM_FRAMES;
+            eui_panel(bx, by, bw, bh, hot ? EUI_PANEL3 : EUI_PANEL2);
+            eui_rect(bx, by, 3 * S, bh, armed ? EUI_GOLD : EUI_CYAN, 1.0f);
+            ef_text(bx + 10 * S, by + 5 * S,
+                    armed ? "REPLACE THE RELIEF?" : "AUTO HEIGHTMAP", t1,
+                    EUI_RGB(armed ? EUI_GOLD : EUI_CYAN));
+            char sub[128];
+            if (armed)
+                snprintf(sub, sizeof sub, "click again -- this rewrites the ground");
+            else if (g_ah.valid)
+                snprintf(sub, sizeof sub, "%d placements read, %d cells marked",
+                         g_ah.places, g_ah.marked);
+            else
+                snprintf(sub, sizeof sub, "read the ground off the slope pieces on the map");
+            ef_text_fit(bx + 10 * S, by + 17 * S, sub, EUI_TS(t1), bw - 20 * S,
+                        EUI_RGB(EUI_FAINT));
+        }
+    }
+
     /* ---- the cliff drawer: stamp any slope piece by hand ---- */
     {
-        ef_text(L->sideX + pad, eui_cliff_top(L) - 12 * S,
-                "CLIFF PIECES   CLICK TO ARM, CLICK THE MAP TO STAMP",
-                EUI_TS(t1), EUI_RGB(EUI_FAINT));
         int list[64];
         const int n = eui_cliff_list(list, 64);
         int shown = 0;
+        /* THE CAPTION IS NOT A CONTROL, so --uitest cannot see it by clicking, and it
+           was drawn unconditionally: at 1280x480 backing 1.0, with the auto heightmap
+           row above it, it landed inside the status card and printed text over text.
+           It is drawn only when the drawer it names has a cell to show, which is the
+           same question the drawer itself asks one line further down, so the caption
+           cannot outlive the thing it captions. The ELEVCAP line is how a gate reads
+           that decision off a DRAWN frame rather than off a hit rectangle -- this
+           caption has none, which is exactly why --uitest was blind to it. */
+        float c0x, c0y, c0w, c0h;
+        const bool capfit = (n > 0) && eui_cliff_cell_rect(L, 0, &c0x, &c0y, &c0w, &c0h);
+        /* SET WHERE THE TEXT IS ACTUALLY PAINTED, not where the decision is made. A
+           diagnostic that reports the guard's own condition reports what the code MEANT
+           to do, and a gate reading it stays green while the paint happens anyway --
+           which is exactly what a mutation of the guard proved. This is set by the same
+           block that calls ef_text, so the line below says what was drawn. */
+        int capdrawn = 0;
+        if (capfit) {
+            ef_text(L->sideX + pad, eui_cliff_top(L) - 12 * S,
+                    "CLIFF PIECES   CLICK TO ARM, CLICK THE MAP TO STAMP",
+                    EUI_TS(t1), EUI_RGB(EUI_FAINT));
+            capdrawn = 1;
+        }
+        {   /* Said when it changes, not per frame -- the same rule the overlay keeps. */
+            static int told = -1;
+            if (told != capdrawn) {
+                told = capdrawn;
+                fprintf(stderr, "ELEVCAP|drawn=%d|capY=%.2f|lintY=%.2f|cells=%d\n",
+                        capdrawn, eui_cliff_top(L) - 12 * S, L->lintY, n);
+            }
+        }
         for (int k = 0; k < n; k++) {
             float x, cy, w, h;
             if (!eui_cliff_cell_rect(L, k, &x, &cy, &w, &h)) break;
@@ -1884,7 +3250,7 @@ static void eui_draw_elev(const EuiLayout* L, float t1)
 /* ------------------------------------------------------------------------------------
  *  THE MAP MENU, AND MODALS
  *
- *  A requirement: the map browser must not stand between double-clicking the app and
+ *  the project owner's note: the map browser must not stand between double-clicking the app and
  *  seeing a map. So the launcher opens the last map straight away, and choosing a
  *  different one -- or making one -- is a menu inside the editor, where it belongs.
  *
@@ -1943,6 +3309,18 @@ static int  g_euiModal   = MODAL_NONE;
 static int  g_checkScroll = 0;
 static bool g_euiMenuOpen = false;
 
+/* A MODAL OWNS THE WHOLE EDITOR, NOT JUST THE PIXELS IT COVERS. eui_hit has caged the
+   MOUSE behind an open dialog since it grew its "a modal takes everything" arm, but
+   nothing caged the keyboard or the pointer's world pick: with OPEN MAP on screen the
+   fly camera still flew, the arrow keys still panned, 1 to 5 still changed mode, Tab
+   still cycled the owning house, Delete still erased the cell under a pointer the dialog
+   was covering, and the console's 3D cursor still stood on ground nobody could reach.
+   Everything that has to stand down while a dialog is up asks this.
+   The dropdown MENU is deliberately NOT in here. It is not a mouse cage either -- a
+   click beside it lands on the map -- so making it a keyboard cage would leave the two
+   halves disagreeing again, in the other direction. */
+static bool edit_modal_up(void) { return g_editOn && g_euiModal != MODAL_NONE; }
+
 /* THE SLOT THE SAVE AS COPY WILL TAKE, resolved once when that dialog opens and shown
    inside it. Someone about to name a map should be able to see which USERnn file the
    name is going into, because the slot is what the GAME finds the map by. Declared up
@@ -1950,19 +3328,69 @@ static bool g_euiMenuOpen = false;
    drawing-first ordering rule of this file. */
 static char g_saveasSlot[32] = "";
 
-/* NEW MAP's choices. The four legacy presets are playable RECTANGLES inside the
-   classic 64x64 grid -- the grid is fixed and what varies is the rect. The fifth is
-   the MEGAMAPS grid itself: a full 128x128 world (playable 120x120, inset 4), saved
-   as [MAP] Version=1 with the brain's own sparse .BIN. */
+/* NEW MAP's choices. Every preset names the same thing, which is what the header over
+   the list says: the PLAYABLE RECTANGLE. The four legacy ones are rectangles inside the
+   classic 64x64 grid -- the grid is fixed and what varies is the rect. The fifth is a
+   rectangle inside the MEGAMAPS grid: a full 128x128 world saved as [MAP] Version=1 with
+   the brain's own sparse .BIN, played 120x120 with the centring leaving 4 blank cells on
+   every side. The sixth is neither: it is whatever was typed into it, anywhere in the
+   range the engine allows.
+
+   THE FIFTH ROW NAMES ITS RECT, NOT ITS GRID, and that is the point of this note. It
+   read "128 x 128" for a while, which is the one number on that row nobody could act on:
+   it named the grid on a list whose every other row names the rect, and it promised a
+   size no map of this format can carry. The widest rectangle a Version=1 map allows is
+   EUI_SIZE_MAX_BIG, which is 126, because the played rect sits one blank cell inside the
+   cell array on every side; a rect of 128 would leave a unit leaving the map with nowhere
+   to walk. The geometry did not change with the name: this row still builds rect 4,4
+   120x120 on a 128 world. Anyone who wants the format's true maximum types 126 into
+   CUSTOM. Widen this row and the name has to move with it. */
 struct EuiSize { const char* name; int w, h; int grid; };
-#define EUI_SIZE_N 5
+#define EUI_SIZE_N 6
+#define EUI_SIZE_CUSTOM 5
 static const EuiSize EUI_SIZES[EUI_SIZE_N] = {
     { "SMALL   32 x 32",  32, 32,  64 },
     { "MEDIUM  44 x 44",  44, 44,  64 },
     { "LARGE   54 x 54",  54, 54,  64 },
     { "HUGE    62 x 62",  62, 62,  64 },
-    { "128 x 128  (BIG MAP)", 120, 120, 128 },
+    { "120 x 120  (BIG MAP)", 120, 120, 128 },
+    /* THE SIXTH IS TYPED, and its w/h/grid are zero because it has none of its own:
+       g_newW and g_newH carry the answer and eui_new_grid picks the grid from them.
+       Five presets were never the range, they were five points inside a range the
+       engine has always allowed, and this is the space between them. */
+    { "CUSTOM",                 0,   0,   0 },
 };
+
+/* WHAT THE ENGINE ACTUALLY ALLOWS, read rather than assumed.
+ *
+ * The 1995 editor's own size dialog holds the played rectangle one blank cell inside
+ * the cell array on every side, so a unit leaving the map has an undrawn cell to walk
+ * onto. Its corner drags clamp the left edge to column 1 and the right edge to
+ * MAP_CELL_W - 2, and refuse a side under 3 (mapeddlg.cpp, Size_Map). So the widest
+ * legal rect is MAP_CELL_W - 2 and the centring in the blank map lands it at column 1
+ * exactly.
+ *
+ * MAP_CELL_W is 64 for a legacy map, whose cell numbers are y*64+x so that nothing past
+ * column 63 can be addressed at all, and 128 for a Version=1 one, which is the FILE's
+ * stride and not this build's storage ceiling. Measured against the cartridge: across
+ * the 98 shipped missions the largest rect is 62x62 and the largest X+Width is 63,
+ * which is this bound and not a coincidence.
+ *
+ * The FLOOR is the editor's own. The engine would take 3; the smallest rectangle the
+ * cartridge ever shipped is 26x23, and 16 sits under that while still leaving room for
+ * a construction yard, its apron and somewhere to drive. */
+#define EUI_SIZE_MIN     16
+#define EUI_SIZE_MAX_64  (64 - 2)
+#define EUI_SIZE_MAX_BIG (C3D_INI_STRIDE - 2)
+
+/* The typed rectangle, and the grid it needs. A side over 62 cannot be numbered on the
+   legacy 64 stride, so it takes the big grid and the map is saved as Version=1. */
+static int g_newW = 62, g_newH = 62;
+static inline int eui_new_grid(void)
+{
+    return (g_newW <= EUI_SIZE_MAX_64 && g_newH <= EUI_SIZE_MAX_64)
+         ? 64 : C3D_INI_STRIDE;
+}
 /* Theaters in the New Map dialog's order. Index 2 is the PC winter bank rebuilt from
    TD's own WINTER.MIX art (tools/win_to_n64bank.py) -- the cartridge never shipped it.
    Index 3 is Red Alert's snow LOOK on the same TD template set: the pack and the
@@ -1983,11 +3411,50 @@ static int eui_theater_index(const char* t)
 }
 static int  g_newSize    = 1;
 static int  g_newTheater = 0;      /* index into EUI_THEATERS                        */
-static int  g_newMulti   = 0;      /* 0 singleplayer, 1 multiplayer / skirmish       */
+/* NEW MAP'S KIND, WHICH IS THREE ANSWERS AND NOT TWO.
+ *
+ * A singleplayer mission has to say WHOSE it is as well as that it is one: [Basic]
+ * Player= is the house the engine hands to the human (scenarioini.cpp:369) and it is the
+ * only place that question is ever asked. Writing GoodGuy there whatever was wanted is
+ * what made a Nod mission unauthorable without leaving the editor.
+ *
+ * THE TWO VALUES THAT ALREADY EXISTED KEEP THEIR NUMBERS, 0 singleplayer and 1
+ * multiplayer, because the script verb that drives this dialog passes the number straight
+ * through and an old script must not quietly come to mean something else. The Nod answer
+ * is a third value on the end, and the ROW ORDER on screen is stated separately so that
+ * the two singleplayer answers still sit next to each other. */
+enum { NEWKIND_GDI = 0, NEWKIND_MULTI = 1, NEWKIND_NOD = 2, NEWKIND_N = 3 };
+static const int NEWKIND_ROW[NEWKIND_N] = { NEWKIND_GDI, NEWKIND_NOD, NEWKIND_MULTI };
+static const char* const NEWKIND_LABEL[NEWKIND_N] = { "GDI MISSION", "NOD MISSION",
+                                                      "SKIRMISH" };
+static int  g_newMulti   = NEWKIND_GDI;
+
+/* THE HOUSE THIS MAP HANDS THE PLAYER, as a place in EUI_HOUSES. Read by the seed writer,
+   which is the only writer that invents a [Basic] at all: a map opened from a file keeps
+   whatever Player= that file carried, because every later save copies the section
+   through, and Save As copies the source before saving. */
+static int  g_mapPlayer  = EUI_HOUSE_GDI;
 
 /* The map's own kind, which outlives the New Map dialog: it decides where the map is
    filed and which list the game offers it in. Changeable afterwards from the menu. */
 static int  g_mapIsMulti = 0;
+
+/* HOW MANY OWNER CHIPS THE STRIP SHOWS, and over how many rows. Declared above the layout
+   and defined here, because the answer needs the map's kind.
+   The strip is shared: OBJECTS paints the house chips in it, TERRAIN a line of text,
+   SCRIPT the rules/teams switch, and the two remaining modes hand the whole block to
+   their own panels. Only the house chips ever want more than one row, so only they get
+   one -- reserving three rows in every mode would leave two rows of empty panel above the
+   drawer tabs for the whole of a skirmish map's terrain work. */
+static int eui_owner_n(void)
+{
+    return (g_editMode == 0) ? EUI_HOUSES_OFFERED : 4;
+}
+static int eui_owner_rows(void)
+{
+    const int n = eui_owner_n();
+    return (n + EUI_OWNER_COLS - 1) / EUI_OWNER_COLS;
+}
 
 /* THE MAP MENU, AND WHY EVERY ROW CARRIES AN ID.
  *
@@ -1997,7 +3464,7 @@ static int  g_mapIsMulti = 0;
  * check the mission, and nothing would fail to compile or fail a test. It had already
  * bitten once in the drawing code, where the SINGLEPLAYER / MULTIPLAYER row printed its
  * current value only when the row index was 6 -- and the row moved to 7, so the value
- * stopped being drawn and it went unnoticed.
+ * stopped being drawn and the failure was missed.
  *
  * So the row's identity is stated in the row, and the dispatch switches on THAT. The
  * table can be reordered, split with separators, or grown forever without touching a
@@ -2124,6 +3591,17 @@ struct MapEntry {
     char kind;              /* 'U' user, 'O' official                                */
     char name[48];          /* [Basic] Name=, when the map has one                    */
     unsigned char enhanced; /* [Basic] Enhanced=1 -- this one needs CNC3D             */
+    /* THE FOLDER IT WAS FOUND IN, and its absence is why opening a user map could not
+       work. The two tabs scan two DIFFERENT directories: user_maps/ and the missions
+       root. The reopen then booted the chosen scenario out of the SESSION'S launch
+       --dir, which playable/Editor.app always sets to missions/, so every row the USER
+       MAPS tab offered was booted from a folder it is not in and the boot failed after
+       game_shutdown had already torn the old world down.
+       It looked like it worked because exactly two user maps, USER01 and USER91, also
+       exist under missions/ by the same name. Every other one, including any map a
+       player imports, could not be opened at all. A row that does not know its own
+       folder cannot be reopened from it. */
+    char dir[1024];
 };
 static std::vector<MapEntry> g_mapList;
 static int  g_mapListTab = 0;        /* 0 user, 1 official                       */
@@ -2177,6 +3655,9 @@ static void edit_scan_dir(const char* dir, char kind)
         memset(&m, 0, sizeof m);
         snprintf(m.scen, sizeof m.scen, "%.*s", (int)(L - 4), nm);
         m.kind = kind;
+        /* Recorded at the one point in the program where the answer is known for
+           certain: this scan is looking at that folder right now. */
+        snprintf(m.dir, sizeof m.dir, "%s", dir ? dir : "");
         /* The map's own name, out of [Basic]. A list of scenario codes tells you nothing
            about which of them is the one you were working on yesterday. Read here rather
            than at draw time: opening the dialog would otherwise re-read a hundred files
@@ -2273,7 +3754,7 @@ static void eui_draw_openlist(const EuiLayout* L, float lx, float ly, float lw, 
     const float S = L->s;
     if (!g_mapListBuilt) edit_build_maplist();
 
-    /* The two tabs asked for, here and in the game's own map lists. */
+    /* The two tabs the project owner asked for, here and in the game's own map lists. */
     {
         static const char* TB[2] = { "USER MAPS", "OFFICIAL MAPS" };
         const float tw = (lw - 6 * S) * 0.5f;
@@ -2351,7 +3832,7 @@ static void eui_draw_openlist(const EuiLayout* L, float lx, float ly, float lw, 
  * alphanumeric. A MAP's name is prose -- it is shown to a person and nothing parses it
  * -- so it is long and takes the punctuation names are made of. */
 enum EuiNumKind { NUM_NONE = 0, NUM_RULE_DATA, NUM_TEAM_COUNT, NUM_TEAM_PRI,
-                  NUM_TEAM_MAX, NUM_ORDER_ARG, NUM_ENH_NUM,
+                  NUM_TEAM_MAX, NUM_ORDER_ARG, NUM_ENH_NUM, NUM_NEWSIZE,
                   NAME_RULE, NAME_TEAM, NAME_ENHRULE, NAME_MAP };
 static int  g_numKind = NUM_NONE;
 static int  g_numRow = -1;
@@ -2391,13 +3872,27 @@ static bool eui_num_accepts(char c)
                        (c >= 'A' && c <= 'Z');
     if (g_numKind == NAME_MAP)
         return alnum || c == ' ' || c == '-' || c == '\'' || c == '.';
+    /* A map SIZE is two numbers in one field, so it is the only numeric field here that
+       takes the x between them. It takes no sign and no point: a side is a whole
+       positive count of cells. */
+    if (g_numKind == NUM_NEWSIZE)
+        return (c >= '0' && c <= '9') || c == 'x' || c == 'X' || c == ' ';
     if (eui_num_is_name()) return alnum;
     return (c >= '0' && c <= '9') || c == '.' || c == '-';
 }
 
+static void eui_num_close(void);      /* defined just below; the guard needs it */
+
 /* Append what was typed, filtered and capped. */
 static void eui_num_type(const char* s)
 {
+    /* A FIELD CANNOT OUTLIVE ITS DIALOG. New Map's size field is armed by a click
+       inside that dialog, and the CANCEL button closes the dialog without knowing the
+       field is there -- so the field would keep the keyboard afterwards and the
+       editor's own letter keys would stop answering. The check sits here rather than in
+       the hit test or the drawer because this is the field's own entry point, and it is
+       the first thing a stranded field is ever asked to do. */
+    if (g_numKind == NUM_NEWSIZE && g_euiModal != MODAL_NEW) { eui_num_close(); return; }
     for (; s && *s; s++) {
         if (!eui_num_accepts(*s)) continue;
         if (g_numPristine) { g_numBuf[0] = 0; g_numPristine = false; }
@@ -2551,7 +4046,7 @@ static void eui_draw_popup(const EuiLayout* L, int fbw, int fbh, float t1)
  *
  * The old version was a table of three hand-tuned row positions, and the moment the
  * text grew, the THEATER header landed on top of the LARGE size row and the buttons on
- * top of the KIND row -- exactly the screenshot that was sent. A flow cannot collide with
+ * top of the KIND row -- exactly the screenshot the project owner sent. A flow cannot collide with
  * itself: each group starts where the previous one ended.
  *
  * Group ids: 0 = size rows (4, stacked), 1 = theater (2 across), 2 = kind (2 across).
@@ -2603,7 +4098,10 @@ static void eui_modal_opt_rect(const EuiLayout* L, int fbw, int fbh, int group, 
         *y = my + optY + row * (*h + 6 * S);
         return;
     }
-    *w = (mw - pad * 2 - 6 * S) * 0.5f;
+    /* THE KIND ROW IS THREE ACROSS, not two: a singleplayer map also has to say which
+       side it is for. n cells have n-1 gaps of 6*S and the last one has to end at the
+       margin, which is the arithmetic the theater grid above already uses. */
+    *w = (mw - pad * 2 - 6 * S * (NEWKIND_N - 1)) / (float)NEWKIND_N;
     *x = mx + pad + i * (*w + 6 * S);
     *y = my + optY;
 }
@@ -2660,13 +4158,56 @@ static void eui_draw_modal(const EuiLayout* L, int fbw, int fbh, float t1)
         for (int i = 0; i < EUI_SIZE_N; i++) {
             float ox, oy, ow, oh;
             eui_modal_opt_rect(L, fbw, fbh, 0, i, &ox, &oy, &ow, &oh);
-            const bool on = (i == g_newSize);
-            const bool hot = (g_euiHotKind == EUI_MODALOPT && g_euiHotArg == i);
+            const bool on   = (i == g_newSize);
+            const bool cust = (i == EUI_SIZE_CUSTOM);
+            /* The custom row answers EUI_RENAME rather than EUI_MODALOPT, so its hover
+               is read from that kind or the row would never light up. */
+            const bool hot = cust ? (g_euiHotKind == EUI_RENAME)
+                                  : (g_euiHotKind == EUI_MODALOPT && g_euiHotArg == i);
             eui_rect(ox, oy, ow, oh, on ? EUI_PANEL3 : hot ? EUI_PANEL2 : EUI_PANEL2,
                      on || hot ? 1.0f : 0.7f);
             eui_frame(ox, oy, ow, oh, on ? EUI_GOLD : EUI_LINE, 1.0f);
             ef_text(ox + 12 * S, oy + oh * 0.5f - 3 * S, EUI_SIZES[i].name, t1,
                     EUI_RGB(on ? EUI_INK : EUI_DIM));
+            if (!cust) continue;
+            /* THE TYPED ROW, IN THE FIELD THIS DIALOG SET ALREADY HAS.
+             *
+             * There was no text-field look in NEW MAP, but there is one in SAVE AS: an
+             * inset almost-black box, a gold frame while it is live, and a trailing
+             * underscore for the caret. It is the same widget doing the same job, so it
+             * is drawn the same way rather than invented twice; a second look for a
+             * typed number would be a second thing to learn.
+             *
+             * The box sits at the RIGHT of the row so the word CUSTOM keeps reading as
+             * the row's label, exactly as the other five rows read. */
+            const bool live = (g_numKind == NUM_NEWSIZE);
+            /* 176 rather than something narrower: the panel's face does not shrink past
+               the smallest rung of its own ladder, so at the layout's floor scale the
+               text stays the size it is while the box around it does not. Measured, the
+               widest thing this box ever holds is "126 x 126_" at 61 points, and
+               176 * S leaves 64 inside it even at the floor. */
+            const float bw = 176 * S, bh = oh - 8 * S;
+            const float bx = ox + ow - bw - 6 * S, by = oy + 4 * S;
+            eui_rect(bx, by, bw, bh, 0x080b10, 1.0f);
+            eui_frame(bx, by, bw, bh, live ? EUI_GOLD : EUI_LINE, 1.0f);
+            {
+                char ed[48];
+                if (live) snprintf(ed, sizeof ed, "%s_", g_numBuf);
+                else      snprintf(ed, sizeof ed, "%d x %d", g_newW, g_newH);
+                ef_text_fit(bx + 8 * S, by + bh * 0.5f - 3 * S, ed, t1, bw - 16 * S,
+                            EUI_RGB(live ? EUI_GOLD : on ? EUI_INK : EUI_DIM));
+            }
+            /* WHAT THE FIELD TAKES, said between the label and the box rather than left
+               to be discovered by being refused. Composed from the two bounds so the
+               number on screen cannot drift from the number that clamps. */
+            if (!live) {
+                char lim[48];
+                const float lw = ef_text_w(EUI_SIZES[i].name, t1);
+                snprintf(lim, sizeof lim, "W x H  %d..%d",
+                         EUI_SIZE_MIN, EUI_SIZE_MAX_BIG);
+                ef_text_fit(ox + 24 * S + lw, oy + oh * 0.5f - 3 * S, lim, EUI_TS(t1),
+                            bx - (ox + 36 * S + lw), EUI_RGB(EUI_FAINT));
+            }
         }
         {
             float ly, oy2;
@@ -2699,17 +4240,25 @@ static void eui_draw_modal(const EuiLayout* L, int fbw, int fbh, float t1)
             ef_text(x + pad, y + ly, "KIND", EUI_TS(t1), EUI_RGB(EUI_FAINT));
         }
         {
-            static const char* KD[2] = { "SINGLEPLAYER", "MULTIPLAYER" };
-            for (int i = 0; i < 2; i++) {
+            /* A row is a POSITION and the kind behind it is a VALUE; the two orders are
+               not the same, so every test here goes through the value. */
+            for (int i = 0; i < NEWKIND_N; i++) {
+                const int v = NEWKIND_ROW[i];
                 float ox, oy, ow, oh;
                 eui_modal_opt_rect(L, fbw, fbh, 2, i, &ox, &oy, &ow, &oh);
-                const bool on = (i == g_newMulti);
-                const bool hot = (g_euiHotKind == EUI_MODALOPT && g_euiHotArg == 20 + i);
+                const bool on = (v == g_newMulti);
+                const bool hot = (g_euiHotKind == EUI_MODALOPT && g_euiHotArg == 20 + v);
                 eui_rect(ox, oy, ow, oh, on ? EUI_PANEL3 : hot ? EUI_PANEL2 : EUI_PANEL2,
                          on || hot ? 1.0f : 0.7f);
                 eui_frame(ox, oy, ow, oh, on ? EUI_CYAN : EUI_LINE, 1.0f);
-                ef_text(ox + (ow - ef_text_w(KD[i], t1)) * 0.5f, oy + oh * 0.5f - 3 * S,
-                        KD[i], t1, EUI_RGB(on ? EUI_CYAN : EUI_DIM));
+                {
+                    /* Three across leaves a mission label little room at small frames. */
+                    float tw = ef_text_w(NEWKIND_LABEL[i], t1);
+                    if (tw > ow - 8 * S) tw = ow - 8 * S;
+                    ef_text_fit(ox + (ow - tw) * 0.5f, oy + oh * 0.5f - 3 * S,
+                                NEWKIND_LABEL[i], t1, ow - 8 * S,
+                                EUI_RGB(on ? EUI_CYAN : EUI_DIM));
+                }
             }
         }
     } else if (g_euiModal == MODAL_OPEN) {
@@ -2719,7 +4268,7 @@ static void eui_draw_modal(const EuiLayout* L, int fbw, int fbh, float t1)
         eui_draw_openlist(L, x + pad, y + 74 * S, w - pad * 2, h - 74 * S - 60 * S, t1);
     } else if (g_euiModal == MODAL_SAVEAS) {
         /* SAVE AS. One field, and a plain statement of what the two halves of a map's
-           identity are: the NAME is what is typed and what every list shows; the SLOT
+           identity are: the NAME is what the project owner types and what every list shows; the SLOT
            is USERnn and is the filename the game probes for, so the dialog says which
            one this copy will take rather than leaving it to be discovered. */
         ef_text(x + pad, y + 18 * S, "SAVE MAP AS", EUI_TL(t1), EUI_RGB(EUI_GOLD));
@@ -2829,21 +4378,40 @@ static void eui_draw_modal(const EuiLayout* L, int fbw, int fbh, float t1)
 /* The STARTS panel. What it offers depends on what kind of map this is, because the two
    kinds use waypoints for entirely different things:
 
-     multiplayer   0..5 are the player starts, one per seat
+     multiplayer   0..7 are the player starts, one per seat, and the brain's own
+                   StartLocationIndex is that same index
      singleplayer  26 HOME is where the view opens and 27 REINFORCE is where
                    reinforcements arrive; 0..25 are cells for triggers and teams to
-                   refer to, so a handful are offered for that
+                   refer to. ALL TWENTY-SIX ARE OFFERED. Eight were, and the other
+                   eighteen were unreachable from the panel -- a hard ceiling on
+                   mission scripting rather than a cosmetic one, because a trigger and
+                   a TeamType order both name a waypoint by INDEX, so an index the
+                   panel will not place is an index no mission can use. The array, the
+                   INI reader and the INI writer already carried all twenty-eight; only
+                   the panel was short.
+
+   Twenty-eight rows fit no window, so the panel is a WINDOW onto them and the wheel
+   moves it. The scroll is applied in the slot function rather than in the rect, so the
+   draw, the hit test and the layout self-check all read one mapping from one place and
+   cannot drift apart -- and the row index each of them passes around stays what it
+   already was, the row on screen.
 
    Right-click a placed start to clear it. */
+static int g_startScroll = 0;      /* first waypoint row shown; singleplayer only */
+
 static int eui_start_slot(int row)
 {
     if (g_mapIsMulti) return (row < EDIT_MAX_PLAYERS) ? row : -1;
-    if (row == 0) return EDIT_WAYPT_HOME;
-    if (row == 1) return EDIT_WAYPT_REINF;
-    return (row - 2 < 8) ? (row - 2) : -1;      /* eight general-purpose cells */
+    const int r = row + g_startScroll;
+    if (r == 0) return EDIT_WAYPT_HOME;
+    if (r == 1) return EDIT_WAYPT_REINF;
+    return (r - 2 < EDIT_WAYPT_COUNT - 2) ? (r - 2) : -1;
 }
 
-static int eui_start_rows(void) { return g_mapIsMulti ? EDIT_MAX_PLAYERS : 10; }
+static int eui_start_rows(void)
+{
+    return g_mapIsMulti ? EDIT_MAX_PLAYERS : EDIT_WAYPT_COUNT;
+}
 
 static void eui_start_rect(const EuiLayout* L, int row, float* x, float* y,
                            float* w, float* h)
@@ -2855,11 +4423,38 @@ static void eui_start_rect(const EuiLayout* L, int row, float* x, float* y,
     *y = L->catY + row * (*h + 3 * S);
 }
 
+/* How many rows the panel has room for right now. Measured by asking eui_start_rect
+   for each row and stopping at the bound the draw and the hit test both break on,
+   rather than by repeating the row pitch here: a clamp that disagreed with the draw
+   about where the list ends would let the scroll run past the last visible row. */
+static int eui_start_fit(const EuiLayout* L)
+{
+    int fit = 0;
+    for (int row = 0; row < EDIT_WAYPT_COUNT; row++) {
+        float x, y, w, h;
+        eui_start_rect(L, row, &x, &y, &w, &h);
+        if (y + h > L->lintY) break;
+        fit++;
+    }
+    return fit < 1 ? 1 : fit;
+}
+
+static void eui_start_scroll_clamp(const EuiLayout* L)
+{
+    int last = eui_start_rows() - eui_start_fit(L);
+    if (last < 0) last = 0;                     /* multiplayer: eight rows always fit */
+    if (g_startScroll > last) g_startScroll = last;
+    if (g_startScroll < 0)    g_startScroll = 0;
+}
+
 static void eui_draw_starts(const EuiLayout* L, float t1)
 {
     const float S = L->s, pad = EUI_PAD * S;
+    /* Clamped on the way IN as well as on the wheel, because the window can be resized
+       and the map can be swapped between two draws, and either changes the fit. */
+    eui_start_scroll_clamp(L);
     ef_text(L->sideX + pad, L->catY - 12 * S,
-            g_mapIsMulti ? "PLAYER STARTS" : "MISSION CELLS", EUI_TS(t1),
+            g_mapIsMulti ? "PLAYER STARTS" : "WAYPOINTS", EUI_TS(t1),
             EUI_RGB(EUI_FAINT));
     for (int row = 0; row < eui_start_rows(); row++) {
         const int w = eui_start_slot(row);
@@ -2881,14 +4476,31 @@ static void eui_draw_starts(const EuiLayout* L, float t1)
         ef_text(x + bw - ef_text_w(v, t1) - 10 * S, y + bh * 0.5f - 3 * S, v, t1,
                 EUI_RGB(set ? EUI_CYAN : EUI_FAINT));
     }
-    {
+    if (g_mapIsMulti) {
         char note[96];
-        snprintf(note, sizeof note, g_mapIsMulti ? "%d of %d seats placed"
-                                                 : "%d cells placed",
-                 g_mapIsMulti ? edit_start_count() : 0, EDIT_MAX_PLAYERS);
-        if (g_mapIsMulti)
-            ef_text(L->sideX + pad, L->lintY - 14 * S, note, EUI_TS(t1),
-                    EUI_RGB(edit_start_count() >= 2 ? EUI_GREEN : EUI_DANGER));
+        snprintf(note, sizeof note, "%d of %d seats placed", edit_start_count(),
+                 EDIT_MAX_PLAYERS);
+        ef_text(L->sideX + pad, L->lintY - 14 * S, note, EUI_TS(t1),
+                EUI_RGB(edit_start_count() >= 2 ? EUI_GREEN : EUI_DANGER));
+    } else {
+        /* The singleplayer arm used to build a count string and then not draw it, so
+           the panel said nothing about how many cells were set. It says it now, and it
+           says where in the list the window is, in the wording the script panel uses
+           for the same job. */
+        int placed = 0;
+        for (int i = 0; i < EDIT_WAYPT_COUNT; i++) if (g_waypoint[i] >= 0) placed++;
+        char note[96];
+        snprintf(note, sizeof note, "%d OF %d CELLS SET", placed, EDIT_WAYPT_COUNT);
+        ef_text(L->sideX + pad, L->lintY - 14 * S, note, EUI_TS(t1),
+                EUI_RGB(placed ? EUI_GREEN : EUI_FAINT));
+        const int fit = eui_start_fit(L);
+        if (fit < eui_start_rows()) {
+            char sc[64];
+            snprintf(sc, sizeof sc, "ROW %d-%d OF %d, WHEEL SCROLLS",
+                     g_startScroll + 1, g_startScroll + fit, eui_start_rows());
+            ef_text(L->sideX + L->sideW - pad - ef_text_w(sc, EUI_TS(t1)),
+                    L->lintY - 14 * S, sc, EUI_TS(t1), EUI_RGB(EUI_GOLD));
+        }
     }
 }
 
@@ -2927,8 +4539,8 @@ static void eui_draw_waypoints(int fbw, int fbh)
 /* ------------------------------------------------------------------------------------
  *  TOASTS
  *
- *  Reported: "If I click on the save button, no popup, no notification, nothing."
- *  That is right, and it is the worst kind of nothing -- the map HAD been written, to a folder
+ *  the project owner: "If I click on the save button, no popup, no notification, nothing." He is
+ *  right, and it is the worst kind of nothing -- the map HAD been written, to a folder
  *  he could not see, under a name he had not chosen. An action that touches the disk
  *  and says nothing is indistinguishable from one that failed.
  *
@@ -3830,7 +5442,7 @@ static void eui_draw_enh(const EuiLayout* L, int fbw, int fbh, float t1)
  *  WIRES -- the graph half of the script editor.
  *
  *  "Script editor needs a visual aspect, like unreal blueprints where it makes sense to
- *  drag lines between boxes." -- as requested.
+ *  drag lines between boxes." -- the project owner, 25 Aug 2026.
  *
  *  A wire has to MEAN something in the file or it is decoration. In Tiberian Dawn there
  *  are exactly two links a rule can carry, and both are a name written into a field:
@@ -4368,7 +5980,7 @@ static void eui_draw_script_panel(const EuiLayout* L, float t1)
         const char* label = enh ? ENH_ROW[row] : teams ? TEAM_ROW[row] : RULE_ROW[row];
         /* THE ROWS SAY WHAT THEY MEAN FOR THIS EVENT. "HOUSE" is the field's name in the
            file; it is not the question the author is asking. On Player Enters the house
-           is WHOSE UNITS TRIP IT, which is exactly what could not be found, and on the
+           is WHOSE UNITS TRIP IT, which is exactly what the project owner could not find, and on the
            object-routed events it does nothing at all. Same for the parameter, which
            counts a different thing per event and said "PARAMETER" for all of them. */
         if (!enh && !teams && have) {
@@ -4465,7 +6077,12 @@ static void eui_draw_script_panel(const EuiLayout* L, float t1)
             else { snprintf(v, sizeof v, "%s", R.repeat ? "every time" : "once only"); }
         } else if (!teams) {
             const EditTrigger& t = g_triggers[g_trigSel];
-            static const char* PER[3] = { "once only", "once per tag", "every time" };
+            /* PERSISTENCE 1 IS NOT ONCE PER OBJECT, IT IS THE OPPOSITE. The engine
+               detaches the rule from the object that sprang it, decrements the attach
+               count, and springs only when that count reaches zero -- one firing for
+               the whole tagged set. This row is labelled REPEATS, so the old wording
+               told the author the mission would do the reverse of what it does. */
+            static const char* PER[3] = { "once only", "when all tagged", "every time" };
             if (row == 2)      snprintf(v, sizeof v, "%s", TRIG_EVENT[t.event]);
             else if (row == 3) snprintf(v, sizeof v, "%s", TRIG_ACTION[t.action]);
             else if (row == 4) {
@@ -5222,6 +6839,118 @@ static void edit_check_run(void)
         }
     }
     {
+        /* THE ECONOMY. A map with no tiberium is a map where a refinery is a building
+           that does nothing and a harvester drives in circles, and until this row
+           existed the only way to find that out was to PLAY it.
+
+           The worth is the engine's arithmetic rather than an estimate. MapClass::
+           Overpass runs as the scenario is read (scenarioini.cpp:489, map.cpp:905) and
+           calls CellClass::Tiberium_Adjust, which counts the cell's eight tiberium
+           neighbours, sets OverlayData to {0,1,3,4,6,7,8,10,11}[count] and values the
+           cell at (OverlayData + 1) * 25 credits (cell.cpp:1901-1934; TIBERIUM_STEP is
+           25 and a harvester carries 28 of those steps, type.h:897-899). So a cell
+           standing alone is worth 25 and a cell buried inside a field is worth 300, and
+           a scatter of single cells is not a small field, it is almost no field at all.
+
+           Counted over every tiberium cell on the grid. The engine's own pass covers the
+           playable rectangle bar its last row, so the two agree wherever the tiberium is
+           inside the played area, which is the only place it can be harvested from.
+
+           SO THE SUM IS OVER THE PLAYED RECTANGLE and the cells outside it are counted
+           apart. Overpass never sizes them and nothing can drive to them, so adding them
+           in reported an income the map does not have -- and now that there is a brush,
+           painting past the rectangle is an easy thing to do by hand.
+
+           THE RECTANGLE THIS ASKS IS ONE CELL WIDER ON EVERY SIDE than the one Overpass
+           walks, and deliberately so. The brain hands the renderer a grown rect --
+           CNCMapDataStruct keeps the real one in OriginalMapCell* and widens MapCell* by
+           a cell in each direction before returning it (dllinterface.cpp:2925-2941) --
+           and g_mapX..g_mapH is that grown one, which is what every other "outside the
+           playable area" row in this check already measures against. Staying with it
+           keeps the check consistent with itself and errs quiet: a one-cell overhang is
+           not worth a row. Measured over the 100 shipped mission files, 81 carry
+           tiberium and 3 of those put every one of their seventeen cells outside even
+           the grown rect, with no refinery anywhere to want them -- and all three are
+           the same map: the first GDI mission, its EB variant, and the copy of it that
+           sits in a multiplayer slot, which carry the identical cell list.
+
+           The NEIGHBOUR count still walks the whole grid, exactly as Tiberium_Adjust
+           does: a cell on the border of the rectangle is fed by what is beside it
+           whether or not that neighbour is playable. */
+        static unsigned char tibmap[EDIT_GRID_MAX];
+        memset(tibmap, 0, sizeof tibmap);
+        for (size_t i = 0; i < g_tib.size(); i++) {
+            const int tx = g_tib[i].x, ty = g_tib[i].y;
+            if (tx >= 0 && ty >= 0 && tx < g_gridW && ty < g_gridH)
+                tibmap[ty * g_gridW + tx] = 1;
+        }
+        int worth = 0, outside = 0;
+        for (size_t i = 0; i < g_tib.size(); i++) {
+            const int tx = g_tib[i].x, ty = g_tib[i].y;
+            if (tx < 0 || ty < 0 || tx >= g_gridW || ty >= g_gridH) continue;
+            if (tx < g_mapX || tx >= g_mapX + g_mapW ||
+                ty < g_mapY || ty >= g_mapY + g_mapH) { outside++; continue; }
+            int nb = 0;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++) {
+                    if (!dx && !dy) continue;
+                    const int px = tx + dx, py = ty + dy;
+                    if (px < 0 || py < 0 || px >= g_gridW || py >= g_gridH) continue;
+                    if (tibmap[py * g_gridW + px]) nb++;
+                }
+            worth += (EDIT_TIB_ADJ[nb] + 1) * 25;
+        }
+        int procs = 0, harvs = 0;
+        for (size_t i = 0; i < g_objects.size(); i++) {
+            if (!strcmp(g_objects[i].type, "PROC")) procs++;
+            else if (!strcmp(g_objects[i].type, "HARV")) harvs++;
+        }
+        if (g_tib.empty()) {
+            if (g_mapIsMulti) {
+                chk_add(CHK_ERROR, "no tiberium anywhere on the map",
+                        "a skirmish map with no tiberium has no economy: every house is "
+                        "stuck on the credits its own section gives it");
+            } else if (procs || harvs) {
+                snprintf(y, sizeof y, "%d refiner%s and %d harvester%s have nothing to "
+                                      "harvest", procs, procs == 1 ? "y" : "ies",
+                         harvs, harvs == 1 ? "" : "s");
+                chk_add(CHK_ERROR, "no tiberium anywhere on the map", y);
+            } else {
+                chk_add(CHK_WARN, "no tiberium anywhere on the map",
+                        "nothing here can be harvested, so every house lives on the "
+                        "credits its own house section gives it");
+            }
+        } else if (outside == (int)g_tib.size()) {
+            /* The same fault as an empty map, arrived at a different way, so it is
+               judged the same way: severe when something on the map expects an income,
+               and worth saying either way. */
+            snprintf(w, sizeof w, "all %d tiberium cells are outside the playable area",
+                     outside);
+            snprintf(y, sizeof y, "the played rectangle is %d,%d %dx%d; nothing out there "
+                                  "is reachable or sized (%d refineries, %d harvesters)",
+                     g_mapX, g_mapY, g_mapW, g_mapH, procs, harvs);
+            chk_add((g_mapIsMulti || procs || harvs) ? CHK_ERROR : CHK_WARN, w, y);
+        } else {
+            const int inside = (int)g_tib.size() - outside;
+            if (outside) {
+                snprintf(w, sizeof w, "%d of %d tiberium cells are outside the playable "
+                         "area", outside, (int)g_tib.size());
+                snprintf(y, sizeof y, "nothing can drive to them and the engine never "
+                                      "sizes them, so the reachable field is the %d "
+                                      "credits below", worth);
+                chk_add(CHK_WARN, w, y);
+            }
+            if (worth < 700) {
+                snprintf(w, sizeof w, "the map's tiberium is worth %d credits", worth);
+                snprintf(y, sizeof y, "%d reachable cell%s, less than the 700 one "
+                                      "harvester carries. A cell is sized by its eight "
+                                      "neighbours: 25 alone against 300 inside a field",
+                         inside, inside == 1 ? "" : "s");
+                chk_add(CHK_WARN, w, y);
+            }
+        }
+    }
+    {
         /* A start nobody placed is a mission that opens with the camera on cell 0. */
         if (!g_mapIsMulti) {
             if (g_waypoint[EDIT_WAYPT_HOME] < 0)
@@ -5543,10 +7272,18 @@ static bool eui_open_row_popup(int row, int fbw, int fbh)
             }
             eui_pop_add("+ new team", "make one and connect it", -2);
         } else if (row == 7) {
-            static const char* P[3] = { "once only", "once per tagged object",
+            /* The same correction as the rule card. Status 1 springs ONCE, after
+               every tagged object has triggered it, because the engine counts the
+               attachments down and fires on the last one. All three of these change
+               what a mission does, and the detail column was sitting empty, so each
+               one now states the consequence rather than leaving the label to carry
+               it alone. */
+            static const char* P[3] = { "once only", "once, when all tagged",
                                         "every time it happens" };
+            static const char* PD[3] = { "then the rule leaves", "not once per object",
+                                         "the rule never leaves" };
             g_popKind = POP_PERSIST; g_popCtx = g_trigSel; g_popCur = t->persist;
-            for (int k = 0; k < 3; k++) eui_pop_add(P[k], "", k);
+            for (int k = 0; k < 3; k++) eui_pop_add(P[k], PD[k], k);
         } else return false;
         eui_pop_anchor_row(fbw, fbh, row);
         return true;
@@ -5899,6 +7636,18 @@ static bool eui_rename_draws(int view, int idx, float x, float y, float scale)
 static bool eui_open_rename(void)
 {
     eui_num_close();
+    /* NEW MAP'S SIZE FIELD COMES FIRST. While that dialog is up nothing behind it is
+       reachable, so the script panel's selection cannot be what was clicked. The row is
+       SELECTED here as well: the custom row answers EUI_RENAME instead of EUI_MODALOPT,
+       so nothing else is going to set it and one click has to do both. */
+    if (g_euiModal == MODAL_NEW) {
+        g_newSize = EUI_SIZE_CUSTOM;
+        g_numKind = NUM_NEWSIZE;
+        snprintf(g_numBuf, sizeof g_numBuf, "%d x %d", g_newW, g_newH);
+        g_numPristine = true;        /* the first digit replaces what is shown */
+        g_numRow  = -1;
+        return true;
+    }
     if (g_scriptView == 0 && g_trigSel >= 0) {
         g_numKind = NAME_RULE;
         snprintf(g_numBuf, sizeof g_numBuf, "%s", g_triggers[g_trigSel].name);
@@ -6042,6 +7791,43 @@ static void eui_num_commit(void)
             edit_trace_invalidate();
         }
         break;
+    case NUM_NEWSIZE: {
+        /* "62", "100x80", "100 X 80" -- one number is a SQUARE. Parsed by hand rather
+           than with sscanf so that a missing or unreadable second number means square
+           and can never mean zero. */
+        const char* q = g_numBuf;
+        while (*q == ' ') q++;
+        int w = atoi(q);
+        while (*q && *q != 'x' && *q != 'X') q++;
+        int h = *q ? atoi(q + 1) : 0;
+        if (h <= 0) h = w;
+        /* THE GRID IS DECIDED BY THE LONGER SIDE and then BOTH are held inside it. A
+           62x100 map is a big map, and 62 is legal there too; deciding per side would
+           let a rect claim the legacy stride for its width and the big one for its
+           height, and there is only one stride in a file. */
+        const int hi = (w <= EUI_SIZE_MAX_64 && h <= EUI_SIZE_MAX_64)
+                     ? EUI_SIZE_MAX_64 : EUI_SIZE_MAX_BIG;
+        const int rawW = w, rawH = h;
+        if (w < EUI_SIZE_MIN) w = EUI_SIZE_MIN;
+        if (h < EUI_SIZE_MIN) h = EUI_SIZE_MIN;
+        if (w > hi) w = hi;
+        if (h > hi) h = hi;
+        g_newW = w; g_newH = h;
+        g_newSize = EUI_SIZE_CUSTOM;
+        {
+            char sub[160];
+            if (rawW != w || rawH != h)
+                snprintf(sub, sizeof sub, "%dx%d became %dx%d -- the engine keeps one "
+                         "blank cell outside the rect on a %d grid, so %d..%d a side",
+                         rawW, rawH, w, h, eui_new_grid(), EUI_SIZE_MIN, hi);
+            else
+                snprintf(sub, sizeof sub, "%d x %d on the %d grid, saved as %s",
+                         w, h, eui_new_grid(),
+                         eui_new_grid() == 64 ? "a legacy map" : "[MAP] Version=1");
+            edit_toast(EUI_GOLD, "CUSTOM SIZE", sub);
+        }
+        break;
+    }
     default: break;
     }
     eui_num_close();
@@ -6163,7 +7949,7 @@ static int elev_tier_of(int b);
 static void eui_draw_viewport(const EuiLayout* L, int fbw, int fbh, float t1)
 {
     const float S = L->s;
-    static const char* MODES[5] = { "OBJECTS", "TERRAIN", "ELEVATION", "STARTS", "SCRIPT" };
+    static const char* MODES[5] = { "OBJECTS", "TERRAIN", "ELEVATION", "WAYPOINTS", "SCRIPT" };
     static const unsigned MC[5] = { 0xe0b070, 0x7ee0a0, 0x8fe4ff, 0xb98fe4, 0xff9a5a };
     const unsigned mc = MC[g_editMode];
 
@@ -6175,8 +7961,11 @@ static void eui_draw_viewport(const EuiLayout* L, int fbw, int fbh, float t1)
         if (g_editMode == 4)
             snprintf(sub, sizeof sub, "%d rules", (int)g_triggers.size());
         else if (g_editMode == 3)
-            snprintf(sub, sizeof sub, "%s", g_waypointArmed >= 0
-                     ? edit_waypoint_label(g_waypointArmed) : "pick a start, then click");
+            snprintf(sub, sizeof sub, "%s",
+                     g_waypointArmed >= 0 ? edit_waypoint_label(g_waypointArmed)
+                                          : "pick a waypoint, then click");
+        else if (g_editMode == 2 && g_sbrPage == 1)
+            snprintf(sub, sizeof sub, "smooth brush -- %s", SBR_TOOL_NAME[g_sbrTool]);
         else if (g_editMode == 2)
             snprintf(sub, sizeof sub, "%s", elev_ready() ? "raise ground, cliffs follow"
                                                          : "not on the ladder");
@@ -6306,6 +8095,18 @@ static void eui_draw_viewport(const EuiLayout* L, int fbw, int fbh, float t1)
                     snprintf(l2, sizeof l2, "click one to edit it, or ADD RULE");
                     l2col = EUI_FAINT;
                 }
+            } else if (g_editMode == 2 && g_sbrPage == 1) {
+                /* THE SMOOTH PAGE HAS ITS OWN READOUT. Reading the rung tool's state
+                   here is how a status card ends up describing a tool that is not the
+                   one the click will run. */
+                snprintf(l1, sizeof l1, "SMOOTH %s", SBR_TOOL_NAME[g_sbrTool]);
+                if (g_sbrWhy[0]) {
+                    snprintf(l2, sizeof l2, "%s", g_sbrWhy);
+                    l2col = EUI_GOLD;
+                } else {
+                    snprintf(l2, sizeof l2, "centre %.1f, falloff %.1f, strength %.2f",
+                             g_sbrVal[0], g_sbrVal[1], g_sbrVal[2]);
+                }
             } else if (g_editMode == 2) {
                 static const char* RUNGN[5] = { "LOW", "GROUND", "+1", "+2", "+3" };
                 static const char* TOOLN[3] = { "RAISE / LOWER", "GRADED PASS",
@@ -6317,7 +8118,25 @@ static void eui_draw_viewport(const EuiLayout* L, int fbw, int fbh, float t1)
                     l2col = EUI_DANGER;
                 } else if (g_terrArmed >= 0 && eui_is_slope(g_terrArmed)) {
                     snprintf(l1, sizeof l1, "STAMP %s", EDIT_TEMPLATES[g_terrArmed].name);
-                    snprintf(l2, sizeof l2, "click the map; drag paints; a tool disarms");
+                    /* The footprint overlay draws nothing over a cell that is off the
+                       map -- there is no ground under the pointer to tint -- so at the
+                       edge the preview goes quiet exactly where it matters. TERRAIN says
+                       this on its own status line a few lines below; ELEVATN could not
+                       reach that branch, so it says it here. */
+                    int xs[64], ys[64], ics[64];
+                    const int n = edit_template_cells(g_terrArmed, g_editCellX,
+                                                      g_editCellY, xs, ys, ics, 64);
+                    int off = 0;
+                    for (int i = 0; i < n; i++)
+                        if (xs[i] >= g_gridW || ys[i] >= g_gridH) off++;
+                    if (off) {
+                        snprintf(l2, sizeof l2, "%d of %d cells fall off the map",
+                                 off, n);
+                        l2col = EUI_DANGER;
+                    } else {
+                        snprintf(l2, sizeof l2,
+                                 "click the map; drag paints; a tool disarms");
+                    }
                 } else {
                     snprintf(l1, sizeof l1, "%s", TOOLN[g_elevTool]);
                     if (g_elevWhy[0]) {
@@ -6374,9 +8193,20 @@ static void eui_draw_viewport(const EuiLayout* L, int fbw, int fbh, float t1)
                 }
             } else if (g_editTool == TOOL_ERASE) {
                 snprintf(l1, sizeof l1, "ERASE");
-                const int k = g_editOverMap ? edit_object_at(g_editCellX, g_editCellY) : -1;
-                if (k >= 0) snprintf(l2, sizeof l2, "click to remove %s", g_objects[k].type);
-                else { snprintf(l2, sizeof l2, "nothing under the pointer");
+                /* Named off the SAME stack the press walks, so the card cannot offer one
+                   thing and DELETE take another. It also has to name the rungs the old
+                   line could not see at all: a cell carrying only tiberium or only a
+                   crater read as "nothing under the pointer" while DELETE had work to
+                   do on it. */
+                char nxt[40];
+                const int lay = g_editOverMap
+                    ? edit_erase_peek(g_editCellX, g_editCellY, nxt, sizeof nxt)
+                    : EDL_EMPTY;
+                if (lay == EDL_GROUND)
+                    snprintf(l2, sizeof l2, "click to put the ground back to clear");
+                else if (lay != EDL_EMPTY)
+                    snprintf(l2, sizeof l2, "click to remove %s", nxt);
+                else { snprintf(l2, sizeof l2, "nothing left on this cell");
                        l2col = EUI_FAINT; }
             } else if (g_editTool == TOOL_PICK) {
                 snprintf(l1, sizeof l1, "PICK");
@@ -6488,12 +8318,21 @@ static void eui_radar_build(void)
         const SimObject& o = g_objects[i];
         if (o.kind == K_TERRAIN) continue;
         if (o.cx < 0 || o.cx >= g_gridW || o.cy < 0 || o.cy >= g_gridH) continue;
-        const bool gdi = !strcmp(o.house, "GoodGuy") || !strcmp(o.house, "Multi1");
-        const bool nod = !strcmp(o.house, "BadGuy")  || !strcmp(o.house, "Multi2");
+        /* THE OWNER'S OWN COLOUR, which is the colour its chip is painted in. This read
+           GDI for GoodGuy OR Multi1 and Nod for BadGuy OR Multi2, and neither of those
+           pairs is one house: Multi1 is light blue and Multi2 is orange. Everything else
+           -- Special and the other six multiplayer seats -- came out as one grey-blue, so
+           a skirmish map's blips said nothing about who owned what.
+           Nothing moves for the three houses that were already right: the three constants
+           this replaces are byte for byte the GDI, NOD and NEUTRAL entries of the chip
+           table, so those blips keep the exact colour they had. A house the table does not
+           carry keeps the neutral grey rather than going black. */
+        const int hh = eui_house_index(o.house);
+        const unsigned hc = (hh >= 0) ? EUI_HOUSES[hh].colour : EUI_HOUSES[2].colour;
         const int i4 = (o.cy * g_gridW + o.cx) * 4;
-        px[i4]   = gdi ? 224 : nod ? 255 : 154;
-        px[i4+1] = gdi ? 176 : nod ? 106 : 167;
-        px[i4+2] = gdi ? 112 : nod ?  90 : 180;
+        px[i4]   = (unsigned char)((hc >> 16) & 255);
+        px[i4+1] = (unsigned char)((hc >>  8) & 255);
+        px[i4+2] = (unsigned char)( hc        & 255);
     }
     if (!g_euiRadarTex) glGenTextures(1, &g_euiRadarTex);
     glBindTexture(GL_TEXTURE_2D, g_euiRadarTex);
@@ -6542,7 +8381,7 @@ static void eui_draw(int fbw, int fbh)
                 EUI_RGB(eui_playtest ? EUI_GOLD : EUI_DIM));
 
         /* WHAT THE MAP IS CALLED, and WHICH SLOT IT IS IN. Both, always, and in that
-           order: the name is the thing typed and the thing every list shows, and
+           order: the name is the thing the project owner typed and the thing every list shows, and
            the slot is USERnn -- the filename the game probes for -- so it stays on
            screen in the dim meta text however the map is named. An unnamed map has only
            its slot, and then the slot IS the title and is not repeated. */
@@ -6626,7 +8465,7 @@ static void eui_draw(int fbw, int fbh)
 
     /* ---- mode tabs ---- */
     {
-        static const char* MODES[5] = { "OBJECTS", "TERRAIN", "ELEVATN", "STARTS", "SCRIPT" };
+        static const char* MODES[5] = { "OBJECTS", "TERRAIN", "ELEVATN", "WAYPTS", "SCRIPT" };
         static const unsigned MC[5] = { 0xe0b070, 0x7ee0a0, 0x8fe4ff, 0xb98fe4, 0xff9a5a };
         for (int i = 0; i < 5; i++) {
             const float x = L.sideX + pad + i * (L.modeW + pad);
@@ -6642,15 +8481,23 @@ static void eui_draw(int fbw, int fbh)
         }
     }
 
-    /* ---- owner chips: objects only. A tile has no house. ---- */
-    if (g_editMode == 0) for (int i = 0; i < 4; i++) {
-        const float x = L.sideX + pad + i * (L.ownerW + 4 * S);
+    /* ---- owner chips: objects only. A tile has no house. ----
+       EVERY HOUSE THE MAP OFFERS, over as many rows as that takes, and the rectangle
+       comes from the one function the hit test and the layout harness also call. */
+    if (g_editMode == 0) for (int i = 0; i < eui_owner_n(); i++) {
+        float chx, chy, chw, chh;
+        eui_owner_chip_rect(&L, i, &chx, &chy, &chw, &chh);
         const bool on = (i == g_editOwner);
-        eui_panel(x, L.ownerY, L.ownerW, L.ownerH, on ? EUI_PANEL3 : EUI_PANEL);
-        eui_rect(x, L.ownerY, L.ownerW, 3 * S, EUI_HOUSES[i].colour, on ? 1.0f : 0.28f);
-        const float tw = ef_text_w(EUI_HOUSES[i].label, t1);
-        ef_text(x + (L.ownerW - tw) * 0.5f, L.ownerY + L.ownerH * 0.5f - 3 * S,
-                EUI_HOUSES[i].label, t1, EUI_RGB(on ? EUI_HOUSES[i].colour : EUI_FAINT));
+        eui_panel(chx, chy, chw, chh, on ? EUI_PANEL3 : EUI_PANEL);
+        eui_rect(chx, chy, chw, 3 * S, EUI_HOUSES[i].colour, on ? 1.0f : 0.28f);
+        /* Fitted rather than drawn at whatever width it wants. Measured in this panel's
+           own face, the longest label needs 51 px and the chip's inside is 45 at the
+           shortest frame the harness runs, so it used to run out over its neighbour. */
+        float tw = ef_text_w(EUI_HOUSES[i].label, t1);
+        if (tw > chw - 6 * S) tw = chw - 6 * S;
+        ef_text_fit(chx + (chw - tw) * 0.5f, chy + chh * 0.5f - 3 * S,
+                    EUI_HOUSES[i].label, t1, chw - 6 * S,
+                    EUI_RGB(on ? EUI_HOUSES[i].colour : EUI_FAINT));
     }
 
     if (g_editMode == 1) {
@@ -6669,7 +8516,7 @@ static void eui_draw(int fbw, int fbh)
     } else if (g_editMode == 2) {
         eui_draw_elev(&L, t1);
     } else
-    /* ---- category tabs: five object kinds, or seven terrain families ---- */
+    /* ---- category tabs: seven object kinds, or seven terrain families ---- */
     {
         const int nc = eui_cat_count(), sel = eui_cat_sel();
         for (int i = 0; i < nc; i++) {
@@ -6731,7 +8578,8 @@ static void eui_draw(int fbw, int fbh)
                      on ? EUI_PANEL3 : hov ? EUI_PANEL2 : EUI_PANEL2, on ? 1.0f : hov ? 1.0f : 0.75f);
             eui_frame(x, y, L.tileW, L.tileH,
                       on ? mode : hov ? EUI_CYAN : EUI_LINE, 1.0f);
-            eui_cameo(x + 2 * S, y + 2 * S, L.tileW - 4 * S, L.tileH - 14 * S, it->code);
+            eui_cameo(x + 2 * S, y + 2 * S, L.tileW - 4 * S, L.tileH - 14 * S,
+                      it->code, t1);
             const float tw = ef_text_w(it->code, t1);
             ef_text(x + (L.tileW - tw) * 0.5f, y + L.tileH - 11 * S, it->code, t1,
                     EUI_RGB(on ? EUI_INK : EUI_DIM));
@@ -6942,6 +8790,11 @@ static bool edit_repaint_cell(int cx, int cy)
 
     const PackTex& at = g_pack.tex[g_pack.terrainTex];
     if (at.uw <= 0 || at.uh <= 0) return false;
+    /* A pack whose atlas is not the packing this table was generated for takes the right
+       slot pixels and lands them on the wrong art. Refusing is the same answer this
+       function already gives for a tile the theater's bank does not carry, so the caller
+       puts the .BIN back and the cell keeps what it had. */
+    if (!tt_atlas_matches(at)) return false;
     float x0, y0;
     tt_slot_rect(slot, &x0, &y0);
     pc->u0 = x0 / (float)at.uw;
@@ -7301,6 +9154,17 @@ static void edit_read_waypoints(const char* path)
 
 #define EDIT_UNDO_MAX 200
 
+/* AUTOSAVE'S INTERVAL, in DRAWN editor frames: 7200 is two minutes at sixty a second.
+   Frames rather than wallclock for the same reason the toast uses them -- a --shot run
+   has to stay reproducible. */
+#define EDIT_AUTOSAVE_FRAMES 7200
+
+/* Autosave writes through the same function the SAVE button does, and that lives with
+   the rest of the file writers, far below the undo funnel that triggers it. */
+static void edit_save(void);
+static bool          g_editAutosave = true;
+static unsigned long g_editSavedAt = 0;
+
 /* EditPrior moved up beside the hit enum; the undo snapshot still carries it. */
 
 struct EditSnap {
@@ -7322,12 +9186,33 @@ struct EditSnap {
            not undo it, and tagging an object pushed one that could not untag it. */
     std::vector<EditPrior>   prior;
     std::vector<short>       cellTrig;
+    /* THE SMOOTH BRUSH'S UNLOCK, which is state the map carries and not a preference.
+       The first smooth stroke on an off-the-ladder map makes the rung tool usable on
+       it; undoing that stroke has to put the heights AND that fact back, or the panel
+       keeps offering a tool for ground that no longer exists. It is one bool rather
+       than a vector because it describes the document, exactly like the corners do. */
+    bool smoothUnlock;
     char label[40];
 };
 
 static std::vector<EditSnap> g_undo, g_redo;
 static EditSnap g_editLoaded;          /* what REVERT goes back to */
 static bool     g_editLoadedOk = false;
+
+/* UNSAVED WORK, tracked at the undo funnel rather than at the fifteen call sites that
+   feed it. Every mutation that can be undone passes through edit_commit, so setting the
+   flag there covers all of them and cannot be forgotten by the next one added; edit_save
+   is the only thing that clears it, because it is the only thing that makes the disk
+   match the screen. A fresh document -- New Map, or a different map opened -- starts
+   clean.
+
+   g_editQuitAskedAt is the frame the quit warning went up. ESC's last rung asks once and
+   then leaves, and the second press counts only while that warning is still on screen:
+   tying the window to the toast puts the question and the answer in front of the eye
+   together, and an ESC an hour later asks again instead of quitting on a stale arm. */
+static bool          g_editDirty = false;
+static bool          g_editQuitAsked = false;
+static unsigned long g_editQuitAskedAt = 0;
 
 static EditSnap edit_snapshot(const char* label)
 {
@@ -7352,6 +9237,7 @@ static EditSnap edit_snapshot(const char* label)
     memcpy(s.waypoint, g_waypoint, sizeof s.waypoint);
     s.prior = g_editPrior;
     s.cellTrig.assign(g_cellTrig, g_cellTrig + edit_ini_cells());
+    s.smoothUnlock = g_elevSmoothUnlock;
     snprintf(s.label, sizeof s.label, "%s", label ? label : "edit");
     return s;
 }
@@ -7367,8 +9253,22 @@ static void edit_restore(const EditSnap& s)
         memcpy(g_editIcon, &s.icon[0], s.icon.size());
         edit_repaint_all();      /* the drawn art has to follow the restored .BIN */
     }
-    if (!s.corner.empty() && s.corner.size() == g_pack.corner.size())
+    /* THE HEIGHTS, AND THE THREE THINGS DERIVED FROM THEM. Putting a different set of
+       corners back is exactly the situation the baked light, the building pads and the
+       off-the-ladder count all have to be told about: undoing an elevation edit used to
+       restore the ground and leave the picture, the pads and the readout describing the
+       ground that had just been taken away. Guarded on the heights ACTUALLY differing,
+       so an ordinary object undo still costs nothing. */
+    if (!s.corner.empty() && s.corner.size() == g_pack.corner.size()) {
+        const bool hmoved =
+            memcmp(&g_pack.corner[0], &s.corner[0], s.corner.size()) != 0;
         g_pack.corner = s.corner;
+        if (hmoved) {
+            g_shadeReady = false;
+            terrain_pads_rebuild();
+            sbr_recount_ladder();
+        }
+    }
     if (!s.tier.empty()) {
         memcpy(g_elevTier, &s.tier[0], s.tier.size());
         memcpy(g_elevPass, &s.pass[0], s.pass.size());
@@ -7378,6 +9278,11 @@ static void edit_restore(const EditSnap& s)
     g_editPrior = s.prior;
     if ((int)s.cellTrig.size() == edit_ini_cells())
         memcpy(g_cellTrig, &s.cellTrig[0], s.cellTrig.size() * sizeof(short));
+    /* THE AUTO HEIGHTMAP'S REPORT DESCRIBES ONE STATE OF THE GROUND, and this is the
+       function that puts a different one back. Undo, redo, revert and the importer's own
+       rollback all come through here, so this is the one place that has to say so. */
+    ah_report_clear();
+    g_elevSmoothUnlock = s.smoothUnlock;
     g_euiRadarDirty = 1;
     /* An armed index survives, but a MOVE in flight cannot: the object it was holding
        may not exist any more. */
@@ -7398,11 +9303,33 @@ static void edit_commit(EditSnap& before)
        it at each of them, and the one that was forgotten would leave the badge quietly
        describing a map that no longer exists. */
     edit_check_dirty();
+    /* AND THE SAME ARGUMENT: every undoable mutation lands here, so this is where the
+       auto heightmap's report is told the ground has moved. A stroke of the rung brush
+       after a fit would otherwise leave marks describing corners that are no longer
+       there, and a report that outlives its map is worse than no report. The fit itself
+       commits BEFORE it fills the report in, so it does not clear its own. */
+    ah_report_clear();
+    /* THE MAP NO LONGER MATCHES THE DISK. Same argument as the line above: this is the
+       one place every undoable mutation reaches, so it is the one place that has to say
+       so. Doing it per-edit-site would mean remembering it at each of them, and the one
+       that was forgotten would let ESC throw the work away without asking. */
+    g_editDirty = true;
     g_undo.push_back(before);
     if ((int)g_undo.size() > EDIT_UNDO_MAX) g_undo.erase(g_undo.begin());
     /* A new edit invalidates the redo branch, which is what every editor does and what
        the browser one does too. */
     g_redo.clear();
+
+    /* AUTOSAVE, off the same flag and the same funnel.
+       A clock on its own would rewrite an unchanged file forever, so the trigger is an
+       EDIT that arrives more than EDIT_AUTOSAVE_FRAMES after the last write: no edits,
+       no writes, and the most an unattended crash can cost is that interval plus the
+       edit in hand. It writes where SAVE writes -- user_maps/, never the cartridge's own
+       missions -- and it toasts like SAVE does, because a write to the disk that says
+       nothing is indistinguishable from one that failed. */
+    if (g_editAutosave && g_editDirty &&
+        g_editFrame - g_editSavedAt >= EDIT_AUTOSAVE_FRAMES)
+        edit_save();
 }
 
 static bool edit_can_undo(void) { return !g_undo.empty(); }
@@ -7517,6 +9444,43 @@ static void edit_wall_put(int x, int y, int kind)
 }
 
 /* ------------------------------------------------------------------------------------
+ *  The tiberium brush
+ *
+ *  One cell per click, the same as a wall, and the arithmetic that sizes the cell lives
+ *  up beside the other cell tests. There is ONE brush for the whole group on purpose:
+ *  the engine throws the TI number away. MapClass::Overpass runs over the playable
+ *  rectangle as the scenario is read (scenarioini.cpp:489, map.cpp:906) and
+ *  Tiberium_Adjust re-picks the overlay at random across TIBERIUM1..12 for every cell
+ *  (cell.cpp:1912), so twelve palette entries would be twelve ways to author a number
+ *  nobody reads back.
+ * ---------------------------------------------------------------------------------- */
+static void edit_tib_put(int x, int y)
+{
+    if (edit_tib_index(x, y) >= 0) {
+        /* Painting where paint already is is neither a refusal nor an edit: nothing
+           changed, so nothing goes on the undo stack for it. */
+        fprintf(stderr, "edit: %d,%d is already tiberium\n", x, y);
+        return;
+    }
+    EditSnap before = edit_snapshot("tiberium");
+    TibCell tc;
+    memset(&tc, 0, sizeof tc);
+    tc.x = (short)x; tc.y = (short)y;
+    /* WHICH OF THE TWELVE, chosen per cell rather than left at zero. Overpass re-picks
+       it the moment the map is read, so this number never survives being played; what it
+       decides is whether the field the AUTHOR is looking at is twelve crystal sprites or
+       the same one two hundred times. Hashed off the cell -- the renderer's own hash --
+       so the same map always draws the same way. */
+    tc.kind = (unsigned char)(tib_hash((unsigned)x, (unsigned)y, 0u) % 12u);
+    tc.stage = 0;
+    g_tib.push_back(tc);
+    edit_tib_restage(x, y);
+    edit_commit(before);
+    g_euiRadarDirty = 1;
+    fprintf(stderr, "edit: tiberium at %d,%d  [%d cells]\n", x, y, (int)g_tib.size());
+}
+
+/* ------------------------------------------------------------------------------------
  *  Hit testing
  *
  *  One layout function feeds both the draw and the hit test, so a control cannot drift
@@ -7568,26 +9532,56 @@ static int eui_hit(float mx, float my, int fbw, int fbh, int* arg)
         if (g_euiModal == MODAL_CHECK) return EUI_DEAD;
         if (g_euiModal == MODAL_NEW) {
             for (int g = 0; g < 3; g++)
-                for (int i = 0; i < (g == 0 ? EUI_SIZE_N : g == 1 ? EUI_THEATER_N : 2); i++) {
+                for (int i = 0; i < (g == 0 ? EUI_SIZE_N
+                                   : g == 1 ? EUI_THEATER_N : NEWKIND_N); i++) {
                     float ox, oy, ow, oh;
                     eui_modal_opt_rect(&L, fbw, fbh, g, i, &ox, &oy, &ow, &oh);
                     if (EUI_IN(ox, oy, ow, oh)) {
-                        *arg = g * 10 + i; return EUI_MODALOPT;
+                        /* THE CUSTOM ROW IS NOT A CHOICE, IT IS A FIELD, so it answers
+                           the one hit kind whose handler asks this file to open the
+                           typed entry under the pointer and start text input. The
+                           opener selects the row as well, so a single click both picks
+                           CUSTOM and puts the caret in it. */
+                        if (g == 0 && i == EUI_SIZE_CUSTOM) {
+                            *arg = -1;
+                            return EUI_RENAME;
+                        }
+                        /* The kind group answers with its VALUE, not with its row. What
+                           receives this stores the number as given, and the two orders
+                           are deliberately different. */
+                        *arg = g * 10 + (g == 2 ? NEWKIND_ROW[i] : i);
+                        return EUI_MODALOPT;
                     }
                 }
         } else if (g_euiModal == MODAL_OPEN) {
+            /* EUI_IN IS A TEXTUAL MACRO OVER lx AND ly, and those two names belong to
+               the POINTER, declared at the head of this function. Naming the list's own
+               origin lx and ly here shadowed them, so every test inside this block
+               compared the pointer against itself: tab 0 reduced to lx >= lx &&
+               lx < lx + tw, true for any click anywhere in the dialog. The dialog
+               answered "tab 0" to everything, no row could be selected, and a map editor
+               that cannot reopen its own maps is not one. The origin is olx/oly now, and
+               no local in this function may take either of the macro's two names. */
             const float pad = 18 * S;
-            const float lx = mx2 + pad, ly = my2 + 74 * S;
+            const float olx = mx2 + pad, oly = my2 + 74 * S;
             const float lw = mw - pad * 2, lh = mh - 74 * S - 60 * S;
             const float tw = (lw - 6 * S) * 0.5f;
             for (int i = 0; i < 2; i++)
-                if (EUI_IN(lx + i * (tw + 6 * S), ly, tw, 28 * S)) {
+                if (EUI_IN(olx + i * (tw + 6 * S), oly, tw, 28 * S)) {
                     *arg = 30 + i; return EUI_MODALOPT;
                 }
-            const int rows = (int)((lh - 40 * S) / (24 * S));
+            /* ONLY THE ROWS THE DRAW PAINTS MAY ANSWER. eui_draw_openlist stops at the
+               last entry of the shown tab; the hit test ran the full height of the list,
+               so the empty space under a short list answered as a row that is not there.
+               The dispatcher survived it -- edit_maplist_at returns -1 and the selection
+               is left alone -- but a rectangle that answers and is not drawn is the exact
+               defect the layout harness exists to catch. */
+            const int shown = edit_maplist_count(g_mapListTab ? 'O' : 'U');
+            int rows = (int)((lh - 40 * S) / (24 * S));
+            if (rows > shown - g_mapListScroll) rows = shown - g_mapListScroll;
             for (int r = 0; r < rows; r++) {
                 float x, y, w, h;
-                eui_openlist_row_rect(lx, ly, lw, S, r, &x, &y, &w, &h);
+                eui_openlist_row_rect(olx, oly, lw, S, r, &x, &y, &w, &h);
                 if (EUI_IN(x, y, w, h)) { *arg = 40 + r; return EUI_MODALOPT; }
             }
         }
@@ -7794,11 +9788,22 @@ static int eui_hit(float mx, float my, int fbw, int fbh, int* arg)
             if (EUI_IN(L.sideX + pad + i * (vw + 4 * S), L.ownerY, vw, L.ownerH)) {
                 *arg = i; return EUI_SCRIPTVIEW;
             }
-    } else
-    for (int i = 0; i < 4; i++)
-        if (EUI_IN(L.sideX + pad + i * (L.ownerW + 4 * S), L.ownerY, L.ownerW, L.ownerH)) {
-            *arg = i; return EUI_OWNER;
+    } else if (g_editMode == 2) {
+        /* THE ELEVATION PAGE TABS SIT IN THE SAME BAND, and are claimed here for the
+           same reason the RULES/TEAMS switch is: the owner loop below would otherwise
+           answer for them. ELEVATN draws no house chips -- a tile has no house -- so
+           this band was answering EUI_OWNER over ground nothing was drawn on. */
+        for (int i = 0; i < 2; i++) {
+            float tx, ty, tw, th;
+            if (!eui_sbr_tab_rect(&L, i, &tx, &ty, &tw, &th)) break;
+            if (EUI_IN(tx, ty, tw, th)) { *arg = i; return EUI_SBRPAGE; }
         }
+    } else
+    for (int i = 0; i < eui_owner_n(); i++) {
+        float ox, oy, ow, oh;
+        eui_owner_chip_rect(&L, i, &ox, &oy, &ow, &oh);
+        if (EUI_IN(ox, oy, ow, oh)) { *arg = i; return EUI_OWNER; }
+    }
     if (g_editMode == 4) {
         eui_script_row_clamp(&L);
         for (int row = g_scriptRowOff,
@@ -7842,16 +9847,48 @@ static int eui_hit(float mx, float my, int fbw, int fbh, int* arg)
             if (y + h > L.lintY) break;
             if (EUI_IN(x, y, w, h)) { *arg = row; return EUI_START; }
         }
+    } else if (g_editMode == 2 && g_sbrPage == 1) {
+        /* THE SMOOTH PAGE. Its rows come from the same four functions the draw calls,
+           so a row the draw skipped for want of height is a row this skips too. */
+        for (int i = 0; i < 3; i++) {
+            float x, y, w, h;
+            if (!eui_sbr_tool_rect(&L, i, &x, &y, &w, &h)) break;
+            if (EUI_IN(x, y, w, h)) { *arg = i; return EUI_SBRTOOL; }
+        }
+        for (int i = 0; i < SBR_SLIDER_N; i++) {
+            float x, y, w, h;
+            if (!eui_sbr_slider_rect(&L, i, &x, &y, &w, &h)) break;
+            if (EUI_IN(x, y, w, h)) { *arg = i; return EUI_SBRSLIDER; }
+        }
+        /* fall through to the action row, save and play, which are shared */
     } else if (g_editMode == 2) {
         /* The elevation panel replaces the category strip and the grid, and its
            geometry is laid out by eui_draw_elev -- repeated here rather than shared,
            and --uitest is what keeps the two honest. */
-        float y = L.catY;
+        float y = eui_elev_top(&L);
         if (!elev_ready()) {
             const float bh = 34 * S, bw = L.sideW - pad * 4;
             if (EUI_IN(L.sideX + pad * 2, y + 140 * S, bw, bh)) return EUI_ELEVGATE;
-            return EUI_DEAD;
-        }
+            /* THE FIT IS ON THIS CARD TOO, and it is not behind the gate: it reads
+               cliff art out of the .BIN and writes corner bytes, and neither of those
+               needs the ladder. Tested after CONVERT because the two rectangles do not
+               overlap and CONVERT is the one that has always been here. */
+            {
+                float ax, ay, aw, ahh;
+                if (eui_elev_auto_rect(&L, &ax, &ay, &aw, &ahh) &&
+                    EUI_IN(ax, ay, aw, ahh)) return EUI_ELEVAUTO;
+            }
+            /* AND THEN FALL THROUGH, WHICH THIS BRANCH DID NOT DO. It returned
+               EUI_DEAD here, and the action row, SAVE and PLAY are tested BELOW the
+               whole panel chain -- so on any map that arrives off the ladder, with the
+               ELEVATION panel open, UNDO, REDO, REVERT, SAVE and PLAY every one of
+               them answered dead and not one could be clicked. It went unseen because
+               the layout harness set g_elevConverted for every elevation pass it made
+               and so never walked this card once. Those five controls are drawn under
+               every panel and are not part of this card; the ready side has always
+               fallen through to them and now both sides do. Undoing a fit from the
+               card the fit is on is the immediate reason it has to. */
+        } else {
         {
             const float w = (L.sideW - pad * 2 - 4 * 3 * S) / 5.0f;
             for (int i = 0; i < 5; i++)
@@ -7875,6 +9912,17 @@ static int eui_hit(float mx, float my, int fbw, int fbh, int* arg)
                 }
         }
         {
+            float bx, by, bw, bh;
+            if (eui_elev_import_rect(&L, 0, &bx, &by, &bw, &bh) &&
+                EUI_IN(bx, by, bw, bh)) return EUI_ELEVIMPORT;
+            if (eui_elev_import_rect(&L, 1, &bx, &by, &bw, &bh) &&
+                EUI_IN(bx, by, bw, bh)) return EUI_ELEVNEXT;
+            /* AND THE ROW UNDER THEM. Before the cliff cells, because it sits above
+               them and the drawer's first row starts where this one ends. */
+            if (eui_elev_auto_rect(&L, &bx, &by, &bw, &bh) &&
+                EUI_IN(bx, by, bw, bh)) return EUI_ELEVAUTO;
+        }
+        {
             int list[64];
             const int n = eui_cliff_list(list, 64);
             for (int k = 0; k < n; k++) {
@@ -7884,6 +9932,7 @@ static int eui_hit(float mx, float my, int fbw, int fbh, int* arg)
             }
         }
         if (EUI_IN(L.sideX + pad, L.actY, L.sideW - pad * 2, L.actH)) { }
+        }
         /* fall through to the action row, save and play, which are shared */
     } else
     for (int i = 0; i < eui_cat_count(); i++)
@@ -7999,6 +10048,17 @@ static bool eui_wheel(float mx, float my, int fbw, int fbh, int dir)
         }
         return true;
     }
+    /* STARTS has no item grid either, and twenty-eight waypoint rows fit no window, so
+       the wheel moves the window over them. Without this arm the wheel fell through to
+       the palette test below and scrolled the object drawer -- a drawer this mode does
+       not draw, so the wheel did nothing anyone could see. */
+    if (g_editMode == 3) {
+        if (my >= L.catY && my < L.lintY) {
+            g_startScroll -= dir;
+            eui_start_scroll_clamp(&L);
+        }
+        return true;
+    }
     if (mx < L.gridX || mx >= L.gridX + L.gridW ||
         my < L.gridY || my >= L.gridY + L.gridH) return true;   /* swallow, don't zoom */
     const int rows = (int)((L.gridH - 6 * L.s - 14 * L.s) / (L.tileH + L.gap));
@@ -8050,11 +10110,18 @@ static int elev_convert(void)
     return wrote;
 }
 
-/* Is this map ready to have its elevation edited? */
+/* Is this map ready to have its elevation edited?
+ *
+ * THREE WAYS IN, and the third is the director's rule that the two tools share a map.
+ * A map already on the ladder needs nothing; CONVERT is the announced, one-way snap of
+ * a whole map; and a SMOOTH STROKE unlocks it too, because a map carrying hand-made
+ * smooth ground is a legitimate map and the rung tool paints on it perfectly well --
+ * inside the blocks it paints it simply wins, which is what elev_write already does.
+ * The rung tool is not asked to convert such a map and must not be. */
 static bool elev_ready(void)
 {
     if (!g_elevSeeded) elev_seed();
-    return g_elevConverted || g_elevOffLadder == 0;
+    return g_elevConverted || g_elevSmoothUnlock || g_elevOffLadder == 0;
 }
 
 /* Write a derived elevation into the map -- but ONLY where the brush has been.
@@ -8232,6 +10299,1174 @@ static int elev_paint(int bx, int by, int radius, int tier, int tool, char* why,
     return elev_write(grown);
 }
 
+
+/* ------------------------------------------------------------------------------------
+ *  IMPORTING A HEIGHTMAP FROM A PAINTED IMAGE
+ *
+ *  Asked for on the feature board: let a PNG or a PCX stand in for the elevation brush,
+ *  so a plateau can be laid out in a paint program with a radar picture on the layer
+ *  below. It is cheap precisely because the elevation model is ALREADY AN IMAGE -- a
+ *  field of tiers over 2x2-cell blocks, on the five-rung ladder the cartridge's own
+ *  heightmaps were painted on. So an import is a decode, a box filter down to the block
+ *  grid, a quantise into that ladder, and ONE ordinary undo step.
+ *
+ *  TWO FORMATS, AND NEITHER ADDS A DEPENDENCY.
+ *    PCX is a 128-byte header and a run-length body: no library at all, and it is what
+ *    the paint tools of the era this project restores still write.
+ *    PNG needs an inflate and this binary already links one. zlib is on the link line of
+ *    both builds and the renderer's own screenshot writer already deflates through it,
+ *    so the reader is the signature, the chunk walk, one uncompress and the five row
+ *    filters.
+ *  Sixteen-bit samples, sub-byte palettes and interlaced PNG are REFUSED with the fix
+ *  named, never half-read. A heightmap has five usable levels so nobody needs sixteen
+ *  bits, and reading an Adam7 file as if it were progressive would produce a
+ *  plausible-looking wrong map, which is the worst outcome an importer has.
+ * ---------------------------------------------------------------------------------- */
+
+struct ElevImage { int w, h; std::vector<unsigned char> g; };
+
+/* Rec.601 luma. The three weights sum to exactly 256, so a grey pixel comes back as
+   itself and a colour reference painted over is folded the way an eye would fold it. */
+static inline unsigned char elev_luma(int r, int g, int b)
+{
+    return (unsigned char)((77 * r + 150 * g + 29 * b) >> 8);
+}
+
+static bool elev_slurp(const char* path, std::vector<unsigned char>* out)
+{
+    FILE* f = fopen(path, "rb");
+    if (!f) return false;
+    fseek(f, 0, SEEK_END);
+    const long L = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (L <= 0 || L > 64L * 1024 * 1024) { fclose(f); return false; }
+    out->resize((size_t)L);
+    const size_t got = fread(&(*out)[0], 1, (size_t)L, f);
+    fclose(f);
+    return got == (size_t)L;
+}
+
+/* PCX. Header fields at their fixed offsets: 3 bits-per-plane, 4..11 the window,
+   65 planes, 66 bytes-per-line. The body is one RLE stream, planes*bpl bytes a row. */
+static bool elev_read_pcx(const unsigned char* f, size_t n, ElevImage* out,
+                          char* why, int whyN)
+{
+    if (n < 128 || f[0] != 0x0A) { snprintf(why, whyN, "not a PCX"); return false; }
+    const int enc    = f[2];
+    const int bpp    = f[3];
+    const int xmin   = f[4] | (f[5] << 8),  ymin = f[6]  | (f[7] << 8);
+    const int xmax   = f[8] | (f[9] << 8),  ymax = f[10] | (f[11] << 8);
+    const int planes = f[65];
+    const int bpl    = f[66] | (f[67] << 8);
+    const int w = xmax - xmin + 1, h = ymax - ymin + 1;
+    if (enc != 1) {
+        snprintf(why, whyN, "this PCX is not run-length encoded, which no paint "
+                 "program writes -- re-save it");
+        return false;
+    }
+    if (bpp != 8 || (planes != 1 && planes != 3)) {
+        snprintf(why, whyN, "this PCX is bits-per-plane %d, planes %d. The importer reads "
+                 "8-bit paletted and 24-bit PCX -- re-save as one of those", bpp, planes);
+        return false;
+    }
+    if (w <= 0 || h <= 0 || w > 4096 || h > 4096 || bpl < w) {
+        snprintf(why, whyN, "this PCX declares a %dx%d image at %d bytes a line, which "
+                 "does not describe a picture", w, h, bpl);
+        return false;
+    }
+    /* The 256-colour palette lives in the last 769 bytes behind a 0x0C marker. Without
+       one the byte IS the grey, which is what a plain greyscale ramp amounts to. */
+    const unsigned char* pal = NULL;
+    if (planes == 1 && n >= 769 && f[n - 769] == 0x0C) pal = f + n - 768;
+
+    const size_t rowbytes = (size_t)planes * (size_t)bpl;
+    std::vector<unsigned char> row(rowbytes);
+    out->w = w; out->h = h;
+    out->g.assign((size_t)w * (size_t)h, 0);
+    size_t p = 128;
+    for (int y = 0; y < h; y++) {
+        size_t got = 0;
+        while (got < rowbytes) {
+            if (p >= n) {
+                snprintf(why, whyN, "this PCX ends %d rows early", h - y);
+                return false;
+            }
+            unsigned char b = f[p++];
+            int run = 1;
+            if ((b & 0xC0) == 0xC0) {
+                run = b & 0x3F;
+                if (p >= n) { snprintf(why, whyN, "this PCX ends mid-run"); return false; }
+                b = f[p++];
+            }
+            while (run-- > 0 && got < rowbytes) row[got++] = b;
+        }
+        for (int x = 0; x < w; x++) {
+            unsigned char v;
+            if (planes == 3)      v = elev_luma(row[x], row[bpl + x], row[2 * bpl + x]);
+            else if (pal)         v = elev_luma(pal[row[x] * 3], pal[row[x] * 3 + 1],
+                                                pal[row[x] * 3 + 2]);
+            else                  v = row[x];
+            out->g[(size_t)y * w + x] = v;
+        }
+    }
+    return true;
+}
+
+static unsigned elev_be32(const unsigned char* p)
+{
+    return ((unsigned)p[0] << 24) | ((unsigned)p[1] << 16) |
+           ((unsigned)p[2] << 8)  |  (unsigned)p[3];
+}
+
+static int elev_paeth(int a, int b, int c)
+{
+    const int q  = a + b - c;
+    const int qa = q > a ? q - a : a - q;
+    const int qb = q > b ? q - b : b - q;
+    const int qc = q > c ? q - c : c - q;
+    if (qa <= qb && qa <= qc) return a;
+    return qb <= qc ? b : c;
+}
+
+/* PNG. Depth 8 and no interlace, which is what every paint program's default save is. */
+static bool elev_read_png(const unsigned char* f, size_t n, ElevImage* out,
+                          char* why, int whyN)
+{
+    static const unsigned char SIG[8] = { 137, 'P', 'N', 'G', '\r', '\n', 26, '\n' };
+    if (n < 8 || memcmp(f, SIG, 8) != 0) { snprintf(why, whyN, "not a PNG"); return false; }
+
+    int w = 0, h = 0, depth = 0, ctype = 0, interlace = 0;
+    bool sawIHDR = false;
+    std::vector<unsigned char> idat, plte;
+    size_t p = 8;
+    while (p + 12 <= n) {
+        const unsigned len = elev_be32(f + p);
+        if ((size_t)len > n || p + 12 + (size_t)len > n) {
+            snprintf(why, whyN, "this PNG is truncated"); return false;
+        }
+        const char* tag = (const char*)(f + p + 4);
+        const unsigned char* d = f + p + 8;
+        if (!memcmp(tag, "IHDR", 4) && len >= 13) {
+            w = (int)elev_be32(d); h = (int)elev_be32(d + 4);
+            depth = d[8]; ctype = d[9]; interlace = d[12];
+            sawIHDR = true;
+        } else if (!memcmp(tag, "PLTE", 4)) {
+            plte.assign(d, d + len);
+        } else if (!memcmp(tag, "IDAT", 4)) {
+            idat.insert(idat.end(), d, d + len);
+        } else if (!memcmp(tag, "IEND", 4)) {
+            break;
+        }
+        p += 12 + (size_t)len;
+    }
+    if (!sawIHDR || w <= 0 || h <= 0 || w > 4096 || h > 4096) {
+        snprintf(why, whyN, "this PNG has no usable header"); return false;
+    }
+    if (interlace) {
+        snprintf(why, whyN, "this PNG is interlaced. Re-save it without interlacing -- "
+                 "reading it as if it were not would give a wrong map that looks right");
+        return false;
+    }
+    if (depth != 8) {
+        snprintf(why, whyN, "this PNG is %d bits a sample. The ladder has five rungs, "
+                 "so save it as 8-bit", depth);
+        return false;
+    }
+    int spp;
+    switch (ctype) {
+        case 0: spp = 1; break;      /* grey            */
+        case 2: spp = 3; break;      /* rgb             */
+        case 3: spp = 1; break;      /* palette         */
+        case 4: spp = 2; break;      /* grey + alpha    */
+        case 6: spp = 4; break;      /* rgba            */
+        default:
+            snprintf(why, whyN, "this PNG uses colour type %d, which PNG does not "
+                     "define", ctype);
+            return false;
+    }
+    if (ctype == 3 && plte.size() < 3) {
+        snprintf(why, whyN, "this PNG is paletted and carries no palette"); return false;
+    }
+    const size_t stride = 1 + (size_t)w * (size_t)spp;
+    std::vector<unsigned char> raw(stride * (size_t)h);
+    uLongf got = (uLongf)raw.size();
+    if (idat.empty() ||
+        uncompress(&raw[0], &got, &idat[0], (uLong)idat.size()) != Z_OK ||
+        (size_t)got != raw.size()) {
+        snprintf(why, whyN, "this PNG's image data did not unpack");
+        return false;
+    }
+    /* Unfilter in place, top down: every row's predictor is the row above it, already
+       reconstructed by the time it is read. */
+    for (int y = 0; y < h; y++) {
+        unsigned char* cur = &raw[(size_t)y * stride] + 1;
+        const unsigned char* up = y ? &raw[(size_t)(y - 1) * stride] + 1 : NULL;
+        const int ft = raw[(size_t)y * stride];
+        const int nb = w * spp;
+        for (int x = 0; x < nb; x++) {
+            const int a = x >= spp ? cur[x - spp] : 0;
+            const int b = up ? up[x] : 0;
+            const int c = (up && x >= spp) ? up[x - spp] : 0;
+            int v = cur[x];
+            switch (ft) {
+                case 0:                              break;
+                case 1: v += a;                      break;
+                case 2: v += b;                      break;
+                case 3: v += (a + b) >> 1;           break;
+                case 4: v += elev_paeth(a, b, c);    break;
+                default:
+                    snprintf(why, whyN, "row %d of this PNG uses filter %d, which PNG "
+                             "does not define", y, ft);
+                    return false;
+            }
+            cur[x] = (unsigned char)v;
+        }
+    }
+    out->w = w; out->h = h;
+    out->g.assign((size_t)w * (size_t)h, 0);
+    for (int y = 0; y < h; y++) {
+        const unsigned char* r = &raw[(size_t)y * stride] + 1;
+        for (int x = 0; x < w; x++) {
+            const unsigned char* q = r + (size_t)x * (size_t)spp;
+            unsigned char v;
+            if (ctype == 3) {
+                const size_t i = (size_t)q[0] * 3;
+                v = (i + 2 < plte.size())
+                        ? elev_luma(plte[i], plte[i + 1], plte[i + 2]) : q[0];
+            } else if (ctype == 2 || ctype == 6) {
+                v = elev_luma(q[0], q[1], q[2]);
+            } else {
+                v = q[0];
+            }
+            out->g[(size_t)y * w + x] = v;
+        }
+    }
+    return true;
+}
+
+/* THE QUANTISER IS THE SEEDER'S, not a second one. elev_tier_of takes the nearest of the
+   five rungs with ties going down, which puts a grey of 0..32 on tier 0, 33..96 on 1,
+   97..159 on 2, 160..223 on 3 and 224..255 on 4. Those are the 0/25/50/75/100 percent
+   greys a paint tool leaves, and that is how the cartridge's own heightmaps were
+   painted, so a heightmap exported as an image and imported back comes home as the
+   tiers it left as.
+
+   THE IMAGE IS THE WHOLE BLOCK GRID, not the playable rectangle. Stretching it over
+   [MAP] X/Y/Width/Height and leaving the border alone is the tempting alternative and it
+   makes a seam the model cannot express: an imported plateau at tier 3 meeting a border
+   still at tier 1 is a two-rung step, and there is no cliff art for one. So the whole
+   field is sampled and legalised. What is WRITTEN back is a smaller thing and
+   deliberately so, for a reason set out beside the dirty mask below.
+
+   TERRACING IS DOWNWARD ONLY. No block may sit more than one rung above a block it
+   touches, because a coarse corner takes the MAX of the four blocks around it and a
+   two-rung corner spread is the single thing the compass has no art for. A painted image
+   knows nothing about that, so a sheer face in the source comes out as a stair. Lowering
+   is the conservative direction: raising would grow the plateau outward over ground the
+   image never asked to raise. */
+static int elev_import_bytes(const unsigned char* file, size_t n, const char* what,
+                             char* why, int whyN)
+{
+    if (why && whyN > 0) why[0] = 0;
+    if (g_pack.corner.empty() || !g_editHaveBin) {
+        if (why) snprintf(why, whyN, "this map carries no heightmap to write into");
+        return 0;
+    }
+    ElevImage img;
+    char bad[220] = { 0 };
+    bool ok;
+    if (n >= 8 && file[0] == 137 && file[1] == 'P')
+        ok = elev_read_png(file, n, &img, bad, sizeof bad);
+    else if (n >= 1 && file[0] == 0x0A)
+        ok = elev_read_pcx(file, n, &img, bad, sizeof bad);
+    else {
+        ok = false;
+        snprintf(bad, sizeof bad, "this is neither a PNG nor a PCX, and those are the "
+                 "two the importer reads");
+    }
+    if (!ok || img.w <= 0 || img.h <= 0) {
+        if (why) snprintf(why, whyN, "%s", bad);
+        return 0;
+    }
+
+    /* SEED BEFORE THE SNAPSHOT. An unseeded tier field is not carried in a snapshot at
+       all, so an import taken before the seed would undo its heights and leave its
+       tiers standing. */
+    if (!g_elevSeeded) elev_seed();
+
+    const int bw = elev_bw(), bh = elev_bh();
+    std::vector<unsigned char> want((size_t)bw * (size_t)bh, 1);
+    for (int by = 0; by < bh; by++) {
+        const int y0 = by * img.h / bh;
+        int y1 = (by + 1) * img.h / bh;
+        if (y1 <= y0) y1 = y0 + 1;
+        for (int bx = 0; bx < bw; bx++) {
+            const int x0 = bx * img.w / bw;
+            int x1 = (bx + 1) * img.w / bw;
+            if (x1 <= x0) x1 = x0 + 1;
+            long sum = 0;
+            int cnt = 0;
+            for (int y = y0; y < y1 && y < img.h; y++)
+                for (int x = x0; x < x1 && x < img.w; x++) {
+                    sum += img.g[(size_t)y * img.w + x];
+                    cnt++;
+                }
+            want[(size_t)by * bw + bx] =
+                (unsigned char)elev_tier_of(cnt ? (int)(sum / cnt) : 0);
+        }
+    }
+
+    const std::vector<unsigned char> asPainted(want);
+    for (int pass = 0; pass < bw + bh + 8; pass++) {
+        int moved = 0;
+        for (int by = 0; by < bh; by++)
+            for (int bx = 0; bx < bw; bx++) {
+                int lo = 4;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++) {
+                        if (!dx && !dy) continue;
+                        const int nx = bx + dx, ny = by + dy;
+                        if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue;
+                        const int t = want[(size_t)ny * bw + nx];
+                        if (t < lo) lo = t;
+                    }
+                if (want[(size_t)by * bw + bx] > lo + 1) {
+                    want[(size_t)by * bw + bx] = (unsigned char)(lo + 1);
+                    moved++;
+                }
+            }
+        if (!moved) break;
+    }
+    int terraced = 0;
+    for (size_t i = 0; i < want.size(); i++) if (want[i] != asPainted[i]) terraced++;
+
+    /* WHAT THE MODEL COULD NOT KEEP, counted before anything is written so the toast can
+       say it out loud. A PINCH is the diagonal saddle: it is drawn undressed, the corner
+       heights carry the climb and no cliff art goes on, which is what the cartridge does
+       on most of its tier-gaining edges, so it is cosmetic. A LOST LOW BLOCK is not
+       cosmetic: raised ground claims the cliff outside itself, so a low block whose four
+       coarse corners have all been claimed comes out raised and a channel the image
+       painted has closed. The brush REFUSES both; an import states them, because
+       throwing a whole map away over one block would make the feature useless. */
+    unsigned char K[ELEV_K_MAX * ELEV_K_MAX];
+    elev_coarse(&want[0], K);
+    int pinches = 0, lost = 0;
+    {
+        const int kw = elev_kw();
+        for (int by = 0; by < bh; by++)
+            for (int bx = 0; bx < bw; bx++) {
+                if (elev_is_saddle(elev_mask_at(K, bx, by))) pinches++;
+                const int nw = K[by * kw + bx],       ne = K[by * kw + bx + 1];
+                const int sw = K[(by + 1) * kw + bx], se = K[(by + 1) * kw + bx + 1];
+                int lo = nw;
+                if (ne < lo) lo = ne;
+                if (sw < lo) lo = sw;
+                if (se < lo) lo = se;
+                if (lo > want[(size_t)by * bw + bx]) lost++;
+            }
+    }
+
+    /* ONLY WHERE THE IMAGE DISAGREES, and this is the part that must not be skipped.
+       elev_write DRESSES every block it is handed: a flat one gets plain CLEAR painted
+       over all four of its cells. Hand it the whole map and it erases the sea, the
+       shore, the roads and the tiberium of every block the image did not actually move
+       -- the exact defect this tool was already fixed for once, and the reason the brush
+       writes the painted blocks GROWN BY ONE rather than the field. An import is a very
+       wide brush stroke and obeys the same rule. The ring of one is not optional: a
+       block's cliff mask is read off corners it shares with its neighbours, so a block
+       the image left alone beside one it raised still has to be re-dressed. */
+    unsigned char dirty[ELEV_BLOCKS_MAX * ELEV_BLOCKS_MAX];
+    memset(dirty, 0, sizeof dirty);
+    int changed = 0;
+    for (int by = 0; by < bh; by++)
+        for (int bx = 0; bx < bw; bx++)
+            if (want[(size_t)by * bw + bx] != g_elevTier[by * bw + bx]) {
+                dirty[by * bw + bx] = 1;
+                changed++;
+            }
+    if (!changed) {
+        if (why) snprintf(why, whyN, "this image is the ground the map already has, so "
+                          "nothing changed");
+        return 0;
+    }
+    unsigned char grown[ELEV_BLOCKS_MAX * ELEV_BLOCKS_MAX];
+    memcpy(grown, dirty, sizeof grown);
+    for (int by = 0; by < bh; by++)
+        for (int bx = 0; bx < bw; bx++) {
+            if (!dirty[by * bw + bx]) continue;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++) {
+                    const int nx = bx + dx, ny = by + dy;
+                    if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue;
+                    grown[ny * bw + nx] = 1;
+                }
+        }
+
+    EditSnap before = edit_snapshot("import heightmap");
+    memcpy(g_elevTier, &want[0], (size_t)bw * (size_t)bh);
+    /* PASS AND RAMP GO WITH THE FIELD THEY DECORATED. They are per-block choices about a
+       tier field that no longer exists, and leaving them behind would dress imported
+       ground with ramp art in blocks the image never mentioned. Both are inside the
+       snapshot, so undo puts them back with everything else. */
+    memset(g_elevPass, 0, sizeof g_elevPass);
+    memset(g_elevRamp, 0, sizeof g_elevRamp);
+
+    const int wrote = elev_write(grown);
+    if (!wrote) {
+        edit_restore(before);
+        if (why) snprintf(why, whyN, "the import wrote nothing");
+        return 0;
+    }
+    /* THE CONVERT GATE IS LEFT ALONE ON PURPOSE. That gate asks whether this map's
+       CORNER BYTES are on the five-rung ladder, and it is answered by a count elev_seed
+       takes over the whole heightmap. An import legalises the TIER FIELD everywhere and
+       rewrites corners only where it drew, so corners it never touched may still be off
+       the ladder, and claiming otherwise would be asserting a number nobody measured. A
+       map made by NEW MAP is already through the gate, which is the workflow this
+       feature is for. */
+    /* ONE UNDO ENTRY FOR THE WHOLE MAP, which is the entire reason the import goes
+       through the snapshot funnel rather than calling elev_paint a thousand times. A
+       snapshot already carries the corner array, so an import costs one ordinary step. */
+    edit_commit(before);
+
+    {
+        char sub[220];
+        snprintf(sub, sizeof sub, "%s, %dx%d over %dx%d blocks -- %d blocks moved, %d "
+                 "cells re-dressed; terraced %d, pinches %d, low blocks lost %d",
+                 what ? what : "an image", img.w, img.h, bw, bh, changed, wrote,
+                 terraced, pinches, lost);
+        edit_toast(EUI_CYAN, "HEIGHTMAP IMPORTED", sub);
+    }
+    return wrote;
+}
+
+static int elev_import_image(const char* path, char* why, int whyN)
+{
+    std::vector<unsigned char> file;
+    if (!elev_slurp(path, &file) || file.empty()) {
+        if (why && whyN > 0) snprintf(why, whyN, "cannot read %s", path);
+        return 0;
+    }
+    const char* base = strrchr(path, '/');
+    return elev_import_bytes(&file[0], file.size(), base ? base + 1 : path, why, whyN);
+}
+
+/* THE IMAGE BESIDE THE MAP. This editor has no file picker and no field a path could be
+   typed into, so the location is a convention instead: put the painted image in
+   user_maps/ under the map's own scenario name. Four spellings are tried because a paint
+   program picks its own case and half the filesystems this runs on care which. */
+static int elev_import_beside_map(char* why, int whyN)
+{
+    static const char* const EXT[4] = { ".PNG", ".png", ".PCX", ".pcx" };
+    char dir[1024];
+    edit_userdir(dir, sizeof dir);
+    for (int i = 0; i < 4; i++) {
+        char p[1200];
+        snprintf(p, sizeof p, "%s/%s%s", dir, g_editScen, EXT[i]);
+        FILE* t = fopen(p, "rb");
+        if (!t) continue;
+        fclose(t);
+        return elev_import_image(p, why, whyN);
+    }
+    if (why && whyN > 0)
+        snprintf(why, whyN, "no %s.PNG and no %s.PCX in user_maps -- paint one and put "
+                 "it there", g_editScen, g_editScen);
+    return 0;
+}
+
+
+/* ------------------------------------------------------------------------------------
+ *  THE AUTO HEIGHTMAP -- fit a heightmap to the cliff art a map already carries
+ *
+ *  The tier brush works the other way round: you paint ground and it derives the cliff
+ *  art. This is for the map that already HAS cliff art -- one converted from a DOS
+ *  editor, or one whose slopes were stamped by hand out of the cliff drawer -- and no
+ *  relief under it. Every such map is a heightmap waiting to be read, because the 1995
+ *  map format has no elevation field at all and the only thing in it that says "high
+ *  ground" is which SLOPE template the designer painted. That is exactly the reading the
+ *  N64 porters made by hand for all 55 of the cartridge's heightmapped scenarios.
+ *
+ *  IT DOES NOT ASK FOR THE MAP TO BE CONVERTED FIRST, AND MUST NOT. Converting is
+ *  elev_write over the whole map, which REPAINTS as plain ground every block whose four
+ *  corners are level -- that is, every block of a flat map, including the ones carrying
+ *  the slope art. Requiring it would destroy the input before the fit could read it: the
+ *  prerequisite and the feature cannot both exist. Neither half of the fit needs the
+ *  ladder anyway. It reads template ids and icon numbers out of the .BIN, and it writes
+ *  corner bytes; the ladder is a property of the bytes it writes, not a precondition on
+ *  the bytes it reads.
+ *
+ *  IT WRITES THROUGH THE LADDER, WHICH IS WHAT MAKES IT SAFE TO PRESS. The first build
+ *  of this feature wrote a free interpolation into every corner, and the result was that
+ *  ONE PRESS on SCB31EA took a map from 0 of 3844 playable corners off the ladder to
+ *  1320 of 3844 -- so the elevation panel replaced itself with the conversion gate and
+ *  refused everything, on a map that had been fully usable a moment earlier. A tool
+ *  whose first press disables the panel it lives on is not a tool. So the fit's output
+ *  is a TIER FIELD over the 2x2 blocks, exactly what the rung tool authors, and the
+ *  bytes go down through elev_coarse and elev_heights, exactly the path a brush stroke
+ *  takes. Every corner it writes therefore lands on a rung by construction, every corner
+ *  it declines to write keeps the byte it already had, and the off-the-ladder count can
+ *  only fall. On the flat-with-art maps this feature is for it falls to zero, and the
+ *  fit becomes what CONVERT should have been: the way onto the ladder that READS the
+ *  cliff art instead of erasing it. It is one undo entry, and the unlock is inside it.
+ *
+ *  IT WORKS PER TEMPLATE PLACEMENT, NOT PER CELL. A cliff is a stamped 2x2 (sometimes
+ *  2x3 or 3x2) block of art, the climb is spread across that block, and the block's own
+ *  id says which way is up. Reading it per cell would throw away both facts.
+ *
+ *      1. recover every SLOPE placement from the .BIN
+ *      2. read its high side off the compass below
+ *      3. flood the open ground so every cell knows its nearest placement and which
+ *         side of it the cell is on
+ *      4. solve one level per placement from the constraint that two adjacent open
+ *         cells are the same height, and MARK the cells where two placements disagree
+ *      5. reduce the cell levels to one tier per 2x2 block, and write the ground from
+ *         that field through the ladder
+ *
+ *  WATER IS NOT GROUND AND IS LEFT ALONE, by the same rule and for the same reason the
+ *  smooth brush keeps off it: the sea surface is drawn from the terrain's own corners,
+ *  so lifting one lifts the sea into a hill. The first build flooded water like open
+ *  ground and gave it a rung -- HEIGHT|30,21 moved from centre 0.0000 to 1.9844 on a
+ *  lake. Here water cells are a barrier to the flood, a block holding any water cell
+ *  keeps the tier it was seeded with, and a corner any of whose four cells is water is
+ *  not written at all. Those corners are counted and said, not silently skipped.
+ *
+ *  THE COMPASS IS MEASURED, AND THE MEASUREMENT IS REPRODUCIBLE. Over the 55 cartridge
+ *  scenarios that ship a heightmap, 4603 SLOPE placements sit wholly inside their map's
+ *  playable rectangle; 4509 of them (97.96%) have a mean height gradient that agrees
+ *  with the entry below, 18 (0.39%) point the other way and 76 (1.65%) are level. That
+ *  arithmetic -- the same projection onto the same eight directions this file uses -- is
+ *  in tools/romdump/cliff_compass.py and the numbers here are its output:
+ *
+ *      python3 tools/romdump/cliff_compass.py
+ *
+ *  Do not restate them from anywhere else. They were quoted wrongly once already, from a
+ *  per-cell average that answers a different question.
+ *
+ *  THE WHOLE GRID IS WRITTEN, NOT THE PLAYABLE RECTANGLE, and the border is the reason:
+ *  a rectangle-only fit leaves the cells outside it at whatever height they were, which
+ *  is a step along all four edges of the map. Nothing plays there, so following the
+ *  terrain out is free and looks right from inside.
+ *
+ *  AND g_mapX..g_mapH IS NOT WRONG ABOUT THOSE MAPS. It reads one cell wider on every
+ *  side than the [Map] X/Y/Width/Height in the file, and that is the brain's own doing
+ *  rather than a disagreement to work around: CNCMapDataStruct keeps the file's own
+ *  rectangle in OriginalMapCell* and widens MapCell* by a cell in each direction before
+ *  handing it over (dllinterface.cpp, GAME_STATE_STATIC_MAP). A map declaring 1,1 62x62
+ *  therefore arrives as 0,0 64x64, exactly as one declaring 36,39 26x23 arrives as
+ *  35,38 28x25. Every other "outside the playable area" test in this file measures
+ *  against the grown one for the same reason.
+ * ---------------------------------------------------------------------------------- */
+
+/* THE COMPASS. One high side per SLOPE template, in grid axes: dy is POSITIVE SOUTH.
+   Four straight edges of seven variants each and ten corner pieces, which is how
+   Westwood organised the 1995 cliff art. */
+struct AhCompass { signed char dx, dy; };
+static const AhCompass AH_COMPASS[AH_SLOPE_N] = {
+    { 0,-1},{ 0,-1},{ 0,-1},{ 0,-1},{ 0,-1},{ 0,-1},{ 0,-1},   /* S01..S07  north */
+    { 1, 0},{ 1, 0},{ 1, 0},{ 1, 0},{ 1, 0},{ 1, 0},{ 1, 0},   /* S08..S14  east  */
+    { 0, 1},{ 0, 1},{ 0, 1},{ 0, 1},{ 0, 1},{ 0, 1},{ 0, 1},   /* S15..S21  south */
+    {-1, 0},{-1, 0},{-1, 0},{-1, 0},{-1, 0},{-1, 0},{-1, 0},   /* S22..S28  west  */
+    { 1,-1},                                                   /* S29  north-east */
+    { 1, 1},                                                   /* S30  south-east */
+    {-1, 1},                                                   /* S31  south-west */
+    {-1,-1},                                                   /* S32  north-west */
+    {-1, 1},                                                   /* S33  south-west */
+    {-1,-1},                                                   /* S34  north-west */
+    { 1,-1},                                                   /* S35  north-east */
+    { 1, 1},                                                   /* S36  south-east */
+    { 1, 1},                                                   /* S37  south-east */
+    { 1,-1}                                                    /* S38  north-east */
+};
+
+/* WHY A CELL IS MARKED. The report is a picture of what the fit could not commit to,
+   and the three reasons are different problems, so they are different colours. */
+enum { AH_OK = 0, AH_DISAGREE = 1, AH_CLAMPED = 2, AH_ORPHAN = 3 };
+
+/* THE REPORT IS ONE COPY, and g_ah itself is declared with the rest of the panel state
+   because the panel draws it. The overlay draws these cells and the headless verb prints
+   these counts; neither recomputes anything, because a report that is counted twice is a
+   report that can disagree with itself -- and it did, on the second map, the first time
+   this was built with a count at each end. */
+static unsigned char g_ahMark[EDIT_GRID_MAX];
+
+/* THE REPORT DOES NOT OUTLIVE THE MAP IT DESCRIBES. Called from the undo funnel and
+   from the restore, which between them are every path that can move the ground: any
+   committed edit invalidates it, and so does undo, redo and revert. */
+static void ah_report_clear(void)
+{
+    /* THE ARM GOES TOO, and before the early return. An arm is a promise about the map
+       as it stands: carrying one across an edit, an undo or a map change would let the
+       next press replace relief the player was never warned about. */
+    g_ahArmed = false;
+    if (!g_ah.valid) return;
+    memset(&g_ah, 0, sizeof g_ah);
+    memset(g_ahMark, 0, sizeof g_ahMark);
+    fprintf(stderr, "edit: the auto heightmap report describes a map that has moved on; "
+                    "cleared\n");
+}
+
+/* HOW MANY CELLS THE OVERLAY HAS TO DRAW. One walk, over the grid stride the rest of
+   this file uses, and the ONLY place that number is produced. */
+static int ah_mark_count(void)
+{
+    if (!g_ah.valid) return 0;
+    int n = 0;
+    for (int cy = 0; cy < g_gridH; cy++)
+        for (int cx = 0; cx < g_gridW; cx++)
+            if (g_ahMark[cy * g_gridW + cx]) n++;
+    return n;
+}
+
+static inline bool ah_is_slope(int t)
+{
+    return t >= AH_SLOPE_FIRST && t <= AH_SLOPE_LAST;
+}
+
+struct AhPlace {
+    short ox, oy, w, h;
+    short tid;
+    signed char ux, uy;
+    int   pot;          /* level relative to its component's root  */
+    int   base;         /* absolute rung of its LOW side           */
+    int   parent;       /* weighted union-find                     */
+};
+static AhPlace g_ahPlace[AH_PLACE_MAX];
+static int     g_ahPlaceN = 0;
+
+/* Union-find with a potential: find() returns the root and fills *pot with this
+   placement's level relative to that root. Path compression rewrites the potential as
+   it goes, so the walk stays flat and the arithmetic stays exact. */
+static int ah_find(int a, int* pot)
+{
+    int r = a, sum = 0;
+    while (g_ahPlace[r].parent != r) { sum += g_ahPlace[r].pot; r = g_ahPlace[r].parent; }
+    int n = a, acc = sum;
+    while (g_ahPlace[n].parent != n) {
+        const int nxt  = g_ahPlace[n].parent;
+        const int mine = g_ahPlace[n].pot;
+        g_ahPlace[n].parent = r;
+        g_ahPlace[n].pot    = acc;
+        acc -= mine;
+        n = nxt;
+    }
+    *pot = (a == r) ? 0 : g_ahPlace[a].pot;
+    return r;
+}
+
+/* Which side of a placement a cell is on: 1 high, 0 low. The projection onto the
+   compass direction, from the placement's own centre, which is what makes a diagonal
+   piece read as a corner rather than as two edges. */
+static inline int ah_side_of(const AhPlace* p, int cx, int cy)
+{
+    const float dx = ((float)cx + 0.5f) - ((float)p->ox + (float)p->w * 0.5f);
+    const float dy = ((float)cy + 0.5f) - ((float)p->oy + (float)p->h * 0.5f);
+    return (dx * (float)p->ux + dy * (float)p->uy) > 0.0f ? 1 : 0;
+}
+
+/* Recover every SLOPE placement from the .BIN. An ORIGIN is a cell carrying icon 0 of a
+   slope template; the placement then claims the cells of its own w x h box that carry
+   that template and the icon that box position implies. A cell of slope art that no
+   origin claims is an ORPHAN -- half a template someone painted over -- and is reported
+   rather than guessed at. */
+static int ah_recover(short* own /* EDIT_GRID_MAX */, unsigned char* wall, int* orphans)
+{
+    g_ahPlaceN = 0;
+    *orphans = 0;
+    for (int i = 0; i < g_gridW * g_gridH; i++) { own[i] = -1; wall[i] = 0; }
+    for (int cy = 0; cy < g_gridH; cy++)
+        for (int cx = 0; cx < g_gridW; cx++)
+            if (ah_is_slope(g_editTmpl[cy * g_editBinW + cx]))
+                wall[cy * g_gridW + cx] = 1;
+
+    for (int cy = 0; cy < g_gridH && g_ahPlaceN < AH_PLACE_MAX; cy++)
+        for (int cx = 0; cx < g_gridW && g_ahPlaceN < AH_PLACE_MAX; cx++) {
+            const int t = g_editTmpl[cy * g_editBinW + cx];
+            if (!ah_is_slope(t) || g_editIcon[cy * g_editBinW + cx] != 0) continue;
+            const int tw = EDIT_TEMPLATES[t].w, th = EDIT_TEMPLATES[t].h;
+            AhPlace* p = &g_ahPlace[g_ahPlaceN];
+            p->ox = (short)cx; p->oy = (short)cy;
+            p->w = (short)tw;  p->h = (short)th;
+            p->tid = (short)t;
+            p->ux = AH_COMPASS[t - AH_SLOPE_FIRST].dx;
+            p->uy = AH_COMPASS[t - AH_SLOPE_FIRST].dy;
+            p->parent = g_ahPlaceN; p->pot = 0; p->base = AH_GROUND_RUNG;
+            int claimed = 0;
+            for (int dy = 0; dy < th; dy++)
+                for (int dx = 0; dx < tw; dx++) {
+                    const int x = cx + dx, y = cy + dy;
+                    if (x >= g_gridW || y >= g_gridH) continue;
+                    if (g_editTmpl[y * g_editBinW + x] != t) continue;
+                    if (g_editIcon[y * g_editBinW + x] != dy * tw + dx) continue;
+                    if (own[y * g_gridW + x] >= 0) continue;   /* first origin wins */
+                    own[y * g_gridW + x] = (short)g_ahPlaceN;
+                    claimed++;
+                }
+            if (claimed) g_ahPlaceN++;
+        }
+    for (int cy = 0; cy < g_gridH; cy++)
+        for (int cx = 0; cx < g_gridW; cx++)
+            if (wall[cy * g_gridW + cx] && own[cy * g_gridW + cx] < 0) (*orphans)++;
+    return g_ahPlaceN;
+}
+
+/* HOW MUCH RELIEF THIS MAP ALREADY HAS, counted over the whole corner grid, which is
+   what the fit writes. Zero means flat ground and the button may run straight away;
+   anything else is hand-authored relief the fit is about to replace, and it asks. */
+static int ah_relief_corners(void)
+{
+    if (g_pack.corner.empty()) return 0;
+    const int hw = g_gridW + 1;
+    int lo = 255, n = 0;
+    for (int gy = 0; gy <= g_gridH; gy++)
+        for (int gx = 0; gx <= g_gridW; gx++) {
+            const int v = g_pack.corner[gy * hw + gx];
+            if (v < lo) lo = v;
+        }
+    for (int gy = 0; gy <= g_gridH; gy++)
+        for (int gx = 0; gx <= g_gridW; gx++)
+            if (g_pack.corner[gy * hw + gx] != lo) n++;
+    return n;
+}
+
+/* A DIGEST OF EXACTLY THE CORNERS THE SEA USES, so the fit can say -- rather than claim
+   -- that it did not move one of them. Taken either side of the write, which is the only
+   place in this file that touches g_pack.corner: if the two agree, no corner any of whose
+   four cells is water changed, and that is the whole of the promise this feature makes to
+   the water. A sampled height at one hand-picked cell is not the same test and was not
+   enough: the first version of the gate read one lake cell that happened to sit where the
+   fit would have written the byte it already had, so pulling the water guard out left the
+   gate green while fifty-two other corners of sea moved. */
+static unsigned ah_wet_hash(void)
+{
+    unsigned h = 2166136261u;
+    const int hw = g_gridW + 1;
+    for (int gy = 0; gy <= g_gridH; gy++)
+        for (int gx = 0; gx <= g_gridW; gx++) {
+            if (!sbr_corner_wet(gx, gy)) continue;
+            h = (h ^ (unsigned)g_pack.corner[gy * hw + gx]) * 16777619u;
+            h = (h ^ (unsigned)(gy * hw + gx)) * 16777619u;
+        }
+    return h;
+}
+
+/* THE FIT. Returns the number of corners rewritten, or 0 with a reason in why. */
+static int ah_fit(char* why, int whyN)
+{
+    if (why && whyN > 0) why[0] = 0;
+    if (!g_editHaveBin || g_pack.corner.empty()) {
+        if (why) snprintf(why, whyN, "this map carries no heightmap to write into");
+        return 0;
+    }
+    static short         own[EDIT_GRID_MAX];
+    static unsigned char wall[EDIT_GRID_MAX];
+    static short         dist[EDIT_GRID_MAX];
+    static signed char   side[EDIT_GRID_MAX];
+    static short         lvl[EDIT_GRID_MAX];
+    static int           q[EDIT_GRID_MAX];
+    /* THE MARKS ARE BUILT HERE AND PUBLISHED AT THE END. edit_commit is the funnel that
+       clears the standing report, and this fit goes through it, so a fit that wrote its
+       marks straight into g_ahMark would have them wiped by its own commit and would
+       then publish a count of zero beside a disagreement count of eighty-six. That is
+       the same disease as counting the report twice, arriving by the other door. */
+    static unsigned char mk[EDIT_GRID_MAX];
+    /* The ground the fit decides on, in the rung tool's own units, and the two arrays
+       the ladder turns it into. Static for the same reason everything above is: a 128
+       map's corner grid is 16641 bytes and this is not a function to put on a stack. */
+    static unsigned char tier[ELEV_BLOCKS_MAX * ELEV_BLOCKS_MAX];
+    static unsigned char kk[ELEV_K_MAX * ELEV_K_MAX];
+    static unsigned char nh[C3D_CORN_MAX * C3D_CORN_MAX];
+
+    /* ONE STRIDE. The .BIN's rows and the world's rows are the same rows on every map
+       this editor loads today, and everything below indexes both with g_gridW. An XL
+       document re-indexed at its own width would make that false, so it is checked
+       rather than assumed: reading one grid at the other's stride would fit a heightmap
+       to art that is somewhere else. */
+    if (g_editBinW != g_gridW || g_editBinH != g_gridH) {
+        if (why) snprintf(why, whyN, "this map's cells are stored %dx%d and its world is "
+                          "%dx%d; the fit reads both at one stride and will not guess",
+                          g_editBinW, g_editBinH, g_gridW, g_gridH);
+        return 0;
+    }
+
+    int orphans = 0;
+    const int np = ah_recover(own, wall, &orphans);
+    if (np <= 0) {
+        if (why) snprintf(why, whyN, "this map has no cliff art on it, so there is no "
+                          "relief to read -- stamp some slope pieces first, or use the "
+                          "rung brush");
+        return 0;
+    }
+
+    /* THE TIER FIELD HAS TO EXIST BEFORE THE FIT CAN LEAVE PARTS OF IT ALONE. A block
+       the flood never reaches, and every block the sea touches, keeps the tier the map
+       already implies -- so seed it if the map has not been read yet. */
+    if (!g_elevSeeded) elev_seed();
+    /* AND THE LADDER COUNT HAS TO BE CURRENT, because the report carries it either side
+       and the whole safety claim is a comparison between those two numbers. */
+    sbr_recount_ladder();
+    const int offBefore = g_elevOffLadder;
+
+    /* 3. THE FLOOD. Every open cell takes the placement nearest it and the side of that
+       placement it lies on. Four-connected and breadth first, so "nearest" is the walk
+       a unit would take rather than a straight line through a cliff. WATER IS A BARRIER,
+       not open ground: the sea is not standing on a rung and asking it which side of a
+       cliff it is on has no answer. */
+    int head = 0, tail = 0;
+    for (int i = 0; i < g_gridW * g_gridH; i++) {
+        dist[i] = -1; side[i] = -1; lvl[i] = 0;
+        if (edit_cell_is_water(i % g_gridW, i / g_gridW)) wall[i] = 1;
+        if (own[i] >= 0) { dist[i] = 0; q[tail++] = i; }
+    }
+    while (head < tail) {
+        const int c = q[head++];
+        const int cx = c % g_gridW, cy = c / g_gridW;
+        static const int D[4][2] = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+        for (int k = 0; k < 4; k++) {
+            const int nx = cx + D[k][0], ny = cy + D[k][1];
+            if (nx < 0 || ny < 0 || nx >= g_gridW || ny >= g_gridH) continue;
+            const int n = ny * g_gridW + nx;
+            if (wall[n] || own[n] >= 0) continue;
+            own[n]  = own[c];
+            dist[n] = (short)(dist[c] + 1);
+            side[n] = (signed char)ah_side_of(&g_ahPlace[own[c]], nx, ny);
+            q[tail++] = n;
+        }
+    }
+
+    /* 4. THE LEVELS. Two adjacent open cells are the same height, whichever placements
+       own them, so every such pair is one equation. The first equation between two
+       components joins them; a later one that disagrees is two placements asking for
+       different ground in the same place, and BOTH cells are marked. */
+    memset(mk, 0, sizeof mk);
+    int disagree = 0;
+    for (int cy = 0; cy < g_gridH; cy++)
+        for (int cx = 0; cx < g_gridW; cx++) {
+            const int a = cy * g_gridW + cx;
+            if (wall[a] || own[a] < 0 || side[a] < 0) continue;
+            static const int D[2][2] = { {1,0}, {0,1} };
+            for (int k = 0; k < 2; k++) {
+                const int nx = cx + D[k][0], ny = cy + D[k][1];
+                if (nx >= g_gridW || ny >= g_gridH) continue;
+                const int b = ny * g_gridW + nx;
+                if (wall[b] || own[b] < 0 || side[b] < 0) continue;
+                if (own[a] == own[b]) continue;
+                int pa = 0, pb = 0;
+                const int ra = ah_find(own[a], &pa), rb = ah_find(own[b], &pb);
+                /* base[a] + side[a] == base[b] + side[b] */
+                const int want = (pa + side[a]) - (pb + side[b]);
+                if (ra != rb) {
+                    g_ahPlace[rb].parent = ra;
+                    g_ahPlace[rb].pot    = want;
+                } else if (want != 0) {
+                    if (!mk[a]) { mk[a] = AH_DISAGREE; disagree++; }
+                    if (!mk[b]) { mk[b] = AH_DISAGREE; disagree++; }
+                }
+            }
+        }
+
+    /* Each component is anchored on its own, because two components share no ground and
+       nothing relates them: the level most of its open cells want becomes GROUND. The
+       histogram is nine bins wide and saturates at its ends, which only matters for a
+       component asking for more than nine levels -- and everything past the fifth is
+       clamped and marked below anyway, so the saturation cannot hide anything. */
+    {
+        static int hist[AH_PLACE_MAX][9];
+        static int seen[AH_PLACE_MAX];
+        for (int i = 0; i < np; i++) { seen[i] = 0; for (int k = 0; k < 9; k++) hist[i][k] = 0; }
+        for (int i = 0; i < g_gridW * g_gridH; i++) {
+            if (wall[i] || own[i] < 0 || side[i] < 0) continue;
+            int pot = 0;
+            const int r = ah_find(own[i], &pot);
+            int v = pot + side[i] + 4;              /* biased so the index is >= 0 */
+            if (v < 0) v = 0; else if (v > 8) v = 8;
+            hist[r][v]++;
+            seen[r] = 1;
+        }
+        for (int r = 0; r < np; r++) {
+            if (!seen[r]) continue;
+            int bestk = 4, bestn = -1;
+            for (int k = 0; k < 9; k++)
+                if (hist[r][k] > bestn) { bestn = hist[r][k]; bestk = k; }
+            /* the winning level is (bestk - 4); shift the component so it reads GROUND */
+            g_ahPlace[r].base = AH_GROUND_RUNG - (bestk - 4);
+        }
+        for (int i = 0; i < np; i++) {
+            int pot = 0;
+            const int r = ah_find(i, &pot);
+            g_ahPlace[i].base = g_ahPlace[r].base + pot;
+        }
+    }
+
+    /* 5. THE RUNGS ARE FIVE AND THE MAP MAY WANT MORE. A placement whose low side is
+       already at the top has nowhere to put its high side, so it is clamped and its own
+       cells are marked: the fit declines to invent a sixth rung. */
+    int clamped = 0;
+    for (int i = 0; i < np; i++) {
+        int b = g_ahPlace[i].base;
+        if (b < 0) b = 0;
+        if (b > AH_TOP_RUNG - 1) b = AH_TOP_RUNG - 1;
+        if (b != g_ahPlace[i].base) {
+            g_ahPlace[i].base = b;
+            for (int cy = g_ahPlace[i].oy; cy < g_ahPlace[i].oy + g_ahPlace[i].h; cy++)
+                for (int cx = g_ahPlace[i].ox; cx < g_ahPlace[i].ox + g_ahPlace[i].w; cx++) {
+                    if (cx < 0 || cy < 0 || cx >= g_gridW || cy >= g_gridH) continue;
+                    if (own[cy * g_gridW + cx] != i) continue;
+                    if (!mk[cy * g_gridW + cx]) {
+                        mk[cy * g_gridW + cx] = AH_CLAMPED;
+                        clamped++;
+                    }
+                }
+        }
+    }
+    for (int i = 0; i < g_gridW * g_gridH; i++) {
+        if (wall[i] || own[i] < 0 || side[i] < 0) continue;
+        int v = g_ahPlace[own[i]].base + side[i];
+        if (v < 0 || v > AH_TOP_RUNG) {
+            if (v < 0) v = 0; else v = AH_TOP_RUNG;
+            if (!mk[i]) { mk[i] = AH_CLAMPED; clamped++; }
+        }
+        lvl[i] = (short)v;
+    }
+    /* Orphan cliff art gets its own mark: it contributes no height, so the corners
+       around it are carried by whatever else touches them. Water was turned into a wall
+       above and must not be reported as orphaned art, so the mark is only for cells that
+       really do carry a slope template. */
+    for (int i = 0; i < g_gridW * g_gridH; i++)
+        if (wall[i] && own[i] < 0 && !mk[i] &&
+            ah_is_slope(g_editTmpl[(i / g_gridW) * g_editBinW + (i % g_gridW)]))
+            mk[i] = AH_ORPHAN;
+
+    /* 6. THE TIER FIELD. One rung per 2x2 block, and it is the LOWEST thing standing in
+       that block -- the same reading elev_seed makes of a map's own corners, so the two
+       agree about what "the ground this block stands on" means. A cell of cliff art
+       counts as its placement's LOW side, which is the ground the art rises out of.
+       A block the flood never reached, and every block the sea touches, keeps the tier
+       the map already had. */
+    memcpy(tier, g_elevTier, sizeof tier);
+    for (int by = 0; by < elev_bh(); by++)
+        for (int bx = 0; bx < elev_bw(); bx++) {
+            int lo = -1;
+            bool wet = false;
+            for (int dy = 0; dy < 2 && !wet; dy++)
+                for (int dx = 0; dx < 2 && !wet; dx++) {
+                    const int cx = 2 * bx + dx, cy = 2 * by + dy;
+                    if (cx >= g_gridW || cy >= g_gridH) continue;
+                    if (edit_cell_is_water(cx, cy)) { wet = true; continue; }
+                    const int c = cy * g_gridW + cx;
+                    if (own[c] < 0) continue;               /* orphan art, or unreached */
+                    const int v = wall[c] ? g_ahPlace[own[c]].base : (int)lvl[c];
+                    if (lo < 0 || v < lo) lo = v;
+                }
+            if (wet || lo < 0) continue;
+            if (lo < 0) lo = 0;
+            if (lo > AH_TOP_RUNG) lo = AH_TOP_RUNG;
+            tier[by * elev_bw() + bx] = (unsigned char)lo;
+        }
+    elev_coarse(tier, kk);
+    elev_heights(kk, nh);
+
+    /* 7. THE BYTES. Every corner the sea does not use takes the ladder's own value for
+       it; every corner the sea does use is left exactly as it was found. That is the
+       whole of the safety property: what is written is on a rung, what is not written
+       has not moved, so the off-the-ladder count cannot rise. */
+    EditSnap before = edit_snapshot("auto heightmap");
+    const unsigned wetWas = ah_wet_hash();
+    const int hw = g_gridW + 1;
+    int wrote = 0, moved = 0, held = 0;
+    for (int gy = 0; gy <= g_gridH; gy++)
+        for (int gx = 0; gx <= g_gridW; gx++) {
+            const int i = gy * hw + gx;
+            if (sbr_corner_wet(gx, gy)) { held++; continue; }
+            const unsigned char v = nh[i];
+            if (g_pack.corner[i] != v) moved++;
+            g_pack.corner[i] = v;
+            wrote++;
+        }
+
+    const bool wetkept = (ah_wet_hash() == wetWas);
+
+    /* A FIT THAT MOVED NO BYTE IS NOT AN EDIT. Running it again on ground that already
+       agrees with its own cliff art rewrites every corner with the value already there,
+       and an undo entry for that is an undo entry that appears not to work -- while
+       claiming the heightmap had been touched would start writing a .HGT for a map that
+       never had one. The report is still published: it describes the map as it stands,
+       and standing still is an answer. */
+    if (moved) {
+        /* THE FOUR THINGS A WRITE INTO THE CORNERS OWES THE REST OF THE GAME. Without
+           the first the .HGT is never saved; without the second the shading still reads
+           flat on ground that has moved; without the third a height query under a
+           building answers off the stale building pad; without the last the radar keeps
+           the old relief. */
+        g_elevTouched  = true;
+        g_shadeReady   = false;
+        terrain_pads_rebuild();
+        g_euiRadarDirty = 1;
+
+        /* THE UNLOCK, AND IT IS INSIDE THE UNDO ENTRY -- the smooth brush's own
+           arrangement, for the same reason and by the same flag. The snapshot above
+           still carries the old value, so undoing this fit takes the ground AND the
+           unlock back together. It is NOT g_elevConverted: CONVERT is a separate,
+           deliberate, announced act with its own "it cannot be undone" contract, and a
+           fit that set it would put that act inside the undo stack by a side door. */
+        g_elevSmoothUnlock = true;
+
+        /* The tier field is a reading of the ground, so re-read it: the rung brush must
+           not go on deriving from a field that describes the map as it was. This also
+           refreshes the off-the-ladder count the panel prints. */
+        g_elevSeeded = false;
+        elev_seed();
+
+        edit_commit(before);      /* ONE undo step for the whole map, and it clears the
+                                     standing report on its way through */
+    } else {
+        sbr_recount_ladder();     /* nothing moved, but the readout still has to be true */
+    }
+
+    /* THE INVARIANT, COUNTED RATHER THAN ASSERTED. Every corner this fit wrote came out
+       of ELEV_RUNG, so the only playable corners that can still be off the ladder are the
+       ones it declined to write -- which is exactly the ones the sea uses. Anything else
+       is the fit having gone off the ladder, and that is the fault that locked the panel
+       the first time this feature was built. Counted on the SAME lattice elev_seed and
+       sbr_recount_ladder walk, because a count on a different denominator is a different
+       question. */
+    int stray = 0;
+    for (int by = 0; by < elev_bh(); by++)
+        for (int bx = 0; bx < elev_bw(); bx++) {
+            static const int DS[4][2] = { {0,0}, {2,0}, {0,2}, {2,2} };
+            for (int k = 0; k < 4; k++) {
+                const int gx = 2 * bx + DS[k][0], gy = 2 * by + DS[k][1];
+                if (gx > g_gridW || gy > g_gridH) continue;
+                if (gx < g_mapX || gx >= g_mapX + g_mapW ||
+                    gy < g_mapY || gy >= g_mapY + g_mapH) continue;
+                if (sbr_corner_wet(gx, gy)) continue;
+                const int b = g_pack.corner[gy * (g_gridW + 1) + gx];
+                int on = 0;
+                for (int r = 0; r < 5; r++) if (b == ELEV_RUNG[r]) on = 1;
+                if (!on) stray++;
+            }
+        }
+
+    memcpy(g_ahMark, mk, sizeof g_ahMark);
+    memset(&g_ah, 0, sizeof g_ah);
+    g_ah.valid     = true;
+    g_ah.places    = np;
+    g_ah.orphans   = orphans;
+    g_ah.wrote     = wrote;
+    g_ah.moved     = moved;
+    g_ah.held      = held;
+    g_ah.disagree  = disagree;
+    g_ah.clamped   = clamped;
+    g_ah.offBefore = offBefore;
+    g_ah.offAfter  = g_elevOffLadder;
+    g_ah.stray     = stray;
+    g_ah.wetkept   = wetkept;
+    g_ah.gridW     = g_gridW;
+    g_ah.gridH     = g_gridH;
+    g_ah.marked    = ah_mark_count();
+    fprintf(stderr, "edit: auto heightmap -- %d placements, %d corners written, %d moved,"
+            " %d held for water, %d cells marked (%d disagree, %d clamped, %d orphan"
+            " art); off the ladder %d -> %d, %d of them not the sea's; the sea's own"
+            " corners %s\n",
+            np, wrote, moved, held, g_ah.marked, disagree, clamped, orphans,
+            offBefore, g_ah.offAfter, stray, wetkept ? "did not move" : "MOVED");
+    return wrote;
+}
+
+/* THE BUTTON, AND IT ASKS BEFORE IT REPLACES. The fit rewrites every corner it can
+   reach, so on a map that already carries hand-authored relief it says how much it is
+   about to overwrite and waits to be asked again. On flat ground there is nothing to
+   lose and it runs at once.
+ *
+ * THERE IS NO LADDER CHECK HERE, DELIBERATELY. This is the control an unconverted map
+ * needs, and it is drawn on the conversion gate's own card for that reason; a version of
+ * it that answered "CONVERT THIS MAP first" answered with the one act that would destroy
+ * its own input. */
+static void ah_button(void)
+{
+    char why[220] = { 0 };
+    if (!g_editHaveBin || g_pack.corner.empty()) {
+        snprintf(g_elevWhy, sizeof g_elevWhy, "this map carries no heightmap to write "
+                 "into");
+        edit_toast(EUI_DANGER, "NO HEIGHTMAP", g_elevWhy);
+        return;
+    }
+    const bool armed = g_ahArmed && (g_editFrame - g_ahArmedAt) < AH_ARM_FRAMES;
+    const int relief = ah_relief_corners();
+    if (relief > 0 && !armed) {
+        char sub[220];
+        snprintf(sub, sizeof sub, "%d corners are not flat and this replaces all of "
+                 "them. Click again to fit the ground to the cliff art.", relief);
+        g_ahArmed = true;
+        g_ahArmedAt = g_editFrame;
+        snprintf(g_elevWhy, sizeof g_elevWhy, "%s", sub);
+        edit_toast(EUI_GOLD, "THIS REPLACES THE RELIEF", sub);
+        fprintf(stderr, "edit: auto heightmap armed -- %d corners of relief to replace\n",
+                relief);
+        return;
+    }
+    g_ahArmed = false;
+    if (ah_fit(why, sizeof why) > 0) {
+        char sub[220];
+        snprintf(sub, sizeof sub, "%d placements read, %d corners moved, %d left to the "
+                 "water, %d cells the fit would not commit to", g_ah.places, g_ah.moved,
+                 g_ah.held, g_ah.marked);
+        g_elevWhy[0] = 0;
+        edit_toast(g_ah.moved ? EUI_CYAN : EUI_DIM,
+                   g_ah.moved ? "HEIGHTMAP FITTED"
+                              : "THE GROUND ALREADY AGREES WITH THE ART", sub);
+        return;
+    }
+    snprintf(g_elevWhy, sizeof g_elevWhy, "%s",
+             why[0] ? why : "the fit did nothing and did not say why");
+    edit_toast(EUI_DANGER, "HEIGHTMAP NOT FITTED", g_elevWhy);
+}
+
+/* THE AUTO HEIGHTMAP'S REPORT, on the ground, in the ELEVATION panel's own mode.
+ *
+ * Three reasons, three colours, because they are three different problems: RED where
+ * two placements asked for different ground in the same place, AMBER where the fit ran
+ * out of rungs, GREY where a piece of cliff art has no template origin to read.
+ *
+ * IT DRAWS EXACTLY WHAT ah_mark_count COUNTED, and it counts what it draws so a gate can
+ * put the two numbers side by side. That is not belt and braces: the first build of this
+ * feature counted at the fit and counted again in the drawer, and the two answers parted
+ * company on the second map because they walked different rectangles at different
+ * strides. One array, one stride, one walk. */
+static void eui_draw_ahmark(int fbw, int fbh)
+{
+    if (!g_editOn || g_editMode != 2 || !g_ah.valid) return;
+    if (g_ah.gridW != g_gridW || g_ah.gridH != g_gridH) return;
+
+    begin_overlay(fbw, fbh);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    int drawn = 0;
+    for (int cy = 0; cy < g_gridH; cy++)
+        for (int cx = 0; cx < g_gridW; cx++) {
+            const int m = g_ahMark[cy * g_gridW + cx];
+            if (!m) continue;
+            drawn++;
+            if (m == AH_DISAGREE)     glColor4f(0.78f, 0.16f, 0.12f, 0.30f);
+            else if (m == AH_CLAMPED) glColor4f(0.88f, 0.66f, 0.16f, 0.28f);
+            else                      glColor4f(0.62f, 0.64f, 0.68f, 0.24f);
+            glBegin(GL_TRIANGLES);
+            sb_place_cell_tris(cx, cy, fbw, fbh);
+            glEnd();
+        }
+    glDisable(GL_BLEND);
+    end_overlay();
+    {   /* Said when it changes, not per frame -- the same rule the no-go overlay keeps.
+           A gate reads this line against the verb's own count. */
+        static int told = -1;
+        if (told != drawn) {
+            told = drawn;
+            fprintf(stderr, "AHOVERLAY|drawn=%d|report=%d|grid=%dx%d\n",
+                    drawn, g_ah.marked, g_gridW, g_gridH);
+        }
+    }
+}
+
 /* ------------------------------------------------------------------------------------
  *  The ELEVATION STROKE: hold the button and drag, exactly like the terrain stroke.
  *  Elevation was click-per-block -- "this makes it hard to paint connected terrain" --
@@ -8289,6 +11524,424 @@ static void elev_stroke_end(void)
 }
 
 
+/* ------------------------------------------------------------------------------------
+ *  THE SMOOTH BRUSH
+ *
+ *  The second elevation tool. It writes g_pack.corner directly, one raw byte a corner,
+ *  and it dresses nothing: no tier, no mask, no cliff art. The rung tool is untouched --
+ *  elev_paint, elev_write, elev_heights and elev_refusal are not called from here and
+ *  not modified by it.
+ *
+ *  THE DOSE, which is what makes a stroke a pure function of how long it was held.
+ *  Every corner under the brush accumulates a DOSE -- weight x time x strength -- and
+ *  its byte is then a function of the byte it had when the stroke began and that dose.
+ *  Nothing is read back and re-written, so the arithmetic cannot drift with the number
+ *  of steps, and ERASE composes exactly:
+ *
+ *      raise   v = base + SBR_RAISE_RATE * dose
+ *      lower   v = base - SBR_RAISE_RATE * dose
+ *      erase   v = D + (base - D) * max(0, 1 - SBR_ERASE_K * dose)
+ *
+ *  D IS THE MAP'S OWN GROUND DATUM AND NOT A CONSTANT -- see sbr_flat_byte. It is the
+ *  byte load_pack re-zeroed the world on, so a corner at D draws at world y 0.000. On a
+ *  corner already at D the formula is exactly D at every dose, which is what makes ERASE
+ *  a no-op on ground nobody has touched. It does not go through a tier: the ladder is
+ *  0/64/128/191/255 with ties down, a round trip through it loses up to 32 units a
+ *  corner, and on SCG01EA the datum (90) is not on the ladder at all.
+ *
+ *  AND THE INTEGRATION IS AT A FIXED TIMESTEP. The frame hands over its dt; this banks
+ *  it and consumes whole 1/SBR_TICK_HZ ticks. The tick count over a held stroke depends
+ *  on the time held, not on the frame rate, so the same stroke fed 25 ms frames and 5 ms
+ *  frames produces the same bytes -- which G151 measures rather than asserts.
+ *
+ *  WATER IS REFUSED, NOT DRAWN THROUGH. The water surface is built from the terrain's
+ *  own corners, so raising a corner the sea touches lifts the sea into a hill. A corner
+ *  any of whose four cells is water is skipped, and the refusal is SAID once a stroke
+ *  rather than being a stroke that quietly does nothing.
+ * ---------------------------------------------------------------------------------- */
+
+static bool          g_sbrOn = false;
+static EditSnap      g_sbrBefore;
+static double        g_sbrHeld = 0.0;        /* how long the button has been down     */
+static int           g_sbrCX = 0, g_sbrCY = 0;   /* the cell the pointer is over      */
+static bool          g_sbrMoved = false;     /* did any byte actually change?         */
+static bool          g_sbrSaidWet = false;   /* the water refusal is said once        */
+static int           g_sbrWet = 0, g_sbrFoot = 0;
+static int           g_sbrTicks = 0;
+/* THE FRAME LOOP'S CLOCK, banked between pumps -- see sbr_frame, which is the only
+   thing that reads or writes either of them. */
+static unsigned      g_sbrLastMs = 0;
+static bool          g_sbrHaveMs = false;
+static int           g_sbrLoX, g_sbrLoY, g_sbrHiX, g_sbrHiY;   /* corners touched     */
+static unsigned char g_sbrBase[C3D_CORN_MAX * C3D_CORN_MAX];
+static float         g_sbrDose[C3D_CORN_MAX * C3D_CORN_MAX];
+
+/* Is a corner one the sea uses? The corner belongs to up to four cells and the water
+   surface is drawn from the same lattice, so ANY water neighbour disqualifies it. */
+static bool sbr_corner_wet(int gx, int gy)
+{
+    for (int dy = -1; dy <= 0; dy++)
+        for (int dx = -1; dx <= 0; dx++) {
+            const int cx = gx + dx, cy = gy + dy;
+            if (cx < 0 || cy < 0 || cx >= g_gridW || cy >= g_gridH) continue;
+            if (edit_land_at(cx, cy) == EDIT_LAND_WATER) return true;
+        }
+    return false;
+}
+
+/* THE MAP'S OWN GROUND DATUM, as a raw corner byte. See the note beside the declaration
+   up with the rest of the tuning: load_pack re-zeroes the world on the median corner of
+   the PLAYABLE RECT and keeps that level in g_terrainBase (world units, 1 unit = 64
+   bytes), so this is the byte whose drawn height is exactly 0.000 on this map. A map the
+   editor made carries 1.0 there, which is the byte 64, so a user map keeps the answer it
+   always had.
+
+   NO HEIGHTMAP, NO QUESTION: a pre-PK9 pack has no corners for the brush to write and
+   g_terrainBase is left at 0, which is a level and not an answer -- so the rung the
+   ladder calls ground is returned instead of a spurious byte 0. */
+static unsigned char sbr_flat_byte(void)
+{
+    if (g_pack.corner.empty()) return ELEV_RUNG[1];
+    long r = lrintf(g_terrainBase * 64.0f);
+    if (r < 0)   r = 0;
+    if (r > 255) r = 255;
+    return (unsigned char)r;
+}
+
+/* The brush's profile: 1 inside the centre, a smoothstep down to 0 across the falloff.
+   Distances are in CELLS, on the corner lattice, measured from the centre of the cell
+   the pointer is over. */
+static float sbr_weight(int gx, int gy, float ccx, float ccy)
+{
+    const float size = g_sbrVal[0], fall = g_sbrVal[1];
+    const float dx = (float)gx - ccx, dy = (float)gy - ccy;
+    const float d = sqrtf(dx * dx + dy * dy);
+    if (d <= size) return 1.0f;
+    if (d >= size + fall) return 0.0f;
+    const float t = (d - size) / fall;
+    return 1.0f - t * t * (3.0f - 2.0f * t);
+}
+
+/* One corner's byte, from the byte it had when the stroke began and the dose it has
+   taken since. A pure function, which is the whole reason the stroke is reproducible. */
+static unsigned char sbr_value(unsigned char base, float dose)
+{
+    float v;
+    if (g_sbrTool == 2) {
+        const float flat = (float)sbr_flat_byte();
+        float k = 1.0f - SBR_ERASE_K * dose;   /* clamped: it ARRIVES, and then stops */
+        if (k < 0.0f) k = 0.0f;
+        v = flat + ((float)base - flat) * k;
+    }
+    else if (g_sbrTool == 1)
+        v = (float)base - SBR_RAISE_RATE * dose;
+    else
+        v = (float)base + SBR_RAISE_RATE * dose;
+    const long r = lrintf(v);
+    return (unsigned char)(r < 0 ? 0 : r > 255 ? 255 : r);
+}
+
+/* The tier field the RUNG tool derives from, brought back into agreement with the
+   corners this stroke moved. Same rule elev_seed uses -- a block's tier is the LOWEST
+   of its four outer corners -- applied only to the blocks the stroke reached, so the
+   rest of the map keeps whatever it had. elev_seed itself is not called: it would wipe
+   the GRADED PASS and RAMP fields, which this stroke has no business touching. */
+static void sbr_reseed_tiers(void)
+{
+    if (g_pack.corner.empty()) return;
+    const int hw = g_gridW + 1;
+    int bx0 = (g_sbrLoX - 1) / 2, bx1 = g_sbrHiX / 2;
+    int by0 = (g_sbrLoY - 1) / 2, by1 = g_sbrHiY / 2;
+    if (bx0 < 0) bx0 = 0;
+    if (by0 < 0) by0 = 0;
+    if (bx1 > elev_bw() - 1) bx1 = elev_bw() - 1;
+    if (by1 > elev_bh() - 1) by1 = elev_bh() - 1;
+    for (int by = by0; by <= by1; by++)
+        for (int bx = bx0; bx <= bx1; bx++) {
+            int lo = 4;
+            static const int D[4][2] = { {0,0}, {2,0}, {0,2}, {2,2} };
+            for (int k = 0; k < 4; k++) {
+                const int gx = 2 * bx + D[k][0], gy = 2 * by + D[k][1];
+                if (gx > g_gridW || gy > g_gridH) continue;
+                const int t = elev_tier_of(g_pack.corner[gy * hw + gx]);
+                if (t < lo) lo = t;
+            }
+            g_elevTier[by * elev_bw() + bx] = (unsigned char)lo;
+        }
+}
+
+/* How much of the playable rect is off the ladder NOW. elev_seed prints this and also
+   rebuilds three fields; this only counts, so the status card can stay honest after a
+   stroke that deliberately put corners between the rungs.
+   THE SAME WALK elev_seed MAKES, deliberately: it counts a block's four outer corners,
+   which double-counts the ones two blocks share and skips the odd rows entirely. That
+   is a peculiar denominator, but it is the denominator the panel has always printed --
+   "332 of 728" -- and a recount on a different one turns a number that was going down
+   into a number that changed shape. One walk, in two places, and a gate that reads the
+   readout before and after can compare them. */
+static void sbr_recount_ladder(void)
+{
+    if (g_pack.corner.empty()) return;
+    int off = 0, tot = 0;
+    for (int by = 0; by < elev_bh(); by++)
+        for (int bx = 0; bx < elev_bw(); bx++) {
+            static const int D[4][2] = { {0,0}, {2,0}, {0,2}, {2,2} };
+            for (int k = 0; k < 4; k++) {
+                const int gx = 2 * bx + D[k][0], gy = 2 * by + D[k][1];
+                if (gx > g_gridW || gy > g_gridH) continue;
+                if (gx < g_mapX || gx >= g_mapX + g_mapW ||
+                    gy < g_mapY || gy >= g_mapY + g_mapH) continue;
+                const int b = g_pack.corner[gy * (g_gridW + 1) + gx];
+                int on = 0;
+                for (int r = 0; r < 5; r++) if (b == ELEV_RUNG[r]) on = 1;
+                tot++;
+                if (!on) off++;
+            }
+        }
+    g_elevOffLadder = off;
+    g_elevTotal = tot;
+}
+
+/* ONE FIXED TICK. Adds this tick's dose to every corner under the brush and rewrites
+   the bytes that changed. */
+static void sbr_tick(void)
+{
+    if (g_pack.corner.empty()) return;
+    const int hw = g_gridW + 1;
+    const float dt = 1.0f / SBR_TICK_HZ;
+    const float str = g_sbrVal[2];
+    /* PER TICK, NOT CUMULATIVE. These two describe the footprint the brush is standing
+       on right now, which is the thing the refusal has to talk about; summed over a
+       held stroke they would report a hundred and twenty times the number of corners
+       the map has. */
+    g_sbrWet = g_sbrFoot = 0;
+    const float reach = g_sbrVal[0] + g_sbrVal[1];
+    const float ccx = (float)g_sbrCX + 0.5f, ccy = (float)g_sbrCY + 0.5f;
+    int g0x = (int)floorf(ccx - reach), g1x = (int)ceilf(ccx + reach);
+    int g0y = (int)floorf(ccy - reach), g1y = (int)ceilf(ccy + reach);
+    if (g0x < 0) g0x = 0;
+    if (g0y < 0) g0y = 0;
+    if (g1x > g_gridW) g1x = g_gridW;
+    if (g1y > g_gridH) g1y = g_gridH;
+    for (int gy = g0y; gy <= g1y; gy++)
+        for (int gx = g0x; gx <= g1x; gx++) {
+            const float w = sbr_weight(gx, gy, ccx, ccy);
+            if (w <= 0.0f) continue;
+            g_sbrFoot++;
+            /* THE SEA REUSES THESE CORNERS. Skipped, and counted so the stroke can say
+               so once at the end instead of appearing to do nothing. */
+            if (sbr_corner_wet(gx, gy)) { g_sbrWet++; continue; }
+            const int i = gy * hw + gx;
+            float d = g_sbrDose[i] + w * dt * str;
+            if (d > SBR_MAX_DOSE) d = SBR_MAX_DOSE;
+            g_sbrDose[i] = d;
+            const unsigned char v = sbr_value(g_sbrBase[i], d);
+            if (v == g_pack.corner[i]) continue;
+            g_pack.corner[i] = v;
+            g_sbrMoved = true;
+            if (gx < g_sbrLoX) g_sbrLoX = gx;
+            if (gy < g_sbrLoY) g_sbrLoY = gy;
+            if (gx > g_sbrHiX) g_sbrHiX = gx;
+            if (gy > g_sbrHiY) g_sbrHiY = gy;
+        }
+    g_sbrTicks++;
+}
+
+static void sbr_stroke_begin(int cx, int cy)
+{
+    if (g_pack.corner.empty() || !g_editHaveBin) return;
+    if (!g_elevSeeded) elev_seed();
+    const size_t n = (size_t)(g_gridW + 1) * (size_t)(g_gridH + 1);
+    if (g_pack.corner.size() < n) return;
+    /* THE SNAPSHOT IS TAKEN NOW AND COMMITTED ONLY IF SOMETHING MOVES. It carries the
+       unlock flag as it stands BEFORE this stroke, which is what makes undo put a
+       newly unlocked map back where it was. */
+    g_sbrBefore = edit_snapshot("smooth brush");
+    memcpy(g_sbrBase, &g_pack.corner[0], n);
+    memset(g_sbrDose, 0, n * sizeof g_sbrDose[0]);
+    g_sbrOn = true;
+    /* THE CLOCK LATCH GOES WITH IT: the first pump of this stroke reads the clock and
+       charges nothing, so the gap since the pump last ran is not billed to the press. */
+    g_sbrHaveMs = false;
+    g_sbrHeld = 0.0;
+    g_sbrMoved = false;
+    g_sbrSaidWet = false;
+    g_sbrWet = g_sbrFoot = g_sbrTicks = 0;
+    g_sbrLoX = g_sbrLoY = 1 << 20;
+    g_sbrHiX = g_sbrHiY = -1;
+    g_sbrCX = cx; g_sbrCY = cy;
+    g_sbrWhy[0] = 0;
+    /* THE FIRST TICK IS NOT FREE. A click that is released inside one tick has to be a
+       click that did something, or the tool feels broken at speed; and it still cannot
+       unlock anything unless a byte moved, which is the point of the whole arrangement. */
+    sbr_tick();
+}
+
+static void sbr_stroke_hover(int cx, int cy)
+{
+    if (!g_sbrOn) return;
+    g_sbrCX = cx; g_sbrCY = cy;
+}
+
+/* THE PUMP. Called once a frame with the frame's own dt; consumes whole ticks. */
+static void sbr_stroke_frame(float dt)
+{
+    if (!g_sbrOn) return;
+    if (dt < 0.0f) dt = 0.0f;
+    g_sbrHeld += (double)dt;
+    /* HOW MANY TICKS THIS STROKE SHOULD HAVE APPLIED BY NOW, from the TOTAL time held,
+       and rounded to nearest rather than accumulated by subtraction. Banking the
+       remainder and subtracting a tick at a time looks equivalent and is not: the
+       leftover is a float that drifts, and a stroke held for exactly one second came
+       out one tick short of a whole second because the drift landed a hair below the
+       threshold. Rounding a total puts the nearest boundary half a tick away -- four
+       milliseconds -- which is six orders of magnitude past anything the arithmetic
+       can accumulate, so the tick count is a function of the time held and nothing
+       else. The +1 is the press itself: the button going down is tick zero. */
+    const int want = 1 + (int)(g_sbrHeld * (double)SBR_TICK_HZ + 0.5);
+    int guard = 0;
+    while (g_sbrTicks < want && guard++ < 4096) sbr_tick();
+    /* THE SHADING IS THE WHOLE VISUAL READ OF THIS TOOL, so it is rebuilt while the
+       stroke is still running rather than at the end. terrain_shade_calc reads the RAW
+       corners, so clearing the flag is all it takes; leaving it set is why raising
+       ground could leave every cell at the flat value of 0.627 and look like nothing
+       had happened. The PADS are not rebuilt here -- that is a stroke-end job, see
+       sbr_stroke_end -- because it walks the object list and prints when it changes. */
+    if (g_sbrMoved) g_shadeReady = false;
+}
+
+static void sbr_stroke_end(void)
+{
+    if (!g_sbrOn) return;
+    g_sbrOn = false;
+    if (!g_sbrMoved) {
+        /* NOTHING MOVED, SO NOTHING HAPPENED. No undo entry, no unlock, no dirty flag,
+           no .HGT. A click that changes no byte and still converts the map -- with no
+           undo entry to put it back -- is the exact defect this arm exists to refuse. */
+        if (g_sbrWet > 0 && !g_sbrSaidWet) {
+            snprintf(g_sbrWhy, sizeof g_sbrWhy,
+                     "the sea reuses the ground's own corners, so the brush will not "
+                     "write a water cell -- painting here would lift the water into a "
+                     "hill");
+            edit_toast(EUI_GOLD, "SMOOTH BRUSH REFUSED", g_sbrWhy);
+            g_sbrSaidWet = true;
+        }
+        g_sbrBefore.objects.clear();
+        g_sbrBefore.tmpl.clear();
+        g_sbrBefore.icon.clear();
+        g_sbrBefore.corner.clear();
+        return;
+    }
+    /* The rung tool derives from a tier field; bring the blocks this stroke reached back
+       into agreement with the ground, so the two tools do share one map. */
+    sbr_reseed_tiers();
+    sbr_recount_ladder();
+    /* WITHOUT THIS THE STROKE IS NEVER SAVED. edit_write_hgt returns early unless the
+       elevation has been touched, so a save after a stroke wrote the same .HGT it had
+       and said nothing at all. */
+    g_elevTouched = true;
+    g_shadeReady = false;
+    /* AND WITHOUT THIS THE GROUND UNDER A BUILDING DOES NOT MOVE. Every height query
+       goes through corner_raw, which prefers the building pad to the map's own corner,
+       and the pad is rebuilt only from a brain dump. Raising the block under a
+       Construction Yard wrote corner 128 and the height query still read 0.0000. */
+    terrain_pads_rebuild();
+    /* THE UNLOCK, AND IT IS INSIDE THE UNDO ENTRY. It is set only now, only because a
+       byte actually moved, and the snapshot taken at stroke begin still carries the old
+       value -- so undoing this stroke takes the heights AND the unlock back together. */
+    g_elevSmoothUnlock = true;
+    if (g_sbrWet > 0 && !g_sbrSaidWet) {
+        snprintf(g_sbrWhy, sizeof g_sbrWhy,
+                 "%d corner%s under the brush belong to water and were left alone -- "
+                 "the sea reuses the ground's own corners", g_sbrWet,
+                 g_sbrWet == 1 ? "" : "s");
+        edit_toast(EUI_GOLD, "SMOOTH BRUSH KEPT OFF THE WATER", g_sbrWhy);
+        g_sbrSaidWet = true;
+    }
+    edit_commit(g_sbrBefore);
+    g_euiRadarDirty = 1;
+    fprintf(stderr, "edit: smooth stroke -- tool %s, %d ticks, corners %d..%d x %d..%d, "
+            "%d of %d footprint samples were water\n", SBR_TOOL_NAME[g_sbrTool],
+            g_sbrTicks, g_sbrLoX, g_sbrHiX, g_sbrLoY, g_sbrHiY, g_sbrWet, g_sbrFoot);
+}
+
+/* IS THE STROKE THE BRUSH IS RUNNING STILL BEING HELD?
+ *
+ * THE DEFECT THIS ANSWERS. sbr_stroke_end had exactly one non-headless caller, the
+ * LEFT-button-up arm of the event loop, while the pump below runs every frame with no
+ * condition on it at all. A release is not guaranteed to arrive there: the window can
+ * lose focus with the button down and the release lands in whatever took the focus; a
+ * dialog can open over the map; the panel's mode or its page can change under the
+ * pointer; the editor can be switched off, or PLAY can reboot the world. Every one of
+ * those left a stroke integrating for ever -- dose climbing to SBR_MAX_DOSE, ground
+ * still moving, no undo entry filed and the unlock never decided.
+ *
+ * SO THE PUMP CLOSES IT. The pump is the one thing that runs in every one of those
+ * states, and this is everything that has to still be true for the stroke to go on:
+ *
+ *   the editor is up                 g_editOn
+ *   its ELEVATION panel is showing   g_editMode == 2
+ *   on the SMOOTH page               g_sbrPage == 1
+ *   with no dialog over the map      edit_modal_up()
+ *   this window has the keyboard     SDL_GetKeyboardFocus(), which is NULL the
+ *                                    moment the window is not the focused one
+ *   and the left button is down      SDL_GetMouseState
+ *
+ * The last two are what focus loss and a swallowed release look like from inside the
+ * loop, and they need no window handle, which is why they can be asked here. */
+static bool sbr_stroke_still_held(void)
+{
+    if (!g_sbrOn) return true;              /* nothing to abandon */
+    if (!g_editOn || g_editMode != 2 || g_sbrPage != 1) return false;
+    if (edit_modal_up()) return false;
+    if (SDL_GetKeyboardFocus() == NULL) return false;
+    return (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
+}
+
+/* THE FRAME LOOP'S ONLY DOOR INTO THE BRUSH, AND IT TAKES A CLOCK READING.
+ *
+ * THE DEFECT THIS CLOSES, and it is the one that made the framerate gate blind. The loop
+ * computes one dt, clamps it -- "a stall must not teleport the camera" -- and used to
+ * hand that same clamped dt to the brush. A frame longer than the camera's ceiling then
+ * contributed the ceiling and not the time it took, so a held stroke was a function of
+ * the frame rate again, which is the single property the fixed-tick integration exists
+ * to guarantee. The gate could not see it because the headless verb called the pump
+ * directly, below the clamp: it measured a path no player takes.
+ *
+ * So the loop hands over the CLOCK and not a delta. There is no dt at the call site for
+ * a clamp to touch, the delta is worked out here, and the headless verb drives THIS
+ * function with simulated stamps -- the same journey, one function, one gate.
+ *
+ * THE FIRST CALL OF A STROKE CONTRIBUTES NOTHING. sbr_stroke_begin drops the latch, so
+ * the first pump after the press only reads the clock; without that the stroke would be
+ * charged for the whole gap since the last time the pump ran, which on a press that
+ * follows a long pause is not time the button was down. The press itself is already a
+ * tick -- see sbr_stroke_frame. */
+static void sbr_frame(unsigned nowMs, bool stillHeld)
+{
+    if (g_sbrOn && !stillHeld) { sbr_stroke_end(); return; }
+    if (!g_sbrHaveMs) { g_sbrLastMs = nowMs; g_sbrHaveMs = true; }
+    const unsigned d = (nowMs > g_sbrLastMs) ? (nowMs - g_sbrLastMs) : 0u;
+    g_sbrLastMs = nowMs;
+    sbr_stroke_frame((float)d / 1000.0f);
+}
+
+/* A cheap order-sensitive digest of the whole corner array, for the gates: two strokes
+   that are supposed to produce the same ground can be compared in one line without
+   saving anything to disk. FNV-1a, 32 bits. */
+static unsigned sbr_corner_hash(void)
+{
+    unsigned h = 2166136261u;
+    const size_t n = (size_t)(g_gridW + 1) * (size_t)(g_gridH + 1);
+    if (g_pack.corner.size() < n) return 0u;
+    for (size_t i = 0; i < n; i++) {
+        h ^= (unsigned)g_pack.corner[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+
 /* The waypoint mutators live here rather than with the rest of the waypoint code:
    they take an undo snapshot, and the snapshot has to exist first. */
 static void edit_place_waypoint(int i, int cx, int cy)
@@ -8322,7 +11975,7 @@ static void edit_clear_waypoint(int i)
  *  horizon is off the top of the screen and there is never anything to see above it.
  *
  *  The editor's free camera can look level. Then most of the window is the clear colour,
- *  and the report of it was exactly right: "the map turns black". Measured before
+ *  and the project owner's report of it was exactly right: "the map turns black". Measured before
  *  this: 81% of the view at pitch 20.
  *
  *  So the editor draws a ground-to-sky gradient behind the world. It is deliberately
@@ -8330,9 +11983,92 @@ static void edit_clear_waypoint(int i)
  *  past the edge of the map" instead of saying nothing at all.
  * ---------------------------------------------------------------------------------- */
 
+/* ------------------------------------------------------------------------------------
+ *  OWNERSHIP COLOURS, THROUGH THE GAME'S OWN LIVERIES
+ *
+ *  The renderer recolours a model by house: a seat's PlayerColorType picks a livery slot,
+ *  the slot picks a texture sheet, and the sheets past the cartridge's own two are built
+ *  out of the two decodes every pack already carries. That join is made by asking the
+ *  brain which seat took which house, which is a question only a running skirmish can
+ *  answer -- so in the editor the join was empty, and every owner that was not GDI fell
+ *  through to the one base texture. Twelve houses, one grey army, and no way to see whose
+ *  anything was. The selection box and the radar blip went the same way, because they read
+ *  the same lookup.
+ *
+ *  A map being AUTHORED has no lobby and no seats, but a house still has a colour of its
+ *  own: the RemapColor its HouseTypeClass declares. That is what goes in, into the SAME
+ *  table the skirmish path fills, so nothing downstream is touched or duplicated.
+ *
+ *  ONLY THE MULTIPLAYER SEATS. GoodGuy, Neutral and Special all declare gold and BadGuy
+ *  light blue, but the cartridge does not paint them that way: it carries two house
+ *  texture sets and gives the sand one to GDI alone, so a civilian building is blue-grey
+ *  on the console. Resolving those four here would turn every neutral building gold and
+ *  disagree with the game the map is being made for. They keep the two-livery answer they
+ *  already fall through to.
+ * ---------------------------------------------------------------------------------- */
+
+/* PlayerColorType per multiplayer house, in HousesType order from Multi1: light blue,
+   orange, green, blue, gold, red, grey, brown. Read off the house table the brain
+   compiles, not chosen here. Written to eight because the house table is; the count is
+   still EDIT_MAX_PLAYERS and the static assert beside it keeps the two in step. */
+static const signed char EUI_HOUSE_LIVERY[8] = { 1, 4, 3, 5, 0, 2, 6, 7 };
+
+/* Is this colour's sheet already in the pack that is loaded NOW? Asked of the pack rather
+   than remembered in a flag: New Map onto another theater reboots onto a different pack
+   and frees every extra sheet with it, so a remembered "already built" would be a promise
+   about textures that no longer exist. The two colours that map to a slot below 2 are the
+   sheets the pack ships, and there is nothing to build for them. */
+static bool edit_livery_built(int colour)
+{
+    const int slot = livery_slot(colour);
+    if (slot < 2) return true;
+    for (size_t i = 0; i < g_pack.tex.size(); i++)
+        if (g_pack.tex[i].gl_extra[slot - 2]) return true;
+    return false;
+}
+
+/* WHAT THIS MAP NEEDS TO BE ABLE TO SHOW: every multiplayer house standing on it, plus
+   the one the chip strip is armed for, so the colour is right the moment the first object
+   of it goes down. NOT every house the strip offers: a sheet costs about 0.18 MB on the
+   card and the Windows half has to fit inside a Voodoo 2's texture memory, so an author
+   pays for the colours the map actually uses and a mission map pays nothing at all. */
+static void edit_livery_sync(void)
+{
+    if (!g_editOn || !g_teamColours) return;
+
+    unsigned want = 0;
+    if (g_editOwner >= 4 && g_editOwner < EUI_HOUSE_N) want |= 1u << g_editOwner;
+    for (size_t i = 0; i < g_objects.size(); i++) {
+        const int h = eui_house_index(g_objects[i].house);
+        if (h >= 4 && h < EUI_HOUSE_N) want |= 1u << h;
+    }
+    if (!want) return;              /* a mission map: nothing to resolve, nothing to build */
+
+    /* The houses, every frame. A handful of small writes, and it is what makes the colour
+       right on the FIRST frame a map is open, including a one-frame screenshot run. */
+    for (int h = 4; h < EUI_HOUSE_N; h++)
+        if (want & (1u << h)) g_liveryOf[EUI_HOUSES[h].key] = EUI_HOUSE_LIVERY[h - 4];
+
+    /* The sheets, only for a colour that is actually absent. The builder decides what to
+       make by reading this same table, and making one twice would strand the first set of
+       textures, so it is handed exactly the houses whose colour is missing and the full
+       table is put back afterwards. */
+    std::map<std::string, int> full = g_liveryOf;
+    g_liveryOf.clear();
+    for (std::map<std::string, int>::const_iterator it = full.begin();
+         it != full.end(); ++it)
+        if (!edit_livery_built(it->second)) g_liveryOf[it->first] = it->second;
+    if (!g_liveryOf.empty()) livery_build();
+    g_liveryOf = full;
+}
+
 static void edit_draw_horizon(int fbw, int fbh)
 {
     if (!g_editOn) return;
+    /* THE OWNERSHIP LIVERIES, RESOLVED HERE. This is the first thing the editor runs
+       inside the world draw, before a single object is submitted, so a one-frame
+       screenshot shows the right textures rather than the previous frame's. */
+    edit_livery_sync();
     begin_overlay(fbw, fbh);
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_BLEND);
@@ -8523,7 +12259,7 @@ static void edit_paint_zone(int cx, int cy, bool erase)
  *
  *  Seven families, grouped by the template's own INI name, the same split the browser
  *  editor uses. CLIFFS ARE DELIBERATELY ABSENT: they are derived from elevation, not
- *  painted, which is a design decision and not an omission.
+ *  painted, which is a design decision the project owner made and not an omission.
  *
  *  Only templates this theater's bank can actually draw are offered. The two banks
  *  differ, and offering a tile that resolves to no art would be a palette entry that
@@ -8798,35 +12534,271 @@ static int edit_item_of(const SimObject& o)
     return -1;
 }
 
+/* ------------------------------------------------------------------------------------
+ *  THE DELETE STACK
+ *
+ *  A cell is not one thing. Top down it can carry an OBJECT (a unit, an infantryman, a
+ *  building or a piece of scenery), a WALL, an authored SMUDGE, a TIBERIUM overlay, and
+ *  under all of them the TERRAIN TEMPLATE. DELETE takes exactly one of those per press,
+ *  from the top, and the press after the last of them puts the ground back to plain
+ *  clear -- which is what "default" means for a cell in this editor.
+ *
+ *  ONE PER PRESS, and one undo step per press. A key that emptied the cell in one go
+ *  would cost a whole cell to a mistake; a key that only ever took the top thing would
+ *  leave the rungs below it unreachable, which is what tiberium and smudges were before
+ *  this: erase looked at walls and objects and at nothing else, so a cell carrying a
+ *  tiberium field answered "nothing to erase" for ever.
+ *
+ *  OBJECTS BEFORE WALLS, which is the other way round from how this used to read. The
+ *  old order argued that a wall is overlay, so a click on a walled cell means the wall.
+ *  That is true of a cell with nothing but a wall on it, and those are the only cells it
+ *  was ever tested on -- but edit_cell_ok refuses a footprint only over BUILDING and
+ *  TERRAIN, so an infantryman may legally stand on a sandbag, and pulling the sandbag
+ *  out from under him is not what "delete what I am pointing at" means.
+ *
+ *  BIBS ARE NOT A RUNG. The apron under a building is laid by the engine and the writer
+ *  deliberately never emits one, so taking one off would change the preview and nothing
+ *  that ever reaches the disk.
+ *
+ *  NEITHER ARE WAYPOINTS OR TRIGGER ZONES. Those do not sit on the cell: they are
+ *  map-wide tables that point AT one, each already has its own gesture in the mode that
+ *  owns it, and a player start lost to a stray DELETE is a worse outcome than one that
+ *  asks for the right mode first.
+ * ---------------------------------------------------------------------------------- */
+
+/* The topmost AUTHORED smudge on this cell, or -1. Types 12..14 are the engine's own
+   bibs, which the writer skips, so they are skipped here for the same reason. */
+static int edit_smudge_at(int cx, int cy)
+{
+    for (int i = (int)g_smudges.size() - 1; i >= 0; i--)
+        if (g_smudges[i].x == cx && g_smudges[i].y == cy && (int)g_smudges[i].type < 12)
+            return i;
+    return -1;
+}
+
+static int edit_tib_at(int cx, int cy)
+{
+    for (int i = (int)g_tib.size() - 1; i >= 0; i--)
+        if (g_tib[i].x == cx && g_tib[i].y == cy) return i;
+    return -1;
+}
+
+/* IS A BUILDING'S OWN APRON ON THIS CELL? edit_smudge_at above deliberately cannot see
+   one: the writer never emits a bib and DELETE must not take one. A brush has to see it,
+   because SmudgeClass::Mark writes only into a cell whose Smudge is SMUDGE_NONE
+   (smudge.cpp:222) and a bib is a smudge. */
+static bool edit_bib_at(int cx, int cy)
+{
+    for (size_t i = 0; i < g_smudges.size(); i++)
+        if (g_smudges[i].x == cx && g_smudges[i].y == cy && (int)g_smudges[i].type >= 12)
+            return true;
+    return false;
+}
+
+/* The palette's smudge rows and the SmudgeType each one means. SMUDGE_CRATER1 is 0 and
+   SMUDGE_SCORCH1..6 are 6..11 (defines.h:1401-1412). */
+static const struct { const char* code; unsigned char type; } SMUDGE_ROW[] = {
+    { "CR1", 0 }, { "SC1", 6 }, { "SC2", 7 },
+    { "SC3", 8 }, { "SC4", 9 }, { "SC5", 10 }, { "SC6", 11 }
+};
+static const int SMUDGE_ROW_N = (int)(sizeof SMUDGE_ROW / sizeof SMUDGE_ROW[0]);
+
+/* ------------------------------------------------------------------------------------
+ *  The smudge brush
+ *
+ *  ONE CRATER ROW AND SIX SCORCH ROWS, and the asymmetry is the engine's rather than a
+ *  preference.
+ *
+ *  A CRATER'S TYPE IS NOT THE ONE THE FILE NAMES. For an IsCrater type Mark stores
+ *  SMUDGE_CRATER1 + CellClass::Spot_Index(Coord) (smudge.cpp:229), and Read_INI hands it
+ *  Cell_Coord(cell), which is the cell CENTRE: both leptons are CELL_LEPTON_W / 2
+ *  (function.h:877) and Spot_Index answers 0 for the centre (cell.cpp:1638). So every
+ *  crater in every INI loads as CRATER1. Read_INI then keeps the stack level only when
+ *  the cell's smudge matches the one it asked for (smudge.cpp:301), so a CR3 row would
+ *  lose its data as well as its shape. That is the same reason the tiberium brush above
+ *  is one entry rather than twelve. A scorch is not IsCrater, Mark stores the type it was
+ *  handed, and the six are six different sprites, so those are six rows. Measured over
+ *  the 100 shipped mission files: 221 authored smudge rows, 47 CR1, no CR2..CR6.
+ *
+ *  REPEATED CLICKS DEEPEN A CRATER instead of doing nothing. That is Mark's own stacking:
+ *  a crater laid where a crater already is increments SmudgeData and clamps it at 4
+ *  (smudge.cpp:218-219), and the crater art holds exactly five frames for it. It is also
+ *  the only way to author the one stack level of 2 the shipped missions contain.
+ *
+ *  ONE SMUDGE PER CELL otherwise, because Mark writes only where Smudge is SMUDGE_NONE.
+ *  A second one is refused with the reason rather than accepted and dropped at load.
+ *
+ *  The radar is deliberately NOT marked dirty. eui_radar_build paints land types and
+ *  object blips and has no smudge layer, so there is nothing there to rebuild.
+ * ---------------------------------------------------------------------------------- */
+static void edit_smudge_put(int x, int y, int type)
+{
+    const int at = edit_smudge_at(x, y);
+    if (at >= 0) {
+        if (type >= 6 || (int)g_smudges[at].type >= 6) {
+            fprintf(stderr, "edit: %d,%d already carries %s, and a cell holds one "
+                    "smudge\n", x, y,
+                    (int)g_smudges[at].type < 6 ? "a crater" : "a scorch mark");
+            return;
+        }
+        if ((int)g_smudges[at].data >= 4) {
+            fprintf(stderr, "edit: the crater at %d,%d is already at stack level 4, "
+                            "which is as deep as the engine lets one get\n", x, y);
+            return;
+        }
+        EditSnap before = edit_snapshot("crater");
+        g_smudges[at].data++;
+        edit_commit(before);
+        fprintf(stderr, "edit: deepened the crater at %d,%d to stack level %d\n",
+                x, y, (int)g_smudges[at].data);
+        return;
+    }
+    EditSnap before = edit_snapshot("smudge");
+    SmudgeCell sc;
+    memset(&sc, 0, sizeof sc);
+    sc.x = (short)x; sc.y = (short)y;
+    sc.type = (unsigned char)type;
+    g_smudges.push_back(sc);
+    edit_commit(before);
+    fprintf(stderr, "edit: %s at %d,%d  [%d smudges]\n",
+            type < 6 ? "crater" : "scorch mark", x, y, (int)g_smudges.size());
+}
+
+/* IS THIS CELL'S GROUND ALREADY THE DEFAULT?
+ *
+ * TEMPLATE_NONE is the cartridge's clear cell and template 0 (TEMPLATE_CLEAR1) is not:
+ * over the 100 shipped dense .BIN files template 0 appears in none of 245,760 cells,
+ * while 295,114 cells carry 255. The ICON byte beside it is not part of the answer --
+ * edit_repaint_cell derives a clear cell's icon from the cell's own coordinates the way
+ * CellClass::Clear_Icon does and never reads the stored one, and only 14,733 of those
+ * 295,114 clear cells carry a non-zero icon at all. So 255 alone is "already clear". */
+static bool edit_ground_is_default(int cx, int cy)
+{
+    if (!g_editHaveBin) return true;         /* no .BIN: there is no ground to put back */
+    if (cx < 0 || cy < 0 || cx >= g_editBinW || cy >= g_editBinH) return true;
+    return g_editTmpl[cy * g_editBinW + cx] == 255;
+}
+
+/* WHAT THE NEXT DELETE WOULD TAKE, and the noun for it. The press and the status card
+   both go through this, so the card cannot describe a different stack from the one the
+   key walks. */
+static int edit_erase_peek(int cx, int cy, char* what, size_t n)
+{
+    if (what && n) what[0] = 0;
+    if (cx < 0 || cy < 0) return EDL_EMPTY;
+    const int k = edit_object_at(cx, cy);
+    if (k >= 0) {
+        if (what) snprintf(what, n, "%s", g_objects[k].type);
+        return EDL_OBJECT;
+    }
+    const WallCell* w = edit_wall_at(cx, cy);
+    if (w) {
+        if (what) snprintf(what, n, "%s wall",
+                           w->kind < 5 ? WALL_NAME[w->kind] : "a");
+        return EDL_WALL;
+    }
+    const int sm = edit_smudge_at(cx, cy);
+    if (sm >= 0) {
+        /* The engine's SmudgeType enum: craters 0-5, scorches 6-11. */
+        if (what) snprintf(what, n, "%s",
+                           (int)g_smudges[sm].type < 6 ? "a crater" : "a scorch mark");
+        return EDL_SMUDGE;
+    }
+    if (edit_tib_at(cx, cy) >= 0) {
+        if (what) snprintf(what, n, "tiberium");
+        return EDL_TIBERIUM;
+    }
+    if (!edit_ground_is_default(cx, cy)) {
+        if (what) snprintf(what, n, "the ground");
+        return EDL_GROUND;
+    }
+    return EDL_EMPTY;
+}
+
 static bool edit_erase_at(int cx, int cy)
 {
-    EditSnap before = edit_snapshot("erase");
-    /* Walls first: they are overlay and sit on top of whatever cell they occupy, so a
-       click on a walled cell means the wall. */
-    for (size_t i = 0; i < g_walls.size(); i++) {
-        if (g_walls[i].x != cx || g_walls[i].y != cy) continue;
-        const int kind = g_walls[i].kind;
-        g_walls.erase(g_walls.begin() + i);
-        edit_commit(before);
-        /* The neighbours have to be re-masked or they keep pointing at a wall that is
-           no longer there. */
-        edit_wall_mask(cx, cy - 1); edit_wall_mask(cx + 1, cy);
-        edit_wall_mask(cx, cy + 1); edit_wall_mask(cx - 1, cy);
-        g_euiRadarDirty = 1;
-        fprintf(stderr, "edit: erased %s wall at %d,%d\n", WALL_NAME[kind], cx, cy);
-        return true;
-    }
-    const int k = edit_object_at(cx, cy);
-    if (k < 0) {
-        fprintf(stderr, "edit: nothing at %d,%d to erase\n", cx, cy);
+    char what[40];
+    const int layer = edit_erase_peek(cx, cy, what, sizeof what);
+    if (layer == EDL_EMPTY) {
+        fprintf(stderr, "edit: %d,%d is already empty -- nothing on it and its ground is "
+                        "already clear\n", cx, cy);
         return false;
     }
-    char t[32]; snprintf(t, sizeof t, "%s", g_objects[k].type);
-    g_objects.erase(g_objects.begin() + k);
+    /* ONE snapshot and ONE commit whichever rung runs: that is what makes one DELETE one
+       undo step. The commit is at the bottom, after the rung has succeeded, so a rung
+       that refuses leaves no undo entry that would undo nothing. */
+    EditSnap before = edit_snapshot("delete");
+    bool did = false;
+    switch (layer) {
+        case EDL_OBJECT: {
+            const int k = edit_object_at(cx, cy);
+            const SimObject o = g_objects[k];
+            g_objects.erase(g_objects.begin() + k);
+            /* Its ORDER and TRIGGER live in the prior table keyed by house|type|cell, so
+               they have to go with it. The snapshot above carries the table, so undo
+               brings the entry back with the object. */
+            edit_prior_drop(o.house, o.type, o.cy * edit_ini_w() + o.cx);
+            did = true;
+            break;
+        }
+        case EDL_WALL: {
+            for (size_t i = 0; i < g_walls.size(); i++) {
+                if (g_walls[i].x != cx || g_walls[i].y != cy) continue;
+                g_walls.erase(g_walls.begin() + i);
+                break;
+            }
+            /* The neighbours have to be re-masked or they keep pointing at a wall that
+               is no longer there -- and BEFORE the commit, not after it as this used to
+               do, because the commit is what can fire an autosave and a file written
+               between the two carries four stumps aimed at an empty cell. */
+            edit_wall_mask(cx, cy - 1); edit_wall_mask(cx + 1, cy);
+            edit_wall_mask(cx, cy + 1); edit_wall_mask(cx - 1, cy);
+            did = true;
+            break;
+        }
+        case EDL_SMUDGE: {
+            const int sm = edit_smudge_at(cx, cy);
+            if (sm >= 0) { g_smudges.erase(g_smudges.begin() + sm); did = true; }
+            break;
+        }
+        case EDL_TIBERIUM: {
+            const int ti = edit_tib_at(cx, cy);
+            if (ti >= 0) {
+                g_tib.erase(g_tib.begin() + ti);
+                /* THE EIGHT NEIGHBOURS ARE WORTH RE-STAGING and this is not a nicety: a
+                   tiberium cell's frame is chosen from how many of its neighbours also
+                   carry tiberium, so taking one away leaves the ring around it drawing a
+                   density that is no longer there. The brush re-stages after every stroke
+                   for the same reason, and an erase is a stroke. */
+                edit_tib_restage(cx, cy);
+                g_euiRadarDirty = 1;
+                did = true;
+            }
+            break;
+        }
+        case EDL_GROUND:
+            /* BACK TO DEFAULT: TEMPLATE_NONE with the icon this cell's own coordinates
+               give it, which is exactly what the palette's own CLEAR1 rung writes. The
+               cartridge stores plain ground as 255 and lets Clear_Icon choose, so a
+               field of it does not visibly tile. */
+            did = edit_paint_cell(cx, cy, 255, (cx & 3) | ((cy & 3) << 2));
+            if (!did)
+                fprintf(stderr, "edit: %d,%d cannot go back to clear -- this theater's "
+                                "bank has no plain-ground tile for it\n", cx, cy);
+            break;
+        default: break;
+    }
+    if (!did) return false;
     edit_commit(before);
     g_euiRadarDirty = 1;
-    fprintf(stderr, "edit: erased %s at %d,%d  [%d objects]\n", t, cx, cy,
-            (int)g_objects.size());
+    /* The legibility rail: say which rung came off, and what the document holds now, so
+       a press that took the wrong thing reads as a mistake rather than a mystery. */
+    if (layer == EDL_GROUND)
+        fprintf(stderr, "edit: put the ground at %d,%d back to clear\n", cx, cy);
+    else
+        fprintf(stderr, "edit: deleted %s at %d,%d  [%d objects, %d walls, %d tiberium, "
+                        "%d smudges]\n", what, cx, cy, (int)g_objects.size(),
+                (int)g_walls.size(), (int)g_tib.size(), (int)g_smudges.size());
     return true;
 }
 
@@ -8853,7 +12825,7 @@ static bool edit_pick_at(int cx, int cy)
     g_editTool  = TOOL_PLACE;      /* picking is for placing another one */
     /* Owning house too: picking a Nod turret and then placing a GDI one is not what
        the eyedropper is for. */
-    for (int h = 0; h < 4; h++)
+    for (int h = 0; h < EUI_HOUSES_OFFERED; h++)
         if (!strcmp(EUI_HOUSES[h].key, g_objects[k].house)) { g_editOwner = h; break; }
     fprintf(stderr, "edit: picked %s (%s)\n", EDIT_ITEMS[it].name, EDIT_ITEMS[it].code);
     return true;
@@ -8960,6 +12932,32 @@ static void edit_set_mode(int m);     /* defined with the tabs, below */
 static bool edit_key(int sym)
 {
     if (!g_editOn) return false;
+    /* THE KEYBOARD HALF OF THE MODAL CAGE. The mouse could not reach the tools behind an
+       open dialog and the keyboard could, so the tool, mode, owner and delete keys all
+       still fired on a map the dialog was covering.
+       The keys are SWALLOWED rather than passed on: returning false hands them to the
+       game's own switch, whose control-group handler reads the top row off the SCANCODE
+       and does not test for the editor at all, so 1 to 5 would have gone from changing
+       mode to recalling a selection. It swallows every unmodified, non-repeat key, which
+       also stands down the grid key, the no-go pin, the camera mode, the cheat menu, the
+       effects dials and the script feed for as long as the dialog is up. Fullscreen and
+       the F5 panel are unaffected: both are handled before this function is reached, and
+       every Ctrl or Cmd shortcut skips it on the existing modifier test.
+
+       ESCAPE CLOSES THE DIALOG, and that is a decision this cage forces rather than an
+       extra. Excepting ESCAPE and letting it through would hand it to the editor's cancel
+       ladder, which on a clean map with nothing armed reaches `running = false` and quits
+       the APPLICATION with the dialog still on screen -- and because every other key is
+       now inert, that would be the only thing the keyboard could still do behind a dialog.
+       So it is dismissal, taking the same two steps the CANCEL button takes: clear the
+       modal, and close the size field with it, because a field that outlives its dialog
+       keeps the keyboard and the editor's letter keys stop answering.
+       Typed fields need no test here: the key dispatch offers them the key first, and
+       this function is never reached while one is open. */
+    if (edit_modal_up()) {
+        if (sym == SDLK_ESCAPE) { g_euiModal = MODAL_NONE; eui_num_close(); }
+        return true;
+    }
     switch (sym) {
         case SDLK_v: g_editTool = TOOL_PLACE; break;
         case SDLK_m: g_editTool = TOOL_MOVE;  g_editArmed = -1; break;
@@ -8975,7 +12973,9 @@ static bool edit_key(int sym)
         case SDLK_4: edit_set_mode(3); return true;
         case SDLK_5: edit_set_mode(4); return true;
         case SDLK_TAB:
-            g_editOwner = (g_editOwner + 1) % 4;
+            /* Round the houses this MAP is offered: the four a mission uses, or the whole
+               roster on a skirmish map. */
+            g_editOwner = (g_editOwner + 1) % EUI_HOUSES_OFFERED;
             fprintf(stderr, "edit: placing for %s\n", EUI_HOUSES[g_editOwner].label);
             return true;
         case SDLK_DELETE:
@@ -9349,7 +13349,7 @@ static void edit_set_mode(int m)
 
 
 /* ------------------------------------------------------------------------------------
- *  THE EDITOR CAMERA -- Unreal's, as asked for
+ *  THE EDITOR CAMERA -- Unreal's, as the project owner asked for
  *
  *      right mouse held + move    look around
  *      W A S D                    fly, relative to where you are looking
@@ -9603,6 +13603,101 @@ static int edit_elevtest(void)
         else fprintf(stderr, "ELEVTEST|ok  |all 12 non-saddle masks resolve to art\n");
     }
 
+    /* THE IMAGE IMPORTER, driven headlessly. It has no button: this editor's click
+       dispatch and its script verbs both live outside this file, so this is the only
+       thing that runs the decoders, and running them is what stops them rotting. The
+       image is synthesised rather than read off disk -- a fixture would be one more file
+       to keep, and a dozen lines of PCX prove the same path. A sheer 24x24 mesa is the
+       case chosen because it is the one the tier model cannot take literally: a
+       four-rung face has no art, so it has to come back terraced. */
+    {
+        const int IW = 64, IH = 64;
+        std::vector<unsigned char> pcx(128 + (size_t)IW * IH * 2, 0);
+        pcx[0] = 0x0A; pcx[1] = 5; pcx[2] = 1; pcx[3] = 8; pcx[65] = 1;
+        pcx[8]  = (unsigned char)(IW - 1);
+        pcx[10] = (unsigned char)(IH - 1);
+        pcx[66] = (unsigned char)IW;
+        size_t o = 128;
+        for (int y = 0; y < IH; y++)
+            for (int x = 0; x < IW; x++) {
+                const unsigned char v =
+                    (x >= 20 && x < 44 && y >= 20 && y < 44) ? 255 : 0;
+                /* A literal byte, unless its top two bits would be read as a run. */
+                if ((v & 0xC0) == 0xC0) pcx[o++] = 0xC1;
+                pcx[o++] = v;
+            }
+        std::vector<unsigned char> was = g_pack.corner;
+        char why[220] = { 0 };
+        const int n = elev_import_bytes(&pcx[0], o, "a synthesised mesa", why, sizeof why);
+        if (!n) {
+            fprintf(stderr, "ELEVTEST|FAIL|the importer refused a valid PCX: %s\n", why);
+            fails++;
+        } else {
+            if (g_pack.corner == was) {
+                fprintf(stderr, "ELEVTEST|FAIL|the import wrote %d cells and moved no "
+                        "ground\n", n);
+                fails++;
+            }
+            /* THE TERRACING CLAIM, checked directly: after an import no block may sit
+               more than one rung above a block it touches, because a coarse corner is
+               the MAX of the four around it and a two-rung spread has no cliff art. */
+            int steep = 0;
+            for (int by = 0; by < elev_bh(); by++)
+                for (int bx = 0; bx < elev_bw(); bx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++) {
+                            const int nx = bx + dx, ny = by + dy;
+                            if (nx < 0 || ny < 0 || nx >= elev_bw() || ny >= elev_bh())
+                                continue;
+                            const int a = g_elevTier[by * elev_bw() + bx];
+                            const int b = g_elevTier[ny * elev_bw() + nx];
+                            if (a - b > 1 || b - a > 1) steep++;
+                        }
+            if (steep) {
+                fprintf(stderr, "ELEVTEST|FAIL|%d block pairs came out more than one "
+                        "rung apart\n", steep);
+                fails++;
+            } else {
+                fprintf(stderr, "ELEVTEST|ok  |a sheer face imported as a terrace, %d "
+                        "cells\n", n);
+            }
+            /* Importing the same picture twice must be a no-op, or a repeated import
+               would stack undo steps that change nothing. */
+            char w1[220] = { 0 };
+            if (elev_import_bytes(&pcx[0], o, "the same mesa", w1, sizeof w1)) {
+                fprintf(stderr, "ELEVTEST|FAIL|re-importing the same image changed the "
+                        "map again\n");
+                fails++;
+            } else {
+                fprintf(stderr, "ELEVTEST|ok  |re-import is a no-op -- %s\n", w1);
+            }
+            edit_undo();
+            if (g_pack.corner != was) {
+                fprintf(stderr, "ELEVTEST|FAIL|one undo did not put the imported "
+                        "heightmap back\n");
+                fails++;
+            } else {
+                fprintf(stderr, "ELEVTEST|ok  |a whole-map import is ONE undo step\n");
+            }
+        }
+        /* A refusal has to be a refusal and not a half-read map. */
+        char w2[220] = { 0 };
+        unsigned char four[128];
+        memset(four, 0, sizeof four);
+        four[0] = 0x0A; four[2] = 1; four[3] = 4; four[65] = 1;
+        if (elev_import_bytes(four, sizeof four, "a 4-bit PCX", w2, sizeof w2)) {
+            fprintf(stderr, "ELEVTEST|FAIL|a 4-bit PCX was imported anyway\n");
+            fails++;
+        } else {
+            fprintf(stderr, "ELEVTEST|ok  |refused, and said why -- %s\n", w2);
+        }
+        /* And the convention the button will reach this by, with nothing there yet. */
+        char w3[220] = { 0 };
+        elev_import_beside_map(w3, sizeof w3);
+        fprintf(stderr, "ELEVTEST|note|beside the map: %s\n",
+                w3[0] ? w3 : "an image was found and imported");
+    }
+
     fprintf(stderr, "ELEVTEST|%s|%d failures\n", fails ? "FAILED" : "PASSED", fails);
     return fails;
 }
@@ -9665,7 +13760,7 @@ static int edit_uitest(int fbw, int fbh)
     const float S = L.s, pad = EUI_PAD * S;
     fprintf(stderr, "UITEST|%s %dx%d  backing %.1f  scale %.2f  rail %.0f  "
             "sidebar x=%.0f w=%.0f  tile %.0fx%.0f\n",
-            g_editMode == 3 ? "STARTS " : g_editMode == 2 ? "ELEVATN"
+            g_editMode == 3 ? "WAYPTS " : g_editMode == 2 ? "ELEVATN"
                                         : g_editMode == 1 ? "TERRAIN" : "OBJECTS",
             fbw, fbh, g_uiBacking, S, L.railW, L.sideX, L.sideW, L.tileW, L.tileH);
 
@@ -9759,11 +13854,88 @@ static int edit_uitest(int fbw, int fbh)
                        L.ownerY + L.ownerH * 0.5f, fbw, fbh, EUI_SCRIPTVIEW, i, nm,
                        &fails);
         }
-    } else
-    for (int i = 0; i < 4; i++) {
-        char nm[32]; snprintf(nm, sizeof nm, "owner chip %d", i);
-        eui_expect(L.sideX + pad + i * (L.ownerW + 4 * S) + L.ownerW * 0.5f,
-                   L.ownerY + L.ownerH * 0.5f, fbw, fbh, EUI_OWNER, i, nm, &fails);
+    } else if (g_editMode == 2) {
+        /* THE ELEVATION PAGE TABS OWN THAT BAND IN THIS MODE, and the house chips are
+           not drawn in it -- so probing them here would be asserting that a rectangle
+           nothing paints still answers, which is the failure eui_expect_not exists to
+           catch rather than to certify. */
+        for (int i = 0; i < 2; i++) {
+            float tx, ty, tw, th;
+            char nm[32]; snprintf(nm, sizeof nm, "elev page tab %d", i);
+            if (!eui_sbr_tab_rect(&L, i, &tx, &ty, &tw, &th)) {
+                eui_expect_not(tx + tw * 0.5f, ty + th * 0.5f, fbw, fbh,
+                               EUI_SBRPAGE, i, nm, &fails);
+                continue;
+            }
+            eui_expect(tx + tw * 0.5f, ty + th * 0.5f, fbw, fbh, EUI_SBRPAGE, i,
+                       nm, &fails);
+            /* AND IT MUST CLEAR THE PAGE'S OWN CAPTION. Both pages draw a small caption
+               at eui_elev_top - 12*S and text is drawn from its TOP, so a tab that
+               reaches past that line is drawn over the caption at every window size.
+               This is the leg that fails if the band is ever filled edge to edge. */
+            if (ty + th > eui_elev_top(&L) - 12 * S + 0.5f) {
+                fails++;
+                fprintf(stderr, "UITEST|FAIL|%-22s|ends at %.1f and the page caption "
+                        "starts at %.1f -- the tab is drawn over it\n", nm, ty + th,
+                        eui_elev_top(&L) - 12 * S);
+            }
+        }
+        /* THE CLAIM THE DIRECTOR MADE THE CONDITION OF ALL OF THIS: the tier page did
+           not move. One line a gate can read, at every size and on both pages. */
+        fprintf(stderr, "ELEVPAGE|%dx%d|backing=%.1f|page=%d|S=%.4f|catY=%.3f|"
+                "top=%.3f|delta=%.3f|tabtop=%.3f|tabbot=%.3f|caption=%.3f|"
+                "lintY=%.3f|room=%.2f\n",
+                fbw, fbh, g_uiBacking, g_sbrPage, S, L.catY, eui_elev_top(&L),
+                eui_elev_top(&L) - L.catY, L.ownerY,
+                L.catY - 14 * S, eui_elev_top(&L) - 12 * S, L.lintY,
+                (L.lintY - eui_elev_top(&L)) / S);
+    } else {
+        /* THE CHIP STRIP, ON BOTH KINDS OF MAP.
+           The driver walks the five modes once and flips the map kind partway through, so
+           OBJECTS is only ever reached with the kind the walk started on -- a strip that
+           grows to twelve chips on a skirmish map would never be probed here at all. The
+           kind is put back before this block ends.
+           AND THE TWO LEGS ARE NOT THE SAME LEG. The draw and the hit test now take their
+           rectangle from one function, so proving they agree proves nothing. What is
+           worth measuring is the strip against its NEIGHBOURS: a chip's y comes from its
+           row, the sidebar's edges and the category tabs come from the layout's own
+           running total, and those only line up if the fixed-height budget counted the
+           same rows the strip drew. */
+        const int owWasMulti = g_mapIsMulti;
+        const int owKinds = (g_editMode == 0) ? 2 : 1;
+        for (int k = 0; k < owKinds; k++) {
+            if (g_editMode == 0) g_mapIsMulti = k;
+            EuiLayout OL; eui_layout(fbw, fbh, &OL);
+            const float opad = EUI_PAD * OL.s;
+            for (int i = 0; i < eui_owner_n(); i++) {
+                float ox, oy, ow, oh;
+                eui_owner_chip_rect(&OL, i, &ox, &oy, &ow, &oh);
+                char nm[40];
+                snprintf(nm, sizeof nm, "owner chip %d %s", i, EUI_HOUSES[i].label);
+                eui_expect(ox + ow * 0.5f, oy + oh * 0.5f, fbw, fbh, EUI_OWNER, i,
+                           nm, &fails);
+                if (ox < OL.sideX + opad - 0.5f ||
+                    ox + ow > OL.sideX + OL.sideW - opad + 0.5f) {
+                    fails++;
+                    fprintf(stderr, "UITEST|FAIL|%-22s|runs %.1f..%.1f, outside the "
+                            "sidebar %.1f..%.1f\n", nm, ox, ox + ow,
+                            OL.sideX + opad, OL.sideX + OL.sideW - opad);
+                }
+                if (oy + oh > OL.catY - opad + 0.5f) {
+                    fails++;
+                    fprintf(stderr, "UITEST|FAIL|%-22s|ends at %.1f and the category "
+                            "tabs start at %.1f -- the fixed-height budget is not "
+                            "counting %d chip rows\n", nm, oy + oh, OL.catY,
+                            OL.ownerRows);
+                }
+            }
+            fprintf(stderr, "UITEST|OWNERSTRIP|multi=%d|chips=%d|rows=%d|chipw=%.1f|"
+                    "bottom=%.1f|tabs=%.1f\n", g_mapIsMulti, eui_owner_n(),
+                    OL.ownerRows, OL.ownerW,
+                    OL.ownerY + (float)OL.ownerRows * OL.ownerH
+                              + (float)(OL.ownerRows - 1) * OL.ownerGap, OL.catY);
+        }
+        g_mapIsMulti = owWasMulti;
     }
     if (g_editMode == 4) {
         /* Every row this view wants must be REACHABLE -- visible at some scroll
@@ -9925,9 +14097,117 @@ static int edit_uitest(int fbw, int fbh)
             }
             eui_expect(x + w * 0.5f, y + h * 0.5f, fbw, fbh, EUI_START, row, nm, &fails);
         }
+    } else if (g_editMode == 2 && g_sbrPage == 1) {
+        /* THE SMOOTH PAGE. Every row that FITS answers as itself and every row that
+           does not must answer as nothing -- the second half is the one that matters,
+           because a control drawn past L.lintY lands on the status card. */
+        for (int i = 0; i < 3; i++) {
+            float x, y, w, h;
+            char nm[32]; snprintf(nm, sizeof nm, "smooth tool %d", i);
+            if (!eui_sbr_tool_rect(&L, i, &x, &y, &w, &h))
+                eui_expect_not(x + w * 0.5f, y + h * 0.5f, fbw, fbh, EUI_SBRTOOL, i,
+                               nm, &fails);
+            else
+                eui_expect(x + w * 0.5f, y + h * 0.5f, fbw, fbh, EUI_SBRTOOL, i,
+                           nm, &fails);
+        }
+        for (int i = 0; i < SBR_SLIDER_N; i++) {
+            float x, y, w, h;
+            char nm[32]; snprintf(nm, sizeof nm, "smooth slider %d", i);
+            if (!eui_sbr_slider_rect(&L, i, &x, &y, &w, &h))
+                eui_expect_not(x + w * 0.5f, y + h * 0.5f, fbw, fbh, EUI_SBRSLIDER, i,
+                               nm, &fails);
+            else
+                eui_expect(x + w * 0.5f, y + h * 0.5f, fbw, fbh, EUI_SBRSLIDER, i,
+                           nm, &fails);
+        }
+        {
+            /* THE HELP BLOCK IS NOT A CONTROL, so nothing can probe it by clicking. It
+               is measured instead: it must start BELOW the last slider that is drawn.
+               The two resolving to the same y is how help text ends up printed over a
+               slider, and that is exactly what happened when the help block's top was
+               written as the same expression the first slider's is. */
+            float sx, sy, sw, sh;
+            eui_sbr_slider_rect(&L, SBR_SLIDER_N - 1, &sx, &sy, &sw, &sh);
+            const float hy = eui_sbr_help_top(&L);
+            if (hy < sy + sh + 0.5f) {
+                fails++;
+                fprintf(stderr, "UITEST|FAIL|%-22s|help starts at %.1f and slider %d "
+                        "ends at %.1f -- the help is drawn over the slider\n",
+                        "smooth help", hy, SBR_SLIDER_N - 1, sy + sh);
+            }
+            /* AND THE ONE MEASUREMENT INSIDE A SLIDER ROW. The rectangles above say
+               the row is reachable; they cannot say the knob is not drawn through the
+               row's own name. Both ends are reported for every slider at every size, so
+               a gate reads clearance rather than trusting an arithmetic that is only
+               correct at the font size somebody happened to look at. */
+            for (int q = 0; q < SBR_SLIDER_N; q++) {
+                float qx, qy, qw, qh, qtx, qtw;
+                if (!eui_sbr_slider_rect(&L, q, &qx, &qy, &qw, &qh)) continue;
+                eui_sbr_track(&L, q, qx, qw, &qtx, &qtw);
+                const float t1m = 1.0f * S;
+                char vq[32];
+                if (SBR_SLIDERS[q].unit[0])
+                    snprintf(vq, sizeof vq, "%.1f %s", SBR_SLIDERS[q].hi,
+                             SBR_SLIDERS[q].unit);
+                else
+                    snprintf(vq, sizeof vq, "%.2f", SBR_SLIDERS[q].hi);
+                const float labEnd = qx + 8 * S
+                                   + ef_text_w(SBR_SLIDERS[q].name, t1m);
+                const float valX   = qx + qw - ef_text_w(vq, t1m) - 8 * S;
+                fprintf(stderr, "SBRSLID|%dx%d|backing=%.1f|i=%d|name=%s|x=%.2f|"
+                        "w=%.2f|trackx=%.2f|trackw=%.2f|labend=%.2f|valx=%.2f|"
+                        "leftclear=%.2f|rightclear=%.2f\n",
+                        fbw, fbh, g_uiBacking, q, SBR_SLIDERS[q].name, qx, qw,
+                        qtx, qtw, labEnd, valX, qtx - labEnd,
+                        valX - (qtx + qtw));
+            }
+            fprintf(stderr, "SBRPAGE|%dx%d|backing=%.1f|S=%.4f|tools=%.3f|"
+                    "sliders=%.3f|help=%.3f|lintY=%.3f|toolfit=%d|slidfit=%d|"
+                    "helpfit=%d\n", fbw, fbh, g_uiBacking, S,
+                    eui_sbr_tools_top(&L), eui_sbr_sliders_top(&L), hy, L.lintY,
+                    eui_sbr_tool_rect(&L, 2, &sx, &sy, &sw, &sh) ? 1 : 0,
+                    eui_sbr_slider_rect(&L, 2, &sx, &sy, &sw, &sh) ? 1 : 0,
+                    eui_sbr_fits(&L, hy, (float)SBR_HELP_N * SBR_HELPLN * S) ? 1 : 0);
+        }
+    } else if (g_editMode == 2 && !elev_ready()) {
+        /* THE CONVERSION GATE'S OWN CARD. This is the panel an imported map opens on and
+           until now the harness had never once walked it: the driver set g_elevConverted
+           for every elevation pass it made, so "both sides of the conversion gate" was a
+           comment rather than a test. It matters here because the auto heightmap's button
+           lives on this card -- the fit is the way onto the ladder that READS the cliff
+           art instead of erasing it, so it belongs beside the button that erases it. */
+        {
+            const float gbh = 34 * S, gbw = L.sideW - pad * 4;
+            eui_expect(L.sideX + pad * 2 + gbw * 0.5f, L.catY + 140 * S + gbh * 0.5f,
+                       fbw, fbh, EUI_ELEVGATE, -1, "convert this map", &fails);
+        }
+        {
+            float ax, ay, aw, ah2;
+            const bool fits = eui_elev_auto_rect(&L, &ax, &ay, &aw, &ah2);
+            if (!fits)
+                eui_expect_not(ax + aw * 0.5f, ay + ah2 * 0.5f, fbw, fbh,
+                               EUI_ELEVAUTO, -1, "gate auto heightmap", &fails);
+            else
+                eui_expect(ax + aw * 0.5f, ay + ah2 * 0.5f, fbw, fbh, EUI_ELEVAUTO, -1,
+                           "gate auto heightmap", &fails);
+            /* AND THE TWO CLEARANCES ON THIS CARD, which nothing measured before and
+               which were both wrong the first time the row was fitted in: the caption
+               that says what else is behind the gate was drawn INSIDE the CONVERT
+               button, and the row was drawn on top of the caption. Neither is a control,
+               so a probe-based harness is structurally blind to both -- the same hole
+               the CLIFF PIECES caption fell through on the other page. Reported as
+               clearances rather than as three y values so the gate reads a sign. */
+            const float gcapY  = L.catY + ELEV_GATE_CAPY * S;
+            const float gconvB = L.catY + (140.0f + 34.0f) * S;
+            fprintf(stderr, "ELEVGATE|%dx%d|backing=%.1f|convertY=%.3f|capY=%.3f|"
+                    "autoY=%.3f|lintY=%.3f|capclear=%.3f|autoclear=%.3f|autofit=%d\n",
+                    fbw, fbh, g_uiBacking, L.catY + 140 * S, gcapY, ay, L.lintY,
+                    gcapY - gconvB, ay - (gcapY + ELEV_GATE_CAPH * S), fits ? 1 : 0);
+        }
     } else if (g_editMode == 2) {
         /* The elevation panel's own controls, at the geometry eui_draw_elev uses. */
-        float y = L.catY;
+        float y = eui_elev_top(&L);
         {
             const float w = (L.sideW - pad * 2 - 4 * 3 * S) / 5.0f;
             for (int i = 0; i < 5; i++) {
@@ -9952,6 +14232,61 @@ static int edit_uitest(int fbw, int fbh)
                            fbw, fbh, EUI_ELEVBRUSH, i, nm, &fails);
             }
         }
+        {   /* The heightmap row. Which controls exist depends on what is in the
+               folder, so the rect is asked rather than assumed -- with nothing there
+               the button spans the row and there is no chip to probe. */
+            float bx, by, bw, bh;
+            const bool fits = eui_elev_import_rect(&L, 0, &bx, &by, &bw, &bh);
+            if (!fits)
+                eui_expect_not(bx + bw * 0.5f, by + bh * 0.5f, fbw, fbh,
+                               EUI_ELEVIMPORT, -1, "import heightmap", &fails);
+            else
+                eui_expect(bx + bw * 0.5f, by + bh * 0.5f, fbw, fbh, EUI_ELEVIMPORT, -1,
+                           "import heightmap", &fails);
+            if (eui_elev_import_rect(&L, 1, &bx, &by, &bw, &bh))
+                eui_expect(bx + bw * 0.5f, by + bh * 0.5f, fbw, fbh, EUI_ELEVNEXT, -1,
+                           "next heightmap", &fails);
+        }
+        {   /* THE AUTO HEIGHTMAP ROW, under the import row. Same contract as the row
+               above it: it answers as itself where it fits and as nothing where it does
+               not, which is the leg that catches a row growing into UNDO / REDO /
+               REVERT. */
+            float bx, by, bw, bh;
+            const bool fits = eui_elev_auto_rect(&L, &bx, &by, &bw, &bh);
+            if (!fits)
+                eui_expect_not(bx + bw * 0.5f, by + bh * 0.5f, fbw, fbh,
+                               EUI_ELEVAUTO, -1, "auto heightmap", &fails);
+            else
+                eui_expect(bx + bw * 0.5f, by + bh * 0.5f, fbw, fbh, EUI_ELEVAUTO, -1,
+                           "auto heightmap", &fails);
+        }
+        {   /* THE CLIFF PIECES CAPTION IS NOT A CONTROL, so nothing can probe it by
+               clicking -- which is exactly why --uitest was blind to it while it was
+               being painted into the status card at 1280x480. It is measured instead,
+               the way the smooth page's help block is: it must not start below the
+               panel's usable bottom, and it is drawn only when the drawer it names has
+               a cell to show. ef_text draws DOWNWARD from the y it is given, so the
+               caption occupies capY..capY+EUI_TS line height. */
+            int clist[64];
+            const int cn = eui_cliff_list(clist, 64);
+            float c0x, c0y, c0w, c0h;
+            const bool cellfits = (cn > 0) &&
+                                  eui_cliff_cell_rect(&L, 0, &c0x, &c0y, &c0w, &c0h);
+            const float capY = eui_cliff_top(&L) - 12 * S;
+            if (cellfits && capY + 10 * S > L.lintY - 4 * S) {
+                fails++;
+                fprintf(stderr, "UITEST|FAIL|%-22s|caption at %.1f runs past the panel's "
+                        "usable bottom %.1f -- it is drawn into the status card\n",
+                        "cliff caption", capY, L.lintY - 4 * S);
+            }
+            float ax2, ay2, aw2, ah2b;
+            fprintf(stderr, "ELEVROWS|%dx%d|backing=%.1f|importY=%.3f|autoY=%.3f|"
+                    "cliffY=%.3f|capY=%.3f|lintY=%.3f|autofit=%d|capdrawn=%d\n",
+                    fbw, fbh, g_uiBacking, eui_elev_import_top(&L),
+                    eui_elev_auto_top(&L), eui_cliff_top(&L), capY, L.lintY,
+                    eui_elev_auto_rect(&L, &ax2, &ay2, &aw2, &ah2b) ? 1 : 0,
+                    cellfits ? 1 : 0);
+        }
         {
             /* The cliff drawer: every cell that FITS answers as itself; the first
                that does not fit must answer as nothing (the draw skipped it). */
@@ -9973,8 +14308,22 @@ static int edit_uitest(int fbw, int fbh)
     } else
     for (int i = 0; i < eui_cat_count(); i++) {
         char nm[32]; snprintf(nm, sizeof nm, "category tab %d", i);
-        eui_expect(L.sideX + pad + i * (L.catW + 3 * S) + L.catW * 0.5f,
-                   L.catY + L.catH * 0.5f, fbw, fbh, EUI_TABC, i, nm, &fails);
+        const float tx = L.sideX + pad + i * (L.catW + 3 * S);
+        /* ON SCREEN BEFORE HITTABLE. Aiming at the centre of a rectangle the probe
+           computes with the DRAW'S OWN arithmetic proves only that the draw and the hit
+           test agree; it says nothing about whether that rectangle is inside the window.
+           Two terrain tabs sat past the right edge of the frame for as long as the strip
+           existed and this probe certified both of them, every run, at every size. The
+           panel's right margin is the bound, and it is where the last tab must end. */
+        if (tx + L.catW > L.sideX + L.sideW - pad + 0.5f) {
+            fails++;
+            fprintf(stderr, "UITEST|FAIL|%-22s|spans %.0f..%.0f, past the panel's right "
+                    "margin at %.0f -- unreachable\n", nm, tx, tx + L.catW,
+                    L.sideX + L.sideW - pad);
+            continue;
+        }
+        eui_expect(tx + L.catW * 0.5f, L.catY + L.catH * 0.5f, fbw, fbh,
+                   EUI_TABC, i, nm, &fails);
     }
 
     /* Every tile the grid would draw, at the centre of the tile, expecting the item the
@@ -10034,7 +14383,7 @@ static int edit_uitest(int fbw, int fbh)
                    L.playY + L.playH * 0.5f, fbw, fbh, EUI_TRACE, -1, "TRACE", &fails);
     }
 
-    /* THE NEW MAP MODAL, probed open. Its size list grew a fifth row (128 x 128) and
+    /* THE NEW MAP MODAL, probed open. Its size list grew a fifth row (the big map) and
        its flow stretches rather than being hand-placed rows -- exactly the growth that
        once landed the THEATER header on the LARGE row. Every option is probed at the
        rect the draw uses, plus both buttons, then the modal is closed so nothing below
@@ -10048,8 +14397,72 @@ static int edit_uitest(int fbw, int fbh)
             eui_modal_opt_rect(&L, fbw, fbh, 0, i, &ox, &oy, &ow, &oh);
             char nm[40]; snprintf(nm, sizeof nm, "new-map size row %d (%s)", i,
                                   EUI_SIZES[i].name);
-            eui_expect(ox + ow * 0.5f, oy + oh * 0.5f, fbw, fbh, EUI_MODALOPT, i,
-                       nm, &fails);
+            /* The CUSTOM row is a typed field, so it answers the hit kind whose handler
+               opens one; the arg is unused there and is not pinned. */
+            const bool cust = (i == EUI_SIZE_CUSTOM);
+            eui_expect(ox + ow * 0.5f, oy + oh * 0.5f, fbw, fbh,
+                       cust ? EUI_RENAME : EUI_MODALOPT, cust ? -1 : i, nm, &fails);
+        }
+        /* THE CUSTOM SIZE, THROUGH THE REAL FIELD AND NOT THROUGH ITS RECTANGLE.
+         *
+         * Every other leg in this harness asks eui_hit whether a control is where the
+         * draw put it, and a probe that aims with the draw's own arithmetic has
+         * certified a broken control before. This one asks a different question: it
+         * OPENS the field with the opener the click handler calls, types through the
+         * filter the keyboard types through, presses the ENTER that eui_num_commit is,
+         * and then reads the state. Geometry cannot make it pass. */
+        {
+            const int keepW = g_newW, keepH = g_newH, keepSz = g_newSize;
+            static const struct { const char* typed; int w, h, grid; } SZCASE[] = {
+                { "40",       40,  40,  64 },   /* one number is a square             */
+                { "100x80",  100,  80, 128 },   /* two numbers, and the big grid      */
+                { "62 X 100", 62, 100, 128 },   /* one side over 62 takes both there  */
+                { "9",        16,  16,  64 },   /* under the floor                    */
+                { "400",     126, 126, 128 },   /* over the ceiling                   */
+            };
+            for (int c = 0; c < (int)(sizeof SZCASE / sizeof SZCASE[0]); c++) {
+                g_newSize = 0;                      /* so the opener has to select it */
+                if (!eui_open_rename()) {
+                    fails++;
+                    fprintf(stderr, "UITEST|FAIL|new-map size field would not open\n");
+                    break;
+                }
+                g_numBuf[0] = 0; g_numPristine = false;
+                eui_num_type(SZCASE[c].typed);
+                eui_num_commit();
+                if (g_newW != SZCASE[c].w || g_newH != SZCASE[c].h ||
+                    eui_new_grid() != SZCASE[c].grid ||
+                    g_newSize != EUI_SIZE_CUSTOM || g_numKind != NUM_NONE) {
+                    fails++;
+                    fprintf(stderr, "UITEST|FAIL|new-map size \"%s\"|got %dx%d grid %d "
+                            "row %d field %d|want %dx%d grid %d row %d field 0\n",
+                            SZCASE[c].typed, g_newW, g_newH, eui_new_grid(),
+                            g_newSize, g_numKind, SZCASE[c].w, SZCASE[c].h,
+                            SZCASE[c].grid, EUI_SIZE_CUSTOM);
+                } else {
+                    fprintf(stderr, "UITEST|ok  |new-map size \"%s\"|%d x %d on the %d "
+                            "grid\n", SZCASE[c].typed, g_newW, g_newH, eui_new_grid());
+                }
+            }
+            /* AND THAT THE FIELD DIES WITH ITS DIALOG. CANCEL closes the dialog without
+               closing the field, so the field has to notice; a stranded one would hold
+               the keyboard and the editor's letter keys would stop answering. */
+            g_newSize = 0;
+            if (eui_open_rename()) {
+                g_euiModal = MODAL_NONE;
+                eui_num_type("99");
+                if (g_numKind != NUM_NONE) {
+                    fails++;
+                    fprintf(stderr, "UITEST|FAIL|the new-map size field survived its "
+                            "dialog and still holds the keyboard (kind %d)\n", g_numKind);
+                } else {
+                    fprintf(stderr, "UITEST|ok  |the new-map size field closes with its "
+                            "dialog\n");
+                }
+                g_euiModal = MODAL_NEW;
+            }
+            g_newW = keepW; g_newH = keepH; g_newSize = keepSz;
+            eui_num_close();
         }
         for (int i = 0; i < EUI_THEATER_N; i++) {
             float ox, oy, ow, oh;
@@ -10058,12 +14471,12 @@ static int edit_uitest(int fbw, int fbh)
             eui_expect(ox + ow * 0.5f, oy + oh * 0.5f, fbw, fbh, EUI_MODALOPT, 10 + i,
                        nm, &fails);
         }
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < NEWKIND_N; i++) {
             float ox, oy, ow, oh;
             eui_modal_opt_rect(&L, fbw, fbh, 2, i, &ox, &oy, &ow, &oh);
-            char nm[40]; snprintf(nm, sizeof nm, "new-map kind %d", i);
-            eui_expect(ox + ow * 0.5f, oy + oh * 0.5f, fbw, fbh, EUI_MODALOPT, 20 + i,
-                       nm, &fails);
+            char nm[40]; snprintf(nm, sizeof nm, "new-map kind %s", NEWKIND_LABEL[i]);
+            eui_expect(ox + ow * 0.5f, oy + oh * 0.5f, fbw, fbh, EUI_MODALOPT,
+                       20 + NEWKIND_ROW[i], nm, &fails);
         }
         for (int i = 0; i < 2; i++) {
             float bx, by, bw, bh;
@@ -10093,6 +14506,86 @@ static int edit_uitest(int fbw, int fbh)
             eui_expect(mx2 + mw2 * 0.5f, my2 + 79 * S, fbw, fbh, EUI_DEAD, -1,
                        "save-as name field", &fails);
         }
+        /* THE OPEN MAP DIALOG, probed open, over a stub list.
+         *
+         * It is the one modal the harness never opened, and it spent that whole time
+         * unusable: the arm re-declared lx and ly -- the two names EUI_IN expands to --
+         * as the list's own origin, so every test inside it compared the pointer with
+         * itself and answered "tab 0" for any click anywhere in the dialog. No row could
+         * be selected, so no map could be reopened, and nothing in the suite could see
+         * it. Opening the modal is the only thing that would have.
+         *
+         * The list is STUBBED rather than scanned. A headless run has no user_maps
+         * folder, edit_build_maplist would find nothing, and a probe over an empty list
+         * asserts nothing at all. Both tabs are walked because the tab is what changes
+         * the row count, and the first row past the last entry is probed for the
+         * OPPOSITE answer: the draw stops there and so must the hit test. */
+        {
+            const std::vector<MapEntry> hadList = g_mapList;
+            const bool hadBuilt  = g_mapListBuilt;
+            const int  hadTab    = g_mapListTab;
+            const int  hadSel    = g_mapListSel;
+            const int  hadScroll = g_mapListScroll;
+            g_mapList.clear();
+            for (int k = 0; k < 7; k++) {
+                MapEntry me;
+                memset(&me, 0, sizeof me);
+                me.kind = (k < 4) ? 'U' : 'O';
+                snprintf(me.scen, sizeof me.scen, "UITEST%d", k);
+                snprintf(me.name, sizeof me.name, "uitest map %d", k);
+                g_mapList.push_back(me);
+            }
+            g_mapListBuilt  = true;
+            g_mapListSel    = -1;
+            g_mapListScroll = 0;
+            g_euiModal      = MODAL_OPEN;
+
+            float omx, omy, omw, omh;
+            eui_modal_rect(&L, fbw, fbh, &omx, &omy, &omw, &omh);
+            const float mpad = 18 * S;
+            const float dlx = omx + mpad,     dly = omy + 74 * S;
+            const float dlw = omw - mpad * 2, dlh = omh - 74 * S - 60 * S;
+            const float dtw = (dlw - 6 * S) * 0.5f;
+            for (int i = 0; i < 2; i++) {
+                char nm[40]; snprintf(nm, sizeof nm, "open-map tab %d", i);
+                eui_expect(dlx + i * (dtw + 6 * S) + dtw * 0.5f, dly + 14 * S,
+                           fbw, fbh, EUI_MODALOPT, 30 + i, nm, &fails);
+            }
+            /* The header is prose and nothing else. It answered "tab 0" for as long as
+               the shadowing lasted, which makes it the single sharpest probe here. */
+            eui_expect(omx + omw * 0.5f, omy + 30 * S, fbw, fbh, EUI_DEAD, -1,
+                       "open-map header", &fails);
+            const int dfit = (int)((dlh - 40 * S) / (24 * S));
+            for (int t = 0; t < 2; t++) {
+                g_mapListTab = t;
+                const int shown = edit_maplist_count(t ? 'O' : 'U');
+                for (int r = 0; r < dfit; r++) {
+                    float rx, ry, rw, rh;
+                    eui_openlist_row_rect(dlx, dly, dlw, S, r, &rx, &ry, &rw, &rh);
+                    char nm[40];
+                    snprintf(nm, sizeof nm, "open-map tab %d row %d", t, r);
+                    if (r >= shown) {
+                        eui_expect_not(rx + rw * 0.5f, ry + rh * 0.5f, fbw, fbh,
+                                       EUI_MODALOPT, 40 + r, nm, &fails);
+                        break;
+                    }
+                    eui_expect(rx + rw * 0.5f, ry + rh * 0.5f, fbw, fbh,
+                               EUI_MODALOPT, 40 + r, nm, &fails);
+                }
+            }
+            for (int i = 0; i < 2; i++) {
+                float bx, by, bw, bh;
+                eui_modal_btn_rect(&L, fbw, fbh, i, &bx, &by, &bw, &bh);
+                char nm[40]; snprintf(nm, sizeof nm, "open-map button %d", i);
+                eui_expect(bx + bw * 0.5f, by + bh * 0.5f, fbw, fbh, EUI_MODALBTN, i,
+                           nm, &fails);
+            }
+            g_mapList       = hadList;
+            g_mapListBuilt  = hadBuilt;
+            g_mapListTab    = hadTab;
+            g_mapListSel    = hadSel;
+            g_mapListScroll = hadScroll;
+        }
         g_euiModal = hadModal;
     }
 
@@ -10110,6 +14603,160 @@ static int edit_uitest(int fbw, int fbh)
    cartridge mesh appears with its shadow, its health bar and its radar blip. The brain
    is not consulted and must not be -- it has no create-with-house-and-cell, and every
    creation path it does have is a game action with game consequences. */
+
+/* WHERE A TERRAIN OBJECT REALLY STANDS, which is not the middle of the cell its INI
+ * line names.
+ *
+ * TerrainClass::Center_Coord is Coord_Add(Coord, Class->CenterBase) (terrain.cpp:705).
+ * Coord is NOT the middle of that cell. ObjectClass::Unlimbo stores
+ * Class_Of().Coord_Fixup(coord) (object.cpp:1258), TerrainTypeClass::Coord_Fixup is
+ * Coord_Whole (tdata.cpp:965), and Coord_Whole zeroes both sub-lepton fields
+ * (function.h:786-791), so Coord is the cell's CORNER. A recorded dump agrees: a T01 on
+ * cell 39,51 reports lx=9984, which is 39*256 with no half cell in it. CenterBase is the
+ * XYP_COORD
+ * pair every type declares in tdata.cpp: a PIXEL offset turned into leptons by
+ * (p * 256) / 24, integer division included (function.h:727, display.h:41-46).
+ *
+ * Measured on T01: XYP_COORD(11, 41) is 117 and 437 leptons, so the tree stands at
+ * cell + (128 + 117)/256 east and (128 + 437)/256 south, i.e. +0.957 and +2.207. That is
+ * 1.707 cells SOUTH of the cx + 0.5, cy + 0.5 this function used to stamp. Every LOADED
+ * map already draws it in the right place, because the brain exports Center_Coord as
+ * clx/cly and the parser divides that by 256: the editor was the only thing putting a
+ * tree anywhere else, so placing one, saving and reopening made it jump.
+ *
+ * THE FOOTPRINT BRANCH IS NOT THE ANSWER. Most tree types occupy {(0,1)} rather than the
+ * cell that was clicked, so the span centre a building uses gives cy + 1.5: closer, and
+ * still 0.707 of a cell north of where T01 really is. Nor is the offset derivable from
+ * the occupy list at all, and TC05 is the proof -- six cells whose span centre is
+ * (1.5, 1.5), standing at (2.039, 2.414). The numbers have to be read.
+ *
+ * The PIXEL pair is stored rather than the lepton so a row can be checked against the
+ * line it came from without arithmetic. Transcribed here rather than added to the
+ * generated table header, because a script writes that file out of the brain and does
+ * not emit this column yet, so a copy there would vanish the next time it ran. A type
+ * with no row keeps the cell centre and says so, which is the old behaviour rather than
+ * a confidently wrong new one. */
+struct TerrainCenter { const char* code; short px, py; };
+static const TerrainCenter TERRAIN_CENTER[] = {
+    { "ROCK1", 33, 41 }, { "ROCK2", 24, 23 }, { "ROCK3", 20, 39 }, { "ROCK4", 12, 20 },
+    { "ROCK5", 17, 19 }, { "ROCK6", 28, 40 }, { "ROCK7", 57, 22 }, { "SPLIT2", 18, 44 },
+    { "SPLIT3", 18, 44 }, { "T01", 11, 41 }, { "T02", 11, 44 }, { "T03", 12, 45 },
+    { "T04",   8,  9 }, { "T05", 15, 41 }, { "T06", 16, 37 }, { "T07", 15, 41 },
+    { "T08", 14, 22 }, { "T09", 11, 22 }, { "T10", 25, 43 }, { "T11", 23, 44 },
+    { "T12", 14, 36 }, { "T13", 19, 40 }, { "T14", 19, 40 }, { "T15", 19, 40 },
+    { "T16", 13, 36 }, { "T17", 18, 44 }, { "T18", 33, 40 }, { "TC01", 28, 41 },
+    { "TC02", 38, 41 }, { "TC03", 33, 35 }, { "TC04", 44, 49 }, { "TC05", 49, 58 },
+};
+static const int TERRAIN_CENTER_N =
+    (int)(sizeof TERRAIN_CENTER / sizeof TERRAIN_CENTER[0]);
+
+/* The type's CenterBase in cells, or false if this table has never heard of it. The
+   conversion is the engine's own, integer division and all: doing it in floating point
+   would land the anchor a fraction of a lepton away from the number the brain reports
+   for the very same object once the map is saved and read back. */
+static bool edit_terrain_center(const char* code, float* ox, float* oz)
+{
+    for (int i = 0; i < TERRAIN_CENTER_N; i++) {
+        if (strcmp(TERRAIN_CENTER[i].code, code)) continue;
+        *ox = (float)((int)TERRAIN_CENTER[i].px * 256 / 24) / 256.0f;
+        *oz = (float)((int)TERRAIN_CENTER[i].py * 256 / 24) / 256.0f;
+        return true;
+    }
+    return false;
+}
+
+/* ------------------------------------------------------------------------------------
+ *  The five places a man can stand in a cell
+ *
+ *  Only infantry are allowed to stop anywhere but the middle of a cell, and only on
+ *  these five points: StoppingCoordAbs (const.cpp:56) as a fraction of a cell, measured
+ *  from the cell's north-west corner. The centre first, then the four quincunx spots in
+ *  the order the fifth field of an [INFANTRY] line numbers them -- upper left, upper
+ *  right, lower left, lower right. One table, read by the placement below and by the
+ *  recovery further down: two copies of it that disagreed would put a man in one place
+ *  and write another into the file.
+ * ---------------------------------------------------------------------------------- */
+static const float EDIT_SUBCELL_X[5] = { 0.5f, 0.25f, 0.75f, 0.25f, 0.75f };
+static const float EDIT_SUBCELL_Z[5] = { 0.5f, 0.25f, 0.25f, 0.75f, 0.75f };
+
+static int edit_subcell_of(float wx, float wz, int cx, int cy);   /* defined below */
+
+/* WHICH SPOT A POINT INSIDE A CELL ASKS FOR, by the engine's rule rather than by nearest
+   neighbour, because the two do not agree. CellClass::Spot_Index (cell.cpp:1630) takes
+   the centre whenever the point is within 60 leptons of it, and only outside that picks
+   a quadrant by comparing each axis against the half cell. Its distance is the engine's
+   octagonal approximation -- longer axis plus half the shorter -- which draws a wider
+   centre than splitting the cell evenly between the five points would, so a click that
+   is merely somewhere in the middle gets the middle. It is worked in leptons here rather
+   than in cell fractions because a cell is 256 leptons and the integer halving is part
+   of the answer. */
+/* THE PRECEDENT IS WESTWOOD'S OWN MAP EDITOR, not a rule reconstructed from runtime
+   behaviour: mapedplc.cpp:1166-1183 places infantry by taking
+   Pixel_To_Coord(Get_Mouse_X(), Get_Mouse_Y()), picking the closest sub-position from
+   it, and returning -1 when nothing is free. The pointer choosing the spot is the
+   original behaviour; the derivation below is how that choice is made. */
+static int edit_spot_index(float fx, float fz)
+{
+    int lx = (int)(fx * 256.0f);
+    int lz = (int)(fz * 256.0f);
+    if (lx < 0) lx = 0;
+    if (lx > 255) lx = 255;
+    if (lz < 0) lz = 0;
+    if (lz > 255) lz = 255;
+    int dx = lx - 128; if (dx < 0) dx = -dx;
+    int dz = lz - 128; if (dz < 0) dz = -dz;
+    if ((dz > dx ? dz + dx / 2 : dx + dz / 2) < 60) return 0;
+    return 1 + (lx > 128 ? 1 : 0) + (lz > 128 ? 2 : 0);
+}
+
+/* The spot asked for, or the nearest free one, or -1 when the cell already holds five
+   men. CellClass::Closest_Free_Spot (cell.cpp:1682) walks the same precalculated table
+   of nearest neighbours, and this is that table. One departure, deliberate: when the
+   CENTRE is asked for and is taken, the engine shuffles the remaining four with
+   Random_Pick so that crowds forming at runtime do not clump. An editor cannot, because
+   the same click has to put a man in the same place every time it is made, so the fixed
+   order is used for the centre too.
+
+   Note that nothing else keeps men off each other: edit_cell_occupied counts only
+   buildings and terrain, so a cell takes as many infantry as it has free spots and no
+   more. Refusing the sixth is the point, and the reason is not that the second man fails
+   to load. During Read_Scenario_Ini, ScenarioInit is held non-zero (scenarioini.cpp:219
+   to :648), so InfantryClass::Unlimbo asks Closest_Free_Spot with any = true, which
+   returns the requested spot without testing occupancy at all (cell.cpp:1717-1722), and
+   ObjectClass::Unlimbo short-circuits Can_Enter_Cell on ScenarioInit (object.cpp:1256).
+   BOTH men load, standing on one point, and Set_Occupy_Bit (infantry.cpp:3185) ORs a bit
+   that was already set. They then share one occupy bit, so the first to walk off clears
+   it while the other is still standing there, and the cell advertises a spot that is not
+   free. That is what a duplicate sub-cell buys, and it is why the sixth is refused here.
+
+   ONE THING THIS DELIBERATELY DOES NOT REFUSE. Closest_Free_Spot is called with
+   any = false by the engine's own editor and returns 0 for a cell carrying
+   Flag.Occupy.Vehicle or a Monolith (cell.cpp:1708-1711), so 1995's editor will not
+   stand a man inside a tank, and the web editor refuses it too
+   (docs/editor-parity/web-features.md:59). edit_cell_occupied (edit_mod.h:623) ignores
+   K_UNIT, so this one allows it, exactly as it did before this change. That is left
+   alone on purpose rather than overlooked: it is a pre-existing difference from both
+   other editors, it is not what was reported, and it is registered
+   with the other two gaps in this block. */
+static int edit_free_subcell(int cx, int cy, int want)
+{
+    static const unsigned char SEQ[5][4] = {
+        { 1, 2, 3, 4 }, { 0, 2, 3, 4 }, { 0, 1, 4, 3 }, { 0, 1, 4, 2 }, { 0, 2, 3, 1 }
+    };
+    bool taken[5];
+    for (int i = 0; i < 5; i++) taken[i] = false;
+    for (size_t i = 0; i < g_objects.size(); i++) {
+        const SimObject& o = g_objects[i];
+        if (o.kind != K_INFANTRY || o.cx != cx || o.cy != cy) continue;
+        taken[edit_subcell_of(o.wx, o.wz, o.cx, o.cy)] = true;
+    }
+    if (want < 0 || want > 4) want = 0;
+    if (!taken[want]) return want;
+    for (int i = 0; i < 4; i++)
+        if (!taken[SEQ[want][i]]) return (int)SEQ[want][i];
+    return -1;
+}
+
 static bool edit_place_q(int cx, int cy, bool quiet)
 {
     if (!g_editOn || g_editArmed < 0 || g_editArmed >= EDIT_ITEM_N) return false;
@@ -10144,6 +14791,110 @@ static bool edit_place_q(int cx, int cy, bool quiet)
         return true;
     }
 
+    /* AND TIBERIUM, for the same reason and by the same route. The cell test above is
+       already the engine's own rule for laying a non-wall overlay: OverlayClass::Mark
+       marks one down only where the cell carries no overlay, holds no terrain object and
+       stands on ground whose LandType is buildable (overlay.cpp:251-253), which is
+       edit_cell_ok exactly. Two things it does not cover are checked here. */
+    if (t->kind == EDIT_KIND_TIBERIUM) {
+        /* A WALL IS AN OVERLAY TOO, and a cell holds one. Walls are not objects, so the
+           occupancy test above cannot see them. */
+        if (edit_wall_at(cx, cy)) {
+            if (!quiet)
+                fprintf(stderr, "edit: refused tiberium at %d,%d -- a wall already holds "
+                        "that cell, and a cell holds one overlay\n", cx, cy);
+            return false;
+        }
+        /* THE FIRST AND LAST ROWS NEVER LOAD. OverlayClass::Read_INI keeps a cell only
+           while its flat number is at least one row in from each end of the engine's
+           grid (overlay.cpp:367), so tiberium painted on the top or bottom row is gone
+           before the mission starts. Refused with the reason, rather than accepted and
+           silently dropped. The engine's upper bound is a cell number rather than a row,
+           so it does admit column zero of the last row; that one cell is refused here
+           too, because "the bottom row is not a place to paint" is a rule an author can
+           hold in their head and "the bottom row except its first cell" is not. */
+        if (cy < 1 || cy > edit_ini_w() - 2) {
+            if (!quiet)
+                fprintf(stderr, "edit: refused tiberium at %d,%d -- row %d is the engine's "
+                        "top or bottom row, and overlay there is dropped as the mission "
+                        "loads\n", cx, cy, cy);
+            return false;
+        }
+        edit_tib_put(cx, cy);
+        return true;
+    }
+
+    /* AND A SMUDGE, by the same route again: a crater is per-CELL state, not an object.
+
+       The cell test above is STRICTER than the engine is at load time, deliberately.
+       Is_Generally_Clear short-circuits to true while ScenarioInit is held
+       (cell.cpp:423), so Read_INI will drop a scorch into water or under a tree that
+       Mark would refuse during play (smudge.cpp:215). Keeping the play-time rule at
+       authoring time is the choice here; a handful of shipped smudges do sit under an
+       object and still load, round-trip and save untouched, they just cannot be redrawn
+       by hand. That gap is registered. Three things the object test cannot see are
+       checked below. */
+    if (t->kind == EDIT_KIND_SMUDGE) {
+        /* A BUILDING'S APRON IS A SMUDGE TOO, and Mark writes only into a cell that
+           carries none. edit_smudge_at cannot see a bib, so ask separately. */
+        if (edit_bib_at(cx, cy)) {
+            if (!quiet)
+                fprintf(stderr, "edit: refused %s at %d,%d -- a building's apron holds "
+                        "that cell, and a cell holds one smudge\n", t->code, cx, cy);
+            return false;
+        }
+        /* A WALL blocks it in the engine: Is_Generally_Clear refuses a cell whose overlay
+           is a wall (cell.cpp:434), and walls are not objects, so the test above cannot
+           see one. */
+        if (edit_wall_at(cx, cy)) {
+            if (!quiet)
+                fprintf(stderr, "edit: refused %s at %d,%d -- a wall holds that cell, and "
+                        "the engine lays no smudge under one\n", t->code, cx, cy);
+            return false;
+        }
+        /* A TIBERIUM FIELD HIDES IT. The console draws ONE decal per cell and an overlay
+           beats a crater or a scorch, so a smudge under crystal would be authored, saved
+           and never seen. Refused rather than accepted invisibly. */
+        if (edit_tib_at(cx, cy) >= 0) {
+            if (!quiet)
+                fprintf(stderr, "edit: refused %s at %d,%d -- tiberium covers that cell, "
+                        "and an overlay is drawn instead of the smudge under it\n",
+                        t->code, cx, cy);
+            return false;
+        }
+        int type = -1;
+        for (int k = 0; k < SMUDGE_ROW_N; k++)
+            if (!strcmp(SMUDGE_ROW[k].code, t->code)) {
+                type = (int)SMUDGE_ROW[k].type;
+                break;
+            }
+        if (type < 0) return false;
+        edit_smudge_put(cx, cy, type);
+        return true;
+    }
+
+    /* WHICH OF THE FIVE SUB-CELL POSITIONS a man goes on, settled here rather than with
+       the draw anchor below because it can still refuse, and the snapshot on the next
+       line is taken only once nothing can.
+
+       The pointer is the only thing fine enough to say which spot is wanted: there is no
+       sub-cell control on the palette and a cell is the finest thing the cursor names. A
+       placement made anywhere but under the pointer -- the script verb, or the outward
+       search for buildable ground a shot proof runs -- has no fraction to read and asks
+       for the centre, which is where a lone man belongs anyway. */
+    int sub = 0;
+    if (t->kind == EDIT_KIND_INFANTRY) {
+        const int want = (g_editOverMap && cx == g_editCellX && cy == g_editCellY)
+                             ? edit_spot_index(g_editCellFx, g_editCellFz) : 0;
+        sub = edit_free_subcell(cx, cy, want);
+        if (sub < 0) {
+            if (!quiet)
+                fprintf(stderr, "edit: refused %s at %d,%d -- all five sub-cell positions "
+                        "in that cell already hold a man\n", t->code, cx, cy);
+            return false;
+        }
+    }
+
     /* Taken here rather than at the top: everything above this line can still refuse,
        and an undo stack full of refused placements is an undo button that looks
        broken. */
@@ -10160,11 +14911,29 @@ static bool edit_place_q(int cx, int cy, bool quiet)
     snprintf(so.type,  sizeof(so.type),  "%s", t->code);
     snprintf(so.house, sizeof(so.house), "%s",
              so.kind == K_TERRAIN ? "None" : EUI_HOUSES[g_editOwner].key);
+    /* WHICH SIDE THE PREVIEW DRAWS THIS AS, stated rather than left at zero.
+     *
+     * The renderer picks an object's house texture table and its selection colour from
+     * act, the brain's HouseClass::ActLike, and only falls back to reading the owner NAME
+     * when act is negative. The struct above is memset to zero, and zero is not "unset":
+     * it is HOUSE_GOOD. So everything the editor stamped drew in GDI livery whatever chip
+     * was armed, and so did every tree, which the brain reports with no side at all.
+     *
+     * Clearing act to -1 would not answer it either. The name fallback knows GoodGuy,
+     * BadGuy and Neutral and nothing else, so Special and all eight multiplayer seats
+     * would resolve to "unknown" and take the Nod table -- a different wrong answer. The
+     * HOUSE INDEX is the value, because a house no lobby has assigned a side to keeps its
+     * own (house.cpp:402, ActLike = Class->House), which is exactly the state a map being
+     * authored is in. Terrain is -1 because the brain reports -1 for anything that is not
+     * a TechnoClass, and matching it is what makes an editor tree and a loaded tree draw
+     * through the same table. */
+    so.act = (so.kind == K_TERRAIN) ? -1 : g_editOwner;
     so.cx = cx;  so.cy = cy;
     so.tcx = cx; so.tcy = cy;
 
-    /* The draw anchor. A building sits at the centre of its cell span; everything else
-       stands in the middle of one cell. */
+    /* The draw anchor. A building sits at the centre of its cell span, a terrain object
+       at its cell centre plus the CenterBase its own type declares, and everything else
+       in the middle of the one cell it was put on. */
     int minx = 63, maxx = 0, miny = 63, maxy = 0;
     for (int i = 0; i < (int)t->n; i++) {
         if (t->dx[i] < minx) minx = t->dx[i];
@@ -10178,8 +14947,32 @@ static bool edit_place_q(int cx, int cy, bool quiet)
         so.wx = so.ex = (float)cx + (float)(minx + maxx + 1) * 0.5f;
         so.wz = so.ez = (float)cy + (float)(miny + maxy + 1) * 0.5f;
     } else {
-        so.wx = so.ex = (float)cx + 0.5f;
-        so.wz = so.ez = (float)cy + 0.5f;
+        /* Everything that is not a building owns one cell, and its offset is measured
+           from that cell's north-west corner. A terrain object sits at its type's
+           CenterBase, and falls back to the middle like everything else if its type has
+           none (unreachable today, since TERRAIN_CENTER carries all 32 codes the palette
+           offers, but the corner is the wrong answer if it ever is reachable). A vehicle stands in the middle, which is StoppingCoordAbs[0]
+           (const.cpp:56). An infantryman stands on whichever of the five the pointer
+           asked for above.
+
+           The default is the middle rather than zero, and that is the whole of it: a
+           zero default put every placed vehicle and every placed man on the cell's
+           CORNER, half a cell from where the brain reports the same object once the map
+           is saved and read back (a unit's position comes back as clx/256, and the
+           fallback for a brain too old to send it is the cell centre). */
+        float ox = 0.5f, oz = 0.5f;
+        if (so.kind == K_TERRAIN) {
+            ox = oz = 0.0f;
+            if (!edit_terrain_center(t->code, &ox, &oz))
+                fprintf(stderr, "edit: %s has no CenterBase on record, so it is standing "
+                                "in the corner of the cell and the engine will not "
+                                "agree\n", t->code);
+        } else if (so.kind == K_INFANTRY) {
+            ox = EDIT_SUBCELL_X[sub];
+            oz = EDIT_SUBCELL_Z[sub];
+        }
+        so.wx = so.ex = (float)cx + ox;
+        so.wz = so.ez = (float)cy + oz;
     }
     so.face  = so.kind == K_BUILDING ? 0 : 96;   /* structures draw unrotated */
     so.tface = -1;
@@ -10203,9 +14996,53 @@ static void edit_draw_footprint(int fbw, int fbh)
     if (!g_editOn || !g_editOverMap) return;
     if (g_editMode == 4) return;      /* SCRIPT has no cell under the pointer */
 
+    /* A cliff piece armed from the ELEVATN drawer stamps through the TERRAIN path, not
+       the height brush. The click handler routes on exactly this test, so the preview
+       has to route on it too: without that the status line reads STAMP Sxx while the
+       overlay under the pointer paints the 2x2 brush lattice, which is a promise about
+       a w x h block answered by drawing something else. Picking an elevation TOOL
+       clears the arm, so the brush and a slope piece are never live at once. */
+    const bool slopeArmed = (g_editMode == 2 && g_terrArmed >= 0 &&
+                             eui_is_slope(g_terrArmed));
+
     /* ELEVATION: the blocks the brush covers, snapped to the 2x2 block lattice the tool
        actually works in -- showing a single cell would be a lie about what will move. */
-    if (g_editMode == 2) {
+    /* THE SMOOTH BRUSH'S OWN FOOTPRINT. It works on the CORNER lattice with a round
+       profile, so drawing the tier tool's 2x2 block square here would promise a shape
+       the click does not paint. Two tints: the full-strength centre, and the ring that
+       fades. */
+    if (g_editMode == 2 && !slopeArmed && g_sbrPage == 1) {
+        const float reach = g_sbrVal[0] + g_sbrVal[1];
+        const float ccx = (float)g_editCellX + 0.5f, ccy = (float)g_editCellY + 0.5f;
+        int g0x = (int)floorf(ccx - reach), g1x = (int)ceilf(ccx + reach);
+        int g0y = (int)floorf(ccy - reach), g1y = (int)ceilf(ccy + reach);
+        if (g0x < 0) g0x = 0;
+        if (g0y < 0) g0y = 0;
+        if (g1x > g_gridW - 1) g1x = g_gridW - 1;
+        if (g1y > g_gridH - 1) g1y = g_gridH - 1;
+        begin_overlay(fbw, fbh);
+        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        for (int cy = g0y; cy <= g1y; cy++)
+            for (int cx = g0x; cx <= g1x; cx++) {
+                const float dx = (float)cx + 0.5f - ccx, dy = (float)cy + 0.5f - ccy;
+                const float d = sqrtf(dx * dx + dy * dy);
+                if (d > reach) continue;
+                const bool wet = (edit_land_at(cx, cy) == EDIT_LAND_WATER);
+                const bool core = (d <= g_sbrVal[0]);
+                if (wet) glColor4f(1.0f, 0.35f, 0.35f, 0.20f);
+                else if (core) glColor4f(0.56f, 0.89f, 1.0f, 0.30f);
+                else glColor4f(0.56f, 0.89f, 1.0f, 0.12f);
+                glBegin(GL_TRIANGLES);
+                sb_place_cell_tris(cx, cy, fbw, fbh);
+                glEnd();
+            }
+        glDisable(GL_BLEND);
+        end_overlay();
+        return;
+    }
+    if (g_editMode == 2 && !slopeArmed) {
         const int bx = g_editCellX / 2, by = g_editCellY / 2;
         const bool ready = elev_ready();
         begin_overlay(fbw, fbh);
@@ -10231,11 +15068,14 @@ static void edit_draw_footprint(int fbw, int fbh)
         return;
     }
 
-    /* TERRAIN: the exact cells the block will overwrite, so a 4x3 river mouth shows its
-       whole shape before it lands rather than after. Green where it will write, red on
-       cells that fall off the map or that this theater's bank has no icon for -- those
-       are SKIPPED, and a skipped cell you were not told about is a hole in your river. */
-    if (g_editMode == 1) {
+    /* TERRAIN, and a cliff piece hand-stamped from the ELEVATN drawer: the exact cells
+       the block will overwrite, so a 4x3 river mouth shows its whole shape before it
+       lands rather than after. Green where it will write, RED where this theater's bank
+       has no icon -- those are SKIPPED, and a skipped cell you were not told about is a
+       hole in your river, or a gap in your cliff. A cell that falls off the map is drawn
+       as nothing at all, because there is no ground under the pointer to tint; the cell
+       count on the status line is what reports those. */
+    if (g_editMode == 1 || slopeArmed) {
         if (g_terrArmed < 0) return;
         const EditTemplate* e = &EDIT_TEMPLATES[g_terrArmed];
         begin_overlay(fbw, fbh);
@@ -10306,7 +15146,7 @@ static void edit_draw_footprint(int fbw, int fbh)
  *  THE WRITER OWNS FIVE SECTIONS AND PRESERVES EVERYTHING ELSE.
  *
  *  A scenario INI holds far more than the editor understands: triggers, teamtypes, the
- *  AI's base list, the briefing, per-house credits and alliances. A writer that emitted
+ *  AI's base list, the mission briefing, per-house credits and alliances. A writer that emitted
  *  only what it knows would silently gut a campaign mission the first time it saved --
  *  the map would still load, and every trigger that made it a mission would be gone.
  *
@@ -10358,16 +15198,16 @@ static bool edit_section_is_owned(const char* name)
 
 /* Infantry stand on one of five sub-cell positions (StoppingCoordAbs): the centre and
    four quincunx spots. SimObject carries the world position, not the index, so the index
-   is recovered from the fractional part -- which is exact, because the brain put it on
-   one of those five points in the first place. */
+   is recovered from the fractional part -- which is exact, because whatever put the man
+   there stood him on one of those five points: the brain reading a mission, or
+   edit_place_q putting one down. The quincunx is the one table above, not a second copy
+   of it. */
 static int edit_subcell_of(float wx, float wz, int cx, int cy)
 {
-    static const float SX[5] = { 0.5f, 0.25f, 0.75f, 0.25f, 0.75f };
-    static const float SZ[5] = { 0.5f, 0.25f, 0.25f, 0.75f, 0.75f };
     const float fx = wx - (float)cx, fz = wz - (float)cy;
     int best = 0; float bd = 1e9f;
     for (int i = 0; i < 5; i++) {
-        const float dx = fx - SX[i], dz = fz - SZ[i];
+        const float dx = fx - EDIT_SUBCELL_X[i], dz = fz - EDIT_SUBCELL_Z[i];
         const float d = dx * dx + dz * dz;
         if (d < bd) { bd = d; best = i; }
     }
@@ -10405,6 +15245,24 @@ static const EditPrior* edit_prior_find(const char* house, const char* type, int
     return NULL;
 }
 
+/* THE ORDER AN OBJECT THE EDITOR PLACED GOES OUT WITH.
+ *
+ * Guard for everything was right until there was tiberium to place. A harvester on Guard
+ * sits where it was put for the whole mission, so a map with a refinery, a harvester and
+ * a field authored here still earned nothing -- measured: mission=Guard at tick 5 and at
+ * tick 900, and the house's stored tiberium never left zero. The economy needs both
+ * halves, and this is the second one.
+ *
+ * Harvest is the shipped answer rather than a preference: 80 of the 81 harvesters in the
+ * campaign's [UNITS] carry it and one carries Guard, and that one is a deliberate
+ * exception which survives here because a harvester read out of a file keeps its own
+ * order -- this default is only ever consulted for an object with no history. Every
+ * other type stays on Guard, which is what the campaign gives them too. */
+static const char* edit_default_order(const char* type)
+{
+    return (type && !strcmp(type, "HARV")) ? "Harvest" : "Guard";
+}
+
 /* MOVING AN OBJECT MUST NOT DETACH ITS TRIGGER.
  *
  * The key is house|type|CELL, which is what identifies an object in an INI -- and the
@@ -10422,6 +15280,31 @@ static void edit_prior_rekey(const char* house, const char* type, int fromCell, 
     for (size_t i = 0; i < g_editPrior.size(); i++)
         if (!strcmp(g_editPrior[i].key, from)) {
             snprintf(g_editPrior[i].key, sizeof g_editPrior[i].key, "%s", to);
+            return;
+        }
+}
+
+/* AND ERASING ONE MUST NOT LEAVE ITS TRIGGER BEHIND.
+ *
+ * The same key, the other direction. An entry whose object is gone is not inert: it is
+ * house|type|cell, so the next object of that type placed on that cell for that house
+ * silently picks up the dead one's order and trigger. Undo is unaffected -- the delete
+ * snapshot carries the whole table, so the entry comes back with the object.
+ *
+ * TWO IDENTICAL OBJECTS CAN SHARE A CELL. edit_cell_ok refuses a footprint only over
+ * BUILDING and TERRAIN, so a second rifleman of the same house may stand on the first,
+ * and the two share one key. The entry therefore goes only once the LAST of them has,
+ * which is why this is called after the erase rather than before it. */
+static void edit_prior_drop(const char* house, const char* type, int cell)
+{
+    for (size_t i = 0; i < g_objects.size(); i++)
+        if (!strcmp(g_objects[i].house, house) && !strcmp(g_objects[i].type, type) &&
+            g_objects[i].cy * edit_ini_w() + g_objects[i].cx == cell) return;
+    char key[64];
+    edit_prior_key(key, sizeof key, house, type, cell);
+    for (size_t i = 0; i < g_editPrior.size(); i++)
+        if (!strcmp(g_editPrior[i].key, key)) {
+            g_editPrior.erase(g_editPrior.begin() + i);
             return;
         }
 }
@@ -10456,9 +15339,9 @@ static void edit_set_object_trigger(int idx, const char* trig)
     EditPrior e;
     memset(&e, 0, sizeof e);
     snprintf(e.key,   sizeof e.key,   "%s", key);
-    /* Guard is what a placed object already saves as, so the tag does not silently
+    /* The same default the writer would have given it, so the tag does not silently
        change its behaviour as a side effect of being tagged. */
-    snprintf(e.order, sizeof e.order, "Guard");
+    snprintf(e.order, sizeof e.order, "%s", edit_default_order(o.type));
     snprintf(e.trig,  sizeof e.trig,  "%s", trig && *trig ? trig : "None");
     g_editPrior.push_back(e);
 }
@@ -10493,8 +15376,34 @@ static int edit_tagged_count(int t)
  * The editor cannot place or erase these, so carrying them verbatim is exactly right:
  * it is the same passthrough the writer already does for every section it does not own,
  * applied to the rows of a section it owns only partly. A cell that the editor DOES
- * model wins, because the editor may have put a wall where a crate used to be. */
-struct OverlayExtra { short cell; char name[10]; };
+ * model wins, because the editor may have put a wall where a crate used to be.
+ *
+ * AND IT CANNOT PLACE TIBERIUM EITHER, which is the one of the five that decides whether
+ * a map has an economy at all. The writer above emits every cell of g_tib and the
+ * renderer draws them, so a map that HAS tiberium keeps it through any number of round
+ * trips. There is simply no tool that adds a cell and none that takes one away, so a map
+ * made from nothing has no tiberium, no refinery income, and no way to get either.
+ *
+ * WHAT SUCH A TOOL MUST KNOW, measured rather than assumed:
+ *   - The TI number is thrown away. MapClass::Overpass runs over the playable rectangle
+ *     as the scenario is read (scenarioini.cpp:489, map.cpp:905) and Tiberium_Adjust
+ *     re-picks the overlay at random across TIBERIUM1..12 (cell.cpp:1913). One brush is
+ *     honest; twelve would be twelve ways to write a number nobody reads back.
+ *   - The growth stage is derived, not authored. The same pass sets OverlayData from the
+ *     count of the cell's eight tiberium neighbours, {0,1,3,4,6,7,8,10,11}, and the cell
+ *     is worth (OverlayData + 1) * 25 credits (cell.cpp:1906-1934, type.h:897). A brush
+ *     that re-derives the stage over the cell it paints AND its eight neighbours, the
+ *     same shape as the wall mask above, draws the field the engine will draw.
+ *   - The first row never loads. OverlayClass::Read_INI keeps a cell only while it is at
+ *     least one row in from the top and the bottom of the engine grid (overlay.cpp:367),
+ *     so an overlay painted on row zero is gone before the mission starts. */
+/* `cell` is a FLAT INI cell number (y * edit_ini_w() + x), so it has to be as wide as
+   one. It was `short`, which holds a flat number for a 128 wide map and stops holding one
+   at 181 cells square: on a 256 map the numbers reach 65,535 against a signed short's
+   32,767, and :10530 admits anything below EDIT_GRID_MAX, so the top half of the map would
+   truncate to negative and :10704 would divide a negative by the stride. Widened for the
+   same reason as g_bldCellNow in cnc_eyes.cpp, and before there is a map that shows it. */
+struct OverlayExtra { int cell; char name[10]; };
 static std::vector<OverlayExtra> g_ovExtra;
 
 static void edit_read_overlay_extra(const char* path)
@@ -10527,7 +15436,7 @@ static void edit_read_overlay_extra(const char* path)
         }
         if (known) continue;
         OverlayExtra e;
-        e.cell = (short)cell;
+        e.cell = cell;
         snprintf(e.name, sizeof e.name, "%s", nm);
         g_ovExtra.push_back(e);
     }
@@ -10538,9 +15447,24 @@ static void edit_read_overlay_extra(const char* path)
                 (int)g_ovExtra.size(), g_ovExtra.size() == 1 ? "" : "s");
 }
 
+/* THE TWO CNC3D-OWNED [Basic] KEYS, read for the map being opened.
+ *
+ * CNC3DKind says whether the map belongs in the User Maps list or the skirmish one.
+ * CNC3DSmooth says the rung tool is unlocked on it because somebody has already painted
+ * smooth ground here -- see g_elevIniUnlock.
+ *
+ * BOTH, WHICH IS WHY THE EARLY `break` IS GONE. It stopped at the first key found, so
+ * whichever of the two came second in the file was never read.
+ *
+ * IT ASSIGNS THE LIVE FLAG AS WELL AS THE LATCH, and that is what stops the previous
+ * map's unlock standing over this one: this runs on every editor load -- the first boot,
+ * OPEN, NEW's donor reload, and the round trip through PLAY -- before anything can look
+ * at the flag. */
 static void edit_read_kind(const char* path)
 {
     g_mapIsMulti = 0;
+    g_elevIniUnlock = false;
+    g_elevSmoothUnlock = false;
     FILE* f = fopen(path, "rb");
     if (!f) return;
     char line[1024];
@@ -10549,12 +15473,14 @@ static void edit_read_kind(const char* path)
         const char* p = line;
         while (*p == ' ' || *p == '\t') p++;
         if (*p == '[') { inBasic = !strncasecmp(p, "[BASIC]", 7); continue; }
-        if (inBasic && !strncasecmp(p, "CNC3DKind", 9)) {
+        if (!inBasic) continue;
+        if (!strncasecmp(p, "CNC3DKind", 9))
             g_mapIsMulti = (strstr(p, "Multi") != NULL) ? 1 : 0;
-            break;
-        }
+        else if (!strncasecmp(p, "CNC3DSmooth", 11))
+            g_elevIniUnlock = (strchr(p, '1') != NULL);
     }
     fclose(f);
+    g_elevSmoothUnlock = g_elevIniUnlock;
 }
 
 /* THE MAP'S OWN NAME, out of [Basic] Name=. The map-list parser reads the same key for
@@ -10635,7 +15561,7 @@ static void edit_read_prior(const char* path)
 static const char* edit_order_for(const SimObject& o)
 {
     const EditPrior* e = edit_prior_find(o.house, o.type, o.cy * edit_ini_w() + o.cx);
-    return e ? e->order : "Guard";
+    return e ? e->order : edit_default_order(o.type);
 }
 
 static const char* edit_trigger_for(const SimObject& o)
@@ -10695,9 +15621,19 @@ static void edit_emit_owned(FILE* out)
            WALL_NAME is already in this file. */
         fprintf(out, "%d=%s\r\n", g_walls[i].y * edit_ini_w() + g_walls[i].x,
                 WALL_NAME[g_walls[i].kind]);
-    for (size_t i = 0; i < g_tib.size(); i++)
+    for (size_t i = 0; i < g_tib.size(); i++) {
+        /* ONE ROW PER CELL. A CellClass holds a single Overlay, so two rows on one key
+           are two answers to one question and whichever is read last wins by accident.
+           The wall is written above and the wall wins: it is the thing standing on the
+           cell, and the tiberium brush refuses to paint onto one. The guard is for a
+           document that already holds both, which the wall tool can still make. */
+        bool walled = false;
+        for (size_t k = 0; k < g_walls.size() && !walled; k++)
+            if (g_walls[k].x == g_tib[i].x && g_walls[k].y == g_tib[i].y) walled = true;
+        if (walled) continue;
         fprintf(out, "%d=TI%d\r\n", g_tib[i].y * edit_ini_w() + g_tib[i].x,
                 (int)g_tib[i].kind + 1);
+    }
     /* And the ones the editor does not model, unless it has since put something of its
        own on that cell. */
     for (size_t i = 0; i < g_ovExtra.size(); i++) {
@@ -10709,7 +15645,7 @@ static void edit_emit_owned(FILE* out)
         for (size_t k = 0; k < g_tib.size() && !taken; k++)
             if (g_tib[k].x == cx && g_tib[k].y == cy) taken = true;
         if (!taken)
-            fprintf(out, "%d=%s\r\n", (int)g_ovExtra[i].cell, g_ovExtra[i].name);
+            fprintf(out, "%d=%s\r\n", g_ovExtra[i].cell, g_ovExtra[i].name);
     }
 
     /* SMUDGE NAMES ARE A TABLE, NOT A FORMULA.
@@ -10718,7 +15654,7 @@ static void edit_emit_owned(FILE* out)
      * SmudgeType enum: craters 0-5, scorches 6-11, bibs 12-14 (defines.h:1379-1393,
      * names in sdata.cpp). So a crater was written as a scorch, a scorch under a name
      * six too high, and a bib as "SC13". The engine's From_Name does not know those
-     * names, so it DROPPED them -- and 25 of the 95 shipped missions carry authored
+     * names, so it DROPPED them -- and 25 of the 100 shipped missions carry authored
      * craters and scorches, every one of which was destroyed by opening the map and
      * saving it. Measured on SCB06EC: nine authored smudges in, nine wrong names out.
      *
@@ -10728,7 +15664,7 @@ static void edit_emit_owned(FILE* out)
      * lines look identical.
      *
      * BIBS ARE NOT WRITTEN AT ALL. They are the aprons the engine lays under a building
-     * by itself, and no shipped mission authors one -- all 178 authored smudges in the
+     * by itself, and no shipped mission authors one -- all 221 authored smudges in the
      * campaign are CR1 or SC1..SC6. Writing them back would freeze an engine-derived
      * decoration into the file, so moving the building later would leave its apron
      * behind under nothing. */
@@ -10819,6 +15755,10 @@ static int edit_write_ini(const char* src, const char* dst)
             }
             if (inBasic && !wroteKind) {
                 fprintf(out, "CNC3DKind=%s\n", g_mapIsMulti ? "Multi" : "Single");
+                /* THE SMOOTH-BRUSH UNLOCK, owned exactly as the tag below is: written
+                   only while it is true, and any older copy dropped further down, so a
+                   map that has never been smoothed keeps a file with no line in it. */
+                if (g_elevSmoothUnlock) fprintf(out, "CNC3DSmooth=1\n");
                 /* THE ENHANCED TAG. Written only when the map really has Enhanced rules,
                    and REMOVED when the last one is deleted -- a map that claims to need
                    an engine it does not need would be refused for nothing. The 1995
@@ -10857,6 +15797,7 @@ static int edit_write_ini(const char* src, const char* dst)
         }
         /* Drop any previous copy of the key rather than accumulating them. */
         if (inBasic && !strncasecmp(p, "CNC3DKind", 9)) continue;
+        if (inBasic && !strncasecmp(p, "CNC3DSmooth", 11)) continue;
         if (inBasic && !strncasecmp(p, "Enhanced", 8) && p[8] == '=') continue;
         if (inMap && !strncasecmp(p, "Version=", 8)) continue;
         if (!skipping) fputs(line, out);
@@ -10867,6 +15808,7 @@ static int edit_write_ini(const char* src, const char* dst)
     }
     if (inBasic && !wroteKind) {
         fprintf(out, "CNC3DKind=%s\n", g_mapIsMulti ? "Multi" : "Single");
+        if (g_elevSmoothUnlock) fprintf(out, "CNC3DSmooth=1\n");
         if (!g_enh.empty()) fprintf(out, "Enhanced=1\n");
     }
     /* A source file with none of the owned sections still needs them. */
@@ -10901,15 +15843,36 @@ static bool edit_write_bin(const char* dst)
         fprintf(stderr, "edit: wrote %s (8192 bytes)\n", dst);
         return true;
     }
-    int recs = 0;
-    for (int i = 0; i < g_editBinW * g_editBinH; i++) {
-        /* 255 is TEMPLATE_NONE and 0 is TEMPLATE_CLEAR1; Read_Binary_Big prefills
-           every cell clear, so neither is stored -- exactly its writer's rule. */
-        if (g_editTmpl[i] == 255 || g_editTmpl[i] == 0) continue;
-        fputc(i & 255, f); fputc((i >> 8) & 255, f);
-        fputc(g_editTmpl[i], f); fputc(g_editIcon[i], f);
-        recs++;
+    /* THIS FORMAT CANNOT EXPRESS A MAP BIGGER THAN ITS OWN STRIDE, and it has no way to
+       say so in the file. Its key is sixteen bits and its cells are read back at 128, so
+       a wider document written here would come back as ground somewhere else entirely,
+       record by record, with nothing anywhere reporting it. Refuse instead: the XL format
+       exists for maps past this point and this editor does not write it yet. */
+    if (g_editBinW > C3D_INI_STRIDE || g_editBinH > C3D_INI_STRIDE) {
+        fclose(f);
+        remove(dst);
+        fprintf(stderr, "edit: this map is %dx%d and the big-map .BIN can only express %d "
+                        "square. Not writing one, because the cells would be read back as "
+                        "different ground.\n",
+                g_editBinW, g_editBinH, C3D_INI_STRIDE);
+        return false;
     }
+    int recs = 0;
+    for (int cy = 0; cy < g_editBinH; cy++)
+        for (int cx = 0; cx < g_editBinW; cx++) {
+            const int i = cy * g_editBinW + cx;
+            /* 255 is TEMPLATE_NONE and 0 is TEMPLATE_CLEAR1; Read_Binary_Big prefills
+               every cell clear, so neither is stored -- exactly its writer's rule. */
+            if (g_editTmpl[i] == 255 || g_editTmpl[i] == 0) continue;
+            /* THE KEY IS AT THE FORMAT'S STRIDE, NOT THE DOCUMENT'S. They are both 128
+               for every big map this editor loads today, so emitting the bare index was
+               right by coincidence rather than by construction; spelling the conversion
+               out is what keeps it right if a document ever arrives at another width. */
+            const int key = cy * C3D_INI_STRIDE + cx;
+            fputc(key & 255, f); fputc((key >> 8) & 255, f);
+            fputc(g_editTmpl[i], f); fputc(g_editIcon[i], f);
+            recs++;
+        }
     fclose(f);
     fprintf(stderr, "edit: wrote %s (%d records, %d bytes, Version=1 sparse)\n",
             dst, recs, recs * 4);
@@ -10996,7 +15959,7 @@ static void edit_shot_prepare(int fbw, int fbh)
 /* A MINIMAL INI FOR A MAP THAT HAS NONE.
  *
  * edit_write_ini copies a source through and swaps the sections it owns, which is what
- * preserves the briefing, the triggers and the AI base list on a shipped mission. A map
+ * preserves the mission briefing, the triggers and the AI base list on a shipped mission. A map
  * made from scratch has no source to preserve, and copying the DONOR mission's would
  * give it somebody else's briefing and win condition.
  *
@@ -11005,6 +15968,14 @@ static void edit_shot_prepare(int fbw, int fbh)
  * triggers, so they are stated plainly rather than left absent for the engine to guess
  * at. Only the sections edit_write_ini does NOT own are written here -- it appends the
  * rest itself.
+ *
+ * SO THE MISSING [OVERLAY] IS NOT THE MISSING TIBERIUM. This seed carries no [OVERLAY],
+ * no [TERRAIN], no [STRUCTURES] and no [SMUDGE], and it should not: all of those are
+ * owned sections, and the writer appends every one of them from the document a moment
+ * later. This file is only ever read back by edit_write_ini itself, which drops the
+ * owned sections it finds and emits its own in their place. A new map has no tiberium
+ * because nothing in this editor can put a cell of it down, not because a heading is
+ * missing here.
  */
 static bool edit_write_seed_ini(const char* dst)
 {
@@ -11023,10 +15994,15 @@ static bool edit_write_seed_ini(const char* dst)
     /* The map's own name if it has been given one, and its slot if it has not. Both
        lists that show a user map read this key and nothing else. */
     fprintf(f, "Name=%s\r\n", edit_map_title());
-    fprintf(f, "Player=GoodGuy\r\n");
+    /* WHOSE MISSION THIS IS. [Basic] Player= is the house the engine hands to the human,
+       and it is read only in a normal game (scenarioini.cpp:369). A skirmish map keeps the
+       key anyway: the value is inert there, and a complete header is worth more than a
+       missing line. */
+    fprintf(f, "Player=%s\r\n", EUI_HOUSES[g_mapPlayer].key);
     fprintf(f, "CarryOverMoney=0\r\nBuildLevel=7\r\nTheme=No theme\r\n");
     fprintf(f, "Intro=x\r\nBrief=x\r\nAction=x\r\nWin=x\r\nLose=x\r\nPercent=0\r\n");
     fprintf(f, "CNC3DKind=%s\r\n", g_mapIsMulti ? "Multi" : "Single");
+    if (g_elevSmoothUnlock) fprintf(f, "CNC3DSmooth=1\r\n");
     fprintf(f, "\r\n[MAP]\r\n");
     /* Version FIRST: the engine reads it before it sizes anything else, and a seeded
        big map with the key missing would be read at the legacy stride. */
@@ -11036,9 +16012,13 @@ static bool edit_write_seed_ini(const char* dst)
     fprintf(f, "Theater=%s\r\n", thbrain);
     fprintf(f, "CNC3DTheater=%s\r\n", thname);
     fprintf(f, "X=%d\r\nY=%d\r\nWidth=%d\r\nHeight=%d\r\n", g_mapX, g_mapY, g_mapW, g_mapH);
-    /* Every house that can own something needs a section, or the engine has nobody to
-       give it to. */
-    for (int h = 0; h < 4; h++) {
+    /* A SECTION FOR EVERY HOUSE THE ENGINE HAS. It is not what makes a house exist:
+       HouseClass::Read_INI walks HOUSE_FIRST to HOUSE_COUNT and news every one of them,
+       taking a default for each key a missing section would have carried
+       (house.cpp:1961-2010). What the sections do is make a seeded map STATE its houses
+       rather than inherit whatever the defaults happen to be, which is the same reason
+       the keys above are written out instead of left absent. */
+    for (int h = 0; h < EUI_HOUSE_N; h++) {
         fprintf(f, "\r\n[%s]\r\n", EUI_HOUSES[h].key);
         fprintf(f, "Credits=5000\r\nMaxBuilding=150\r\nMaxUnit=150\r\n");
         fprintf(f, "Allies=%s\r\nEdge=North\r\n", EUI_HOUSES[h].key);
@@ -11105,6 +16085,10 @@ static void edit_save(void)
         return;
     }
     edit_write_bin(bin);
+    /* THE DISK MATCHES THE SCREEN AGAIN, and only here: every earlier return in this
+       function is a save that did not happen, and clearing the flag on one of those
+       would be the editor promising a file that was never written. */
+    g_editDirty = false;
     {
         char what[128], where[200];
         snprintf(what, sizeof what, "SAVED  %s", g_editScen);
@@ -11118,6 +16102,9 @@ static void edit_save(void)
         snprintf(hgt, sizeof hgt, "%.*s.HGT", (int)(strlen(ini) - 4), ini);
         edit_write_hgt(hgt);
     }
+    /* The autosave clock restarts from EVERY write, manual or not, so pressing SAVE
+       pushes the next automatic one a full interval out rather than leaving it due. */
+    g_editSavedAt = g_editFrame;
 }
 
 
@@ -11212,8 +16199,9 @@ static void edit_set_world_grid(int nw, int nh)
             memset(&c, 0, sizeof c);
             c.x = (short)cx; c.y = (short)cy;
             /* Mid-grey until the bake computes a real mean colour: the in-game radar
-               plots mr/mg/mb, and black would read as unexplored. */
-            c.mr = c.mg = c.mb = 96;
+               plots avg[], and black would read as unexplored. Every set gets the same
+               placeholder, so switching terrain art on a fresh grid changes nothing. */
+            memset(c.avg, 96, sizeof c.avg);
             if (cx < ow && cy < oh) {
                 /* Keep the old cell where one stood at this spot (row-major guess,
                    scan fallback -- the same lookup edit_pack_cell makes). */
@@ -11290,7 +16278,7 @@ static void edit_next_user_name(char* out, int n)
 /* ------------------------------------------------------------------------------------
  *  SAVE AS -- name the map, keep the slot
  *
- *  The request was to NAME maps instead of living with USER07. The name cannot be the
+ *  the project owner asked to NAME his maps instead of living with USER07. The name cannot be the
  *  FILENAME: the game finds user maps by probing USER00..USER99 (app/cnc3d.cpp
  *  usermaps_scan), so a map saved as "Tiberium Valley.INI" would work perfectly in this
  *  editor and never appear in the game at all. So the file keeps a slot and the name
@@ -11302,7 +16290,7 @@ static void edit_next_user_name(char* out, int n)
  * ---------------------------------------------------------------------------------- */
 
 /* Byte copy. The copy is the SOURCE the save then writes through, which is what carries
-   the briefing, the houses, the win/lose conditions and everything else this editor
+   the mission briefing, the houses, the win/lose conditions and everything else this editor
    does not model across to the new file. Without it a Save As off a cartridge mission
    would land on edit_save's "no source, seed a fresh header" path and quietly throw all
    of that away. */
@@ -11421,11 +16409,23 @@ static void edit_blank_map(int sizeIdx, int multi)
        calling itself "GDI Mission 1" and would be filed under that name. It shows as
        its slot until SAVE AS gives it one. */
     g_editTitle[0] = 0;
-    const int w = EUI_SIZES[sizeIdx].w, h = EUI_SIZES[sizeIdx].h;
+    /* WHICH ROW WAS ASKED FOR, held inside the table. The script verb that drives this
+       dialog passes the row straight through from a text file and nothing checked it,
+       so an out-of-range number read past the end of EUI_SIZES; a longer table does not
+       fix that, it only moves where it lands. */
+    if (sizeIdx < 0 || sizeIdx >= EUI_SIZE_N) {
+        fprintf(stderr, "edit: size row %d does not exist (0..%d); using MEDIUM\n",
+                sizeIdx, EUI_SIZE_N - 1);
+        sizeIdx = 1;
+    }
+    const bool custom = (sizeIdx == EUI_SIZE_CUSTOM);
+    const int w = custom ? g_newW : EUI_SIZES[sizeIdx].w;
+    const int h = custom ? g_newH : EUI_SIZES[sizeIdx].h;
     /* The GRID first: the four legacy presets are playable rectangles inside the
        64x64 grid; the BIG MAP preset is the full 128 grid with its rectangle inset,
-       and the world must be that size before anything below paints into it. */
-    const int grid = EUI_SIZES[sizeIdx].grid;
+       and a TYPED one takes whichever grid its longest side can be numbered on. The
+       world must be that size before anything below paints into it. */
+    const int grid = custom ? eui_new_grid() : EUI_SIZES[sizeIdx].grid;
     edit_set_world_grid(grid, grid);
     /* The DOCUMENT follows the grid: a new map's .BIN is exactly the world, and the
        blank pass below writes every cell of it. Without this, making a 64 map right
@@ -11498,9 +16498,44 @@ static void edit_blank_map(int sizeIdx, int multi)
         g_shadeReady = false;      /* the lighting is derived from the heights */
     }
 
+    /* AND THE BUILDING PAD OVERLAY, the one piece of donor state this list had missed.
+     *
+     * Every height the renderer draws, and every height the editor's geometry
+     * reads, comes through corner_raw, and corner_raw prefers the pad to the map's own
+     * corner. The elevation tool's own tier readout does NOT: elev_seed reads
+     * g_pack.corner directly, which is exactly why the tools reported themselves working
+     * while nothing moved. Until this line the pad was rebuilt only from a brain dump,
+     * and a blank map never gets another one, so the last dump's pads stood
+     * over ground the elevation tools were writing underneath: a raise or a lower wrote
+     * its corners and nothing appeared to move. Raised ground that cannot be modified is
+     * one omission, not two.
+     *
+     * MEASURED on a medium map, sampling all 4096 cells. A new DESERT map came up with
+     * 103 cells off the flat, a one rung plateau over x20..34, y15..26, from its donor's
+     * thirteen buildings on high ground. It is not a desert fault: a new map in the
+     * theater already loaded takes the fast path above and never reboots, so it inherits
+     * whatever map was open (61 cells, from a session on the fifth Nod mission), and the
+     * three theaters that looked clean were only lucky in their donors carrying no
+     * buildings at all. On the 128 grid it is not even stale, it is displaced: a pad
+     * written at stride 65 and read back at stride 129 puts the plateau elsewhere again.
+     *
+     * REBUILT RATHER THAN ZEROED, because the rebuild is what owns these two arrays: it
+     * is idempotent, it derives only from the raw corners, and it answers for whatever
+     * the object list holds, which here is nothing. It runs AFTER the flatten so that it
+     * measures the ground this map actually has, and it leaves g_shadeReady alone, which
+     * is right because the line above has already cleared it. */
+    terrain_pads_rebuild();
+
+    ah_report_clear();           /* a new document, so no report and no standing arm */
     g_elevSeeded = false;
     g_elevConverted = true;      /* a map made on the ladder is already on it */
     g_elevTouched = true;        /* so its .HGT is written */
+    /* AND THE SMOOTH-BRUSH UNLOCK IS THE PREVIOUS MAP'S, so it goes with the previous
+       map. This is not covered by the load path: edit_request_new has a FAST PATH that
+       never reboots when the new map's theater matches the pack already loaded, so
+       edit_read_kind is not called and nothing else would clear it. A blank map is on
+       the ladder anyway, which is what the line above says. */
+    g_elevSmoothUnlock = g_elevIniUnlock = false;
     elev_seed();
     g_elevConverted = true;
 
@@ -11521,6 +16556,10 @@ static void edit_blank_map(int sizeIdx, int multi)
     g_waypointArmed = -1;
 
     g_undo.clear(); g_redo.clear(); g_editLoadedOk = false;
+    /* A BLANK DOCUMENT IS NOT UNSAVED WORK. The undo stack is gone with the map it
+       belonged to, so the flag derived from it goes too, and the quit warning is
+       disarmed with it. */
+    g_editDirty = false; g_editQuitAsked = false;
     g_editArmed = -1; g_terrArmed = -1;
     g_euiRadarDirty = 1;
     g_mapListBuilt = false;
@@ -11538,19 +16577,41 @@ static void edit_blank_map(int sizeIdx, int multi)
    point in the loop, for the same reason Play's is. */
 static int  g_editOpenReq = 0;          /* 1 = open g_editOpenScen, 2 = new map */
 static char g_editOpenScen[32] = "";
+static char g_editOpenDir[1024] = "";   /* the folder that row was LISTED from */
 static int  g_editNewPending = 0;
 
-static void edit_request_open(const char* scen)
+/* THE FOLDER TRAVELS WITH THE NAME. Opening used to pass the scenario alone and the
+   reboot then looked for it under the session's launch --dir, which is not where the
+   USER MAPS tab found it. Passing both is what makes the browser's two tabs actually
+   openable, and it is why MapEntry now carries a dir. */
+static void edit_request_open(const char* scen, const char* dir)
 {
     snprintf(g_editOpenScen, sizeof g_editOpenScen, "%s", scen ? scen : "");
+    snprintf(g_editOpenDir,  sizeof g_editOpenDir,  "%s", dir  ? dir  : "");
+    /* THE REPORT BELONGS TO THE MAP IT WAS MEASURED ON, and opening another one is the
+       one way it could outlive its subject. Undo, redo, revert, every elevation stroke
+       and a brand new document all cleared it already; OPEN did not, so a fit run on one
+       map left its marks standing while a different map came up underneath them. Cleared
+       here, at the REQUEST, rather than after the reboot, because the frames between the
+       two still draw and the marks would describe ground that is on its way out. */
+    ah_report_clear();
     g_editOpenReq = 1;
 }
 
 static void edit_request_new(void)
 {
+    /* A NUMBER STILL BEING TYPED IS STILL AN ANSWER. CREATE can arrive with the size
+       field open and uncommitted, and throwing that away would make the button ignore
+       the very thing on screen. Same two functions ENTER calls. */
+    if (g_numKind == NUM_NEWSIZE) eui_num_commit();
+    /* WHOSE MISSION THIS IS, settled here rather than at the blank map: the theater path
+       below finishes only after a reboot, and both paths have to reach the same answer.
+       A skirmish map takes GoodGuy, which the engine will not read. */
+    g_mapPlayer = (g_newMulti == NEWKIND_NOD) ? EUI_HOUSE_NOD : EUI_HOUSE_GDI;
     /* Same theater as the pack already loaded? Then nothing has to be reloaded. */
     if (g_newTheater == eui_theater_index(g_pack.theater)) {
-        edit_blank_map(g_newSize, g_newMulti);
+        /* The kind is three-valued now and this parameter is the multiplayer FLAG. */
+        edit_blank_map(g_newSize, g_newMulti == NEWKIND_MULTI);
         return;
     }
     snprintf(g_editOpenScen, sizeof g_editOpenScen, "%s", edit_donor_for(g_newTheater));
@@ -11674,15 +16735,44 @@ static bool edit_service_play(SDL_Window* win, const GameOpts* o)
         g_editOpenReq = 0;
         static GameOpts nx;
         static char scen[32];
+        static char dir[1024];
         nx = *o;
         snprintf(scen, sizeof scen, "%s", g_editOpenScen);
         nx.scen = scen;
+        /* THE MAP'S OWN FOLDER, not the session's launch folder, and this line is the
+           whole of the import bug.
+
+           `nx = *o` copies the command line the process started with, and Editor.app
+           always starts it with --dir missions/. The OPEN dialog's USER MAPS tab scans
+           missions/user_maps/. So the reboot below looked for the chosen scenario in a
+           folder it is not in, and because game_shutdown() has already run by then, the
+           editor was left alive over a world that no longer existed. That is what
+           "the editor crashes when importing a map" is from the outside.
+
+           It appeared to work because exactly two user maps, USER01 and USER91, also
+           exist under missions/ by the same name. Every other one, including any map a
+           player imports from another C&C editor, could not be opened at all.
+
+           A NEW MAP takes the missions root instead, because its donor mission is a
+           cartridge scenario and lives there: making a Desert map from a session opened
+           on a user map printed "edit: could not open SCB01EA" and then drew nothing,
+           which is the same bug wearing its other face. */
+        if (req == 2) edit_maps_root(dir, sizeof dir);
+        else          snprintf(dir, sizeof dir, "%s", g_editOpenDir);
+        if (dir[0]) nx.dir = dir;
         nx.pack = edit_pack_for(nx.dir, scen);   /* the map's own pack, or its
                                                     theater's donor -- see edit_pack_for */
         nx.edit = 1;
         game_shutdown();
         if (!game_boot(win, &nx)) {
-            fprintf(stderr, "edit: could not open %s\n", scen);
+            /* SAY IT ON SCREEN, not only on stderr. game_shutdown has already run, so
+               the editor is now sitting over a torn-down world and the loop falls
+               straight through into tick and draw: the player sees an empty map and no
+               reason for it. edit_toast prints to stderr as well, so the log keeps what
+               it always had. */
+            edit_toast(EUI_DANGER, "COULD NOT OPEN THAT MAP", scen);
+            fprintf(stderr, "edit: could not open %s in %s\n", scen,
+                    dir[0] ? dir : "(the session's own folder)");
             return false;
         }
         g_editOn = true;
@@ -11698,12 +16788,24 @@ static bool edit_service_play(SDL_Window* win, const GameOpts* o)
              - a paint or tag mode left on means the next right-drag to look around
                silently edits the map you just opened. */
         edit_trace_invalidate();          /* clears the trace AND marks the check stale */
+        /* And the unsaved-work flag, for the same reason as everything else on this
+           list: it describes the map that WAS open, and a different one is open now.
+           (Opening still discards the old map's unsaved edits without asking. That is
+           the same flag's next job and a separate report.) */
+        g_editDirty = false; g_editQuitAsked = false;
         g_zonePaint = g_tagMode = g_enhPaint = false;
         g_scriptRowOff = 0;
         g_scriptScroll = 0.0f;
+        /* AND THE SMOOTH-BRUSH UNLOCK, which belongs to the map and not to the session.
+           It is set to what the map that was JUST OPENED said, not to false: this line
+           runs AFTER game_boot, so edit_read_kind has already read the file, and a bare
+           false here would throw the file's own answer away and re-lock a map that says
+           it is unlocked. The previous map's unlock cannot survive either way. */
+        g_elevSmoothUnlock = g_elevIniUnlock;
         if (req == 2 && g_editNewPending) {
             g_editNewPending = 0;
-            edit_blank_map(g_newSize, g_newMulti);
+            /* The kind is three-valued now and this parameter is the multiplayer FLAG. */
+            edit_blank_map(g_newSize, g_newMulti == NEWKIND_MULTI);
         }
         return true;
     }
@@ -11888,6 +16990,7 @@ static void edit_shot_overlay_at_screen_centre(int fbw, int fbh)
  *  What the include site must already have declared
  *
  *      bool  screen_to_cell(float, float, int, int, int*, int*)
+ *      bool  screen_to_world(float, float, int, int, float*, float*)
  *      void  world_to_screen(float, float, float, int, int, float*, float*)
  *      float terrain_corner_y(int, int)
  *      void  begin_overlay(int, int) / end_overlay(void)
@@ -12001,6 +17104,143 @@ static int edit_undotest(const char* dir, const char* scen)
         fails++;
     } else {
         fprintf(stderr, "UNDOTEST|ok  |revert returned to the map as loaded\n");
+    }
+
+    /* ----------------------------------------------------------------------------
+     *  THE DELETE STACK: one rung per press, and the ground back to clear at the end.
+     *
+     *  The fixture is BUILT rather than found, because no shipped cell carries all
+     *  five layers at once: a cell gets a template, a tiberium overlay, a crater, a
+     *  wall and a man standing on the lot, and DELETE is then pressed six times. A
+     *  stack that empties the cell in one press fails on press one; a stack that only
+     *  ever takes the top thing fails on press three, where the old code answered
+     *  "nothing to erase" over a crater and a tiberium field; a stack that never
+     *  reaches the ground fails on press five. The sixth press must REFUSE and leave
+     *  the undo stack alone -- a DELETE that keeps reporting success on an empty cell
+     *  is a row of undo steps that undo nothing.
+     *
+     *  The counts are the whole document's, not the cell's, so nothing here re-uses
+     *  the arithmetic the stack itself aims with.
+     * -------------------------------------------------------------------------- */
+    {
+        int cx = -1, cy = -1;
+        for (int y = g_mapY + 1; y < g_mapY + g_mapH - 1 && cx < 0; y++)
+            for (int x = g_mapX + 1; x < g_mapX + g_mapW - 1 && cx < 0; x++)
+                if (edit_cell_ok(x, y) && !edit_wall_at(x, y) &&
+                    edit_tib_at(x, y) < 0 && edit_smudge_at(x, y) < 0) { cx = x; cy = y; }
+
+        /* A tile this theater's bank really carries, that is not plain ground and that
+           still leaves the cell buildable -- otherwise the man cannot be stood on it. */
+        int nT = 0;
+        const TtSlot* tt = tt_table(g_pack.theater, &nT);
+        int wt = -1, wi = 0;
+        for (int k = 0; k < nT && wt < 0; k++) {
+            if (tt[k].tmpl == 255 || tt[k].tmpl == 0) continue;
+            if (!EDIT_LAND_BUILD[edit_land_of(tt[k].tmpl, tt[k].icon)]) continue;
+            wt = tt[k].tmpl; wi = tt[k].icon;
+        }
+        int man = -1;
+        for (int i = 0; i < EDIT_ITEM_N && man < 0; i++)
+            if (EDIT_ITEMS[i].kind == EDIT_KIND_INFANTRY) man = i;
+
+        if (cx < 0 || wt < 0 || man < 0 || !g_editHaveBin) {
+            fprintf(stderr, "UNDOTEST|FAIL|delete stack untested: free cell %d,%d, "
+                    "buildable non-clear tile %d in %s, infantry item %d, .BIN %d\n",
+                    cx, cy, wt, g_pack.theater, man, g_editHaveBin ? 1 : 0);
+            fails++;
+        } else if (!edit_paint_cell(cx, cy, wt, wi)) {
+            fprintf(stderr, "UNDOTEST|FAIL|delete stack untested: could not paint "
+                    "template %d icon %d onto %d,%d\n", wt, wi, cx, cy);
+            fails++;
+        } else {
+            /* The fixture. Both go straight into the document rather than through their
+               brushes: what is under test is DELETE reaching them, not how they arrived. */
+            TibCell tc; memset(&tc, 0, sizeof tc);
+            tc.x = (short)cx; tc.y = (short)cy;
+            g_tib.push_back(tc);
+            SmudgeCell sc; memset(&sc, 0, sizeof sc);
+            sc.x = (short)cx; sc.y = (short)cy;      /* type 0 is CR1, a crater */
+            g_smudges.push_back(sc);
+            edit_wall_put(cx, cy, 0);
+            g_editOwner = 0;
+            g_editArmed = man;
+            const bool stood = edit_place_q(cx, cy, true);
+
+            const int u0 = (int)g_undo.size();
+            int eo = (int)g_objects.size(), ew = (int)g_walls.size(),
+                es = (int)g_smudges.size(), et = (int)g_tib.size();
+            const int o0 = eo, w1 = ew, s0 = es, t0 = et;
+            if (!stood) {
+                fprintf(stderr, "UNDOTEST|FAIL|delete stack untested: no infantryman "
+                        "would stand on %d,%d\n", cx, cy);
+                fails++;
+            } else {
+                int took = 0;
+                bool clear = false;
+                for (int step = 0; step < 5; step++) {
+                    if      (step == 0) eo--;
+                    else if (step == 1) ew--;
+                    else if (step == 2) es--;
+                    else if (step == 3) et--;
+                    else                clear = true;
+                    char nm[40];
+                    const int lay = edit_erase_peek(cx, cy, nm, sizeof nm);
+                    const bool hit = edit_erase_at(cx, cy);
+                    const int tm = g_editTmpl[cy * g_editBinW + cx];
+                    if (!hit || (int)g_objects.size() != eo ||
+                        (int)g_walls.size() != ew || (int)g_smudges.size() != es ||
+                        (int)g_tib.size() != et || tm != (clear ? 255 : wt) ||
+                        (int)g_undo.size() != u0 + step + 1) {
+                        fprintf(stderr, "UNDOTEST|FAIL|delete %d of 5 at %d,%d took "
+                                "'%s' (rung %d, %s): objects %d want %d, walls %d want "
+                                "%d, smudges %d want %d, tiberium %d want %d, template "
+                                "%d want %d, undo depth %d want %d\n",
+                                step + 1, cx, cy, nm, lay, hit ? "took it" : "refused",
+                                (int)g_objects.size(), eo, (int)g_walls.size(), ew,
+                                (int)g_smudges.size(), es, (int)g_tib.size(), et,
+                                tm, clear ? 255 : wt,
+                                (int)g_undo.size(), u0 + step + 1);
+                        fails++;
+                        break;
+                    }
+                    took++;
+                }
+                if (took == 5) {
+                    fprintf(stderr, "UNDOTEST|ok  |five presses on %d,%d took five "
+                            "things one at a time -- object, wall, crater, tiberium, "
+                            "then the ground back to template 255\n", cx, cy);
+                    /* The sixth press: nothing left, so nothing happens and no undo
+                       step is filed. */
+                    const int uEnd = (int)g_undo.size();
+                    if (edit_erase_at(cx, cy) || (int)g_undo.size() != uEnd) {
+                        fprintf(stderr, "UNDOTEST|FAIL|a sixth press on an empty cell "
+                                "reported success or filed an undo step (%d -> %d)\n",
+                                uEnd, (int)g_undo.size());
+                        fails++;
+                    } else {
+                        fprintf(stderr, "UNDOTEST|ok  |the sixth press refuses an "
+                                "already empty cell and files no undo step\n");
+                    }
+                    /* And five undos put all five back. */
+                    for (int i = 0; i < 5; i++) edit_undo();
+                    const int tm = g_editTmpl[cy * g_editBinW + cx];
+                    if ((int)g_objects.size() != o0 || (int)g_walls.size() != w1 ||
+                        (int)g_smudges.size() != s0 || (int)g_tib.size() != t0 ||
+                        tm != wt) {
+                        fprintf(stderr, "UNDOTEST|FAIL|five undos did not rebuild the "
+                                "cell: objects %d want %d, walls %d want %d, smudges "
+                                "%d want %d, tiberium %d want %d, template %d want "
+                                "%d\n", (int)g_objects.size(), o0, (int)g_walls.size(),
+                                w1, (int)g_smudges.size(), s0, (int)g_tib.size(), t0,
+                                tm, wt);
+                        fails++;
+                    } else {
+                        fprintf(stderr, "UNDOTEST|ok  |five undos rebuilt the cell one "
+                                "rung at a time, tiberium and crater included\n");
+                    }
+                }
+            }
+        }
     }
 
     fprintf(stderr, "UNDOTEST|%s|%d failures\n", fails ? "FAILED" : "PASSED", fails);

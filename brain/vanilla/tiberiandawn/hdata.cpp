@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Under the EIGHTPLAYERS build switch, defines two new house types,
+// HouseMulti7 and HouseMulti8 (grey and brown remap tables, MP7 and MP8 file
+// suffixes, civilian name and neutral radar colours), and registers both in
+// HouseTypeClass::Pointers. With the switch off the file reads as upstream.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\hdata.cpv   2.17   16 Oct 1995 16:48:18   JOE_BOSTIC  $ */
 /***********************************************************************************************

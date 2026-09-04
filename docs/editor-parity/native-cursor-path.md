@@ -1,4 +1,4 @@
-All line numbers are against `game/cnc_eyes.cpp` at md5 `1e6409d2e13ddfe88d24b8e0c30889f3`, 18320 lines. **Warning: this file was changing during the analysis** -- it grew from 17477 to 18320 lines mid-analysis, and `game/cnc_eyes.cpp` + `game/edit_mod.h` are both dirty in the worktree. Re-anchor before editing.
+All line numbers are against `game/cnc_eyes.cpp` at md5 `1e6409d2e13ddfe88d24b8e0c30889f3`, 18320 lines. **Warning: a concurrent edit is editing this file right now** -- it grew from 17477 to 18320 lines mid-analysis, and `game/cnc_eyes.cpp` + `game/edit_mod.h` are both dirty in the worktree. Re-anchor before editing.
 
 ## 1. Which function draws the pointer, and from where
 

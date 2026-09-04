@@ -1,6 +1,6 @@
 {
- "anchor": "crop symmetric about frame column 27 (Draw_It ground x); quad bottom = crop bottom = feet line (STAND/WALK unified per type)",
- "bytes": 4973856,
+ "anchor": "crop symmetric about frame column 27 (Draw_It ground x); quad bottom = crop bottom = feet line. Every upright pose (STAND, WALK, FIRE, IDLE1, IDLE2, LIEDOWN, GETUP) shares that row per type, padded down to it, never cropped to it; a pose whose body reaches lower keeps its own row and the bake log names it. Where the PRONE row is the FIRE_PRONE row's stage 0 the two share the body's row, so the firing flash cannot set the ground. Deaths and CRAWL keep their own bottom.",
+ "bytes": 4990240,
  "death_dotype": {
   "17_20_punch_kick": "fallback D_GUN",
   "22": "D_GUN",
@@ -148,7 +148,7 @@
   "C10_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -161,7 +161,7 @@
   "C10_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -174,7 +174,7 @@
   "C10_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -187,7 +187,7 @@
   "C10_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -343,7 +343,7 @@
   "C1_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -356,7 +356,7 @@
   "C1_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -369,7 +369,7 @@
   "C1_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -382,7 +382,7 @@
   "C1_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -538,7 +538,7 @@
   "C2_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -551,7 +551,7 @@
   "C2_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -564,7 +564,7 @@
   "C2_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -577,7 +577,7 @@
   "C2_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -733,7 +733,7 @@
   "C3_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -746,7 +746,7 @@
   "C3_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -759,7 +759,7 @@
   "C3_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -772,7 +772,7 @@
   "C3_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -928,7 +928,7 @@
   "C4_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -941,7 +941,7 @@
   "C4_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -954,7 +954,7 @@
   "C4_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -967,7 +967,7 @@
   "C4_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1123,7 +1123,7 @@
   "C5_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1136,7 +1136,7 @@
   "C5_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -1149,7 +1149,7 @@
   "C5_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -1162,7 +1162,7 @@
   "C5_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1318,7 +1318,7 @@
   "C6_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1331,7 +1331,7 @@
   "C6_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -1344,7 +1344,7 @@
   "C6_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -1357,7 +1357,7 @@
   "C6_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1513,7 +1513,7 @@
   "C7_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1526,7 +1526,7 @@
   "C7_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -1539,7 +1539,7 @@
   "C7_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -1552,7 +1552,7 @@
   "C7_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1708,7 +1708,7 @@
   "C8_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1721,7 +1721,7 @@
   "C8_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -1734,7 +1734,7 @@
   "C8_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -1747,7 +1747,7 @@
   "C8_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1903,7 +1903,7 @@
   "C9_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -1916,7 +1916,7 @@
   "C9_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -1929,7 +1929,7 @@
   "C9_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -1942,7 +1942,7 @@
   "C9_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -2085,7 +2085,7 @@
   "CHAN_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 15,
    "frames": 8,
    "fw": 9,
    "src_stages": 1,
@@ -2098,7 +2098,7 @@
   "CHAN_IDLE1#0": {
    "cols": 16,
    "facings": 1,
-   "fh": 10,
+   "fh": 15,
    "frames": 16,
    "fw": 11,
    "src_stages": 16,
@@ -2111,7 +2111,7 @@
   "CHAN_IDLE2#0": {
    "cols": 19,
    "facings": 1,
-   "fh": 10,
+   "fh": 15,
    "frames": 20,
    "fw": 13,
    "src_stages": 20,
@@ -2124,7 +2124,7 @@
   "CHAN_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 15,
    "frames": 8,
    "fw": 9,
    "src_stages": 1,
@@ -2280,7 +2280,7 @@
   "DELPHI_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -2293,7 +2293,7 @@
   "DELPHI_IDLE1#0": {
    "cols": 10,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 10,
    "fw": 11,
    "src_stages": 10,
@@ -2306,7 +2306,7 @@
   "DELPHI_IDLE2#0": {
    "cols": 6,
    "facings": 1,
-   "fh": 10,
+   "fh": 13,
    "frames": 6,
    "fw": 13,
    "src_stages": 6,
@@ -2319,7 +2319,7 @@
   "DELPHI_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 10,
+   "fh": 13,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
@@ -2553,7 +2553,7 @@
   "E1_FPRONE#0": {
    "cols": 7,
    "facings": 8,
-   "fh": 18,
+   "fh": 15,
    "frames": 48,
    "fw": 33,
    "src_stages": 6,
@@ -2566,7 +2566,7 @@
   "E1_FPRONE#1": {
    "cols": 7,
    "facings": 8,
-   "fh": 18,
+   "fh": 15,
    "frames": 48,
    "fw": 33,
    "src_stages": 6,
@@ -2605,7 +2605,7 @@
   "E1_IDLE1#0": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -2618,7 +2618,7 @@
   "E1_IDLE1#1": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -2631,7 +2631,7 @@
   "E1_IDLE2#0": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -2644,7 +2644,7 @@
   "E1_IDLE2#1": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -2995,7 +2995,7 @@
   "E2_IDLE1#0": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -3008,7 +3008,7 @@
   "E2_IDLE1#1": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -3021,7 +3021,7 @@
   "E2_IDLE2#0": {
    "cols": 16,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 15,
    "src_stages": 16,
@@ -3034,7 +3034,7 @@
   "E2_IDLE2#1": {
    "cols": 16,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 15,
    "src_stages": 16,
@@ -3333,7 +3333,7 @@
   "E3_FPRONE#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 17,
+   "fh": 15,
    "frames": 80,
    "fw": 31,
    "src_stages": 10,
@@ -3346,7 +3346,7 @@
   "E3_FPRONE#1": {
    "cols": 8,
    "facings": 8,
-   "fh": 17,
+   "fh": 15,
    "frames": 80,
    "fw": 31,
    "src_stages": 10,
@@ -3723,7 +3723,7 @@
   "E4_FPRONE#0": {
    "cols": 7,
    "facings": 8,
-   "fh": 18,
+   "fh": 15,
    "frames": 64,
    "fw": 35,
    "src_stages": 16,
@@ -3736,7 +3736,7 @@
   "E4_FPRONE#1": {
    "cols": 7,
    "facings": 8,
-   "fh": 18,
+   "fh": 15,
    "frames": 64,
    "fw": 35,
    "src_stages": 16,
@@ -3749,7 +3749,7 @@
   "E4_GETUP#0": {
    "cols": 11,
    "facings": 8,
-   "fh": 12,
+   "fh": 13,
    "frames": 16,
    "fw": 23,
    "src_stages": 2,
@@ -3762,7 +3762,7 @@
   "E4_GETUP#1": {
    "cols": 11,
    "facings": 8,
-   "fh": 12,
+   "fh": 13,
    "frames": 16,
    "fw": 23,
    "src_stages": 2,
@@ -3775,7 +3775,7 @@
   "E4_IDLE1#0": {
    "cols": 12,
    "facings": 1,
-   "fh": 12,
+   "fh": 13,
    "frames": 16,
    "fw": 21,
    "src_stages": 16,
@@ -3788,7 +3788,7 @@
   "E4_IDLE1#1": {
    "cols": 12,
    "facings": 1,
-   "fh": 12,
+   "fh": 13,
    "frames": 16,
    "fw": 21,
    "src_stages": 16,
@@ -3801,7 +3801,7 @@
   "E4_IDLE2#0": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 13,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -3814,7 +3814,7 @@
   "E4_IDLE2#1": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 13,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -3827,7 +3827,7 @@
   "E4_LIEDOWN#0": {
    "cols": 12,
    "facings": 8,
-   "fh": 12,
+   "fh": 13,
    "frames": 16,
    "fw": 21,
    "src_stages": 2,
@@ -3840,7 +3840,7 @@
   "E4_LIEDOWN#1": {
    "cols": 12,
    "facings": 8,
-   "fh": 12,
+   "fh": 13,
    "frames": 16,
    "fw": 21,
    "src_stages": 2,
@@ -4191,7 +4191,7 @@
   "E5_IDLE2#0": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -4204,7 +4204,7 @@
   "E5_IDLE2#1": {
    "cols": 15,
    "facings": 1,
-   "fh": 11,
+   "fh": 12,
    "frames": 16,
    "fw": 17,
    "src_stages": 16,
@@ -4724,53 +4724,53 @@
   "MOEBIUS_GETUP#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 12,
+   "fh": 17,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
    "stages": 1,
    "tex": [
     128,
-    16
+    32
    ]
   },
   "MOEBIUS_IDLE1#0": {
    "cols": 16,
    "facings": 1,
-   "fh": 12,
+   "fh": 17,
    "frames": 16,
    "fw": 11,
    "src_stages": 16,
    "stages": 16,
    "tex": [
     256,
-    16
+    32
    ]
   },
   "MOEBIUS_IDLE2#0": {
    "cols": 17,
    "facings": 1,
-   "fh": 12,
+   "fh": 17,
    "frames": 20,
    "fw": 15,
    "src_stages": 20,
    "stages": 20,
    "tex": [
     256,
-    32
+    64
    ]
   },
   "MOEBIUS_LIEDOWN#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 12,
+   "fh": 17,
    "frames": 8,
    "fw": 11,
    "src_stages": 1,
    "stages": 1,
    "tex": [
     128,
-    16
+    32
    ]
   },
   "MOEBIUS_PRONE#0": {
@@ -4997,7 +4997,7 @@
   "RMBO_FPRONE#0": {
    "cols": 8,
    "facings": 8,
-   "fh": 21,
+   "fh": 18,
    "frames": 32,
    "fw": 29,
    "src_stages": 4,
@@ -5010,7 +5010,7 @@
   "RMBO_FPRONE#1": {
    "cols": 8,
    "facings": 8,
-   "fh": 21,
+   "fh": 18,
    "frames": 32,
    "fw": 29,
    "src_stages": 4,
@@ -5291,9 +5291,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -5301,9 +5301,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -5311,9 +5311,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -5321,9 +5321,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -5357,6 +5357,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C1.SHP",
    "shp_frames": 375
   },
@@ -5447,9 +5448,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -5457,9 +5458,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -5467,9 +5468,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -5477,9 +5478,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -5513,6 +5514,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C10.SHP",
    "shp_frames": 375
   },
@@ -5603,9 +5605,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -5613,9 +5615,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -5623,9 +5625,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -5633,9 +5635,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -5669,6 +5671,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C2.SHP",
    "shp_frames": 375
   },
@@ -5759,9 +5762,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -5769,9 +5772,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -5779,9 +5782,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -5789,9 +5792,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -5825,6 +5828,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C3.SHP",
    "shp_frames": 375
   },
@@ -5915,9 +5919,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -5925,9 +5929,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -5935,9 +5939,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -5945,9 +5949,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -5981,6 +5985,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C4.SHP",
    "shp_frames": 375
   },
@@ -6071,9 +6076,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -6081,9 +6086,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -6091,9 +6096,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -6101,9 +6106,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -6137,6 +6142,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C5.SHP",
    "shp_frames": 375
   },
@@ -6227,9 +6233,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -6237,9 +6243,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -6247,9 +6253,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -6257,9 +6263,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -6293,6 +6299,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C6.SHP",
    "shp_frames": 375
   },
@@ -6383,9 +6390,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -6393,9 +6400,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -6403,9 +6410,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -6413,9 +6420,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -6449,6 +6456,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C7.SHP",
    "shp_frames": 375
   },
@@ -6539,9 +6547,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -6549,9 +6557,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -6559,9 +6567,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -6569,9 +6577,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -6605,6 +6613,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C8.SHP",
    "shp_frames": 375
   },
@@ -6695,9 +6704,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -6705,9 +6714,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -6715,9 +6724,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -6725,9 +6734,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -6761,6 +6770,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "C9.SHP",
    "shp_frames": 375
   },
@@ -6841,9 +6851,9 @@
       23,
       10,
       31,
-      19
+      24
      ],
-     "fh": 10,
+     "fh": 15,
      "fw": 9
     },
     "IDLE1": {
@@ -6851,9 +6861,9 @@
       22,
       10,
       32,
-      19
+      24
      ],
-     "fh": 10,
+     "fh": 15,
      "fw": 11
     },
     "IDLE2": {
@@ -6861,9 +6871,9 @@
       21,
       10,
       33,
-      19
+      24
      ],
-     "fh": 10,
+     "fh": 15,
      "fw": 13
     },
     "LIEDOWN": {
@@ -6871,9 +6881,9 @@
       23,
       10,
       31,
-      19
+      24
      ],
-     "fh": 10,
+     "fh": 15,
      "fw": 9
     },
     "PRONE": {
@@ -6907,6 +6917,7 @@
      "fw": 15
     }
    },
+   "feet_row": 24,
    "shp": "CHAN.SHP",
    "shp_frames": 257
   },
@@ -6997,9 +7008,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE1": {
@@ -7007,9 +7018,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "IDLE2": {
@@ -7017,9 +7028,9 @@
       21,
       10,
       33,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 13
     },
     "LIEDOWN": {
@@ -7027,9 +7038,9 @@
       22,
       10,
       32,
-      19
+      22
      ],
-     "fh": 10,
+     "fh": 13,
      "fw": 11
     },
     "PRONE": {
@@ -7063,6 +7074,7 @@
      "fw": 15
     }
    },
+   "feet_row": 22,
    "shp": "DELPHI.SHP",
    "shp_frames": 375
   },
@@ -7143,9 +7155,9 @@
       11,
       9,
       43,
-      26
+      23
      ],
-     "fh": 18,
+     "fh": 15,
      "fw": 33
     },
     "GETUP": {
@@ -7163,9 +7175,9 @@
       19,
       9,
       35,
-      19
+      20
      ],
-     "fh": 11,
+     "fh": 12,
      "fw": 17
     },
     "IDLE2": {
@@ -7173,9 +7185,9 @@
       19,
       9,
       35,
-      19
+      20
      ],
-     "fh": 11,
+     "fh": 12,
      "fw": 17
     },
     "LIEDOWN": {
@@ -7219,6 +7231,7 @@
      "fw": 25
     }
    },
+   "feet_row": 20,
    "shp": "E1.SHP",
    "shp_frames": 532
   },
@@ -7319,9 +7332,9 @@
       19,
       9,
       35,
-      19
+      20
      ],
-     "fh": 11,
+     "fh": 12,
      "fw": 17
     },
     "IDLE2": {
@@ -7329,9 +7342,9 @@
       20,
       9,
       34,
-      19
+      20
      ],
-     "fh": 11,
+     "fh": 12,
      "fw": 15
     },
     "LIEDOWN": {
@@ -7375,6 +7388,7 @@
      "fw": 15
     }
    },
+   "feet_row": 20,
    "shp": "E2.SHP",
    "shp_frames": 660
   },
@@ -7455,9 +7469,9 @@
       12,
       9,
       42,
-      25
+      23
      ],
-     "fh": 17,
+     "fh": 15,
      "fw": 31
     },
     "GETUP": {
@@ -7531,6 +7545,7 @@
      "fw": 21
     }
    },
+   "feet_row": 20,
    "shp": "E3.SHP",
    "shp_frames": 548
   },
@@ -7611,9 +7626,9 @@
       10,
       9,
       44,
-      26
+      23
      ],
-     "fh": 18,
+     "fh": 15,
      "fw": 35
     },
     "GETUP": {
@@ -7621,9 +7636,9 @@
       16,
       9,
       38,
-      20
+      21
      ],
-     "fh": 12,
+     "fh": 13,
      "fw": 23
     },
     "IDLE1": {
@@ -7631,9 +7646,9 @@
       17,
       9,
       37,
-      20
+      21
      ],
-     "fh": 12,
+     "fh": 13,
      "fw": 21
     },
     "IDLE2": {
@@ -7641,9 +7656,9 @@
       19,
       9,
       35,
-      19
+      21
      ],
-     "fh": 11,
+     "fh": 13,
      "fw": 17
     },
     "LIEDOWN": {
@@ -7651,9 +7666,9 @@
       17,
       9,
       37,
-      20
+      21
      ],
-     "fh": 12,
+     "fh": 13,
      "fw": 21
     },
     "PRONE": {
@@ -7687,6 +7702,7 @@
      "fw": 25
     }
    },
+   "feet_row": 21,
    "shp": "E4.SHP",
    "shp_frames": 660
   },
@@ -7797,9 +7813,9 @@
       19,
       9,
       35,
-      19
+      20
      ],
-     "fh": 11,
+     "fh": 12,
      "fw": 17
     },
     "LIEDOWN": {
@@ -7843,6 +7859,7 @@
      "fw": 25
     }
    },
+   "feet_row": 20,
    "shp": "E5.SHP",
    "shp_frames": 660
   },
@@ -7969,6 +7986,7 @@
      "fw": 17
     }
    },
+   "feet_row": 20,
    "shp": "E6.SHP",
    "shp_frames": 248
   },
@@ -8049,9 +8067,9 @@
       22,
       8,
       32,
-      19
+      24
      ],
-     "fh": 12,
+     "fh": 17,
      "fw": 11
     },
     "IDLE1": {
@@ -8059,9 +8077,9 @@
       22,
       8,
       32,
-      19
+      24
      ],
-     "fh": 12,
+     "fh": 17,
      "fw": 11
     },
     "IDLE2": {
@@ -8069,9 +8087,9 @@
       20,
       8,
       34,
-      19
+      24
      ],
-     "fh": 12,
+     "fh": 17,
      "fw": 15
     },
     "LIEDOWN": {
@@ -8079,9 +8097,9 @@
       22,
       8,
       32,
-      19
+      24
      ],
-     "fh": 12,
+     "fh": 17,
      "fw": 11
     },
     "PRONE": {
@@ -8115,6 +8133,7 @@
      "fw": 15
     }
    },
+   "feet_row": 24,
    "shp": "MOEBIUS.SHP",
    "shp_frames": 257
   },
@@ -8195,9 +8214,9 @@
       13,
       7,
       41,
-      27
+      24
      ],
-     "fh": 21,
+     "fh": 18,
      "fw": 29
     },
     "GETUP": {
@@ -8271,6 +8290,7 @@
      "fw": 15
     }
    },
+   "feet_row": 20,
    "shp": "RMBO.SHP",
    "shp_frames": 468
   }

@@ -300,11 +300,13 @@ enum EditKind {
     EDIT_KIND_INFANTRY  = 2,
     EDIT_KIND_TERRAIN   = 3,
     EDIT_KIND_WALL      = 4,
-    EDIT_KIND_COUNT   = 5
+    EDIT_KIND_TIBERIUM  = 5,
+    EDIT_KIND_SMUDGE    = 6,
+    EDIT_KIND_COUNT   = 7
 };
 
 #define EDIT_CELL_MAX  12
-#define EDIT_ITEM_N    140
+#define EDIT_ITEM_N    148
 
 struct EditItem {
     const char*    code;      /* the INI code, and the cameo's name            */
@@ -461,12 +463,22 @@ static const EditItem EDIT_ITEMS[EDIT_ITEM_N] = {
     { "BRIK", "Concrete Wall", EDIT_KIND_WALL, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
     { "BARB", "Barbwire Fence", EDIT_KIND_WALL, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
     { "WOOD", "Wood Fence", EDIT_KIND_WALL, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    /* ---- TIBERIUM ---- */
+    { "TI1", "Tiberium", EDIT_KIND_TIBERIUM, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    /* ---- SMUDGE ---- */
+    { "CR1", "Crater", EDIT_KIND_SMUDGE, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    { "SC1", "Scorch Mark 1", EDIT_KIND_SMUDGE, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    { "SC2", "Scorch Mark 2", EDIT_KIND_SMUDGE, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    { "SC3", "Scorch Mark 3", EDIT_KIND_SMUDGE, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    { "SC4", "Scorch Mark 4", EDIT_KIND_SMUDGE, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    { "SC5", "Scorch Mark 5", EDIT_KIND_SMUDGE, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    { "SC6", "Scorch Mark 6", EDIT_KIND_SMUDGE, 1, 1, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
 };
 
 /* Where each group starts in EDIT_ITEMS, and how many it has. */
-static const int EDIT_KIND_FIRST[EDIT_KIND_COUNT] = { 0, 61, 83, 103, 135 };
-static const int EDIT_KIND_N[EDIT_KIND_COUNT]     = { 61, 22, 20, 32, 5 };
-static const char* const EDIT_KIND_NAME[EDIT_KIND_COUNT] = { "BUILDING", "UNIT", "INFANTRY", "TERRAIN", "WALL" };
+static const int EDIT_KIND_FIRST[EDIT_KIND_COUNT] = { 0, 61, 83, 103, 135, 140, 141 };
+static const int EDIT_KIND_N[EDIT_KIND_COUNT]     = { 61, 22, 20, 32, 5, 1, 7 };
+static const char* const EDIT_KIND_NAME[EDIT_KIND_COUNT] = { "BUILDING", "UNIT", "INFANTRY", "TERRAIN", "WALL", "TIBERIUM", "SMUDGE" };
 
 
 /* ------------------------------------------------------------------------------

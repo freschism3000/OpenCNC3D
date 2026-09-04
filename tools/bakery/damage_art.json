@@ -9,7 +9,70 @@
    "damaged_emitter_ram": 2148117624,
    "forced_frame": 0,
    "dl_ram": 2148730496,
-   "dl_rom": 870848
+   "dl_rom": 870848,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148117624,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -35.0,
+      125.0,
+      220.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 30,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "ram": 2148117548,
+     "fire_mask": 1,
+     "jitter": 0.0,
+     "pos": [
+      148.0,
+      12.0,
+      80.0
+     ],
+     "vel": [
+      0.0,
+      6.8,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.4,
+      0.0
+     ],
+     "size": 30.0,
+     "grow": 0.1,
+     "life": 25,
+     "arate": 8,
+     "argb": [
+      190,
+      255,
+      255,
+      255
+     ]
+    }
+   ]
   },
   {
    "slot": 1,
@@ -19,7 +82,40 @@
    "damaged_emitter_ram": 2148117700,
    "forced_frame": 1000,
    "dl_ram": 2149181336,
-   "dl_rom": 1319432
+   "dl_rom": 1319432,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148117700,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -80.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 30,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 2,
@@ -29,7 +125,131 @@
    "damaged_emitter_ram": 2148117852,
    "forced_frame": 100,
    "dl_ram": 2149207032,
-   "dl_rom": 1345128
+   "dl_rom": 1345128,
+   "healthy_chain": [
+    {
+     "ram": 2148117092,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      54.0,
+      387.0,
+      28.0
+     ],
+     "vel": [
+      0.0,
+      2.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.7,
+      0.0
+     ],
+     "size": 20.0,
+     "grow": 2.0,
+     "life": 31,
+     "arate": 4,
+     "argb": [
+      40,
+      200,
+      200,
+      200
+     ]
+    },
+    {
+     "ram": 2148117016,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      155.0,
+      362.0,
+      45.0
+     ],
+     "vel": [
+      0.0,
+      2.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.7,
+      0.0
+     ],
+     "size": 20.0,
+     "grow": 2.0,
+     "life": 31,
+     "arate": 4,
+     "argb": [
+      40,
+      200,
+      200,
+      200
+     ]
+    }
+   ],
+   "damaged_chain": [
+    {
+     "ram": 2148117852,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -80.0,
+      280.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 20,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "ram": 2148117776,
+     "fire_mask": 1,
+     "jitter": 0.0,
+     "pos": [
+      148.0,
+      12.0,
+      80.0
+     ],
+     "vel": [
+      0.0,
+      6.8,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.4,
+      0.0
+     ],
+     "size": 30.0,
+     "grow": 0.1,
+     "life": 25,
+     "arate": 8,
+     "argb": [
+      190,
+      255,
+      255,
+      255
+     ]
+    }
+   ]
   },
   {
    "slot": 3,
@@ -39,7 +259,40 @@
    "damaged_emitter_ram": 2148117928,
    "forced_frame": 0,
    "dl_ram": 2149194312,
-   "dl_rom": 1332408
+   "dl_rom": 1332408,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148117928,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -35.0,
+      125.0,
+      0.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.3,
+      -0.1
+     ],
+     "size": 20.0,
+     "grow": 3.1,
+     "life": 20,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 4,
@@ -49,7 +302,40 @@
    "damaged_emitter_ram": 2148118004,
    "forced_frame": 0,
    "dl_ram": 2149186536,
-   "dl_rom": 1324632
+   "dl_rom": 1324632,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118004,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      4.8,
+      234.6,
+      35.5
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.5,
+     "life": 24,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 5,
@@ -59,7 +345,40 @@
    "damaged_emitter_ram": 2148118080,
    "forced_frame": 0,
    "dl_ram": 0,
-   "dl_rom": 0
+   "dl_rom": 0,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118080,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -60.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 30,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 6,
@@ -69,7 +388,40 @@
    "damaged_emitter_ram": 2148118156,
    "forced_frame": 0,
    "dl_ram": 2149247408,
-   "dl_rom": 1385504
+   "dl_rom": 1385504,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118156,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -10.0,
+      44.9,
+      36.0
+     ],
+     "vel": [
+      0.0,
+      7.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 20,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 7,
@@ -79,7 +431,40 @@
    "damaged_emitter_ram": 2148118232,
    "forced_frame": 0,
    "dl_ram": 2148724848,
-   "dl_rom": 865200
+   "dl_rom": 865200,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118232,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      165.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 25.0,
+     "grow": 4.4,
+     "life": 27,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 8,
@@ -89,7 +474,131 @@
    "damaged_emitter_ram": 2148118384,
    "forced_frame": 0,
    "dl_ram": 2149012848,
-   "dl_rom": 1150944
+   "dl_rom": 1150944,
+   "healthy_chain": [
+    {
+     "ram": 2148116940,
+     "fire_mask": 3,
+     "jitter": 0.05,
+     "pos": [
+      160.0,
+      50.0,
+      -30.0
+     ],
+     "vel": [
+      0.0,
+      30.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      -5.0,
+      0.0
+     ],
+     "size": 15.0,
+     "grow": 0.0,
+     "life": 10,
+     "arate": 32,
+     "argb": [
+      150,
+      255,
+      255,
+      100
+     ]
+    },
+    {
+     "ram": 2148116864,
+     "fire_mask": 3,
+     "jitter": 0.05,
+     "pos": [
+      115.0,
+      50.0,
+      140.0
+     ],
+     "vel": [
+      0.0,
+      25.9,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      -5.0,
+      0.0
+     ],
+     "size": 15.0,
+     "grow": 0.0,
+     "life": 10,
+     "arate": 32,
+     "argb": [
+      150,
+      255,
+      255,
+      100
+     ]
+    }
+   ],
+   "damaged_chain": [
+    {
+     "ram": 2148118384,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -245.0,
+      120.0,
+      -15.0
+     ],
+     "vel": [
+      2.1,
+      7.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      0.0
+     ],
+     "size": 35.0,
+     "grow": 4.0,
+     "life": 28,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "ram": 2148118308,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -80.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 0.0,
+     "grow": 3.1,
+     "life": 0,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 9,
@@ -99,7 +608,40 @@
    "damaged_emitter_ram": 2148118460,
    "forced_frame": 0,
    "dl_ram": 2149029808,
-   "dl_rom": 1167904
+   "dl_rom": 1167904,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118460,
+     "fire_mask": 1,
+     "jitter": 0.0,
+     "pos": [
+      115.0,
+      30.0,
+      -5.0
+     ],
+     "vel": [
+      1.3,
+      0.0,
+      0.0
+     ],
+     "accel": [
+      0.8,
+      0.0,
+      0.18
+     ],
+     "size": 20.0,
+     "grow": 0.0,
+     "life": 17,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      255,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 10,
@@ -109,7 +651,40 @@
    "damaged_emitter_ram": 2148118536,
    "forced_frame": 0,
    "dl_ram": 2149198536,
-   "dl_rom": 1336632
+   "dl_rom": 1336632,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118536,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -80.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 30,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 11,
@@ -119,7 +694,40 @@
    "damaged_emitter_ram": 2148118612,
    "forced_frame": 1000,
    "dl_ram": 2149181336,
-   "dl_rom": 1319432
+   "dl_rom": 1319432,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118612,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -80.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 25,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 12,
@@ -129,7 +737,40 @@
    "damaged_emitter_ram": 2148118688,
    "forced_frame": 0,
    "dl_ram": 2148705336,
-   "dl_rom": 845688
+   "dl_rom": 845688,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118688,
+     "fire_mask": 3,
+     "jitter": 0.001,
+     "pos": [
+      7.68,
+      24.93,
+      24.55
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 30,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 13,
@@ -139,7 +780,40 @@
    "damaged_emitter_ram": 2148118764,
    "forced_frame": 0,
    "dl_ram": 2149232064,
-   "dl_rom": 1370160
+   "dl_rom": 1370160,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148118764,
+     "fire_mask": 3,
+     "jitter": 0.001,
+     "pos": [
+      -185.6,
+      155.6,
+      -117.5
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.8,
+      -0.1
+     ],
+     "size": 35.0,
+     "grow": 5.0,
+     "life": 25,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 14,
@@ -149,7 +823,101 @@
    "damaged_emitter_ram": 2148118916,
    "forced_frame": 0,
    "dl_ram": 2148999960,
-   "dl_rom": 1138056
+   "dl_rom": 1138056,
+   "healthy_chain": [
+    {
+     "ram": 2148117168,
+     "fire_mask": 1,
+     "jitter": 0.1,
+     "pos": [
+      -85.0,
+      134.0,
+      -107.0
+     ],
+     "vel": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": 13.0,
+     "grow": 1.3,
+     "life": 15,
+     "arate": 4,
+     "argb": [
+      40,
+      200,
+      200,
+      200
+     ]
+    }
+   ],
+   "damaged_chain": [
+    {
+     "ram": 2148118916,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -80.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 27,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "ram": 2148118840,
+     "fire_mask": 1,
+     "jitter": 0.0,
+     "pos": [
+      148.0,
+      12.0,
+      80.0
+     ],
+     "vel": [
+      0.0,
+      6.8,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.4,
+      0.0
+     ],
+     "size": 30.0,
+     "grow": 0.1,
+     "life": 25,
+     "arate": 8,
+     "argb": [
+      190,
+      255,
+      255,
+      255
+     ]
+    }
+   ]
   },
   {
    "slot": 15,
@@ -159,7 +927,131 @@
    "damaged_emitter_ram": 2148119068,
    "forced_frame": 0,
    "dl_ram": 2148942384,
-   "dl_rom": 1080480
+   "dl_rom": 1080480,
+   "healthy_chain": [
+    {
+     "ram": 2148117320,
+     "fire_mask": 0,
+     "jitter": 0.04,
+     "pos": [
+      -85.0,
+      200.0,
+      -50.0
+     ],
+     "vel": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": 13.0,
+     "grow": 1.3,
+     "life": 15,
+     "arate": 4,
+     "argb": [
+      40,
+      180,
+      180,
+      180
+     ]
+    },
+    {
+     "ram": 2148117244,
+     "fire_mask": 1,
+     "jitter": 0.04,
+     "pos": [
+      120.0,
+      200.0,
+      170.0
+     ],
+     "vel": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": 13.0,
+     "grow": 1.3,
+     "life": 15,
+     "arate": 4,
+     "argb": [
+      40,
+      180,
+      180,
+      180
+     ]
+    }
+   ],
+   "damaged_chain": [
+    {
+     "ram": 2148119068,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -80.0,
+      130.0,
+      20.0
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 27,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "ram": 2148118992,
+     "fire_mask": 1,
+     "jitter": 0.0,
+     "pos": [
+      3.0,
+      7.0,
+      190.0
+     ],
+     "vel": [
+      0.0,
+      6.8,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.4,
+      0.0
+     ],
+     "size": 30.0,
+     "grow": 0.1,
+     "life": 25,
+     "arate": 8,
+     "argb": [
+      190,
+      255,
+      255,
+      255
+     ]
+    }
+   ]
   },
   {
    "slot": 16,
@@ -169,7 +1061,9 @@
    "damaged_emitter_ram": 0,
    "forced_frame": 0,
    "dl_ram": 2148976288,
-   "dl_rom": 1114384
+   "dl_rom": 1114384,
+   "healthy_chain": [],
+   "damaged_chain": []
   },
   {
    "slot": 17,
@@ -179,7 +1073,9 @@
    "damaged_emitter_ram": 0,
    "forced_frame": 0,
    "dl_ram": 2148951272,
-   "dl_rom": 1089368
+   "dl_rom": 1089368,
+   "healthy_chain": [],
+   "damaged_chain": []
   },
   {
    "slot": 18,
@@ -189,7 +1085,40 @@
    "damaged_emitter_ram": 2148119144,
    "forced_frame": 0,
    "dl_ram": 2149193408,
-   "dl_rom": 1331504
+   "dl_rom": 1331504,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148119144,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      -35.0,
+      130.0,
+      -65.0
+     ],
+     "vel": [
+      0.0,
+      15.774003,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 79.1462,
+     "grow": 7.439495,
+     "life": 23,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 19,
@@ -199,7 +1128,40 @@
    "damaged_emitter_ram": 2148119220,
    "forced_frame": 0,
    "dl_ram": 2149242136,
-   "dl_rom": 1380232
+   "dl_rom": 1380232,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148119220,
+     "fire_mask": 3,
+     "jitter": 0.0,
+     "pos": [
+      52.3,
+      130.0,
+      212.55
+     ],
+     "vel": [
+      0.0,
+      8.1,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.5,
+      -0.1
+     ],
+     "size": 31.0,
+     "grow": 3.1,
+     "life": 32,
+     "arate": 8,
+     "argb": [
+      255,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 20,
@@ -209,7 +1171,40 @@
    "damaged_emitter_ram": 2148119296,
    "forced_frame": 0,
    "dl_ram": 2149016808,
-   "dl_rom": 1154904
+   "dl_rom": 1154904,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148119296,
+     "fire_mask": 1,
+     "jitter": 0.001,
+     "pos": [
+      -15.0,
+      -30.0,
+      25.0
+     ],
+     "vel": [
+      0.0,
+      2.2,
+      0.0
+     ],
+     "accel": [
+      0.0,
+      0.8,
+      0.0
+     ],
+     "size": 30.0,
+     "grow": 4.0,
+     "life": 30,
+     "arate": 8,
+     "argb": [
+      170,
+      0,
+      0,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 21,
@@ -219,7 +1214,9 @@
    "damaged_emitter_ram": 0,
    "forced_frame": 0,
    "dl_ram": 2148987392,
-   "dl_rom": 1125488
+   "dl_rom": 1125488,
+   "healthy_chain": [],
+   "damaged_chain": []
   },
   {
    "slot": 22,
@@ -229,7 +1226,40 @@
    "damaged_emitter_ram": 2148117396,
    "forced_frame": 0,
    "dl_ram": 0,
-   "dl_rom": 0
+   "dl_rom": 0,
+   "healthy_chain": [],
+   "damaged_chain": [
+    {
+     "ram": 2148117396,
+     "fire_mask": 31,
+     "jitter": 0.0,
+     "pos": [
+      -9.0,
+      361.0,
+      -30.0
+     ],
+     "vel": [
+      0.8,
+      0.076,
+      0.00475
+     ],
+     "accel": [
+      0.06245,
+      0.402898,
+      0.0
+     ],
+     "size": 37.285,
+     "grow": 3.678751,
+     "life": 33,
+     "arate": 8,
+     "argb": [
+      128,
+      0,
+      255,
+      0
+     ]
+    }
+   ]
   },
   {
    "slot": 23,
@@ -239,7 +1269,40 @@
    "damaged_emitter_ram": 0,
    "forced_frame": 0,
    "dl_ram": 0,
-   "dl_rom": 0
+   "dl_rom": 0,
+   "healthy_chain": [
+    {
+     "ram": 2148117472,
+     "fire_mask": 0,
+     "jitter": 0.0,
+     "pos": [
+      0.0,
+      40.0,
+      0.0
+     ],
+     "vel": [
+      -1.751752,
+      1.45625,
+      0.0
+     ],
+     "accel": [
+      -0.056625,
+      0.0,
+      0.0
+     ],
+     "size": 61.3125,
+     "grow": 1.835,
+     "life": 30,
+     "arate": 8,
+     "argb": [
+      87,
+      255,
+      255,
+      255
+     ]
+    }
+   ],
+   "damaged_chain": []
   }
  ]
 }

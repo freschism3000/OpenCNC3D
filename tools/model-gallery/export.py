@@ -18,7 +18,7 @@ surplus is variant meshes -- a building's turn states (`FIXT0..FIXT49` are 50 co
 over 5 meshes) and a cursor's texture flipbook (`CUR0AF0..F3`) -- which belong under
 their parent rather than beside it. The gallery therefore lists the 186 primary
 meshes, hangs the 34 variants off the parent they belong to, and adds the 16 meshes
-the briefing screen names for itself (the GDI and Nod medallions, the EVA wordmark,
+the mission briefing screen names for itself (the GDI and Nod medallions, the EVA wordmark,
 and the high-detail hero models), which live in the ROM and never enter a pack.
 
 Names and categories come from EA's GPL source, not from us: see catalog.py.
@@ -58,7 +58,7 @@ CATEGORY_ORDER = ["Vehicles", "Aircraft", "Structures", "Civilian", "Walls",
                   "Scenery", "Projectiles", "Cursors", "Debris", "Rigs",
                   "Parts", "Logos", "Briefing", "Misc"]
 
-# The four the briefing screen carries as marks rather than as objects.
+# The four the mission briefing screen carries as marks rather than as objects.
 LOGOS = {"BRF_LOGO_GDI", "BRF_LOGO_NOD", "GDI_LOGO_TITLE_ROOT", "BRF_EVA_ROOT"}
 
 
@@ -385,7 +385,7 @@ def main():
                 blob, n, lo, hi = pack_geometry(tris, texmeta)
                 off = len(geo)
                 geo += blob
-                why = ("named by the cartridge: the briefing overlay's own node and "
+                why = ("named by the cartridge: the mission briefing overlay's own node and "
                        "name arrays at ROM 0x01DEBE0 / 0x01DECE0")
                 if lit:
                     why += (". Its Vtx bytes are packed NORMALS, not baked colour, so "

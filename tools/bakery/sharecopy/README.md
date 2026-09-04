@@ -9,7 +9,10 @@ something extracted from it, which is why the public snapshot leaves it out.
 tools/bakery/sharecopy/
   rom/cnc_eu.z64            a copy of the cartridge, kept beside the baker
   assets/extracted/         decoded cartridge files by type: IMG, BIN, DA8, PA8, ENG/FRE/GER
-  assets/raw/dir_*/         raw directory-table dumps, one folder per ROM directory record
+  (assets/raw/ is gone. It held raw directory-table dumps cut at the guessed base
+   0x470000, so every non-empty file in it was the middle of its neighbour. Nothing
+   read it, the cartridge it derives from is in the repo, and `archive.py` computes
+   the data base itself: read through the parser instead. G184 reds on its return.)
   assets/terrain/           terrain tile sheets
   assets/*.json             model submeshes and payload tables
   eyes/                     the baker scripts that run against the copy

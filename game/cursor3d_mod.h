@@ -131,11 +131,49 @@ static int c3d_state_for_mouse(int mt)
  *     their addresses; the index rule is RAM 0x80080FAC's: tt = (u32)t mod period, then
  *     the first slot whose upper bound is not less than tt.
  *
- *  3. NOTHING. Code 0x05 (the repair wrench) carries frameCount 100 and has no track and
- *     no flipbook. That is the cartridge's answer and it is left alone rather than given
- *     an invented wobble; it is as a known gap so nobody re-opens it.
+ *  3. THE FRAME COUNT ITSELF, SPENT AS A YAW. Code 0x05, the repair wrench, is the one
+ *     model that carries frameCount 100 and NEITHER a node track NOR a flipbook, so
+ *     mechanisms 1 and 2 both have nothing to drive. It used to draw dead still.
+ *
+ *     MEASURED, all twenty rows of the state table, one cursor3ddump each:
+ *       state=4  code=0x03 frames=100 animframes=100  flipvariants=0
+ *       state=5  code=0x04 frames=100 animframes=100  flipvariants=0
+ *       state=6  code=0x05 frames=100 animframes=0    flipvariants=0   <-- only this one
+ *       state=7  code=0x06 frames=100 animframes=100  flipvariants=0
+ *       state=9  code=0x08 frames=100 animframes=100  flipvariants=0
+ *       state=10 code=0x09 frames=100 animframes=100  flipvariants=0
+ *       state=11 code=0x0A frames=100 animframes=0    flipvariants=4
+ *       state=12 code=0x0B frames=100 animframes=0    flipvariants=3
+ *       state=16 code=0x04 frames=100 animframes=100  flipvariants=0
+ *       state=17 code=0x06 frames=100 animframes=100  flipvariants=0
+ *     and every one of the remaining twelve rows carries frameCount 1, i.e. does not
+ *     animate at all. Rows 16 and 17 repeat rows 5 and 7's models byte for byte, so the
+ *     ten animating rows name eight distinct models and exactly one of them is idle.
+ *
+ *     SO THE FRAME COUNT IS THE SPIN. A row that says 100 and hands the evaluators
+ *     nothing to evaluate is still saying a hundred of something, and the one channel
+ *     left on a single-part model with no track is its own yaw. c3d_spin_face below
+ *     turns the clock's frame into a facing, ONE law at ONE site, spent through the
+ *     draw's ordinary facing argument.
+ *
+ *     WHAT DOES NOT FOLLOW FROM THIS. "The only frames=100 model with no track and no
+ *     flipbook" is a property of the BAKED DATA measured above, not a rule anything
+ *     enforces: a future bake that dropped a track would silently enlist another cursor
+ *     into this. So the law is written as an explicit test on code 0x05 and on nothing
+ *     else, and a second spinning cursor can only ever arrive by somebody editing this
+ *     line. Row 15 also carries code 0x05 (the no-repair wrench under its red ring) and
+ *     its frameCount is 1: it must stay still, which is why the test is on the CLOCK's
+ *     answer for this draw, not on the code alone.
  * ---------------------------------------------------------------------------------- */
 #define C3D_FRAME_STEP  4       /* sll v0,v0,2 at RAM 0x8004CB28 */
+/* THE POINTER'S OWN HEIGHT ABOVE THE GROUND, in cells, and the same nudge the shadow
+   triangles get: the ground-marker triangle is modelled at exactly y=0 and z-fights the
+   terrain without it. Named here rather than repeated as a literal at the four draws the
+   pointer's body and its flattened shadow make, because c3d_draw_one now takes a lift and
+   a caller that wants the pointer's own must be able to ask for it by name instead of by
+   remembering the number. (The screen-edge arrow and the push pointer keep their own
+   spellings of the same value; they are separate draws with separate reasons.) */
+#define C3D_CURSOR_LIFT 0.012f
 
 /* TexAnim time tables, node+0x10 -> TexAnim+0x00. Code 0x0A: RAM 0x801BBE80 / ROM
    0x15F8F0. Code 0x0B: RAM 0x801BBC40 / ROM 0x15F6B0. Last entry is the PERIOD. */
@@ -155,6 +193,11 @@ static int  g_c3dFlipN[14];
    and the pointer keeps working. */
 static int  g_c3dEdgeMesh = -1;
 static bool g_c3dEdgeArrow = true;      /* --noedgearrow for the A/B */
+/* THE FOUR-ARROW PUSH POINTER, set around the ONE c3d_draw call in draw_frame exactly as
+   g_c3dEdgeArrow is masked there for the editor. This header is included long before the
+   right button's own block is compiled, so the fact travels in a flag rather than in a
+   read of the latch. */
+static bool g_c3dPush = false;
 
 static bool g_c3dReady = false;
 static bool g_c3dUsable = false;
@@ -242,6 +285,56 @@ static int c3d_anim_frame(int frames)
         return -1;
     const int fc = (g_engineFrame < 0) ? 0 : g_engineFrame;
     return (fc * C3D_FRAME_STEP) % frames;
+}
+
+/* ---- THE WRENCH'S SPIN -------------------------------------------------------------
+   Mechanism 3 in the header, and the ONLY animation law code 0x05 has. It is the state
+   table's own frameCount turned into the draw's ordinary facing argument: a cycle of
+   `frames` clock frames is one revolution, so the model's yaw is frame/frames of a turn.
+
+   THE UNITS ARE DirType, 256 to the circle, INCREASING CLOCKWISE (0 north, 64 east, 128
+   south, 192 west) -- the same units c3d_edge_face returns and the only thing draw_mesh
+   accepts. `frame` climbs by C3D_FRAME_STEP every engine tick, so the yaw climbs too and
+   the wrench turns CLOCKWISE seen from above. That is a direction, and it is asserted as
+   one: reversing it is a different picture, not a rounding difference.
+
+   HOW LONG A TURN TAKES, in the only unit that was measured: the clock advances the frame
+   by 4 per ENGINE TICK and the period is 100, so one revolution is 25 ENGINE TICKS and it
+   passes through 25 distinct facings, 0, 10, 20, 30, 40, 51, 61, 71, 81, 92, 102 and so on
+   (256*frame/100, truncated). No wall-clock figure is quoted here: what a tick costs in
+   seconds is the renderer's business and has not been measured, and the last version of
+   this feature shipped a confident "1.6 s" that nothing in its own submission supported.
+
+   frame < 0 is the clock's way of saying "this draw does not animate" -- either the state
+   row's frameCount is 1 (row 15, the no-repair wrench under its ring) or the animation
+   has been switched off for a gate -- and it returns -1, which is draw_mesh's "no yaw".
+   Every code but 0x05 gets -1 as well; see the header for why that is a written test and
+   not an inference from the pack. */
+#define C3D_WRENCH_CODE  0x05
+#define C3D_WRENCH_STATE 6      /* the state row whose byte +2 is this model's period */
+static int c3d_spin_face(int code, int frame)
+{
+    if (code != C3D_WRENCH_CODE || frame < 0)
+        return -1;
+    const int frames = C3D_STATE[C3D_WRENCH_STATE][2];
+    if (frames <= 1)
+        return -1;
+    return (frame * 256 / frames) & 255;
+}
+
+/* THE ONE MODEL THE REPAIR WRENCH IS, for the draw over a repairing building. Resolved
+   through the same lazy c3d_init the pointer uses, so there is one resolve and one latch.
+
+   NOT gated on g_c3dUsable, and that is deliberate rather than sloppy. The POINTER demands
+   all fourteen models because half a cursor set makes the pointer vanish over some terrain
+   and not others, which is worse than the flat sprite. A wrench over a building needs
+   exactly one model; a pack that carries CUR05 can draw it whatever else it is missing,
+   and a pack that does not falls back to the 1995 sprite on its own. Returns -1 for
+   "this pack has no CUR05". */
+static int c3d_wrench_mesh(void)
+{
+    if (!g_c3dReady) c3d_init();
+    return g_c3dMesh[C3D_WRENCH_CODE];
 }
 
 /* RAM 0x80080FAC: tt = (u32)t mod period, then the first slot whose upper bound is not
@@ -358,15 +451,19 @@ static void c3d_draw_shadow(int code, float wx, float wz, int frame)
        -Z north), just further, because a cursor floats well clear of the ground and a
        shadow directly beneath it reads as dirt rather than as a shadow. */
     const float ox = g_c3dShadowOff / 256.0f, oz = -g_c3dShadowOff / 256.0f;
+    /* THE SPIN REACHES THE SILHOUETTE, for exactly the reason the animation time above
+       does: a wrench that turned while its shadow lay still would be the same defect in
+       a different channel. Same call, same argument, so the two cannot drift. */
+    const int face = c3d_spin_face(code, frame);
     /* Both passes, so a cursor whose marker is cutout still casts its whole shape. */
-    draw_mesh(mi, wx + ox, wz + oz, -1, MODE_OPAQUE,
-              0, 0.0f, 0, 1.0f, 0.012f, false, WOBBLE_NONE, animT, FLATTEN);
+    draw_mesh(mi, wx + ox, wz + oz, face, MODE_OPAQUE,
+              0, 0.0f, 0, 1.0f, C3D_CURSOR_LIFT, false, WOBBLE_NONE, animT, FLATTEN);
     /* Same coverage rule as the body above, or the marker we just stopped drawing would
        still cast a wedge-shaped shadow on the ground. */
     glEnable(GL_ALPHA_TEST);
     glAlphaFunc(GL_GREATER, 0.5f);
-    draw_mesh(mi, wx + ox, wz + oz, -1, MODE_CUTOUT,
-              0, 0.0f, 0, 1.0f, 0.012f, false, WOBBLE_NONE, animT, FLATTEN);
+    draw_mesh(mi, wx + ox, wz + oz, face, MODE_CUTOUT,
+              0, 0.0f, 0, 1.0f, C3D_CURSOR_LIFT, false, WOBBLE_NONE, animT, FLATTEN);
     glDisable(GL_ALPHA_TEST);
     g_meshShadowPass = false;
     glEnable(GL_DEPTH_TEST);
@@ -376,7 +473,25 @@ static void c3d_draw_shadow(int code, float wx, float wz, int frame)
     glColor3f(1.0f, 1.0f, 1.0f);
 }
 
-static void c3d_draw_one(int code, float wx, float wz, int frame)
+/* ONE MODEL, ONE DRAW, TWO PLACES IT IS ASKED FOR.
+   The pointer asks for it under the mouse; draw_repair_wrenches asks for CUR05 over a
+   repairing building. The three arguments after `frame` are the whole difference between
+   those two calls, and they are arguments rather than a second copy of this function so
+   that the wrench over the building cannot drift from the wrench under the mouse -- the
+   spin, the shading flags, the animation time and the two passes are shared by
+   construction.
+
+     ylift  height above the terrain under the anchor, in CELLS. C3D_CURSOR_LIFT for the
+            pointer (the same nudge the shadow triangles get, because the ground-marker
+            triangle is modelled at exactly y=0 and would z-fight); the building's own
+            half-extent for the wrench, so it floats over the roof.
+     ontop  lift the model out of the depth buffer. The pointer follows g_c3dOnTop, which
+            is a decoded-vs-reported A/B. The wrench passes true unconditionally: it is
+            drawn over a structure that is taller than it by design, so depth-testing it
+            would mean drawing nothing at all on most buildings.
+     marker draw the model's ground-marker triangle -- the cutout pass. */
+static void c3d_draw_one(int code, float wx, float wz, int frame,
+                         float ylift, bool ontop, bool marker)
 {
     if (code < 0 || code >= 14) return;
     int mi = g_c3dMesh[code];
@@ -400,11 +515,15 @@ static void c3d_draw_one(int code, float wx, float wz, int frame)
        DEVIATION and is off by default: what the console does about it has not been
        decoded, and the cursor's own draw-command handler (type 2, RAM 0x8004C890) has
        not been read far enough to say. Recorded as a known gap. */
-    if (g_c3dOnTop) {
+    if (ontop) {
         glDisable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
     }
-    draw_mesh(mi, wx, wz, -1, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, 0.012f, true,
+    /* The spin, and the ONLY place this model's yaw comes from. See c3d_spin_face:
+       every code but 0x05 gets -1 back, which is draw_mesh's "no yaw", so nothing that
+       drew still before this line moves after it. */
+    const int face = c3d_spin_face(code, frame);
+    draw_mesh(mi, wx, wz, face, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, ylift, true,
               WOBBLE_NONE, animT);
     /* THE GROUND MARKER OBEYS ITS OWN ALPHA BIT, and that is a REVERSAL. Ten of the
        fourteen models end their display list with one flat triangle at exactly y=0 --
@@ -430,12 +549,28 @@ static void c3d_draw_one(int code, float wx, float wz, int frame)
        Every cursor mesh's only cutout triangle IS this marker (audited across all 14),
        except CUR0C, which is entirely cutout and which no state in c3d_state_for_mouse
        ever selects -- so this switch cannot silently remove a cursor anyone can see. */
-    glEnable(GL_ALPHA_TEST);
-    glAlphaFunc(GL_GREATER, 0.5f);
-    draw_mesh(mi, wx, wz, -1, MODE_CUTOUT, 0, 0.0f, 0, 1.0f, 0.012f, true,
-              WOBBLE_NONE, animT);
-    glDisable(GL_ALPHA_TEST);
-    if (g_c3dOnTop) {
+    /* AND OVER A BUILDING IT IS NOT DRAWN AT ALL, which is a choice and not an
+       omission. The triangle is a GROUND marker: it names the map cell the floating
+       pointer is over, and it is modelled at exactly y=0 for that job. A wrench standing
+       over a roof is over no cell in that sense -- its anchor cell is the building's own,
+       which the building already occupies -- so a marker there would be a claim about the
+       ground that the ground cannot see anyway, lying inside the structure's mesh.
+       WHAT IT COSTS TODAY, MEASURED RATHER THAN ASSUMED: CUR05 bakes 65 triangles, 64
+       opaque and exactly 1 cutout, and that one cutout triangle IS the marker (wrenchdump
+       prints all three numbers). So this switch removes a real triangle from a real draw
+       and is not a no-op dressed up as a decision. What it does NOT do is change what the
+       pointer looks like: the pointer still asks for the marker, and the alpha test still
+       throws its texels away on this bake for the reason written above. If a later bake
+       gives that triangle opaque texels, the pointer grows a wedge and the wrench does
+       not, which is the difference this argument is about. */
+    if (marker) {
+        glEnable(GL_ALPHA_TEST);
+        glAlphaFunc(GL_GREATER, 0.5f);
+        draw_mesh(mi, wx, wz, face, MODE_CUTOUT, 0, 0.0f, 0, 1.0f, ylift, true,
+                  WOBBLE_NONE, animT);
+        glDisable(GL_ALPHA_TEST);
+    }
+    if (ontop) {
         glDepthMask(GL_TRUE);
         glEnable(GL_DEPTH_TEST);
     }
@@ -461,8 +596,25 @@ static int c3d_state_now(int mousetype)
    3.14159 S, 3.92699 SE, 4.71239 E, 5.49779 NE. The model points -Z, which is north in this
    renderer's convention, unrotated.
 
-   Returns the heading in DEGREES, or -1 for "not at an edge". */
+   Returns the heading in DEGREES, COUNTER-CLOCKWISE, which is the cartridge's own
+   handedness and NOT the engine's. This is not a DirType facing and must never be handed
+   to a draw as one; c3d_edge_face below is the only sanctioned way to spend it. Or -1 for
+   "not at an edge". */
 #define C3D_EDGE_LEPTONS 16
+/* THE PUSH POINTER'S THREE NUMBERS, in the config layer beside the constant above rather
+   than as literals at the draw site.
+   SPREAD is how far each of the four arrows stands out from the centre, in world cells.
+   CUR0E is a SOLID FILLED WEDGE, wider than it is long, so four of them with their fat
+   tails converging fill the middle in: 0.2579 photographed as one white diamond blob and
+   0.3647 as a diamond outline. 0.5500 is the first value at which the four arms read as
+   four separate arrows, and G146 asserts that in PIXELS.
+   HALF is the size, and it is spent through MODEL_SCALE because draw_mesh HAS NO SCALE
+   PARAMETER: the 0.012f in the edge-arrow call below is ylift, its tenth positional
+   argument. glScalef is not an option either, because the yaw is applied per vertex on
+   the CPU so the Glide port needs no matrix stack. */
+#define C3D_PUSH_SPREAD 0.5500f
+#define C3D_PUSH_HALF   0.5f
+#define C3D_PUSH_LIFT   0.012f
 static float c3d_edge_heading(float wx, float wz)
 {
     /* Cells to leptons, the engine's own 256 per cell. The bounds are the map rect the
@@ -489,18 +641,76 @@ static float c3d_edge_heading(float wx, float wz)
     return -1.0f;
 }
 
+/* The same edge, in the units the renderer actually turns a model by. TWO CONVENTIONS MEET
+   HERE AND THEY RUN OPPOSITE WAYS, which is the whole reason this is a named function and
+   not a multiply at the draw site:
+
+     - c3d_edge_heading hands back the CARTRIDGE's number, a counter-clockwise rotation about
+       Y in degrees. Its table reads 90 for west and 270 for east.
+     - facing_rot() takes the engine's DirType, which is CLOCKWISE: 0 north, 64 east,
+       128 south, 192 west.
+
+   So the conversion is a NEGATION and not a plain scale: face = (360 - degrees) * 256 / 360.
+   A plain scale mirrors the arrow east for west, and it does it invisibly, because 0 and 180
+   are their own negatives around the circle: north and south come out right and the other six
+   headings come out backwards. Anyone reworking this should check a diagonal, not a cardinal.
+
+   Returns -1 for "not at an edge", matching c3d_edge_heading. */
+static int c3d_edge_face(float wx, float wz)
+{
+    const float head = c3d_edge_heading(wx, wz);
+    if (head < 0.0f) return -1;
+    return (int)((360.0f - head) * 256.0f / 360.0f + 0.5f) & 255;
+}
+
+/* THE PUSH POINTER: the cartridge's own scroll arrow, four of them, at half size, pointing
+   out of the picked ground point. It is the edge arrow's model because it is the same
+   idea -- the view is travelling -- and because it is the one arrow mesh the pack carries.
+   THE HALVING IS DONE ON MODEL_SCALE and restored immediately, with no other call between
+   the two, because draw_mesh takes no scale and this renderer has no matrix stack to push.
+   The four facings are DirType, 0 north 64 east 128 south 192 west; the four offsets are
+   the matching directions in cell space, where +x is east and +z is south. */
+static void c3d_draw_push(float wx, float wz)
+{
+    static const int   FACE[4] = { 0, 64, 128, 192 };
+    static const float OFF[4][2] = { { 0.0f, -1.0f }, { 1.0f, 0.0f },
+                                     { 0.0f,  1.0f }, { -1.0f, 0.0f } };
+    const float save = MODEL_SCALE;
+    int i;
+    if (g_c3dEdgeMesh < 0) return;
+    glColor3f(1.0f, 1.0f, 1.0f);
+    if (g_c3dOnTop) { glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); }
+    MODEL_SCALE = save * C3D_PUSH_HALF;
+    for (i = 0; i < 4; i++)
+        draw_mesh(g_c3dEdgeMesh,
+                  wx + OFF[i][0] * C3D_PUSH_SPREAD,
+                  wz + OFF[i][1] * C3D_PUSH_SPREAD,
+                  FACE[i], MODE_OPAQUE, 0, 0.0f, 0, 1.0f, C3D_PUSH_LIFT,
+                  true, WOBBLE_NONE, -1.0f);
+    MODEL_SCALE = save;
+    if (g_c3dOnTop) { glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); }
+    glDisable(GL_TEXTURE_2D);
+}
+
 static void c3d_draw(int mousetype, float wx, float wz)
 {
     if (!c3d_have()) return;
+
+    /* THE PUSH POINTER WINS, and it is asked BEFORE the map-edge arrow rather than folded
+       into it. The edge arrow's own block below is left exactly as it was, so with the
+       push inactive this function behaves byte for byte as it did. */
+    if (g_c3dPush) { c3d_draw_push(wx, wz); return; }
 
     /* AT THE EDGE the cartridge draws the scroll arrow INSTEAD of the ordinary cursor --
        its handler binds cursorNodeTable[0x0E] and returns, never reaching the state
        table's own model. */
     if (g_c3dEdgeArrow && g_c3dEdgeMesh >= 0) {
-        const float head = c3d_edge_heading(wx, wz);
-        if (head >= 0.0f) {
-            /* draw_facing takes DirType units, 256 to the turn. */
-            const int face = (int)(head * 256.0f / 360.0f + 0.5f) & 255;
+        /* DirType units, 256 to the turn, already turned round out of the cartridge's
+           counter-clockwise degrees. draw_mesh spends this through facing_rot() with no
+           model_face_bias in the way, so what c3d_edge_face returns is what the model turns
+           by. */
+        const int face = c3d_edge_face(wx, wz);
+        if (face >= 0) {
             glColor3f(1.0f, 1.0f, 1.0f);
             if (g_c3dOnTop) { glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); }
             draw_mesh(g_c3dEdgeMesh, wx, wz, face, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, 0.012f,
@@ -517,11 +727,11 @@ static void c3d_draw(int mousetype, float wx, float wz)
        cursor rather than per model, or the no-entry ring would double the darkness. */
     c3d_draw_shadow(C3D_STATE[st][0], wx, wz, frame);
     glColor3f(1.0f, 1.0f, 1.0f);
-    c3d_draw_one(C3D_STATE[st][0], wx, wz, frame);
+    c3d_draw_one(C3D_STATE[st][0], wx, wz, frame, C3D_CURSOR_LIFT, g_c3dOnTop, true);
     /* The overlay ring is state 3's model, whose own state row carries frameCount 1: it
        is static on the cartridge and stays static here. */
     if (C3D_STATE[st][3])              /* no-sell / no-repair: the ring goes on top */
-        c3d_draw_one(C3D_NOENTRY_CODE, wx, wz, -1);
+        c3d_draw_one(C3D_NOENTRY_CODE, wx, wz, -1, C3D_CURSOR_LIFT, g_c3dOnTop, true);
     glDisable(GL_TEXTURE_2D);
 }
 

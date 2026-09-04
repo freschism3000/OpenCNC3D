@@ -153,7 +153,12 @@ jobs:
             x86_64-w64-mingw32-objdump -p build/win/TiberianDawn.dll | grep -q "$sym" \
               || { echo "brain is missing $sym"; exit 1; }
           done
-          for exe in build/win/cnc3d.exe build/win/cnc_eyes.exe; do
+          # netcheck.exe is in this loop because it SHIPS: it is copied into the
+          # Windows package beside the game, so a dependency it cannot resolve is a
+          # dependency a player meets. It is also the one binary here whose whole
+          # purpose is networking, which makes it the one where a stray link is most
+          # likely and least excusable.
+          for exe in build/win/cnc3d.exe build/win/cnc_eyes.exe build/win/netcheck.exe; do
             # msvcrt.dll is on this list because it IS a Windows system DLL, present on
             # every Windows since NT, and because Ubuntu's mingw-w64 is the MSVCRT
             # variant while Homebrew's is the UCRT one. So CI links against msvcrt and
@@ -161,8 +166,17 @@ jobs:
             # Left open deliberately: it means this job proves the code compiles and that
             # nothing exotic crept into the dependency list, NOT that it produced the
             # same binary ships.
+            #
+            # WS2_32.dll is winsock, and it is on this list for exactly the reason
+            # KERNEL32 and WINMM are: it is a Windows SYSTEM DLL, in System32 on every
+            # Windows since 98, and nothing has to ship beside the binary for it to
+            # resolve. The lockstep networking in net/ links it. This is the list of
+            # things Windows already has, not a list of things allowed to fail, so
+            # adding a genuine system DLL to it does not soften what the check is for:
+            # the case it exists to catch, a link quietly pulling in something that has
+            # to be shipped like libwinpthread-1.dll, is refused exactly as before.
             extra=$(x86_64-w64-mingw32-objdump -p $exe | grep "DLL Name" \
-                    | grep -viE "api-ms-win-crt|msvcrt|KERNEL32|USER32|SHELL32|OPENGL32|WINMM|OLEAUT32|ADVAPI32|GDI32|SDL2" || true)
+                    | grep -viE "api-ms-win-crt|msvcrt|KERNEL32|USER32|SHELL32|OPENGL32|WINMM|OLEAUT32|ADVAPI32|GDI32|WS2_32|SDL2" || true)
             [ -z "$extra" ] || { echo "$exe needs a DLL that Windows 11 does not ship:"; echo "$extra"; exit 1; }
           done
           echo "PE32 i686, brain exports present, SDL2.dll is the only extra dependency"

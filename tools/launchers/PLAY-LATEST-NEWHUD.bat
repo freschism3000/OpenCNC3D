@@ -12,7 +12,7 @@ rem      play-latest-newhud.bat mission
 rem
 rem  A --vsync 0 workaround used to be forced here. It is gone on purpose: the
 rem  stutter it papered over was never vsync, it was the brain's world dump
-rem  leaving one WriteFile syscall per character.
+rem  leaving one WriteFile syscall per character (known-gap notes, 20 Aug 2026).
 rem  With that fixed, vsync holds 60 fps at a full 15 Hz tick on every map size
 rem  measured. If stutter returns, measure the tick cost before blaming the swap.
 rem ---------------------------------------------------------------------------

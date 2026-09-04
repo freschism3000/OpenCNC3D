@@ -1,6 +1,6 @@
 # G109. THE SAM SITE MAKES A NOISE WHEN IT FIRES.
 #
-# This was asked for and turned out to already work; the gate exists so it keeps
+# the project owner asked for this and it turned out to already work; the gate exists so it keeps
 # working, and so the next person to doubt it has a script that answers in 30 seconds.
 #
 # THREE THINGS ABOUT THIS SCRIPT ARE LOAD-BEARING. Each one, on its own, makes the run

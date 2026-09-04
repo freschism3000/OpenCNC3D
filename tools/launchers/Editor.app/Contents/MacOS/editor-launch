@@ -2,7 +2,7 @@
 # ============================================================================
 #  Editor -- the mission editor, for testing whatever is currently being built.
 #
-#  One app in playable/ was asked for that is ALWAYS the current thing, so that
+#  the project owner asked for one app in playable/ that is ALWAYS the current thing, so that
 #  testing never means "which binary did I actually just run?". Three rules keep
 #  that promise, and each of them exists because the obvious version of this
 #  launcher would quietly break it:
@@ -21,7 +21,7 @@
 #
 #  3. IT UPDATES ITSELF. tools/launchers/Editor.app is the tracked master; this
 #     is a copy. If the master is newer, the copy is refreshed and re-run before
-#     anything else happens, so a fix to this file does not need anyone to be told
+#     anything else happens, so a fix to this file does not need the project owner to be told
 #     to reinstall anything.
 #
 #  Everything it cannot do it SAYS, in a dialog, with the command that fixes it.
@@ -37,7 +37,7 @@ set -u
 BUNDLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HERE="$(dirname "$BUNDLE")"
 
-# ---- talking to the user -------------------------------------------------------------
+# ---- talking to the project owner -------------------------------------------------------------
 alert() {  # alert <title> <message>
     osascript - "$1" "$2" >/dev/null 2>&1 <<'OSA'
 on run argv
@@ -181,7 +181,7 @@ Bake one with:    sh tools/stage-skirmish-maps.sh $WANT"
     CHOICE="$WANT"
 fi
 
-# NO PICKER. A requirement: the map browser must not stand between double-clicking this
+# NO PICKER. the project owner's note: the map browser must not stand between double-clicking this
 # and seeing a map. The editor has a MAP menu of its own now -- New Map, Open Map, and
 # the singleplayer/multiplayer switch -- so this opens the last map straight away and
 # choosing a different one happens inside, where it belongs.

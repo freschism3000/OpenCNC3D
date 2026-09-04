@@ -5,7 +5,7 @@
  *     320x200 palette plate, which camp_draw then uploads as one GL texture. A
  *     3D model cannot go into that plate without pre-rendering it to frames and
  *     giving up the smooth spin. So it draws as a second GL pass over the plate
- *     quad, in its own viewport, with its own depth buffer region. Reported
+ *     quad, in its own viewport, with its own depth buffer region. the project owner, 26 Aug
  *     2026: "Dont bake them into the render. Have them appear on top."
  *
  * FIXED FUNCTION ON PURPOSE
@@ -229,7 +229,7 @@ void logo3d_draw(Logo3D *L, int which, int fbh, int x, int y, int w, int h,
        and silently broken in the sidebar, which draws its 2D bar with depth writes off.
        There the buffer kept the WORLD's depths, so most of the model failed the depth
        test against terrain that is nowhere near it and what survived was one untextured
-       batch: the recording shows the coin as a flat grey ellipse with the emblem
+       batch: the project owner's recording shows the coin as a flat grey ellipse with the emblem
        missing. Nothing about the model, the pack or the textures was wrong. */
     glDepthMask(GL_TRUE);
     glClear(GL_DEPTH_BUFFER_BIT);   /* scissored, so the plate quad is untouched */

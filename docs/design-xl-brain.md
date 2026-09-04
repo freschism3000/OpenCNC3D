@@ -1,9 +1,9 @@
 # The XL Brain -- design (26 Aug 2026)
 
 Authoritative design for the Enhanced-only engine fork that takes CNC3D past the
-classic brain's ceilings, per the direction given: 256x256/16 players, then 512x512/32,
+classic brain's ceilings, per the project owner's direction: 256x256/16 players, then 512x512/32,
 then 1024x1024/64 -- modern Windows and Mac only; the Classic/Win98 build keeps the
-stock engine untouched (section 1e, the two-brain law). Produced
+stock engine untouched (engineering notes section 1e, the two-brain law). Produced
 from the big-map recon evidence; where this doc and the code disagree once phases
 land, update THIS DOC in the same commit.
 
@@ -33,7 +33,7 @@ PRECISION AND FEEL: leptons stay 256 per cell, so Move_Point's CosTable/SinTable
 
 ## 64 houses
 
-ENUM GROWTH, NOT DYNAMIC HOUSES, WITH ONE STRUCTURAL MOVE: multi-first ordering. Arithmetic forces it: 4 campaign houses + 64 multi houses = 68 indices, and every mask shifts by FULL HousesType index, so u64 overflows for the tail four. XL reorders the enum: HOUSE_MULTI1 = 0 .. HOUSE_MULTI64 = 63, then HOUSE_GOOD = 64, HOUSE_BAD, HOUSE_NEUTRAL, HOUSE_JP = 67; HOUSE_COUNT = 68 (char-based enum survives, 68 < 127). All u64 masks then cover exactly the 64 multi slots. Campaign houses carry NO mask bits; the XL brain REFUSES GAME_NORMAL scenarios at load (campaign is classic-brain territory under the two-brain law), and Is_Ally(h) for h >= 64 resolves by rule (self only; civilians stay hostile-neutral) with a debug assert. The port audit this buys: every comparison shaped like h >= HOUSE_MULTI1 or loops starting at HOUSE_GOOD gets reviewed once (grep-able, finite). Fallback if the audit finds a swamp: cap at 60 players so 4+60 fits u64 unordered; that is a project decision to pre-approve, and the reorder is the recommendation.
+ENUM GROWTH, NOT DYNAMIC HOUSES, WITH ONE STRUCTURAL MOVE: multi-first ordering. Arithmetic forces it: 4 campaign houses + 64 multi houses = 68 indices, and every mask shifts by FULL HousesType index, so u64 overflows for the tail four. XL reorders the enum: HOUSE_MULTI1 = 0 .. HOUSE_MULTI64 = 63, then HOUSE_GOOD = 64, HOUSE_BAD, HOUSE_NEUTRAL, HOUSE_JP = 67; HOUSE_COUNT = 68 (char-based enum survives, 68 < 127). All u64 masks then cover exactly the 64 multi slots. Campaign houses carry NO mask bits; the XL brain REFUSES GAME_NORMAL scenarios at load (campaign is classic-brain territory under the two-brain law), and Is_Ally(h) for h >= 64 resolves by rule (self only; civilians stay hostile-neutral) with a debug assert. The port audit this buys: every comparison shaped like h >= HOUSE_MULTI1 or loops starting at HOUSE_GOOD gets reviewed once (grep-able, finite). Fallback if the audit finds a swamp: cap at 60 players so 4+60 fits u64 unordered; that is the project owner's call to pre-approve, and the reorder is the recommendation.
 
 MASKS to uint64_t: CellClass::IsMappedByPlayerMask / IsVisibleByPlayerMask (cell.h:149/154), HouseClass::Allies + Get_Allies (house.h:489/743), the ObjectClass IsSelectedMask / IsDiscoveredByPlayerMask family, and Ownable (type.h u16 to u64, fixing the recon's latent truncation: TechnoClass::Get_Ownable returning unsigned char at techno.h:247/object.h:188). Mechanical law: every 1 << house becomes 1ULL << house; a grep-gate over brain/xl enforces no bare "1 <<" against a house index. Mask scans iterate ascending bit index for determinism.
 
@@ -41,7 +41,7 @@ EVENTCLASS: Frame:27 to 24 (12.9 days at 15Hz), ID:4 to 7 (house index to 67), I
 
 CAPACITIES: MAX_PLAYERS = 64 (defines.h:2592 block); MAX_MULTI_NAMES >= 64 to satisfy the score-row static_assert (defines.h:2881). Heap caps scale for 64 armies: UNIT_MAX / INFANTRY_MAX / BUILDING_MAX 500 to 4000, AIRCRAFT_MAX 100 to 800 (EACH_* derive; TARGET's 24-bit mantissa is indifferent). hdata.cpp's 64 HouseTypeClass entries + Pointers rows generate from one X-macro table (IniName "Multi1".."Multi64"), not 64 hand-written blocks. Waypoints: XL INIs use RA-style numeric waypoints; Scen.Waypoint grows to WAYPT_COUNT = 130 with starts 0..63, WAYPT_HOME = 128, WAYPT_REINF = 129; the way[26] letter-parse cap dies in xl's INI reader. dllinterface.h: MAX_HOUSES 32 to 68; AllyFlags/SpiedPowerFlags/SpiedMoneyFlags u32 to u64; GAME_OVER_MULTIPLAYER_MAX_PLAYERS_TRACKED 8 to 64; SpiedInfo[68].
 
-COLOR IDENTITY, THE BRAIN/HOST CONTRACT: the brain keeps its PlayerColorType palette remaps and lets them repeat past ~8; its 8-bit rendering output is unused by CNC3D anyway. What the HOST needs is stable identity, and the dump provides it: the HOUSE| line (dllinterface.cpp:8401) grows |slot=%d|color=%d|side=%s where slot is the multi index 0..63 (stable all session), color is the brain's ColorIndex, side is ActLike GDI or NOD. OBJ| already names the owner house (IniName) which resolves to that HOUSE| row. The host picks the pack's livery by side (the existing two-livery gdi_data scheme survives untouched) and applies a per-slot tint from a host-side 64-entry palette data file (tunable, cnc3d-fx.cfg style); obj_is_gdi (cnc_eyes.cpp:2071) becomes a slot+side lookup and house_colour (cnc_eyes.cpp:4094) reads the palette, which automatically fixes radar dots, health bars and selection since all route through house_colour already.
+COLOR IDENTITY, THE BRAIN/HOST CONTRACT: the brain keeps its PlayerColorType palette remaps and lets them repeat past ~8; its 8-bit rendering output is unused by CNC3D anyway. What the HOST needs is stable identity, and the dump provides it: the HOUSE| line (dllinterface.cpp:8401) grows |slot=%d|color=%d|side=%s where slot is the multi index 0..63 (stable all session), color is the brain's ColorIndex, side is ActLike GDI or NOD. OBJ| already names the owner house (IniName) which resolves to that HOUSE| row. The host picks the pack's livery by side (the existing two-livery gdi_data scheme survives untouched) and applies a per-slot tint from a host-side 64-entry palette data file (the project owner-tunable, cnc3d-fx.cfg style); obj_is_gdi (cnc_eyes.cpp:2071) becomes a slot+side lookup and house_colour (cnc_eyes.cpp:4094) reads the palette, which automatically fixes radar dots, health bars and selection since all route through house_colour already.
 
 SIDEBAR/SCORE/RADAR: sidebar is per-local-player through the GlyphX path and is house-count-agnostic; score screen re-dimensions MultiPlayerPlayersData to 64 rows (host draws it, so layout work is host-side); the brain's own radar class stays vestigial, the host radar handles 64 colors via the palette. PER-SESSION vs ENGINE: MAX_PLAYERS 64 is the engine ceiling; how many the lobby offers (SK_AI_MAX, roster rows) stays a host/session decision lifted in the host phases.
 
@@ -107,7 +107,7 @@ The XL brain inherits vanilla's frame (one seeded RNG, tick-locked logic); the f
 
 (f) THE NET: all XL gates join the one suite; tools/release.sh already refuses on any red gate and on a missing changelog entry, and the DIVERGENCE.md-entry-per-changed-file gate keeps fork review honest. Determinism regressions therefore cannot ship; at worst they cost a suite run, which is the system working.
 
-## Decisions
+## the project owner's decisions (26 Aug 2026)
 
 Answered on the day the design landed:
 
@@ -116,15 +116,15 @@ Answered on the day the design landed:
    Multiplayer, we'll test with real humans"). The event wire still widens as
    designed so replays stay coherent when that day comes.
 2. **SAVES: no cross-loading.** XL saves load only in XL, classic only in classic;
-   slot records carry a brain tag and refuse politely. XL is equated with
+   slot records carry a brain tag and refuse politely. the project owner equates XL with
    Enhanced mode outright.
 3. **CAMPAIGN STAYS CLASSIC.** The multi-first house reorder stands; the XL brain
    refuses GAME_NORMAL scenarios; campaign houses stay maskless.
 
 Unanswered items below remain open; heap caps (Q9) proceed at the proposed
-4000/4000/4000/800 as TUNING DATA that can be changed, per the design.
+4000/4000/4000/800 as TUNING DATA the project owner can change, per the design.
 
-## Open questions
+## Open questions for the project owner
 
 1. NETWORKING SCOPE: is XL 64-player AI-skirmish only, or is human multiplayer on XL ever in scope? The legacy peer wire (546-byte IPX mesh, CONNECT_MAX, MAX_EVENTS 256/frame) is unusable past ~16 and human MP means a client-server layer, effectively a separate project. The design assumes AI-skirmish only; the event wire is still widened for replay integrity.
 
@@ -132,16 +132,16 @@ Unanswered items below remain open; heap caps (Q9) proceed at the proposed
 
 3. CAMPAIGN ON XL: the multi-first house reorder leans on "the XL brain refuses GAME_NORMAL", which keeps campaign houses maskless. If campaign-on-XL is ever wanted, the alternative is a 60-player cap (4+60 fits u64 without the reorder). Cheap to choose now, expensive later. Which is it?
 
-4. DOES 256/16 SHIP BEFORE THE NEW PATHFINDER? The design treats Phase 4 as a ship-blocker for the tier because edge-follower stalls on long treks read as bugs. That can be overruled to ship the tier early with the bumped 1200-entry scaffolding, accepting visible stalls.
+4. DOES 256/16 SHIP BEFORE THE NEW PATHFINDER? The design treats Phase 4 as a ship-blocker for the tier because edge-follower stalls on long treks read as bugs. the project owner can overrule and ship the tier early with the bumped 1200-entry scaffolding, accepting visible stalls.
 
 5. HUD AT XL SIZES: does Enhanced keep the DOS sidebar and radar (radar becomes an 8.5-cells-per-pixel windowed view at 1024) or get an Enhanced HUD variant? Decides real scope in phases 5-6.
 
-6. THE 64-TINT PALETTE: who authors it (a tunable data file in the cnc3d-fx.cfg pattern is the design), and is two players sharing a livery (same side art, different tint) acceptable presentation, or do liveries need to multiply?
+6. THE 64-TINT PALETTE: who authors it (a the project owner-tunable data file in the cnc3d-fx.cfg pattern is the design), and is two players sharing a livery (same side art, different tint) acceptable presentation, or do liveries need to multiply?
 
 7. MAP AUTHORSHIP AT 512/1024: editor-first (pulls editor XL work earlier in the ladder) or a couple of hand-built flagship maps first? Changes the order inside phases 5-6.
 
 8. PACKAGING: Enhanced zips always carry both dylibs (about 2MB extra, one artifact, no version skew; the recommendation) or XL as a separate launcher asset?
 
-9. HEAP CAPS ARE GAMEPLAY: 4000 units / 4000 infantry / 4000 buildings / 800 aircraft at 64 players (EACH_* per-player derivations follow). These are tuning numbers that may want to be different, and they gate perf budgets.
+9. HEAP CAPS ARE GAMEPLAY: 4000 units / 4000 infantry / 4000 buildings / 800 aircraft at 64 players (EACH_* per-player derivations follow). These are tuning numbers the project owner may want different, and they gate perf budgets.
 
 10. WAYPOINT AUTHORING: confirm XL maps may use RA-style numeric [Waypoints] (0..129) while classic maps keep the letter namespace, so the editor writes per-format.

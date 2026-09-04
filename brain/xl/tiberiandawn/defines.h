@@ -315,9 +315,31 @@ typedef enum DiffType : unsigned char
 
 /*
 **	To enable big maps we need to load the normal format a little differently.
+**
+**	XL ADDS A THIRD, AND IT IS THE ONLY ONE THAT SAYS WHAT IT MEANS. The first
+**	two carry cell numbers at the stride of the build that wrote them -- 64 and
+**	128 -- and say so nowhere; the reader has to know. That works because there
+**	are exactly two of them and MAP_VERSION picks between them, and it runs out
+**	immediately afterwards: the sparse .BIN key is sixteen bits, which reaches
+**	256x256 exactly and is dead one cell past it.
+**
+**	MAP_VERSION_XL is native to this brain. Its cell numbers ARE this brain's
+**	cell numbers, at the fixed 1024 stride the whole XL ladder shares, so
+**	confinement is the identity and no conversion can be got wrong. The size of
+**	a map is [MAP] Width/Height as always; the STRIDE is a property of the
+**	format, not of the map, which is the whole point of having fixed the
+**	address space at 1024 from the first XL commit. A 256 map, a 512 map and a
+**	1024 map are all Version=2 and all read by the same code.
+**
+**	Its .BIN is sparse like the mega format but with a 32 bit key and a twelve
+**	byte header naming the magic, the version, the stride it was written at and
+**	the record count, so a file that ever does arrive from a different address
+**	space is REFUSED rather than silently misread, and a truncated one is
+**	caught rather than read short. See MapClass::Read_Binary_XL.
 */
 #define MAP_VERSION_NORMAL 0
 #define MAP_VERSION_MEGA   1
+#define MAP_VERSION_XL     2
 
 /**********************************************************************
 **	These are the various return conditions that production may
@@ -707,18 +729,29 @@ typedef enum HousesType : signed char
 
 // inline HousesType operator++(HousesType &, int);
 
-#define HOUSEF_GOOD    (1 << HOUSE_GOOD)
-#define HOUSEF_BAD     (1 << HOUSE_BAD)
-#define HOUSEF_NEUTRAL (1 << HOUSE_NEUTRAL)
-#define HOUSEF_JP      (1 << HOUSE_JP)
-#define HOUSEF_MULTI1  (1 << HOUSE_MULTI1)
-#define HOUSEF_MULTI2  (1 << HOUSE_MULTI2)
-#define HOUSEF_MULTI3  (1 << HOUSE_MULTI3)
-#define HOUSEF_MULTI4  (1 << HOUSE_MULTI4)
-#define HOUSEF_MULTI5  (1 << HOUSE_MULTI5)
-#define HOUSEF_MULTI6  (1 << HOUSE_MULTI6)
-#define HOUSEF_MULTI7  (1 << HOUSE_MULTI7)
-#define HOUSEF_MULTI8  (1 << HOUSE_MULTI8)
+/*
+**	EVERY HOUSE BIT IS 64 WIDE HERE, and it is spelled 1ULL rather than 1 on purpose.
+**	The ladder this fork exists for ends at 64 multiplayer houses, and a bare 1 is an int:
+**	shifting it by 32 or more is undefined behaviour, not a truncation, so the failure
+**	arrives as whatever the optimiser felt like rather than as a missing bit. That is the
+**	one failure mode a wider FIELD does not fix by itself, because the value being stored
+**	was already wrong before the assignment.
+**
+**	tools/xl-house-mask-guard.sh fails the build on a bare `1 <<` against a house index
+**	anywhere in this fork, so this cannot quietly come back one site at a time.
+*/
+#define HOUSEF_GOOD    (1ULL << HOUSE_GOOD)
+#define HOUSEF_BAD     (1ULL << HOUSE_BAD)
+#define HOUSEF_NEUTRAL (1ULL << HOUSE_NEUTRAL)
+#define HOUSEF_JP      (1ULL << HOUSE_JP)
+#define HOUSEF_MULTI1  (1ULL << HOUSE_MULTI1)
+#define HOUSEF_MULTI2  (1ULL << HOUSE_MULTI2)
+#define HOUSEF_MULTI3  (1ULL << HOUSE_MULTI3)
+#define HOUSEF_MULTI4  (1ULL << HOUSE_MULTI4)
+#define HOUSEF_MULTI5  (1ULL << HOUSE_MULTI5)
+#define HOUSEF_MULTI6  (1ULL << HOUSE_MULTI6)
+#define HOUSEF_MULTI7  (1ULL << HOUSE_MULTI7)
+#define HOUSEF_MULTI8  (1ULL << HOUSE_MULTI8)
 
 typedef enum PlayerColorType : signed char
 {
@@ -2882,10 +2915,13 @@ typedef struct
 **	headroom. These pins fail the build the moment anyone widens past what the
 **	on-the-wire encodings can carry.
 */
-// EventClass carries the originating house in a 4-bit field (event.h, "unsigned ID : 4"),
-// so the highest HousesType index must stay within 0..15. HOUSE_MULTI8 is index 11.
-static_assert(HOUSE_MULTI8 == 11 && HOUSE_MULTI8 <= 15,
-              "max HousesType index must fit EventClass's 4-bit ID wire field (event.h)");
+// EventClass carries the originating house in a 7-bit field (event.h, "unsigned ID : 7"),
+// so the highest HousesType index must stay within 0..127. It was 4 bits until the
+// sixteen-player decision, which capped the wire at 16 house indices and so at twelve
+// multiplayer slots. HOUSE_MULTI8 is index 11 today; the roster grows in Phase 4 and this
+// pin moves with HOUSE_COUNT rather than with a hardcoded index.
+static_assert(HOUSE_COUNT <= 128,
+              "max HousesType index must fit EventClass's 7-bit ID wire field (event.h)");
 // The multiplayer score screen has exactly eight rows; every player must get one.
 static_assert(MAX_MULTI_NAMES == 8, "score screen rows must match the eight-player roster");
 static_assert(MAX_PLAYERS <= MAX_MULTI_NAMES, "every player needs a score-screen row");

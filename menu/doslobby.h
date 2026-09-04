@@ -26,7 +26,7 @@
  *                      waypoints 0..25 and then indexes the compacted list unchecked.
  *   chat               there is nobody to talk to.
  *
- * TEAMS USED TO BE ON THAT LIST AND ARE NOT ANY MORE (by request). The
+ * TEAMS USED TO BE ON THAT LIST AND ARE NOT ANY MORE (26 Aug 2026, the project owner's request). The
  * note said "the field works; the renderer has no ally concept, so a 2v2 would be drawn
  * as a 1v3", and the first half was right: CNCPlayerInfoStruct::Team reaches
  * MPlayerTeamIDs (dllinterface.cpp:759) and GlyphX_Assign_Houses calls Make_Ally for
@@ -36,7 +36,7 @@
  * enemies and two players on one side look like one army. The roster's colours name
  * players in the LOBBY and nowhere else, which is what the footer row says.
  *
- * COLOUR WAS ON THAT LIST TOO AND IS NOT ANY MORE (by request: "make
+ * COLOUR WAS ON THAT LIST TOO AND IS NOT ANY MORE (26 Aug 2026, the project owner's request: "make
  * sure theres a colorpicker for each player as well"). The old note said a colour index
  * "changes a number nothing draws", and the second half of that is still true of the
  * TACTICAL VIEW -- CNC3D draws 3D models whose texture set is chosen by SIDE, and the
@@ -51,7 +51,7 @@
  * engine's own enum annotates itself with the colours it does NOT produce
  * (defines.h:707-718: "REMAP_LTBLUE, // Ingame grey color", "REMAP_BLUE, // Ingame dark
  * green color"), so neither the enum name nor MPlayerGColors is a reliable description
- * of what a player will SEE. Looking at the running game, a player reads the theme that
+ * of what a player will SEE. the project owner, looking at his running game, read the theme that
  * paints blue-grey units with red parts on Nod buildings as the one called "Red" -- and
  * he was reading the engine correctly, because in a single player game Nod BUILDINGS
  * take RemapRed while Nod UNITS keep the default bluegrey (house.cpp:2257-2262). His
@@ -132,7 +132,7 @@ typedef struct SK_Lobby
      * are still written (GDI, own team, own colour) and describe nobody.
      *   house  0 GDI, 1 Nod: the side that player's army wears and builds from.
      *   team   ZERO BASED, so the screen prints team + 1. Two players carrying the same
-     *          number are allies. The default is team[i] = i -- the original rule, eight
+     *          number are allies. The default is team[i] = i -- the project owner's own rule, eight
      *          players and eight teams, everybody on their own.
      *   colour PlayerColorType, 0..7, in the ENGINE's own order (defines.h:705-720) so
      *          the number means the same thing on both sides of the handoff. It is
@@ -245,7 +245,7 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 #define SK_MAP_W 108
 
 /* THE TWO TABS, above the list: the maps that shipped, and the ones made in the editor.
- * The split was asked for because a folder of your own maps is worth nothing if it is
+ * the project owner asked for the split because a folder of your own maps is worth nothing if it is
  * mixed into a wall of SCM names.
  *
  * The list gives up a row to make space rather than the column growing: the Battlefield
@@ -297,17 +297,39 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 #define SK_GDI_X 24
 #define SK_NOD_X 72
 
-/* Three live rows and a fourth left laid out and empty: it is where Unit Count and
- * Crates go if they ever earn their place, and leaving the slot means adding them
- * later moves nothing. */
-/* STARTING UNITS. FR-20260825-77A9E9 asked for "a count up to 10, from an assortment
- * including Mammoth Tank, Stealth Tank, SSM Launcher". The ASSORTMENT is already the Tech
- * Level row's doing: scenarioini.cpp:1416's utable maps build level to unit type, and
- * level 6 is the SSM launcher while level 7 is Mammoth for GDI and Stealth for Nod. So the
- * only control missing was the COUNT, which is this.
- * Zero stays the default and stays the measured-best: the engine scatters the escort within
- * about four cells of the MCV and any unit landing inside the 3x3 Construction Yard pad
- * makes the player's first click do nothing. The player may now choose otherwise. */
+/* FOUR LIVE ROWS IN EACH COLUMN. The fourth was laid out and then left undrawn while both
+ * of its controls were already live: SK_I_UNITS had a range, a rectangle, a caption, a
+ * mouse arm, a keyboard arm and a field in the result, and SK_I_CRATES took clicks and
+ * Space and wrote MPlayerGoodies. Neither is disabled, so the keyboard walk stopped on
+ * both, and neither painted a pixel: two settings a player could change by accident and
+ * read nowhere. They are drawn now, and nothing else on the plate moved, because the slot
+ * was already dimensioned for them. Row four is y=140, a gauge is 7 tall so it ends at
+ * 146, and SK_STATUS_Y is 150.
+ *
+ * UNIT COUNT IS A SLIDER, which is what the 1995 dialog makes it rather than a new widget:
+ * nulldlg.cpp:1852 prints TXT_COUNT right aligned, countgauge draws the travel beside it,
+ * and a static button prints the number to its right (:1886). sk_draw_gauge is that shape
+ * already, and it is the same shape the options screen draws game speed and scroll rate in.
+ *
+ * THE CAPTION IS TXT_COUNT'S OWN WORDS. conquer.h:655 in Tiberian Dawn and :315 in Red
+ * Alert both define it as "Unit Count:". Measured in GRAD6FNT it is 61 pixels, the same as
+ * "AI Players:" and "Tech Level:", inside the 78 the caption column has. The invented
+ * "Starting Units:" it replaces measured 85 and would have printed from x=15, one pixel
+ * outside the dialog's own left edge, because db_print clips to the surface and never to a
+ * caller's box.
+ *
+ * THE CEILING IS 10 AND THE 1995 CEILING IS 12. globals.cpp:541-542 indexes
+ * MPlayerCountMin/Max by MPlayerBases, so with bases on, which this screen locks, the
+ * retail dialog offers 0..12. Ten is the requirement for this screen and is a deliberate
+ * departure, written down here so the two numbers are not later read as a transcription
+ * error.
+ *
+ * Zero stays the default and stays the measured-best: the engine scatters the escort
+ * within about four cells of the MCV, and any unit landing inside the 3x3 Construction
+ * Yard pad makes the player's first click do nothing. The player may now choose otherwise.
+ * The ASSORTMENT is the Tech Level row's doing rather than this row's: scenarioini.cpp:1416's
+ * utable maps build level to unit type, level 6 to the SSM launcher and level 7 to Mammoth
+ * for GDI and Stealth for Nod. */
 #define SK_UNITS_MIN 0
 #define SK_UNITS_MAX 10
 
@@ -348,7 +370,7 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * drawing model is one immediate pass into one surface with no z ordering: a popup has
  * to be drawn LAST and hit-tested FIRST. That is the whole cost and it is paid in two
  * places -- sk_draw calls sk_draw_popup after everything else, and sk_hit_test asks the
- * popup before it asks anything -- because a drop down by name was asked for and a
+ * popup before it asks anything -- because the project owner asked for a drop down by name and a
  * per-row faction plus a per-row team is four choices in one place, not one.
  *
  * It is a floating box and the plate is 320x200, so its size is arithmetic, not taste.
@@ -366,7 +388,7 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * rows rather than trusting the arithmetic above.
  *
  * THE THIRD ROW IS CAPTIONED AND ITS EIGHT BUTTONS ARE NOT. "COLOUR" names the QUESTION,
- * which cannot be the wrong word; naming an ANSWER is the thing ruled out, and no
+ * which cannot be the wrong word; naming an ANSWER is the thing the project owner ruled out, and no
  * square carries a glyph.
  * ------------------------------------------------------------------------ */
 #define SK_POP_PAD 4
@@ -494,12 +516,12 @@ typedef struct SK_State
     int house[SK_ROSTER_ROWS];
     int house_set[SK_ROSTER_ROWS];
     /* ZERO BASED; the screen prints team + 1. sk_init writes team[i] = i, which is
-     * The rule: eight players, eight teams, everyone on their own. */
+     * the project owner's rule: eight players, eight teams, everyone on their own. */
     int team[SK_ROSTER_ROWS];
 
     /* THE PLAYER COLOUR PER SEAT, PlayerColorType 0..7 in the engine's own order.
      *
-     * THE INVARIANT, and it is the whole of the request: this array is a PERMUTATION
+     * THE INVARIANT, and it is the whole of the project owner's request: this array is a PERMUTATION
      * of 0..7 at every moment, over all EIGHT seats and not only the seated ones. Held
      * that way, "no two players share a colour" is true for any opponent count, dragging
      * the AI gauge up cannot surface a duplicate, and a change is a plain transposition

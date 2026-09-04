@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Adds HOUSEF_MULTI7 and HOUSEF_MULTI8 to the owner mask of every infantry
+// type in the table, so houses 7 and 8 may own and build the same infantry
+// the first six multiplayer houses can. The two bits are defined as zero
+// unless the EIGHTPLAYERS build switch is on, so with the switch off the
+// masks are unchanged.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\idata.cpv   2.12   02 Aug 1995 17:00:30   JOE_BOSTIC  $ */
 /***********************************************************************************************

@@ -42,7 +42,7 @@
 ; The same script with the ANSI target builds and runs. So this line is a
 ; workaround for a broken toolchain, not a decision about what the installer
 ; should be, and it has one real consequence that is registered in
-; Open question:: an ANSI installer resolves paths through the system codepage,
+; known-gap notes: an ANSI installer resolves paths through the system codepage,
 ; so a Windows account whose NAME contains characters outside that codepage would
 ; get a mangled install path. Everything ASCII, which is every path this
 ; installer chooses for itself, is unaffected.

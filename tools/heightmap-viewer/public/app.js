@@ -447,7 +447,7 @@ void main(){
 /* THE 1995 DOS INFANTRY.
  *
  * The cartridge draws infantry as five stored facings mirrored to eight; the PC
- * game stores all eight and mirrors nothing. The two were compared, and the one chosen was the
+ * game stores all eight and mirrors nothing. the project owner compared the two and chose the
  * DOS art, which the game itself already ships (game/dosinfantry.pack), so the
  * viewer bakes the same sprites out of the same CONQUER.MIX with the same palette
  * and the same crop rule -- tools/heightmap-viewer/export_dosinf.py, verified
@@ -621,8 +621,8 @@ function seaClock(t){
  *  cut-and-fill platform looks like. Where two pads share a corner the taller wins, so
  *  the result does not depend on object order.
  *
- *  This is the renderer's, not the cartridge's, and it is registered that way
- *  as an open question. The toggle turns it off for the A/B. */
+ *  This is the renderer's, not the cartridge's, and it is registered that way in
+ *  known-gap notes. The toggle turns it off for the A/B. */
 function padHeights(m){
   const H = m.h;
   if (!flatPads || !MODELS) return H;

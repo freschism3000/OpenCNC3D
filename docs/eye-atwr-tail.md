@@ -8,7 +8,7 @@ over. Slot 11 is not the Ion Cannon; the cartridge names it GDI_STR_ADVCOMZ1, th
 Communications Centre. There is no beam geometry, no beam texture and no visibility channel
 anywhere in either model.**
 
-A separate and genuinely new find fell out of the visibility half of the brief: the scene
+A separate and genuinely new find fell out of the visibility half of the requirement: the scene
 graph carries a **per-node TEXTURE FLIPBOOK channel at node+0x10** that no tool in the tree
 reads. Ten model slots use it. Neither EYE nor ATWR does. Section 6.
 
@@ -26,7 +26,7 @@ model slot - 10:
 
 Slot 11 is the **Advanced Communications Centre**. In the 1995 engine that is `STRUCT_EYE`,
 the building that *unlocks* the Ion Cannon; the Ion Cannon itself is an orbital weapon with
-no building-side muzzle. Slot 11's tail has been called "the Ion Cannon fire
+no building-side muzzle. `known-gap notes` calls slot 11's tail "the Ion Cannon fire
 sequence". That name was an inference from the slot id, not a reading of the data, and the
 data does not support it.
 
@@ -162,7 +162,7 @@ Slots 11 and 14 are also the only two slots in the entire model table with a 160
 ## 6. Visibility: there is no per-frame visibility channel, and I can now say why
 
 `tools/bakery/bake5.py` writes a `vis` byte per part per frame and hardcodes every one of
-them to 1 (line ~1220, "every part starts at identity and visible"). The question was whether
+them to 1 (line ~1220, "every part starts at identity and visible"). the requirement asked whether
 the cartridge carries the visibility the baker never populates. Four places it could live,
 all checked, all negative:
 
@@ -217,7 +217,7 @@ The whole census, times converted at 160 ticks/frame:
 | 22 HPAD | 0x801BEE48 | 0x801BEE20 | CI8 w16 | 0,10,20,30,40,50,60 | 0x0F28F0 +0x200 x6 |
 | 32 FIX | 0x801B74D8 | 0x801B74B0 | CI8 w8 | 0,10,20,30,40,50 | 0x0E4120 +0x40 x5 |
 
-**SILO gets FIVE textures.** The silo's decoded arm has five tiberium
+**SILO gets FIVE textures.** `known-gap notes` says the silo's decoded arm has five tiberium
 fill poses and complains that the baked clip is identity. It is identity because the silo's
 animation was never a transform: it is a five-frame texture swap on one node. PROC, HPAD and
 FIX are the same shape of thing. This looks like the real answer to the standing
@@ -272,7 +272,7 @@ independent reason to read slot 11's tail as a collapse rather than a discharge.
 * **Ion Cannon beam: not in slot 11.** The Advanced Communications Centre's model contains no
   beam, no emitter, no additively-blended geometry and no channel that could reveal one. The
   "already baked, never plays" tail at bake indices 963..1002 is the building's masts and dish
-  collapsing. It should be renamed and, if anything, driven off
+  collapsing. It should be renamed in `known-gap notes` and, if anything, driven off
   destruction rather than BSTATE_ACTIVE. Note also that the entry's claim that nodes
   0x801BD5D0 and 0x801BDD10 "exist for nothing else" is wrong: they carry the two mast meshes
   and are drawn for the whole clip; only their *rotation keys* start at 153760.
@@ -290,8 +290,8 @@ independent reason to read slot 11's tail as a collapse rather than a discharge.
 
 ## 9. Reproduce
 
-Working scripts, not published: `et_rig.py` (rig + world transforms),
+Scripts under `scratch work`: `et_rig.py` (rig + world transforms),
 `et_walk.py` (section 4), `et_classes.py` / `et_p10.py` / `et_p10b.py` (section 6),
 `et_flip2.py` (section 6b), `et_root.py` (root display lists), `et_texusers.py`.
-Renders were produced as `r_EYE_*.png` and `r_ATWR_*.png` (tail nodes drawn red).
+Renders in `scratch work*.png` and `r_ATWR_*.png` (tail nodes drawn red).
 All read-only against `data/rom/cnc_eu.z64`; nothing in the repo was touched.

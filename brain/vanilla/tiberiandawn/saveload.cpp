@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Splits the savegame version constant into a named SAVEGAME_MAGIC that
+// takes a different value under EIGHTPLAYERS, so a save file written by a
+// six-player build no longer matches and is refused instead of being loaded
+// against the changed house indices and multiplayer table layout.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\saveload.cpv   2.18   16 Oct 1995 16:48:44   JOE_BOSTIC  $ */
 /***********************************************************************************************

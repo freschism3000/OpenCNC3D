@@ -1807,7 +1807,20 @@ short const* InfantryClass::Overlap_List(void) const
 {
     Validate();
     // return(Coord_Spillage_List(Coord, 24 + ((IsSelected || Doing > DO_WALK)?12:0)));
-    return (Coord_Spillage_List(Coord, 24 + ((Doing > DO_WALK || Is_Selected_By_Player()) ? 12 : 0)));
+    /*
+    **	CNC3D lockstep: the selection term is dropped IN A MATCH ONLY.
+    **	Is_Selected_By_Player() reads the global PlayerPtr, so it answers differently on
+    **	every peer, and this list is not advisory: MapClass::Place_Down / Pick_Up /
+    **	Overlap_Down / Overlap_Up walk it into CellClass::Overlapper, and Overlap_Down ends
+    **	by revealing the object to the local player, which assigns MISSION_HUNT, springs
+    **	EVENT_DISCOVERED and calls Look(). So a selected man wrote occupancy a deselected
+    **	one did not.
+    **	Outside a match the fat list stays, because it is also what makes a selected man's
+    **	brackets redraw cleanly and no peer has to agree with anyone. The Doing term stays
+    **	in both cases: it is replicated state, and the death and fire shapes need the ring.
+    */
+    return (Coord_Spillage_List(
+        Coord, 24 + ((Doing > DO_WALK || (!CNC3D_Lockstep && Is_Selected_By_Player())) ? 12 : 0)));
     //	return(Coord_Spillage_List(Coord, (IsSelected ? 24 : 14))+1);
 }
 
@@ -2485,7 +2498,7 @@ bool InfantryClass::Unlimbo(COORDINATE coord, DirType facing)
         */
         if (Class->SightRange == 0 && GameToPlay == GAME_NORMAL && !House->IsHuman
             && !Map[Coord_Cell(coord)].Is_Visible(PlayerPtr)) {
-            IsDiscoveredByPlayerMask &= ~(1 << (int)PlayerPtr->Class->House);
+            IsDiscoveredByPlayerMask &= ~(1ULL << (int)PlayerPtr->Class->House);
             IsDiscoveredByPlayer = false;
         }
 
@@ -2994,11 +3007,9 @@ void InfantryClass::Read_INI(CCINIClass& ini)
                         CELL cell = (CELL)atoi(strtok(NULL, ",\n\r"));
 
                         /*
-                        ** Convert the normal cell position to a new big map position.
+                        ** Convert from the scenario's OWN stride into this build's (function.h).
                         */
-                        if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-                            cell = Confine_Old_Cell(cell);
-                        }
+                        cell = Confine_Scenario_Cell(cell, Map.MapBinaryVersion);
 
                         COORDINATE coord = Cell_Coord(cell);
 
@@ -3090,7 +3101,8 @@ void InfantryClass::Write_INI(CCINIClass& ini)
                     infantry->House->Class->IniName,
                     infantry->Class->IniName,
                     infantry->Health_Ratio(),
-                    Coord_Cell(infantry->Coord),
+                    /* the scenario's own stride, not ours -- see Scenario_Cell_Of */
+                    Scenario_Cell_Of(Coord_Cell(infantry->Coord), Map.MapBinaryVersion),
                     CellClass::Spot_Index(infantry->Coord),
                     MissionClass::Mission_Name((infantry->Mission == MISSION_NONE) ? infantry->MissionQueue
                                                                                    : infantry->Mission),

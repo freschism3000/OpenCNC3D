@@ -102,7 +102,7 @@ def expand_sparse_bin(data, what):
     this expands it to the dense square the rest of this pipeline speaks.
     An EMPTY file is the valid all-clear map and expands to one: the format
     stores only NON-clear cells, so a freshly created big map with no terrain
-    painted on it is legitimately zero bytes. Refusing that told the user their own
+    painted on it is legitimately zero bytes. Refusing that told the project owner his own
     128x128 map "is neither the engine's sparse record form nor a dense
     square", and it was both correct and blank.
 
@@ -120,6 +120,83 @@ def expand_sparse_bin(data, what):
         out[2 * cell] = data[i + 2]
         out[2 * cell + 1] = data[i + 3]
     return bytes(out)
+
+
+XL_BIN_MAGIC = b"C3XB"
+
+
+def expand_xl_bin(data, grid):
+    """The XL-native .BIN (MAP_VERSION_XL) -> the dense square everything downstream wants.
+
+    This format is the only one of the three that says what it is. Twelve byte header --
+    magic 'C3XB', version, the CELL STRIDE its keys are written against, and the record
+    count -- then eight byte records of {u32 cell, u8 template, u8 icon, u16 pad}. The
+    stride is the engine's own (1024), which is why the keys have to be un-strided here
+    into the map's own square rather than used as offsets: cell 129246 is x=222, y=126 on
+    a 256 map, not the 129246th tile of anything.
+
+    `grid` is the square the map occupies, taken from the INI rather than guessed, because
+    a sparse file cannot tell you how much empty ground it is describing.
+
+    Returns None when the bytes are not this form, so the caller can go on to judge them
+    as one of the older shapes."""
+    import struct as _struct
+    if len(data) < 12 or data[0:4] != XL_BIN_MAGIC:
+        return None
+    _, version, stride, count = _struct.unpack_from("<4sHHI", data, 0)
+    if version != 2 or stride <= 0:
+        return None
+    if len(data) != 12 + count * 8:
+        raise SystemExit("XL .BIN: the header claims %d records, which is %d bytes, and "
+                         "the file is %d" % (count, 12 + count * 8, len(data)))
+    out = bytearray(b"\xff\x00" * (grid * grid))
+    for i in range(count):
+        cell, tmpl, icon, _pad = _struct.unpack_from("<IBBH", data, 12 + i * 8)
+        x, y = cell % stride, cell // stride
+        if x >= grid or y >= grid:
+            raise SystemExit("XL .BIN: a record names cell %d (%d,%d), outside the map's "
+                             "own %dx%d grid" % (cell, x, y, grid, grid))
+        j = y * grid + x
+        out[2 * j] = tmpl
+        out[2 * j + 1] = icon
+    return bytes(out)
+
+
+def ini_map_version(text):
+    """[MAP] Version=, defaulting to 0 (the legacy 64-wide format)."""
+    section = None
+    for line in text.splitlines():
+        t = line.strip()
+        if t.startswith("["):
+            section = t.strip("[]").upper()
+            continue
+        if section == "MAP" and t.upper().startswith("VERSION="):
+            try:
+                return int(t.split("=", 1)[1])
+            except ValueError:
+                return 0
+    return 0
+
+
+def ini_grid(text):
+    """[CNC3D] Grid= -- the square an XL-native map occupies.
+
+    The playable rect in [MAP] is not this: a map is authored inside a border, so
+    X/Y/Width/Height describe the part that is played on and say nothing about the size of
+    the array it sits in. The older formats did not need to state the square because it
+    was implied by the .BIN's own length; a sparse file has no length to read it from."""
+    section = None
+    for line in text.splitlines():
+        t = line.strip()
+        if t.startswith("["):
+            section = t.strip("[]").upper()
+            continue
+        if section == "CNC3D" and t.upper().startswith("GRID="):
+            try:
+                return int(t.split("=", 1)[1])
+            except ValueError:
+                return 0
+    return 0
 
 
 def ini_is_mega(text):
@@ -220,6 +297,16 @@ def read_scenario(scen, binpath=None, inipath=None):
     # to the dense square everything downstream expects. Dense files (either
     # size) pass through untouched, so every existing scenario reads exactly
     # as it always did.
+    if ini_map_version(ini) == 2:
+        grid = ini_grid(ini)
+        if grid <= 0:
+            raise SystemExit("%s: [MAP] Version=2 but the INI has no [CNC3D] Grid= line, "
+                             "so the size of the map is not stated anywhere" % scen)
+        dense = expand_xl_bin(data, grid)
+        if dense is None:
+            raise SystemExit("%s: [MAP] Version=2 but the .BIN is not the XL record form"
+                             % scen)
+        return dense, theater
     if ini_is_mega(ini):
         dense = expand_sparse_bin(data, scen)
         if dense is not None:

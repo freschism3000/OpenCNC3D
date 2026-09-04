@@ -12,6 +12,19 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Adds the cheat menu's Build Anywhere. Defines a static per-house bitmask
+// on DisplayClass with setter and getter, clears it in Init_Clear so it does
+// not survive from one scenario into the next, and adds a hook in the
+// USE_RA_AI overload of Passes_Proximity_Check that returns true for a house
+// whose bit is set. That lifts the rule requiring a new building to touch
+// the house's existing base; ground buildability is decided elsewhere and is
+// not affected.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\display.cpv   2.16   16 Oct 1995 16:48:24   JOE_BOSTIC  $ */
 /***********************************************************************************************
@@ -927,8 +940,8 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
     ** your base" test and nothing else; whether the GROUND will take a foundation is
     ** decided in CellClass (Is_Generally_Clear), which is not reached from here and is
     ** not touched by this. So the player gets to build away from base and still cannot
-    ** build on a river, a cliff or rock. Reported: "so the user can build
-    ** anywhere they want (but not on rivers, cliffs etc. for obvious reasons)".
+    ** build on a river, a cliff or rock, which is the requirement: build anywhere, but
+    ** not on ground that could never take a foundation.
     **
     ** IT BELONGS IN THIS OVERLOAD, not the single argument one. The first cut put it in
     ** that one's #else arm, which USE_RA_AI compiles out: it built clean, changed
@@ -2900,7 +2913,23 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
         case SOURCE_AIR:
             cell = Scen.Waypoint[WAYPT_REINF];
             if (cell < 1) {
-                cell = Coord_Cell(TacticalCoord);
+                /*
+                **	CNC3D lockstep: the original fallback read Coord_Cell(TacticalCoord), a
+                **	DisplayClass view member, from inside the simulation. In this build that
+                **	expression is already peer invariant and always equals XY_Cell(MapCellX,
+                **	MapCellY): under REMASTER_BUILD, DisplayClass::Set_Tactical_Position
+                **	discards its argument (xx = yy = 0) and recomputes the playfield's top
+                **	left corner, and it only writes TacticalCoord while ScenarioInit is set,
+                **	so nothing after scenario load can move it. Writing the constant down
+                **	makes that a contract instead of an accident of the host's design, and
+                **	is value identical on every map -- no cell changes anywhere.
+                **
+                **	The early return is deliberate and must stay: the code after the switch
+                **	zeroes an occupied cell, and the enclosing while(cell == 0) loop would
+                **	then spin forever, because this arm returns a constant and draws no
+                **	random numbers to vary on the next pass.
+                */
+                cell = XY_Cell(MapCellX, MapCellY);
                 return (cell);
             } else {
                 if ((*this)[cell].Cell_Techno()) {
@@ -2919,7 +2948,50 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
         **	Dramatic entry point is somewhere on the visible screen as defined
         **	by the current tactical map position.
         */
+        /*
+        **	"Dramatic entry point somewhere on the visible screen" is REFUSED
+        **	UNDER LOCKSTEP and left exactly as 1995 wrote it everywhere else.
+        **	It was never deterministic and no shipped scenario has ever asked
+        **	for it, but a hand-written Edge=Visible map played on its own is
+        **	entitled to the behaviour it has always had.
+        **
+        **	It read three things that differ between peers. TacticalCoord, the
+        **	local camera, supplied both cell origins. TacLeptonWidth and
+        **	TacLeptonHeight, the local viewport, supplied the two Random_Pick
+        **	RANGES; DisplayClass::Set_View_Dimensions derives them from the local
+        **	framebuffer, so two peers running at different resolutions do not
+        **	get the same number. PlayerPtr, the local player, decided whether
+        **	the cell was thrown away. (In_Radar on that line was NOT one of them:
+        **	MapClass::In_Radar in map.cpp is a MapCellX/MapCellWidth bounds test,
+        **	which is shared scenario state.)
+        **
+        **	The ranges were the worst of the three. RandomClass's ranged operator
+        **	rejection samples against a mask derived from the range magnitude
+        **	(common/random.cpp:153-171), so a peer at a different resolution
+        **	advances Scen.RandomNumber a DIFFERENT NUMBER OF TIMES for the same
+        **	call. Matching the call count would not have been enough. And because
+        **	the PlayerPtr test could zero the cell and send control back around
+        **	the enclosing while (cell == 0), the skew was unbounded rather than
+        **	two draws, and the loop could fail to terminate at all.
+        **
+        **	Nothing can reach this. Edge= across the retail scenario INIs is only
+        **	North, East, South, West or None; the scenario editor writes only
+        **	those four (mapeddlg.cpp:2102-2161); and no code in this tree assigns
+        **	SOURCE_VISIBLE. The one route in is a hand-written Edge=Visible, since
+        **	"Visible" is SourceName[7] (const.cpp:37). Such a map is told so, and
+        **	gets no cell, exactly as SOURCE_ENEMYBASE and SOURCE_HOMEBASE below.
+        **	The supported way to land reinforcements near the player is SOURCE_AIR
+        **	with WAYPT_REINF, which is shared state.
+        */
         case SOURCE_VISIBLE:
+            if (CNC3D_Lockstep) {
+                GlyphX_Debug_Print("Calculated_Cell: Edge=Visible (SOURCE_VISIBLE) is not supported in "
+                                   "a network match and produced no reinforcement cell. It derives its "
+                                   "cell from the local camera and the local viewport, which are not "
+                                   "shared between peers. Use Edge=North/East/South/West, or a "
+                                   "Reinforcement waypoint with an air transport (SOURCE_AIR).");
+                return (0);
+            }
             cell = XY_Cell(Coord_XCell(TacticalCoord) + Random_Pick(0, Lepton_To_Cell(TacLeptonWidth) - 1),
                            Coord_YCell(TacticalCoord) + Random_Pick(0, Lepton_To_Cell(TacLeptonHeight) - 1));
             if (house == PlayerPtr->Class->House && !In_Radar(cell)) {

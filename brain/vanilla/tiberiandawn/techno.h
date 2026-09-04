@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Widens the declaration of the virtual TechnoClass::Get_Ownable from
+// unsigned char to unsigned short, and adds a comment explaining that the
+// ownable mask is 16 bits and that the narrow return truncated the higher
+// multiplayer houses off it.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\techno.h_v   2.17   16 Oct 1995 16:46:58   JOE_BOSTIC  $ */
 /***********************************************************************************************

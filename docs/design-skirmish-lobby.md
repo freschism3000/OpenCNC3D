@@ -387,8 +387,8 @@ preview and it is honest about what we know.
 | Superweapons | checkbox | on / off | on | `EnableSuperweapons` | **yes** |
 | Bases | checkbox drawn **disabled** | locked on | on | `MPlayerBases` and `DestroyStructures` together | **shown, locked** |
 | Tiberium Regrows | checkbox | on / off | on | `MPlayerTiberium` | **only with the leak fix**, see below |
-| Unit Count | gauge | 0 .. 12 | 0 | `MPlayerUnitCount` | **no**, see below |
-| Crates | checkbox | | off | `MPlayerGoodies` | **no**: invisible in CNC3D |
+| Unit Count | gauge | 0 .. 10 | 0 | `MPlayerUnitCount` | **yes**, with a warning: see below |
+| Crates | checkbox | | off | `MPlayerGoodies` | **yes**, drawn and clickable |
 | PLAY / CANCEL | text buttons | | | | **yes** |
 
 The gauge readouts are printed as plain text to the right of each gauge, which is what both
@@ -414,7 +414,14 @@ with tiberium off permanently disables tiberium growth for every campaign missio
 in the same process. Measured, in `docs/design-skirmish.md` section 6.9. Either the reset
 lands in the same change or the checkbox stays out and the value stays at its default.
 
-**Unit Count stays out of v1.** The engine scatters the escort within about four cells of the
+**Unit Count SHIPS, with a warning, and this paragraph used to say it stayed out of v1.**
+The slider was then asked for. The measurement below is unchanged and is the reason
+the DEFAULT is zero and the reason the status line says what it says; it is no longer the
+reason the control is absent. What was actually wrong was smaller than this ruling assumed:
+the gauge was fully built all along, with a range, a rectangle, a caption, a mouse arm, a
+keyboard arm and a field in the result, and `sk_draw`'s loop simply stopped one item short of
+it, so it took input and drew nothing. The same was true of the Crates box one column over.
+The original ruling, kept because its measurement is still the argument for the default: The engine scatters the escort within about four cells of the
 MCV and any unit inside the 3x3 Construction Yard pad makes the player's first click do
 nothing. Swept across all nine maps at both start positions: 0 leaves 17 of 18 starts
 deployable, 1 leaves 10, 2 leaves 9, 5 leaves 4, and 6 or more leaves none. There is no safe
@@ -500,7 +507,7 @@ disagree about what already exists, that one is the closer read of the working t
 
 ---
 
-## 9. Decisions
+## 9. Decisions for the project owner
 
 1. **Does the side plate stay?** The spec folds the side choice into the lobby so skirmish is
    one screen. The alternative is to keep the plate and drop the two buttons.
@@ -520,7 +527,7 @@ disagree about what already exists, that one is the closer read of the working t
 
 ## 10. Register entries this document owes
 
-Open questions:
+For `known-gap notes`:
 
 - **Crates are invisible in CNC3D.** The brain patch dumps only tiberium and wall overlays,
   so `MPlayerGoodies` scatters pickups that never appear on screen. The option is therefore

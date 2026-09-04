@@ -43,7 +43,7 @@ static const T1_WallVariant WALL_VARIANT[16] = {
  *
  * The other three types' shadows are MODE 3 with a per-vertex alpha the mesh record
  * cannot carry, and the desktop measured them as drawing zero visible pixels because they
- * sit inside their own walls' footprints. Registered as an open question rather than
+ * sit inside their own walls' footprints. Registered in known-gap notes rather than
  * approximated. */
 static const unsigned char WALL_SHADOW11[16] = {
     /*  0 ----   */ 0,  /*  1 N      */ 1,  /*  2 E      */ 0,  /*  3 N|E    */ 3,

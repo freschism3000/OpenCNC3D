@@ -106,7 +106,7 @@ extern "C" {
  * and MEASURED by game/gate_optlayout.c, which reads the separation
  * back out of dopt_item_rect rather than trusting this paragraph. Nothing in the gate
  * suite could see this dialog's geometry until that binary existed. */
-#define DOPT_H 122
+#define DOPT_H 133
 #define DOPT_X 48  /* (SeenBuff width - OptionWidth) / 2          goptions.cpp:54 */
 /* DERIVED, not a literal any more. It used to be 50, which is goptions.cpp:55's formula
    evaluated for a 100-tall box; with the box grown for the Visuals button a literal
@@ -357,6 +357,40 @@ typedef struct
 #define DOPT_DIS_CORNERS 13  /* DKGREY */
 #define DOPT_TEXT_DISABLED 3 /* CC_GREEN itself, ungraded */
 
+/* ------------------------------------------------------------------------ *
+ * THE DIALOG'S OWN WIDGETS, exported.
+ *
+ * These four are what makes a screen LOOK like a 1995 C&C dialog: the inset green
+ * border on black, the filigreed and underlined caption, the green button plate and the
+ * sunken green gauge. They were static here until the DATABASE codex needed the same
+ * look (game/codex_mod.h); exporting them rather than copying them is the difference
+ * between one dialog style in this program and two that agree until somebody retunes a
+ * bevel.
+ *
+ * All four draw into an 8-bit DB_Surface in the DOS palette, and take a rect as
+ * (x, y, w, h) with w and h being SIZES, not last-pixel coordinates.
+ * ------------------------------------------------------------------------ */
+
+/* dialog.cpp:64 Dialog_Box -> BOXSTYLE_GREEN_BORDER: black, with a one-pixel green
+   rectangle inset by one. */
+void dopt_style_dialog(DB_Surface *s, int x, int y, int w, int h);
+
+/* goptions.cpp:507 Draw_Caption: the two OPTIONS.SHP filigrees at the top corners, the
+   caption centred in GRAD6FNT through the gradient palette, and the bright rule under
+   it the exact width of the text. `w` is the width of the box being captioned. */
+void dopt_style_caption(DB_Surface *s, const DB_Pack *p, const char *text,
+                        int x, int y, int w);
+
+/* The green button plate. `pressed` swaps the bevel; `disabled` takes it to the grey
+   ramp. Print the label over it through db_font_palette_grad with DOPT_TEXT_BRIGHT when
+   it is pressed or current and DOPT_TEXT_MEDIUM otherwise. */
+void dopt_style_plate(DB_Surface *s, int x, int y, int w, int h, int pressed,
+                      int disabled);
+
+/* The sunken green gauge. `fill_to_x` is an ABSOLUTE surface column, not a width:
+   anything below x + 1 leaves it empty. */
+void dopt_style_track(DB_Surface *s, int x, int y, int w, int h, int fill_to_x);
+
 /* goptions.cpp:249 Draw_Caption(TXT_OPTIONS, ...) -> goptions.cpp:516-519 OPTION_CONTROLS,
  * which is defines.h:2901 frame 2, and the mirrored partner is frame 3.
  * gamedlg.cpp:226 Draw_Caption(TXT_GAME_CONTROLS, ...) lands on the same pair. */
@@ -377,6 +411,7 @@ typedef enum
     DOPT_DELETE,   /* TXT_DELETE_MISSION    conquer.h:72  "Delete Mission"   */
     DOPT_GAME,     /* TXT_GAME_CONTROLS     conquer.h:76  "Game Controls"    */
     DOPT_VISUALS,  /* ours; the desktop presentation chain. See DOPT_H above.  */
+    DOPT_GAMEPLAY, /* ours; how the game is DRIVEN, which is not how it is drawn */
     DOPT_ABORT,    /* TXT_QUIT_MISSION      conquer.h:80  "Abort Mission"    */
     DOPT_EXIT,     /* TXT_EXIT_GAME         conquer.h:81  "Exit Game"  OURS  */
     DOPT_RESUME,   /* TXT_RESUME_MISSION    conquer.h:78  "Resume Mission"   */
@@ -420,7 +455,12 @@ typedef enum
     DOPT_PAGE_ADVANCED,  /* one checkbox per element, on/off only         */
     DOPT_PAGE_SOUND,     /* sounddlg.cpp's SoundControlsClass: the jukebox */
     DOPT_PAGE_CHEATS,    /* OURS: the testing switches, opened with *       */
-    DOPT_PAGE_CONFIRM    /* the abort confirmation, goptions.cpp:425        */
+    DOPT_PAGE_CONFIRM,   /* the abort confirmation, goptions.cpp:425        */
+    /* OURS: the input switches. APPENDED after CONFIRM rather than inserted beside
+       VISUALS because four gates match the page numbers as LITERALS (measured:
+       page=3 ADVANCED, page=4 SOUND, page=5 CHEATS, page=6 and page=0 for CONFIRM
+       and OPTIONS). Inserting would renumber three of them silently. */
+    DOPT_PAGE_GAMEPLAY
 } DOPT_Page;
 
 /* THE ABORT CONFIRMATION, which 1995 raises from the same button.
@@ -552,6 +592,17 @@ typedef enum
        variable, which is a developer's switch and not a player's. */
     DOPT_VE_NEWHUD,
     DOPT_VE_BILINEAR,
+    /* WHICH TERRAIN TILE ART DRAWS, and the one row on this page that is not a
+       checkbox: it is a three-way drop list. Sits with the other presentation rows
+       rather than in the post chain, because like the HUD and the filter it changes
+       what is DRAWN and not how the frame is graded. The row's own value lives in
+       DOPT_Visuals::texset rather than in elem[], which stays a pure boolean array.
+       See FxState::texset. */
+    DOPT_VE_TEXSET,
+    /* The same three-way drop list for the infantry sprites, immediately below the
+       terrain one. Its value lives in DOPT_Visuals::infset for the same reason the
+       terrain one lives in ::texset -- elem[] is a boolean array. */
+    DOPT_VE_INFSET,
     DOPT_VE_GAMMA,
     DOPT_VE_SUPERSAMPLE,
     DOPT_VE_SHADOWS,
@@ -564,17 +615,40 @@ typedef enum
 } DOPT_VisElem;
 
 #define DOPT_A_OK DOPT_VE_COUNT          /* the OK button follows the checkboxes */
-#define DOPT_A_COUNT (DOPT_VE_COUNT + 1)
+/* The scroll bar is the LAST item on the page, after OK, and that ordering is
+   load-bearing: every index below DOPT_A_OK is still an element row, so dopt_activate's
+   `item < DOPT_VE_COUNT` toggle test and dopt_draw_advanced's row loop both keep working
+   without learning that the bar exists. */
+#define DOPT_A_BAR (DOPT_VE_COUNT + 1)
+#define DOPT_A_COUNT (DOPT_VE_COUNT + 2)
 
 typedef struct
 {
     int enhanced;                 /* 0 = CLASSIC, 1 = ENHANCED              */
     int elem[DOPT_VE_COUNT];      /* per element, meaningful only when on   */
+    /* DOPT_VE_TEXSET's value: one of DOPT_TEX_*. It is here rather than in elem[]
+       because elem[] is a boolean array and this row is a three-way choice. */
+    int texset;
+    /* DOPT_VE_INFSET's value: one of DOPT_TEX_*, the same numbering. */
+    int infset;
+    /* Whether the Remastered entry can be chosen at all -- the host sets this from
+       whether it found an install. A false here greys the entry and gives it the
+       tooltip; it never hides it, because 1995 draws a disabled gadget rather than
+       removing it (gadget.cpp:632) and a player has to be able to see the option
+       exists before they understand what would unlock it. */
+    int remaster_ok;
     /* Set when the MAIN MENU opened this screen directly rather than the pause dialog
        walking to it. OK then closes the whole dialog instead of stepping back to a
        pause menu that is not on screen. */
     int from_menu;
 } DOPT_Visuals;
+
+/* The drop list's entries, in the order they are drawn. Matches FxState's FX_TEX_*
+   numbering one for one, deliberately: the dialog and the renderer must not need a
+   translation table between them. */
+enum { DOPT_TEX_N64 = 0, DOPT_TEX_DOS = 1, DOPT_TEX_REMASTER = 2, DOPT_TEX_COUNT = 3 };
+
+
 
 /* Geometry: the Game Controls box, reused, because it is already the right size and
    already centred. The checkbox column steps 10 rows so nine of them plus the caption
@@ -590,15 +664,111 @@ typedef struct
 #define DOPT_V_STEP 11
 #define DOPT_V_GAP 8                     /* between ENHANCED and ADVANCED */
 #define DOPT_A_TOP (DOPT_V_Y + DOPT_GC_TOP_MARGIN - 4)
-/* 9, not 10, and the number is arithmetic rather than taste. The column starts at
-   DOPT_A_TOP (55) and the OK button's top edge is at DOPT_GC_OK_Y (156). At a step of 10
-   the ELEVENTH checkbox would sit at y=155 and end at 162, straight through the button.
-   At 9 the last row ends at 142 and clears it by 14 pixels, with 2 pixels between rows
-   for a 7-pixel box. Checked by rendering the page, not by this comment. */
+/* THE COLUMN'S PITCH, AND WHY IT IS BACK AT NINE.
+   The column starts at DOPT_A_TOP (55) and the OK button's top edge is at DOPT_GC_OK_Y
+   (156). At a step of 10 the ELEVENTH checkbox would sit at y=155 and end at 162,
+   straight through the button, so 9 was the answer for eleven rows: row 10 sits at 145
+   and ends at 151, four clear of the button.
+   A TWELFTH ROW forced 9 down to 8 for a while, because a twelfth row at a step of 9
+   lands at 154 and runs through the button, and the box had to shrink to 6 with it.
+   That compromise is now paid off rather than tightened again: this page is a SCROLLING
+   LIST, so the number of rows it HOLDS and the number of rows it SHOWS are two different
+   numbers, and only the second one has to fit between the caption and the OK button. The
+   pitch therefore goes back to the roomier 9 and the well shows DOPT_A_VIEW_ROWS of
+   however many elements exist.
+   The BOX moves with the step and always has: the layout gate requires at least 2 rows
+   between two items sharing a column and that gap is step minus box, so 9-7 is the same
+   2 that 8-6 was. 9-6 would waste a row of ink and 8-7 would be 1 and would turn that
+   gate red on every adjacent pair. The column top is deliberately left where it is, so
+   the clearance under the caption stays the one already checked. */
 #define DOPT_A_STEP 9
 #define DOPT_A_BOX 7                     /* the checkbox square */
 #define DOPT_A_BOX_X (DOPT_V_X + 16)
 #define DOPT_A_LABEL_X (DOPT_A_BOX_X + DOPT_A_BOX + 6)
+
+/* THE WELL, AND THE SCROLL BAR DOWN ITS RIGHT-HAND EDGE.
+ *
+ * This page used to be a fixed budget: twelve rows was everything that fitted between
+ * the caption and the OK button, and a thirteenth element had nowhere to go. A list
+ * longer than its well is what the 1995 toolkit's ListClass is for, and it answers it
+ * with a SliderClass in LIST MODE. That is what this is, and none of it is a new widget:
+ *
+ *   - list.cpp:82 `ScrollGadget(0, x + w, y, 0, h, true)` puts the bar on the list's own
+ *     right edge, and list.cpp:566 `Width -= ScrollGadget.Width` makes the LIST narrower
+ *     to pay for it rather than hanging the bar off its side. DOPT_A_ROW_W is that
+ *     subtraction, plus the 2 columns the layout gate demands between two items sharing
+ *     a row (goptions.cpp:130's own stack gap).
+ *   - slider.cpp:68-82: with belong_to_list true the slider builds NO plus/minus shape
+ *     gadgets. That matters here, because BTN-PLUS.SHP and BTN-MINS.SHP, which are what
+ *     a NON-list slider builds (slider.cpp:69-70), are in no archive this project bakes,
+ *     the same gap that leaves the jukebox's Stop and Play as glyphs. BTN-UP.SHP and
+ *     BTN-DN.SHP are a different pair again: they are ListClass's own arrows
+ *     (list.cpp:80-81), and a list-mode slider does not build those either.
+ *     The list-mode slider needs neither, so nothing has to be invented to draw this.
+ *   - slider.cpp:339 draws the body BOXSTYLE_GREEN_DOWN and slider.cpp:310 draws the
+ *     thumb BOXSTYLE_GREEN_RAISED. Those are exactly the two boxes dopt_draw_slider
+ *     already paints for the volume rows, so the bar is this dialog's own slider stood
+ *     on end and not a second visual grammar beside it.
+ *   - gauge.cpp:59 takes LEFTHELD|LEFTPRESS|LEFTRELEASE and NOT KEYBOARD, which is why
+ *     dopt_next_item steps over the bar: it is a pointer gadget, not a stop on the walk.
+ *
+ * THE NUMBERS, all derived.
+ *   The well may not come within 2 rows of the OK button, which is the layout gate's own
+ *   minimum, so it ends at DOPT_GC_OK_Y - 2 and DOPT_A_VIEW_H is 99. At a step of 9 that
+ *   is exactly 11 rows: the well runs 55..153, its last row sits at 145..151, and OK
+ *   starts at 156.
+ *   The bar is 5 wide, which is MSlider_Height (sounddlg.cpp:102), the thickness this
+ *   dialog's own slider body already has, used on the other axis rather than chosen. The
+ *   rows end at 252 and the bar occupies 255..259, inside a box whose inner edge is 274.
+ *   MEASURED by game/gate_optlayout.c, which reads these rectangles back at the top AND
+ *   at the bottom of travel rather than trusting this paragraph. */
+#define DOPT_A_VIEW_H (DOPT_GC_OK_Y - 2 - DOPT_A_TOP)
+#define DOPT_A_VIEW_ROWS (DOPT_A_VIEW_H / DOPT_A_STEP)
+#define DOPT_A_BAR_W 5   /* MSlider_Height                       sounddlg.cpp:102 */
+#define DOPT_A_BAR_GAP 2 /* the layout gate's own minimum        goptions.cpp:130 */
+#define DOPT_A_ROW_W (DOPT_V_W - 32 - DOPT_A_BAR_W - DOPT_A_BAR_GAP)
+/* The texture row's value box: right-aligned in the row, wide enough for the longest
+   entry ("Remastered Textures") at GRAD6FNT's spacing plus the arrow and the padding. */
+#define DOPT_A_DROP_W 86
+#define DOPT_A_DROP_H (DOPT_A_BOX + 2)
+#define DOPT_A_DROP_X (DOPT_A_BOX_X + DOPT_A_ROW_W - DOPT_A_DROP_W)
+
+#define DOPT_A_BAR_X (DOPT_A_BOX_X + DOPT_A_ROW_W + DOPT_A_BAR_GAP)
+#define DOPT_A_BAR_Y DOPT_A_TOP
+#define DOPT_A_BAR_H (DOPT_A_VIEW_ROWS * DOPT_A_STEP)
+#define DOPT_A_THUMB_MIN 4 /* MAX(size, 4)                         slider.cpp:185 */
+
+/* ------------------------------------------------------------------------ *
+ * THE GAMEPLAY PAGE. Ours in full, and it is the page for how the game is DRIVEN as
+ * against how it is drawn. That distinction is the whole reason it is not a group on the
+ * Advanced page: the CLASSIC / ENHANCED master switch governs the PICTURE, and a player
+ * who chooses the cartridge's own picture keeps their own mouse. Nothing on this page is
+ * gated on that switch, in the dialog or in the host.
+ * ------------------------------------------------------------------------ */
+#define DOPT_G_HEADING "Enhanced Mode"
+#define DOPT_G_HEAD_Y (DOPT_V_Y + DOPT_GC_TOP_MARGIN)   /* under the caption rule */
+#define DOPT_G_TOP (DOPT_G_HEAD_Y + 11)                 /* one row under the heading */
+#define DOPT_G_STEP DOPT_V_STEP
+#define DOPT_G_ROW_W (DOPT_V_W - 32)
+
+typedef enum
+{
+    /* ON, the button that selects, orders and builds becomes the right one and the button
+       that cancels, holds a cameo and navigates the radar becomes the left. OFF by
+       default. The exchange happens at the SDL event boundary and nowhere else. */
+    DOPT_G_SWAPBTN = 0,
+    /* ON, holding the right button and moving past the click threshold PUSHES the view.
+       ON by default. OFF, the right button never moves the camera at all. */
+    DOPT_G_RPUSH,
+    DOPT_G_TOGGLES,
+    DOPT_G_OK = DOPT_G_TOGGLES,
+    DOPT_G_COUNT
+} DOPT_Gp;
+
+typedef struct
+{
+    int on[DOPT_G_TOGGLES];
+} DOPT_Gameplay;
 
 /* What the caller has to do about a click. Everything else is handled internally. */
 #define DOPT_ACT_NONE 0
@@ -614,7 +784,7 @@ typedef struct
 #define DOPT_ACT_LOAD 5
 /* Restart the mission from the beginning. 1995's Do_Restart calls Start_Scenario with
    briefing = false (scenario.cpp:728), so the shell goes straight back into the mission
-   and does NOT replay the brief. */
+   and does NOT replay the requirement. */
 #define DOPT_ACT_RESTART 6
 /* The cheat page's two one-shot buttons. They are ACTIONS rather than another entry in
    DOPT_Cheats because there is no state to hold: the host asks the engine to flag the
@@ -677,6 +847,10 @@ typedef struct
     /* And the same seam again for the cheat page. NULL means the switches move, draw and
        remember, and nothing in the game changes. */
     void (*applych)(void *user, const DOPT_Cheats *c);
+    /* AND THE SAME SEAM AGAIN for the Gameplay page, a seam of its own rather than
+       two more booleans on DOPT_Visuals ON PURPOSE: the host's visuals arm CANNOT
+       reach the input settings even by accident. */
+    void (*applygp)(void *user, const DOPT_Gameplay *g);
 } DOPT_Bind;
 
 /* ------------------------------------------------------------------------ */
@@ -689,6 +863,22 @@ typedef struct
     int ntracks;
     int trkSel;   /* the highlighted row, an index into tracks[]               */
     int trkTop;   /* first visible row                                         */
+    /* The Advanced page's own first visible row, and the same kind of number: it is
+       CurValue on that page's scroll bar (slider.cpp:186) and the element index drawn
+       at the top of the well. */
+    int advTop;
+    /* DOPT_VE_TEXSET's drop list. It is drawn OVER the rows beneath it and hit-tested
+       before them, which is the whole of what makes it a drop list rather than another
+       row. texhot is the entry under the pointer and is what the tooltip follows; -1
+       when the pointer is not on one. */
+    /* Which drop list is open: -1 none, else the DOPT_VE_* of the row that owns it.
+       One at a time, because a second open list would have to be drawn over the first
+       and neither could say which of them a click belongs to. */
+    int texdrop;
+    int texhot;
+    /* The drop control's width, measured from its widest entry at layout time the way
+       btnw and okw are, rather than written down. */
+    int texw;
     int trkPlaying; /* the row the caller says is sounding, or -1              */
     int shuffle;  /* Options.IsScoreShuffle                                    */
     int repeat;   /* Options.IsScoreRepeat                                     */
@@ -705,6 +895,7 @@ typedef struct
     DOPT_Settings set;
     DOPT_Visuals  vis;
     DOPT_Cheats   cheat;
+    DOPT_Gameplay gp;
     DOPT_Bind bind;
 
     /* Cached geometry. goptions.cpp:137-159 sizes every button to the widest label in
@@ -757,6 +948,16 @@ void dopt_cheats_defaults(DOPT_Cheats *c);
 void dopt_set_cheats(DOPT_State *st, const DOPT_Cheats *c);
 const DOPT_Cheats *dopt_cheats(const DOPT_State *st);
 void dopt_bind_cheats(DOPT_State *st, void (*applych)(void *, const DOPT_Cheats *));
+/* THE GAMEPLAY PAGE, and the same four calls the cheat page has, for the same reasons. */
+void dopt_gameplay_defaults(DOPT_Gameplay *g);
+void dopt_set_gameplay(DOPT_State *st, const DOPT_Gameplay *g);
+const DOPT_Gameplay *dopt_gameplay(const DOPT_State *st);
+void dopt_bind_gameplay(DOPT_State *st, void (*applygp)(void *, const DOPT_Gameplay *));
+const char *dopt_gp_label(int item);
+/* The one heading on that page, measured HERE so the draw and any dump of it cannot
+   disagree about where it lands. 0 when there is no font to measure with. */
+int dopt_gp_head_rect(const DOPT_State *st, const DB_Pack *p, int *x, int *y, int *w,
+                      int *h);
 const char *dopt_cheat_label(int item);
 
 /* THE JUKEBOX. The caller supplies the track list (it is the one that knows which
@@ -764,7 +965,12 @@ const char *dopt_cheat_label(int item);
  * required: with no tracks the page draws an empty list and says so. */
 void dopt_set_tracks(DOPT_State *st, const DOPT_Track *tracks, int count, int playing);
 void dopt_bind_jukebox(DOPT_State *st, void (*jb)(void *, int verb, int arg));
-/* Wheel over the track list. Positive scrolls down. Harmless on every other page. */
+/* The wheel over a scrolling list: the jukebox's track list, and the Advanced page's
+ * element column. Positive scrolls down. Harmless on every other page.
+ * IT IS ACTUALLY CALLED NOW, which is worth saying because for a long time it was not:
+ * this function shipped with the jukebox and no event loop ever routed a wheel into it,
+ * so the line above described a gesture the build did not have. Both dialog loops call
+ * it. */
 void dopt_scroll(DOPT_State *st, int delta);
 /* Which row is highlighted, so the caller can keep the list in step with what the
  * playlist moved on to by itself. -1 for none. */
@@ -794,6 +1000,25 @@ int dopt_page_count(const DOPT_State *st);
 
 /* The verbatim DOS label for an item on the current page. */
 const char *dopt_item_label(const DOPT_State *st, int item);
+
+/* The label for one DOPT_VE_TEXSET drop-list entry (a DOPT_TEX_* index). */
+const char *dopt_texset_label(int which);
+
+/* The label for one entry of the drop list on `item` -- the terrain row names textures
+   and the infantry row names sprites. */
+const char *dopt_drop_label(int item, int which);
+
+/* The tooltip shown when the pointer rests on an entry that cannot be chosen, or NULL
+   when that entry is selectable. Only Remastered has one. */
+const char *dopt_texset_tooltip(const DOPT_State *st, int which);
+
+/* The screen rectangle of one open drop-list entry, or 0 when the list is shut or the
+   texture row is scrolled out of the well. For the headless driver: the entries are not
+   dialog items, so dopt_item_rect cannot reach them. */
+int dopt_texset_item_rect_pub(const DOPT_State *st, int item, int i,
+                              int *x, int *y, int *w, int *h);
+int dopt_texset_box_rect_pub(const DOPT_State *st, int item,
+                             int *x, int *y, int *w, int *h);
 
 /* Input, in DOS pixels. Each returns a DOPT_ACT_*; DOPT_ACT_NONE means it was handled
  * internally (page change, slider move, nothing hit). */

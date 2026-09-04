@@ -54,6 +54,71 @@
 #include "function.h"
 #include "tile.h"
 
+/*
+**	THE SPARSE .BIN RECORD, AS IT IS ON DISK, WHICH IS NOT WHAT THIS BUILD'S TYPES SAY.
+**
+**	The big-map .BIN is a run of these, ascending by cell, with clear cells omitted, and
+**	it is frozen: the shipped 128 maps and everything the CNC3D editor writes are in it.
+**	The record is FOUR bytes. Spelling it with this brain's own CELL, as the code here
+**	did up to 27 Aug 2026, gets that wrong twice over in XL, where CELL is int32_t:
+**	Read_Binary_Big declared the struct with no packing at all and so read EIGHT byte
+**	records, Write_Binary_Big packed it and so wrote SIX, and the file has four. The two
+**	halves of the same file's format did not even agree with each other, and neither
+**	agreed with a single shipped map. It went unnoticed because Phase 1's gates only ever
+**	loaded classic 64-wide scenarios, which take the dense Read_Binary path instead.
+**
+**	So the record is declared here in its own terms, byte for byte, and asserted. A type
+**	whose width is a property of the BUILD must never be a field in a file whose layout is
+**	a property of the FORMAT.
+*/
+#pragma pack(push, 1)
+struct MegaBinaryRecord
+{
+    unsigned short Cell;  // cell number at the AUTHORING build's 128 stride, not ours
+    unsigned char TType;  // TemplateType
+    unsigned char TIcon;  // template icon number
+};
+#pragma pack(pop)
+static_assert(sizeof(MegaBinaryRecord) == 4, "the big-map .BIN record is four bytes on disk");
+
+/*
+**	THE XL-NATIVE .BIN, WHICH IS THE ONLY ONE OF THE THREE THAT SAYS WHAT IT MEANS.
+**
+**	The two legacy formats carry cell numbers at the stride of the build that wrote them
+**	and record that nowhere; the reader has to already know. That is exactly why the mega
+**	loader was wrong here for the whole of phase 1, and it cannot be extended: the mega
+**	key is sixteen bits, which reaches 256x256 exactly and dies one cell past it.
+**
+**	So this one carries its stride in a header and REFUSES a file from any other address
+**	space rather than reading it as something else. The stride is fixed at MAP_CELL_W for
+**	the whole XL ladder, so in practice the check never fires -- which is the point: it is
+**	an assertion that the format's central assumption still holds, and it costs four bytes.
+**
+**	The count is explicit rather than derived from the file length, so a truncated file is
+**	a refusal instead of a map that quietly loses its last tiles. And an EMPTY map is a
+**	twelve byte file, not a zero byte one, which is worth having: a zero byte .BIN is
+**	legitimate in the mega format and is indistinguishable from a write that failed.
+*/
+#pragma pack(push, 1)
+struct XLBinaryHeader
+{
+    char Magic[4];            // 'C', '3', 'X', 'B'
+    unsigned short Version;   // MAP_VERSION_XL
+    unsigned short Stride;    // the MAP_CELL_W these cell numbers are against
+    unsigned int Count;       // how many records follow
+};
+struct XLBinaryRecord
+{
+    unsigned int Cell;        // this brain's own cell number, no conversion
+    unsigned char TType;      // TemplateType
+    unsigned char TIcon;      // template icon number
+    unsigned short Pad;       // zero; keeps the record eight bytes and aligned
+};
+#pragma pack(pop)
+static_assert(sizeof(XLBinaryHeader) == 12, "the XL .BIN header is twelve bytes on disk");
+static_assert(sizeof(XLBinaryRecord) == 8, "the XL .BIN record is eight bytes on disk");
+static const char XL_BIN_MAGIC[4] = {'C', '3', 'X', 'B'};
+
 #define MCW MAP_CELL_W
 int const MapClass::RadiusOffset[] = {
     /* 0  */ 0,
@@ -993,58 +1058,56 @@ bool MapClass::Read_Binary_Big(char const* fname, uint32_t* crc)
     }
 
     /*
-    **	Loop through all cells.
+    **	Loop through all cells. Each record names its own cell, at the 128 stride the
+    **	authoring build used, so it is confined into this build's stride on the way in --
+    **	the same conversion the INI readers apply, and for the same reason.
     */
-    struct
-    {
-        CELL Cell;           // cell number on the map.
-        TemplateType TType;  // Template type.
-        unsigned char TIcon; // Template icon number.
-    } temp;
+    MegaBinaryRecord rec;
 
-    int file_size = file.Size() / sizeof(temp);
+    int file_size = file.Size() / sizeof(rec);
     cellptr = &Map[0];
     for (i = 0; i < MAP_CELL_TOTAL; i++) {
 
         if (i >= file_size)
             break;
-        if (file.Read(&temp, sizeof(temp)) != sizeof(temp))
+        if (file.Read(&rec, sizeof(rec)) != sizeof(rec))
             break;
-        if (temp.TType == (TemplateType)255) {
-            temp.TType = TEMPLATE_NONE;
+
+        TemplateType ttype_id = (TemplateType)rec.TType;
+        unsigned char ticon = rec.TIcon;
+        if (ttype_id == (TemplateType)255) {
+            ttype_id = TEMPLATE_NONE;
         }
 
-        cellptr = &Map[temp.Cell];
+        cellptr = &Map[Confine_Scenario_Cell((CELL)rec.Cell, MAP_VERSION_MEGA)];
 
         /*
         **	Verify that the template type actually contains the template number specified. If
         **	an illegal icon was specified, then replace it with clear terrain.
         */
-        if (temp.TType != TEMPLATE_CLEAR1 && temp.TType != TEMPLATE_NONE) {
-            TemplateTypeClass const& ttype = TemplateTypeClass::As_Reference(temp.TType);
+        if (ttype_id != TEMPLATE_CLEAR1 && ttype_id != TEMPLATE_NONE) {
+            TemplateTypeClass const& ttype = TemplateTypeClass::As_Reference(ttype_id);
             shape = ttype.Get_Image_Data();
             if (shape) {
                 rawmap = Get_Icon_Set_Map(shape);
                 if (rawmap) {
                     map = (char*)rawmap;
-                    if ((temp.TIcon >= (ttype.Width * ttype.Height)) || (map[temp.TIcon] == -1)) {
-                        temp.TIcon = 0;
-                        temp.TType = TEMPLATE_NONE;
+                    if ((ticon >= (ttype.Width * ttype.Height)) || (map[ticon] == -1)) {
+                        ticon = 0;
+                        ttype_id = TEMPLATE_NONE;
                     }
                 }
             }
         }
 
-        cellptr->TType = temp.TType;
-        cellptr->TIcon = temp.TIcon;
+        cellptr->TType = ttype_id;
+        cellptr->TIcon = ticon;
         cellptr->Recalc_Attributes();
 
 #ifndef DEMO
         Add_CRC(crc, (unsigned int)cellptr->TType);
         Add_CRC(crc, (unsigned int)cellptr->TIcon);
 #endif
-
-        cellptr++;
     }
 
     /*
@@ -1052,7 +1115,19 @@ bool MapClass::Read_Binary_Big(char const* fname, uint32_t* crc)
     */
     file.Close();
 
-    return (i == MAP_CELL_TOTAL);
+    /*
+    **	THE POST-CONDITION IS "THE WHOLE FILE WAS CONSUMED", not "the whole map was
+    **	filled". This read `i == MAP_CELL_TOTAL`, which is a quantity of the BUILD used
+    **	against a file whose length is a quantity of the FORMAT: the format is sparse, so
+    **	a complete file has as many records as the map has non-clear cells and never
+    **	1,048,576 of them. The loop always left by the break and the function always
+    **	returned false, which made a truncated .BIN indistinguishable from a complete one.
+    **	It changed no behaviour, because both callers treat false as "no binary" and fall
+    **	through to a [TEMPLATE] section that shipped maps do not have -- but a
+    **	post-condition that cannot hold is not a post-condition. Same defect class as the
+    **	record width above, one line further down.
+    */
+    return (i == file_size);
 }
 
 /***********************************************************************************************
@@ -1080,6 +1155,10 @@ bool MapClass::Read_Binary_File(char const* fname, uint32_t* crc)
     void* rawmap;
     void const* shape;
     CellClass* cellptr = NULL;
+
+    if (MapBinaryVersion == MAP_VERSION_XL) {
+        return Read_Binary_XL(fname, crc);
+    }
 
     if (MapBinaryVersion == MAP_VERSION_MEGA) {
         return Read_Binary_Big(fname, crc);
@@ -1184,6 +1263,10 @@ bool MapClass::Read_Binary_File(char const* fname, uint32_t* crc)
  *=============================================================================================*/
 bool MapClass::Write_Binary(char const* root)
 {
+    if (MapBinaryVersion == MAP_VERSION_XL) {
+        return Write_Binary_XL(root);
+    }
+
     if (MapBinaryVersion == MAP_VERSION_MEGA) {
         return Write_Binary_Big(root);
     }
@@ -1259,6 +1342,7 @@ bool MapClass::Write_Binary_Big(char const* root)
     CCFileClass* file;
     char fname[_MAX_FNAME + _MAX_EXT];
     int i;
+    int dropped = 0;
 
     /*
     **	Filename = INI name with BIN extension.
@@ -1275,14 +1359,8 @@ bool MapClass::Write_Binary_Big(char const* root)
     **	Loop through all cells.
     */
     for (i = 0; i < MAP_CELL_TOTAL; i++) {
-#pragma pack(push, 1)
-        struct
-        {
-            CELL Cell;           // cell number on the map.
-            TemplateType TType;  // Template type.
-            unsigned char TIcon; // Template icon number.
-        } temp;
-#pragma pack(pop)
+        MegaBinaryRecord rec;
+
         /*
         **	To cut down the size of the scenario binary don't save clear tiles.
         **  Read_Binary handles this by initialising the map data with clear tiles for us.
@@ -1291,23 +1369,230 @@ bool MapClass::Write_Binary_Big(char const* root)
             continue;
         }
 
-        temp.Cell = i;
-        temp.TType = Map[i].TType;
-        temp.TIcon = Map[i].TIcon;
+        /*
+        **	Back out of this build's stride into the format's own, so what is written is
+        **	what a classic build would have written and what Read_Binary_Big above will
+        **	read back. A cell outside the format's 128x128 window has no representation in
+        **	a sixteen bit key, so it is DROPPED AND COUNTED rather than truncated into
+        **	some other cell: silently moving a tile is worse than losing it, and a native
+        **	XL map has no business in this format at all (see Confine_Scenario_Cell).
+        */
+        CELL out = Scenario_Cell_Of(i, MAP_VERSION_MEGA);
+        if (Cell_X(i) >= CLASSIC_MAP_CELL_W || Cell_Y(i) >= CLASSIC_MAP_CELL_W
+            || out < 0 || out > 0xFFFF) {
+            dropped++;
+            continue;
+        }
+
+        rec.Cell = (unsigned short)out;
+        rec.TType = (unsigned char)Map[i].TType;
+        rec.TIcon = Map[i].TIcon;
 
         /*
         **	Save cell data.
         */
-        if (file->Write(&temp, sizeof(temp)) != sizeof(temp)) {
+        if (file->Write(&rec, sizeof(rec)) != sizeof(rec)) {
             file->Close();
             delete file;
             return (false);
         }
     }
 
+    if (dropped != 0) {
+        GlyphX_Debug_Print("Write_Binary_Big: this map does not fit the 128x128 big-map "
+                           "format; cells outside that window were not written.");
+    }
+
     /*
     **	Close the file.
     */
+    file->Close();
+    delete file;
+
+    return (true);
+}
+
+/***********************************************************************************************
+ * MapClass::Read_Binary_XL -- reads an XL-native map's binary image file                      *
+ *                                                                                             *
+ *    Sparse, like the big-map format, and with a header. Its cell numbers are already this    *
+ *    brain's, so there is no conversion here at all -- which is the whole reason the format   *
+ *    exists. See MAP_VERSION_XL in defines.h.                                                 *
+ *                                                                                             *
+ * INPUT:   fname -- the .BIN to read                                                          *
+ *          crc   -- ptr to CRC value to update                                                *
+ *                                                                                             *
+ * OUTPUT:  true on a complete, well formed file; false on anything else.                      *
+ *=============================================================================================*/
+bool MapClass::Read_Binary_XL(char const* fname, uint32_t* crc)
+{
+    CCFileClass file;
+    int i;
+    char* map;
+    void* rawmap;
+    void const* shape;
+
+    file.Set_Name(fname);
+    if (!file.Is_Available()) {
+        return (false);
+    }
+    file.Open(READ);
+
+    XLBinaryHeader hdr;
+    if (file.Read(&hdr, sizeof(hdr)) != sizeof(hdr)) {
+        GlyphX_Debug_Print("Read_Binary_XL: the file is shorter than its own header.");
+        file.Close();
+        return (false);
+    }
+    if (memcmp(hdr.Magic, XL_BIN_MAGIC, sizeof(hdr.Magic)) != 0 || hdr.Version != MAP_VERSION_XL) {
+        GlyphX_Debug_Print("Read_Binary_XL: not an XL map binary.");
+        file.Close();
+        return (false);
+    }
+    /*
+    **	THE CHECK THE OTHER TWO FORMATS CANNOT MAKE. A legacy .BIN read against the wrong
+    **	stride is a map with its rows fanned out across the array, and nothing anywhere
+    **	says so. This one refuses.
+    */
+    if (hdr.Stride != (unsigned short)MAP_CELL_W) {
+        GlyphX_Debug_Print("Read_Binary_XL: this map was written against a different cell "
+                           "stride than this build uses; refusing to read it as if it were "
+                           "ours.");
+        file.Close();
+        return (false);
+    }
+    if (hdr.Count > (unsigned int)MAP_CELL_TOTAL) {
+        GlyphX_Debug_Print("Read_Binary_XL: the header claims more records than there are "
+                           "cells in the map.");
+        file.Close();
+        return (false);
+    }
+
+    /*
+    **	Clear tiles everywhere first; the format stores only what is not clear.
+    */
+    for (i = 0; i < MAP_CELL_TOTAL; i++) {
+        CellClass* cellptr = &Map[i];
+        cellptr->TType = (TemplateType)255;
+        cellptr->TIcon = 0;
+        cellptr->Recalc_Attributes();
+    }
+
+    unsigned int n;
+    for (n = 0; n < hdr.Count; n++) {
+        XLBinaryRecord rec;
+        if (file.Read(&rec, sizeof(rec)) != sizeof(rec)) {
+            GlyphX_Debug_Print("Read_Binary_XL: the file ends before the record count in its "
+                               "own header.");
+            file.Close();
+            return (false);
+        }
+        if (rec.Cell >= (unsigned int)MAP_CELL_TOTAL) {
+            GlyphX_Debug_Print("Read_Binary_XL: a record names a cell outside the map.");
+            file.Close();
+            return (false);
+        }
+
+        TemplateType ttype_id = (TemplateType)rec.TType;
+        unsigned char ticon = rec.TIcon;
+        if (ttype_id == (TemplateType)255) {
+            ttype_id = TEMPLATE_NONE;
+        }
+
+        CellClass* cellptr = &Map[rec.Cell];
+
+        /*
+        **	Verify that the template type actually contains the template number specified. If
+        **	an illegal icon was specified, then replace it with clear terrain.
+        */
+        if (ttype_id != TEMPLATE_CLEAR1 && ttype_id != TEMPLATE_NONE) {
+            TemplateTypeClass const& ttype = TemplateTypeClass::As_Reference(ttype_id);
+            shape = ttype.Get_Image_Data();
+            if (shape) {
+                rawmap = Get_Icon_Set_Map(shape);
+                if (rawmap) {
+                    map = (char*)rawmap;
+                    if ((ticon >= (ttype.Width * ttype.Height)) || (map[ticon] == -1)) {
+                        ticon = 0;
+                        ttype_id = TEMPLATE_NONE;
+                    }
+                }
+            }
+        }
+
+        cellptr->TType = ttype_id;
+        cellptr->TIcon = ticon;
+        cellptr->Recalc_Attributes();
+
+#ifndef DEMO
+        Add_CRC(crc, (unsigned int)cellptr->TType);
+        Add_CRC(crc, (unsigned int)cellptr->TIcon);
+#endif
+    }
+
+    file.Close();
+    return (true);
+}
+
+/***********************************************************************************************
+ * MapClass::Write_Binary_XL -- writes an XL-native map's binary image file                    *
+ *                                                                                             *
+ *    The inverse of Read_Binary_XL, and it writes this brain's own cell numbers unchanged.    *
+ *    Every cell in the address space is representable, so unlike Write_Binary_Big there is    *
+ *    nothing here that can be dropped for want of room in the key.                            *
+ *=============================================================================================*/
+bool MapClass::Write_Binary_XL(char const* root)
+{
+    CCFileClass* file;
+    char fname[_MAX_FNAME + _MAX_EXT];
+    int i;
+
+    sprintf(fname, "%s.BIN", root);
+
+    file = new CCFileClass(fname);
+    file->Open(WRITE);
+
+    /*
+    **	The count goes in the header, so it has to be known before the header is written.
+    **	One extra pass over the array is cheaper than seeking back, and far cheaper than
+    **	the class of bug where the header and the body disagree.
+    */
+    unsigned int count = 0;
+    for (i = 0; i < MAP_CELL_TOTAL; i++) {
+        if (Map[i].TType != TEMPLATE_NONE && Map[i].TType != TEMPLATE_CLEAR1) {
+            count++;
+        }
+    }
+
+    XLBinaryHeader hdr;
+    memcpy(hdr.Magic, XL_BIN_MAGIC, sizeof(hdr.Magic));
+    hdr.Version = MAP_VERSION_XL;
+    hdr.Stride = (unsigned short)MAP_CELL_W;
+    hdr.Count = count;
+    if (file->Write(&hdr, sizeof(hdr)) != sizeof(hdr)) {
+        file->Close();
+        delete file;
+        return (false);
+    }
+
+    for (i = 0; i < MAP_CELL_TOTAL; i++) {
+        if (Map[i].TType == TEMPLATE_NONE || Map[i].TType == TEMPLATE_CLEAR1) {
+            continue;
+        }
+
+        XLBinaryRecord rec;
+        rec.Cell = (unsigned int)i;
+        rec.TType = (unsigned char)Map[i].TType;
+        rec.TIcon = Map[i].TIcon;
+        rec.Pad = 0;
+
+        if (file->Write(&rec, sizeof(rec)) != sizeof(rec)) {
+            file->Close();
+            delete file;
+            return (false);
+        }
+    }
+
     file->Close();
     delete file;
 
@@ -1357,10 +1642,22 @@ void MapClass::Logic(void)
     **	-- the exact thing the cross-brain parity oracle exists to catch. So
     **	classic-format scenarios walk the classic window (its cells mapped
     **	into the XL stride row by row), at the classic chunk rate; XL-native
-    **	scenarios (Version=1) walk the whole stride space as before.
+    **	scenarios walk the whole stride space as before.
+    **
+    **	BOTH SHIPPED FORMATS ARE CLASSIC CONTENT, which this test got wrong
+    **	until 27 Aug 2026: it read MAP_VERSION_NORMAL only, so a Version=1
+    **	map -- the retail skirmish conversions and everything the editor
+    **	makes -- swept the full 1024 stride and sheared against the classic
+    **	brain on identical content. MAP_VERSION_MEGA is 128-wide outright and
+    **	MAP_VERSION_NORMAL is 64-wide confined into 128; neither is native to
+    **	this brain. So the test is written the other way round, naming the
+    **	exception rather than the rule: nothing is XL-native yet, and when a
+    **	format that IS lands it has to declare itself here rather than be
+    **	assumed by falling through.
     */
     int scan_total = MAP_CELL_TOTAL;
-    bool scan_confined = (MapBinaryVersion == MAP_VERSION_NORMAL);
+    bool scan_native = (MapBinaryVersion != MAP_VERSION_NORMAL && MapBinaryVersion != MAP_VERSION_MEGA);
+    bool scan_confined = !scan_native;
     if (scan_confined) {
         scan_total = CLASSIC_MAP_CELL_TOTAL;
     }

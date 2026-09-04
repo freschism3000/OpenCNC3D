@@ -126,7 +126,7 @@ static void line(SR_Target *t, int x0, int y0, int x1, int y1, unsigned int c)
  *
  * These are the settled ones from the project's own research, quoted rather than
  * invented: GDI draws sand/gold and Nod draws the blue-grey/red table, and neutral
- * genuinely shares Nod's (see "House colours"). Here they are
+ * genuinely shares Nod's (see engineering notes, "House colours"). Here they are
  * approximated in the DOS palette because the tactical readout is 2D; the 3D path will
  * use the cartridge's own two TLUTs when it draws models.
  * ------------------------------------------------------------------------- */

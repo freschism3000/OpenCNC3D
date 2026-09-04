@@ -9,7 +9,7 @@
  * injection methods (AutoIt MouseDown/MouseUp, AutoIt MouseClick, and mouse_event called
  * straight through user32): the pointer moved exactly where it was told every time, and
  * the button state was seen ZERO times. The keyboard is fine, 17 frames of a scripted D.
- * A real hand works: units have been selected, a band dragged and move orders given.
+ * A real hand works: the project owner has selected units, dragged a band and given move orders.
  *
  * So the OS input layer cannot be driven from a script on this box, and everything
  * downstream of it -- the hit test, the build clicks, the radar jump, the selection, the

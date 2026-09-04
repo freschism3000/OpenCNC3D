@@ -1,7 +1,7 @@
 /*
  * t1_menu.h -- the 1995 MS-DOS main menu, on the Voodoo.
  *
- * Menus were asked for. The game booted straight into SCG01EA: there was no title
+ * the project owner asked for menus. The game booted straight into SCG01EA: there was no title
  * screen, no way to choose anything, and no way out except closing the process.
  *
  * NOTHING HERE DRAWS THE MENU. menu/dosmenu.c already does, it is pure C89 built on the

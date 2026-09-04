@@ -1,18 +1,22 @@
 # RIGHT EDGE SCROLLING, THE DEFAULT DOS BAR.
 #
-# The fault this covers: the right-hand scroll strip used to be measured from the WINDOW
-# edge, so it sat entirely underneath the sidebar, and the panel guard refuses to scroll
-# from over the panel. Right edge scrolling was therefore unreachable at every window
-# size while the bar was out, and no gate saw it because the `edge` verb used to call the
-# scroller raw, bypassing the very guard that killed it.
+# There are TWO right-hand strips and this script probes both, plus the bar between them.
+# The map-side strip is [tacRight-12, tacRight), the columns immediately left of the bar.
+# The window strip is the window's own last 12 columns, which lie ON the bar while the
+# bar is deployed and are exempt from the panel veto for exactly that reason. A strip on
+# the map alone cannot answer a pointer thrown at the physical edge of the window, and a
+# strip on the window alone is vetoed everywhere the bar covers.
 #
-# Run at 1280x720. The DOS bar is 240 wide there, so the map ends at x=1040 and the strip
-# is [1028,1040). Four probes:
+# Run at 1280x720. The DOS bar is 240 wide there, so the map ends at x=1040, the map-side
+# strip is [1028,1040) and the window strip is [1268,1280). Six probes:
 #   1  the map's right edge scrolls EAST
 #   2  the map's left edge scrolls WEST by the same distance
-#   3  the window's right edge, which is on the bar, moves nothing
-#   4  a pixel just LEFT of the strip moves nothing, so the fix did not turn the whole
-#      map into a scroll zone
+#   3  the window's right edge, on the bar, scrolls EAST by that same distance
+#   4  a pixel just LEFT of the map-side strip moves nothing
+#   5  the middle of the bar, between the two strips, moves nothing, so the fix did not
+#      turn the whole bar into a scroll zone
+#   6  the last column BEFORE the window strip moves nothing, which is what fixes that
+#      strip's width at 12 rather than "somewhere near the edge"
 # Run again with --nosidebar and probe 1 lands on the window edge instead; the distance
 # must come out the same, which is what says the bar no longer changes the answer.
 cam 45 38
@@ -23,4 +27,8 @@ cam 45 38
 edgeat 1278 360 20
 cam 45 38
 edgeat 1020 360 20
+cam 45 38
+edgeat 1200 360 20
+cam 45 38
+edgeat 1267 360 20
 quit

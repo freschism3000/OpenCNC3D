@@ -1,3 +1,9 @@
+#
+# MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+# The change is additive and does not alter the game simulation; the complete
+# diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
+# lists every modified file.
+#
 # Embed some git version information in the binary.
 set(GIT_PRE_CONFIGURE_FILE "gitinfo.cpp.in")
 set(GIT_POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/gitinfo.cpp")

@@ -36,7 +36,7 @@
  * nothing at all. mov_play also drains pending keys and mouse buttons immediately before
  * it opens the file, which is conquer.cpp:2190 / intro.cpp:250. When a console-style
  * controller is wired up later, map its abort button onto this same ESC path rather than
- * onto "any input", or the briefing dies on the first impatient press again.
+ * onto "any input", or the mission briefing dies on the first impatient press again.
  *
  * Tier 1 note (Win98 / Voodoo 2): mov_present is the only function that touches GL and
  * it uses GL 1.1 only, one GL_NEAREST texture and one quad, which is what Glide does

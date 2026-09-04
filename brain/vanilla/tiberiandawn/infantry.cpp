@@ -1807,7 +1807,20 @@ short const* InfantryClass::Overlap_List(void) const
 {
     Validate();
     // return(Coord_Spillage_List(Coord, 24 + ((IsSelected || Doing > DO_WALK)?12:0)));
-    return (Coord_Spillage_List(Coord, 24 + ((Doing > DO_WALK || Is_Selected_By_Player()) ? 12 : 0)));
+    /*
+    **	CNC3D lockstep: the selection term is dropped IN A MATCH ONLY.
+    **	Is_Selected_By_Player() reads the global PlayerPtr, so it answers differently on
+    **	every peer, and this list is not advisory: MapClass::Place_Down / Pick_Up /
+    **	Overlap_Down / Overlap_Up walk it into CellClass::Overlapper, and Overlap_Down ends
+    **	by revealing the object to the local player, which assigns MISSION_HUNT, springs
+    **	EVENT_DISCOVERED and calls Look(). So a selected man wrote occupancy a deselected
+    **	one did not.
+    **	Outside a match the fat list stays, because it is also what makes a selected man's
+    **	brackets redraw cleanly and no peer has to agree with anyone. The Doing term stays
+    **	in both cases: it is replicated state, and the death and fire shapes need the ring.
+    */
+    return (Coord_Spillage_List(
+        Coord, 24 + ((Doing > DO_WALK || (!CNC3D_Lockstep && Is_Selected_By_Player())) ? 12 : 0)));
     //	return(Coord_Spillage_List(Coord, (IsSelected ? 24 : 14))+1);
 }
 

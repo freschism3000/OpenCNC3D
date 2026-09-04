@@ -51,11 +51,27 @@
 /* The menu's half of the audio contract, in one place: everything the menu does to the
    score goes through this, and the movie's own ducking is moviesnd.c's business. That
    makes "the menu talks to the shared engine and never to a device" checkable by
-   reading three lines rather than the whole file. */
-static void dms_music_gain(DMS *s, int permille, int ms)
+   reading three lines rather than the whole file.
+
+   UP MEANS UP TO THE SLIDER, NOT TO UNITY. cnc_audio_set_music_volume
+   (Options.ScoreVolume, 0..255) is the one thing that owns MIX_BUS_MUSIC, and the
+   player's remembered controls are pushed at the mixer before this shell ever opens.
+   Every place the menu brought the score back used to ask for MIX_UNITY regardless,
+   which threw that remembered level away before the first note and threw it away again
+   on every return from a mission; the level only reappeared once some dialog's bind
+   re-applied the settings block, so from the outside the saved volumes looked like they
+   were not loaded until a mission was paused. Same rule the movie sink and the
+   side-select screen already follow.
+
+   The one other writer of this bus is cnc_music_fade_out (audio/cncaudio.c:488), which
+   ramps it to zero for the campaign's side-select and is restored by app/campaign.c:1235.
+   It is not in this path; it is named so "everything the menu does goes through here" is
+   not read as "nothing else ever touches this bus". */
+static void dms_music_up(DMS *s, int ms)
 {
     if (s->cfg.au)
-        mixer_bus_gain(cnc_audio_mixer(s->cfg.au), MIX_BUS_MUSIC, permille, ms);
+        mixer_bus_gain(cnc_audio_mixer(s->cfg.au), MIX_BUS_MUSIC,
+                       cnc_audio_get_music_volume(s->cfg.au) * MIX_UNITY / 255, ms);
 }
 
 static int dms_pot(int v)
@@ -372,7 +388,7 @@ int dms_open(DMS *s, SDL_Window *win, const DMS_Config *cfg, char *err, int errl
             fprintf(stderr, "menu: no theme %s on the disc; the menu is silent\n",
                     cfg->music);
         else
-            dms_music_gain(s, MIX_UNITY, 0);
+            dms_music_up(s, 0);
     }
     (void)e2;
     return 1;
@@ -393,7 +409,7 @@ static int dms_movie_then_menu(DMS *s, const char *path)
         return 0;
     dms_redraw(s);
     dms_fade(s, s->rgba, 0);
-    dms_music_gain(s, MIX_UNITY, DM_FADE_MS);
+    dms_music_up(s, DM_FADE_MS);
     return 1;
 }
 
@@ -417,7 +433,7 @@ int dms_run(DMS *s)
         cnc_music_set_playlist(s->cfg.au, 0);
         cnc_music_play_index(s->cfg.au, cnc_music_theme_index(s->cfg.music));
     }
-    dms_music_gain(s, MIX_UNITY, DM_FADE_MS);
+    dms_music_up(s, DM_FADE_MS);
     dms_layout(s);
     dms_redraw(s);
 

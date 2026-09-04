@@ -113,6 +113,22 @@ extern "C" {
 #define DB_FONT6_XSPACING (-2)
 #define DB_FONT6_YSPACING (-1)
 
+/* dialog.cpp Simple_Text_Print, factor 0, TPF_8POINT with any shadow flag:
+ *   xspace = 0; TPF_8POINT -> -2 (:491); NOSHADOW / DROPSHADOW / FULLSHADOW each -> -1
+ * so the engine's own 8 point spacing is -3, and the 6 point constant above IS the
+ * engine's number unchanged.
+ *
+ * THIS ONE IS NOT, AND THE DEPARTURE IS MEASURED RATHER THAN PREFERRED. 8POINT's glyph
+ * cells carry their own one-pixel surround in nibble classes 2 and 3, and db_print draws
+ * glyph after glyph, so at -3 one letter's surround lands on top of the previous letter's
+ * ink. Rasterised from the shipped pack: at -3 the ink of a P and a following r touch with
+ * no clear column between them, and with the surround drawn the r overwrites the stem that
+ * closes the P's bowl at two of its rows, so the P comes out open. At -2 every letter keeps
+ * a clear column. "Primary" measures 42 DOS pixels wide by 11 tall at -2 and 35 by 11 at
+ * -3. Stating the number here so a reader is not left to infer that -2 came from the
+ * engine, which it did not. */
+#define DB_FONT8_XSPACING (-2)
+
 /* The Westwood 16 colour GUI ramp, pinned from the engine in pal/palette_roles.json */
 enum
 {
@@ -219,6 +235,12 @@ void db_print(DB_Surface *s, const DB_Font *f, const char *text, int x, int y,
               const unsigned char *fontpal, int xspacing);
 void db_font_palette(unsigned char fp[16], unsigned char fore, unsigned char back);
 void db_font_palette_grad(unsigned char fp[16], unsigned char fore, unsigned char back);
+/* dialog.cpp's TPF_FULLSHADOW arm: "each letter is surrounded by black", which is what the
+ * engine reaches for when the text will be drawn over a non-plain background. Identical to
+ * db_font_palette except that nibble classes 2 and 3 keep BLACK instead of being flattened
+ * into the background, so the glyphs carry their own outline and need no opaque plate under
+ * them. */
+void db_font_palette_full(unsigned char fp[16], unsigned char fore, unsigned char back);
 
 /* ------------------------------------------------------------------------ *
  * The state the sidebar renders. This mirrors what SidebarClass reads out of

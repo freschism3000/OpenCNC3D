@@ -330,7 +330,7 @@ void t1_glide_quad(float x0, float y0, float x1, float y1,
      * of thousands of pixels; the sprite's SIZE was clamped, which looked like enough,
      * but its POSITION never was.
      *
-     * Handing the Voodoo a vertex that far out is the wedge that was seen: the picture stops
+     * Handing the Voodoo a vertex that far out is the wedge the project owner saw: the picture stops
      * with the SLI pair's interleaved scanlines frozen and the process still running.
      * It reproduced only while SCROLLING, only with the infantry pass on, and only once
      * the two soldiers near the yard left the view, which is why three other passes were
@@ -390,7 +390,7 @@ void t1_glide_begin(unsigned int clear_rgb)
 /* ---- THE SWAP -----------------------------------------------------------------------
  *
  * ALWAYS INTERVAL 0 ON THIS HARDWARE. Both of the obvious ways to throttle it were tried
- * on the test box and both hang outright:
+ * on the project owner's box and both hang outright:
  *
  *   grBufferSwap(1)                  never returns. The driver waits on a retrace this
  *                                    SLI pair does not signal to it, and the game stops
@@ -443,7 +443,7 @@ static long glide_tri(SR_Target *t, const SR_Vertex *a, const SR_Vertex *b,
      * limited fixed point range and it is the application's job to keep them there.
      * Hand it a vertex a few tens of thousands of pixels off the edge and the chip stops
      * rasterising, mid frame, with the SLI pair's interleaved scanlines frozen on screen
-     * and the process still running. That was hit exactly by scrolling the camera.
+     * and the process still running. the project owner hit exactly that by scrolling the camera.
      *
      * The software rasteriser never noticed because it clamps its scanline loop to the
      * target; the card has no such mercy.

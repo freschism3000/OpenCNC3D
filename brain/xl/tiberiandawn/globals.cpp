@@ -38,6 +38,7 @@
 bool ForceEnglish = false;
 #endif
 
+bool CNC3D_Lockstep = false; /* see externs.h; only CNC3D_Set_Lockstep writes this */
 bool Debug_Quiet = false;
 bool Debug_Cheat = false;
 bool Debug_Remap = false;

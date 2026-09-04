@@ -30,9 +30,10 @@
  *     TechnoClass::Draw_It (tiberiandawn/techno.cpp):
  *        - shown when: Strength > 0 and (selected OR damaged)     (techno.cpp:1069)
  *          [engine gates the damaged case on Special.HealthBarDisplayMode ==
- *           HB_DAMAGED; vanilla's default is HB_SELECTED (special.h:75). This module
- *           implements the HB_DAMAGED behaviour because "selected or damaged" is the
- *           requested rule; flip HB_MODE_DAMAGED_TOO to 0 for the strict default.]
+ *           HB_DAMAGED; vanilla's default is HB_SELECTED (special.h:75). Which of the
+ *           two applies is a RUNTIME mode here rather than a compile-time one, read
+ *           from the F5 dial hb_mode, and HB_MODE_DAMAGED_TOO is its default. The enum
+ *           beside hb_should_show carries the reasoning and the third position, off.]
  *        - ratio = Cardinal_To_Fixed(MaxStrength, Strength)       (object.cpp:1707)
  *                = (Strength << 8) / MaxStrength                  (common/misc.cpp:18)
  *        - colour: LTGREEN; YELLOW when ratio < 0x7F; RED when ratio < 0x3F
@@ -98,8 +99,13 @@ static int g_shroudValid = 0;          /* a good snapshot is in g_shroudCell */
 static int g_shroudCornersDirty = 1;
 static int g_shroudWhined = 0;         /* count-mismatch reported once, not per frame */
 
-/* One byte per grid entry, SHROUD_* values. 128x128 is MAP_MAX under MEGAMAPS. */
-static unsigned char g_shroudCell[MAP_MAX_CELL_WIDTH * MAP_MAX_CELL_HEIGHT];
+#include "c3d_ceiling.h"
+
+/* One byte per grid entry, SHROUD_* values, sized from the RENDERER's ceiling like every
+   other grid in this program. It used to size from the engine's MAP_MAX_CELL_WIDTH, which
+   is a different number that moves for different reasons, and that is how the shroud came
+   to have a ceiling of its own that nothing named. */
+static unsigned char g_shroudCell[C3D_MAP_MAX * C3D_MAP_MAX];
 
 /* THE WORLD-GRID CORNER DIMS, (packW+1) x (packH+1): the per-corner coverage field
    further down covers the whole PACK grid, which stopped being a constant 64x64 when
@@ -109,10 +115,35 @@ static unsigned char g_shroudCell[MAP_MAX_CELL_WIDTH * MAP_MAX_CELL_HEIGHT];
    the mission-state reset). Storage stays static at the ceiling -- the same
    MAP_MAX_CELL_WIDTH the two buffers above already size from -- and every corner
    INDEX strides by these. */
-#define SHROUD_CORN_MAX (MAP_MAX_CELL_WIDTH + 1)
+#define SHROUD_CORN_MAX C3D_CORN_MAX
 static int g_shroudCornW = 65, g_shroudCornH = 65;
+static int g_shroudClampWhined = 0;
 static void shroud_set_world_grid(int cornW, int cornH)
 {
+    /* THE CLAMP SAYS SO NOW, and it used to be the only world-grid gate in the host that
+       did not. load_pack refuses a pack whose dims exceed the ceiling and prints why;
+       edit_set_world_grid refuses a world the same way and prints why; this one quietly
+       took the smaller number and carried on, which on a map larger than the ceiling
+       produces a shroud covering part of the board and no statement anywhere that
+       anything was dropped.
+       It is the SAME ceiling as everything else now (c3d_ceiling.h). Until 27 Aug 2026
+       it was a second one: this header is included above the renderer's grid seam and so
+       sized itself from the ENGINE's map constant, which meant raising the renderer's
+       ceiling moved the rest of the program and left the shroud behind, silently.
+       It still clamps rather than refusing, because the storage above is static at the
+       ceiling and there is nothing safe to do with a larger grid until it is heap-sized.
+       Once, not per call: the setter runs on every pack load and every mission reset. */
+    if (cornW > SHROUD_CORN_MAX || cornH > SHROUD_CORN_MAX) {
+        if (!g_shroudClampWhined) {
+            g_shroudClampWhined = 1;
+            fprintf(stderr,
+                    "*** shroud: asked for a %dx%d corner grid and this build's storage "
+                    "stops at %dx%d, so the shroud will cover only part of this map. The "
+                    "shroud's ceiling is the BRAIN's MAP_MAX_CELL_WIDTH, separate from the "
+                    "renderer's own C3D_MAP_MAX; both have to move together.\n",
+                    cornW, cornH, SHROUD_CORN_MAX, SHROUD_CORN_MAX);
+        }
+    }
     if (cornW < 2) cornW = 2; else if (cornW > SHROUD_CORN_MAX) cornW = SHROUD_CORN_MAX;
     if (cornH < 2) cornH = 2; else if (cornH > SHROUD_CORN_MAX) cornH = SHROUD_CORN_MAX;
     g_shroudCornW = cornW;
@@ -123,7 +154,7 @@ static void shroud_set_world_grid(int cornW, int cornH)
 /* Fetch buffer: header + max entries + the DLL's own 256-byte slack (dllinterface.cpp:
    5481 counts that slack against buffer_size, so it must really be there). */
 static unsigned char g_shroudBuf[sizeof(CNCShroudStruct)
-                                 + MAP_MAX_CELL_WIDTH * MAP_MAX_CELL_HEIGHT
+                                 + C3D_MAP_MAX * C3D_MAP_MAX
                                        * sizeof(CNCShroudEntryStruct)
                                  + 256];
 
@@ -485,7 +516,7 @@ static float shroud_corner_vis(int x, int y)
 }
 
 /* ---- the shroud on WORLD OBJECTS, not just on the ground -------------------------
-   Reported: "if a tree is half covered in shroud, the covered side will be covered in
+   the project owner: "if a tree is half covered in shroud, the covered side will be covered in
    shadow, while the visible part will be lit up."
 
    Our build had NO shroud term on objects at all: visible() culled on the object's
@@ -544,7 +575,7 @@ static void shroud_draw_soft(int x0, int y0, int x1, int y1, shroud_cellshown_fn
        invisible because the next cell's lid covers the gap; at the OUTERMOST ring there
        is no next cell, so the last strip of terrain was left uncovered and read as a
        bright lit line along the map edge -- measured at 3 screen rows on SCG01EB, and
-       the second half of the reported "the border is very clear to see".
+       the second half of the project owner's "the border is very clear to see".
        terrain_y clamps both coordinates to the world grid before indexing, so a ring vertex at
        -1 or 65 reuses the edge corner height and the lid simply extends flat outward:
        no out-of-bounds read and no phantom cliff, because nothing textured is drawn out
@@ -581,7 +612,7 @@ static void shroud_draw_soft(int x0, int y0, int x1, int y1, shroud_cellshown_fn
                west pair was pinned to the absolute plane while the east pair rode
                the ground, so every deep-shroud cell drew as a RAMP, not a lid.
                Uphill the ramp sank under the terrain and let the ground show
-               through (the reported black stripes); downhill it floated a whole cell up
+               through (the project owner's black stripes); downhill it floated a whole cell up
                and painted black over sand and water (the shoreline wedges). */
             glVertex3f((float)x,        SHROUD_BLACK_Y + shroud_gy((float)x, (float)y), (float)y);
             glVertex3f((float)x + 1.0f, SHROUD_BLACK_Y + shroud_gy((float)x + 1.0f, (float)y), (float)y);
@@ -656,9 +687,43 @@ static void shroud_draw_soft(int x0, int y0, int x1, int y1, shroud_cellshown_fn
 
 static int g_hbOn = 1;
 
-/* 1 = "selected or damaged" (the remaster's HB_DAMAGED behaviour, and what this module
-   was asked for). 0 = vanilla DOS default, selected only (special.h:75 HB_SELECTED). */
-#define HB_MODE_DAMAGED_TOO 1
+/* THE SHOW RULE IS A RUNTIME MODE, and the three positions are the only ones the two
+   originals between them define:
+       HB_MODE_OFF          nothing carries a bar, whatever is selected
+       HB_MODE_SELECTED     selected only -- the vanilla DOS default (special.h:75
+                            HB_SELECTED)
+       HB_MODE_DAMAGED_TOO  selected OR below full health -- the remaster's HB_DAMAGED,
+                            what this module has always drawn, and the default
+   It was a compile-time 0/1, so neither the strict default nor an off position was
+   reachable from inside the game, which is what both of the reports against this rule
+   come down to. The third position keeps the name HB_MODE_DAMAGED_TOO so that the
+   references to it elsewhere in the tree still resolve to the thing they describe.
+
+   IT IS NOT THE CARTRIDGE'S RULE, and that is registered rather than implied. The
+   console shows a bar on every ALLIED object whether or not it is damaged, and this
+   renderer is handed no ally relation to test: Is_Ally reads a per-house bitfield
+   (house.cpp:2068) and the object export carries only the owning house's name, which
+   answers "is this mine" and not "is this allied", so the ally arm of the console's
+   rule cannot be reproduced without widening the export.
+
+   OFF REACHES THE PIP ROW TOO, because both strips ask this one function. That coupling
+   is deliberate: a pip row hovering beside no health bar
+   reads as a bug. --nohb is the older switch and still gates the health bars alone. */
+enum { HB_MODE_OFF = 0, HB_MODE_SELECTED = 1, HB_MODE_DAMAGED_TOO = 2 };
+
+/* ONE READ OF THE DIAL, and it clamps. Every supported path into g_fx.hb_mode already
+   bounds it -- the panel slider, the gfx script verb and the cfg loader all go through
+   fx_quant against the row's own 0..2 -- so the clamp is for a value that arrives some
+   other way, where falling off the end of the range must not silently mean "draw none".
+   g_fx comes from fx_state.h, which the one translation unit that includes this header
+   includes well above it; shatter_mod.h reaches it the same way. */
+static int hb_show_mode(void)
+{
+    float m = g_fx.hb_mode;
+    if (m < (float)HB_MODE_OFF)         m = (float)HB_MODE_OFF;
+    if (m > (float)HB_MODE_DAMAGED_TOO) m = (float)HB_MODE_DAMAGED_TOO;
+    return (int)(m + 0.5f);
+}
 
 /* Cardinal_To_Fixed(MaxStrength, Strength): common/misc.cpp:18. 0x100 = full health.
    The 0xFFFF degenerate (base 0) matches the engine and falls into "green". */
@@ -706,15 +771,15 @@ static void hb_colour(unsigned ratio, float* r, float* g, float* b)
 /* techno.cpp:1069..1073 (cloak omitted; see header note). */
 static int hb_should_show(int strength, int maxstrength, int selected)
 {
+    int mode;
     if (strength <= 0)
+        return 0;
+    mode = hb_show_mode();
+    if (mode == HB_MODE_OFF)
         return 0;
     if (selected)
         return 1;
-#if HB_MODE_DAMAGED_TOO
-    return strength < maxstrength;
-#else
-    return 0;
-#endif
+    return mode == HB_MODE_DAMAGED_TOO && strength < maxstrength;
 }
 
 /* One bar. Screen-space pixels, y down; the caller has an ortho pixel projection up

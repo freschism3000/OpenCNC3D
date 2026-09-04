@@ -101,7 +101,13 @@ void TemplateClass::Read_INI(CCINIClass& ini)
     for (int index = 0; index < len; index++) {
         char const* entry = ini.Get_Entry(INI_Name(), index);
         char buf[128]; // Working string staging buffer.
-        CELL cell = atoi(entry);
+        /*
+        ** Convert from the scenario's OWN stride into this build's (function.h). This is
+        ** the TENTH such reader and it was missed when the other nine were converted,
+        ** because it only runs when the map has a [TEMPLATE] section AND its .BIN did not
+        ** load -- no shipped map has both, so nothing exercised it.
+        */
+        CELL cell = Confine_Scenario_Cell((CELL)atoi(entry), Map.MapBinaryVersion);
 
         /*
         **	Get the template entry.

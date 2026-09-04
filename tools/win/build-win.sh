@@ -11,11 +11,11 @@
 # how the code was written; at 64 it truncates, and GCC is right to refuse it. Building
 # i686 makes the question disappear instead of suppressing it, and it is the same
 # architecture the promised Win98 / Voodoo 2 target needs. Nothing here depends on the
-# larger address space.
+# larger address space. See docs/win-build.md.
 #
 # WHY NO SOURCE WAS EDITED TO MAKE THIS WORK. Every file except game/cnc_eyes.cpp already
 # carried its own `#ifdef __APPLE__` GL guard. The renderer did not, and it is the file
-# most likely to be open elsewhere, so compat/win/ supplies the three macOS-only
+# most likely to be open in a concurrent edit, so compat/win/ supplies the three macOS-only
 # headers it asks for by name instead. See compat/win/README.md.
 set -e
 cd "$(dirname "$0")/../.."
@@ -91,6 +91,10 @@ compile_c() {
 AUDIO_C89=$(echo $WIN_AUDIO_C | tr ' ' '\n' | grep -v audio_sdl.c | tr '\n' ' ')
 compile_c c89   $WIN_GAME_C $AUDIO_C89
 compile_c gnu99 audio/audio_sdl.c $WIN_MENU_C $WIN_VIDEO_C $WIN_APP_C
+# The scheduler is strict C89; the socket file needs gnu89 for the winsock headers.
+compile_c c89   net/lockstep.c
+compile_c gnu89 net/net_udp.c
+compile_c gnu89 net/netmatch.c
 
 echo "== renderer"
 # -fpermissive for the same reason the brain build needs it, and only for that reason:
@@ -108,7 +112,7 @@ $CXX -std=c++14 -O2 -g -fms-extensions -fpermissive \
 
 # -static-libgcc and -static-libstdc++ are NOT enough on their own: they leave
 # libwinpthread-1.dll as a runtime dependency, and a stock Windows 11 does not have it,
-# so the build would have died on the target machine with a missing-DLL box and nothing else
+# so the build would have died on the project owner's machine with a missing-DLL box and nothing else
 # to go on. The explicit -Bstatic -lwinpthread folds that one in too.
 #
 # A blanket -static was tried first and is wrong: it also drags in the static libSDL2.a,
@@ -125,7 +129,9 @@ $CXX -std=c++14 -O2 -g -fms-extensions -fpermissive \
 # DLL, and the GCC runtime, the C++ runtime and winpthread folded into the binary.
 # Naming -lwinpthread with -Bstatic was tried first and does not work, because the g++
 # driver appends its own dynamic -lwinpthread after everything we pass.
-LIBS="-lmingw32 -lSDL2main -Wl,-Bdynamic -lSDL2 -Wl,-Bstatic -lopengl32 -lz -static"
+# -lws2_32 is winsock, for net/net_udp.c. It goes AFTER the objects that reference it,
+# which is what the rest of this line already assumes.
+LIBS="-lmingw32 -lSDL2main -Wl,-Bdynamic -lSDL2 -Wl,-Bstatic -lopengl32 -lz -lws2_32 -static"
 
 echo "== link"
 # THE ICON AND THE VERSION BLOCK, compiled into cnc3d.exe as resources. One executable per
@@ -139,7 +145,7 @@ echo "== link"
 # there is still only one place the number is written down.
 #
 # Only cnc3d.exe gets any of this. cnc_eyes.exe is the verification binary the gate suite
-# drives on Windows, not something anybody double-clicks, and giving it the game's
+# drives on the Windows test machine, not something anybody double-clicks, and giving it the game's
 # face would undo the point of the exercise.
 RCOBJ=""
 if [ -f "$ROOT/tools/win/cnc3d.rc" ] && [ -f "$ROOT/tools/launchers/cnc3d.ico" ]; then
@@ -176,6 +182,35 @@ $CXX -o "$OUT/cnc_eyes.exe" "$OBJ/cnc_eyes_main.o" $COBJ $LIBDIRS $LIBS
 $CXX -o "$OUT/cnc3d.exe"    "$OBJ/cnc3d.o" "$OBJ/cnc_eyes_lib.o" $RCOBJ $COBJ $LIBDIRS $LIBS
 
 cp "$SDL2_ROOT/bin/SDL2.dll" "$OUT/"
+
+# THE CONNECTIVITY TOOL SHIPS WITH THE WINDOWS BUILD, and it has to, because the pairing
+# it is most needed for is this machine against the Mac one. It links only the two net
+# modules and needs no SDL and no engine, so it is a few kilobytes and cannot be affected
+# by anything else in the build going wrong. Standalone, exactly like the gates: nothing
+# links it into the game, and tools/win/check-sources.sh excludes it by name.
+#
+# A 16 MB STACK, because an LsState is a megabyte (LS_HISTORY x LS_MAX_SEATS turns of
+# LS_TURN_BYTES) and netcheck keeps them as locals in main. macOS gives the main thread
+# 8 MB and never noticed; Windows gives 2 MB, and the v0.6.4 netcheck.exe died on launch
+# with STATUS_STACK_OVERFLOW (0xC00000FD) before printing a byte. Found on the Windows
+# box, 3 Sep 2026. The lasting fix is to stop putting the scheduler state on the stack
+# at all, which is the net/ author's call; this makes the shipped tool run today.
+echo "== netcheck.exe"
+$CC -std=gnu89 -O2 -g -Wall -Wl,--stack,16777216 -o "$OUT/netcheck.exe" \
+    "$ROOT/net/netcheck.c" "$ROOT/net/lockstep.c" "$ROOT/net/net_udp.c" -lws2_32
+
+# THE HEADLESS BRAIN HOST AND THE TWO-BRAIN GATE, for the Windows half of Phase 0
+# (docs/design-multiplayer.md section 10). Both are dependency-free C over LoadLibrary,
+# compiled unedited from brain/host/, and both need the DLL built below beside them to
+# be useful. Until 3 Sep 2026 the only Windows build rule for cnc_host.c was the Win98
+# one, so the cross architecture determinism run could be captured on the Mac and not
+# here, which is the one machine it needs. gnu99 for the same reason tools/win98/build.sh
+# gives: loop variables in for statements and _Static_assert on the struct mirrors.
+# Standalone, like netcheck: nothing links them into the game, and brain/host/* is
+# excluded from tools/win/check-sources.sh by directory.
+echo "== cncbrain.exe, cnc_twobrain.exe"
+$CC -std=gnu99 -O2 -g -Wall -I"$ROOT/brain/host" -o "$OUT/cncbrain.exe" "$ROOT/brain/host/cnc_host.c"
+$CC -std=gnu99 -O2 -g -Wall -I"$ROOT/brain/host" -o "$OUT/cnc_twobrain.exe" "$ROOT/brain/host/cnc_twobrain.c"
 
 if [ $DO_BRAIN -eq 1 ]; then
     echo "== brain (TiberianDawn.dll)"

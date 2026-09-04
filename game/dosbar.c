@@ -380,6 +380,24 @@ void db_font_palette_grad(unsigned char fp[16], unsigned char fore, unsigned cha
     fp[1] = fore;
 }
 
+/* dialog.cpp's TPF_FULLSHADOW arm of the same shadow switch db_font_palette transcribes
+ * the TPF_NOSHADOW arm of: the whole array is set to `back`, then classes 2 and 3 are set
+ * to BLACK rather than to `back`. Those two classes are the surround the font's own cells
+ * already carry, so the result is ink in `fore` with a hard black outline and nothing else
+ * touched -- which is what lets a string be drawn straight onto a busy picture instead of
+ * onto an opaque plate. The engine's own words for when to use it are that the text will
+ * be over a non-plain background. */
+void db_font_palette_full(unsigned char fp[16], unsigned char fore, unsigned char back)
+{
+    int i;
+    for (i = 0; i < 16; i++)
+        fp[i] = back;
+    fp[0] = back;
+    fp[1] = fore;
+    fp[2] = DB_BLACK; /* TPF_FULLSHADOW */
+    fp[3] = DB_BLACK; /* TPF_FULLSHADOW */
+}
+
 int db_string_width(const DB_Font *f, const char *text, int xspacing)
 {
     int w = 0;

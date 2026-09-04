@@ -854,6 +854,50 @@ inline CELL Confine_Old_Cell(CELL cell)
     return (cell % OLD_MAP_CELL_W) + (cell / OLD_MAP_CELL_W) * MAP_CELL_W;
 }
 
+/*
+**	THE SCENARIO'S OWN STRIDE, WHICH IS NEVER THIS BUILD'S STRIDE.
+**
+**	A cell number written into a scenario -- in the INI's [UNITS] / [STRUCTURES] /
+**	[TERRAIN] / [OVERLAY] / [SMUDGE] / [Waypoints] / [CellTriggers] entries, or as the
+**	key of a sparse .BIN record -- is y * <the stride the AUTHORING build used> + x. It
+**	is not a position in this brain's array and it never was: MEGAMAPS already had to
+**	confine 64-wide content into its 128 stride (Confine_Old_Cell, above), and XL has to
+**	confine BOTH the 64-wide and the 128-wide formats into its 1024 stride.
+**
+**	Two legacy authoring strides exist, both frozen by shipped content, and the
+**	scenario's own MAP_VERSION picks between them. They cannot be extended: the sparse
+**	.BIN key is a 16 bit field (see MegaBinaryRecord in map.cpp) and neither the .BIN nor
+**	the INI has room to say which stride it meant, so a third legacy stride would be
+**	indistinguishable from one of the first two.
+**
+**	MAP_VERSION_XL is the answer to that and it is deliberately not a third legacy case:
+**	its numbers are already this brain's, at the fixed 1024 stride the whole XL ladder
+**	shares, so the conversion is the identity and there is nothing to get wrong. Every
+**	XL-native map at every tier -- 256, 512, 1024 -- goes through this arm.
+**
+**	Confine_Scenario_Cell is exact for all three and is the ONLY reader-side conversion;
+**	Scenario_Cell_Of is its inverse for the writers, so a scenario this brain reads and
+**	writes back round-trips to the numbers it came in with.
+*/
+inline int Scenario_Cell_Stride(int binary_version)
+{
+    if (binary_version == MAP_VERSION_XL)
+        return MAP_CELL_W;
+    return (binary_version == MAP_VERSION_MEGA) ? CLASSIC_MAP_CELL_W : OLD_MAP_CELL_W;
+}
+
+inline CELL Confine_Scenario_Cell(CELL cell, int binary_version)
+{
+    int w = Scenario_Cell_Stride(binary_version);
+    return (cell % w) + (cell / w) * MAP_CELL_W;
+}
+
+inline CELL Scenario_Cell_Of(CELL cell, int binary_version)
+{
+    int w = Scenario_Cell_Stride(binary_version);
+    return (cell % MAP_CELL_W) + (cell / MAP_CELL_W) * w;
+}
+
 inline COORDINATE Cell_Coord(CELL cell)
 {
     return XY_Coord((Cell_X(cell) << 8) | (CELL_LEPTON_W / 2), (Cell_Y(cell) << 8) | (CELL_LEPTON_W / 2));

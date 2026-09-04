@@ -12,6 +12,22 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Under an EIGHTPLAYERS build flag, widens the playable house set from six
+// multiplayer houses to eight: adds HOUSE_MULTI7 and HOUSE_MULTI8 to
+// HousesType, adds their ownership bit macros, adds REMAP_GREY and
+// REMAP_BROWN player colours and moves REMAP_LAST, derives HOUSE_MAX from
+// HOUSE_COUNT instead of the fixed 12, and raises MAX_PLAYERS and
+// MAX_MPLAYER_COLORS from 6 to 8. It also adds static_asserts pinning the
+// highest house index to the 4-bit house field in the event wire format and
+// pinning the score screen row count, and, when EIGHTPLAYERS is off, defines
+// the two new ownership bits as 0 so ownership literals elsewhere can name
+// them unconditionally without changing the stock masks.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\defines.h_v   2.19   16 Oct 1995 16:44:54   JOE_BOSTIC  $ */
 /***********************************************************************************************
@@ -2872,10 +2888,13 @@ typedef struct
 **	headroom. These pins fail the build the moment anyone widens past what the
 **	on-the-wire encodings can carry.
 */
-// EventClass carries the originating house in a 4-bit field (event.h, "unsigned ID : 4"),
-// so the highest HousesType index must stay within 0..15. HOUSE_MULTI8 is index 11.
-static_assert(HOUSE_MULTI8 == 11 && HOUSE_MULTI8 <= 15,
-              "max HousesType index must fit EventClass's 4-bit ID wire field (event.h)");
+// EventClass carries the originating house in a 7-bit field (event.h, "unsigned ID : 7"),
+// so the highest HousesType index must stay within 0..127. It was 4 bits until the
+// sixteen-player decision, which capped the wire at 16 house indices and so at twelve
+// multiplayer slots. HOUSE_MULTI8 is index 11 today; the roster grows in Phase 4 and this
+// pin moves with HOUSE_COUNT rather than with a hardcoded index.
+static_assert(HOUSE_COUNT <= 128,
+              "max HousesType index must fit EventClass's 7-bit ID wire field (event.h)");
 // The multiplayer score screen has exactly eight rows; every player must get one.
 static_assert(MAX_MULTI_NAMES == 8, "score screen rows must match the eight-player roster");
 static_assert(MAX_PLAYERS <= MAX_MULTI_NAMES, "every player needs a score-screen row");

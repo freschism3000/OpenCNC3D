@@ -101,6 +101,12 @@ if __name__ == "__main__":
     # which is where the painted word was. It has to be its own plate because the bar
     # slides out from under it and a word baked into the bar would slide away with it.
     three_frames(plate_with("SIDEBAR")).save(f"{CH}/tab_sidebar.png")
+    # DATABASE, the fourth plate. The 1995 pre-release tab strip carried four captions
+    # (TACTICAL / OPTIONS / DATABASE / S.DIGEST) and this is the second of them coming
+    # back. Same blank plate, same GRAD6FNT, same 1.75 scale and 12px pitch as OPTIONS,
+    # so it is the same control wearing a different word rather than a new design: 99px
+    # of lettering inside the 132px the plate has between its end rivets.
+    three_frames(plate_with("DATABASE")).save(f"{CH}/tab_database.png")
     # And the chassis with that word erased. blank_plate() tiles a mirrored sample of the
     # plate across the middle, which covers the lettering and leaves the two end rivets.
     # chunks/chassis.png stays untouched: it is the source of truth.

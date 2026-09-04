@@ -97,7 +97,11 @@ struct Entry {            // big-endian
   wrong fails every length check). An earlier guess of `0x470000` was **wrong**; it put
   the decoder mid-stream in a neighbouring file, which still produced plausible-looking
   text and briefly fooled the eye. Length-exactness is the only trustworthy oracle here.
-  The two trailing archives (`0x0A4D778`, `0x0D45008`) use a **different base — TODO**.
+  The two trailing archives (`0x0A4D778`, `0x0D45008`) answer to the SAME rule and their
+  bases are no longer unknown: `0x0A4D778 -> 0x00A4DB80`, `0x0D45008 -> 0x00D45410` (item 4
+  under the solved list below). Handing them the MAIN table's base instead is a bug this
+  project actually shipped, in `extract.py`, and it cut all 43 of their records from the
+  wrong address.
 - The 3 tiny IMG dirs (`0x019EE70/0x019F380/0x019F890`) have all-zero offsets — a
   different sub-format; revisit.
 
@@ -110,13 +114,13 @@ overlapping sub-ranges of the main table and inflated every count ~3.4×):
 | `0x019F380` | 53 | IMG, ditto |
 | `0x019F890` | 10 | IMG, ditto |
 | **`0x0460540`** | **1422** | **MAIN table — ends at exactly `0x0468A90` = the data base** |
-| `0x0A4D778` | 43 | trailing archive (base unknown) |
-| `0x0D45008` | 43 | trailing archive, duplicate of the above |
+| `0x0A4D778` | 43 | trailing archive, base `0x00A4DB80` (English) |
+| `0x0D45008` | 43 | trailing archive, base `0x00D45410` (French build of the same set) |
 
 The main table ending exactly at `0x0468A90` is an independent confirmation of the data
 base found in M2: **the directory is immediately followed by its data.**
 
-**Full contents = 1,624 records / 1,615 unique** (`docs/rom-manifest.csv`, regenerate
+**Full contents = 1,624 records / 1,457 unique names** (`docs/rom-manifest.csv`, regenerate
 with `python3 tools/romdump/archive.py rom/cnc_eu.z64 manifest docs/rom-manifest.csv`):
 
 | ext | n | | ext | n | | ext | n |
@@ -467,9 +471,17 @@ wrong tile size); 12 models use 2–3 textures and render with the dominant one 
 5. **Audio** (`.BIN`/`.MRT`, `soundlib.c`, `trackctrl.c`).
 6. The 14 unsolved `.IMG` and the 3 zero-offset IMG directories.
 
-### Tooling bug to fix
-`tools/romdump/archive.py` still carries `GROUP_BASE = 0x470000`, the early wrong guess.
-The correct value is **`0x468A90`** (as already used in `extract.py`).
+### Tooling bug to fix (CLOSED, and the data it left behind)
+`tools/romdump/archive.py` carried `GROUP_BASE = 0x470000`, the early wrong guess; it now
+carries **`0x468A90`** and derives it from the rule rather than a literal. What outlived
+the code fix was the DATA. `docs/rom-manifest.csv` was still the old parser's output, so
+1538 of its rows published a base and a `rom_addr` 0x7570 too high and its 86
+trailing-table rows published no base at all. `tools/bakery/sharecopy/assets/raw/` was a
+5337-file extraction cut at 0x470000 in which every non-empty file was the middle of its
+neighbour. The manifest is regenerated and the mirror is deleted; **G184** now fails if
+either comes back, by pinning the published CSV to a fresh regeneration and by reddening
+on any file in the tree whose bytes match the old base. Fixing a constant does not fix
+the artefacts it already produced, and this is the entry that should have said so.
 
 ### Method notes that cost time (read before the next format)
 - **Do not trust "looks like readable text" as proof of a correct base.** Files tile

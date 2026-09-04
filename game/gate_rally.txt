@@ -32,7 +32,7 @@ tick 3
 rallydump
 
 echo G96-2 and RIGHT-click does NOT -- it still cancels, which is its one meaning here
-# Right-click was asked for first, delivered, and then reversed once he had
+# the project owner asked for right-click first, got it, and changed his mind on 25 Aug once he had
 # tried it: "Should only be left click". This leg is the regression guard for that. Every
 # other arm of the right button's ladder is a MODE BEING LEFT, and putting a rally point
 # there cost right-click its ability to deselect a factory -- for a gesture that was

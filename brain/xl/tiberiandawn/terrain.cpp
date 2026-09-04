@@ -803,11 +803,9 @@ void TerrainClass::Read_INI(CCINIClass& ini)
         TerrainType terrain = ini.Get_TerrainType(INI_Name(), entry, TERRAIN_NONE);
         CELL cell = atoi(entry);
         /*
-        ** Convert the normal cell position to a new big map position.
+        ** Convert from the scenario's OWN stride into this build's (function.h).
         */
-        if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-            cell = Confine_Old_Cell(cell);
-        }
+        cell = Confine_Scenario_Cell(cell, Map.MapBinaryVersion);
         if (terrain != TERRAIN_NONE) {
             tptr = new TerrainClass(terrain, cell);
         }
@@ -848,7 +846,8 @@ void TerrainClass::Write_INI(CCINIClass& ini)
         terrain = Terrains.Ptr(index);
         if (terrain != NULL && !terrain->IsInLimbo && terrain->IsActive) {
             char uname[10];
-            sprintf(uname, "%d", Coord_Cell(terrain->Coord));
+            /* the scenario's own stride, not ours -- see Scenario_Cell_Of */
+            sprintf(uname, "%d", Scenario_Cell_Of(Coord_Cell(terrain->Coord), Map.MapBinaryVersion));
             ini.Put_TerrainType(INI_Name(), uname, *terrain);
         }
     }

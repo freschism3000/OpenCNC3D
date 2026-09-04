@@ -1,0 +1,66 @@
+# G140. THE PRIMARY FACTORY SAYS SO, AND ONLY WHILE IT IS SELECTED.
+#
+# Clicking a second time on an already selected factory makes it the primary one, the
+# building the next unit of that kind walks out of. The engine has always done it and said
+# nothing on screen: BuildingClass::Toggle_Primary moves IsLeader and speaks
+# VOX_PRIMARY_SELECTED, and the picture never changed. This gate covers the word that now
+# says which building it is.
+#
+# THE GESTURE IS NOT CHANGED BY THIS ROUND, and this script exercises it as a hand would,
+# through actclickobj, so a regression in the click path fails here too. Measured on the
+# staged build before any of this was written: with ONE barracks the second click does
+# nothing at all, because BuildingClass::What_Action returns ACTION_NONE below two
+# factories of a kind (building.cpp:3168-3176). So a second PYLE is built first. With two,
+# the second click logs probe=20, which is ACTION_TOGGLE_PRIMARY counted from ACTION_NONE
+# at defines.h:563, and raises SOUND|eva|23|PRIBLDG1, which only the becomes-primary edge
+# of Toggle_Primary speaks.
+#
+# THREE LEGS, AND THE THIRD IS THE ONE THAT MATTERS. Asserting only that the flag moved
+# would pass on a build that draws nothing at all, which is exactly the failure this
+# project keeps naming.
+#   1. the ENGINE agreed:    objdump carries primary=1 on the clicked barracks and
+#                            primary=0 on the other.
+#   2. the FRAME will draw:  primarydump names that same building, out of the collector the
+#                            draw pass uses, and reports the rectangle it will fill.
+#   3. the PIXELS are there: that rectangle, read out of primarydump rather than hard
+#                            coded, is counted for the font's white with the building
+#                            selected and again with nothing selected.
+#
+# AND THE FLAG SURVIVES THE DESELECT. After `deselect`, objdump must STILL say primary=1
+# while primarydump falls to zero. That is the whole of the selected-only rule: the word
+# goes away, the state does not. A build that cleared the flag on deselect would pass a
+# test that only looked at the picture.
+#
+# Other factory kinds legitimately carry the flag too -- the engine sets IsLeader on a
+# house's first factory of each kind -- so every assertion below is anchored to PYLE and to
+# the id the run's own SELECT| line reports, never to a count over all buildings.
+tick 2
+sidebar BOOT
+player
+cheatset money 1
+cheatset instant 1
+build PYLE
+ready PYLE 4000
+startplace PYLE
+place auto
+tick 3
+count PYLE
+look PYLE 1
+tick 2
+echo === select it
+actclickobj PYLE 1
+tick 2
+echo === and again, which is the gesture
+actclickobj PYLE 1
+tick 3
+objdump
+primarydump
+shot shots/g140_sel.png
+echo === the word goes with the selection, the flag does not
+deselect
+expectsel 0
+tick 3
+objdump
+primarydump
+shot shots/g140_desel.png
+quit

@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Under EIGHTPLAYERS raises MAX_PLAYERS from 6 to 8 and MAX_MPLAYER_COLORS
+// from 6 to 8 in this header, with an added comment recording that no file
+// in the Tiberian Dawn tree includes session.h and that the live copies of
+// these constants are in defines.h.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /***************************************************************************
  *                                                                         *

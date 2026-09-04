@@ -6,7 +6,7 @@
 # cell on purpose. The engine never agreed with the cull in the first place:
 # HouseClass::Place_Special_Blast has no visibility test of any kind, so the charge was
 # spent and the strike really happened, and only the PICTURE was missing. From the
-# player's side that is indistinguishable from a dead button, which is how it was found:
+# player's side that is indistinguishable from a dead button, which is how the project owner found it:
 # "When trying to use a Superweapon on Fog of War, it doesnt work."
 #
 # WHY THE EXISTING SUPERWEAPON GATES COULD NOT SEE IT. G97 (nuke) and G98 (ion) both run

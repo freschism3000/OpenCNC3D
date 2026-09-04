@@ -26,6 +26,24 @@
 #include <string.h>
 #include <math.h>
 
+/* Same spelling fx_filter.h uses, and defined here too because this header is included
+   by translation units that never pull that one in. */
+#if defined(__GNUC__) || defined(__clang__)
+#define FX_STATE_MAYBE_UNUSED __attribute__((unused))
+#else
+#define FX_STATE_MAYBE_UNUSED
+#endif
+
+/* WHICH TERRAIN TILE ART. Written into the saved preset as a number, so the order is
+   part of the file format: append, never renumber. */
+enum { FX_TEX_N64 = 0, FX_TEX_DOS = 1, FX_TEX_REMASTER = 2 };
+
+/* WHICH INFANTRY ART. Same three choices and the same numbering as the terrain above, on
+   purpose: the two drop lists sit beside each other and a reader should not have to hold
+   two orders in their head. Written into the saved preset as a number, so append, never
+   renumber. */
+enum { FX_INF_N64 = 0, FX_INF_DOS = 1, FX_INF_REMASTER = 2 };
+
 struct FxState {
     /* 0. BILINEAR FILTERING, and it is deliberately NOT under the master switch.
           It is not a post pass -- it changes how every texture in the program is
@@ -51,6 +69,52 @@ struct FxState {
           measuring instruments must keep the DOS bar whatever this says. */
     int   new_hud;
 
+    /* 0c-2. WHICH TERRAIN TILE ART DRAWS, and the fourth thing here that is not a post pass.
+          The cartridge and the 1995 PC game draw the same 24x24 cell from the same
+          (template, icon) -- the cart's own TL4/TL8 tables say so -- but the cartridge's
+          temperate bank puts 315 of its 758 tiles at 4bpp, sixteen colours, and CLEAR1
+          is one of them, so the plain grass under most of a map has the least colour to
+          spend. Its art is also smoothed where the PC's is dithered, which costs about
+          half the per-texel detail. So this is a CHOICE of three, not a switch:
+
+            FX_TEX_N64       the cartridge's own bank. The faithful one, and CLASSIC.
+            FX_TEX_DOS       the 1995 game's tile art, and ENHANCED's default. Rides in
+                             the pack as a second atlas (PKG) that n64_terrain.py bakes.
+            FX_TEX_REMASTER  the 2020 Remastered Collection's art, read from the
+                             player's OWN install at runtime and never shipped by us.
+                             Selectable only when that install is found.
+
+          Choosing something the build cannot supply falls back rather than drawing
+          nothing: see fx_texset_effective. A theater with no DOS original (SNOW, SAND)
+          likewise has nothing to swap to and keeps the cartridge.
+          The measurement behind the default: the cartridge puts 315 of TEMPERAT's 758
+          tiles at 4bpp and CLEAR1 is one of them, so most of a map is 16-colour.
+          Note the same rule as bilinear above: this does not swap anything by itself.
+          fx_texset_on starts at FX_TEX_N64 and only fx_texset_set moves it, so a bare
+          cnc_eyes run still draws the cartridge and every pixel gate measures what it
+          always did. */
+    /* FLOAT, not int, and that is a type contract rather than a preference: FX_PARAMS
+       declares this row FXP_STEP, and every non-FXP_BOOL row is written through
+       fx_fptr() -- a float pointer. Declared int, the F5 panel and the `gfx texset N`
+       verb wrote a float bit pattern into an int field and the value came out garbage,
+       while the Visuals dialog (which assigns the field directly) worked, so it looked
+       fine everywhere it was first tested. ss_scale is the other FXP_STEP row and is a
+       float for the same reason. */
+    float texset;
+
+    /* 0c-3. WHICH INFANTRY ART DRAWS, the fifth thing here that is not a post pass.
+          FX_INF_N64 is the cartridge's billboards and DETH strips; FX_INF_DOS is the 1995
+          sprite art, which is what has shipped and stays the default; FX_INF_REMASTER is
+          the 2020 art, read from the player's own install at runtime and never shipped by
+          us, selectable only when that install is found.
+          House colour is OURS in all three. The Remaster ships one green sprite per type
+          and recolours it from its own team-colour table, which cannot express this
+          engine's eight PlayerColorType seats -- so the uniform is repainted to the same
+          LIVERY_BAND the DOS art uses and all three sets agree.
+          Same rule as bilinear and the terrain: fx_infset_on starts at FX_INF_DOS, which
+          is what a bare cnc_eyes run has always drawn, and only fx_infset_set moves it. */
+    float infset;
+
     /* 0d. SOFT DECAL EDGES. Ground decals cut hard against the terrain, and the edges
           should be able to blend into the ground below. They are hard because the cartridge's art is a strict 1-bit alpha key and
           the renderer draws it with a 0.5 alpha TEST, which is what the console does. This
@@ -58,6 +122,24 @@ struct FxState {
           for byte, which is why the unsoftened sheet is kept in memory. Not a post pass
           and not under the master switch, like the three above it. */
     float decal_soft;
+
+    /* 0e. SWAPPED MOUSE BUTTONS, the fifth thing here that is not a post pass. With it on
+          the two tactical buttons trade jobs: the one that selects, orders and builds
+          moves to the right, the one that cancels, holds a cameo and navigates the radar
+          moves to the left. OFF by default, and the memset at the top of fx_defaults is
+          what makes it so, which is why no line down there sets it.
+          IT LIVES IN THIS STRUCT because this is the struct the Visuals screen writes and
+          cnc3d-fx.cfg remembers. A second settings mechanism for one boolean would be a
+          second thing to keep in step. It is read live at the SDL event boundary, so
+          nothing has to be pushed anywhere when it moves. */
+    int   swap_buttons;
+
+    /* 0f. THE RIGHT BUTTON PUSHES THE VIEW. Holding it and moving past the click
+          threshold pushes the camera: the further the pointer stands from the middle of
+          the screen the faster it travels, with a small flat spot at the centre. ON by
+          default. Like the one above it this is NOT under the master switch: CLASSIC
+          governs the picture, and how the game is driven stays the player's. */
+    int   right_drag_scroll;
 
     int   enabled;          /* the master switch. 0 = the chain does not run at all   */
 
@@ -91,6 +173,45 @@ struct FxState {
     float shadow_res;                 /* shadow map edge, quantised to a power of two  */
     float shadow_r, shadow_g, shadow_b;/* what a shadowed pixel is multiplied BY       */
     int   shadow_terrain;             /* let the ground cast into itself (hills)       */
+
+    /* 3b. CLOUD SHADOWS. Weather crossing the battlefield: one perfectly tiling mask
+          (fx_cloud.h generates it, and says there why it is generated rather than
+          shipped) sampled in WORLD cells and drifting on the wind, darkening the ground
+          and everything standing on it.
+
+          IT IS THE SAME SUN. The mask is read where the sun's ray through this pixel
+          crosses the cloud deck at cloud_height, so a shadow on a roof lines up with
+          the shadow on the ground beside it. The two terms combine with a MAX and not
+          a product: ground already inside a hard cast shadow does not darken a second
+          time when a cloud crosses it, which is what happens outdoors. The tint is the
+          sun's own shadow_r/g/b for the same reason -- one shadow colour, not two that
+          can drift apart under the panel.
+
+          NOTHING HERE IS THE CARTRIDGE'S. No N64 model, texture or table carries a
+          cloud and the 1995 game has none either, so this is an addition rather than a
+          fidelity feature, it is registered as one, and it is OFF by default.
+
+          THE DRIFT IS NOT IN THIS STRUCT. It is a phase the host computes from the
+          engine frame and hands to the chain, because a clock inside a post pass is the
+          one thing the chain's determinism promise does not allow. See fx_post.h. */
+    int   cloud_on;
+    float cloud_strength;             /* 0 = invisible, 1 = the full shadow tint       */
+    float cloud_cover;                /* fraction of the ground under cloud, and it is
+                                         exact rather than approximate: the mask is
+                                         histogram-equalised, so 0.40 here means 40% of
+                                         the map at EVERY sharpness. fx_cloud.h note 3. */
+    float cloud_sharp;                /* 0 = a haze with no edge, 1 = a cut-out edge   */
+    float cloud_scale;                /* WORLD CELLS the mask repeats over, and so how
+                                         big one mass is: roughly an eighth of it. The
+                                         view is about 33 cells wide. LARGE (100+) gives
+                                         slabs that drift across; SMALL gives fine tonal
+                                         variation, and the tuned set is the small end.
+                                         What does not work is a scale NEAR 33: one mass
+                                         then covers the screen and the dial reads as
+                                         broken rather than as subtle.                 */
+    float cloud_speed;                /* cells per second the deck travels             */
+    float cloud_rot;                  /* degrees: which way the wind blows             */
+    float cloud_height;               /* cells above the ground the deck sits at       */
 
     /* 4. Bloom, off the composited world only, never the sidebar. */
     int   bloom_on;
@@ -135,6 +256,14 @@ struct FxState {
            rate and the roll friction are all read straight out of this struct. */
     int   shatter_on, shatter_pulse, shake_on;
     float shatter_force, shatter_spin, shatter_roll, shatter_linger, shake_amount;
+
+    /* 12. THE HEALTH-BAR SHOW RULE. Like the shatter dials above it, and unlike
+           everything before those, this changes what the renderer DECIDES rather than
+           how a post pass looks: 0 off, 1 selected only, 2 selected or damaged. It
+           lives in this struct so that it saves and loads through cnc3d-fx.cfg with no
+           second mechanism. A float because FXP_STEP rows are floats; game/shroud_mod.h
+           rounds and clamps it once, in hb_show_mode. */
+    float hb_mode;
 };
 
 static FxState g_fx;
@@ -155,6 +284,47 @@ struct FxParam {
 
 #define FXO(f) ((size_t)((char*)&(((FxState*)0)->f) - (char*)0))
 
+/* THE TERRAIN ART SWITCH, kept here beside the preference it answers to rather than in
+   fx_filter.h, because unlike the filter it touches no GL state: draw_terrain simply asks
+   which atlas to bind. FX_TEX_N64 is the shipped picture and it stays there until
+   something calls the setter -- which is what keeps every bare cnc_eyes run and every
+   pixel gate on the cartridge whatever the preference says. */
+static int fx_texset_on = FX_TEX_N64;
+
+FX_STATE_MAYBE_UNUSED static const char* fx_texset_name(int v)
+{
+    return v == FX_TEX_DOS ? "DOS" : v == FX_TEX_REMASTER ? "Remastered" : "cartridge";
+}
+
+FX_STATE_MAYBE_UNUSED static void fx_texset_set(int v)
+{
+    if (v < FX_TEX_N64 || v > FX_TEX_REMASTER) v = FX_TEX_N64;
+    if (v == fx_texset_on) return;
+    fx_texset_on = v;
+    fprintf(stderr, "FX|texset|%s terrain art\n", fx_texset_name(v));
+}
+
+FX_STATE_MAYBE_UNUSED static int fx_texset_get(void) { return fx_texset_on; }
+
+/* THE INFANTRY ART SWITCH. Starts where the shipped picture is -- the DOS sprites -- so a
+   bare cnc_eyes run and every pixel gate draw what they always did. */
+static int fx_infset_on = FX_INF_DOS;
+
+FX_STATE_MAYBE_UNUSED static const char* fx_infset_name(int v)
+{
+    return v == FX_INF_DOS ? "DOS" : v == FX_INF_REMASTER ? "Remastered" : "cartridge";
+}
+
+FX_STATE_MAYBE_UNUSED static void fx_infset_set(int v)
+{
+    if (v < FX_INF_N64 || v > FX_INF_REMASTER) v = FX_INF_DOS;
+    if (v == fx_infset_on) return;
+    fx_infset_on = v;
+    fprintf(stderr, "FX|infset|%s infantry art\n", fx_infset_name(v));
+}
+
+FX_STATE_MAYBE_UNUSED static int fx_infset_get(void) { return fx_infset_on; }
+
 static const FxParam FX_PARAMS[] = {
 { FXP_GROUP, "",  "MASTER", 0,0,0,0, "" },
 { FXP_BOOL,  "bilinear", "bilinear filtering", FXO(bilinear), 0,1,0,
@@ -163,8 +333,16 @@ static const FxParam FX_PARAMS[] = {
   "sub-tick interpolation of movement and animation; off = the original stepping" },
 { FXP_BOOL,  "new_hud", "new HUD", FXO(new_hud), 0,1,0,
   "the 640x480 sidebar; off = the 1995 DOS bar" },
+{ FXP_STEP,  "texset", "terrain art", FXO(texset), 0,2,1,
+  "0 = the cartridge's 16-colour bank, 1 = the 1995 DOS art, 2 = Remastered" },
+{ FXP_STEP,  "infset", "infantry art", FXO(infset), 0,2,1,
+  "0 = the cartridge's billboards, 1 = the 1995 DOS sprites, 2 = Remastered" },
 { FXP_FLOAT, "decal_soft", "soft decal edges", FXO(decal_soft), 0.0f, 1.0f, 0,
   "scorches, craters and building aprons; 0 = the cartridge's hard 1-bit edge" },
+{ FXP_BOOL,  "swap_buttons", "swap mouse buttons", FXO(swap_buttons), 0,1,0,
+  "select/order moves to the right button; off is the shipped binding" },
+{ FXP_BOOL,  "right_drag_scroll", "right button scrolls", FXO(right_drag_scroll), 0,1,0,
+  "hold the right button and push: the view follows. off = the right button only cancels" },
 { FXP_BOOL,  "enabled", "post chain", FXO(enabled), 0,1,0,
   "off = the picture this project has always shipped" },
 
@@ -196,6 +374,24 @@ static const FxParam FX_PARAMS[] = {
 { FXP_FLOAT, "shadow_b", "shadow blue", FXO(shadow_b), 0.0f, 1.0f, 0, "" },
 { FXP_BOOL,  "shadow_terrain", "ground casts", FXO(shadow_terrain), 0,1,0,
   "hills shadowing themselves; off if it speckles" },
+
+{ FXP_GROUP, "",  "3b  CLOUD SHADOWS  (ours)", 0,0,0,0, "" },
+{ FXP_BOOL,  "cloud_on", "cloud shadows", FXO(cloud_on), 0,1,0,
+  "weather crossing the map; nothing in the cartridge has this" },
+{ FXP_FLOAT, "cloud_strength", "strength", FXO(cloud_strength), 0.0f, 1.0f, 0,
+  "how dark under a cloud; tinted like the sun's own shadow" },
+{ FXP_FLOAT, "cloud_cover", "coverage", FXO(cloud_cover), 0.0f, 1.0f, 0,
+  "fraction of the ground in shadow, and it is exact at any sharpness" },
+{ FXP_FLOAT, "cloud_sharp", "sharpness", FXO(cloud_sharp), 0.0f, 1.0f, 0,
+  "0 = a blurred haze, 1 = a hard cut edge" },
+{ FXP_FLOAT, "cloud_scale", "size", FXO(cloud_scale), 20.0f, 400.0f, 0,
+  "cells the pattern repeats over; one mass is about an eighth of it" },
+{ FXP_FLOAT, "cloud_speed", "speed", FXO(cloud_speed), 0.0f, 8.0f, 0,
+  "cells per second the deck drifts; 0 parks it" },
+{ FXP_FLOAT, "cloud_rot", "wind bearing", FXO(cloud_rot), 0.0f, 360.0f, 0,
+  "degrees: which way the weather travels, and how the mask is turned" },
+{ FXP_FLOAT, "cloud_height", "deck height", FXO(cloud_height), 0.0f, 40.0f, 0,
+  "cells up. higher slides the shadow further off a tall roof" },
 
 { FXP_GROUP, "",  "4  BLOOM", 0,0,0,0, "" },
 { FXP_BOOL,  "bloom_on", "bloom", FXO(bloom_on), 0,1,0, "" },
@@ -269,6 +465,16 @@ static const FxParam FX_PARAMS[] = {
   "1.0 is a small jolt scaled by the building's footprint" },
 { FXP_BOOL,  "shatter_pulse", "centre pulse", FXO(shatter_pulse), 0,1,0,
   "the cartridge's own unused shock sprite at the blast centre. OFF by default:\n   the SHOCK bake window is misaligned, so the ring draws low. See missing.md" },
+{ FXP_GROUP, "",  "12  HEALTH BARS", 0,0,0,0, "" },
+/* THE LEGEND IS IN THE LABEL, deliberately. The panel draws a label, a track and a
+   number and nothing else: FxParam::help is carried by every row in this table and
+   rendered by none of them, so a bare "2" on a three-position dial tells a player
+   nothing -- and the player this dial exists for is the one asking how to switch the
+   bars off. 26 characters at the 6px advance is 156px, against the 168px the label
+   column has between FXP_LABX and the track at FXP_TRKX, so it fits without running
+   under the slider. Widen it further and it will not. */
+{ FXP_STEP,  "hb_mode", "health bars 0off 1sel 2dmg", FXO(hb_mode), 0.0f, 2.0f, 1.0f,
+  "0 none; 1 selected only, the 1995 default; 2 selected or damaged, shipped" },
 { FXP_END, "", "", 0,0,0,0, "" }
 };
 
@@ -313,10 +519,25 @@ static void fx_defaults(FxState* s)
        dialog, and a bare cnc_eyes run reaches neither. */
     s->new_hud = 1;
 
+    /* DOS by project decision (2 Sep 2026): Enhanced Visuals draws the 1995 tile art.
+       Harmless to the gates for exactly the reason bilinear's note above gives -- the
+       value is a preference and fx_texset_on is the switch, and only the Enhanced path
+       and the Visuals dialog move it. Classic goes back to the cartridge. */
+    s->texset = (float)FX_TEX_DOS;
+
+    /* The 1995 sprites, which is what this project has drawn since dosinfantry.pack
+       landed. Changing the default would change every existing screenshot. */
+    s->infset = (float)FX_INF_DOS;
+
     /* The softening is wanted, so it is on. Not 1.0: a full blur of a 24x24 frame
        loses the crater's shape as well as its edge. 0.6 takes the staircase off without
        turning a scorch mark into a smudge of the wrong kind. His to tune. */
     s->decal_soft = 0.60f;
+
+    /* ON, by decision: the gesture was asked for and a player should not have to go
+       looking for it. Harmless to the gates because it arms only from a real
+       right-button press that has travelled past the click threshold. */
+    s->right_drag_scroll = 1;
 
     /* 2. NOT COPIED FROM THE FILE (1 of 2). The saved preset says enabled 1 because it
           was saved from a running Enhanced session. The compiled default stays OFF: the
@@ -348,6 +569,32 @@ static void fx_defaults(FxState* s)
     s->shadow_res = 4096.0f;
     s->shadow_r = 0.49107f; s->shadow_g = 0.58000f; s->shadow_b = 0.68750f;
     s->shadow_terrain = 1;
+
+    /* CLOUD SHADOWS. TUNED THROUGH THE PANEL 4 Sep 2026 and ON from here, which is a
+       reversal of the day before: they shipped off, on the argument that the cartridge
+       has no weather and a bare run should draw the picture this project has always
+       drawn. That argument is answered by WHERE the switch sits rather than by its
+       value. The chain does not run at all in CLASSIC -- fx_world_begin returns on
+       !enabled before anything is drawn -- so a cloud cannot reach the classic picture
+       whatever this says, and ENHANCED is the mode that already carries the sun, the
+       occlusion and the bloom, none of which the cartridge has either. On here means
+       on in ENHANCED and nowhere else, and that is the whole of it.
+
+       THE SET IS DELIBERATELY SUBTLE and reads as weather in the light rather than as
+       shapes crossing the ground: strength 0.402 takes about 24 levels out of the
+       terrain at its deepest, over about a third of the view. cloud_scale is 20, which
+       is the BOTTOM OF ITS RANGE -- one mass is then about two and a half cells, so
+       this is fine tonal variation and not the drifting slabs the first draft aimed
+       at. If it is ever wanted finer still, the range is what has to move, not this
+       number; see the row in FX_PARAMS. */
+    s->cloud_on = 1;
+    s->cloud_strength = 0.40200f;
+    s->cloud_cover = 0.34800f;
+    s->cloud_sharp = 0.49100f;
+    s->cloud_scale = 20.00000f;
+    s->cloud_speed = 0.57100f;
+    s->cloud_rot = 67.50000f;
+    s->cloud_height = 12.00000f;
 
     s->bloom_on = 1;
     s->bloom_threshold = 0.68000f; s->bloom_knee = 0.15000f;
@@ -382,7 +629,7 @@ static void fx_defaults(FxState* s)
     s->crt_on = 0;
     s->crt_scanline = 0.10714f; s->crt_mask = 0.71429f; s->crt_curve = 0.00536f;
     s->crt_bleed = 0.48214f; s->crt_vignette = 0.32143f; s->crt_hud = 1;
-    /* 3. BUILDING SHATTER AND CAMERA SHAKE ARE THE TUNED PANEL, read off the
+    /* 3. BUILDING SHATTER AND CAMERA SHAKE ARE the project owner's PANEL, 26 Aug 2026, read off the
        screenshot he sent dial for dial. The previous set was the first cut's guesses.
        The picture he tuned to: a harder outward blast (0.85 -> 1.098) with much LESS
        tumble (1.0 -> 0.295), pieces that roll a little less far (1.0 -> 0.688), a short
@@ -390,7 +637,7 @@ static void fx_defaults(FxState* s)
        much heavier jolt (1.0 -> 2.518).
 
        CENTRE PULSE IS THE ONE DIAL NOT TAKEN FROM HIS PANEL. It was ON in the
-       screenshot and went in that way, and it was put back OFF the same day once the
+       screenshot and went in that way, and the project owner put it back OFF the same day once the
        reason was on the table: the SHOCK texture is still baked through a misaligned
        window and draws about half a sprite-height BELOW the blast (missing.md, found
        24 Aug 2026). Turning it on shows that defect rather than the effect. It stays
@@ -400,6 +647,15 @@ static void fx_defaults(FxState* s)
     s->shake_amount = 2.518f;
     s->shatter_force = 1.098f; s->shatter_spin = 0.295f;
     s->shatter_roll = 0.688f; s->shatter_linger = 0.5f;
+
+    /* 12. SELECTED OR DAMAGED, which is what this renderer has always drawn. The dial
+           exists to make the other two positions reachable, not to move a picture that
+           anybody already has, so the default is the shipped behaviour and every gate
+           stays green. The literal is HB_MODE_DAMAGED_TOO, which cannot be named here:
+           game/shroud_mod.h declares it and is included well below this header. A cfg
+           written before this dial existed carries no hb_mode line and leaves this
+           value standing, which is the behaviour that cfg was tuned against. */
+    s->hb_mode = 2.0f;
 }
 
 static inline float fx_clampf(float v, float lo, float hi)

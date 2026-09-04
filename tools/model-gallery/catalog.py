@@ -48,6 +48,32 @@ EXTRA = {
     "MCVANIM":  ("MCV Deploy Rig", "Rigs", "model slot 18 ANY_UNIT_MCVANIMZ1, the 21-node deploy rig"),
     "PROCANIM": ("Refinery Dock Rig", "Rigs", "the refinery's harvester-dock animation rig"),
     "ROAD":     ("Road", "Scenery", "cartridge overlay mesh"),
+    # Model-table slot 205, display list dl_012DBC8. The cartridge never names it: its
+    # name catalogue is the pointer array at ROM 0x1DE8FC indexed by slot, and the entry
+    # for slot 205 is ZERO. This comment used to say the catalogue was "at ROM 0x1B70F8"
+    # and "covers slots 10..161 only". The address is wrong (the blob starts at 0x1B7000
+    # and fourteen named slots point below 0x1B70F8) and the extent describes the model
+    # LOOKUP's 152-entry bound rather than the array, which goes on naming front-end slots
+    # past 161. Run tools/bakery/name_catalogue.py for the scan. A
+    # ROM-wide scan for CRASH/WRECK/HULK/DEBRIS/HUSK/DOWNED finds only particle and
+    # animation names, so the code is the PC TEMPLATE the cartridge swaps it in for, and
+    # the label describes the shape rather than asserting an identity the data does not
+    # carry.
+    "P04":      ("Wrecked Airframe", "Scenery",
+                 "model slot 205; the cartridge draws it through cell-decoration entry 38 "
+                 "wherever a map places PC template 70 (P04, a 1x1 rock patch on the PC). "
+                 "The cartridge does not name the model, so this label is its shape: a "
+                 "broken airframe, nose down, wings torn outward"),
+    # THE CRATES ARE OverlayTypeClass, AND THAT CLASS MAPS TO "Walls". Correct for the
+    # sandbags, the chain link, the concrete and the barbed wire, and wrong for the only
+    # two overlays that are not walls at all. Without these two rows the gallery filed a
+    # goodie crate under Walls, which is where a reader would never look for it.
+    "SCRATE":   ("Steel Crate", "Scenery",
+                 "model slot 98; the cartridge's own 3D goodie crate, drawn through "
+                 "cell-decoration entry 34. A cube 0.18 of a cell on a side"),
+    "WCRATE":   ("Wooden Crate", "Scenery",
+                 "model slot 100; the wooden goodie crate, cell-decoration entry 36. "
+                 "Slots 99 to 105 are seven table entries sharing this one record"),
     "CURCIRC":  ("Area Cursor Ring", "Cursors", "cartridge cursor mesh"),
 }
 DEBRIS = {"DBRS": ("Structure Debris %s", "Debris", "structure debris chunk"),
@@ -166,7 +192,7 @@ def resolve(code, txt, gpl, km, shadow=None):
     k = km.get(c, {})
     if k.get("kind"):
         return c, {"wall": "Walls", "cursor": "Cursors", "bullet": "Projectiles",
-                   "door": "Parts", "marker": "Parts",
+                   "door": "Parts", "marker": "Parts", "scenery": "Scenery",
                    "structure-extra": "Structures"}.get(k["kind"], "Misc"), \
             "unit_models.json kind=%s" % k["kind"]
     return c, "Misc", "no name in any source; showing the cartridge code"
@@ -184,5 +210,6 @@ if __name__ == "__main__":
     import collections
     fam = collections.Counter(v[0] for v in gpl.values())
     print("by family:", dict(fam))
-    for c in ("MTNK", "HTNK", "ORCA", "PROC", "T07", "SBAG_L", "V12", "120MM", "CUR06", "DBRV3"):
+    for c in ("MTNK", "HTNK", "ORCA", "PROC", "T07", "SBAG_L", "V12", "120MM", "CUR06",
+              "DBRV3", "P04"):
         print("  %-8s %s" % (c, resolve(c, txt, gpl, km)))

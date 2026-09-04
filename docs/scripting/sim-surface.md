@@ -94,7 +94,7 @@ LOAD|slot=0|frame=300|scen=SCG05EA|objects=131
 448 dump lines (OBJ|/TIB|/WALL|/HOUSE|/SMUDGE|) identical pre-save vs post-load
 ```
 
-Note: **never hash the payload**. Two runs of the identical deterministic sim differ by ~272 bytes because vtable pointers are written raw and move with ASLR. Assert the state, not the file.
+Note `known-gap notes:1614`: **never hash the payload**. Two runs of the identical deterministic sim differ by ~272 bytes because vtable pointers are written raw and move with ASLR. Assert the state, not the file.
 
 **Two refusals to know about:** save and load are both refused outright during a skirmish (`cnc_eyes.cpp:16825-16833` and `:16891-16897`), because `CNC_Save_Load` takes the game mode as an argument and *sets* it. And `game_load_slot` refuses a slot whose scenario differs from `g_bootScen` (`:16912-16919`).
 
@@ -166,7 +166,7 @@ externs.h:185  extern DynamicVectorClass<TriggerClass*> CellTriggers;
 - **Triggers are free.** Every field you want is public: `Name`, `Event`, `Action`, `House`, `Data`, `AttachCount`, `IsPersistant`, `Team` (`trigger.h:213-260`), and there are static `Name_From_Event` / `Name_From_Action` helpers (`trigger.h:190-193`). A `TRIG|` loop is about fifteen lines and nothing in the engine needs touching.
 - **Teams are mostly free.** `Class`, `House`, `Center`, `ObjectiveCenter`, `MissionTarget`, `Target`, `Total`, `Risk`, and the state flags `IsForcedActive / IsHasBeen / IsFullStrength / IsUnderStrength / IsReforming / IsLagging` are public (`team.h:49-165`). `CurrentMission` and the `Member` chain are private (`team.h:230-256`), so those two need an accessor. There is precedent for exactly that in the patch: `AnimClass::CNC3D_Stage()`, used at `dllinterface.cpp:8333`.
 
-Cost: this is a brain change, so `brain/patches/vanilla-cnc3d.patch` grows and it is a two-platform rebuild (`tools/mac/build-brain-mac.sh`, not part of `game/build.sh`; G30 now checks the deployed brain as a chain). Per the skirmish precedent in that precedent` a brain commit needs a go-ahead.
+Cost: this is a brain change, so `brain/patches/vanilla-cnc3d.patch` grows and it is a two-platform rebuild (`tools/mac/build-brain-mac.sh`, not part of `game/build.sh`; G30 now checks the deployed brain as a chain). Per the skirmish precedent in `engineering notes:409` a brain commit needs the project owner's go-ahead.
 
 ### The timing number you need before any of this is useful
 
@@ -225,14 +225,14 @@ That is the right shape for the actual question a mission author asks ("does `at
 
 ### Option E: a second sim process or a second brain instance. Not viable.
 
-The dylib is `dlopen`'d once behind a `g_brainLoaded` latch (`cnc_eyes.cpp:13414`, `:13431-13468`) and the engine is all file-scope globals (`brain/vanilla/tiberiandawn/globals.cpp`). Two worlds in one process would need a second physical copy of `TiberianDawn.dylib` under a different filename, and the stated requirement (`docs/design-map-editor.md` section 0e) is one window, one application. Rule it out and say so.
+The dylib is `dlopen`'d once behind a `g_brainLoaded` latch (`cnc_eyes.cpp:13414`, `:13431-13468`) and the engine is all file-scope globals (`brain/vanilla/tiberiandawn/globals.cpp`). Two worlds in one process would need a second physical copy of `TiberianDawn.dylib` under a different filename, and the project owner's stated requirement (`docs/design-map-editor.md` section 0e) is one window, one application. Rule it out and say so.
 
 ### Suggested order
 
 1. Fix the SPACE hole (question 2). It is a one-line guard and it currently eats unsaved work.
 2. **B**: tick-0 keyframe on entering play, `game_load_slot` on Ctrl+P back. Small, uses only built and gated machinery, and turns "rewind" from a 2.2 s file reload into an exact snap-back.
-3. **The brain dump extension** (`TRIG|`, `TEAM|`, `TEAMTYPE|`). Fifteen to forty lines in `CNC3D_Dump_Objects`, one accessor on `TeamClass`, one two-platform brain rebuild. This is what turns watching into understanding, and it is the only item that needs a go-ahead.
+3. **The brain dump extension** (`TRIG|`, `TEAM|`, `TEAMTYPE|`). Fifteen to forty lines in `CNC3D_Dump_Objects`, one accessor on `TeamClass`, one two-platform brain rebuild. This is what turns watching into understanding, and it is the only item that needs the project owner's go-ahead.
 4. **D** on top of 3: a fast-forward-and-report button, since the trigger clock makes real-time watching impractical.
-5. **C** last, once it is clear the sim is wanted inside the editor chrome rather than a report plus the existing Ctrl+P.
+5. **C** last, once it is clear the project owner wants the sim inside the editor chrome rather than a report plus the existing Ctrl+P.
 
 Also worth fixing alongside, since it will bite anyone testing a scripted mission: the `house|type|cell` prior-key at `edit_mod.h:4388` detaches an object's trigger the moment you move it.

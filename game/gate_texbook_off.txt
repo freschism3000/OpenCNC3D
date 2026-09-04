@@ -1,9 +1,10 @@
 # THE OFF ARM of the texture-book gate: the same frame with --notexbook, so the only
-# difference inside the helipad's box is the book itself. Measured against the flag rather
-# than across frames because a unit walking past would also change pixels across frames.
+# difference inside the refinery's box is the book itself. Measured against the flag
+# rather than across frames because a unit walking past would also change pixels across
+# frames.
 tick 40
-cam 54 58
+cam 44 46
 zoom max
-clickobj HPAD:GoodGuy 0
+clickobj PROC:GoodGuy 0
 shot shots/texbook_off.png
 quit

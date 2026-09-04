@@ -14,9 +14,13 @@
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
 // MODIFIED for C&C 3D in August 2026. This is not EA's original file.
-// The change is additive and does not alter the game simulation; the complete
-// diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
-// lists every modified file.
+// Adds one read-only inline accessor, CNC3D_Altitude, returning the
+// projectile's existing Altitude field in leptons so the renderer's object
+// dump can draw an arcing projectile above the ground. Nothing is written,
+// and no existing member is changed.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
 //
 
 /* $Header:   F:\projects\c&c\vcs\code\bullet.h_v   2.18   16 Oct 1995 16:47:40   JOE_BOSTIC  $ */

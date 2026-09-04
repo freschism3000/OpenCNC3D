@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Declares one new member function on BuildingClass, CNC3D_Can_Rally, the
+// predicate for whether a building may take a rally point. The
+// implementation and all resulting behaviour are in building.cpp.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\building.h_v   2.20   16 Oct 1995 16:47:54   JOE_BOSTIC  $ */
 /***********************************************************************************************

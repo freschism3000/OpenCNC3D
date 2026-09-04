@@ -34,6 +34,32 @@
  * priming of it was wrong. */
 #define MUSIC_TOPUPS 2
 
+/* HOW MANY COPIES OF ONE CLIP MAY START IN ONE ENGINE TICK.
+ *
+ * Every effect an advance raises lands in the mixer before the next block is rendered, so
+ * N copies of one clip started in one tick begin at the SAME sample of that clip. They are
+ * then bit-identical waveforms in lockstep and they sum COHERENTLY: N times the amplitude
+ * of one, which is what turns a squad caught by a flame tank into distortion rather than
+ * into a loud squad. Copies started one tick apart are 1470 samples out of step (22050 Hz
+ * against the 15 Hz brain tick) and do not do this, which is why the window is exactly one
+ * tick wide and no wider.
+ *
+ * Two, not one. The first copy is the event; the second is the audible difference between
+ * one thing happening and more than one, and two coherent copies are 6 dB, which the
+ * output stage's knee is there for. A third adds 3.5 dB of exactly the same waveform and
+ * no information at all.
+ *
+ * This is the one number to sweep if the rule proves too tight or too loose, and it is
+ * deliberately a count of STARTS rather than of ringing voices: see cnc_audio_begin_tick
+ * in the header for why a voice count refuses ordinary combat and answers differently
+ * depending on whether anything is rendering the mix. */
+#define SFX_DUPES_PER_TICK 2
+
+/* Distinct clip names tracked inside one tick. A tick that raises more different sounds
+ * than this lets the surplus through uncapped, which is the safe direction: a full table
+ * behaves like the code did before this rule existed, never like silence. */
+#define SFX_DUPES_TRACKED 16
+
 struct CncAudio
 {
     SndBank *bank;
@@ -74,6 +100,15 @@ struct CncAudio
 
     char pinned[MIX_VOICES][32];
     int pinned_handle[MIX_VOICES];
+
+    /* The duplicate window, one engine tick wide. sfx_ticked stays 0 until a host calls
+       cnc_audio_begin_tick, and while it is 0 nothing is capped: the mixer harnesses fire
+       sixteen copies of one clip at once on purpose and have no tick to count against.
+       calloc zeroes all four, which is the correct starting state for every one. */
+    int sfx_ticked;
+    int sfx_names;
+    char sfx_name[SFX_DUPES_TRACKED][32];
+    int sfx_count[SFX_DUPES_TRACKED];
 
     /* The folder cnc_audio_create was pointed at. Kept because LOCAL.MIX sits in it
        and carries CONQUER.ENG, which the campaign screens read their text out of. */
@@ -252,6 +287,46 @@ int cnc_audio_play_named_loop(CncAudio *au, const char *name, int bus, int gain,
 
 const char *cnc_audio_dosdata(const CncAudio *au) { return au ? au->dosdata : ""; }
 
+/* ------------------------------------------------------ the duplicate window */
+
+void cnc_audio_begin_tick(CncAudio *au)
+{
+    if (!au)
+        return;
+    au->sfx_ticked = 1;
+    au->sfx_names = 0;
+}
+
+/* Count one start against the current tick and say whether it may go ahead. Names are
+   compared whole, so BLEEP2.AUD and BLEEP2.JUV are two clips, which is what they are on
+   the disc, and a response that resolved to a different .V0x is its own clip too: a
+   different waveform does not stack coherently with the others and must not be counted
+   against them. */
+static int sfx_dupe_ok(CncAudio *au, const char *name)
+{
+    int i;
+
+    if (!au->sfx_ticked)
+        return 1; /* no host tick: no window to count in, and nothing to cap */
+
+    for (i = 0; i < au->sfx_names; i++) {
+        if (strcmp(au->sfx_name[i], name) == 0) {
+            if (au->sfx_count[i] >= SFX_DUPES_PER_TICK)
+                return 0;
+            au->sfx_count[i]++;
+            return 1;
+        }
+    }
+    if (au->sfx_names >= SFX_DUPES_TRACKED)
+        return 1; /* table full: let it through rather than cap what was never counted */
+
+    strncpy(au->sfx_name[au->sfx_names], name, sizeof au->sfx_name[0] - 1);
+    au->sfx_name[au->sfx_names][sizeof au->sfx_name[0] - 1] = 0;
+    au->sfx_count[au->sfx_names] = 1;
+    au->sfx_names++;
+    return 1;
+}
+
 int cnc_audio_on_sound_effect(CncAudio *au, int sfx_index, int variation, int x, int y)
 {
     if (!au)
@@ -279,6 +354,17 @@ int cnc_audio_on_sound_effect(CncAudio *au, int sfx_index, int variation, int x,
     if (!bank_has(au->bank, name) && sfx_voc[sfx_index].where == SFX_JUV) {
         snprintf(name, sizeof name, "%s.AUD", sfx_voc[sfx_index].name);
     }
+
+    /* The duplicate window is applied LAST: after the placement test, so a sound the
+     * listener cannot hear never spends a slot the audible copy needs, and after the .JUV
+     * fallback, so the name counted is the file that would really be played.
+     *
+     * A name the disc does not have is never refused here. It has to reach the bank so the
+     * miss log records it and so --dumpsound still says SILENT for it: a duplicate is a
+     * rule working, a missing file is a fact about the disc, and the two must not be
+     * spelled the same way in a log that two gates read. */
+    if (bank_has(au->bank, name) && !sfx_dupe_ok(au, name))
+        return CNC_SFX_DUPLICATE;
 
     return cnc_audio_play_named(au, name, MIX_BUS_FX, gain, pan, pri);
 }

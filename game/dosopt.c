@@ -31,6 +31,7 @@ static const struct {
     {"Delete Mission", 1},  /* wants the slot dialog; left open deliberately */
     {"Game Controls", 0},
     {"Visuals", 0},        /* ours: the desktop presentation chain */
+    {"Gameplay", 0},       /* ours: how the game is driven, not how it is drawn */
     {"Abort Mission", 0},
     {"Exit Game", 0},
     {"Resume Mission", 0},
@@ -46,6 +47,12 @@ static const char *const dopt_vis_elem[DOPT_VE_COUNT] = {
     "Smooth animations",
     "New HUD",
     "Bilinear filtering",
+    /* Short, because unlike every other row on this page this one carries a control
+       with words in it: the entries all end in "Textures", so the row says which
+       textures and the control says which set. "Terrain textures / DOS Textures"
+       collided at the widest entry. */
+    "Terrain",
+    "Infantry",
     "Console output gamma",
     "Supersampling",
     "Sun shadows",
@@ -55,6 +62,31 @@ static const char *const dopt_vis_elem[DOPT_VE_COUNT] = {
     "Colour grade",
     "CRT"
 };
+
+/* The entries name the ART, and the noun follows the row: the terrain row picks between
+   tile textures and the infantry row between sprites, so "Remastered Textures" under
+   INFANTRY would be simply wrong. Same three choices, same order, same numbering. */
+static const char *const dopt_texset_name[DOPT_TEX_COUNT] = {
+    "N64 Textures", "DOS Textures", "Remastered Textures"
+};
+static const char *const dopt_infset_name[DOPT_TEX_COUNT] = {
+    "N64 Sprites", "DOS Sprites", "Remastered Sprites"
+};
+
+/* The Gameplay page's labels. Both are ours. Measured against GRAD6FNT: 104 and 116
+   pixels, printed from DOPT_A_LABEL_X, so they end well inside the box inner edge.
+   db_print clips to the surface and not to the button, so this measurement is the only
+   thing between a long label and ink on the next control. */
+static const char *const dopt_gp_row[DOPT_G_TOGGLES] = {
+    "Swap mouse buttons",
+    "Right button scrolls"
+};
+
+const char *dopt_gp_label(int item)
+{
+    if (item == DOPT_G_OK) return "OK";
+    return (item >= 0 && item < DOPT_G_TOGGLES) ? dopt_gp_row[item] : "";
+}
 
 const char *dopt_vis_elem_label(int elem)
 {
@@ -90,6 +122,7 @@ int dopt_page_count(const DOPT_State *st)
     case DOPT_PAGE_ADVANCED: return DOPT_A_COUNT;
     case DOPT_PAGE_SOUND:    return DOPT_S_COUNT;
     case DOPT_PAGE_CHEATS:   return DOPT_CH_COUNT;
+    case DOPT_PAGE_GAMEPLAY: return DOPT_G_COUNT;
     case DOPT_PAGE_CONFIRM:  return DOPT_CF_COUNT;
     default:                 return DOPT_ITEM_COUNT;
     }
@@ -104,9 +137,15 @@ const char *dopt_item_label(const DOPT_State *st, int item)
         return (item >= 0 && item < DOPT_V_COUNT) ? dopt_vis_label[item] : "";
     case DOPT_PAGE_ADVANCED:
         if (item == DOPT_A_OK) return "OK";
+        /* The bar prints nothing; the name is here because the scripted click verb looks
+           items up by label, and an item with no name is an item no gate can reach. The
+           layout gate exempts it from the printed-label leg by name for that reason. */
+        if (item == DOPT_A_BAR) return "Scroll";
         return dopt_vis_elem_label(item);
     case DOPT_PAGE_CHEATS:
         return dopt_cheat_label(item);
+    case DOPT_PAGE_GAMEPLAY:
+        return dopt_gp_label(item);
     case DOPT_PAGE_CONFIRM:
         if (item == DOPT_CF_ABORT)   return DOPT_CF_ABORT_S;
         if (item == DOPT_CF_RESTART) return DOPT_CF_RESTART_S;
@@ -135,6 +174,7 @@ int dopt_item_disabled(const DOPT_State *st, int item)
         return 0;
     case DOPT_PAGE_ADVANCED:
         return 0;
+    case DOPT_PAGE_GAMEPLAY:
     case DOPT_PAGE_CHEATS:
         return 0;
     case DOPT_PAGE_CONFIRM:
@@ -189,6 +229,21 @@ void dopt_layout(DOPT_State *st, const DB_Pack *p)
     st->okw = db_string_width(f, dopt_ctrl_label[DOPT_C_OK], DB_FONT6_XSPACING) + 8;
     if (st->okw < 40)
         st->okw = 40;
+    /* The terrain drop list is as wide as its widest entry plus the arrow, measured the
+       way every other stacked control here is measured. Written down as a literal it
+       clipped "Remastered Textures", which is exactly the failure goptions.cpp's own
+       measure-the-widest rule exists to prevent. */
+    {
+        int tw = 0, k;
+        for (k = 0; k < DOPT_TEX_COUNT; k++) {
+            int cw = db_string_width(f, dopt_texset_name[k], DB_FONT6_XSPACING);
+            if (cw > tw) tw = cw;
+            cw = db_string_width(f, dopt_infset_name[k], DB_FONT6_XSPACING);
+            if (cw > tw) tw = cw;
+        }
+        st->texw = tw + 14;               /* 3 left pad, the arrow, and its margin */
+        if (st->texw > DOPT_A_ROW_W - 8) st->texw = DOPT_A_ROW_W - 8;
+    }
     st->chresetw = db_string_width(f, dopt_cheat_label(DOPT_CH_RESET),
                                    DB_FONT6_XSPACING) + 8;
     if (st->chresetw < DOPT_MIN_BTN_W)
@@ -227,6 +282,10 @@ void dopt_open(DOPT_State *st, const DB_Pack *p)
     st->pressed = -1;
     st->drag = -1;
     st->dragdiff = 0;
+    st->advTop = 0;
+    /* -1 and not 0: texdrop names the ROW whose list is open, and 0 is a real row. */
+    st->texdrop = -1;
+    st->texhot = -1;
     dopt_layout(st, p);
 }
 
@@ -267,9 +326,87 @@ void dopt_set_playing(DOPT_State *st, int playing)
     st->trkPlaying = (playing >= 0 && playing < st->ntracks) ? playing : -1;
 }
 
+/* ------------------------------------------------------------------------ *
+ * THE ADVANCED PAGE'S SCROLL BAR, which is SliderClass in list mode.
+ *
+ * In the 1995 slider's terms (list.cpp:595-597): MaxValue is the number of elements,
+ * Thumb is the number of rows the well shows, and CurValue is advTop. Every function
+ * below is one of that class's, done in plain integers on the vertical axis.
+ * ------------------------------------------------------------------------ */
+
+/* The bottom of travel. Floored at zero so a list shorter than its own well is not a
+ * special case anywhere else. */
+static int dopt_adv_last(void)
+{
+    const int last = DOPT_VE_COUNT - DOPT_A_VIEW_ROWS;
+    return last > 0 ? last : 0;
+}
+
+static void dopt_adv_clamp(DOPT_State *st)
+{
+    const int last = dopt_adv_last();
+    if (st->advTop > last)
+        st->advTop = last;
+    if (st->advTop < 0)
+        st->advTop = 0;
+}
+
+/* SliderClass::Recalc_Thumb, slider.cpp:181-188, vertical: the thumb is the same
+ * fraction of the well that the well is of the list, floored at 4 (slider.cpp:185), and
+ * its start is pulled back so it cannot hang off the end (slider.cpp:187). */
+static void dopt_adv_thumb(const DOPT_State *st, int *ty, int *th)
+{
+    int size = (DOPT_A_BAR_H * DOPT_A_VIEW_ROWS) / DOPT_VE_COUNT;
+    int start;
+    if (size < DOPT_A_THUMB_MIN)
+        size = DOPT_A_THUMB_MIN;
+    if (size > DOPT_A_BAR_H)
+        size = DOPT_A_BAR_H;
+    start = (DOPT_A_BAR_H * st->advTop) / DOPT_VE_COUNT;
+    if (start > DOPT_A_BAR_H - size)
+        start = DOPT_A_BAR_H - size;
+    if (start < 0)
+        start = 0;
+    *ty = DOPT_A_BAR_Y + start;
+    *th = size;
+}
+
+/* GaugeClass::Pixel_To_Value, gauge.cpp:143-190, on the other axis: where the TOP of the
+ * thumb lands is what decides the top row, so the grab offset inside the thumb is taken
+ * off first and the bar does not jump under the hand at the moment it is seized. */
+static void dopt_adv_drag(DOPT_State *st, int my)
+{
+    int top = my - st->dragdiff - DOPT_A_BAR_Y;
+    if (top < 0)
+        top = 0;
+    st->advTop = (top * DOPT_VE_COUNT) / DOPT_A_BAR_H;
+    dopt_adv_clamp(st);
+}
+
+/* Keep the highlighted row inside the well after the keyboard walk moved it, which is
+ * the same job dopt_track_show does for the jukebox. OK and the bar are not in the well,
+ * so they leave it where it is. */
+static void dopt_adv_show(DOPT_State *st)
+{
+    if (st->selected < 0 || st->selected >= DOPT_VE_COUNT)
+        return;
+    if (st->selected < st->advTop)
+        st->advTop = st->selected;
+    if (st->selected >= st->advTop + DOPT_A_VIEW_ROWS)
+        st->advTop = st->selected - DOPT_A_VIEW_ROWS + 1;
+    dopt_adv_clamp(st);
+}
+
 void dopt_scroll(DOPT_State *st, int delta)
 {
     int last;
+    /* The Advanced page's column is the second thing on this screen that scrolls, and it
+       goes through the same door as the first rather than growing a door of its own. */
+    if (st->page == DOPT_PAGE_ADVANCED) {
+        st->advTop += delta;
+        dopt_adv_clamp(st);
+        return;
+    }
     if (st->page != DOPT_PAGE_SOUND || st->ntracks <= 0)
         return;
     last = st->ntracks - DOPT_SND_ROWS;
@@ -538,6 +675,26 @@ int dopt_item_rect(const DOPT_State *st, int item, int *x, int *y, int *w, int *
         return 1;
     }
 
+    if (st->page == DOPT_PAGE_GAMEPLAY) {
+        if (item < 0 || item >= DOPT_G_COUNT)
+            return 0;
+        if (item == DOPT_G_OK) {
+            *w = st->okw ? st->okw : DOPT_MIN_BTN_W;
+            *h = DOPT_GC_OK_H;
+            *x = (DOPT_SCREEN_W - *w) / 2;   /* gamedlg.cpp:151, as V_OK and A_OK do */
+            *y = DOPT_GC_OK_Y;
+            return 1;
+        }
+        /* The whole row is the target, not the seven pixel box, for the reason the
+           Advanced page gives: a checkbox you have to hit within seven pixels is a
+           checkbox nobody uses. */
+        *x = DOPT_A_BOX_X;
+        *y = DOPT_G_TOP + DOPT_G_STEP * item;
+        *w = DOPT_G_ROW_W;
+        *h = DOPT_A_BOX;
+        return 1;
+    }
+
     if (st->page == DOPT_PAGE_ADVANCED) {
         if (item < 0 || item >= DOPT_A_COUNT)
             return 0;
@@ -548,13 +705,29 @@ int dopt_item_rect(const DOPT_State *st, int item, int *x, int *y, int *w, int *
             *y = DOPT_GC_OK_Y;
             return 1;
         }
-        /* The whole row is the target, not just the little box: a checkbox you have to
-           hit within seven pixels is a checkbox nobody uses. */
-        *x = DOPT_A_BOX_X;
-        *y = DOPT_A_TOP + DOPT_A_STEP * item;
-        *w = DOPT_V_W - 32;
-        *h = DOPT_A_BOX;
-        return 1;
+        if (item == DOPT_A_BAR) {
+            *x = DOPT_A_BAR_X; *y = DOPT_A_BAR_Y;
+            *w = DOPT_A_BAR_W; *h = DOPT_A_BAR_H;
+            return 1;
+        }
+        {
+            /* A ROW OUTSIDE THE WELL HAS NO RECTANGLE AT ALL, and that is the whole of
+               the scrolling. dopt_hit_test skips an item that answers with no rectangle,
+               so a row the player cannot see is a row no click can reach; the row loop in
+               dopt_draw_advanced skips one too, so nothing is painted outside the well.
+               Both come free rather than needing a clip. */
+            const int row = item - st->advTop;
+            if (row < 0 || row >= DOPT_A_VIEW_ROWS)
+                return 0;
+            /* The whole row is the target, not just the little box: a checkbox you have
+               to hit within seven pixels is a checkbox nobody uses. It stops short of
+               the bar, which is list.cpp:566's own `Width -= ScrollGadget.Width`. */
+            *x = DOPT_A_BOX_X;
+            *y = DOPT_A_TOP + DOPT_A_STEP * row;
+            *w = DOPT_A_ROW_W;
+            *h = DOPT_A_BOX;
+            return 1;
+        }
     }
 
     if (item < 0 || item >= DOPT_ITEM_COUNT)
@@ -605,6 +778,12 @@ int dopt_next_item(const DOPT_State *st, int item, int delta)
             k = 0;
         if (k < 0)
             k = n - 1;
+        /* THE SCROLL BAR IS NOT A STOP ON THE WALK. gauge.cpp:59 gives a gauge
+           LEFTHELD|LEFTPRESS|LEFTRELEASE and no KEYBOARD, so 1995's list slider is not
+           in the tab order either. Landing on it would give the player a highlighted
+           control that Enter does nothing with. */
+        if (st->page == DOPT_PAGE_ADVANCED && k == DOPT_A_BAR)
+            continue;
         if (!dopt_item_disabled(st, k))
             return k;
     }
@@ -701,13 +880,72 @@ static void dopt_set_value(DOPT_State *st, int ctrl, int value)
  * Input.
  * ------------------------------------------------------------------------ */
 
+/* The DOPT_VE_TEXSET drop list. Defined further down with the rest of the drawing, and
+   declared here because the input handlers above it are its first users. */
+static void dopt_vis_apply(DOPT_State *st);
+static int  dopt_texset_hit(const DOPT_State *st, int mx, int my);
+static int  dopt_texset_pickable(const DOPT_State *st, int which);
+static int  dopt_is_droprow(int item);
+static int  dopt_drop_value(const DOPT_State *st, int item);
+static void dopt_drop_set(DOPT_State *st, int item, int v);
+
 int dopt_press(DOPT_State *st, int mx, int my)
 {
-    int hit = dopt_hit_test(st, mx, my);
+    int hit;
+
+    /* THE DROP LIST FIRST, because it is drawn over the rows and has to take their
+       clicks back. An entry that cannot be chosen swallows the click and leaves the
+       list open, which is what lets the player read the tooltip rather than having the
+       list shut in their face. A click anywhere else closes it and then falls through
+       to the normal handling, so one click can close the list and press what is under
+       the pointer. */
+    if (dopt_is_droprow(st->texdrop)) {
+        const int pick = dopt_texset_hit(st, mx, my);
+        if (pick >= 0) {
+            st->lastmy = my;
+            st->drag = -1;
+            st->pressed = -1;
+            if (!dopt_texset_pickable(st, pick))
+                return DOPT_ACT_NONE;
+            dopt_drop_set(st, st->texdrop, pick);
+            st->texdrop = -1;
+            st->texhot = -1;
+            dopt_vis_apply(st);
+            return DOPT_ACT_NONE;
+        }
+        st->texdrop = -1;
+        st->texhot = -1;
+    }
+
+    hit = dopt_hit_test(st, mx, my);
 
     st->lastmy = my;
     st->drag = -1;
     if (hit < 0) {
+        st->pressed = -1;
+        return DOPT_ACT_NONE;
+    }
+
+    /* THE SCROLL BAR, and it is SliderClass::Action (slider.cpp:212-246) rather than the
+       gauge press below it: a click ABOVE the thumb bumps one wellful up, a click BELOW
+       bumps one wellful down, and a click ON the thumb sticks to it. Bump is
+       Set_Value(CurValue -/+ Thumb) (slider.cpp:267-273), and Thumb here is the number of
+       rows the well shows. The selection is deliberately left where it was: this gadget
+       is not a stop on the keyboard walk, so moving the highlight onto it would strand
+       the walk on a control it cannot reach again. */
+    if (st->page == DOPT_PAGE_ADVANCED && hit == DOPT_A_BAR) {
+        int ty, th;
+        dopt_adv_thumb(st, &ty, &th);
+        if (my < ty) {
+            st->advTop -= DOPT_A_VIEW_ROWS;
+            dopt_adv_clamp(st);
+        } else if (my >= ty + th) {
+            st->advTop += DOPT_A_VIEW_ROWS;
+            dopt_adv_clamp(st);
+        } else {
+            st->drag = hit;
+            st->dragdiff = my - ty; /* GaugeClass::ClickDiff, on the other axis */
+        }
         st->pressed = -1;
         return DOPT_ACT_NONE;
     }
@@ -738,7 +976,17 @@ int dopt_press(DOPT_State *st, int mx, int my)
 
 int dopt_motion(DOPT_State *st, int mx, int my)
 {
-    (void)my;
+    /* The entry under the pointer, which is what the tooltip and the highlight follow.
+       Recomputed on every motion and cleared when the list is shut, so a tooltip can
+       never outlive the list that explains it. */
+    st->texhot = dopt_is_droprow(st->texdrop) ? dopt_texset_hit(st, mx, my) : -1;
+
+    /* The one drag on this screen that reads y instead of x. Everything else here is a
+       horizontal gauge, which is why `my` used to be discarded outright. */
+    if (st->page == DOPT_PAGE_ADVANCED && st->drag == DOPT_A_BAR) {
+        dopt_adv_drag(st, my);
+        return DOPT_ACT_NONE;
+    }
     if (st->drag >= 0) {
         dopt_set_value(st, st->drag, dopt_pixel_to_value(st, st->drag, mx - st->dragdiff));
         return DOPT_ACT_NONE;
@@ -797,6 +1045,10 @@ static int dopt_activate(DOPT_State *st, int item)
                 return DOPT_ACT_NONE;     /* gadget.cpp:632, and ENTER has no guard */
             st->page = DOPT_PAGE_ADVANCED;
             st->selected = 0;
+            /* The page opens at the top of its list, because the selection opens on the
+               first row and the two must agree: row 0 highlighted with the well halfway
+               down is a page with no visible selection on it. */
+            st->advTop = 0;
             st->pressed = -1;
             return DOPT_ACT_NONE;
         default:
@@ -832,6 +1084,30 @@ static int dopt_activate(DOPT_State *st, int item)
         if (item >= 0 && item < DOPT_CH_TOGGLES) {
             st->cheat.on[item] = !st->cheat.on[item];
             dopt_cheat_apply(st);
+        }
+        return DOPT_ACT_NONE;
+    }
+
+    if (st->page == DOPT_PAGE_ADVANCED && dopt_is_droprow(item)) {
+        /* The whole row opens the list, not just the little box -- the same reasoning
+           dopt_item_rect gives for making the whole row the checkbox target. Opening one
+           closes the other: two open lists would overlap and neither could say which of
+           them a click belonged to. */
+        st->texdrop = (st->texdrop == item) ? -1 : item;
+        st->texhot = -1;
+        return DOPT_ACT_NONE;
+    }
+    if (st->page == DOPT_PAGE_GAMEPLAY) {
+        if (item == DOPT_G_OK) {
+            st->page = DOPT_PAGE_OPTIONS;
+            st->selected = DOPT_GAMEPLAY;
+            st->pressed = -1;
+            return DOPT_ACT_NONE;
+        }
+        if (item >= 0 && item < DOPT_G_TOGGLES) {
+            st->gp.on[item] = !st->gp.on[item];
+            if (st->bind.applygp)
+                st->bind.applygp(st->bind.user, &st->gp);
         }
         return DOPT_ACT_NONE;
     }
@@ -931,6 +1207,11 @@ static int dopt_activate(DOPT_State *st, int item)
         st->selected = st->vis.enhanced ? DOPT_V_ENHANCED : DOPT_V_CLASSIC;
         st->pressed = -1;
         return DOPT_ACT_NONE;
+    case DOPT_GAMEPLAY:
+        st->page = DOPT_PAGE_GAMEPLAY;
+        st->selected = DOPT_G_SWAPBTN;
+        st->pressed = -1;
+        return DOPT_ACT_NONE;
     case DOPT_SAVE:
         return DOPT_ACT_SAVE;
     case DOPT_LOAD:
@@ -958,6 +1239,15 @@ static int dopt_activate(DOPT_State *st, int item)
 int dopt_release(DOPT_State *st, int mx, int my)
 {
     int hit, was;
+
+    /* Same split as dopt_motion: the bar's drag ends on the y, not the x. Without this
+       arm the release would fall into dopt_set_value with the bar's index, which finds
+       no slot and silently does nothing -- correct by accident is not correct. */
+    if (st->page == DOPT_PAGE_ADVANCED && st->drag == DOPT_A_BAR) {
+        dopt_adv_drag(st, my);
+        st->drag = -1;
+        return DOPT_ACT_NONE;
+    }
 
     if (st->drag >= 0) {
         dopt_set_value(st, st->drag, dopt_pixel_to_value(st, st->drag, mx - st->dragdiff));
@@ -992,6 +1282,11 @@ int dopt_key(DOPT_State *st, int key)
             }
         }
         st->selected = dopt_next_item(st, st->selected, d);
+        /* The walk can move the highlight past the bottom of the well, so the well
+           follows it. Same rule as the jukebox's dopt_track_show, and it is what makes
+           the last element reachable without a wheel or a hand on the bar. */
+        if (st->page == DOPT_PAGE_ADVANCED)
+            dopt_adv_show(st);
         return DOPT_ACT_NONE;
     }
     case DOPT_KEY_LEFT:
@@ -1025,6 +1320,8 @@ int dopt_key(DOPT_State *st, int key)
             return dopt_activate(st, DOPT_S_OK);
         /* The cheat page is not walked to, so there is no level to go back to: Escape
            closes it exactly as its OK button does. */
+        if (st->page == DOPT_PAGE_GAMEPLAY)
+            return dopt_activate(st, DOPT_G_OK);
         if (st->page == DOPT_PAGE_CHEATS)
             return dopt_activate(st, DOPT_CH_OK);
         /* On the confirmation, Escape is Cancel and NOT Resume. Leaving it as Resume
@@ -1044,8 +1341,29 @@ int dopt_key(DOPT_State *st, int key)
  * menu uses; see menu/dosmenu.c for the walk-through of each one.
  * ------------------------------------------------------------------------ */
 
-static void dopt_button_box(DB_Surface *s, int x, int y, int w, int h, int pressed,
-                            int disabled)
+/* EXPORTED. The green gauge: BOXSTYLE_GREEN_DOWN's sunken track (dialog.cpp row 6 --
+ * filler BKGD, shadow LIGHT, hilite SHADOW) with the bright green filled up to
+ * `fill_to_x`, which is an absolute surface column and not a width. Pass anything below
+ * x + 1 for an empty gauge. This is the volume slider's own body, and the DATABASE
+ * codex's stat bars are drawn with it. */
+void dopt_style_track(DB_Surface *s, int x, int y, int w, int h, int fill_to_x)
+{
+    db_fill_rect(s, x, y, x + w - 1, y + h - 1, DOPT_GREEN_BKGD);
+    db_line_h(s, x, x + w - 1, y + h - 1, DOPT_LIGHT_GREEN);
+    db_line_v(s, x + w - 1, y, y + h - 1, DOPT_LIGHT_GREEN);
+    db_line_h(s, x, x + w - 1, y, DOPT_GREEN_SHADOW);
+    db_line_v(s, x, y, y + h - 1, DOPT_GREEN_SHADOW);
+    if (fill_to_x >= x + 1)
+        db_fill_rect(s, x + 1, y + 1, fill_to_x, y + h - 2, DOPT_BRIGHT_GREEN);
+}
+
+/* EXPORTED. The green button plate, and it is the only one in the program: the DATABASE
+ * codex (game/codex_mod.h) draws its category tabs with this rather than with a second
+ * copy of the same five lines, so the two screens cannot drift apart the day somebody
+ * retunes the bevel. Same reason for dopt_style_dialog, dopt_style_caption and
+ * dopt_style_track below. */
+void dopt_style_plate(DB_Surface *s, int x, int y, int w, int h, int pressed,
+                      int disabled)
 {
     unsigned char filler, shadow, hilite, corner;
 
@@ -1072,7 +1390,7 @@ static void dopt_button_box(DB_Surface *s, int x, int y, int w, int h, int press
 }
 
 /* dialog.cpp:64 Dialog_Box -> BOXSTYLE_GREEN_BORDER, an inset rectangle on black. */
-static void dopt_dialog_box(DB_Surface *s, int x, int y, int w, int h)
+void dopt_style_dialog(DB_Surface *s, int x, int y, int w, int h)
 {
     w--;
     h--;
@@ -1085,8 +1403,8 @@ static void dopt_dialog_box(DB_Surface *s, int x, int y, int w, int h)
 
 /* goptions.cpp:507 Draw_Caption: two OPTIONS.SHP filigrees, the centred caption and
  * the bright underline the width of the text. */
-static void dopt_caption(DB_Surface *s, const DB_Pack *p, const char *text, int x, int y,
-                         int w)
+void dopt_style_caption(DB_Surface *s, const DB_Pack *p, const char *text, int x, int y,
+                        int w)
 {
     const DB_Shape *sh = db_shape(p, "OPTIONS");
     const DB_Font *f = db_font(p, "GRAD6FNT");
@@ -1121,7 +1439,7 @@ static void dopt_draw_button(DB_Surface *s, const DB_Font *f, const DOPT_State *
     pressed = (st->pressed == item);
     on = (st->selected == item);
 
-    dopt_button_box(s, x, y, w, h, pressed, disabled);
+    dopt_style_plate(s, x, y, w, h, pressed, disabled);
     if (disabled) {
         for (i = 0; i < 16; i++)
             fp[i] = (i >= 4) ? DOPT_TEXT_DISABLED : DB_TBLACK;
@@ -1144,23 +1462,15 @@ static void dopt_draw_slider(DB_Surface *s, const DOPT_State *st, int ctrl, int 
     if (!dopt_item_rect(st, ctrl, &x, &y, &w, &h))
         return;
 
-    /* BOXSTYLE_GREEN_DOWN, dialog.cpp row 6: filler BKGD, shadow LIGHT, hilite SHADOW */
-    db_fill_rect(s, x, y, x + w - 1, y + h - 1, DOPT_GREEN_BKGD);
-    db_line_h(s, x, x + w - 1, y + h - 1, DOPT_LIGHT_GREEN);
-    db_line_v(s, x + w - 1, y, y + h - 1, DOPT_LIGHT_GREEN);
-    db_line_h(s, x, x + w - 1, y, DOPT_GREEN_SHADOW);
-    db_line_v(s, x, y, y + h - 1, DOPT_GREEN_SHADOW);
-
     mid = dopt_value_to_pixel(st, ctrl, value);
-    if (mid >= x + 1)
-        db_fill_rect(s, x + 1, y + 1, mid, y + h - 2, DOPT_BRIGHT_GREEN);
+    dopt_style_track(s, x, y, w, h, mid);
 
     /* gauge.cpp:357-368: the thumb is pulled back so it cannot hang off the end. */
     max = dopt_value_to_pixel(st, ctrl, dopt_ctrl_max(st, ctrl));
     thumb = mid;
     if (thumb + 4 > max)
         thumb = max - 2;
-    dopt_button_box(s, thumb, y, 4, h, 0, 0);
+    dopt_style_plate(s, thumb, y, 4, h, 0, 0);
 }
 
 /* THE TWO CAPTION RULES, and they are not the same rule.
@@ -1215,10 +1525,222 @@ static void dopt_draw_check(DB_Surface *s, const DOPT_State *st, int item, int o
     int x, y, w, h;
     if (!dopt_item_rect(st, item, &x, &y, &w, &h))
         return;
-    dopt_button_box(s, x, y, DOPT_A_BOX, DOPT_A_BOX, on, 0);
+    dopt_style_plate(s, x, y, DOPT_A_BOX, DOPT_A_BOX, on, 0);
     if (on)
         db_fill_rect(s, x + 2, y + 2, x + DOPT_A_BOX - 3, y + DOPT_A_BOX - 3,
                      DOPT_BRIGHT_GREEN);
+}
+
+/* ---- DOPT_VE_TEXSET, the one drop list on the Advanced page ------------------------
+ *
+ * Three choices where the rest of the page has checkboxes, so it needs a control 1995
+ * never drew. It is built out of the same primitives the page already uses -- the
+ * button box, GRAD6FNT and the disabled ink -- rather than a new widget vocabulary.
+ *
+ * The list is drawn LAST and hit-tested FIRST, and that pair is the whole mechanism:
+ * drawn last it covers the rows beneath it, tested first it takes their clicks back.
+ * Nothing else on the page has to know it exists.
+ *
+ * REMASTERED IS DRAWN EVEN WHEN IT CANNOT BE CHOSEN, in the disabled ink and with a
+ * tooltip explaining what would unlock it. That is the page's own rule (see
+ * dopt_item_disabled) and 1995's before it: a disabled gadget rather than a missing
+ * one, so a player can see the option exists.
+ */
+
+/* Two lines, because one is wider than the 232-pixel dialog it has to sit inside. */
+/* Three lines, because the sentence is wider than the 232-pixel dialog it sits in and
+   wider than a comfortable share of the 320-pixel screen. Broken at phrase boundaries
+   rather than by measure, so it reads. */
+#define DOPT_TIP_L1 "Available if you have"
+#define DOPT_TIP_L2 "Command & Conquer"
+#define DOPT_TIP_L3 "Remastered Collection installed"
+
+const char *dopt_texset_label(int which)
+{
+    return (which >= 0 && which < DOPT_TEX_COUNT) ? dopt_texset_name[which] : "";
+}
+
+const char *dopt_drop_label(int item, int which)
+{
+    if (which < 0 || which >= DOPT_TEX_COUNT) return "";
+    return item == DOPT_VE_INFSET ? dopt_infset_name[which] : dopt_texset_name[which];
+}
+
+const char *dopt_texset_tooltip(const DOPT_State *st, int which)
+{
+    if (st && which == DOPT_TEX_REMASTER && !st->vis.remaster_ok)
+        return DOPT_TIP_L1 " " DOPT_TIP_L2 " " DOPT_TIP_L3;
+    return NULL;
+}
+
+static int dopt_texset_pickable(const DOPT_State *st, int which)
+{
+    return !(which == DOPT_TEX_REMASTER && !st->vis.remaster_ok);
+}
+
+/* THE TWO ROWS THAT ARE DROP LISTS, and where each keeps its value. Everything below is
+   written against `item` rather than against the terrain row, so a third list is a line
+   here and nothing else. */
+static int dopt_is_droprow(int item)
+{
+    return item == DOPT_VE_TEXSET || item == DOPT_VE_INFSET;
+}
+
+static int dopt_drop_value(const DOPT_State *st, int item)
+{
+    return item == DOPT_VE_INFSET ? st->vis.infset : st->vis.texset;
+}
+
+static void dopt_drop_set(DOPT_State *st, int item, int v)
+{
+    if (item == DOPT_VE_INFSET) st->vis.infset = v;
+    else                        st->vis.texset = v;
+}
+
+/* The closed value box. No rectangle at all when the texture row is scrolled out of the
+   well, which is the same contract dopt_item_rect keeps for every row and is what stops
+   an invisible control taking a click. */
+static int dopt_texset_box_rect_of(const DOPT_State *st, int item,
+                                   int *x, int *y, int *w, int *h)
+{
+    int rx, ry, rw, rh;
+    if (st->page != DOPT_PAGE_ADVANCED || !dopt_is_droprow(item))
+        return 0;
+    if (!dopt_item_rect(st, item, &rx, &ry, &rw, &rh))
+        return 0;
+    *w = st->texw > 0 ? st->texw : DOPT_A_DROP_W;
+    *x = DOPT_A_BOX_X + DOPT_A_ROW_W - *w;    /* right-aligned in the row */
+    *y = ry - 1;
+    *h = DOPT_A_DROP_H;
+    return 1;
+}
+
+/* One open entry, stacked directly under the value box. */
+static int dopt_texset_item_rect_of(const DOPT_State *st, int item, int i,
+                                    int *x, int *y, int *w, int *h)
+{
+    int bx, by, bw, bh;
+    if (st->texdrop != item || i < 0 || i >= DOPT_TEX_COUNT)
+        return 0;
+    if (!dopt_texset_box_rect_of(st, item, &bx, &by, &bw, &bh))
+        return 0;
+    *x = bx; *w = bw; *h = bh;
+    *y = by + bh + i * bh;
+    return 1;
+}
+
+int dopt_texset_box_rect_pub(const DOPT_State *st, int item, int *x, int *y, int *w, int *h)
+{
+    return dopt_texset_box_rect_of(st, item, x, y, w, h);
+}
+
+/* The public face of dopt_texset_item_rect, for the headless driver: a gate has to be
+   able to put the pointer on an entry, and the entries are not dialog items. */
+int dopt_texset_item_rect_pub(const DOPT_State *st, int item, int i,
+                              int *x, int *y, int *w, int *h)
+{
+    return dopt_texset_item_rect_of(st, item, i, x, y, w, h);
+}
+
+/* Which open entry the point is over, or -1. Also answers -1 when the list is shut, so
+   every caller can ask without first testing texdrop. */
+static int dopt_texset_hit(const DOPT_State *st, int mx, int my)
+{
+    int i, x, y, w, h;
+    if (!dopt_is_droprow(st->texdrop)) return -1;
+    for (i = 0; i < DOPT_TEX_COUNT; i++)
+        if (dopt_texset_item_rect_of(st, st->texdrop, i, &x, &y, &w, &h)
+            && mx >= x && mx < x + w && my >= y && my < y + h)
+            return i;
+    return -1;
+}
+
+
+/* The closed control: the current choice, and a small triangle to say it opens. */
+static void dopt_draw_texset_box(DB_Surface *s, const DB_Pack *p, const DOPT_State *st,
+                                 int item)
+{
+    const DB_Font *f = db_font(p, "GRAD6FNT");
+    unsigned char fp[16];
+    int x, y, w, h, i, ink;
+    const int open = (st->texdrop == item);
+
+    if (!dopt_texset_box_rect_of(st, item, &x, &y, &w, &h))
+        return;
+    dopt_style_plate(s, x, y, w, h, open, 0);
+    ink = (st->selected == item || open) ? DOPT_TEXT_BRIGHT : DOPT_TEXT_MEDIUM;
+    if (f) {
+        db_font_palette_grad(fp, (unsigned char)ink, DB_TBLACK);
+        db_print(s, f, dopt_drop_label(item, dopt_drop_value(st, item)), x + 3, y, fp,
+                 DB_FONT6_XSPACING);
+    }
+    /* A 5-wide triangle pointing down, drawn the way dopt_draw_shapebtn draws its
+       play arrow: rows of a horizontal line, narrowing. */
+    for (i = 0; i < 3; i++)
+        db_line_h(s, x + w - 8 + i, x + w - 4 - i, y + 2 + i, (unsigned char)ink);
+}
+
+/* A tooltip, two lines in a boxed panel, placed under the entry it explains and nudged
+   back inside the dialog if that would push it off the right edge. */
+static void dopt_draw_tip(DB_Surface *s, const DB_Pack *p, int ax, int ay)
+{
+    const DB_Font *f = db_font(p, "GRAD6FNT");
+    unsigned char fp[16];
+    int w1, w2, w3, w, h, x, y;
+
+    if (!f)
+        return;
+    w1 = db_string_width(f, DOPT_TIP_L1, DB_FONT6_XSPACING);
+    w2 = db_string_width(f, DOPT_TIP_L2, DB_FONT6_XSPACING);
+    w3 = db_string_width(f, DOPT_TIP_L3, DB_FONT6_XSPACING);
+    w = (w1 > w2 ? w1 : w2);
+    if (w3 > w) w = w3;
+    w += 6;
+    h = 3 * DOPT_A_STEP + 2;
+    x = ax;
+    y = ay;
+    /* CLAMPED TO THE SCREEN, not to the dialog. A tooltip is allowed to overhang the box
+       it explains -- that is what a tooltip does -- and clamping it to the dialog is what
+       chopped the first version off at both ends. */
+    if (x + w > DOPT_SCREEN_W - 2) x = DOPT_SCREEN_W - 2 - w;
+    if (x < 2) x = 2;
+    if (y + h > DOPT_SCREEN_H - 2) y = ay - h - DOPT_A_DROP_H;
+    if (y < 2) y = 2;
+    dopt_style_plate(s, x, y, w, h, 0, 0);
+    db_font_palette_grad(fp, DOPT_TEXT_BRIGHT, DB_TBLACK);
+    db_print(s, f, DOPT_TIP_L1, x + 3, y + 1, fp, DB_FONT6_XSPACING);
+    db_print(s, f, DOPT_TIP_L2, x + 3, y + 1 + DOPT_A_STEP, fp, DB_FONT6_XSPACING);
+    db_print(s, f, DOPT_TIP_L3, x + 3, y + 1 + 2 * DOPT_A_STEP, fp, DB_FONT6_XSPACING);
+}
+
+/* The open list. Drawn after everything else on the page so it covers it. */
+static void dopt_draw_texset_drop(DB_Surface *s, const DB_Pack *p, const DOPT_State *st)
+{
+    const DB_Font *f = db_font(p, "GRAD6FNT");
+    unsigned char fp[16];
+    int i, x, y, w, h, ink, tipx = 0, tipy = 0, tip = 0;
+    const int item = st->texdrop;
+
+    if (!dopt_is_droprow(item))
+        return;
+    for (i = 0; i < DOPT_TEX_COUNT; i++) {
+        if (!dopt_texset_item_rect_of(st, item, i, &x, &y, &w, &h))
+            continue;
+        dopt_style_plate(s, x, y, w, h, i == dopt_drop_value(st, item), 0);
+        if (!dopt_texset_pickable(st, i))       ink = DOPT_TEXT_DISABLED;
+        else if (i == st->texhot)               ink = DOPT_TEXT_BRIGHT;
+        else                                    ink = DOPT_TEXT_MEDIUM;
+        if (f) {
+            db_font_palette_grad(fp, (unsigned char)ink, DB_TBLACK);
+            db_print(s, f, dopt_drop_label(item, i), x + 3, y, fp, DB_FONT6_XSPACING);
+        }
+        if (i == st->texhot && dopt_texset_tooltip(st, i)) {
+            tip = 1; tipx = x; tipy = y + h + 1;
+        }
+    }
+    /* After the loop, so the tooltip is over the entries and not under the next one. */
+    if (tip)
+        dopt_draw_tip(s, p, tipx, tipy);
 }
 
 /* The two Visuals pages. Everything on them is ours; see dosopt.h. */
@@ -1228,8 +1750,8 @@ static void dopt_draw_visuals(DB_Surface *s, const DB_Pack *p, const DOPT_State 
     unsigned char fp[16];
     int i, x, y, w, h;
 
-    dopt_dialog_box(s, DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
-    dopt_caption(s, p, "Visuals", DOPT_V_X, DOPT_V_Y, DOPT_V_W);
+    dopt_style_dialog(s, DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
+    dopt_style_caption(s, p, "Visuals", DOPT_V_X, DOPT_V_Y, DOPT_V_W);
 
     for (i = 0; i < DOPT_V_COUNT; i++)
         dopt_draw_button(s, f, st, i, dopt_vis_label[i]);
@@ -1241,7 +1763,7 @@ static void dopt_draw_visuals(DB_Surface *s, const DB_Pack *p, const DOPT_State 
         const int sel = st->vis.enhanced ? DOPT_V_ENHANCED : DOPT_V_CLASSIC;
         if (dopt_item_rect(st, sel, &x, &y, &w, &h) && f) {
             int tx;
-            dopt_button_box(s, x, y, w, h, 1, 0);
+            dopt_style_plate(s, x, y, w, h, 1, 0);
             db_font_palette_grad(fp, DOPT_TEXT_BRIGHT, DB_TBLACK);
             tx = x + (w >> 1) - 1
                  - (db_string_width(f, dopt_vis_label[sel], DB_FONT6_XSPACING) >> 1);
@@ -1265,38 +1787,134 @@ static void dopt_draw_visuals(DB_Surface *s, const DB_Pack *p, const DOPT_State 
     }
 }
 
+/* THE SCROLL BAR. SliderClass in list mode, drawn with the two boxes this dialog already
+ * has: slider.cpp:339 draws the body BOXSTYLE_GREEN_DOWN, which is dialog.cpp row 6 and
+ * is the same well dopt_draw_slider paints under the volume rows, and slider.cpp:310
+ * draws the thumb `Draw_Box(X, Y + ThumbStart, Width, ThumbSize, BOXSTYLE_GREEN_RAISED)`,
+ * which is dopt_button_box unpressed. Nothing here is a new shape, a new colour or a new
+ * primitive, and there are no arrow buttons because a list-mode slider has none
+ * (slider.cpp:68-82) -- which is fortunate, since BTN-UP.SHP and BTN-DN.SHP are in no
+ * archive this project bakes.
+ * The thumb is drawn PRESSED while it is being dragged, which is the same feedback every
+ * other control on this screen gives under the hand. */
+static void dopt_draw_adv_bar(DB_Surface *s, const DOPT_State *st)
+{
+    int x, y, w, h, ty, th;
+
+    if (!dopt_item_rect(st, DOPT_A_BAR, &x, &y, &w, &h))
+        return;
+    db_fill_rect(s, x, y, x + w - 1, y + h - 1, DOPT_GREEN_BKGD);
+    db_line_h(s, x, x + w - 1, y + h - 1, DOPT_LIGHT_GREEN);
+    db_line_v(s, x + w - 1, y, y + h - 1, DOPT_LIGHT_GREEN);
+    db_line_h(s, x, x + w - 1, y, DOPT_GREEN_SHADOW);
+    db_line_v(s, x, y, y + h - 1, DOPT_GREEN_SHADOW);
+
+    dopt_adv_thumb(st, &ty, &th);
+    dopt_style_plate(s, x, ty, w, th, st->drag == DOPT_A_BAR, 0);
+}
+
 static void dopt_draw_advanced(DB_Surface *s, const DB_Pack *p, const DOPT_State *st)
 {
     const DB_Font *f = db_font(p, "GRAD6FNT");
     unsigned char fp[16];
     int i, x, y, w, h;
 
-    dopt_dialog_box(s, DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
-    dopt_caption(s, p, "Advanced", DOPT_V_X, DOPT_V_Y, DOPT_V_W);
+    dopt_style_dialog(s, DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
+    dopt_style_caption(s, p, "Advanced", DOPT_V_X, DOPT_V_Y, DOPT_V_W);
 
     for (i = 0; i < DOPT_VE_COUNT; i++) {
         if (!dopt_item_rect(st, i, &x, &y, &w, &h))
             continue;
-        dopt_draw_check(s, st, i, st->vis.elem[i]);
+        if (dopt_is_droprow(i))
+            dopt_draw_texset_box(s, p, st, i);
+        else
+            dopt_draw_check(s, st, i, st->vis.elem[i]);
         if (!f)
             continue;
         db_font_palette_grad(fp, (st->selected == i) ? DOPT_TEXT_BRIGHT
                                                      : DOPT_TEXT_MEDIUM, DB_TBLACK);
         db_print(s, f, dopt_vis_elem[i], DOPT_A_LABEL_X, y - 1, fp, DB_FONT6_XSPACING);
     }
+    dopt_draw_adv_bar(s, st);
     dopt_draw_button(s, f, st, DOPT_A_OK, "OK");
+    /* LAST, so it covers the rows and the bar beneath it. */
+    dopt_draw_texset_drop(s, p, st);
 }
 
 /* The cheat page. Same box, same caption, same checkbox and same button as the Advanced
    page draws, because it IS those, called with a different list. */
+void dopt_gameplay_defaults(DOPT_Gameplay *g)
+{
+    if (!g) return;
+    /* OFF: nobody who does not come looking for it gets a different set of buttons. */
+    g->on[DOPT_G_SWAPBTN] = 0;
+    /* ON: the gesture was asked for, and a player should not have to go looking for it. */
+    g->on[DOPT_G_RPUSH] = 1;
+}
+
+void dopt_set_gameplay(DOPT_State *st, const DOPT_Gameplay *g)
+{ if (st && g) st->gp = *g; }
+
+const DOPT_Gameplay *dopt_gameplay(const DOPT_State *st) { return st ? &st->gp : 0; }
+
+void dopt_bind_gameplay(DOPT_State *st, void (*applygp)(void *, const DOPT_Gameplay *))
+{
+    if (!st) return;
+    st->bind.applygp = applygp;
+    if (applygp)
+        applygp(st->bind.user, &st->gp);
+}
+
+int dopt_gp_head_rect(const DOPT_State *st, const DB_Pack *p, int *x, int *y, int *w,
+                      int *h)
+{
+    const DB_Font *f = p ? db_font(p, "GRAD6FNT") : 0;
+    (void)st;
+    if (!f) return 0;
+    *w = db_string_width(f, DOPT_G_HEADING, DB_FONT6_XSPACING);
+    *h = f->maxh;
+    *x = DOPT_V_X + (DOPT_V_W - *w) / 2;
+    *y = DOPT_G_HEAD_Y;
+    return 1;
+}
+
+/* The Gameplay page. Same box, same caption, same checkbox and same button the Advanced
+   page draws, because it IS those, called with a different list. */
+static void dopt_draw_gameplay(DB_Surface *s, const DB_Pack *p, const DOPT_State *st)
+{
+    const DB_Font *f = db_font(p, "GRAD6FNT");
+    unsigned char fp[16];
+    int i, x, y, w, h;
+
+    dopt_style_dialog(s, DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
+    dopt_style_caption(s, p, "Gameplay", DOPT_V_X, DOPT_V_Y, DOPT_V_W);
+
+    if (f && dopt_gp_head_rect(st, p, &x, &y, &w, &h)) {
+        db_font_palette_grad(fp, DOPT_TEXT_MEDIUM, DB_TBLACK);
+        db_print(s, f, DOPT_G_HEADING, x, y, fp, DB_FONT6_XSPACING);
+    }
+
+    for (i = 0; i < DOPT_G_TOGGLES; i++) {
+        if (!dopt_item_rect(st, i, &x, &y, &w, &h))
+            continue;
+        dopt_draw_check(s, st, i, st->gp.on[i]);
+        if (!f)
+            continue;
+        db_font_palette_grad(fp, (st->selected == i) ? DOPT_TEXT_BRIGHT
+                                                     : DOPT_TEXT_MEDIUM, DB_TBLACK);
+        db_print(s, f, dopt_gp_label(i), DOPT_A_LABEL_X, y - 1, fp, DB_FONT6_XSPACING);
+    }
+    dopt_draw_button(s, f, st, DOPT_G_OK, "OK");
+}
+
 static void dopt_draw_cheats(DB_Surface *s, const DB_Pack *p, const DOPT_State *st)
 {
     const DB_Font *f = db_font(p, "GRAD6FNT");
     unsigned char fp[16];
     int i, x, y, w, h;
 
-    dopt_dialog_box(s, DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
-    dopt_caption(s, p, "Cheats", DOPT_V_X, DOPT_V_Y, DOPT_V_W);
+    dopt_style_dialog(s, DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
+    dopt_style_caption(s, p, "Cheats", DOPT_V_X, DOPT_V_Y, DOPT_V_W);
 
     for (i = 0; i < DOPT_CH_TOGGLES; i++) {
         if (!dopt_item_rect(st, i, &x, &y, &w, &h))
@@ -1324,7 +1942,7 @@ static void dopt_draw_shapebtn(DB_Surface *s, const DOPT_State *st, int item, in
 
     if (!dopt_item_rect(st, item, &x, &y, &w, &h))
         return;
-    dopt_button_box(s, x, y, w, h, st->pressed == item, dopt_item_disabled(st, item));
+    dopt_style_plate(s, x, y, w, h, st->pressed == item, dopt_item_disabled(st, item));
     ink = dopt_item_disabled(st, item) ? DOPT_TEXT_DISABLED
         : ((st->pressed == item || st->selected == item) ? DOPT_TEXT_BRIGHT
                                                          : DOPT_TEXT_MEDIUM);
@@ -1374,8 +1992,8 @@ static void dopt_draw_sound(DB_Surface *s, const DB_Pack *p, const DOPT_State *s
     unsigned char fp[16];
     int i, row, y;
 
-    dopt_dialog_box(s, DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W, DOPT_SND_H);
-    dopt_caption(s, p, "Sound Controls", DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W);
+    dopt_style_dialog(s, DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W, DOPT_SND_H);
+    dopt_style_caption(s, p, "Sound Controls", DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W);
 
     /* sounddlg.cpp:332-343, the two volume rows: caption right-aligned at (x-5, y-2). */
     dopt_draw_slider(s, st, DOPT_S_MUSIC, st->set.music);
@@ -1456,12 +2074,12 @@ static void dopt_draw_confirm(DB_Surface *s, const DB_Pack *p, const DOPT_State 
     int i;
 
     /* the pause dialog stays behind it */
-    dopt_dialog_box(s, DOPT_X, DOPT_Y, DOPT_W, DOPT_H);
-    dopt_caption(s, p, "Options", DOPT_X, DOPT_Y, DOPT_W);
+    dopt_style_dialog(s, DOPT_X, DOPT_Y, DOPT_W, DOPT_H);
+    dopt_style_caption(s, p, "Options", DOPT_X, DOPT_Y, DOPT_W);
     for (i = 0; i < DOPT_ITEM_COUNT; i++)
         dopt_draw_button(s, f, st, i, dopt_items[i].label);
 
-    dopt_dialog_box(s, st->cfx, st->cfy, st->cfw, st->cfh);
+    dopt_style_dialog(s, st->cfx, st->cfy, st->cfw, st->cfh);
     if (f) {
         /* GRAD6FNT IS A GRADIENT FONT and needs the gradient palette builder, not a
            single index. Setting fp[1] alone and leaving the rest DB_TBLACK, which is what
@@ -1486,12 +2104,13 @@ void dopt_draw(DB_Surface *s, const DB_Pack *p, const DOPT_State *st)
     if (st->page == DOPT_PAGE_VISUALS)  { dopt_draw_visuals(s, p, st);  return; }
     if (st->page == DOPT_PAGE_ADVANCED) { dopt_draw_advanced(s, p, st); return; }
     if (st->page == DOPT_PAGE_CHEATS)   { dopt_draw_cheats(s, p, st);   return; }
+    if (st->page == DOPT_PAGE_GAMEPLAY) { dopt_draw_gameplay(s, p, st); return; }
     if (st->page == DOPT_PAGE_SOUND)    { dopt_draw_sound(s, p, st);    return; }
     if (st->page == DOPT_PAGE_CONFIRM)  { dopt_draw_confirm(s, p, st);  return; }
 
     if (st->page == DOPT_PAGE_CONTROLS) {
-        dopt_dialog_box(s, DOPT_GC_X, DOPT_GC_Y, DOPT_GC_W, DOPT_GC_H);
-        dopt_caption(s, p, "Game Controls", DOPT_GC_X, DOPT_GC_Y, DOPT_GC_W);
+        dopt_style_dialog(s, DOPT_GC_X, DOPT_GC_Y, DOPT_GC_W, DOPT_GC_H);
+        dopt_style_caption(s, p, "Game Controls", DOPT_GC_X, DOPT_GC_Y, DOPT_GC_W);
         for (i = 0; i < DOPT_C_SOUNDCTRL; i++) {
             dopt_draw_slider_label(s, f, st, i);
             switch (i) {
@@ -1508,8 +2127,8 @@ void dopt_draw(DB_Surface *s, const DB_Pack *p, const DOPT_State *st)
         return;
     }
 
-    dopt_dialog_box(s, DOPT_X, DOPT_Y, DOPT_W, DOPT_H);
-    dopt_caption(s, p, "Options", DOPT_X, DOPT_Y, DOPT_W);
+    dopt_style_dialog(s, DOPT_X, DOPT_Y, DOPT_W, DOPT_H);
+    dopt_style_caption(s, p, "Options", DOPT_X, DOPT_Y, DOPT_W);
     for (i = 0; i < DOPT_ITEM_COUNT; i++)
         dopt_draw_button(s, f, st, i, dopt_items[i].label);
 

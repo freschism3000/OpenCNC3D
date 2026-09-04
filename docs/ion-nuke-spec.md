@@ -97,7 +97,7 @@ slot 6 node 0x801B4A18 (ROM 0x158488):
    +00 8015CE18  +04 00000000  +08 801B4A10  +0C 00000000  +10 00000000
 ```
 
-That is the whole reason slots 1..5 are recorded as "pure transform rigs with
+That is the whole reason `known-gap notes` records slots 1..5 as "pure transform rigs with
 no geometry at all". They are not rigs. The cartridge's own node renderer
 (RAM 0x8008F988 / ROM 0x090588) reads node+0x10 and I disassembled that arm:
 
@@ -279,7 +279,7 @@ Chain: ANIM_ATOM_BLAST chains to recipe index 8 = ANIM_ART_EXP1 on completion (t
 table does the same); ANIM_ION_CANNON chains to nothing (DOS chains it to ART_EXP1, so the
 cartridge deliberately removed that).
 
-### 1.4 Two things the sweep refuted, and they need to be recorded as open questions
+### 1.4 Two things the sweep refuted, and they need to reach `known-gap notes`
 
 **(a) The EYE / ATWR tail at t 153280..160000 is NOT an Ion Cannon discharge.** I verified
 the names out of the model-table name array (ROM 0x1DE924, delta 0x8000BE30, entry =
@@ -478,11 +478,11 @@ uses: `QueueAnim(type, stage, x, y)`.
 
 - Ion Cannon: the brain's `HouseClass::Place_Special_Blast` spawns `ANIM_ION_CANNON` at the
   target cell, so a type-59 anim appearing in the export **is** the fire event. Latch on
-  it, exactly as already suggested.
+  it, exactly as `known-gap notes` already suggests.
 - Nuclear Strike: `BulletClass::AI` spawns `ANIM_ATOM_BLAST` at the impact cell from
   `BulletTypeClass::Explosion`. Also already exported.
 
-**Neither effect needs a per-building fire signal.** The earlier note that ATWR
+**Neither effect needs a per-building fire signal.** The `known-gap notes` note that ATWR
 would need one belongs to the EYE/ATWR tail clip, and that clip is a collapse, not a
 discharge (1.4a). It is not part of either superweapon.
 
@@ -603,7 +603,7 @@ measured count against a number this document takes from the cartridge.
 ## 6. WHAT WOULD BE OURS RATHER THAN THE CARTRIDGE'S
 
 If this were built today, these are the parts the ROM does not answer. They must be named
-as an open question rather than shipped as if decoded.
+in `known-gap notes` rather than shipped as if decoded.
 
 1. **The nuclear blast's blend mode and combiner.** Unknown 1 above. Whatever we pick,
    translucent or additive or opaque, is our choice until the inherited state is read out

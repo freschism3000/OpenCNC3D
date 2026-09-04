@@ -19,7 +19,7 @@
 struct TtSlot { unsigned short tmpl; unsigned char icon; unsigned short slot;
                 unsigned char sea; };
 
-/* TEMPERAT: 758 tiles in the bank, 241 of them showing sea. */
+/* TEMPERAT: 758 tiles in the bank, 235 of them showing sea. */
 #define TT_TEMPERAT_N 758
 #define TT_TEMPERAT_SLOTS 758
 static const TtSlot TT_TEMPERAT[TT_TEMPERAT_N] = {
@@ -592,9 +592,9 @@ static const TtSlot TT_TEMPERAT[TT_TEMPERAT_N] = {
     { 136, 12, 508, 1 },
     { 136, 13, 509, 1 },
     { 136, 14, 510, 1 },
-    { 136, 16, 518, 1 },
-    { 136, 17, 519, 1 },
-    { 137, 0, 620, 1 },
+    { 136, 16, 518, 0 },
+    { 136, 17, 519, 0 },
+    { 137, 0, 620, 0 },
     { 137, 1, 621, 1 },
     { 137, 2, 622, 1 },
     { 137, 3, 623, 1 },
@@ -606,7 +606,7 @@ static const TtSlot TT_TEMPERAT[TT_TEMPERAT_N] = {
     { 137, 9, 629, 1 },
     { 137, 10, 630, 1 },
     { 137, 11, 631, 1 },
-    { 137, 12, 632, 1 },
+    { 137, 12, 632, 0 },
     { 138, 0, 469, 1 },
     { 138, 1, 470, 0 },
     { 138, 4, 471, 1 },
@@ -620,7 +620,7 @@ static const TtSlot TT_TEMPERAT[TT_TEMPERAT_N] = {
     { 138, 13, 485, 0 },
     { 138, 14, 486, 1 },
     { 138, 15, 487, 1 },
-    { 139, 2, 604, 1 },
+    { 139, 2, 604, 0 },
     { 139, 3, 605, 1 },
     { 139, 5, 608, 1 },
     { 139, 6, 609, 1 },
@@ -641,7 +641,7 @@ static const TtSlot TT_TEMPERAT[TT_TEMPERAT_N] = {
     { 140, 6, 574, 0 },
     { 140, 7, 575, 1 },
     { 140, 8, 576, 1 },
-    { 141, 0, 555, 1 },
+    { 141, 0, 555, 0 },
     { 141, 1, 556, 1 },
     { 141, 2, 557, 1 },
     { 141, 3, 558, 0 },
@@ -783,7 +783,7 @@ static const TtSlot TT_TEMPERAT[TT_TEMPERAT_N] = {
     { 187, 8, 732, 0 },
 };
 
-/* DESERT: 973 tiles in the bank, 349 of them showing sea. */
+/* DESERT: 973 tiles in the bank, 341 of them showing sea. */
 #define TT_DESERT_N 973
 #define TT_DESERT_SLOTS 973
 static const TtSlot TT_DESERT[TT_DESERT_N] = {
@@ -1254,7 +1254,7 @@ static const TtSlot TT_DESERT[TT_DESERT_N] = {
     { 149, 0, 625, 0 },
     { 149, 1, 626, 0 },
     { 149, 2, 627, 0 },
-    { 149, 3, 628, 1 },
+    { 149, 3, 628, 0 },
     { 149, 4, 637, 1 },
     { 149, 5, 638, 1 },
     { 149, 6, 639, 1 },
@@ -1310,7 +1310,7 @@ static const TtSlot TT_DESERT[TT_DESERT_N] = {
     { 152, 16, 635, 1 },
     { 152, 17, 636, 1 },
     { 152, 18, 641, 0 },
-    { 152, 19, 642, 1 },
+    { 152, 19, 642, 0 },
     { 152, 20, 643, 0 },
     { 152, 21, 644, 1 },
     { 152, 22, 645, 1 },
@@ -1361,7 +1361,7 @@ static const TtSlot TT_DESERT[TT_DESERT_N] = {
     { 155, 19, 772, 1 },
     { 155, 20, 773, 1 },
     { 155, 21, 774, 1 },
-    { 155, 22, 775, 1 },
+    { 155, 22, 775, 0 },
     { 155, 24, 776, 0 },
     { 155, 25, 777, 1 },
     { 155, 26, 778, 1 },
@@ -1433,7 +1433,7 @@ static const TtSlot TT_DESERT[TT_DESERT_N] = {
     { 159, 8, 608, 0 },
     { 160, 0, 113, 0 },
     { 160, 1, 114, 1 },
-    { 160, 2, 115, 1 },
+    { 160, 2, 115, 0 },
     { 160, 3, 125, 1 },
     { 160, 4, 126, 1 },
     { 160, 5, 127, 0 },
@@ -1520,7 +1520,7 @@ static const TtSlot TT_DESERT[TT_DESERT_N] = {
     { 171, 1, 147, 0 },
     { 171, 2, 148, 0 },
     { 171, 3, 149, 1 },
-    { 171, 4, 150, 1 },
+    { 171, 4, 150, 0 },
     { 171, 5, 151, 0 },
     { 171, 6, 153, 0 },
     { 171, 7, 154, 0 },
@@ -1542,7 +1542,7 @@ static const TtSlot TT_DESERT[TT_DESERT_N] = {
     { 172, 1, 857, 0 },
     { 172, 2, 858, 0 },
     { 172, 3, 859, 1 },
-    { 172, 4, 860, 1 },
+    { 172, 4, 860, 0 },
     { 172, 5, 861, 0 },
     { 172, 6, 865, 0 },
     { 172, 7, 866, 0 },
@@ -1692,14 +1692,14 @@ static const TtSlot TT_DESERT[TT_DESERT_N] = {
     { 204, 2, 744, 1 },
     { 204, 3, 745, 1 },
     { 204, 6, 749, 1 },
-    { 204, 7, 750, 1 },
+    { 204, 7, 750, 0 },
     { 204, 10, 837, 1 },
     { 204, 11, 838, 1 },
     { 205, 0, 501, 0 },
     { 205, 1, 502, 0 },
     { 205, 2, 503, 1 },
     { 205, 3, 504, 1 },
-    { 205, 4, 509, 1 },
+    { 205, 4, 509, 0 },
     { 205, 5, 510, 1 },
     { 205, 6, 511, 1 },
     { 205, 7, 512, 1 },
@@ -2608,7 +2608,7 @@ static const TtSlot TT_WINTER[TT_WINTER_N] = {
     { 187, 8, 839, 0 },
 };
 
-/* SNOW: 840 tiles in the bank, 3 of them showing sea. */
+/* SNOW: 840 tiles in the bank, 0 of them showing sea. */
 #define TT_SNOW_N 840
 #define TT_SNOW_SLOTS 840
 static const TtSlot TT_SNOW[TT_SNOW_N] = {
@@ -2658,8 +2658,8 @@ static const TtSlot TT_SNOW[TT_SNOW_N] = {
     { 7, 1, 43, 0 },
     { 7, 2, 44, 0 },
     { 7, 3, 45, 0 },
-    { 7, 4, 46, 1 },
-    { 7, 5, 47, 1 },
+    { 7, 4, 46, 0 },
+    { 7, 5, 47, 0 },
     { 7, 6, 48, 0 },
     { 7, 7, 49, 0 },
     { 7, 8, 50, 0 },
@@ -3212,7 +3212,7 @@ static const TtSlot TT_SNOW[TT_SNOW_N] = {
     { 138, 0, 597, 0 },
     { 138, 1, 598, 0 },
     { 138, 4, 599, 0 },
-    { 138, 5, 600, 1 },
+    { 138, 5, 600, 0 },
     { 138, 6, 601, 0 },
     { 138, 7, 602, 0 },
     { 138, 8, 603, 0 },

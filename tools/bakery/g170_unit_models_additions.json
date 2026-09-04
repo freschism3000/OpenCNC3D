@@ -1,0 +1,86 @@
+{
+ "SCRATE": {
+  "confidence": "high",
+  "dl_rom": "0x011D4C8",
+  "evidence": "Steel goodie crate. The cell-decoration draw table at RAM 0x8020FF58 record 34 is {88, -1} and the OverlayTypeClass registration for SCRATE at ROM 0x195A18 passes 34 as its third constructor argument (ctor RAM 0x801F2F20). Model slot = type id + 10, so slot 98. Cube 185 x 185 x 184 mesh units = 0.18 cell on a side. The game draws a flat 1995 DOS sprite quad here instead. Placed on 8 desert cells in 8 maps and 6 temperate cells in 5; the brain also drops crates at run time.",
+  "kind": "overlay",
+  "mesh": "dl_011D4C8",
+  "model_index": 98,
+  "node_ram": "0x801B775C",
+  "segment": "GameModelsGeometry",
+  "tris": 10,
+  "type_id": 88
+ },
+ "T04D": {
+  "confidence": "high",
+  "dl_rom": "0x00FE360",
+  "evidence": "DESERT substitute for T04. The draw enqueue at RAM 0x8004A420 adds 97 to any model id in [103,121] when the theater word at RAM 0x80097150 is 0, and theater 0 is DESERT by the loader's own filename switch at RAM 0x801E5190. T04 is id 106, so in desert it draws id 203, model slot 213. Tall columnar cactus with its ground patch. Shipped desert maps place T04 on 32 cells in 6 missions.",
+  "kind": "terrain",
+  "mesh": "dl_00FE360",
+  "model_index": 213,
+  "node_ram": "0x801B46C8",
+  "segment": "GameModelsGeometry",
+  "theaters": [
+   "desert"
+  ],
+  "tris": 12,
+  "type_id": 203
+ },
+ "T08D": {
+  "confidence": "high",
+  "dl_rom": "0x00FE660",
+  "evidence": "DESERT substitute for T08 (id 110 -> 207 -> slot 217). Wide brown desert scrub tree. Shipped desert maps place T08 on 558 cells in 44 missions, the commonest terrain object in the theater.",
+  "kind": "terrain",
+  "mesh": "dl_00FE660",
+  "model_index": 217,
+  "node_ram": "0x801B46E4",
+  "segment": "GameModelsGeometry",
+  "theaters": [
+   "desert"
+  ],
+  "tris": 8,
+  "type_id": 207
+ },
+ "T09D": {
+  "confidence": "high",
+  "dl_rom": "0x00FE918",
+  "evidence": "DESERT substitute for T09 (id 112 -> 209 -> slot 219). Small twin cactus. Shipped desert maps place T09 on 29 cells in 8 missions.",
+  "kind": "terrain",
+  "mesh": "dl_00FE918",
+  "model_index": 219,
+  "node_ram": "0x801B4700",
+  "segment": "GameModelsGeometry",
+  "theaters": [
+   "desert"
+  ],
+  "tris": 8,
+  "type_id": 209
+ },
+ "T18D": {
+  "confidence": "high",
+  "dl_rom": "0x00FEBD8",
+  "evidence": "DESERT substitute for T18 (id 121 -> 218 -> slot 228). Largest desert scrub tree. Shipped desert maps place T18 on 320 cells in 44 missions.",
+  "kind": "terrain",
+  "mesh": "dl_00FEBD8",
+  "model_index": 228,
+  "node_ram": "0x801B471C",
+  "segment": "GameModelsGeometry",
+  "theaters": [
+   "desert"
+  ],
+  "tris": 8,
+  "type_id": 218
+ },
+ "WCRATE": {
+  "confidence": "high",
+  "dl_rom": "0x010F3C8",
+  "evidence": "Wooden goodie crate. Draw table record 36 is {90, -1} and the WCRATE registration at ROM 0x1959C4 passes 36. Slot 100. Slots 99..105 are seven table entries sharing this one record, so any connectivity offset the mode-2 draw path applies lands on the same cube. Cube 185 x 185 x 184 mesh units. Placed on 12 desert cells in 10 maps and 15 temperate cells in 14.",
+  "kind": "overlay",
+  "mesh": "dl_010F3C8",
+  "model_index": 100,
+  "node_ram": "0x801B6930",
+  "segment": "GameModelsGeometry",
+  "tris": 10,
+  "type_id": 90
+ }
+}

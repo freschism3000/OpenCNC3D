@@ -20,7 +20,7 @@ tools/launcher/selftest.sh            prove the whole update path, end to end
 
 You do not normally run any of these by hand. `game/make-build.sh` builds the macOS
 launcher into `playable/`, `tools/win/make-build-win.sh` builds the Windows one into the
-package, and `tools/release.sh` does the lot.
+package, and `tools/release.sh` does the lot (repository rules rule 9).
 
 ## Why it is not a new UI toolkit
 
@@ -167,11 +167,11 @@ script can tell the three apart without reading the text.
 
 The `--` passthrough is how the macOS bundle keeps handing the game `--w 1600 --h 960`.
 That is not a number the launcher should know: the sidebar magnifies by whole numbers
-only, so the window height has to be a multiple of 480.
+only, so the window height has to be a multiple of 480 (`known-gap notes`).
 
 ## What is not done
 
-Registered as an open question rather than left to be rediscovered:
+Registered in `known-gap notes` rather than left to be rediscovered:
 
 1. **Neither the Windows launcher nor the installer has been RUN on Windows.** Both cross
    compile clean and the installer counts the files it embedded, but that is packaging

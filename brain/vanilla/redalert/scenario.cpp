@@ -297,11 +297,11 @@ bool ScenarioClass::Set_Global_To(int global, bool value)
  * Start_Scenario -- Starts the scenario.                                                      *
  *                                                                                             *
  *    This routine will start the scenario. In addition to loading the scenario data, it will  *
- *    play the briefing and action movies.                                                     *
+ *    play the mission briefing and action movies.                                                     *
  *                                                                                             *
  * INPUT:   root     -- Pointer to the filename root for this scenario (e.g., "SCG01EA").      *
  *                                                                                             *
- *          briefing -- Should the briefing be played? Normally this is true except when the   *
+ *          briefing -- Should the mission briefing be played? Normally this is true except when the   *
  *                      scenario is restarting.                                                *
  *                                                                                             *
  * OUTPUT:  Was the scenario started without error?                                            *
@@ -2420,7 +2420,7 @@ bool Read_Scenario_INI(char* fname, bool)
     Call_Back();
 
     /*	Moved above ini.Get_TextBlock(...) so Xlat mission.ini could be loaded
-    **	If the briefing text could not be found in the INI file, then search
+    **	If the mission briefing text could not be found in the INI file, then search
     **	the mission.ini file.  VG 10/17/96
     */
     INIClass mini;

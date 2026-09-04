@@ -2980,11 +2980,20 @@ short const* UnitClass::Overlap_List(void) const
         return (&_gunboat[0]);
     }
 
+    /*
+    **	CNC3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
+    **	the bigger half. ICON_PIXEL_W * 2 is 48, and the _gigundo test is a strict greater
+    **	than, so a selected vehicle took the by-hand branch at maxsize 24 and got the full
+    **	3x3 ring. For a unit that is already IsFiring, IsGigundo, IsAnimAttached or Flagged
+    **	the size was 48 either way, so for those this is a no-op in both modes.
+    */
+    bool selected = !CNC3D_Lockstep && Is_Selected_By_Player();
+
     size = ICON_PIXEL_W;
-    if (Is_Selected_By_Player() || IsFiring) {
+    if (selected || IsFiring) {
         size += 24;
     }
-    if (Is_Selected_By_Player() || Class->IsGigundo || IsAnimAttached || Flagged != HOUSE_NONE) {
+    if (selected || Class->IsGigundo || IsAnimAttached || Flagged != HOUSE_NONE) {
         size = ICON_PIXEL_W * 2;
     }
     return (Coord_Spillage_List(Coord, size) + 1);
@@ -3796,11 +3805,9 @@ void UnitClass::Read_INI(CCINIClass& ini)
                         int strength = atoi(strtok(NULL, ",\r\n"));
                         CELL cell = (CELL)atoi(strtok(NULL, ",\n\r"));
                         /*
-                        ** Convert the normal cell position to a new big map position.
+                        ** Convert from the scenario's OWN stride into this build's (function.h).
                         */
-                        if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-                            cell = Confine_Old_Cell(cell);
-                        }
+                        cell = Confine_Scenario_Cell(cell, Map.MapBinaryVersion);
                         COORDINATE coord = Cell_Coord(cell);
                         DirType dir = (DirType)atoi(strtok(NULL, ",\r\n"));
                         MissionType mission = MissionClass::Mission_From_Name(strtok(NULL, ",\n\r"));
@@ -3887,7 +3894,8 @@ void UnitClass::Write_INI(CCINIClass& ini)
                     unit->House->Class->IniName,
                     unit->Class->IniName,
                     unit->Health_Ratio(),
-                    Coord_Cell(unit->Coord),
+                    /* the scenario's own stride, not ours -- see Scenario_Cell_Of */
+                    Scenario_Cell_Of(Coord_Cell(unit->Coord), Map.MapBinaryVersion),
                     unit->PrimaryFacing.Current(),
                     MissionClass::Mission_Name(unit->Mission),
                     unit->Trigger ? unit->Trigger->Get_Name() : "None");

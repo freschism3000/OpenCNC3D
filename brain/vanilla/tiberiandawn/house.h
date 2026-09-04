@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Declares, on HouseClass, a static bitmask of houses whose super weapons
+// were granted by the cheat menu plus a setter and a getter for it.
+// Declarations only; the behaviour that reads the flag lives in house.cpp.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\house.h_v   2.21   16 Oct 1995 16:46:14   JOE_BOSTIC  $ */
 /***********************************************************************************************

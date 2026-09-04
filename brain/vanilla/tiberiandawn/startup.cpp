@@ -14,9 +14,12 @@
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
 // MODIFIED for C&C 3D in August 2026. This is not EA's original file.
-// The change is additive and does not alter the game simulation; the complete
-// diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
-// lists every modified file.
+// Adds a single include of "cnc3d_compat.h", the project's small Win32
+// compatibility shim, ahead of function.h so the file compiles with non-
+// Windows toolchains. No other line of the file is changed.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
 //
 
 /* $Header:   F:\projects\c&c\vcs\code\startup.cpv   2.17   16 Oct 1995 16:48:12   JOE_BOSTIC  $ */

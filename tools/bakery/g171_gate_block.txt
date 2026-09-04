@@ -1,0 +1,103 @@
+# =====================================================================================
+# G171 THE ION CANNON, THE NUCLEAR STRIKE AND THE GROUND SHADOWS ARE IN EVERY PACK.
+#
+# Eight cartridge display lists carry the two superweapon effects: a beam column and
+# three shock rings for the ion strike, and a dome, a stem, a collar and a ground cloud
+# for the nuke. None of them is baked under its own name. The ion set is COMPOSED into
+# the fifteen snapshot meshes ION0..ION14 and the nuke set into the single animated
+# NUKEFX, which is why a search for the display lists reports zero and why a survey can
+# talk itself into re-baking geometry that is already there.
+#
+# The triangle profile is the proof and it closes arithmetically. A snapshot is the
+# beam (101) plus N rings of 28, and N NEVER REACHES FOUR: the cartridge authored a
+# fourth ring, tabled it, textured it, and then never drew it, so a bake that produces
+# 213 or 129+28 in the wrong slot has added a ring the console does not show. The nuke
+# is 96+20+60+160 = 336 over 31 frames, so a dropped part shows up as a smaller number
+# rather than as a missing mesh.
+#
+# The same gate holds the eighteen vehicle and aircraft ground shadows in the PKD block,
+# BY NAME AND IN ORDER, and checks two of the quads by size. That pair is not
+# decoration: the shadow table's records are {typeId, x3, node} at stride 0x14, and
+# reading them as {node, typeId} shifts every name by one place, which puts the Mobile
+# SAM's 298 x 718 quad under the buggy and the buggy's 512 x 1084 under the flame tank.
+# The two extents below are the cheapest possible fence against that slip coming back.
+# =====================================================================================
+G171=$(python3 - "$GATEDIR/../tools/bakery" <<'G171EOF' 2>&1
+import glob, struct, sys
+sys.path.insert(0, sys.argv[1])
+try:
+    import packinspect
+except Exception as e:
+    print("G171|ERROR|packinspect: %s" % e); raise SystemExit(0)
+
+ION = [101, 101, 129, 129, 157, 157, 185, 185, 84, 84, 84, 56, 56, 28, 28]
+SHAD = ["MHQ", "HTNK", "MTNK", "MSAM", "BGGY", "FTNK", "LTNK", "ARTY", "BIKE", "JEEP",
+        "MCV", "A10", "ORCA", "TRAN", "HELI", "C17", "HARV", "STNK"]
+REC = 96                                  # name8 + bank4 + prim4 + 4 x (x,y,z,u,v)
+BEHIND = 65 * 65 * 2 + 65 * 65 + 4 + 8    # cm tint, heights, seabed, water
+
+def pkd(path):
+    b = open(path, "rb").read()
+    end = len(b) - BEHIND
+    for n in range(63, 0, -1):
+        start = end - n * REC - 4
+        if start >= 0 and struct.unpack_from("<I", b, start)[0] == n:
+            out, o = [], start + 4
+            for _ in range(n):
+                nm = b[o:o + 8].split(b"\0")[0].decode("latin-1")
+                vs = [struct.unpack_from("<5f", b, o + 16 + 20 * k) for k in range(4)]
+                out.append((nm, vs))
+                o += REC
+            return out
+    return []
+
+npack = 0; efx = 0; shad = 0; ext = 0; first = ""
+for p in sorted(glob.glob("*.pack")):
+    try:
+        d = packinspect.read(p)
+    except Exception:
+        continue                          # asset packs and USER maps: not mission packs
+    npack += 1
+    tm = dict((t[0], t[1]) for t in d["types"])
+    prof = [d["meshes"][tm[k]]["ntris"] for k in ("ION%d" % i for i in range(len(ION)))
+            if k in tm]
+    nuke = tm.get("NUKEFX")
+    nm = d["meshes"][nuke] if nuke is not None else None
+    okefx = (prof == ION and "ION%d" % len(ION) not in tm and nm is not None
+             and nm["ntris"] == 336 and nm["anim"] and nm["anim"]["frames"] == 31)
+    if okefx:
+        efx += 1
+    elif not first:
+        first = "%s ion=%s nuke=%s" % (p, prof, nm and nm["ntris"])
+    rows = pkd(p)
+    if [r[0] for r in rows] == SHAD:
+        shad += 1
+        sz = {}
+        for name, vs in rows:
+            xs = [v[0] for v in vs]; zs = [v[2] for v in vs]
+            sz[name] = (int(round(max(xs) - min(xs))), int(round(max(zs) - min(zs))))
+        if sz.get("MSAM") == (298, 718) and sz.get("BGGY") == (512, 1084):
+            ext += 1
+        elif not first:
+            first = "%s MSAM=%s BGGY=%s" % (p, sz.get("MSAM"), sz.get("BGGY"))
+    elif not first:
+        first = "%s shadows=%s" % (p, [r[0] for r in rows][:6])
+print("G171|packs=%d|efx=%d|shadows=%d|extents=%d|%s" % (npack, efx, shad, ext, first))
+G171EOF
+)
+echo "$G171" >> "$OUT"
+G171N=$(printf '%s\n' "$G171" | sed -n 's/^G171|packs=\([0-9]*\).*/\1/p')
+G171E=$(printf '%s\n' "$G171" | sed -n 's/^G171|packs=[0-9]*|efx=\([0-9]*\).*/\1/p')
+G171S=$(printf '%s\n' "$G171" | sed -n 's/^G171|.*|shadows=\([0-9]*\)|.*/\1/p')
+G171X=$(printf '%s\n' "$G171" | sed -n 's/^G171|.*|extents=\([0-9]*\)|.*/\1/p')
+if [ -z "$G171N" ] || [ "${G171N:-0}" -lt 80 ]; then
+  bad "G171 the superweapon meshes: the reader saw ${G171N:-no} mission packs (want at least 80), so every count below is of nothing. [$G171]"
+elif [ "$G171E" != "$G171N" ]; then
+  bad "G171 the superweapon meshes: only $G171E of $G171N packs carry NUKEFX at 336 triangles over 31 frames AND ION0..ION14 at 101 101 129 129 157 157 185 185 84 84 84 56 56 28 28 with no sixteenth snapshot. A snapshot is the beam plus N rings of 28 and N must never reach four, because the cartridge never draws its fourth ring. First offender: [$G171]"
+elif [ "$G171S" != "$G171N" ]; then
+  bad "G171 the ground shadows: only $G171S of $G171N packs carry the eighteen PKD vehicle and aircraft shadows by name and in the cartridge's own order. First offender: [$G171]"
+elif [ "$G171X" != "$G171N" ]; then
+  bad "G171 the ground shadows: the names are right in all $G171N packs but only $G171X carry MSAM at 298 x 718 and BGGY at 512 x 1084. Those two sizes are the fence against reading the shadow table's {typeId, x3, node} records as {node, typeId}, which shifts every name by one place. First offender: [$G171]"
+else
+  ok "G171 the superweapon meshes and the ground shadows: all $G171N mission packs carry NUKEFX at 336 triangles over 31 frames, ION0..ION14 at the beam-plus-N-rings profile with no fourth ring and no sixteenth snapshot, and the eighteen PKD shadows in order with MSAM at 298 x 718 and BGGY at 512 x 1084"
+fi

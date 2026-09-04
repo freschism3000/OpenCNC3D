@@ -1833,7 +1833,7 @@ function syncOverlays(){
    OrbitControls calls setPointerCapture on this very canvas, so the left button has
    to be taken away from it while editing or it eats the drag. pointermove and
    pointerup go on WINDOW and nothing here captures the pointer: a capture is exactly
-   what stole a click in the original GamedevTycoon map pins. The canvas needs
+   what stole a click in the project owner's own GamedevTycoon map pins. The canvas needs
    touch-action none or a touch drag scrolls the page instead. pointercancel has to
    clean up as well as pointerup. And OrbitControls binds contextmenu, so the right
    button needs its own preventDefault or the browser menu lands mid-orbit. */

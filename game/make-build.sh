@@ -25,6 +25,20 @@ GITDESC=$(git describe --always --dirty 2>/dev/null || echo untracked)
 # moment it builds, VERSION has been bumped and not yet committed, so git describe would
 # name the artefact "-dirty" for what is about to become a clean release.
 [ -n "$CNC3D_BUILD_ID" ] && GITDESC="$CNC3D_BUILD_ID"
+
+# GENERATE BEFORE YOU COMPILE. bake_pack.py writes game/hud640_layout.h, and hud640.h
+# takes every coordinate from it, so it is a compile INPUT. It used to run after the three
+# builds, two hundred lines below, which left every binary a second or two older than a
+# header it had compiled against and made G30 report STALE after a perfectly good build.
+# "STALE by 0 min" is the signature: not a real staleness, a same-minute ordering.
+# This is the FIFTH variant of one trap on this project -- a tool touching a file another
+# tool is timed against -- and the other four all cost somebody an afternoon. The bake
+# itself still runs in its old place for the PACK it writes; this early call is only so
+# the header exists and is older than the objects. It is cheap and idempotent: a second
+# run rewrites identical bytes, and the guard below is the same one the later call uses.
+python3 ../tools/sidebar_redesign/bake_pack.py >/dev/null || {
+    echo "make-build.sh: bake_pack.py failed; hud640_layout.h would be stale" >&2; exit 1; }
+
 ./build.sh
 (cd ../app && ./build.sh)          # the merged program: menu, movies, mission, sound
 (cd ../launcher && ./build.sh) # the front door: version, changelog, update, Play
@@ -38,7 +52,7 @@ cp ../app/cnc3d "$DEST/"
 # that breaks the moment anyone moves the app. At the root it is an ordinary file
 # beside the game: tools/bundle-sdl.sh below finds it by scanning the folder, and
 # the binary-only update can name it. C&C3D.app stays a tracked, binary-free
-# wrapper whose script execs it.
+# wrapper whose script execs it (repository rules rule 2 keeps binaries out of git).
 cp ../launcher/cnc3d-launcher "$DEST/"
 [ -x "$DEST/cnc3d-launcher" ] || { echo "the launcher did not reach $DEST" >&2; exit 1; }
 
@@ -84,7 +98,7 @@ cp ../menu/dosmenu.pack "$DEST/" 2>/dev/null || true
 # is to say so rather than to paper over it with old bytes.
 #
 # content/ and CONQUER.MIX are the two with no baker. They are left alone here: where they
-# are meant to live is an open question and not this script's to settle.
+# are meant to live is an open question in known-gap notes and not this script's to settle.
 # Note only that the RIGHT CONQUER.MIX is the 268366-byte one beside the other play data,
 # not the 2244000-byte archive of the same name in data/dosdata, which is a different file.
 
@@ -99,6 +113,29 @@ cp ../menu/dosmenu.pack "$DEST/" 2>/dev/null || true
 # smudges, the verdict banner, the DOS infantry -- write beside themselves in game/. A
 # refresh that scanned only the first would ship a stale smudge.pack on a clean machine
 # and nothing would say so, which is the same hole this block was written to close.
+# TWO BAKERS DO NOT WRITE INTO EITHER SCANNED DIRECTORY, so the loop below cannot
+# refresh what they make and a folder that already has an old copy keeps it for ever:
+#
+#   bake_pack.py  writes straight to $REPO/playable/hud640.pack -- not tools/bakery/game,
+#                 not game/ -- so the loop has never seen it at all.
+#   bake_logos.py writes game/logos.pack, which the loop DOES see, but only a re-bake
+#                 makes it newer than the copy already in the folder.
+#
+# That is how a build ships a feature's code without its art: the DATABASE tab's plate
+# lives in hud640.pack and its EVA wordmark in logos.pack, and a binary-only refresh
+# leaves both behind. Baking here costs a couple of seconds and closes it. Both read only
+# committed inputs (tools/sidebar_redesign/chunks/ and data/rom), so this works on a
+# clean clone.
+echo "baking the two packs no scanned directory carries"
+python3 ../tools/sidebar_redesign/bake_pack.py >/dev/null || {
+    echo "make-build.sh: bake_pack.py failed; hud640.pack would be stale" >&2; exit 1; }
+python3 bake_logos.py >/dev/null || {
+    echo "make-build.sh: bake_logos.py failed; logos.pack would be stale" >&2; exit 1; }
+# bake_pack.py writes into the REPO's playable, which is not necessarily $DEST.
+if [ "$REPO/playable/hud640.pack" != "$DEST/hud640.pack" ]; then
+    cp "$REPO/playable/hud640.pack" "$DEST/hud640.pack"
+fi
+
 n=0
 for BAKED in ../tools/bakery/game .; do
   [ -d "$BAKED" ] || continue
@@ -193,6 +230,21 @@ done
 cp gate_optlayout "$DEST/" 2>/dev/null || true
 [ -x "$DEST/gate_optlayout" ] || { echo "FAIL: gate_optlayout did not reach $DEST (G57 runs it; game/build.sh makes it)" >&2; exit 1; }
 g=$((g+1))
+# THE LOCKSTEP GATES, and the same argument as gate_optlayout word for word: they are
+# binaries, so none of the .txt/.py/.sh patterns above reach them, and G130 runs both of
+# them from this folder. Without this the gate that needs no window, no pack and no brain
+# is the one gate that cannot run, and it reports exit=99 as a FAILURE rather than a skip.
+# That is deliberate in the gate and useless here: a red light for a missing file, on the
+# suite that decides whether a release may be cut.
+#
+# netcheck is not a gate. It rides along because this folder is where a person is standing
+# when a match will not start, and it is the tool that answers whether the two ends can
+# lockstep at all before the game is blamed for it.
+for b in gate_lockstep gate_netloop netcheck; do
+  cp "$b" "$DEST/" 2>/dev/null || true
+  [ -x "$DEST/$b" ] || { echo "FAIL: $b did not reach $DEST (G130 runs the two gates; game/build.sh makes all three)" >&2; exit 1; }
+  g=$((g+1))
+done
 echo "gates: $g files copied to $DEST"
 
 # THE SOUND DATA. Without dosdata/ beside the binary the build boots, plays and is
@@ -210,9 +262,11 @@ fi
 # macOS 26 rejected the release before main() ran -- on top of, and hiding behind, the
 # SDL bundling that was supposed to make a release playable elsewhere.
 #
-# WHAT IS CHECKED: cnc3d, cnc_eyes and every .dylib -- which is exactly the set
-# tools/mac/make-package-mac.sh ships, the two binaries by name and the libraries by the
-# same *.dylib glob. Not the whole folder: playable/ is the developer's working folder
+# WHAT IS CHECKED: cnc3d, cnc_eyes, netcheck and every .dylib -- the binaries by name and
+# the libraries by the same *.dylib glob the macOS packager uses. netcheck is on the list
+# because it ships too, and because of what it is for: it is the tool a person reaches for
+# when a match will not start, so a copy that dyld refuses would answer that question with
+# nothing at all. Not the whole folder: playable/ is the developer's working folder
 # and accumulates things that are on nobody's allow-list (cnc_eyes_head, a stale binary
 # referenced by nothing, is sitting in it as this is written), and a build that refuses
 # over a file that does not ship is a build that gets switched off.
@@ -224,7 +278,7 @@ fi
 # fixed.
 . ../tools/mac/deployment-target.sh
 floorbad=0
-for p in "$DEST/cnc3d" "$DEST/cnc_eyes" "$DEST"/*.dylib; do
+for p in "$DEST/cnc3d" "$DEST/cnc_eyes" "$DEST/netcheck" "$DEST"/*.dylib; do
   [ -f "$p" ] || continue
   MIN=$(otool -l "$p" 2>/dev/null \
         | awk '/LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX/{f=1} f && /^ *(minos|version) /{print $2; exit}')
@@ -246,7 +300,7 @@ done
   echo "the brain gets it from tools/mac/build-brain-mac.sh, which is what to run if the" >&2
   echo "name above is TiberianDawn.dylib." >&2
   exit 1; }
-echo "macOS floor: cnc3d, cnc_eyes and every .dylib in $DEST are $CNC3D_MACOS_MIN or older"
+echo "macOS floor: cnc3d, cnc_eyes, netcheck and every .dylib in $DEST are $CNC3D_MACOS_MIN or older"
 
 # A COMPLETE PLAY FOLDER, OR A REFUSAL THAT NAMES WHAT IS MISSING AND WHO MAKES IT.
 #
@@ -267,7 +321,7 @@ check_asset() {   # $1 = file or dir, $2 = how to get it
   $1
       $2"
 }
-check_asset content            "the theater archives. No baker in this repo: see the open questions"
+check_asset content            "the theater archives. No baker in this repo: see known-gap notes"
 check_asset CONQUER.MIX        "the 268366-byte one. NOT data/dosdata's 2244000-byte file of that name"
 check_asset dossidebar.pack    "game/bake_dossidebar.py   (the game REFUSES to draw a sidebar without it)"
 check_asset cameos.pack        "game/bake_cameos.py"
@@ -283,13 +337,29 @@ check_asset logos.pack         "game/bake_logos.py       (the score screen's spi
 check_asset hud640.pack        "tools/sidebar_redesign/bake_pack.py"
 check_asset cameos95.pack      "tools/sidebar_redesign/cameos95.py"
 check_asset cameos_tdr.pack    "tools/sidebar_redesign/cameos_tdr.py"
+
+# CONTENT, NOT EXISTENCE. check_asset above answers "is there a file called that", which
+# a pack from any previous build satisfies for ever. These two carry art that a specific
+# feature needs, and a stale one of either is the failure mode this whole block exists to
+# prevent: correct code, old data, no error anywhere. Cheap to ask, so ask.
+grep -qa tab_database "$DEST/hud640.pack" 2>/dev/null || MISSING="$MISSING
+  hud640.pack carries no tab_database plate, so the DATABASE tab cannot draw
+      python3 tools/sidebar_redesign/bake_pack.py"
+python3 - "$DEST/logos.pack" <<'LOGOCHK' 2>/dev/null || MISSING="$MISSING
+  logos.pack carries fewer than 4 logos, so the EVA wordmark is missing
+      python3 game/bake_logos.py"
+import struct, sys
+d = open(sys.argv[1], "rb").read()
+sys.exit(0 if d[:8] == b"C3DLOGO1" and struct.unpack("<I", d[8:12])[0] >= 4 else 1)
+LOGOCHK
+
 if [ -n "$MISSING" ]; then
   echo "" >&2
   echo "make-build.sh: $DEST is NOT a complete play folder. Missing:$MISSING" >&2
   echo "" >&2
   echo "Refusing rather than shipping a folder that starts and is wrong. Most of these" >&2
   echo "degrade silently, so the damage would show up as a renderer bug in somebody's" >&2
-  echo "report weeks later. See the open questions, \"make-build.sh cannot assemble a" >&2
+  echo "report weeks later. See known-gap notes, \"make-build.sh cannot assemble a" >&2
   echo "complete play folder from a fresh checkout\"." >&2
   echo "" >&2
   echo "Do NOT satisfy these by copying from data/dist-v0.3.1. It is a v0.3.1 snapshot," >&2
@@ -297,6 +367,31 @@ if [ -n "$MISSING" ]; then
   echo "fails seven gates that all appear to blame the renderer." >&2
   exit 1
 fi
+
+# SKIRMISH NEEDS A PAIR PER MAP, and nothing above can see that. Every name in the list
+# above is a fixed auxiliary pack; not one scenario pack is among them, and the missions
+# copy is "|| true", so a folder can pass every check written so far with the SCM mission
+# INIs present and no SCM packs at all. skirmish_scan in app/cnc3d.cpp admits a map only
+# when it finds BOTH halves, so such a folder ships a Skirmish button with an empty lobby
+# behind it and nothing in this file says a word.
+#
+# PAIRS, NOT TOTALS. An INI can be staged without a pack, so "every INI has a pack" is
+# not the rule and would refuse a folder that is correct. The rule is that at least one
+# map is complete.
+skpairs=0
+for ini in "$DEST"/missions/SCM*.INI; do
+  [ -f "$ini" ] || continue
+  code=$(basename "$ini" .INI)
+  if [ -f "$DEST/$code.pack" ]; then skpairs=$((skpairs+1)); fi
+done
+if [ "$skpairs" -eq 0 ]; then
+  echo "" >&2
+  echo "make-build.sh: $DEST has no playable skirmish map." >&2
+  echo "A map counts only where the game counts it: missions/<CODE>.INI and" >&2
+  echo "<CODE>.pack both present. sh tools/stage-skirmish-maps.sh makes both." >&2
+  exit 1
+fi
+echo "skirmish: $skpairs map(s) with an INI and a pack"
 
 echo "build $GITDESC -> $DEST"
 echo "$GITDESC  $(date '+%Y-%m-%d %H:%M')" >> "$DEST/BUILD-HISTORY.txt"

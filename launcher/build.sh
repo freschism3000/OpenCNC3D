@@ -6,7 +6,7 @@
 #
 # The Windows half is tools/win/build-launcher-win.sh and reads the SAME source
 # list out of sources.sh, so the two cannot drift apart. That is the arrangement
-# the repository's rule 4 already imposes on the game (tools/win/check-sources.sh), for
+# repository rules rule 4 already imposes on the game (tools/win/check-sources.sh), for
 # the same reason: a file added to one platform and forgotten on the other is a
 # build that breaks on the machine you are not sitting at.
 set -e

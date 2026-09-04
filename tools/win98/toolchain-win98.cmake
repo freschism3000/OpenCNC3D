@@ -2,7 +2,7 @@
 #
 # It is a copy of brain/vanilla/cmake/i686-mingw-w64-toolchain.cmake with the Win98 C
 # runtime recipe added, and it lives HERE rather than there on purpose: brain/vanilla is
-# a checkout of someone else's GPL project and the repository conventions keeps our changes out of it.
+# a checkout of someone else's GPL project and repository rules keeps our changes out of it.
 #
 # The recipe itself is explained in tools/win98/build.sh and docs/win98-port.md section 2.
 # The short version: this mingw is UCRT-only and its libmsvcrt.a is a relabelled UCRT

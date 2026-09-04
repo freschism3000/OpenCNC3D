@@ -5,7 +5,7 @@ WHY THIS EXISTS
 
 The editor drew every word with C&C's FONT.SHP: an 8x11 fixed-cell bitmap, caps only,
 scaled by whole numbers. That is the right font for the 1995 sidebar and the wrong one
-for a tool -- every glyph the same width, nothing between 1x and 2x, and it was reported
+for a tool -- every glyph the same width, nothing between 1x and 2x, and the project owner reported
 the result three times: "UI text is still VERY uneven and in many places unreadable."
 
 So the editor gets a real face: DejaVu Sans (Bitstream Vera license -- free to embed and

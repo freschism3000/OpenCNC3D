@@ -33,7 +33,7 @@ not contemplate, because at the time the native editor could not author a script
 Gates: `--uitest`, `--picktest`, `--undotest`, `--painttest`, `--elevtest`,
 `tools/gate-scripttest.sh` (95 missions), `tools/gate-enhanced.sh`.
 
-## The 25 Aug scripting-UX rebuild (after the reported "redo the entire scripting system")
+## The 25 Aug scripting-UX rebuild (after the project owner's "redo the entire scripting system")
 
 Done in this pass, and the shape future work must keep:
 
@@ -71,7 +71,7 @@ the new chips, boxes and rename regions; AUTHGATE drives the pickers.
    but only after 1 and 2, which answer the same question in cheaper ways.
 4. **P8's terrain half.** The mission check validates the world's objects and the whole
    script; it does not check the playable rectangle, tiberium on buildable ground, or the
-   elevation refusals.
+   elevation refusals. See `known-gap notes`.
 5. **P12 surface modes and view toggles.** The view bar exists; Texture/White/Tile-type/
    Tiers, wireframe, pads, border, sea plane and the exaggeration slider do not.
 6. **P13 radar.** Jump-only. Missing the camera frustum rectangle, drag-to-fly and the
@@ -99,7 +99,7 @@ its own gate, the browser editor has nothing left that native lacks and should g
 
 ## Read this first: the recon reports are stale
 
-All five reports were written against a tree that has since been rewritten. Everything below was re-verified against the **current working copy** (`game/cnc_eyes.cpp` = 18,411 lines, `game/edit_mod.h` = 1,668 lines, both dirty on `main` at `f4c3a53`). What changed since the reports were written:
+All five reports were written against a tree that a a concurrent edit has since rewritten. I re-verified everything below against the **current working copy** (`game/cnc_eyes.cpp` = 18,411 lines, `game/edit_mod.h` = 1,668 lines, both dirty on `main` at `f4c3a53`). What changed since the reports were written:
 
 | Reported as broken | Actual state now | Evidence |
 |---|---|---|
@@ -112,7 +112,7 @@ All five reports were written against a tree that has since been rewritten. Ever
 
 `playable/cnc_eyes` is dated 24 Aug 23:10 and **already contains this code** (it answers `--uitest`, which did not exist when the reports were written). `./cnc_eyes --uitest` currently prints `UITEST|TOTAL|0 failures` across six frame sizes.
 
-**So: if the old symptoms are still visible, the first thing to check is staleness, not code.** The launcher prints `WARNING a source file is newer than this binary` into `playable/Editor.log` when the staged binary is behind. Rebuild is `cd game && ./build.sh && cp cnc_eyes ../playable/`.
+**So: if the project owner still sees the old symptoms, the first thing to check is staleness, not code.** The launcher prints `WARNING a source file is newer than this binary` into `playable/Editor.log` when the staged binary is behind. Rebuild is `cd game && ./build.sh && cp cnc_eyes ../playable/`.
 
 Everything below is what is *still* wrong or *still* missing as of right now.
 
@@ -153,7 +153,7 @@ Depends on B2 being done in the same pass, since B2's fix is verified through th
 
 Two defects in `edit_uitest` / `eui_expect` (`edit_mod.h:997-1080`):
 
-1. **Probe points use unscaled paddings.** e.g. `L.sideX + EUI_PAD + i * (L.modeW + EUI_PAD)` where `eui_layout` actually uses `EUI_PAD * S`. At S=1.05 (1920x1200) the drift at i=2 is ~1px and it passes by luck. At S=3 (Retina 2x plus a tall frame, which is exactly the reported machine) the drift is 42px, well outside a tab. Same for the literal `4`, `3`, `5`, `6` gaps.
+1. **Probe points use unscaled paddings.** e.g. `L.sideX + EUI_PAD + i * (L.modeW + EUI_PAD)` where `eui_layout` actually uses `EUI_PAD * S`. At S=1.05 (1920x1200) the drift at i=2 is ~1px and it passes by luck. At S=3 (Retina 2x plus a tall frame, which is exactly the project owner's machine) the drift is 42px, well outside a tab. Same for the literal `4`, `3`, `5`, `6` gaps.
 2. **`g_uiBacking` is never varied.** It defaults to 1.0 and `--uitest` runs before `SDL_Init` (`cnc_eyes.cpp:18275-18287`), so the harness has never once exercised the Retina path that the whole `eui_scale` work exists to serve.
 
 **Change:** multiply every probe offset by `L.s`; add an outer loop over `g_uiBacking ∈ {1.0f, 2.0f}` and print it in the `UITEST|frame` line.
@@ -196,7 +196,7 @@ Not visible today (the 2D sprite self-suppresses at `:9520` on `g_cursorOnMap`, 
 ---
 
 ## B7. `g_uiZoom` exists but nothing writes it
-`edit_mod.h:304` - `static float g_uiZoom = 1.0f;` with the comment "the original zoom, so the panel can be sized without resizing the window." There is no key bound to it anywhere in the tree (grep confirms: the only reads are `eui_scale`). If the complaint after B1-B6 is still "too small", this is the escape hatch and it is unreachable.
+`edit_mod.h:304` - `static float g_uiZoom = 1.0f;` with the comment "the project owner's own zoom, so the panel can be sized without resizing the window." There is no key bound to it anywhere in the tree (grep confirms: the only reads are `eui_scale`). If the project owner's complaint after B1-B6 is still "too small", this is the escape hatch and it is unreachable.
 
 **Change:** bind `Cmd/Ctrl +` / `Cmd/Ctrl -` / `Cmd/Ctrl 0` in the edit-mode key handler near `cnc_eyes.cpp:17758`, stepping `g_uiZoom` by 0.1 over [0.7, 1.6] and logging the new value.
 
@@ -259,7 +259,7 @@ Ordered by dependency, then by how much of the web editor's daily loop each one 
 
 **P13. Radar.** Native radar is jump-only: click a cell, camera teleports (`cnc_eyes.cpp:17822-17826`). Missing the live camera frustum rectangle (four NDC corners raycast onto y=0, hidden when fewer than 4 hit), drag-to-fly, the three "Your base / Enemy base / Tiberium" centre-of-mass jumps, and the height-range and object-count mini stats.
 
-**P14. Mission browser.** Native is one map per process (`--scen`). Missing the whole `#topbox` Missions face: filter box with live hit count, 13 filter chips in 4 groups (OR within a group, AND across groups, per-chip counts), the 9-group sorted list, the empty state, the briefing panel with its source tag, prev/next map buttons and Arrow Left/Right. Also missing the Map info face (heightmap source/range/relief/corners/playable, the >=2% terrace histogram, per-kind object counts, the "how things are drawn" prose).
+**P14. Mission browser.** Native is one map per process (`--scen`). Missing the whole `#topbox` Missions face: filter box with live hit count, 13 filter chips in 4 groups (OR within a group, AND across groups, per-chip counts), the 9-group sorted list, the empty state, the mission briefing panel with its source tag, prev/next map buttons and Arrow Left/Right. Also missing the Map info face (heightmap source/range/relief/corners/playable, the >=2% terrace histogram, per-kind object counts, the "how things are drawn" prose).
 
 ## Tier 5 - persistence and chrome
 
@@ -273,8 +273,8 @@ Ordered by dependency, then by how much of the web editor's daily loop each one 
 
 - **Wall auto-connection.** `edit_wall_mask` / `edit_wall_put` (`edit_mod.h:856`, `871`) implement the 4-bit N/E/S/W same-overlay mask, same as web's `reconnectWalls()`.
 - **Buildability from the GPL land table**, occupancy, and bib-aware footprints: `edit_land_at` / `edit_can_build` / `edit_cell_occupied` / `edit_cell_ok` (`edit_mod.h:205-240`).
-- **Click-to-arm-then-click-to-place, with the second click on the same tile disarming.** The click-path report called the toggle a bug; it is not, the web editor does exactly the same thing (editor.js: "click to arm, click again to disarm"). Do not change it without asking.
-- **Cartridge-data protection.** The web server derives `SCM91EA`..`SCM99EA` when you edit a shipped mission. Native writes into `game/authored/` via `edit_save`; confirm whether the derived-name rule should be replicated natively, since the two paths currently differ.
+- **Click-to-arm-then-click-to-place, with the second click on the same tile disarming.** The click-path report called the toggle a bug; it is not, the web editor does exactly the same thing (editor.js: "click to arm, click again to disarm"). Do not change it without asking the project owner.
+- **Cartridge-data protection.** The web server derives `SCM91EA`..`SCM99EA` when you edit a shipped mission. Native writes into `game/authored/` via `edit_save`; confirm with the project owner whether the derived-name rule should be replicated natively, since the two paths currently differ.
 
 ## Gaps the web editor also has - do not "fix" them into existence natively
 
@@ -287,6 +287,6 @@ Carried straight from web-features §14, so they are not misread as native regre
 1. **cursor-path recommended Option A (teach `update_cursor` about the panel, then defer `draw_cursor_top` past `eui_draw`). That is not what shipped.** The panel draws its own arrow instead (`edit_mod.h:815-832`). The visible symptom is gone, but A1's underlying observation is still true and is B5 above. Do not apply A2 (deferring the draw) on top of the panel arrow, or you get two pointers over the sidebar.
 2. **dpi-path's two central claims are now false**: `ALLOW_HIGHDPI` *is* set (`:18331`) and the window *is* resizable (`:18325`). Its analysis of `mscale` as the bridge between window points and drawable pixels is still correct and is what `g_uiBacking` is fed from at `:17237`.
 3. **B2's exact height threshold is my arithmetic, not a measurement.** I derived ~500px for the ACT row and ~450px for SAVE from the layout constants. Measure it with the extended `--uitest` rather than trusting those numbers.
-4. **B8 is unverified** at current line numbers. The surrounding code has since moved.
-5. **Palette tab sizes differ between the two editors** and I cannot tell whether that is deliberate. Native carries 61 buildings / 22 units / 20 infantry / 32 terrain / 5 walls (`game/edit_tables.h:462-464`); web carries 22 / 16 / 13 / 19 / 10 with hardcoded curated lists. Native is offering the full cartridge table, web is offering a subset. That is a design question, not a defect on either side.
-6. **`game/cnc_eyes.cpp` and `game/edit_mod.h` were changing while this was written.** Every line number above is live as of this reading; re-anchor on the quoted text before editing, and coordinate file scope before touching `edit_mod.h`.
+4. **B8 is unverified** at current line numbers. The surrounding code moved during the a concurrent edit's edits.
+5. **Palette tab sizes differ between the two editors** and I cannot tell whether that is deliberate. Native carries 61 buildings / 22 units / 20 infantry / 32 terrain / 5 walls (`game/edit_tables.h:462-464`); web carries 22 / 16 / 13 / 19 / 10 with hardcoded curated lists. Native is offering the full cartridge table, web is offering a subset. That is a design question for the project owner, not a defect on either side.
+6. **`game/cnc_eyes.cpp` and `game/edit_mod.h` are dirty and a concurrent edit may still be in them.** Every line number above is live as of this reading; re-anchor on the quoted text before editing, and coordinate file scope before touching `edit_mod.h`.

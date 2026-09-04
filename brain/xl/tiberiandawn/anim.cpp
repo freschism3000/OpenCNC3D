@@ -785,19 +785,17 @@ void AnimClass::AI(void)
     }
 
     /*
-    **	Check the kill time.
+    **	Check the kill frame. See EventClass::Execute, case ANIMATION / ANIM_BEACON:
+    **	KillTime holds a ::Frame number, not a wall clock, and this now runs on every
+    **	platform rather than only on one. A legacy save written before this change can
+    **	only hold either 0 or a FILETIME; a FILETIME is around 1.3e17 and ::Frame will
+    **	never reach it, so the stale case degrades to "never expires", which is exactly
+    **	what the non-Windows build did before.
     */
     if (KillTime > 0ULL) {
-#ifdef _WIN32
-        FILETIME ft;
-        GetSystemTimeAsFileTime(&ft);
-
-        unsigned long long now =
-            (unsigned long long)ft.dwLowDateTime + ((unsigned long long)ft.dwHighDateTime << 32ULL);
-        if (now >= KillTime) {
+        if ((unsigned long long)::Frame >= KillTime) {
             IsToDelete = true;
         }
-#endif
     }
 
     /*

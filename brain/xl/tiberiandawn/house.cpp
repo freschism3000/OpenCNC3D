@@ -2009,7 +2009,7 @@ bool HouseClass::Is_Ally(HousesType house) const
 {
     Validate();
     if (house != HOUSE_NONE) {
-        return (((1 << house) & Allies) != 0);
+        return (((1ULL << house) & Allies) != 0);
     }
     return (false);
 }
@@ -2088,7 +2088,7 @@ void HouseClass::Make_Ally(HousesType house)
         if (!ScenarioInit && (IsDefeated || house == HOUSE_JP))
             return;
 
-        Allies |= (1 << house);
+        Allies |= (1ULL << house);
 
 #ifdef CHEAT_KEYS
         if (Debug_Flag) {
@@ -2148,9 +2148,9 @@ void HouseClass::Make_Enemy(HousesType house)
     Validate();
     if (house != HOUSE_NONE && Is_Ally(house)) {
         HouseClass* enemy = HouseClass::As_Pointer(house);
-        Allies &= ~(1 << house);
+        Allies &= ~(1ULL << house);
         if (enemy && enemy->Is_Ally(this)) {
-            enemy->Allies &= ~(1 << Class->House);
+            enemy->Allies &= ~(1ULL << (int)Class->House);
         }
 
         if ((Debug_Flag || GameToPlay != GAME_NORMAL) && !ScenarioInit) {
@@ -8297,7 +8297,22 @@ CELL HouseClass::Random_Cell_In_Zone(ZoneType zone) const
  *=============================================================================================*/
 unsigned HouseClass::Get_Ally_Flags()
 {
-    return Allies;
+    /*
+    **	THE EXPORT ABI'S ALLY FIELD IS 32 BITS AND THIS ONE IS 64, so this is the boundary
+    **	where a house mask stops being the engine's shape and becomes the host's. It is a
+    **	deliberate narrowing and not an oversight: every dllinterface struct the host reads
+    **	is held byte-identical to the classic brain's on purpose, so that one host binary
+    **	drives either brain, and widening this field is a change to BOTH sides at once.
+    **
+    **	The cast is written out so the narrowing is visible, and the assertion below is what
+    **	makes it safe: the moment the roster grows past what 32 bits can name, this stops
+    **	compiling instead of quietly dropping the alliances of every house above the 32nd.
+    */
+    static_assert(HOUSE_COUNT <= 32,
+                  "the export ABI's AllyFlags is 32 bits wide; growing the house roster "
+                  "past 32 means widening CNCPlayerInfoStruct::AllyFlags and the host that "
+                  "reads it in the same change");
+    return (unsigned)Allies;
 }
 
 #endif

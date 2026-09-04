@@ -282,3 +282,19 @@ be about 12 MB, which is fine on a modern desktop and not fine on Win98.
 
 **Speech cuts, it does not overlap.** EVA speaks one line at a time and a new line stops
 the current one, matching `Speak_AI`.
+
+**One clip may only start twice per engine tick.** Every effect an advance raises reaches
+the mixer before the next block is rendered, so copies of ONE clip started in one tick
+begin at the same sample of it: identical waveforms in lockstep, summing coherently rather
+than adding up like separate sounds. Twelve deaths on one tick were twelve times the
+amplitude of one, which is distortion and not loudness. `cnc_audio_begin_tick` opens the
+window and `cnc_audio_on_sound_effect` returns `CNC_SFX_DUPLICATE` for the surplus. It
+counts STARTS, not ringing voices, so it cannot refuse an ordinary exchange of fire the way
+a voice cap does, and it does not depend on anything having rendered the mix, so a headless
+run and a run with a device open make the same decisions. Copies one tick apart are 1470
+samples out of step and are left alone. A name the disc does not have is never refused, so
+the miss log and the SILENT label keep meaning what they meant.
+
+The rule is **dormant until a host declares a tick**, so `mixtest` is uncapped and the two
+rows above that fire 6 and 16 copies of one clip at once still measure the voice pool
+itself. Nothing in this folder owns a clock; the clock belongs to the game loop.

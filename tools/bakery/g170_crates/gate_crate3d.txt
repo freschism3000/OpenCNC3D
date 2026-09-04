@@ -1,0 +1,6 @@
+tick 60
+cratedump
+cam 7.0 60.0
+zoom max
+shot shots/crate3d_on.png
+quit

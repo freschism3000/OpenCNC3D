@@ -22,7 +22,7 @@ static unsigned int rd32(const unsigned char *p)
  * infantryman, in a way that reads as art being slightly off rather than as a
  * bug. That was checked before this file was written, not after.
  *
- * Duplicating them is a real cost and is, recorded as an open gap: the shared
+ * Duplicating them is a real cost and is recorded in known-gap notes: the shared
  * copy lives in a GL header this branch may not touch yet.
  * ------------------------------------------------------------------------- */
 static const unsigned char T1I_Facing32[256] = {

@@ -1,0 +1,75 @@
+# G110. THE RADAR TAKES ORDERS.
+#
+# Reported: units cannot be given move orders through the minimap, a click only ever
+# jumps the camera. That was exactly true. minimap_hit had three callers -- the two script
+# verbs and the live left press -- and every one of them did nothing but move g_camX and
+# g_camZ. The right button never reached the radar either, and not because the cancel
+# ladder declined it: the radar interior is inside sb_over_panel, so sb_click, the first
+# rung of ui_right_press, answered SBH_RADAR, did nothing with it and reported the press
+# consumed.
+#
+# THE BUTTONS. Left issues the order, right navigates. Left is the order button
+# everywhere else in this build (see the note over ui_click_action) and gate_rally is the
+# standing guard that right means cancel and nothing else, so the radar follows the same
+# split instead of inverting it for one control. 1995 agrees on the left half:
+# radar.cpp:1427-1515 runs Mouse_Left_Release on a LEFTPRESS when something is selected,
+# and only falls through to Set_Tactical_Position when the selection is empty.
+#
+# NOTHING IS TAKEN OFF THE RIGHT BUTTON, because nothing was there. The navigate rung is
+# placed ABOVE the sb_click call that was already swallowing the press, so placement, an
+# in-flight band, an armed superweapon and the Repair and Sell latches are exactly as
+# reachable from the right button as they were, which on the radar is not at all. Off the
+# radar the ladder is untouched.
+#
+# WHY THE CELL IS 52,50. SCG90EA's own INI: that row carries Medium Tanks at 56,50 and
+# 57,50, Minigunners at 48,50 and 49,50 and Grenadiers at 54,50, so it is walkable ground,
+# and 52,50 itself appears in no [TERRAIN], [OVERLAY], [STRUCTURES], [UNITS] or [INFANTRY]
+# entry. If a later edit to that map puts something there, the MINIMAP|order line will say
+# REFUSED and this is the one number to change.
+#
+# WHY THE CAMERA IS THE ASSERTION. The defect is "the click only jumps", so the proof the
+# click became an order is that the camera did not move while an order went out. Asserting
+# only the order line would pass on a build that issued the order AND jumped, which is
+# still wrong and is the likely first attempt at this.
+#
+# WHAT THIS DOES NOT CLOSE. On the DOS bar the radar plots at a whole-number cell zoom
+# inside a 72x69 hole and clamps, so a tactical rectangle wider than 72 cells or taller
+# than 69 has outer cells that are neither drawn nor clickable, and they cannot be ordered
+# from the radar either. 1995 answers that with the radar's own zoom toggle, which this
+# build does not have. SCG90EA is 26x32 and fits at zoom 2. The 640x480 HUD drops below
+# 1:1 rather than crop, so it never has the problem, and gates.sh runs this script once
+# on each HUD because the two radars are different rectangles at different zooms.
+tick 30
+zoom max
+
+echo MM-1 NOTHING SELECTED: a left press on the radar still jumps the camera
+deselect
+expectsel 0
+cam 57 50
+mmclick 44 40
+cam
+
+echo MM-2 WITH A TANK SELECTED the same press is an ORDER and the camera holds still
+look MTNK 0
+lclickobj MTNK 0
+expectsel 1
+cam 57 50
+mmclick 52 50
+cam
+player
+# THE TANK HAS TO GET THERE, AND 120 TICKS IS NOT ENOUGH TO DRIVE IT. Measured: at 120 it
+# is at 54,49 and still moving, which reads as a failed order when the order was fine. The
+# drive completes inside 400. Do not shave this back to make the suite quicker: a tick
+# budget that only just covers the journey turns a slower path into a phantom bug, and
+# arrival is the one assertion here that proves the order was ACTED on rather than merely
+# accepted.
+tick 400
+expectcell MTNK 0 52 50
+
+echo MM-3 THE RIGHT BUTTON NAVIGATES, and the order left the tank selected
+expectsel 1
+cam 57 50
+mmclick 44 40 r
+cam
+expectsel 1
+quit

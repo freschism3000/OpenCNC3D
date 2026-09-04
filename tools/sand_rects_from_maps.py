@@ -2,7 +2,7 @@
 """sand_rects_from_maps.py -- derive the SAND theater's slope art from Dune 2000's
 OWN MAPS instead of anyone's eyes.
 
-Three vision passes over the tilesheet each left seams that were visible, because the
+Three vision passes over the tilesheet each left seams the project owner could see, because the
 sheet's layout only SUGGESTS which tiles join; the shipped .MAP files STATE it: a
 D2K map is a plain grid of tile indices (u16 w, u16 h, then w*h * {u16 tile, u16
 attr}), so every 2x2 window that occurs in a real map is a combination Westwood's

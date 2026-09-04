@@ -22,7 +22,7 @@
  *   near. Subdivision is the era's answer and it is the right trade here.
  *
  * - THERE IS NO NEAR PLANE CLIPPER YET. A triangle with any vertex at or behind the
- *   eye is rejected whole. That is, recorded as an open gap rather than hidden,
+ *   eye is rejected whole. That is recorded in known-gap notes rather than hidden,
  *   because the symptom when it finally matters (geometry vanishing at the screen
  *   edge as the camera gets close) is confusing if you do not know it is deliberate.
  *

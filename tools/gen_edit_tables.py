@@ -121,8 +121,51 @@ def _terrain():
             for c, cells in sorted(EX.occupy().items())]
 
 
+def _tiberium():
+    """ONE brush, and the only group in this catalog that is stated rather than read.
+
+    The engine has twelve tiberium overlays and throws the choice away: Overpass runs
+    over the playable rectangle as the scenario is read and Tiberium_Adjust re-picks the
+    overlay at random across TIBERIUM1..12 for every cell (cell.cpp:1912). Twelve palette
+    entries would be twelve ways to author a number nobody reads back, and the growth
+    stage is derived by the same pass rather than authored either.
+
+    Strength 1 matches the wall rows: an overlay cell carries no health field."""
+    return [{"code": "TI1", "name": "Tiberium", "cells": [(0, 0)],
+             "str": 1, "wall": False}]
+
+
+def _smudges():
+    """The authorable smudges: one crater row and six scorch rows, not fifteen.
+
+    THE ENGINE RE-PICKS A CRATER rather than taking the one the file names. For an
+    IsCrater type SmudgeClass::Mark stores SMUDGE_CRATER1 + CellClass::Spot_Index(Coord)
+    (smudge.cpp:229), and Read_INI hands it Cell_Coord(cell), which is the cell CENTRE:
+    both leptons are CELL_LEPTON_W / 2 (function.h:877), and Spot_Index answers 0 for the
+    centre (cell.cpp:1638). So every crater in every INI loads as CRATER1 whatever it was
+    called, and Read_INI then keeps the stack level only when the cell's smudge matches
+    the one it asked for (smudge.cpp:301), so a CR3 row would throw its data away too.
+    That is the same reason tiberium above is one brush rather than twelve. The shipped
+    missions agree: over the 100 shipped mission files, 25 of which carry an authored [SMUDGE] section, 221 rows, 47 of them
+    CR1 and not one CR2..CR6.
+
+    A scorch is not IsCrater, so Mark stores the type it was handed, and the six are six
+    different sprites. Those get six rows.
+
+    Bibs get none. They are the aprons the engine lays under a building by itself, the
+    writer never emits one, and authoring one would strand it under nothing the moment
+    the building moved.
+
+    Strength 1 matches the wall and tiberium rows: a smudge cell carries no health
+    field."""
+    return ([{"code": "CR1", "name": "Crater", "cells": [(0, 0)],
+              "str": 1, "wall": False}]
+            + [{"code": "SC%d" % i, "name": "Scorch Mark %d" % i, "cells": [(0, 0)],
+                "str": 1, "wall": False} for i in range(1, 7)])
+
+
 def catalog():
-    """Everything placeable, in the five groups the sidebar shows.
+    """Everything placeable, in the seven groups the sidebar shows.
 
     Walls come out of the buildings group: the engine models them as BuildingTypeClass
     with IsWall, but they are drawn, saved and edited as overlay, and the editor has a
@@ -132,7 +175,9 @@ def catalog():
             ("UNIT",     _one_cell("udata.cpp", "UnitTypeClass", 128)),
             ("INFANTRY", _one_cell("idata.cpp", "InfantryTypeClass", 50)),
             ("TERRAIN",  _terrain()),
-            ("WALL",     [x for x in b if x["wall"]])]
+            ("WALL",     [x for x in b if x["wall"]]),
+            ("TIBERIUM", _tiberium()),
+            ("SMUDGE",   _smudges())]
 
 
 def _structtypes():
@@ -205,7 +250,7 @@ def emit_catalog(w):
             cells = r["cells"][:widest]
             dx = [str(c[0]) for c in cells] + ["0"] * (widest - len(cells))
             dy = [str(c[1]) for c in cells] + ["0"] * (widest - len(cells))
-            disp = names.get(r["code"], r["code"]).replace('"', "'")
+            disp = (r.get("name") or names.get(r["code"], r["code"])).replace('"', "'")
             w('    { "%s", "%s", EDIT_KIND_%s, %d, %d, {%s}, {%s} },'
               % (r["code"], disp, nm, r["str"], len(cells),
                  ", ".join(dx), ", ".join(dy)))

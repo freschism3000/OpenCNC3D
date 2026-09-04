@@ -2,7 +2,7 @@
 #
 # ONE LIST, TWO PLATFORMS. The game already learned this the expensive way: a
 # source file added to the Mac build and forgotten in tools/win/sources.sh is a
-# Windows build that stops compiling, and the repository's rule 4 exists because that
+# Windows build that stops compiling, and repository rules rule 4 exists because that
 # happened. The launcher starts with the list shared rather than duplicated, so
 # there is nothing to keep in step.
 #

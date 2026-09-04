@@ -566,6 +566,14 @@ static struct
     fn_CNC_Set_Home_Cell Set_Home_Cell;
 } Brain;
 
+/* CNC3D_Dump_Objects: the brain's own per-tick state dump, resolved separately from the
+   CNC_* set above because it is OURS rather than EA's, and because a brain built without
+   it must still run this host. It is the oracle Phase 0 compares across architectures:
+   it walks the real object heaps instead of the draw intercept, so it needs no art, no
+   window and no renderer, and tools/xl-parity/compare.py already parses exactly what it
+   prints. Absent in an older brain, in which case the dump is simply skipped. */
+static int (*Dump_Objects)(void);
+
 /* ================================ name tables ==================================== */
 
 static const char* house_name(int owner)
@@ -1119,6 +1127,7 @@ static void usage(const char* argv0)
     printf("  build_level    tech level passed to CNC_Start_Custom_Instance, default 7\n");
     printf("\n");
     printf("  env CNC3D_BRAIN   override the path to the shared library\n");
+    printf("  env CNC3D_TICKDUMP  dump full engine state every tick (Phase 0 determinism runs)\n");
 }
 
 int main(int argc, char** argv)
@@ -1128,6 +1137,17 @@ int main(int argc, char** argv)
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
     setvbuf(stdout, NULL, _IOLBF, 0);
+
+    /* CNC3D_TICKDUMP prints about 32 KB per tick, and on Windows an unbuffered stdout
+       under msvcrt is one WriteFile syscall PER CHARACTER, the same trap that once cost
+       the renderer its framerate. Measured on a 32 bit Windows build, 3 Sep 2026: 112 ms
+       per dumped tick against 1.3 ms for the simulation itself,
+       so a 20,000 tick capture took 37 minutes. A crash mid-capture is not the run this
+       tool keeps stdout unbuffered for, so buffer only while dumping; every other run
+       keeps its crash-proof stdout. */
+    if (getenv("CNC3D_TICKDUMP") != NULL) {
+        setvbuf(stdout, NULL, _IOFBF, 1 << 20);
+    }
 
     const char* libpath = getenv("CNC3D_BRAIN");
     if (libpath == NULL || libpath[0] == '\0') {
@@ -1157,6 +1177,9 @@ int main(int argc, char** argv)
     Brain.Config = (fn_CNC_Config)resolve(lib, "CNC_Config");
     Brain.Start_Custom_Instance = (fn_CNC_Start_Custom_Instance)resolve(lib, "CNC_Start_Custom_Instance");
     Brain.Advance_Instance = (fn_CNC_Advance_Instance)resolve(lib, "CNC_Advance_Instance");
+    /* Not through resolve(): a missing one is not a missing symbol in the sense that
+       function reports, and it must not count against the resolved tally. */
+    Dump_Objects = (int (*)(void))cnc_lib_sym(lib, "CNC3D_Dump_Objects");
     Brain.Get_Game_State = (fn_CNC_Get_Game_State)resolve(lib, "CNC_Get_Game_State");
     Brain.Get_Visible_Page = (fn_CNC_Get_Visible_Page)resolve(lib, "CNC_Get_Visible_Page");
     Brain.Handle_Input = (fn_CNC_Handle_Input)resolve(lib, "CNC_Handle_Input");
@@ -1262,6 +1285,16 @@ int main(int argc, char** argv)
     for (int i = 0; i < ticks; i++) {
         cnc_bool cont = Brain.Advance_Instance(player_id);
         completed++;
+
+        /* CNC3D_TICKDUMP: one dump per tick, for the cross architecture determinism run.
+           OFF unless the variable is set, because it prints roughly 32 KB per tick and
+           every other user of this host wants the two dumps it already produces. The
+           TICK| line is what makes the output splittable per tick, and it is what
+           compare.py keys the first divergent tick on. */
+        if (Dump_Objects != NULL && getenv("CNC3D_TICKDUMP") != NULL) {
+            printf("TICK|%d\n", completed);
+            Dump_Objects();
+        }
         if (i == 0) {
             printf("  tick 1 -> %s\n", cont ? "true" : "false");
             dump_all("AFTER TICK 1", player_id, 8192);

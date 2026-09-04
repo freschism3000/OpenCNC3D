@@ -166,8 +166,60 @@ except where noted):
 
 ## Houses
 
-- (nothing yet -- Phase 3 territory; the fork still builds the EIGHTPLAYERS
-  roster collapsed to ON)
+- THE HOUSE MASKS ARE 64 BIT, 30 Aug 2026. Phase 3's first landing, and it
+  grows no houses: the roster is still the EIGHTPLAYERS twelve. What changed is
+  the WIDTH every house bit lives in, because the widths were the thing that
+  would have failed silently when the roster did grow.
+
+  `defines.h` HOUSEF_* now shift `1ULL`; `cell.h`
+  IsMappedByPlayerMask/IsVisibleByPlayerMask, `house.h` Allies and its
+  Get_Allies accessor, `object.h` IsSelectedMask and CNC3D_InvincibleHouses,
+  and `type.h` Ownable all become `uint64_t`. The `Get_Ownable` virtual widens
+  with them, which is why `object.h`, `techno.h`, `type.h`, `abstract.cpp`,
+  `object.cpp` and `techno.cpp` all appear: the compiler refuses a mismatched
+  override, and that is the whole reason the signature is the safe way to carry
+  the width. `mapedit.cpp` and `dllinterface.cpp` hold the two remaining
+  `1ULL <<` sites.
+
+  WHY THE SHIFT AND NOT ONLY THE FIELD. A wider field does not fix `1 << house`:
+  a bare 1 is an int, so at house 32 that is undefined behaviour and not a lost
+  bit, and it is undefined at COMPILE time in a simulation that every peer has to
+  agree on. `tools/xl-house-mask-guard.sh` fails on a bare shift
+  anywhere in the fork and carries a self-test, because a grep guard that has
+  stopped matching reports a clean tree forever.
+
+  TWO NARROWINGS ARE DELIBERATE AND GUARDED. `HouseClass::Get_Ally_Flags` and
+  the `IsSelectedMask` copy in `dllinterface.cpp` hand a 64 bit mask to a 32 bit
+  export field, because every dllinterface struct the host reads is held
+  byte-identical to the classic brain's so one host drives either brain. Both
+  now cast explicitly and both carry a `static_assert(HOUSE_COUNT <= 32)`, so
+  growing the roster past 32 stops the build rather than dropping the alliances
+  and selection of every house above the 32nd. Widening those fields is a change
+  to the brain AND the host in one commit, and it is not this one.
+
+  NOT DONE HERE: the multi-first enum reorder, and any growth in the roster.
+  Both change what a house INDEX means, and their failure modes (a comparison
+  like `h >= HOUSE_MULTI1` that silently reverses, an index that was serialised)
+  are exactly the ones a compiler cannot see. They need a brain that can boot a
+  scenario as the oracle.
+
+- PORTED 27 Aug 2026: the four `CNC3D_*` exports the classic brain gained
+  after the fork point and XL lacked -- `CNC3D_Set_Build_Anywhere`,
+  `CNC3D_Get_Build_Anywhere`, `CNC3D_Proximity_Ok` and
+  `CNC3D_Force_Verdict` (the v0.6.3 cheat menu). With them the symbol
+  surfaces differ by exactly one name in one direction: XL exports
+  `CNC3D_ABI_Facts` and the classic brain does not. Gate XLb asserts that
+  and nothing looser, so the host can call every other export
+  unconditionally on either brain.
+
+  The Build Anywhere machinery came with them, at all THREE copies of the
+  adjacency rule (DisplayClass, DLLExportClass and BuildingClass), because
+  hooking only the cursor routines gives a green cursor and a click that is
+  silently refused -- which is what the classic brain shipped for an hour
+  on 26 Aug 2026. `DisplayClass::CNC3D_BuildAnywhereHouses` is uint64_t
+  here where the classic brain has unsigned: the 64-house phase widens
+  every house mask, and this one would otherwise be found by a player at
+  slot 32 rather than by a compiler.
 
 ## Pathfinder
 
@@ -193,10 +245,10 @@ except where noted):
   sizeof(CNCShroudEntryStruct)} so the host's vtable phase can assert at
   dlopen and refuse a mismatched dylib loudly.
 - The OBJ| dump's `inicell` field (CNC3D_Print_One) still emits the
-  forkpoint's `cy * 64 + cx` convention; brain/vanilla has an uncommitted
-  in-flight change of that formula elsewhere in the tree, and the parity
-  comparator treats inicell as stride-derived either way. Re-sync when that
-  lands.
+  forkpoint's `cy * 64 + cx` convention. That formula is in flight on the
+  classic side, and the parity comparator treats inicell as stride-derived
+  either way, so it is dropped from the comparison rather than normalized.
+  Re-sync the field when the classic formula settles.
 
 ## Formats
 
@@ -211,12 +263,111 @@ except where noted):
   INI surface in the reader). Write_INI masks each axis to 16 bits -- exact
   for classic content; an XL-native base past 256 cells per axis needs the
   Phase 2 map-format work.
-- KNOWN GAP, not fixed in Phase 1: MAP_VERSION_MEGA content (the 128-wide
-  .BIN format Read_Binary_Big reads, e.g. the retail skirmish conversions
-  and the editor's new 128x128 maps) stores raw 128-stride cell NUMBERS,
-  which land unconfined -- and therefore WRONG -- in the 1024 stride. The
-  Phase 1 gates exercise only MAP_VERSION_NORMAL missions, which confine
-  correctly through Confine_Old_Cell. The mega loader needs its own
-  confinement (cell%128 + cell/128*MAP_CELL_W) when the 256-through-the-eyes
-  phase brings real content to the XL brain; the tiberium scan-window rule
-  above must learn the same case then.
+- CLOSED 27 Aug 2026 (was a Phase 1 known gap): MAP_VERSION_MEGA content --
+  the 128-wide format, which is the retail skirmish conversions and
+  everything the mission editor makes -- did not load correctly on this
+  brain. The gap as recorded was the missing stride confinement. It was
+  three faults, and the other two were worse:
+
+  1. STRIDE. A scenario's cell numbers are at the AUTHORING build's stride,
+     never at ours. Nine reader sites confined MAP_VERSION_NORMAL and let
+     MAP_VERSION_MEGA through raw, so every mega cell landed at
+     (y*128 + x) in a 1024-wide array. Now one helper does both formats:
+     `Confine_Scenario_Cell(cell, binary_version)` in function.h, with
+     `Scenario_Cell_Of` as its inverse for the writers. Sites: overlay.cpp,
+     smudge.cpp, terrain.cpp, unit.cpp, infantry.cpp, building.cpp,
+     display.cpp (waypoints and cell triggers), map.cpp (both .BIN paths).
+  2. THE RECORD WAS THE WRONG SIZE, IN TWO DIFFERENT WAYS. The sparse
+     big-map .BIN record is four bytes on disk: `{u16 cell, u8 tmpl,
+     u8 icon}`. It was spelled with this brain's own CELL, which is
+     int32_t here and `signed short` in the classic brain, so
+     Read_Binary_Big (no pragma pack) read EIGHT byte records and
+     Write_Binary_Big (packed) wrote SIX. The two halves of one file's
+     format did not agree with each other, and neither agreed with a single
+     shipped map. It is now an explicit `MegaBinaryRecord` in map.cpp with
+     a static_assert on its size. THE GENERAL RULE: a type whose width is a
+     property of the BUILD must never be a field in a file whose layout is
+     a property of the FORMAT.
+  3. THE TIBERIUM SCAN WINDOW followed the same wrong test, so a mega map
+     swept the full 1024 stride and sheared the seeded random stream
+     against the classic brain on identical content. Both shipped formats
+     are classic content; the test now names the XL-native case as the
+     exception, which does not exist yet.
+
+  A TENTH READER was found afterwards and is fixed: `TemplateClass::Read_INI`
+  (template.cpp:104) reads scenario cell numbers and was never confined. It
+  runs only when a map has a `[TEMPLATE]` section AND its `.BIN` did not
+  load, and no shipped map has both, so nothing exercised it.
+
+  `Read_Binary_Big`'s post-condition was `i == MAP_CELL_TOTAL`, a quantity
+  of the BUILD tested against a file whose length is a quantity of the
+  FORMAT. The format is sparse, so a complete file never has 1,048,576
+  records: the function always returned false and a truncated `.BIN` was
+  indistinguishable from a complete one. Now `i == file_size`. It changes
+  no reachable behaviour (both callers treat false as "no binary" and fall
+  through to a `[TEMPLATE]` section that shipped maps do not have), but a
+  post-condition that cannot hold is not a post-condition.
+
+- **MAP_VERSION_XL (2), a scenario format that carries its own stride.**
+  Added 27 Aug 2026, and it exists because the two legacy formats cannot be
+  extended. Their cell numbers are at the AUTHORING build's stride and
+  neither the `.BIN` nor the INI records which that was; the reader has to
+  already know. That works while there are exactly two and `MAP_VERSION`
+  picks between them, and it runs out immediately after: the sparse key is
+  16 bits, which reaches 256x256 exactly and is dead one cell past it, and
+  `[Base]` packs 16 bits per axis for the same ceiling.
+
+  Version 2's cell numbers ARE this brain's own, at the fixed 1024 stride
+  the whole XL ladder shares, so `Confine_Scenario_Cell` is the identity for
+  it and there is no conversion to get wrong. Every tier -- 256, 512, 1024 --
+  is Version 2; the size of a map is `[MAP] Width/Height` and the STRIDE is
+  a property of the format, not of the map. That is what fixing the address
+  space at 1024 from the first XL commit bought.
+
+  Its `.BIN` (`MapClass::Read_Binary_XL` / `Write_Binary_XL`, map.cpp) is a
+  twelve byte header -- magic `C3XB`, version, the stride it was written
+  against, the record count -- followed by eight byte records with a 32 bit
+  key. Both structs are declared in their own terms and asserted, per the
+  rule above. The stride field means a file from another address space is
+  REFUSED rather than misread; the explicit count means a truncated file is
+  refused rather than read short; and an empty map is a twelve byte file
+  rather than a zero byte one, which the mega format cannot distinguish
+  from a failed write.
+
+  `display.cpp`'s version clamp had to move with it, and that was the whole
+  bug on the first attempt: `Bound(MapBinaryVersion, 0, 1)` did not reject a
+  Version=2 map, it read it AS the mega format, converting every cell from a
+  stride it was never written at, and landed as a segfault in the waypoint
+  loop. The clamp is now `Bound(..., 0, MAP_VERSION_XL)` and the comment
+  says why a narrowing clamp is worse than a refusal.
+
+  `Write_INI` no longer forces `MAP_VERSION_MEGA` on every save. It kept the
+  format the map came in as, which is right now that the writers convert
+  through `Scenario_Cell_Of`, and it promotes a NORMAL-format map whose rect
+  has outgrown 64 cells rather than aliasing two cells onto one INI key.
+
+  Gate XLg covers all three tiers plus determinism, and carries a NEGATIVE
+  CONTROL: a refused `.BIN` is not fatal (the loader falls back to the INI's
+  `[TEMPLATE]` section) and the object dump has no terrain channel, so a
+  corrupted map passed every leg with a byte-identical dump hash until the
+  control was added.
+
+## The unshroud debug flag reaches the shroud export
+
+`Get_Shroud_State` filled `IsVisible` and `IsMapped` straight from
+`cellptr->Is_Visible/Is_Mapped(PlayerPtr)` with no `Debug_Unshroud` term, which is
+the same defect the unforked engine carried and which was fixed there first. Every
+other answer to "can the player see this" in that file already folds the flag in:
+the object export, the cell-draw export, and the tactical cursor path.
+
+The consequence was a disagreement rather than a missing feature. With the fog
+cheat on, the engine lifted the shroud and would accept an attack, while the
+snapshot the host reads still reported the cell unseen -- so the pointer offered a
+move over an enemy the click would in fact attack.
+
+**This is NOT a divergence from the unforked engine.** Both copies now carry the
+identical two lines, and the fork is listed here only because its own copy had to be
+changed by hand: `tiberiandawn/` is the directory this fork is allowed to differ in,
+so nothing asserts the two files are equal and a fix in one does not travel to the
+other. A big map is where a player is most likely to reach for that cheat, which is
+why the fork wanted it as much as the engine it forked from.

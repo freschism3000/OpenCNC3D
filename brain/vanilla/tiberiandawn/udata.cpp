@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Adds HOUSEF_MULTI7 and HOUSEF_MULTI8 to the OWNABLE house bit field of 18
+// unit types (every unit except the four dinosaurs), so multiplayer houses 7
+// and 8 may own and build them. No other unit statistic is touched.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\udata.cpv   2.17   16 Oct 1995 16:50:42   JOE_BOSTIC  $ */
 /***********************************************************************************************

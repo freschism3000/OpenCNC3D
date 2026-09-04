@@ -123,14 +123,18 @@ Keys 1-5 switch tabs. Key 0 frames the whole map.
   SAVE      Writes the map. SAVE AS... takes a name of up to 40 characters
             and files it in the next free USERnn slot.
 
-NEW MAP offers five sizes in any of the five theaters:
+NEW MAP offers five preset sizes in any of the five theaters, plus a size you
+type yourself:
 
     SMALL   32 x 32     MEDIUM  44 x 44     LARGE  54 x 54
-    HUGE    62 x 62     128 x 128 (BIG MAP, 120 x 120 playable)
+    HUGE    62 x 62     120 x 120 (BIG MAP)     CUSTOM  W x H
 
-The first four are playable rectangles inside the classic 64 x 64 world, the
-size the original game used. 128 x 128 is the big-map format and is the one
-that supports up to 8 player starts.
+Every one of those numbers is the PLAYABLE rectangle. The first four are
+rectangles inside the classic 64 x 64 world, the size the original game used.
+120 x 120 sits inside the 128 x 128 big-map format and is the one that supports
+up to 8 player starts. CUSTOM takes any rectangle from 16 x 16 up to 126 x 126,
+which is the widest the big-map format allows, and anything over 62 a side is
+saved as a big map too.
 
 Your maps are written to  missions\user_maps\  in this folder. There is no
 separate bake or export step: a map you make borrows the theater's tile bank

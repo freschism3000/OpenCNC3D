@@ -616,13 +616,13 @@ static void skirmish_scan(const char* dir)
                CNC3DKind=Multi, and the comment above says why: a map with one start
                would seat a skirmish nobody can join. But the reason is the START
                COUNT, and now that the editor places up to eight of them on any map,
-               the count is measurable -- so measure it. A 128x128 map was built
+               the count is measurable -- so measure it. the project owner built a 128x128 map
                with eight starts, left the kind at the dialog's default, and watched
                it never appear here. */
             if (so.starts < 2) continue;
             /* A map's OWN bake is better -- it carries real per-cell terrain colours,
                which the radar uses -- but it is NOT required, and demanding it was a
-               mistake that hid the original maps from this list. A borrowed donor pack
+               mistake that hid the project owner's own maps from this list. A borrowed donor pack
                is only a source of ART: edit_reskin_from_bin grows the world to the
                document's own size and repaints every cell from its .BIN, so a
                128x128 map on a 64x64 donor comes up whole (measured: 16384 of 16384
@@ -853,12 +853,23 @@ static const DMS_LobbyStep LOBBY_SCRIPT[] = {
     { SK_I_AI,      1000, 500, 0 },   /* the gauge, hard right             */
     { SK_I_BUILD,    420, 500, 0 },   /* about half travel                 */
     { SK_I_CREDITS,  250, 500, 0 },   /* a quarter, snapped to 500         */
-    { SK_I_SUPER,    100, 500, 0 },   /* the one live check box, off       */
+    { SK_I_UNITS,   1000, 500, 0 },   /* the fourth gauge, hard right: 10  */
+    /* CRATES BEFORE SUPERWEAPONS, and the order is load-bearing rather than tidy: a
+       disabled control does not take the focus (sk_press), so the mouse half has to end
+       on Superweapons for the Space below to toggle the box it says it toggles. Putting
+       crates last would hand Space the crate box and undo it. */
+    { SK_I_CRATES,   100, 500, 0 },   /* a live check box, switched ON     */
+    { SK_I_SUPER,    100, 500, 0 },   /* the other live one, switched off  */
     { SK_I_BASES,    100, 500, 0 },   /* locked: it must say why           */
-    /* The keyboard half, from wherever the mouse left the focus: space toggles the
-       check box back on, the walk steps UP over the two locked boxes onto Credits,
-       left nudges it, three more steps reach the map list, down moves the selection
-       inside it, and Enter is Play. Every arm of sk_key except Escape and Tab. */
+    /* The keyboard half, from wherever the mouse left the focus, which is Superweapons.
+       TRACED against sk_next_item rather than assumed, because the account that stood here
+       described a walk this script does not take: Space toggles Superweapons back on, UP
+       steps over the two locked boxes onto UNIT COUNT (which is enabled, so the walk stops
+       there), LEFT nudges Unit Count down an eighth of its travel from 10 to 9, and three
+       more UPs reach Credits, Tech Level and AI Players with DOWN coming back to Tech
+       Level. The map list is never focused here; it is exercised by the SK_I_MAPS click
+       above. Page Up and Page Down are not driven by this half, and Escape is driven by
+       the drop down steps below. */
     { 0, 0, 0, SDLK_SPACE },
     { 0, 0, 0, SDLK_UP },             /* over the two locked boxes         */
     { 0, 0, 0, SDLK_LEFT },           /* an eighth of the credit gauge     */
@@ -882,7 +893,7 @@ static const DMS_LobbyStep LOBBY_SCRIPT[] = {
     { SK_ROW_ITEM(1), 500, 500, 0 },  /* open COMPUTER 1's drop down       */
     { SK_I_POP_NOD,  500, 500, 0 },   /* faction: the human's own side     */
     { SK_TEAM_ITEM(0), 500, 500, 0 }, /* team 1: allied with the human     */
-    /* THE COLOUR PICKER, and the two steps are the two halves of the rule.
+    /* THE COLOUR PICKER, and the two steps are the two halves of the project owner's rule.
        First the square the PLAYER is wearing, which on any row but the player's own is
        locked: it must change nothing and say why. If that lock ever broke, the human's
        colour would move as a side effect of a change to a computer, and the assignment
@@ -893,7 +904,7 @@ static const DMS_LobbyStep LOBBY_SCRIPT[] = {
     { SK_COLOUR_ITEM(0), 500, 500, 0 },  /* locked: PLAYER's own          */
     { SK_COLOUR_ITEM(2), 500, 500, 0 },  /* takes it off COMPUTER 2       */
     { 0, 0, 0, SDLK_ESCAPE },         /* shuts the box, NOT the lobby      */
-    /* AND THE HUMAN TAKES A COLOUR AN AI IS ALREADY WEARING, which is the case
+    /* AND THE HUMAN TAKES A COLOUR AN AI IS ALREADY WEARING, which is the case the project owner
        named in his own words: "If the player picks a color already used by an ai
        opponent, that opponents color should automatically change to another." COMPUTER 3
        still holds colour 3, so PLAYER asking for it must push COMPUTER 3 off rather than
@@ -1350,7 +1361,7 @@ int main(int argc, char** argv)
     ab.music_vol255 = opt.musicvol;
     ab.sound_vol255 = opt.soundvol;
     /* EVERY AUTOMATED ENTRY POINT IS SILENT, not just the two that were listed here.
-       The rule is a project decision, and this is the second time it has been asked
+       The rule is the project owner's, 26 Aug 2026, and this is the second time it has been asked
        for: "every time you launch the eyes to test something, music still blasts
        through the speakers. We already agreed that shouldnt happen on tests."
        --harness and --flowtest were covered; --lobbyshot, --lobbyplay and
@@ -1370,6 +1381,24 @@ int main(int argc, char** argv)
     CncAudio* au = audio_boot(&ab);
     mcfg.au = au;
     game_set_audio(au);
+
+    /* THE PLAYER'S GAME CONTROLS COME BACK, and only for a player. Speed, scroll rate and
+       the three volumes are read from the working folder here and rewritten when the
+       pause dialog closes on a change; game_controls_remember in cnc_game.h has the
+       account of why this is a call and not a default.
+
+       `automated` is reused rather than restated because it already names every entry
+       point a gate drives, and a remembered SPEED is the engine's tick rate: no gate may
+       inherit one from a file somebody left in the run folder. It sits after
+       game_set_audio because restoring the volumes pushes them at the mixer. */
+    if (!automated)
+        game_controls_remember("cnc3d-controls.cfg");
+    /* AND THE PLAYER'S PRESET IS WRITTEN BACK FROM THE PAUSE MENU TOO. Until this call
+       existed, only the main menu's Visuals screen and the F5 panel ever wrote
+       cnc3d-fx.cfg, so a Swapped Mouse Buttons set from the in-mission pause dialog was
+       lost on quit. It sits AFTER game_visuals_default_enhanced has loaded that file. */
+    if (!automated)
+        game_visuals_remember("cnc3d-fx.cfg");
 
     /* --visualsshot: the menu's Visuals screen, one frame, then out. Placed here on
        purpose -- after the GL context and the audio boot, but BEFORE the menu shell
@@ -1713,16 +1742,30 @@ int main(int argc, char** argv)
                    Every control on the lobby writes a field the engine reads; see
                    menu/doslobby.h for the ones that are deliberately not drawn. */
                 skirmish_scan(base_dir(opt.dir));
-                if (g_skirmish.empty()) {
+                /* AN EMPTY LIST STILL OPENS THE SCREEN, and until now it did not.
+                   This arm printed one line to stderr and fell straight back to the
+                   menu, so a player whose install is missing its SCM packs pressed
+                   Skirmish, watched the button click, and got nothing. The button
+                   was working; the game simply had nowhere to say so. The lobby
+                   draws its own empty state, and its Play button is dead while the
+                   list is empty (sk_item_disabled, SK_I_PLAY), so opening it risks
+                   nothing and is the only place a player can be told anything at
+                   all. The line below stays: it is the half that can name the
+                   FOLDER, and it is what cnc3d-log.txt carries. */
+                if (g_skirmish.empty())
                     fprintf(stderr, "menu: no skirmish maps found in '%s' -- the SCM "
                                     "mission INIs and their packs have to be installed "
                                     "alongside the campaign's\n",
                             opt.dir ? opt.dir : "missions/");
-                } else {
+                {
                     SK_Lobby lob;
                     memset(&lob, 0, sizeof lob);
                     SK_Prev* prev = skirmish_previews();
-                    const int r = dms_lobby(&menu, &g_skirmishMaps[0],
+                    /* &v[0] on an empty vector is undefined and the list is now
+                       allowed to be empty; sk_init takes a null list with count 0. */
+                    const int r = dms_lobby(&menu,
+                                            g_skirmishMaps.empty()
+                                                ? NULL : &g_skirmishMaps[0],
                                             (int)g_skirmishMaps.size(), prev, &lob,
                                             g_lobbyPlay ? &g_lobbyProbe : NULL);
                     if (r == DMS_QUIT) {
@@ -1809,7 +1852,7 @@ int main(int argc, char** argv)
                    scen, intro, brief, action);
             fflush(stdout);
             /* Start_Scenario's exact exceptions (scenario.cpp): the intro plays
-               unless this is Nod scenario 1; the briefing plays unless this is GDI
+               unless this is Nod scenario 1; the mission briefing plays unless this is GDI
                scenario 1 (Choose_Side already played both sides' first briefing). */
             int ok = 1;
             if (g_camp.scenario != 1 || g_camp.side == 0)
@@ -1921,7 +1964,7 @@ int main(int argc, char** argv)
                same g_camp, so a restarted campaign mission is still a campaign mission
                and still knows which one it is. Never APP_BRIEF: 1995's Do_Restart calls
                Start_Scenario with briefing = false (scenario.cpp:728), and a player who
-               has just asked to start over does not want the briefing again.
+               has just asked to start over does not want the mission briefing again.
 
                There is no new teardown here and none is needed. game_shutdown has
                already run by this point, and booting the same scenario name again is

@@ -12,7 +12,7 @@ DESERT.MIX (.DES icon sets); the ART is Dune 2000's:
     plain-sand tiles; slopes/cliffs and boulders GRAFT rock/edge tiles and patches
     graft dune tiles, per cell, by the same amplitude-blind structure correlation
     the snow bank uses. Every D2K tile is Lanczos-resampled 32->24 and requantised
-    to the D2K palette -- a documented resample, recorded as an open gap.
+    to the D2K palette -- a documented resample, recorded in known-gap notes.
   - Families Dune 2000 has no art for -- roads, and every water template -- keep TD
     DESERT art under the luminance-rank ramp transfer so their ground matches D2K
     sand. Arrakis has no water; desert water recolors to the nearest thing the D2K

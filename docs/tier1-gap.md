@@ -1,6 +1,6 @@
 # Tier 1 gap list (what the Windows 98 build gives up)
 
-Two render tiers, see the repository's rule 1. Tier 2 is the modern desktop build and may use
+Two render tiers, see repository rules rule 1. Tier 2 is the modern desktop build and may use
 shaders freely. Tier 1 is Win98 with a 3dfx Voodoo 2 through Glide: fixed function,
 no shaders, no render targets, 640x480, 16-bit colour.
 
@@ -16,6 +16,9 @@ a bug, because it converts the port from a known list of compromises into a surp
 | Texture wrap: mirror | `GL_MIRRORED_REPEAT` (x1) | pre-mirrored texture baked at pack time, `GL_REPEAT` |
 | Shatter: buildings, vehicles and aircraft (pieces fly, roll and settle) | a killed structure's display-list sections become rigid bodies: radial launch from the footprint centre, gravity, bounce, downhill roll on the PK9 heightfield, settle, linger, then sink into the ground while fading. `game/shatter_mod.h` | the section SHED alone (G90): the building disassembles over its eight-tick death window in the display list's own order and is gone. No flying pieces. **A VEHICLE GETS NOTHING AT ALL on Tier 1**, and cannot get the shed either: a vehicle has no death window to shed across -- measured, a Jeep goes from `str=12/150` straight to MISSING in one tick -- so Win98 keeps exactly what it has today, the cartridge's seven generic VehicleDamage debris chunks (DBRV0..6, baked and already firing: a dying Jeep spawns 129 particles and 15 chunks). That is the cartridge's own answer to a dying vehicle and it is unchanged. NOT a fidelity loss -- the cartridge has no authored building collapse either, it swaps to FRAG3 debris and that is all. **The blocker is not shaders and not the per-vertex 3x4** (12 multiplies on a vertex that already pays a bilinear shroud lookup); it is COUNT x DURATION x DRAW CALLS -- a full 128-piece pool is up to 384 separate `draw_mesh` calls and 128-plus texture binds per frame, for five to six seconds after the buildings are already gone. **The centre PULSE is excepted and ships on both tiers**: one particle in the existing sprite pool, fired above the shatter's own early-outs so switching the shatter off does not take it too. |
 | Damaged building overlay | the cartridge's own per-building damage display list appended over the intact model when `Health_Ratio() < 0x80`: 2 to 78 triangles, one or two CI8 textures. BUILT 24 Aug 2026, decoded in `docs/damage-textures.md` | **SHIPS ON TIER 1, no gap.** Measured worst case if all 142 structures on the largest shipped map were visible and below half health at once: 2428 extra triangles, 7285 host vertex transforms, 568 `grTexSource` binds per frame, and 57.0 KB of texture against a 2 MB TMU. Realistic load is one to two orders of magnitude under that. No shader, no render target, no new state. The one Tier 1 detail is the z-fight epsilon, and the answer is the mesh-space Y bias already used at `cnc_eyes.cpp:5568`, not `grDepthBiasLevel`. |
+| Landed-helicopter rotor rate (the cartridge's k=1 / k=2 rule) | `rotor_spin(o)` halves the sweep while `o.alt == 0`, so a helicopter on a pad or on the ground turns idling blades at exactly half the airborne rate. The 2:1 ratio is the console's, from RAM 0x80097A50 (k=2) and RAM 0x80097A4C (k=1); the absolute rate is ours. | NONE today, and the blocker is a MISSING FIELD, not the Voodoo. `tier1/w98_glidegame.c:1935` drives every rotor from one clock, `g_mesh.rotor = (ticks * 60) & 255`, with no altitude test, because `W98_Object` (`tier1/w98_brain.h:32`) carries no altitude and `wb_parse` (`tier1/w98_brain.c:820-843`) never reads `|alt=` -- although both brains already emit it (`dllinterface.cpp:8285` vanilla, `:8234` XL). The fix is three lines whenever Win98 is next touched: an `int alt;` in the struct, one `field_int(line, "|alt=", 0)`, and a conditional on the multiplier at :1935. No shader, no render state and no Glide call is involved. |
+
+| Network multiplayer | deterministic lockstep over UDP: peers exchange 22-byte `EventClass` orders through a star, with a rendezvous for address exchange, hole punching, and a relay for the pairs that cannot punch through. 8 players on the classic brain, 16 to 24 on the Enhanced engine | **NONE. TIER 2 ONLY.** Not a Winsock limit, and that is worth stating because it is the guess everyone makes: Windows 98 SE ships Winsock 2.2, plain UDP is all a lockstep order stream needs, and hole punching requires no encryption, so the sockets themselves would be fine. Three other things rule it out, any one of them sufficient. **(1) Tier 1 is a separate program.** `tools/win98/build.sh` builds `w98glide.exe` out of `tier1/*.c` and never compiles `game/cnc_eyes.cpp`, so parity would mean writing the lobby, the turn scheduler and the transport twice, in two codebases that share no code. **(2) Lockstep runs at the pace of the slowest peer**, because every machine simulates every player's army; a Pentium-class box would set the frame rate for everyone else in the match. **(3) 16 to 24 players requires the Enhanced engine**, which never ships to Windows 98, so large matches are inherently Tier 2 whatever the transport does. **What stays possible and is not planned:** a LAN and direct-IP-only Tier 1 build, which needs no rendezvous, no relay and no encryption, and which is exactly what the 1995 game shipped. It would cost a session or two once the transport seam exists, and it is not promised. The menu already tells the truth today: `menu/dosmenu.c:62` marks Multiplayer disabled and `tier1/t1_menu.c:103` refuses the click. |
 
 ## The presentation chain (added 19 Aug 2026)
 
@@ -44,7 +47,7 @@ know the chain exists.
 | One switch flipping every texture drawn IN THE WORLD between `GL_NEAREST` and `GL_LINEAR`: the 3D pack art and terrain atlas, the DOS infantry sprites, the tiberium, the decals, the construction scaffold. **Never the UI** -- not the sidebar, cameos, fonts, cursors, pause dialog, menus or movies | `glTexParameteri` over a register of every uploaded WORLD texture; UI textures are simply never registered, so the switch has no way to reach them | **the Voodoo 2 filters bilinearly in hardware and has since 1996.** `grTexFilterMode(GR_TEXTUREFILTER_BILINEAR)` per TMU, set per texture source rather than globally. This is one of the few additions Tier 1 can simply do |
 
 Worth recording alongside it: the console's RDP filtered its textures bilinearly, so
-point sampling is OUR choice, not the cartridge's. Whichever way this switch is set
+point sampling is OUR choice, not the cartridge's. Whichever way the project owner sets this switch
 it is a decision, and the default (off, point sampled) is the one that keeps every
 existing gate's pixels where they were.
 
@@ -96,8 +99,8 @@ cannot rot while it waits.
 **A REAL Tier 1 finding fell out of that link, and it is not about audio.** The probe
 binary imports `api-ms-win-crt-*.dll`: that is the UCRT, which Homebrew's mingw-w64
 links by default and which **does not exist on Windows 98**. Ubuntu's mingw-w64 (what CI
-uses) is the MSVCRT variant and imports `msvcrt.dll`, which does. It is
-already recorded that the two toolchains differ and that both run on Windows 11; what is
+uses) is the MSVCRT variant and imports `msvcrt.dll`, which does. `known-gap notes`
+already records that the two toolchains differ and that both run on Windows 11; what is
 new is that the difference is load-bearing for Tier 1. **The Win98 build must be made
 with the MSVCRT variant**, whichever machine makes it, and that is a toolchain decision
 to settle before the port starts rather than a link error to discover during it.
@@ -192,7 +195,7 @@ works in 1/255. So a terrain pixel can come out one level brighter than the cons
 Measured by the `cmcombine` script verb against read-back pixels over 180
 (texel, tint, lit) triples: **146 exact, 34 one level brighter, 0 darker.** That is the
 signature of the divide and nothing else. It is not new -- the plain modulate this
-replaced carried the identical /255 -- and it is, registered as an open gap rather
+replaced carried the identical /255 -- and it is registered in `known-gap notes` rather
 than corrected, because pre-scaling the vertex alpha by 255/256 would move every terrain
 pixel that already exists for a sub-level gain.
 
@@ -200,13 +203,13 @@ pixel that already exists for a sub-level gain.
 the SIBLING combiner arm (ROM 0x19A590, `(TEXEL0 - 0) * SHADE_ALPHA + SHADE`), i.e. it
 ADDS the same tint to the sea floor. On Glide that is
 `GR_COMBINE_FUNCTION_SCALE_OTHER_ADD_LOCAL` with the same factor, so it is equally
-native when someone builds it.
+native when someone builds it. See `known-gap notes`.
 
 ## The software renderer (added 19 Aug 2026)
 
 Tier 1 now has TWO possible backends, not one, and this table gained a column in spirit:
 a **software rasteriser** (`tier1/softras.c`, running today on the box) and **Glide on the
-Voodoo 2** (not yet built). The decision was to prove the path in software first,
+Voodoo 2** (not yet built). the project owner's call on 19 Aug was to prove the path in software first,
 because a CPU rasteriser removes the 3dfx driver from every early failure, can be gated on
 the Mac before it reaches Win98 hardware, and unlike a Voodoo is visible over VNC.
 
@@ -221,15 +224,15 @@ than left to be misread:
 | Perspective correction | free | subdivided: one divide per 8 pixels, linear in between. This is the era's technique and it is in `SR_SPAN` | free in hardware |
 | Lighting | per-vertex or per-fragment | **a 32 level palette shade table**, one indexed load per pixel. Not a multiply. Colour is palettised end to end, which is what the art already is | per-vertex iterated colour, and **Glide WRAPS a component above 255 to near-black instead of clamping**, so the caller must clamp |
 | Depth buffer | 24 bit | a float 1/w buffer today, which is one float compare and one float store per pixel. A 16 bit fixed point buffer is the era's answer and is owed | hardware |
-| Near plane clipping | free | **absent.** Triangles with any vertex at or behind the eye are dropped whole. Recorded as an open question | absent for the same reason until written |
+| Near plane clipping | free | **absent.** Triangles with any vertex at or behind the eye are dropped whole. See `known-gap notes` | absent for the same reason until written |
 | Output | window or fullscreen GL | a 32 bit DIB section blitted with `BitBlt`. No page flip, no vsync, and it goes through GDI | fullscreen only; a Voodoo 2 has no 2D output of its own |
 | VI output gamma | `pow(c, gamma)` in the resolve pass | **free and exact.** The gamma can be folded into the shade table when it is built, at zero per-pixel cost. This closes the one real fidelity loss the Glide row above admits to | `grGammaCorrectionValue()` |
 
 **The software backend's speed is currently unexplained and roughly 50x off**, which is
-, recorded as an open gap rather than here, because it is a defect to fix and not a
+recorded in `known-gap notes` rather than here, because it is a defect to fix and not a
 declared compromise.
 
-### Two Tier 1 decisions that are open
+### Two Tier 1 decisions that are open, and are the project owner's
 
 **1. The pixel format of the 3D art.** The software rasteriser is palettised end to end:
 8-bit texture indices and a 32-level shade table, one indexed load per pixel. That is what
@@ -297,3 +300,38 @@ when the baked node animation (1,091 KB of pose) and the shadow alpha planes (18
 converted. That is resident on a machine with about 388 MB free, so it is comfortable
 today, but it is the largest single block in the build and halving the pose to `short`
 fixed point is still available and still not needed.
+
+
+## Team colours on infantry (added with the per-seat livery round)
+
+| Piece | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **A skirmish seat's colour on its FOOT SOLDIERS** | up to six extra copies of the 1995 infantry sheets, the uniform band (palette 176..191) substituted per `PlayerColorType`. Measured on the shipping pack: 102 of its 397 strips qualify, 1.43 M texels, so **5.5 MB on the card per colour and 33 MB with all six in play** | **none by default, and that is a deliberate cut rather than an oversight.** It is thirty times what the mesh liveries cost (0.18 MB per colour) and a Voodoo 2 has 4 MB of texture memory in total, so Tier 1 keeps the pack's own two colourways on infantry and puts the seat's colour on vehicles, buildings, selection boxes, radar blips and rally flags only. **A much cheaper Glide answer exists and is not written:** these sheets are 8-bit and Glide is natively palettised, so `GR_TEXFMT_P_8` plus one `grTexDownloadTable` per colour makes a livery cost a 768 byte palette instead of a second copy of the art. On that route Tier 1 could carry all six for less than one costs on Tier 2 |
+
+
+## The primary-factory label (1 Sep 2026)
+
+| Piece | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **The word "Primary" under a selected factory** | one 8-bit DOS surface rasterised once with `db_print` in 8POINT, widened to RGBA, uploaded as a 64x16 GL texture and drawn as one alpha-tested screen quad per label | **the same thing minus the widening step, and it is CHEAPER here than on the desktop.** `game/dosbar.c` is compiled into the Win98 build UNEDITED, so `db_font`, `db_print`, `db_string_width`, `db_font_palette_full` and the 8POINT glyphs are all present today at no additional cost. The plate is 8-bit palettised, which is the Voodoo's native `GR_TEXFMT_P_8`, so this tier skips `db_surface_to_rgba` entirely and lets the chroma key drop index 0 the way the HUD pages already do. 1 KB of a 4 MB TMU, uploaded once, because the string never changes. The projection is `t1_world_to_eye` plus the same divide `draw_brackets` already performs per selected object, and the brain field arrives through `field_int(line, "|primary=", 0)` beside `o->sel`, so an older brain reads 0 |
+
+**The plate is authored 64x16 on BOTH tiers for this tier's sake.** The software rasteriser
+masks rather than clamps, so every texture there must be a power of two; 42x11 of ink inside a
+64x16 page satisfies that and costs the desktop nothing.
+
+**What is actually absent on Tier 1 today is the whole per-object overlay family, not this.**
+There are no health bars, no pip rows and no repair wrench on the Win98 build: it draws
+selection brackets off the engine's own `sel` flag and nothing else per object. So the honest
+row is that the label ships on Tier 1 with no new mechanism and no shader, one chroma-keyed
+textured quad and 1 KB of texture, and it lands when that family lands, which it has not yet.
+It is not a Tier 2 exclusive and it is not a blocker; it is one more quad on a list that is
+currently empty.
+
+Two traps to carry over when it is written, both already on the recorded list: texture
+coordinates live in a fixed 0..256 space stretched over the bound LOD, so the UVs cropping the
+ink out of the 64x16 page must be scaled by 256/64, and an unbounded quad wedges the card.
+
+One placement difference to declare rather than discover: Tier 2 anchors the label to the
+bottom of the object's projected MESH silhouette, and Tier 1 has no mesh-silhouette bound, so
+it anchors to the object's ground point plus a fixed offset in HUD pixels. Identical on a squat
+building, a little high on a tall one.

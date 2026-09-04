@@ -1,0 +1,6 @@
+tick 5
+lclickobj MCV:@me
+actclickobj MCV:@me
+tick 6000
+objdump
+quit

@@ -1,4 +1,4 @@
-All line numbers below are against `game/cnc_eyes.cpp` at sha1 `be86abb` (18320 lines). **Caveat: this file was changing during the analysis** -- it grew from 17477 to 18320 lines while it was being read, so re-anchor on the quoted text if the numbers have drifted. No files were changed.
+All line numbers below are against `game/cnc_eyes.cpp` at sha1 `be86abb` (18320 lines). **Caveat: a concurrent edit is actively editing this file** -- it grew from 17477 to 18320 lines while I was reading it, so re-anchor on the quoted text if the numbers have drifted. No files were changed.
 
 ---
 

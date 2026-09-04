@@ -14,9 +14,16 @@
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
 // MODIFIED for C&C 3D in August 2026. This is not EA's original file.
-// The change is additive and does not alter the game simulation; the complete
-// diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
-// lists every modified file.
+// Changes the impact explosion animation on four bullet types in the shipped
+// bullet table: BULLET_SSM, BULLET_SSM2 and BULLET_NUKE_UP now use
+// ANIM_ART_EXP1 instead of ANIM_FRAG1, and BULLET_GRENADE uses ANIM_GRENADE
+// instead of ANIM_VEH_HIT2, to match the animations the N64 cartridge's own
+// bullet table names. Damage, warhead, speed and turn rate are untouched;
+// the substituted animations differ only in their artwork, impact sound and
+// crater or scorch flags.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
 //
 
 /* $Header:   F:\projects\c&c\vcs\code\bbdata.cpv   2.17   16 Oct 1995 16:49:46   JOE_BOSTIC  $ */

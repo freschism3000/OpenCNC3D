@@ -43,6 +43,40 @@ cc -std=c89 -O2 -g -c hud640.c -o hud640.o
 # it rasterises into an 8-bit surface and nothing else.
 cc -std=c89 -O2 -g -c dosopt.c -o dosopt.o
 
+# THE 3D FACTION LOGOS. app/logo3d.c is compiled into BOTH binaries now: the app draws the
+# spinning emblem on the score screen and the renderer draws it, plus the EVA wordmark, in
+# the DATABASE page's two top corners. One file, one format, one baker (game/bake_logos.py)
+# -- a second copy of a mesh reader is a second thing to keep in step with the pack.
+# gnu89 rather than c89 because it includes <OpenGL/gl.h>, whose headers are not strict C89.
+cc -std=gnu89 -O2 -g -c ../app/logo3d.c -o logo3d.o
+
+# THE LOCKSTEP NETWORKING, same rule again and for the same reason. lockstep.c is the turn
+# scheduler and has no I/O in it whatsoever, which is what lets it be tested by running two
+# schedulers in one process with no network; net_udp.c is the only file that knows what a
+# socket is. Keeping them apart is the discipline this file already applies to the DOS
+# rasterisers, and it is what will let a relay or a different platform be dropped
+# underneath without touching the rules above it.
+cc -std=c89   -O2 -g -c ../net/lockstep.c -o lockstep.o
+cc -std=gnu89 -O2 -g -c ../net/net_udp.c  -o net_udp.o
+# netmatch.c is the match itself: the handshake, one turn per tick and the desync alarm,
+# between the scheduler and the socket. It is the only net file the game calls.
+cc -std=gnu89 -O2 -g -c ../net/netmatch.c -o netmatch.o
+
+# The two gates and the connectivity tool are STANDALONE binaries, the same category as
+# gate_optlayout below: nothing links them into the game. gate_lockstep drives the
+# scheduler with no sockets at all; gate_netloop does it again over real loopback
+# datagrams; netcheck is the two machine version a person runs by hand before blaming the
+# game for a match that will not start. tools/win/check-sources.sh excludes all three by
+# name, for the reason it excludes gate_optlayout.
+cc -std=c89   -O2 -g -o gate_lockstep ../net/gate_lockstep.c lockstep.o
+cc -std=gnu89 -O2 -g -o gate_netloop  ../net/gate_netloop.c  lockstep.o net_udp.o
+cc -std=gnu89 -O2 -g -o netcheck      ../net/netcheck.c      lockstep.o net_udp.o
+
+# cnc_twobrain: TWO brain instances in ONE process, compared per tick. It is the gate that
+# one-binary-twice cannot be: it proves two independent copies of the engine AGREE, which is
+# what lockstep is built on. Dependency free, no sockets, dlopens the brain itself.
+cc -std=gnu99 -O2 -g -o cnc_twobrain  ../brain/host/cnc_twobrain.c
+
 # gate_optlayout MEASURES that dialog's geometry, and it is a separate binary precisely
 # BECAUSE of the rule above: with no SDL and no GL in dosopt.c there is nothing to open a
 # window for, so the whole layout can be interrogated headlessly in milliseconds. It
@@ -72,7 +106,7 @@ AUDOBJ="$AUDOBJ aud_sdl.o"
 # be rewritten after the link without relinking. Same flag and same reason as app/build.sh.
 clang++ -std=c++14 -O2 -g \
     -fms-extensions -fdeclspec -D__int64="long long" \
-    -o cnc_eyes cnc_eyes.cpp dosbar.o hud640.o dosopt.o dossave.o $AUDOBJ \
+    -o cnc_eyes cnc_eyes.cpp dosbar.o hud640.o dosopt.o dossave.o logo3d.o lockstep.o net_udp.o netmatch.o $AUDOBJ \
     -I"$HDR" -I../audio \
     $(sdl2-config --cflags) $(sdl2-config --libs) \
     -Wl,-headerpad_max_install_names \
@@ -103,7 +137,9 @@ sh ../tools/bundle-sdl.sh . cnc_eyes
 # could never agree again and the launcher warned "rebuild" after every successful build.
 # A warning that is always on is a warning nobody reads. One list, published here.
 BUILD_SOURCES="cnc_eyes.cpp cnc_sidebar.h edit_mod.h edit_tables.h enhanced_mod.h \
-edit_emblem.h dosbar.c hud640.c dosopt.c"
+edit_emblem.h codex_mod.h codex_table.h dosbar.c hud640.c dosopt.c ../app/logo3d.c \
+../net/lockstep.c ../net/net_udp.c ../net/lockstep.h ../net/net_udp.h \
+../net/netmatch.c ../net/netmatch.h"
 {
     cat $BUILD_SOURCES 2>/dev/null | shasum -a 1 | cut -d" " -f1
     echo "$BUILD_SOURCES"
@@ -116,6 +152,14 @@ edit_emblem.h dosbar.c hud640.c dosopt.c"
 # be able to disagree, so they no longer can.
 if [ -d ../playable ]; then
     cp cnc_eyes ../playable/cnc_eyes
+    # THE NET TEST BINARIES GO WITH IT, because the gate that runs them runs from the
+    # PLAY folder and looks for ./gate_lockstep beside itself. Built here and left here,
+    # they were invisible to the suite: the gate reported exit 99, "the binary was not
+    # built", when all three had been built and were simply somewhere else. Same shape as
+    # the engine and the app, so it is staged in the same place rather than in a third.
+    for b in gate_lockstep gate_netloop netcheck cnc_twobrain; do
+        [ -x "$b" ] && cp "$b" "../playable/$b"
+    done
     # THE WORKED EXAMPLE. examples/ is tracked, playable/ is not, so the demo mission has
     # to be staged or it only exists on the machine it was made on. Copied ONLY when it is
     # not already there: it is meant to be edited, and a build that silently reverted

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CNC3D -- the DOS half of the viewer's map corpus.
 
-The cartridge ships 79 maps. the original 1995 MS-DOS CD ships more, and they are
+The cartridge ships 79 maps. the project owner's own 1995 MS-DOS CD ships more, and they are
 the ones the N64 never got: the SCM multiplayer maps and the SCJ dinosaur
 missions. Both live in data/dosdata/GENERAL.MIX.
 

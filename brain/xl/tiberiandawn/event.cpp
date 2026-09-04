@@ -446,7 +446,17 @@ void EventClass::Execute(void)
     case REPAIR:
         CCDebugString("C&C95 - Repair packet received\n");
         techno = As_Techno(Data.Target.Whom);
-        if (techno && techno->IsActive) {
+        /*
+        **	CNC3D: the ownership test the SELL arm below has always had and this one never
+        **	did. Harmless in 1995 because only the owner's mouse could queue a REPAIR, and
+        **	harmless in the shipped campaign because nothing there reaches this arm at all.
+        **	It matters the moment orders arrive off a wire, where a peer's bytes name any
+        **	house they like: without it a stranger could repair, and therefore charge for,
+        **	a building that is not theirs. UNGATED on purpose, because there is no path on
+        **	which it changes an outcome, and a branch that can never be observed is worse
+        **	than no branch.
+        */
+        if (techno && techno->IsActive && techno->House == Houses.Raw_Ptr(ID)) {
             techno->Repair(-1);
         }
         break;
@@ -484,17 +494,23 @@ void EventClass::Execute(void)
 
             /*
             **	Beacons have a 30-second kill time.
+            **
+            ** CNC3D lockstep: the deadline is a FRAME NUMBER, not a wall clock. The old
+            ** code read GetSystemTimeAsFileTime inside #ifdef _WIN32, so a beacon expired
+            ** after 30 s of wall time on Windows and NEVER expired anywhere else. That is
+            ** real state divergence rather than a cosmetic one, because Delete_This()
+            ** removes an object from the shared Anims list.
+            **
+            ** THE SCOPE OPERATOR IS LOAD-BEARING. This is EventClass::Execute, and
+            ** EventClass has its OWN member named Frame, the wire field holding the frame
+            ** this event was SCHEDULED for, which the sixteen-player respin narrowed to 24
+            ** bits so that it wraps. Unqualified `Frame` here would bind to that member and
+            ** compile silently. `::Frame` is the engine's master clock, incremented once
+            ** per tick and reset per scenario. 30 seconds at TICKS_PER_SECOND is the same
+            ** 30 seconds the comment always promised.
             */
             if (Data.Anim.What == ANIM_BEACON) {
-#ifdef _WIN32
-                FILETIME ft;
-                GetSystemTimeAsFileTime(&ft);
-
-                unsigned long long kill_time =
-                    ((unsigned long long)ft.dwLowDateTime + ((unsigned long long)ft.dwHighDateTime << 32ULL))
-                    + 300000000ULL;
-                anim->Kill_At(kill_time);
-#endif
+                anim->Kill_At((unsigned long long)::Frame + (30ULL * TICKS_PER_SECOND));
             }
         }
         break;

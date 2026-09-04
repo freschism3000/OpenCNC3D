@@ -1,0 +1,6 @@
+tick 20
+cam 46.5 14.5
+zoom max
+shot shots/g174_hill.png
+cratedump
+quit

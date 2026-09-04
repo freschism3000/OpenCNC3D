@@ -2,11 +2,11 @@
 # One-time setup of the 3dfx Glide SDK for the Windows 98 Tier 1 build.
 #
 # Glide has no redistributable SDK any more, so this assembles one from two sources that
-# both still exist, and pins nothing to a temporary directory the way the earlier Game
+# both still exist, and pins nothing to a scratch work the way the earlier Game
 # Browser work did (its SDK path pointed into /private/tmp and evaporated).
 #
 #   1. HEADERS come from sezero/glide, the maintained mirror of 3dfx's own GPL release.
-#   2. The IMPORT LIBRARY is built from the REAL glide2x.dll off the Voodoo 2 machine.
+#   2. The IMPORT LIBRARY is built from the REAL glide2x.dll off the project owner's Voodoo 2 box.
 #      That matters: it guarantees we link against exactly the entry points that
 #      machine's driver exports, rather than against a header's idea of them.
 #
@@ -53,7 +53,7 @@ fetch glide2x/sst1/init/sst1vid.h sst1vid.h
 # The import library, from the box's own driver.
 # ---------------------------------------------------------------------------
 DLL=""
-for c in "$CNC3D_GLIDE_DLL" ./glide2x.dll; do
+for c in "$CNC3D_GLIDE_DLL" ./glide2x.dll $CNC3D_SHARE/gl2.dll $CNC3D_SHARE/glide2x.dll; do
     [ -n "$c" ] && [ -f "$c" ] && DLL="$c" && break
 done
 if [ -z "$DLL" ]; then

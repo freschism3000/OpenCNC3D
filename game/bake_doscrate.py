@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-bake_doscrate.py -- the two bonus-crate overlays, WCRATE and SCRATE, baked into
-`doscrate.pack` so the renderer can draw a crate instead of leaving an invisible pickup
-on the ground.
+bake_doscrate.py -- the DOS world overlays, baked into `doscrate.pack`: the two bonus
+crates WCRATE and SCRATE, so the renderer can draw a crate instead of leaving an
+invisible pickup on the ground, and the repair WRENCH, so a structure that is repairing
+itself says so instead of silently gaining health.
 
 WHY THIS EXISTS
 
@@ -16,8 +17,17 @@ and WALL| closes the first half; this closes the second.
 
 NO CD REQUIRED, and that is the point of the two sources below.
 
-  the art       WCRATE.SHP and SCRATE.SHP out of playable/dosdata/CONQUER.MIX, which
-                ships with the game. Both are a single 10x11 frame.
+  the art       WCRATE.SHP, SCRATE.SHP and SELECT.SHP out of
+                playable/dosdata/CONQUER.MIX, which ships with the game. The two crates
+                are a single 10x11 frame each. SELECT.SHP is four 24x21 frames and only
+                frame 2 is taken: defines.h enumerates SELECT_INFANTRY, SELECT_UNIT
+                (which SELECT_BUILDING and SELECT_TERRAIN alias) and then SELECT_WRENCH,
+                so the wrench is index 2, and that is the frame building.cpp:686 hands to
+                CC_Draw_Shape while a building is repairing.
+
+                Measured, not assumed: frame 2 is 204 opaque texels of 504 and uses only
+                indices 0, 12, 13, 14 and 15. No index 4, so the shadow question below
+                does not arise for it either.
 
   the palette   read back out of playable/dossidebar.pack, NOT from TEMPERAT.PAL on the
                 1995 CD. bake_dossidebar.py stores `pal8[768]`, the palette "widened the
@@ -36,10 +46,13 @@ FORMAT (all little-endian), magic "DOSCRT1\\0":
 
     char  magic[8]        "DOSCRT1\\0"
     u32   version         1
-    u32   count           2 (wood, steel -- in that order, and the order IS the wire
-                          value: the brain's CRATE| line ends in steel=0 or steel=1)
+    u32   count           3 (wood, steel, wrench -- in that order). The FIRST TWO are
+                          the wire value: the brain's CRATE| line ends in steel=0 or
+                          steel=1. The wrench has no wire value and is looked up by slot,
+                          and it is LAST so that a reader handed a two-entry pack baked
+                          before it existed still finds both crates where it expects them.
     count x {
-        char name[12]     "WCRATE", "SCRATE"
+        char name[12]     "WCRATE", "SCRATE", "WRENCH"
         u32  w, h
         u8   rgba[w*h*4]  straight RGBA8, alpha a hard 0 or 255
     }
@@ -54,7 +67,12 @@ sys.path.insert(0, os.path.join(HERE, "..", "menu", "tools"))
 MAGIC = b"DOSCRT1\x00"
 VERSION = 1
 DOS_TRANSPARENT = 0
-SHAPES = ["WCRATE", "SCRATE"]      # wood is steel=0, steel is steel=1
+# (name in the pack, SHP in CONQUER.MIX, frame index). Wood is steel=0 and steel is
+# steel=1; that order IS the wire value. The wrench is appended rather than inserted,
+# for the reason the format block above gives.
+SHAPES = [("WCRATE", "WCRATE.SHP", 0),
+          ("SCRATE", "SCRATE.SHP", 0),
+          ("WRENCH", "SELECT.SHP", 2)]
 
 
 def load_palette(barpack):
@@ -81,12 +99,16 @@ def load_shapes(mixpath, pal8):
     from mixshp import MixFile, Shape
     mix = MixFile(mixpath)
     out = []
-    for name in SHAPES:
-        shp = Shape(mix.read(name + ".SHP"))
-        if shp.frames != 1:
-            raise SystemExit("%s has %d frames, expected 1" % (name, shp.frames))
+    for name, shpname, frame in SHAPES:
+        shp = Shape(mix.read(shpname))
+        # A BOUND, not an equality. The crates really are one frame each and SELECT.SHP
+        # really is four, so asserting a count here would only encode which file is which
+        # twice. What must not happen quietly is asking for a frame that is not there.
+        if frame >= shp.frames:
+            raise SystemExit("%s has %d frames, wanted frame %d"
+                             % (shpname, shp.frames, frame))
         w, h = shp.width, shp.height
-        src = shp.frame(0)
+        src = shp.frame(frame)
         buf = bytearray(w * h * 4)
         opaque = 0
         for p in range(w * h):
@@ -142,7 +164,7 @@ def main():
 
     for name, w, h, _rgba, op in shapes:
         print("  %-8s %dx%d, %d opaque pixels" % (name, w, h, op))
-    print("wrote %s: %d crates, %d bytes, readback clean" % (out, len(shapes), len(blob)))
+    print("wrote %s: %d sprites, %d bytes, readback clean" % (out, len(shapes), len(blob)))
 
 
 if __name__ == "__main__":

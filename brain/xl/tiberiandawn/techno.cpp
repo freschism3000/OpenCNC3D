@@ -259,7 +259,7 @@ int TechnoTypeClass::Raw_Cost(void) const
  * HISTORY:                                                                                    *
  *   07/29/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
-unsigned short TechnoTypeClass::Get_Ownable(void) const
+uint64_t TechnoTypeClass::Get_Ownable(void) const
 {
     return (Ownable);
 }
@@ -4056,7 +4056,7 @@ void TechnoClass::Base_Is_Attacked(TechnoClass const* enemy)
  * HISTORY:                                                                                    *
  *   07/29/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
-unsigned short TechnoClass::Get_Ownable(void) const
+uint64_t TechnoClass::Get_Ownable(void) const
 {
     return ((TechnoTypeClass const&)Class_Of()).Ownable;
 }

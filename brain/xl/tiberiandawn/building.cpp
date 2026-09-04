@@ -2126,7 +2126,16 @@ void BuildingClass::Active_Click_With(ActionType action, CELL cell)
         OutList.Add(EventClass(EventClass::SELL, As_Target()));
 
         COORDINATE coord = Map.Pixel_To_Coord(Get_Mouse_X(), Get_Mouse_Y());
-        OutList.Add(EventClass(ANIM_MOVE_FLASH, PlayerPtr->Class->House, coord, 1 << PlayerPtr->Class->House));
+        /*
+            **	NARROWED ON PURPOSE, and it is a 64-house blocker rather than a tidy-up.
+            **	EventClass::Data.Anim.Visible is an `int` in the event payload itself
+            **	(event.h), so this visibility mask is 32 bits wide ON THE WIRE and cannot
+            **	name a house at index 32 or above however it is spelled here. 1ULL keeps
+            **	the shift out of int arithmetic and the cast says the truncation is seen;
+            **	widening the payload is a wire change and is registered as one.
+            */
+            OutList.Add(EventClass(ANIM_MOVE_FLASH, PlayerPtr->Class->House, coord,
+                                   (int)(1ULL << (int)PlayerPtr->Class->House)));
     } else if (action == ACTION_MOVE && CNC3D_Can_Rally()) {
         /*	A FACTORY sets a rally point: the SAME ARCHIVE event, and deliberately WITHOUT
         **	the SELL beside it -- that pairing is what makes a Construction Yard undeploy
@@ -3375,9 +3384,10 @@ void BuildingClass::Read_INI(CCINIClass& ini)
             */
             cell = atoi(strtok(NULL, ","));
 
-            if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-                cell = Confine_Old_Cell(cell);
-            }
+            /*
+            ** Convert from the scenario's OWN stride into this build's (function.h).
+            */
+            cell = Confine_Scenario_Cell(cell, Map.MapBinaryVersion);
 
             /*
             **	5th token: facing.
@@ -3457,7 +3467,8 @@ void BuildingClass::Write_INI(CCINIClass& ini)
                     building->House->Class->IniName,
                     building->Class->IniName,
                     building->Health_Ratio(),
-                    Coord_Cell(building->Coord),
+                    /* the scenario's own stride, not ours -- see Scenario_Cell_Of */
+                    Scenario_Cell_Of(Coord_Cell(building->Coord), Map.MapBinaryVersion),
                     building->PrimaryFacing.Current(),
                     building->Trigger ? building->Trigger->Get_Name() : "None");
             ini.Put_String(INI_Name(), uname, buf);
@@ -5599,12 +5610,27 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
     **	cells to these are of friendly persuasion, then consider the proximity check to
     **	have been a success.
     */
+    /*
+    ** CNC3D: the cheat menu's Build Anywhere. THIS is the third copy of the adjacency
+    ** rule and the one that decides whether the click is actually HONOURED. Hooking
+    ** only the cursor routines gives a green cursor over a far cell and a click that is
+    ** silently refused.
+    **
+    ** It lifts the ADJACENCY rule only. In_Radar is still demanded of every cell the
+    ** foundation covers, so "anywhere" means anywhere ON THE MAP, and whether the ground
+    ** will take a foundation is decided in CellClass and is untouched.
+    */
+    const bool anywhere = DisplayClass::CNC3D_Build_Anywhere(House->Class->House);
+
     short const* ptr = Occupy_List(true);
     while (*ptr != REFRESH_EOL) {
         CELL cell = homecell + *ptr++;
 
         if (!Map.In_Radar(cell))
             return (false);
+
+        if (anywhere)
+            continue;
 
         for (FacingType facing = FACING_N; facing < FACING_COUNT; facing++) {
             CELL newcell = Adjacent_Cell(cell, facing);

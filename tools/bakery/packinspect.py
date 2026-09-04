@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read a baked mission pack (CNC3DPK5 .. CNC3DPKC) back into Python.
+"""Read a baked mission pack (CNC3DPK5 .. CNC3DPKG) back into Python.
 
 Written so a bake can be PROVEN rather than assumed: it parses every section the
 baker writes, so a diff between two packs can name exactly which textures, which
@@ -15,6 +15,7 @@ goes at the FRONT of the tail and never between two existing ones.
     python3 packinspect.py summary  A.pack
     python3 packinspect.py texdiff  OLD.pack NEW.pack      # per-texture byte diff
     python3 packinspect.py meshdiff OLD.pack NEW.pack      # per-mesh triangle diff
+    python3 packinspect.py meshdump A.pack MSAM            # one mesh, per triangle
     python3 packinspect.py texpng   A.pack IDX out.png [-x SCALE]
 """
 import struct
@@ -22,6 +23,13 @@ import sys
 
 N_HOUSE = 2
 N_SPRITE_ANIMS = 3
+
+# One baked triangle as it sits on disk: texture index, mode, wrap, then three
+# vertices of x y z u v + rgba. The mode order is the renderer's TriMode enum, and a
+# texture index of -1 means the display list drew that face with no texture.
+TRI_STRIDE = 4 + 2 + 3 * (5 * 4 + 4)
+TRI_FMT = "<i2B" + "5f4B" * 3
+MODE_NAME = ("opaque", "cutout", "shadow", "xlu")
 
 
 class R(object):
@@ -59,7 +67,27 @@ def read(path):
     magic = r.raw(8)
     assert magic[:6] == b"CNC3DP", magic
     ver = r.u32()
+    # PKF (v15) is the big-map header: the same fields as PKE with u32 mapW and mapH
+    # inserted directly after the version, from which every later offset derives. A
+    # reader that does not know about those eight bytes does not fail at the header --
+    # it reads the texture count out of mapW and walks off the end of the file some
+    # megabytes later, which is what a bare `except: continue` in a caller then reports
+    # as "this pack has no crates". Three packs in the shipped run folder are PKF
+    # (USER01, USER50, USER91: user maps whose grid is not 64x64), and until this branch
+    # existed EVERY tool built on this reader was silently blind to all three. Every pack
+    # before PKF is defined to be 64x64, the grid cnc_eyes.cpp:1933 falls back to.
+    #
+    # PKG (v16) retires the PKE/PKF split: the grid is written ALWAYS, so `ver >= 15`
+    # below still covers it. Its own addition is the second terrain-atlas index, read
+    # where the first one is.
+    # Both spellings of the dimension keys are published because two callers were
+    # written against different ones; they are the same two numbers.
+    mapw, maph = 64, 64
+    if ver >= 15:
+        mapw, maph = r.u32(), r.u32()
     p = dict(path=path, magic=magic.decode("latin-1"), version=ver,
+             mapw=mapw, maph=maph, mapW=mapw, mapH=maph,
+             ncorner=(mapw + 1) * (maph + 1),
              scen=r.name(16), theater=r.name(16), size=len(b))
     pk6 = ver >= 6
     pk7 = ver >= 7
@@ -121,6 +149,13 @@ def read(path):
     p["types"] = types
 
     p["terrain_tex"] = r.u32()
+    # PKG (v16): one int32 after the terrain atlas's bank index, holding the index of the
+    # SAME tiles drawn from the 1995 DOS art, or -1 where the theater has no DOS original.
+    # It is an insertion in the SEQUENTIAL region rather than the tail, so every
+    # EOF-relative block below is unmoved -- but a reader that walks past it reads the
+    # cell count out of this field and then walks off the end of the file, which is what
+    # every gate using this module did until it learned about PKG.
+    p["terrain_tex_dos"] = r.i32() if ver >= 16 else -1
     cells = []
     for _ in range(r.u32()):
         x, y = struct.unpack_from("<hh", r.b, r.o)
@@ -152,14 +187,30 @@ def read(path):
     # is the FIRST block of the tail. New tail blocks go at the front, never in the
     # middle, because every block from the heights down is reached by an
     # eof-relative seek in the renderer.
+    # PKD (v13) is the vehicle/aircraft shadow block, and it is the NEWEST tail block,
+    # so it sits in FRONT of the cm tint. Skipping it here is what made every v13+ pack
+    # read its tint out of shadow bytes.
+    p["vshadows"] = None
+    if p["version"] >= 13:
+        nsh = r.u32()
+        sh = []
+        for _ in range(nsh):
+            nm = r.name(8)
+            bank_ix = r.i32()
+            prim = r.raw(4)
+            verts = [tuple(r.f32() for _ in range(5)) for _ in range(4)]
+            sh.append(dict(name=nm, bank=bank_ix, prim=prim, verts=verts))
+        p["vshadows"] = sh
+    # The two per-corner blocks are sized by the PKF dims, not by a hardcoded 65x65.
+    nc = p["ncorner"]
     p["cmtint"] = None
     if p["version"] >= 12:
-        p["cmtint"] = struct.unpack_from("<%dH" % (65 * 65), b, r.o)
-        r.o += 65 * 65 * 2
+        p["cmtint"] = struct.unpack_from("<%dH" % nc, b, r.o)
+        r.o += nc * 2
     p["corner"] = None
     if pk9:
-        p["corner"] = b[r.o:r.o + 65 * 65]
-        r.o += 65 * 65
+        p["corner"] = b[r.o:r.o + nc]
+        r.o += nc
     p["water"] = None
     p["seabed"] = None
     if pk8:
@@ -204,9 +255,9 @@ def tail_ok(p):
             % p["path"]
     if p["version"] >= 12:
         cm = p["cmtint"]
-        assert cm is not None and len(cm) == 65 * 65, \
-            "%s: PKC cm tint is %s entries, expected 4225" \
-            % (p["path"], None if cm is None else len(cm))
+        assert cm is not None and len(cm) == p["ncorner"], \
+            "%s: PKC cm tint is %s entries, expected %d" \
+            % (p["path"], None if cm is None else len(cm), p["ncorner"])
         # The cartridge's own ceiling: 255*31*200/32768 = 48, so no unpacked
         # channel can exceed 31 and no scaled tint can exceed 48. A CM block that
         # has been byte-shifted by a moved tail block fails this only by luck, so
@@ -264,8 +315,11 @@ def cmd_summary(path):
         # 5-bit one, because 200/32768 floors most non-black corners to nothing.
         t = [cm_tint(v, 255) for v in cm]
         mx = [max(x[i] for x in t) for i in range(3)]
-        print("  cm tint: %d of 4225 corners non-black, per-channel max at "
-              "lit=255 = (%d,%d,%d) of a 48 ceiling" % (nz, mx[0], mx[1], mx[2]))
+        # NOT 4225. read() sizes both per-corner blocks by (mapW+1)*(mapH+1) since the
+        # PKF branch landed, so a 256x256 pack has 66049 of them and this line was
+        # reporting "0 of 4225" against a block it had just read 66049 values from.
+        print("  cm tint: %d of %d corners non-black, per-channel max at "
+              "lit=255 = (%d,%d,%d) of a 48 ceiling" % (nz, len(cm), mx[0], mx[1], mx[2]))
     if p["version"] >= 8:
         tail_ok(p)
         print("  PK8/PKA/PKC tail OK")
@@ -330,6 +384,69 @@ def cmd_texpng(path, idx, out, scale=1, gdi=False):
           % (out, t["w"], t["h"], t["uw"], t["uh"], t["gdi"] is not None))
 
 
+def cmd_meshdump(path, which):
+    """One mesh, triangle by triangle: texture index, mode, wrap, centroid, colour.
+
+    THE QUESTION THIS ANSWERS. "That panel has no texture" and "that panel's texture
+    failed to resolve" look identical on screen and are not the same defect, and
+    telling them apart used to need a bake and a run of the game. A face the cartridge
+    draws with a combiner carrying no TEXEL0 term bakes with texture index -1 BY
+    DESIGN, and its colour is then the vertex colour verbatim: every windscreen,
+    canopy and painted panel in the game is one of those. A texture that really failed
+    would leave a live index behind. The two are one column apart here.
+
+    `which` is a mesh label (dl_014CB50) or a pack type code (MSAM); the pack's own
+    type table resolves the second. When a -1 face still needs explaining, walk the
+    same display list with support/vx_rdp.py and read the combiner it reports: that is
+    the cartridge's own answer rather than an inference from the pack.
+    """
+    p = read(path)
+    m = None
+    for mesh in p["meshes"]:
+        if mesh["name"] == which:
+            m = mesh
+            break
+    if m is None:
+        for code, mi, _flag in p["types"]:
+            if code == which and 0 <= mi < len(p["meshes"]):
+                m = p["meshes"][mi]
+                break
+    if m is None:
+        raise SystemExit("%s: no mesh named %r and no type code %r (%d meshes, "
+                         "%d type codes)"
+                         % (path, which, which, len(p["meshes"]), len(p["types"])))
+    part_of = {}
+    for i, (tri0, nt, _role, _pivot) in enumerate(m["parts"]):
+        for t in range(tri0, tri0 + nt):
+            part_of[t] = i
+    print("%s  %s  %d triangles, %d parts, %d sections"
+          % (path, m["name"], m["ntris"], len(m["parts"]), len(m["sections"])))
+    used = {}
+    for i in range(m["ntris"]):
+        f = struct.unpack_from(TRI_FMT, m["tris"], i * TRI_STRIDE)
+        ti, mode, wrap = f[0], f[1], f[2]
+        # Centroid rather than three corners: it is what a human needs to say WHICH
+        # panel this is, and the mesh frame is x east, y up, z south.
+        c = [sum(f[3 + k * 9 + a] for k in range(3)) / 3.0 for a in range(3)]
+        used[ti] = used.get(ti, 0) + 1
+        print("  tri %3d  part %d  tex %4d  %-6s  wrap %2d  centroid "
+              "(%7.1f %7.1f %7.1f)  rgba %s"
+              % (i, part_of.get(i, -1), ti,
+                 MODE_NAME[mode] if mode < len(MODE_NAME) else "?%d" % mode,
+                 wrap, c[0], c[1], c[2], tuple(f[8:12])))
+    for ti in sorted(used):
+        if ti < 0:
+            print("  tex   -1: %d triangles, UNTEXTURED. The display list drew them"
+                  " with no texture bound to the combiner, so the rgba column IS"
+                  " their colour. This is not a texture that went missing."
+                  % used[ti])
+        else:
+            t = p["tex"][ti]
+            print("  tex %4d: %d triangles, %dx%d (used %dx%d)%s"
+                  % (ti, used[ti], t["w"], t["h"], t["uw"], t["uh"],
+                     ", GDI variant" if t["gdi"] else ""))
+
+
 if __name__ == "__main__":
     c = sys.argv[1]
     if c == "summary":
@@ -339,6 +456,8 @@ if __name__ == "__main__":
         cmd_texdiff(sys.argv[2], sys.argv[3])
     elif c == "meshdiff":
         cmd_meshdiff(sys.argv[2], sys.argv[3])
+    elif c == "meshdump":
+        cmd_meshdump(sys.argv[2], sys.argv[3])
     elif c == "texpng":
         cmd_texpng(*sys.argv[2:])
     else:

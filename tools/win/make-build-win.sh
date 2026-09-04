@@ -65,10 +65,12 @@ mkdir -p "$OUT"
 # the gates and the source list call it; it is named C&C3D.exe in the PACKAGE because that
 # is what a player sees. It carries the icon (see the windres step in build-win.sh).
 #
-# cnc_eyes.exe still ships, and that is deliberate rather than an oversight: it is the
-# verification binary the gate suite drives on Windows, and dropping it would make
-# the Windows build notes impossible to follow. It is not a plausible thing to double-click,
-# which is what the launchers were.
+# cnc_eyes.exe still ships, and it has TWO jobs now. It is the verification binary the
+# gate suite drives on Windows, and it is also the MAP EDITOR: the editor is a flag on
+# the renderer (--edit) and not a program of its own, and cnc3d.exe's entry point never
+# reads that flag. So the launcher's EDITOR button runs this file. It is still not a
+# plausible thing to double-click, which is what the launchers were; the button in front
+# of it is.
 # C&C3D.exe IS THE LAUNCHER NOW, and cnc3d.exe is the engine under it. Until
 # 24 Aug 2026 the engine itself was copied to C&C3D.exe, because it was the one
 # thing to double-click. It still is; there is simply something in front of it
@@ -80,13 +82,58 @@ cp "$ROOT/build/win/cnc3d.exe"  "$OUT/cnc3d.exe"
 cp "$ROOT/build/win/cnc_eyes.exe" \
    "$ROOT/build/win/SDL2.dll"  "$ROOT/build/win/TiberianDawn.dll" "$OUT/"
 
+# THE CONNECTIVITY TOOL ships with the game, and it is the reason this line exists rather
+# than being a build-tree convenience. netcheck.exe has no game in it: it opens one UDP
+# socket, runs three hundred lockstep turns against the other end and prints a digest of
+# the orders both sides executed. Identical digests mean the two ends can lockstep;
+# different ones mean they cannot, and it says so before the match is blamed.
+#
+# The person who needs it is the person whose game will not start, and that person has a
+# zip rather than a compiler. It is 40 KB, it is built unconditionally by build-win.sh,
+# and it links nothing beyond ws2_32, which is part of Windows.
+cp "$ROOT/build/win/netcheck.exe" "$OUT/"
+
 # Named rather than globbed, and checked, because "the package looks fine and the
 # game will not start" is the failure this catches.
-for f in "C&C3D.exe" cnc3d.exe cnc_eyes.exe SDL2.dll TiberianDawn.dll; do
+for f in "C&C3D.exe" cnc3d.exe cnc_eyes.exe netcheck.exe SDL2.dll TiberianDawn.dll; do
     [ -s "$OUT/$f" ] || { echo "$f did not reach the package" >&2; exit 1; }
 done
 
-# THE THING A PLAYER DOUBLE-CLICKS IS THE LAUNCHER. (Reported: "Make sure
+# ---- the editor ships, and the button in front of it is wired to it ----------------
+# The launcher's EDITOR button was drawn grey for as long as the editor existed in the
+# tree and not in a package. Turning it on is one line of C; keeping it honest is this
+# block, and the two are one change. An enabled button over a package with no editor
+# behind it fails in front of the player at the moment it is pressed, which is worse
+# than a grey button and is exactly what the grey button was avoiding.
+#
+# CHECKED BY CONTENT, NOT BY NAME. cnc_eyes.exe is copied a few lines above, so its
+# presence says nothing about whether the editor was compiled into it: a build with the
+# editor sources dropped still produces a file of that name. The string below is an
+# editor-only diagnostic, and it discriminates -- measured on the cross compiled .exe,
+# it appears in cnc_eyes.exe and not at all in the launcher.
+strings -a "$OUT/cnc_eyes.exe" 2>/dev/null | grep -q 'edit: world grid' || {
+    echo "cnc_eyes.exe carries no editor: the editor-only diagnostic string is not in" >&2
+    echo "it. The launcher's EDITOR button runs this binary with --edit, so a package" >&2
+    echo "built from it would open the renderer in a mission instead of the editor." >&2
+    exit 1
+}
+# AND THE BUTTON KNOWS HOW TO REACH IT. The launcher names the editor's executable and
+# its flag as literals, so both are in the binary if, and only if, it was built with the
+# path that opens the editor. A launcher built before this feature has NEITHER string,
+# which is what makes this a test rather than a formality. It proves the path was
+# COMPILED IN and not that the button is drawn enabled; nothing readable out of a cross
+# compiled .exe can prove the second, and that half is checked on the Mac, where the
+# launcher can actually be run.
+for f in cnc_eyes --edit; do
+    strings -a "$OUT/C&C3D.exe" 2>/dev/null | grep -q -- "$f" || {
+        echo "C&C3D.exe does not contain '$f', so it was built without the path that" >&2
+        echo "opens the editor and its EDITOR button would do nothing." >&2
+        exit 1
+    }
+done
+echo "   editor: cnc_eyes.exe carries it, C&C3D.exe knows how to open it"
+
+# THE THING A PLAYER DOUBLE-CLICKS IS THE LAUNCHER. (the project owner, 24 Aug 2026: "Make sure
 # its the default executeable / app for Windows / Mac, from release v0.6.3 and
 # going forward.") Three checks rather than one, because the interesting failure
 # is not a missing file, it is the RIGHT NAME CARRYING THE WRONG BINARY:
@@ -148,7 +195,7 @@ Binaries only, build $GITDESC.
 
 Copy these over the folder you already have, keeping the game data where it is:
 
-  C&C3D.exe  cnc3d.exe  cnc_eyes.exe  SDL2.dll  TiberianDawn.dll
+  C&C3D.exe  cnc3d.exe  cnc_eyes.exe  netcheck.exe  SDL2.dll  TiberianDawn.dll
 
 C&C3D.exe is the launcher and cnc3d.exe is the game. If you have the launcher
 already you do not need to do any of this by hand: press Update in it.
@@ -169,8 +216,10 @@ build you have, shows what changed in it, and offers the next one when there is
 one. Press Play and the game boots the 1995 DOS main menu: START NEW GAME runs
 the GDI campaign, TEST MAP is the sandbox.
 
-The Editor button is drawn grey on purpose. There is a map editor being built;
-there is not yet one you can be handed.
+The Editor button opens the map editor. It starts on the first GDI mission; MAP
+inside it makes a new map or opens another. Maps you save go into the
+missions\\user_maps folder beside the game, which is also where the game's own User
+Maps list reads them from, so a map you make is playable without moving anything.
 
 Enhanced Visuals are ON, with the 640x480 HUD. ESC in game opens Options; Visuals
 has CLASSIC for the 1995 presentation and ADVANCED for the individual switches.
@@ -197,8 +246,9 @@ THE CONTROLS
     F5 the Visuals tuning panel, ESC the pause menu.
 
 If you have an older build, delete any PLAY*.bat files in it. They are gone.
-The other file beside the game, cnc_eyes.exe, is the verification binary the test
-suite drives. It is not the game and there is no reason to run it by hand.
+The other file beside the game, cnc_eyes.exe, is two things: the verification
+binary the test suite drives, and the map editor the Editor button starts. There is
+still no reason to run it by hand; press Editor instead.
 
 WHAT THIS BUILD IS
   A 32-bit Windows build, cross compiled on the Mac from the same sources as the
@@ -245,6 +295,18 @@ IF SOMETHING IS WRONG
     * LoadLibrary / 126    the brain DLL, or something it depends on, is missing
 TXT
 
+    # THE LICENCE AND THE NOTICE, and they are not optional. This program is a single
+    # work built on EA's GPL source, so a binary package carrying neither the licence nor
+    # the notice of modification is not a compliant distribution. Every release up to and
+    # including v0.6.4 shipped without them, which is a defect in the builds already in
+    # players' hands and not only in the next one. Copied from the TRACKED masters at the
+    # repo root, never from the play folder, for the same reason the READ-ME is written
+    # here rather than copied: an untracked copy goes stale in silence.
+    for f in LICENSE NOTICE.md; do
+        [ -f "$ROOT/$f" ] || { echo "$f is missing from the repo root; a GPL binary package has to carry it" >&2; exit 1; }
+        cp "$ROOT/$f" "$OUT/"
+    done
+
     # The data. -L on dosdata because it is a symlink into the repo on the Mac side and
     # a symlink is worthless once this is unzipped on another machine.
     for f in "$SRC"/*.pack "$SRC"/CONQUER.MIX; do
@@ -254,6 +316,61 @@ TXT
         [ -d "$SRC/$d" ] && rsync -aL "$SRC/$d" "$OUT/"
     done
     [ -e "$SRC/dosdata" ] && rsync -aL "$SRC/dosdata" "$OUT/"
+
+    # THE SAME PAIR CHECK THE MAC PACKAGER MAKES, on the files that actually landed here.
+    # The two copies above are a glob and an rsync and neither can fail loudly, so a
+    # source folder holding the SCM mission INIs and no SCM packs produces a Windows
+    # package with a Skirmish button and an empty lobby behind it. A map counts only
+    # where the game counts it: skirmish_scan in app/cnc3d.cpp wants BOTH halves. At
+    # least one COMPLETE map is the rule, not one pack per INI, because an INI can be
+    # staged without a pack.
+    skpairs=0
+    for ini in "$OUT"/missions/SCM*.INI; do
+        [ -f "$ini" ] || continue
+        code=$(basename "$ini" .INI)
+        if [ -f "$OUT/$code.pack" ]; then skpairs=$((skpairs+1)); fi
+    done
+    if [ "$skpairs" -eq 0 ]; then
+        echo "no playable skirmish map reached $OUT. A map needs BOTH" >&2
+        echo "missions/<CODE>.INI and <CODE>.pack. Check $SRC first, and run" >&2
+        echo "sh tools/stage-skirmish-maps.sh if it has none either." >&2
+        exit 1
+    fi
+    echo "   skirmish: $skpairs map(s) with an INI and a pack"
+
+    # WHAT THE EDITOR NEEDS ON DISK, and it is a short list because most of the editor
+    # is not on disk at all: its font, its emblem and its legality tables are baked into
+    # the binary as C headers, so there is no editor data folder to forget.
+    #
+    # MEASURED BY REMOVAL rather than guessed. Run in a package shaped folder, the
+    # editor opens with no cameos.pack, no dosinfantry.pack and no CONQUER.MIX, and
+    # refuses to open without any one of these. content/ is the sharpest of them: its
+    # absence is not a message but a segmentation fault inside the engine's own scenario
+    # start, so a package missing it looks like a crashing editor rather than a package
+    # with a hole in it.
+    for f in dossidebar.pack content missions; do
+        [ -e "$OUT/$f" ] || {
+            echo "$f is not in $OUT, and the editor cannot open without it." >&2
+            echo "The launcher's EDITOR button opens the editor from this folder, so a" >&2
+            echo "package missing this ships a button that fails when it is pressed." >&2
+            exit 1
+        }
+    done
+
+    # FIVE MAPS, NOT ONE, and none of them is an example. SCG01EA is what the launcher
+    # passes to --scen; the other four are the editor's donors, one per theater. A map
+    # made in the editor has no baked terrain of its own and borrows the pack of the
+    # donor for ITS theater, so shipping four of the five means MAP > New Map opens a
+    # blank map in whichever theater was dropped with nothing on screen to explain it. A
+    # map needs BOTH halves, for the same reason the skirmish check above says so.
+    for f in SCG01EA SCB01EA SCW01EA SCS01EA SCA01EA; do
+        if [ ! -f "$OUT/$f.pack" ] || [ ! -f "$OUT/missions/$f.INI" ]; then
+            echo "the editor's $f donor is incomplete: it needs BOTH $f.pack and" >&2
+            echo "missions/$f.INI, and every map made in that theater borrows it." >&2
+            exit 1
+        fi
+    done
+    echo "   editor: five theater donors complete, and the data it reads is here"
 fi
 
 echo "$GITDESC  windows  $(date '+%Y-%m-%d %H:%M')" > "$OUT/BUILD-ID.txt"

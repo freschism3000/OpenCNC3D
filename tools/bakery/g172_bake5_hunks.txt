@@ -1,0 +1,80 @@
+THE TWO bake5.py HUNKS, verbatim. Both anchors occur exactly once in the file as it
+stands. Hunk 1 inserts the table and the resolver immediately BEFORE the build()
+definition; hunk 2 replaces the type-table write loop.
+
+=========================== HUNK 1 : anchor (replace this one line) ===========================
+def build(scen, outpath, verbose=True, heights=None, cmvals=None):
+
+--------------------------- with ---------------------------
+# ---------------------------------------------------------------------------
+# THE DESERT FLORA SWAP
+# ---------------------------------------------------------------------------
+# The cartridge does not ship a separate desert tree TYPE. It ships one set of tree
+# types and REMAPS THE MODEL ID AT DRAW TIME when the theater is desert. The draw
+# command enqueue at RAM 0x8004A420 (resident ROM 0x04B020) reads the theater word at
+# RAM 0x80097150 and, when it is zero, adds 97 to any model id in [103,121]:
+#
+#     0x8004A430  lw    $v0, 0x7150($v0)      the theater word
+#     0x8004A454  bnez  $v0, ...              not theater 0: leave the id alone
+#     0x8004A45C  slti  $v0, $s0, 0x67        id < 103: leave it alone
+#     0x8004A468  slti  $v0, $s0, 0x7A        id < 122
+#     0x8004A470  addiu $s0, $s0, 0x61        +97, in a BRANCH-LIKELY delay slot
+#
+# Branch-likely means that add runs only when the branch is taken, so the input range
+# is exactly [103,121]. Theater 0 is DESERT, from the loader's own filename switch at
+# RAM 0x801E5190 (0 -> DESERT.TL4/.TL8, 2 -> TEMPERAT.TL4/.TL8, else "Illegal theater
+# type: %d"). Ids 103..121 are exactly T01..T18, from the 32 TerrainTypeClass
+# registrations (ctor RAM 0x801EAC0C, jals ROM 0x18CEE0..0x18DD70), and 103+97..121+97
+# plus the usual +10 model-slot bias gives slots 210..228, which hold exactly FOUR
+# distinct scene-graph nodes. Those four are the cacti and scrub trees below.
+#
+# WHY IT IS RESOLVED HERE AND NOT IN THE RENDERER: a pack is baked for ONE scenario and
+# therefore for one theater, and the pack's type table is keyed by the INI name the
+# renderer already looks the object up by. Binding the name to the right mesh at bake
+# time is the same answer the console computes at draw time, and it needs no renderer
+# change and no pack format change.
+#
+# T08 IS THE ONE THAT MUST STAY THEATER DEPENDENT. It is the only tree registered in
+# all three theaters (id 110 in every field), it is placed on 558 desert cells across
+# 44 missions AND on 79 temperate cells across 19, so an unconditional swap would put
+# a desert scrub tree in nineteen temperate maps. T04, T09 and T18 are desert only.
+DESERT_TERRAIN_MESH = {"T04": "T04D", "T08": "T08D", "T09": "T09D", "T18": "T18D"}
+
+
+def terrain_source_code(code, theater):
+    """The unit_models entry whose MESH the INI name `code` draws in this theater."""
+    if str(theater).upper() == "DESERT":
+        return DESERT_TERRAIN_MESH.get(code, code)
+    return code
+
+
+def build(scen, outpath, verbose=True, heights=None, cmvals=None):
+
+=========================== HUNK 2 : anchor (replace these six lines) ===========================
+        types = [k for k in sorted(um) if k != "_meta"]
+        w32(f, len(types) + len(debris_types) + len(flip_types))
+        for k in types:
+            wname(f, k, 8)
+            f.write(struct.pack("<i", meshindex.get(um[k]["mesh"], -1)))
+            f.write(bytes((B.CONF[um[k]["confidence"]],)))
+
+--------------------------- with ---------------------------
+        types = [k for k in sorted(um) if k != "_meta"]
+        w32(f, len(types) + len(debris_types) + len(flip_types))
+        swapped = []
+        for k in types:
+            # The theater swap (see DESERT_TERRAIN_MESH): the NAME the renderer looks up
+            # is always k, only the mesh behind it moves.
+            src = terrain_source_code(k, terr["theater"])
+            if src != k:
+                assert src in um, ("%s: the desert flora swap wants entry %s and this "
+                                   "file has no such entry" % (k, src))
+                swapped.append((k, src, um[src]["mesh"]))
+            wname(f, k, 8)
+            f.write(struct.pack("<i", meshindex.get(um[src]["mesh"], -1)))
+            f.write(bytes((B.CONF[um[src]["confidence"]],)))
+        if verbose and swapped:
+            print("desert flora: %s"
+                  % ", ".join("%s -> %s (%s)" % (k, m, s) for k, s, m in swapped))
+        elif verbose:
+            print("desert flora: no swap, theater is %s" % terr["theater"])

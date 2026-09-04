@@ -3,7 +3,7 @@
 #  C&C3D -- the default way to play. Double-click it.
 #
 #  As of 21 Aug 2026 this is the ONLY thing in the macOS package a player runs,
-#  by request. What it opens is the LAUNCHER
+#  at the project owner's request. As of 24 Aug 2026 what it opens is the LAUNCHER
 #  (cnc3d-launcher, beside the game): which build is installed, what changed in
 #  it, an Update button when the host has a newer one, and Play. Play then boots
 #  the DOS main menu exactly as before: Start New Game runs the GDI campaign,
@@ -12,7 +12,7 @@
 #  This file stays a script, and stays this long, for one reason: everything below
 #  about App Translocation is still true and is still the only thing standing
 #  between a downloaded zip and "Could not find the game." The launcher is a
-#  binary and cannot be committed, so the bundle is a tracked
+#  binary and cannot be committed (repository rules rule 2), so the bundle is a tracked
 #  wrapper and the binary it runs is a build product beside the game.
 #
 #  Everything the old .command launchers chose for you is a setting in the game
@@ -36,7 +36,7 @@
 #    .app from the folder it was unzipped into, it does NOT run it in place. It
 #    mounts a randomised READ-ONLY copy of the .app ALONE -- none of its sibling
 #    files come with it -- and runs that. The old code then looked next to
-#    itself, found no cnc3d, fell back to $HOME/CNC3D/playable (the developer's own
+#    itself, found no cnc3d, fell back to $HOME/CNC3D/playable (the project owner's own
 #    development path, which no player has), and gave up.
 #
 #    On the machine that builds the release BOTH of those tests pass, which is
@@ -49,7 +49,7 @@
 #  real folder, which also keeps saves and cnc3d-fx.cfg writable: the
 #  translocated mount is read-only and the game could not have written to it.
 #
-#  THE REAL FIX IS SIGNING AND NOTARISATION (the unsigned
+#  THE REAL FIX IS SIGNING AND NOTARISATION (known-gap notes, the unsigned
 #  binaries entry). This makes the symptom survivable; it does not make the
 #  download trusted.
 # ============================================================================
@@ -149,13 +149,13 @@ xattr -dr com.apple.quarantine "$DIR" >/dev/null 2>&1 || true
 # choices in the Visuals screen survive instead of being overridden on every launch.
 #
 # CNC3D_HUD is deliberately NOT set. It used to be, and once the HUD became a checkbox that
-# made the checkbox inert, which is exactly the bug reported. The dial owns
+# made the checkbox inert, which is exactly the bug the project owner reported on 21 Aug. The dial owns
 # the HUD now.
 # THE LAUNCHER FIRST, the game behind it, and the window size passed THROUGH
 # rather than dropped. 1600x960 is not arbitrary and is not the launcher's to
 # know: the sidebar magnifies by whole numbers only, so the height has to be a
 # multiple of 480 or every second glyph stem comes out two pixels wide
-# Everything after `--` goes to the game when Play is pressed.
+# (known-gap notes). Everything after `--` goes to the game when Play is pressed.
 #
 # If the launcher is not there -- an install from before it existed, or a build
 # where it failed to compile -- the game is still started directly. A missing

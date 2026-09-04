@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Adds a compile-time static_assert, under an EIGHTPLAYERS guard, that
+// GAME_OVER_MULTIPLAYER_MAX_PLAYERS_TRACKED is still 8, so the end-of-game
+// stats block cannot silently drop players if the maximum player count is
+// widened further.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 #pragma once
 

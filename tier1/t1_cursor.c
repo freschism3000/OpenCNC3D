@@ -350,7 +350,7 @@ long t1_cursor_draw(T1_Cursor *c, T1_MeshBank *b, const T1_Terrain *t,
     t1_glide_filter(0);
     b->house = 0;
 
-    /* THE CURSOR DRAWS OVER THE SCENE rather than inside it. Both were tested on the
+    /* THE CURSOR DRAWS OVER THE SCENE rather than inside it. the project owner tested both on the
      * desktop build and confirmed this one: depth-tested, the cursor is cut through by
      * any building it stands on, because its body sits only a tenth of a cell above the
      * ground. Done by turning the depth test off, never by nudging w, which on this card

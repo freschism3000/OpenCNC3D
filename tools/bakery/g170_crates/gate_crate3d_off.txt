@@ -1,0 +1,6 @@
+tick 60
+crates 0
+cam 7.0 60.0
+zoom max
+shot shots/crate3d_off.png
+quit

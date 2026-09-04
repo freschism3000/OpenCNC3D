@@ -1323,7 +1323,16 @@ void FootClass::Active_Click_With(ActionType action, CELL cell)
     case ACTION_MOVE:
         if (AllowVoice) {
             COORDINATE coord = Map.Pixel_To_Coord(Get_Mouse_X(), Get_Mouse_Y());
-            OutList.Add(EventClass(ANIM_MOVE_FLASH, PlayerPtr->Class->House, coord, 1 << PlayerPtr->Class->House));
+            /*
+            **	NARROWED ON PURPOSE, and it is a 64-house blocker rather than a tidy-up.
+            **	EventClass::Data.Anim.Visible is an `int` in the event payload itself
+            **	(event.h), so this visibility mask is 32 bits wide ON THE WIRE and cannot
+            **	name a house at index 32 or above however it is spelled here. 1ULL keeps
+            **	the shift out of int arithmetic and the cast says the truncation is seen;
+            **	widening the payload is a wire change and is registered as one.
+            */
+            OutList.Add(EventClass(ANIM_MOVE_FLASH, PlayerPtr->Class->House, coord,
+                                   (int)(1ULL << (int)PlayerPtr->Class->House)));
         }
         // Fall into next case.
 

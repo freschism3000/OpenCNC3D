@@ -1,22 +1,25 @@
-# THE STRUCTURES' TEXTURE BOOKS, measured on a building that HAS one.
+# THE STRUCTURES' TEXTURE BOOKS, measured on a building whose book is VISIBLE.
 #
-# The Construction Yard's fans were the first of these; the other five are the refinery's
-# warning triangle and chimney strip, the HELIPAD's landing markers, the repair bay's lamp
-# and the silo's fill strip. Two of the six are NOT uniformly spaced -- the refinery's
+# The Construction Yard's fans were the first of these; the others are the refinery's
+# warning triangle and chimney strip, the helipad's landing markers, the repair bay's
+# lamp and the silo's fill strip. Two of them are NOT uniformly spaced -- the refinery's
 # triangle is lit for 1600 units of 16000 -- so the baker emits one type code per TIME
 # SLOT and the cartridge's own schedule rides in the data.
 #
-# WHY THIS MOVED FROM SCG90EA TO SCG41EA. G56 announced "the 60-slot helipad table" in its
-# PASS text and then measured a whole-frame pixel difference on SCG90EA, a map with NO
-# HELIPAD ON IT. Whatever it was counting, it was not the thing it named. It also proved
-# the table's existence by grepping the PACK for the string HPADT59, which says a name is
-# in a file and nothing whatever about a running program; that leg is deleted.
+# WHY THIS IS NO LONGER THE HELIPAD. The books used to free-run on a wall clock, so any
+# book differed from --notexbook at almost any tick and the helipad was as good a subject
+# as any. They are driven by the building's own state now, and an idle helipad holds slot
+# 0 -- which is what the console does. HPADT0 is byte for byte the HPAD base mesh, so
+# drawing it is a pixel no-op and the measurement would read 0 for the RIGHT reason.
+# A gate that cannot tell "the book is correctly still" from "the book never arrived" is
+# not measuring anything, so the subject moved to a book that is visible while idle.
 #
-# So: a map with a helipad, the camera on it, and the count taken INSIDE the helipad's own
-# silhouette as clickobj reports it in this same run.
+# The refinery's book T sits on its lit slot while the building is idle, so it differs
+# from no-book at rest. SCG08EA is the nearest map with a GoodGuy refinery: SCG41EA, which
+# this gate used to run, has only the helipad.
 tick 40
-cam 54 58
+cam 44 46
 zoom max
-clickobj HPAD:GoodGuy 0
+clickobj PROC:GoodGuy 0
 shot shots/texbook_on.png
 quit

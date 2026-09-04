@@ -39,6 +39,16 @@ WIN_AUDIO_C="audio/sosadpcm.c audio/wsadpcm.c audio/wsaud.c audio/mixfile.c \
 # it is the <OpenGL/gl.h> vs <GL/gl.h> #ifdef every other file here already carries.
 WIN_APP_C="app/campaign.c app/logo3d.c"
 
+# The lockstep networking. lockstep.c is portable C89 with no I/O in it at all and
+# net_udp.c is the one file that knows what a socket is, which is the same split the
+# renderer keeps between scene assembly and the graphics API. Windows needs -lws2_32 for
+# the second one; the link line below carries it.
+#
+# The gate and tool binaries beside them (gate_lockstep.c, gate_netloop.c, netcheck.c) are
+# NOT here on purpose: they are standalone, exactly like gate_optlayout.c and playvqa.c,
+# and tools/win/check-sources.sh excludes them by name for that reason.
+WIN_NET_C="net/lockstep.c net/net_udp.c net/netmatch.c"
+
 # The C++ half.
 WIN_EYES_CPP="game/cnc_eyes.cpp"
 WIN_APP_CPP="app/cnc3d.cpp"

@@ -20,21 +20,14 @@ Or from a shell:
     tools/win98/w98box.py pulldata          copy data/dosdata to the box (needed for sound)
 
 DEPENDENCY: `w98.py`, the AutoIt daemon client, which is NOT part of this repo (it is
-shared, and it serves every project that touches that machine). It is kept at
+the project owner's, and it serves every project that touches that machine). It is kept at
 `~/Documents/GamedevTycoon/w98.py` and on the share at `GameBrowser/tools/w98.py`. The
 daemon itself listens on 192.168.1.115:9855 and autostarts with Windows.
 """
 import os, shutil, sys, time
 
-def _root():
-    """The repository root. CNC3D_ROOT wins so a second worktree can be pointed at;
-    otherwise it is derived from this file's own location, which makes the script
-    portable to any checkout rather than to one home directory."""
-    return os.environ.get("CNC3D_ROOT") or os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-
 for _p in (os.path.expanduser("~/Documents/GamedevTycoon"),
-           os.environ.get("W98_TOOLS", "")):
+           "$CNC3D_SHARE/GameBrowser/tools"):
     if os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)
 try:
@@ -47,7 +40,7 @@ except ImportError:
 # this machine, and COMMAND.COM's `copy` from C: to a UNC path silently fails outright
 # ("0 file(s) copied"), which is why every transfer below goes through a pushed AutoIt
 # script rather than through the shell.
-DROP = os.environ.get("W98_DROP", "")   # the share's drop folder, per machine
+DROP = "$CNC3D_SHARE/cnc98"
 UNC  = r"\\192.168.1.117\share\cnc98"
 DEST = r"C:\CNC98"
 EXE  = "w98glide.exe"
@@ -161,7 +154,7 @@ def missions(names, root=None):
     actually live -- this branch's copy of game/missions is older and does not have all
     of them.
     """
-    root = root or os.path.join(_root(), "game", "missions")
+    root = root or os.path.expanduser("./game/missions")
     dest = DEST + r"\missions"
     _au3(['DirCreate("%s")' % dest], "mkmis.au3", "mkmis.done")
     ok = True
@@ -187,7 +180,7 @@ def pullmovies(names=None, root=None):
     side rather than assumed -- a truncated movie decodes for a while and then stops,
     which looks exactly like a decoder bug.
     """
-    root = root or os.path.join(_root(), "data", "dosdata", "movies")
+    root = root or os.path.expanduser("./data/dosdata/movies")
     names = names or ["GDI1.VQA", "LANDING.VQA", "CONSYARD.VQA", "GAMEOVER.VQA",
                       "LOGO.VQA"]
     dest = DEST + r"\dosdata\movies"

@@ -125,6 +125,53 @@ static void sb_set_hud_new(int on);
  * the old DOS bar stays available for comparison until the new one is signed off. */
 #include "hud640.h"
 
+/* ---- the engine's cell stride, which is NOT a constant ------------------------------
+ *
+ * A sidebar entry's PlacementList is the building's Occupy_List copied verbatim out of
+ * the engine, and an occupy list is a list of CELL DELTAS: "one row down" is +MAP_CELL_W,
+ * whatever MAP_CELL_W happens to be in the brain that produced it. This file used to
+ * spell that 128 four times as a literal, which was correct for exactly as long as there
+ * was one brain. The XL brain's MAP_CELL_W is 1024, so on it every delta that crosses a
+ * row decodes to a cell about eight rows away: a two-by-three foundation reads as six
+ * cells scattered down a column, the placement cursor paints the wrong ground, and
+ * sb_legal_origin tests cells the building was never going to occupy.
+ *
+ * Nothing catches this by looking at the picture on the classic brain, because on the
+ * classic brain the literal is right.
+ *
+ * So the host tells this file what the loaded brain's stride actually is, taken from the
+ * brain's own CNC3D_ABI_Facts export rather than assumed. 128 remains the default for a
+ * brain that does not export it, which is every classic build.
+ */
+static int g_sbStride = 128;
+#define SB_STRIDE g_sbStride
+
+static void sb_set_brain_stride(int stride)
+{
+    /* Refuse nonsense rather than propagate it: a zero would divide by zero four lines
+       from here, and the smallest map this project has ever had is 64 wide. */
+    if (stride >= 16 && stride <= (1 << 20)) {
+        g_sbStride = stride;
+    }
+}
+
+/* One line of the 1995 multiplayer player list (radar.cpp:1849 Draw_Names). `name` is
+   MPlayerNames[] for that seat, which in this build already reads "PLAYER" or "COMPUTER",
+   so the DOS branch that substitutes Text_String(TXT_COMPUTER) for a non-human house
+   (radar.cpp:1919-1920) has nothing left to do here. `colour` is the seat's
+   PlayerColorType, 0..7. `house` is its HousesType, and it is carried because Draw_Names
+   walks HOUSES, not seats, and the engine hands the multiplayer houses out with
+   Random_Pick (dllinterface.cpp:972). `defeated` greys the row, which is the only thing
+   1995 varies per row beyond the colour (radar.cpp:1903-1908). */
+struct SbRosterRow {
+    char name[16];
+    int  colour;
+    int  house;
+    int  kills;
+    int  defeated;
+};
+#define SB_ROSTER_MAX 8
+
 /* ---- what the host must provide ---------------------------------------------------- */
 
 struct SbHooks {
@@ -161,6 +208,18 @@ struct SbHooks {
        that one is simply never reached on this path -- which is why the new HUD showed
        the faction emblem for ever: not a broken radar, an unwired one. */
     void (*RadarPlotRGBA)(unsigned char* rgba, int w, int h, const DB_Pack* p, int active);
+    /* THE RADAR'S SECOND FACE: WHO IS PLAYING, AND WHAT THEY HAVE KILLED.
+       1995's Map button is a THREE-WAY cycle and only two of its states are a map.
+       sidebar.cpp:2626-2650 Zoom_Mode_Control runs zoomed -> unzoomed -> player status
+       -> zoomed, and the player-status rung is reached only when GameToPlay is not
+       GAME_NORMAL (:2635 and :2646), so a campaign never sees it. radar.cpp:1849-1958
+       Draw_Names is what that rung paints.
+       THIS HOOK IS THE CAMPAIGN GUARANTEE, made structural rather than tested: the host
+       assigns it only when the match being started is a skirmish, so in a campaign it is
+       NULL, the Map button below is the two-state radar toggle it has always been, and
+       no roster state is reachable at all. Fill `out` with up to `max` rows, in the
+       engine's own house order, and return how many were written. */
+    int (*Roster)(SbRosterRow* out, int max);
     /* Repair / Sell are DOS toggle buttons: pressing one puts the engine into that mode.
        CNC_Handle_Structure_Request(request, player_id, object_id). */
     void (*StructureReq)(StructureRequestEnum, uint64, int);
@@ -182,6 +241,19 @@ struct SbHooks {
          Speak:    an index into the VOX table; 33 is SELECT1, VOX_SELECT_TARGET. */
     void (*Unselect)(void);
     void (*Speak)(int vox_index);
+    /* WHAT IS STANDING ON A CELL THE PLAYER CAN SEE NOTHING ON. The placement overlay
+       paints a refused cell red straight out of the engine's own GenerallyClear flag,
+       and on a temperate map the commonest reason a cell will not take a foundation is
+       a TC01..TC05 tree clump. The cartridge registers all five with model index -1 in
+       every theater, so the console draws no pixels there and neither does this
+       renderer: the red sits on what looks like open grass and reads as a broken cursor
+       rather than as a rule, with the reason living only in a log line.
+       The host answers with the object's own 1995 name for a cell it draws NOTHING for,
+       and NULL for everything else, because a rock or a barracks needs no caption when
+       the player is already looking at it. The returned pointer must outlive the call.
+       A NULL hook means no captions at all, which is what this file did before the hook
+       existed. */
+    const char* (*CellBlocker)(int cellx, int celly);
     /* GAME_STATE_STATIC_MAP geometry; also the placement grid origin and size */
     int mapX, mapY, mapW, mapH;
     /* radar.cpp:348 picks the bezel by house: the Brotherhood gets RADARNOD. */
@@ -416,6 +488,18 @@ static int g_sbHoverX = -1, g_sbHoverY = -1;
    into RGBA, so there is no palette conversion between rasterise and upload. */
 static H6_Pack*   g_h6Pack = NULL;
 static bool       g_hudNew = false;          /* see sb_set_hud_new */
+
+/* IS THERE A DATABASE PLATE. Defined in codex_mod.h, which is included thousands of
+   lines below this because it draws through the renderer's own camera helpers. It is
+   declared up HERE, above sb_chrome_hit, because the hit test is the first thing that
+   asks -- and the hit test and the draw asking the same function is what stops a plate
+   being clickable on a screen that is not drawing it. */
+static bool codex_available(void);
+
+/* IS THE DATABASE PAGE HOLDING THE SCREEN. Declared beside codex_available and for the
+   same reason: update_cursor, thousands of lines below this and thousands above
+   codex_mod.h, has to know, or the pointer is drawn into the world underneath the page. */
+static bool codex_holds_the_world(void);
 /* -1 = nobody has asked, so the CNC3D_HUD environment variable still decides. 0/1 = the
    Visuals dialog or the Enhanced path has an opinion and it wins. */
 static int        g_hudNewWish = -1;
@@ -423,7 +507,7 @@ static int        g_hudNewWish = -1;
    direction. When G53 went red on the day the New HUD dial landed, the env var was made a
    HARD override so the gate could pin the HUD it wanted. That broke the feature outright
    for the person who asked for it: `tools/launchers/C&C3D.app/.../cnc3d-launch:39` and
-   `PLAY-HUD-MENU.command` both set CNC3D_HUD=new, so on the original launcher the new
+   `PLAY-HUD-MENU.command` both set CNC3D_HUD=new, so on the project owner's own launcher the new
    checkbox did nothing at all in either direction. He reported it within the hour.
 
    THE PLAYER'S DIAL ALWAYS WINS. A launcher's environment says what to start with; a
@@ -462,7 +546,14 @@ static unsigned char g_h6Radar[H6_RADAR_W * H6_RADAR_H * 4];
    palette at the last step, which costs full-colour art a visible per-pixel RGB error.
    The reason that path is 8-bit is the build clock, which is a lookup through the
    pack's own translucency table rather than paint -- so going true-colour means doing
-   in RGB what that table does in indices. See h6_clock_fade below; it is decoded, not guessed. */
+   in RGB what that table does in indices. See h6_clock_fade below; it is decoded, not guessed.
+
+   ONE BACKDROP FOR EVERY THEATER, and none of this can say otherwise. The art stands almost
+   every subject on sandy desert ground, so on a temperate map the build column reads as the
+   wrong theater. The container has no theater field, the load below runs once on a fixed
+   path, and it runs from sb_init before a scenario is booted, so the theater is not known
+   yet at that point. Making the cameos follow the theater therefore takes a format change,
+   a re-bake and a different load point; the art is the part that does not exist. */
 typedef struct { char key[9]; unsigned char* rgba; } H6_TdrCam;
 static H6_TdrCam* g_tdrCam = NULL;
 static int        g_tdrCamN = -1;   /* -1 = not tried yet, 0 = none */
@@ -496,12 +587,72 @@ static void h6_tdr_load(const char* path)
     fprintf(stderr, "sidebar: %d true-colour cameos loaded from %s\n", g_tdrCamN, path);
 }
 
+/* THIS SET IS NOT THE CARTRIDGE'S, and that has to be said at the point of substitution.
+   art/cameos-tdr is 54 generated 128x96 PNGs, 49 of them made by an image model from the
+   1995 manual renders (tools/sidebar_redesign/cameos_tdr.py; provenance in
+   art/cameos-tdr/provenance/RECIPE.md), and the measured drift is recorded
+   from the source art. It is used for these four tiles because the alternative is a
+   captioned rectangle, not because it is faithful. On the WALL page that puts two soft
+   renders beside SBAG, CYCL and BRIK, which are flat 32x25 console pixel art of the same
+   subject; that is the sharpest adjacency in the palette and it is a look call, not a
+   correctness one.
+
+   THE CACHED TEXTURES OUTLIVE sb_free ON PURPOSE, like the tdr pack itself. There is one
+   GL context for the process (app/cnc3d.cpp creates it once and the editor's
+   shutdown/boot round trip reuses it), the ceiling is four 64x64 RGBA textures at 64 KB
+   built once, and rebuilding them on every boot would cost more than it saves. Note that
+   sb_free's opening line already overstates itself for g_tipTex, g_qdTex, g_ptTex and
+   h6_upload; this is a fifth deliberate exception, recorded rather than hidden. */
 static const unsigned char* h6_tdr_find(const char* key)
 {
     int i;
     for (i = 0; i < g_tdrCamN; i++)
         if (!strcmp(g_tdrCam[i].key, key)) return g_tdrCam[i].rgba;
     return NULL;
+}
+
+/* THE SAME ART AS A TEXTURE, for the one caller that wants it that way.
+ *
+ * The cartridge cameo set is what the ROM's SIDEBAR carried, which is not the same thing as
+ * what the console could build: it holds UI plates like BLNK and SLCT too, and MLRS, SSM and
+ * CONC. Five of the true-colour keys have no record in it at all: A10, BARB, BOAT, LST and
+ * WOOD. Four of those five
+ * are types the map editor can place, and their palette tiles drew a captioned plate rather
+ * than a picture only because the lookup asked one pack. Nothing here changes a tile that
+ * already has cartridge art; this answers only where that set is silent.
+ *
+ * The upload is deferred to the first ask rather than done at load, because this set exists
+ * for the HUD, which composites it in system memory and never needs a texture out of it. A
+ * handful of keys are ever requested, so uploading fifty-three to serve four is waste.
+ *
+ * 64x48 art goes into a 64x64 texture with the used region declared, exactly as the
+ * cartridge bake pads 32x25 into 32x32: a fixed-function 3dfx part wants power-of-two
+ * dimensions, and a texture that only works on desktop GL is one the Win98 build cannot
+ * draw. The 16 padding rows are cleared and never sampled, since v stops at 48/64.
+ *
+ * The cache is reserved to the pack's own count BEFORE anything goes into it, because a
+ * caller holds the returned record while it draws and a reallocation would move it. A key
+ * with no art is not cached: the walk it repeats is the same length as the one sb_cameo
+ * already does per tile, and not caching it is what keeps the reserve a hard bound. */
+static const SbTex* sb_cameo_true(const char* name)
+{
+    static std::vector<SbTex> cache;
+    if (!name || !name[0] || g_tdrCamN <= 0) return NULL;
+    cache.reserve((size_t)g_tdrCamN);
+    for (size_t i = 0; i < cache.size(); i++)
+        if (!strcasecmp(cache[i].name, name)) return &cache[i];
+    const unsigned char* px = h6_tdr_find(name);
+    if (!px) return NULL;
+    std::vector<unsigned char> pot((size_t)H6_CAMEO_W * H6_CAMEO_W * 4, 0);
+    memcpy(&pot[0], px, (size_t)H6_CAMEO_W * H6_CAMEO_H * 4);
+    SbTex t;
+    memset(&t, 0, sizeof t);
+    snprintf(t.name, sizeof t.name, "%s", name);
+    t.w  = H6_CAMEO_W; t.h  = H6_CAMEO_W;
+    t.uw = H6_CAMEO_W; t.uh = H6_CAMEO_H;
+    t.gl = sb_upload(t.w, t.h, &pot[0]);
+    cache.push_back(t);
+    return &cache.back();
 }
 
 /* THE BUILD CLOCK, IN RGB. The DOS engine fades the cell under the clock wedge with
@@ -530,6 +681,7 @@ static void h6_clock_fade(unsigned char* px)
 static float g_h6Scale = 1.5f;
 static unsigned char g_h6Tab[H6_BAR_W * H6_TAB_H * 4];
 static GLuint     g_h6TexBar = 0, g_h6TexCred = 0, g_h6TexOpt = 0, g_h6TexSide = 0;
+static GLuint     g_h6TexDb = 0;   /* the DATABASE plate */
 #define H6_POT_W 256
 /* 1024, not 512: a twelve-row bar is 816 tall. The power-of-two upload is one texture
    for every bar height, so the atlas is sized once for the maximum and the quad's v
@@ -563,8 +715,12 @@ enum SbHit {
     /* THE THREE SCREEN-EDGE PLATES, added at the END so every existing index and every
        baked frame strip keeps its number. They are not part of the bar: OPTIONS is pinned
        to the LEFT edge of the window and the other two to the right, which is exactly why
-       sb_over_panel could not see them and why the pointer went behind OPTIONS. */
-    SBH_OPTIONS, SBH_SIDEBAR, SBH_CREDITS
+       sb_over_panel could not see them and why the project owner's pointer went behind OPTIONS. */
+    SBH_OPTIONS, SBH_SIDEBAR, SBH_CREDITS,
+    /* The DATABASE plate, in the slot immediately right of OPTIONS. It exists only in
+       Enhanced with the Enhanced HUD; codex_available() below is what decides, and the
+       hit test asks it rather than assuming. */
+    SBH_DATABASE
 };
 
 /* THE DRAWER. The bar slides out to the right and back, in BAR-LOCAL INTEGER pixels so
@@ -601,6 +757,11 @@ static bool g_sbRadarShown = true;
    is opt-in through --forceradar, which is the way round it should always have been: a
    diagnostic override that ships enabled is not an override, it is the behaviour. */
 static bool g_sbRadarForce = false;
+/* THE MAP BUTTON'S THIRD STATE. It exists only when SbHooks::Roster does, which is only
+   in a skirmish; see that hook for the 1995 cycle this reproduces. */
+static bool g_sbRoster = false;
+static SbRosterRow g_sbRosterRow[SB_ROSTER_MAX];
+static int  g_sbRosterN = 0;
 
 static std::vector<unsigned char> g_sbBuf;
 
@@ -808,7 +969,22 @@ static void sb_request(SidebarRequestEnum r, int idx, short cx, short cy)
     g_sb.SidebarReq(r, 0, e.btype, e.bid, cx, cy);
 }
 
-static void sb_start(int idx) { sb_request(SIDEBAR_REQUEST_START_CONSTRUCTION, idx, 0, 0); }
+/* THE LAST THING THE SIDEBAR WAS ASKED TO BUILD, remembered here and nowhere else
+   because this is the single funnel every start goes through: the cameo click, the
+   script's build verb and the queue pump all end at sb_start. A hotkey that repeats the
+   last build therefore cannot drift from what the player actually pressed.
+
+   A NAME AND NOT AN INDEX, for the reason the queue map already gives: the strip is
+   rebuilt from scratch on every poll and entries move and vanish, so a stored index would
+   point at whatever slid into that slot. */
+static char g_sbLastBuilt[16] = "";
+
+static void sb_start(int idx)
+{
+    if (idx >= 0 && idx < (int)g_sbState.entry.size())
+        snprintf(g_sbLastBuilt, sizeof(g_sbLastBuilt), "%s", g_sbState.entry[idx].name);
+    sb_request(SIDEBAR_REQUEST_START_CONSTRUCTION, idx, 0, 0);
+}
 
 /* ================================================================================
  *  BUILD QUEUEING, Red Alert 2 style: click a cameo again and another one is queued.
@@ -900,7 +1076,7 @@ static void sb_queue_pump(void)
 
 static bool sb_queueable(const SbEntry& e)
 {
-    /* v1 is infantry, vehicles and aircraft -- what was asked for. BUILDINGS are
+    /* v1 is infantry, vehicles and aircraft -- what the project owner asked for. BUILDINGS are
        excluded on purpose and it is not a dodge: a finished building does not auto-exit
        its factory (sidebar.cpp:1704-1709 has no PLACE event for RTTI_BUILDING), so it
        sits completed and busy until a human places it. A building queue needs a "hold the
@@ -963,13 +1139,46 @@ static bool sb_legal_origin(int cellx, int celly)
     int oi = sb_grid_index(cellx, celly);
     if (oi < 0 || !g_sbPlaceProx[oi]) return false;
     const SbEntry& e = g_sbState.entry[g_sbPlaceIdx];
-    int origin = celly * 128 + cellx;
+    int origin = celly * SB_STRIDE + cellx;
     for (size_t k = 0; k < e.occupy.size(); k++) {
         int c = origin + e.occupy[k];
-        int i = sb_grid_index(c % 128, c / 128);
+        int i = sb_grid_index(c % SB_STRIDE, c / SB_STRIDE);
         if (i < 0 || !g_sbPlaceClear[i]) return false;
     }
     return true;
+}
+
+/* WHY THIS ORIGIN WAS REFUSED, in one word, or NULL when there is no word to give.
+
+   The engine's verdict is a bit with no reason attached, so the footprint is walked in
+   the same order sb_legal_origin walks it and the first cell that will not take a
+   foundation is put to the host. Turning "no" into "no, there is a tree here" is the
+   whole difference between a rule and a bug.
+
+   OUT OF RANGE IS A DIFFERENT REFUSAL and must not borrow this one's words. The cursor
+   still paints red outside the proximity region, and naming a tree under a footprint
+   that was never going to be allowed there anyway would be a true sentence answering
+   the wrong question, so the proximity test comes first and silences everything else.
+
+   A footprint cell off the grid is left unnamed rather than guessed at: the host has no
+   object out there to name. */
+static const char* sb_place_blocker(int cellx, int celly)
+{
+    if (!g_sb.CellBlocker || !g_sbPlacing || g_sbPlaceIdx < 0
+        || g_sbPlaceIdx >= (int)g_sbState.entry.size()) return 0;
+    int oi = sb_grid_index(cellx, celly);
+    if (oi < 0 || !g_sbPlaceProx[oi]) return 0;
+    const SbEntry& e = g_sbState.entry[g_sbPlaceIdx];
+    int origin = celly * SB_STRIDE + cellx;
+    for (size_t k = 0; k < e.occupy.size(); k++) {
+        int c = origin + e.occupy[k];
+        int cxx = c % SB_STRIDE, cyy = c / SB_STRIDE;
+        int i = sb_grid_index(cxx, cyy);
+        if (i < 0 || g_sbPlaceClear[i]) continue;
+        const char* n = g_sb.CellBlocker(cxx, cyy);
+        if (n && *n) return n;
+    }
+    return 0;
 }
 
 /* Commit. cell_x/cell_y handed to the DLL are GRID indices, not engine cells. */
@@ -1031,7 +1240,7 @@ static void sb_layout(int fbw, int fbh)
        This branch used to allow HALF steps, so a 720-row window drew the bar at 1.5x to
        fill the height exactly. GL_NEAREST does not save you there: at 1.5x one source
        pixel in every two is doubled and the other is not, so glyph stems come out
-       alternately 1 and 2 screen pixels wide. That reads off the screen as the cameo
+       alternately 1 and 2 screen pixels wide. the project owner read that off the screen as the cameo
        captions being "slightly scrambled, not 1:1", and he was right - it was never the
        cameo art, it was this line.
 
@@ -1077,6 +1286,78 @@ static void sb_layout(int fbw, int fbh)
 }
 
 static int sb_scale(void) { return g_dbScale; }
+
+/* HOW BIG ONE DOS PIXEL IS ON SCREEN.
+
+   Two overlays are rasterised in DOS pixels and then blown up as their OWN quad instead
+   of being composed into the sidebar surface: the hover tooltip and the queue count.
+   Neither of them inherits the panel's magnification for free, and both used to take the
+   window height over the 200-row DOS screen, which is not either HUD's zoom.
+
+   On the DOS bar that quotient is FRACTIONAL -- 3.6 at 720 rows against a bar drawn at 3
+   -- so the 6-point font came out with the doubled rows and seams sb_layout refuses for
+   the panel itself, and it also ignores sb_layout's width clamp, so a narrow window put
+   the plate at several times the bar's own zoom.
+
+   On the 640x480 HUD it is simply unrelated to what is beside it: at 1280x720 the HUD
+   draws at 1x and the quotient is 3.6, so a 44x22 name-and-price plate landed at 158x79
+   screen pixels next to a bar 160 wide and a cameo cell 61x45.
+
+   THE DOS BAR is the easy half: the bar's own whole-number zoom, which is g_dbScale.
+
+   THE 640x480 HUD IS A DOUBLED DOS SPACE, and that is measured rather than assumed. Its
+   cameo well is 64x48 for a 32x24 DOS cameo and the fallback path below doubles the DOS
+   art to fill it; its chrome is lettered with the game's own GRAD6FNT enlarged 1.75x to
+   match the delivered nameplate (tools/sidebar_redesign/tabs.py). So one DOS pixel is two
+   HUD pixels there, and a DOS-pixel plate belongs at twice the HUD's zoom. That also
+   holds the plate at the share of the bar 1995 gave it: the 44-pixel "Med. Tank" plate is
+   55% of the 80-wide DOS sidebar, and 88 of the 160-wide HUD bar is the same 55%. Scaling
+   it by the HUD zoom alone would halve that and read as a second, smaller UI standing
+   next to this one. */
+#define SB_HUD640_DOS_ZOOM 2.0f
+static float sb_dos_px(void)
+{
+    /* The same predicate sb_layout, sb_item_rect and the 640 hit test branch on, so a
+       plate can never pick a scale the geometry around it disagrees with. Both values are
+       written by sb_layout, which the draw path runs before either of these overlays. */
+    if (g_hudNew && g_h6Pack) return g_h6Scale * SB_HUD640_DOS_ZOOM;
+    return (float)g_dbScale;
+}
+
+/* HALF THAT, IN WHOLE STEPS.
+
+   The two plates that ask sb_dos_px -- the hover tooltip and the queue count -- were both
+   coming out at twice the size they want. Measured at the default 1280x720 window: the
+   640 HUD put the 44x22 "Med. Tank" plate on screen at 88x44 and the 9x9 queue plate at
+   18x18 on a 61x45 cameo, and the DOS bar put the same two at 132x66 and 27x27 on a 96x72
+   cameo. The longest name in the table is 114 DOS pixels wide, which ran 228 across next
+   to a bar 160 wide.
+
+   HALVING THE PLATE IS NOT HALVING THE SCALE. A magnification that is not a whole number
+   is the exact fault this pair was corrected for once already: under GL_NEAREST one source
+   row in two is doubled and the other is not, so the 6-point font grows seams and the
+   plate changes shape from one window size to the next instead of growing with the
+   interface around it. So the half is taken in WHOLE STEPS, and never below one.
+
+   ON THE 640 HUD IT IS EXACTLY HALF AT EVERY WINDOW SIZE, because a DOS pixel there is two
+   HUD pixels of a whole-number zoom. Half of an even number is whole, so the halved plate
+   lands on the HUD's own pixel grid, which is the grid its chrome art is drawn on.
+
+   AN ODD DOS-BAR ZOOM HAS NO HALF, and 3 is what a 720-row window gives. The step is taken
+   UPWARDS there, 3 to 2 and 5 to 3, which is a little over half. The step below is one
+   screen pixel per DOS pixel, and a digit 7 pixels tall next to captions the same bar
+   draws 21 pixels tall is not an improvement. Even zooms are exactly half, so the two
+   answers differ only where they must. */
+static float sb_dos_px_half(void)
+{
+    /* Derived from sb_dos_px rather than from g_dbScale and g_h6Scale directly, so the
+       plate and the interface can never disagree about which zoom they are on. That
+       function is a whole number in both of its arms, so recovering the integer and
+       halving it cannot land between steps. */
+    const int s = (int)(sb_dos_px() + 0.5f);
+    const int h = (s + 1) / 2;
+    return (float)(h < 1 ? 1 : h);
+}
 
 /* WHERE THE MAP STOPS. The window's right-hand column belongs to the sidebar, so the
    tactical view ends at the bar's left edge rather than at the window edge. Returns the
@@ -1138,6 +1419,7 @@ static SbHit sb_chrome_hit(float col, float row, int fbw, int fbh)
         const float th = (float)H6_TAB_H * g_h6Scale;
         if (row < g_dbY0 || row >= g_dbY0 + th) return SBH_NONE;
         if (col >= 0.0f && col < g_dbW)                            return SBH_OPTIONS;
+        if (codex_available() && col >= g_dbW && col < 2.0f * g_dbW) return SBH_DATABASE;
         if (col >= (float)fbw - 2.0f * g_dbW && col < (float)fbw - g_dbW) return SBH_CREDITS;
         if (col >= (float)fbw - g_dbW && col < (float)fbw)          return SBH_SIDEBAR;
     }
@@ -1199,6 +1481,21 @@ static void sb_clamp_top(void)
     }
 }
 
+/* Where the Map button was drawn, in screen pixels, off the same two rectangles
+   sb_hit_dos and sb_hit_h6 test -- so what a script clicks and what the click path
+   resolves are one description, exactly as sb_item_rect does it for the cameos. */
+static void sb_map_button_centre(float* col, float* row)
+{
+    if (g_hudNew && g_h6Pack) {
+        *col = g_dbX0 + ((float)H6_BTN_MAP_X + (float)H6_BTN_MAP_W * 0.5f) * g_h6Scale;
+        *row = g_dbY0 + ((float)H6_BTN_MAP_Y + (float)H6_BTN_MAP_H * 0.5f) * g_h6Scale;
+        return;
+    }
+    sb_dos_to_screen(DB_MAP_X, DB_REPAIR_Y, col, row);
+    *col += (float)(DB_MAP_W * g_dbScale) * 0.5f;
+    *row += (float)(DB_BUTTON_HEIGHT * g_dbScale) * 0.5f;
+}
+
 /* item index -> screen rect; false when it is scrolled out of the four visible slots */
 static bool sb_item_rect(int idx, float* x0, float* y0, float* x1, float* y1)
 {
@@ -1220,6 +1517,127 @@ static bool sb_item_rect(int idx, float* x0, float* y0, float* x1, float* y1)
     *x1 = *x0 + (float)(DB_OBJECT_WIDTH * g_dbScale);
     *y1 = *y0 + (float)(DB_OBJECT_HEIGHT * g_dbScale);
     return true;
+}
+
+/* ==================================================================================== *
+ *  THE PLAYER LIST -- the Map button's third state
+ *
+ *  radar.cpp:1849-1958 RadarClass::Draw_Names, transcribed. Every number below was read
+ *  off that function rather than chosen:
+ *
+ *    ground  CC_Draw_Shape(RadarAnim, RADAR_ACTIVATED_FRAME, ...) and then a Fill_Rect of
+ *            the interior in BLACK, and BOTH ARE UNCONDITIONAL (:1871-1873). The list
+ *            does not care whether this player has a radar: it takes the LIT bezel and a
+ *            black hole either way and never prints over the house-logo plate. Out here
+ *            that is one flag rather than two calls, because both HUDs already draw the
+ *            bezel off DB_State::radar_active -- sb_fill_dos_state raises it whenever the
+ *            list is up, db_draw_sidebar draws the ACTIVATED frame and fills black on it
+ *            (dosbar.c:641-648), and hud640_draw_bar shows the radar box rather than the
+ *            faction emblem on it (hud640.c:345-353)
+ *    header  "Name:" (TXT_NAME_COLON, conquer.h:344) at the interior origin and "Kills:"
+ *            (TXT_KILLS_COLON, conquer.h:658) RIGHT-ALIGNED two pixels in from the right
+ *            edge, both LTGREY, both TPF_6PT_GRAD|TPF_USE_GRAD_PAL|TPF_NOSHADOW, which
+ *            selects the GRAD6FNT face (:1877-1884)
+ *    rule    one LTGREY line across the full interior width, 6*factor+1 below the header,
+ *            and factor is 1 on the 320-wide screen this bar rasterises into (:1886-1888)
+ *    rows    2*factor below the rule (:1890), 6*factor+1 apart (:1955)
+ *    name    a seat with no name draws NOTHING, not even a kill count (:1940); a long one
+ *            is cut to nine characters and a full stop (:1941-1944)
+ *    colour  MPlayerTColors[RemapColor], or GREY when the house is defeated (:1901-1908)
+ *    kills   "%2d", right-aligned on the same two-pixel inset (:1952-1953)
+ *
+ *  At the DOS hole's 72x69 that is a header, a rule and eight rows, the last starting at
+ *  y=66 with the interior running to y=76, so the whole eight-house roster this build
+ *  allows fits the 1995 box at 1995 spacing.
+ *
+ *  ONE DEPARTURE, and it is the text layer's, not this list's: TPF_USE_GRAD_PAL keeps the
+ *  gradient font's ramp, and the DOS text this project rasterises only implements the
+ *  flattened branch (db_font_palette_grad). Every other caption on this bar is flat for
+ *  the same reason, so the roster matches the bar it sits in rather than standing out.
+ * ==================================================================================== */
+
+/* MPlayerTColors (globals.cpp:482-493) resolved through the sixteen-colour GUI ramp
+   (wwstd.h:198-216 ColorType), which is the ramp DB_* names, entry for entry:
+   CC_GDI_COLOR->YELLOW, CC_BLUE_GREY->LTBLUE, CC_NOD_COLOR->RED, CC_GREEN->GREEN,
+   CC_ORANGE->PURPLE, CC_BLUE_GREEN->CYAN, GREY->GREY, CC_TAN->BROWN (defines.h:2922-2928).
+   1995's own collision is left alone rather than papered over: seat colour 6 is GREY and
+   so is the defeated marking, so a grey player who loses looks unchanged. */
+static const unsigned char SB_ROSTER_TCOLOR[8] = {
+    DB_YELLOW, DB_LTBLUE, DB_RED,    DB_GREEN,
+    DB_PURPLE, DB_CYAN,   DB_DKGREY, DB_BROWN
+};
+
+static bool sb_roster_shown(void)
+{
+    return g_sbRoster && g_sb.Roster != 0;
+}
+
+static void sb_roster_refresh(void)
+{
+    if (!g_sb.Roster) { g_sbRosterN = 0; return; }
+    g_sbRosterN = g_sb.Roster(g_sbRosterRow, SB_ROSTER_MAX);
+    if (g_sbRosterN < 0) g_sbRosterN = 0;
+    if (g_sbRosterN > SB_ROSTER_MAX) g_sbRosterN = SB_ROSTER_MAX;
+}
+
+/* Draw_Names into an 8-bit surface. ox,oy is the interior origin and iw,ih its size, so
+   one function serves the DOS bar's 72x69 hole and the art HUD's 136x120 box. The bezel
+   and the black fill are NOT drawn here: both HUDs have already put them down off
+   radar_active, which is where 1995's two unconditional opening calls landed. */
+static void sb_roster_draw(DB_Surface* s, const DB_Pack* p, int ox, int oy, int iw, int ih)
+{
+    const DB_Font* f = db_font(p, "GRAD6FNT");
+    unsigned char fp[16];
+    const int step = 7;                  /* 6 * factor + 1, factor 1   radar.cpp:1886 */
+    const int rightx = ox + iw - 2;      /* radar.cpp:1880 */
+    int y = oy, i;
+
+    if (!f) f = db_font(p, "6POINT");
+    if (!f) return;
+    sb_roster_refresh();
+
+    db_font_palette_grad(fp, DB_LTGREY, DB_TBLACK);
+    db_print(s, f, "Name:", ox, y, fp, DB_FONT6_XSPACING);
+    {
+        const char* k = "Kills:";
+        db_print(s, f, k, rightx - db_string_width(f, k, DB_FONT6_XSPACING), y, fp,
+                 DB_FONT6_XSPACING);
+    }
+    y += step;
+    db_line_h(s, ox, ox + iw - 1, y, DB_LTGREY);   /* radar.cpp:1888 */
+    y += 2;
+
+    for (i = 0; i < g_sbRosterN && y + 6 <= oy + ih; i++) {
+        const SbRosterRow& r = g_sbRosterRow[i];
+        const int ci = (r.colour >= 0 && r.colour < 8) ? r.colour : 0;
+        const unsigned char col = r.defeated ? DB_DKGREY : SB_ROSTER_TCOLOR[ci];
+        char txt[16];
+        snprintf(txt, sizeof txt, "%s", r.name);
+        if (!txt[0]) continue;           /* radar.cpp:1940: a nameless seat draws nothing */
+        if (strlen(txt) > 9) { txt[9] = '.'; txt[10] = 0; }
+        db_font_palette_grad(fp, col, DB_TBLACK);
+        db_print(s, f, txt, ox, y, fp, DB_FONT6_XSPACING);
+        snprintf(txt, sizeof txt, "%2d", r.kills);
+        db_print(s, f, txt, rightx - db_string_width(f, txt, DB_FONT6_XSPACING), y, fp,
+                 DB_FONT6_XSPACING);
+        y += step;
+    }
+}
+
+/* The same list for the art HUD, which wants RGBA. Rasterised through the 8-bit surface
+   and resolved once at the end, for the reason the radar states in its own note: one
+   description of the picture rather than two that drift. DB_BLACK is the OPAQUE black,
+   so the box under the names is the same black the DOS hole gets. */
+static unsigned char g_sbRosterPx[H6_RADAR_W * H6_RADAR_H];
+static void sb_roster_rgba(unsigned char* rgba, int w, int h, const DB_Pack* p)
+{
+    DB_Surface s;
+    if (!rgba || !p || w != H6_RADAR_W || h != H6_RADAR_H) return;
+    memset(g_sbRosterPx, DB_BLACK, sizeof g_sbRosterPx);
+    db_surface_init(&s, w, h, g_sbRosterPx);
+    db_clip_reset(&s);
+    sb_roster_draw(&s, p, 2, 2, w - 4, h - 4);
+    db_surface_to_rgba(&s, p->pal8, rgba, 0);
 }
 
 /* ---- engine state -> DB_State ------------------------------------------------------ *
@@ -1266,8 +1684,24 @@ static void sb_fill_dos_state(void)
     g_dbState.sell_on = g_sbSellOn ? 1 : 0;
     g_dbState.repair_disabled = g_sbState.repairEnabled ? 0 : 1;
     g_dbState.sell_disabled = g_sbState.sellEnabled ? 0 : 1;
-    g_dbState.map_disabled = (g_sbState.radarActive || g_sbRadarForce) ? 0 : 1;
-    g_dbState.radar_active = ((g_sbState.radarActive || g_sbRadarForce) && g_sbRadarShown) ? 1 : 0;
+    /* sidebar.cpp:401-405 is one test: `if (IsRadarActive || GameToPlay != GAME_NORMAL)
+       Zoom->Enable(); else Zoom->Disable();`. In a multiplayer game the Map button is
+       LIVE whether or not the player has a radar, because its other job -- the player
+       list -- does not need one. The Roster hook is exactly "this is not a campaign". */
+    g_dbState.map_disabled =
+        (g_sbState.radarActive || g_sbRadarForce || g_sb.Roster) ? 0 : 1;
+    /* AND THE PLAYER LIST RAISES IT TOO. That is not a special case, it is Draw_Names'
+       own first two statements: CC_Draw_Shape(RadarAnim, RADAR_ACTIVATED_FRAME, ...) and
+       a Fill_Rect of the interior in BLACK, run with no test in front of them at all
+       (radar.cpp:1871-1873). This flag is what db_draw_sidebar draws the ACTIVATED frame
+       and fills black on, and what it otherwise leaves the full house-logo plate up for
+       (dosbar.c:641-648); it is also what hud640_draw_bar swaps for the faction emblem
+       (hud640.c:345-353). Without the term a radarless skirmish -- which is every
+       skirmish until somebody builds a Communications Center -- printed the roster
+       straight onto the emblem, on both HUDs. */
+    g_dbState.radar_active =
+        (sb_roster_shown()
+         || ((g_sbState.radarActive || g_sbRadarForce) && g_sbRadarShown)) ? 1 : 0;
 
     /* power.cpp:425 Power_Height turns watts into bar pixels: six equal fractions of the
        remaining bar per 100 units, so the gauge is logarithmic and never runs off the
@@ -1315,6 +1749,19 @@ static float g_mouseScrC = -1.0f, g_mouseScrR = -1.0f;
    lines after this header. So the click raises a request and the two places that call
    sb_click drain it. */
 static bool g_sbOptionsReq = false;
+
+/* DATABASE is the same arrangement for the same reason: codex_mod.h is included after
+   the camera helpers it needs, which is thousands of lines below this. */
+static bool g_sbDatabaseReq = false;
+static bool sb_take_database_request(void)
+{
+    const bool v = g_sbDatabaseReq;
+    g_sbDatabaseReq = false;
+    return v;
+}
+/* Set while the codex holds the screen: the drawer is folded away and its handle is
+   drawn dimmed, because a handle that looks live but is not is worse than a dim one. */
+static bool g_sbCodexUp = false;
 static bool sb_take_options_request(void)
 {
     const bool v = g_sbOptionsReq;
@@ -1365,7 +1812,18 @@ static void sb_draw_panel(int fbw, int fbh)
     memset(g_dbScreen, DB_BLACK, sizeof(g_dbScreen));
     sb_fill_dos_state();
     db_draw_sidebar(&g_dbSurf, g_dbPack, &g_dbState);
-    if (g_sb.RadarPlot) g_sb.RadarPlot(&g_dbSurf, g_dbPack, g_dbState.radar_active);
+    /* radar.cpp:356-360: in player-name mode Draw_It draws the names and RETURNS, so the
+       plot never runs. db_draw_sidebar above has already laid down the ACTIVATED bezel
+       and filled its interior black, because sb_fill_dos_state raises radar_active for
+       the list -- which is Draw_Names' own unconditional opening pair (radar.cpp:
+       1871-1873) -- so the names land on the ground 1995 gave them whether or not this
+       player has a radar. */
+    if (sb_roster_shown())
+        sb_roster_draw(&g_dbSurf, g_dbPack,
+                       DB_RAD_X + DB_RAD_OFF_X, DB_RAD_Y + DB_RAD_OFF_Y,
+                       DB_RAD_I_WIDTH, DB_RAD_I_HEIGHT);
+    else if (g_sb.RadarPlot)
+        g_sb.RadarPlot(&g_dbSurf, g_dbPack, g_dbState.radar_active);
     /* CreditsCounter, not Credits: the engine's own animated display value, which is
        CreditClass tracking Available_Money() = credits PLUS harvested tiberium in
        storage, with the 1995 count-up/count-down motion. Plain Credits excludes
@@ -1449,7 +1907,7 @@ static void sb_draw_panel(int fbw, int fbh)
    SCALE: the HUD is authored at 640x480, so at the default 1280x720 window an integer
    step of 1 makes the bar 160 wide, NARROWER on screen than the 240 the DOS bar gets at
    3x. That is a consequence of the art being native at the Tier 1 size, not a bug, but
-   it is a real look change and is flagged as such. */
+   it is a real look change and is flagged in engineering notes. */
 static void h6_upload(GLuint* tex, const unsigned char* rgba, int w, int h)
 {
     if (!*tex) {
@@ -1507,14 +1965,23 @@ static void h6_fill_state(H6_State* st)
         st->power_level = lim > 0 ? (total * 100) / lim : 0;
         if (st->power_level < 0)   st->power_level = 0;
         if (st->power_level > 100) st->power_level = 100;
+        /* AND THE DRAIN, in the same bar pixels against the same ceiling, which is what
+           the meter was missing: output alone cannot tell a base with two idle plants
+           from a base overdrawing them. g_dbState.power_drain is the very number the DOS
+           bar puts its own POWER marker at, so the two sidebars mark one level rather
+           than each computing a level of its own. */
+        const int drain = g_dbState.power_drain;
+        st->power_drain_level = lim > 0 ? (drain * 100) / lim : 0;
+        if (st->power_drain_level < 0)   st->power_drain_level = 0;
+        if (st->power_drain_level > 100) st->power_drain_level = 100;
         /* The overdraw warning, on the SAME watt rule the DOS bar uses (power.cpp:
            475-482), so the two sidebars cannot disagree about whether the base is in
            trouble. Until v0.5.9 the art HUD had no warning at all: one green meter
            whatever the drain was doing.
-           STILL OWED, and registered rather than bodged: a distinct DRAIN THRESHOLD
-           tick. The delivered art carries one asset for this channel, meter_lit, and
-           nothing to mark a level with, so inventing one would be authoring art in the
-           renderer. The colour is the honest half that needs no new asset. */
+           The colour was the half of this that needed no new asset. The other half, a
+           distinct DRAIN THRESHOLD tick, was owed for a while and now exists as art:
+           meter_drain in the HUD pack, the DOS gauge's own POWER mark redrawn at the
+           art HUD's scale, placed against this same level by hud640.c. */
         const int pw = g_dbState.power_watts, dw = g_dbState.drain_watts;
         st->power_color = (dw > pw * 2) ? 2 : (dw > pw ? 1 : 0);
     }
@@ -1522,7 +1989,16 @@ static void h6_fill_state(H6_State* st)
     st->radar_active = g_dbState.radar_active;
     /* The pixels, without which radar_active means nothing: hud640_draw_bar tests BOTH
        and falls back to the emblem if either is missing. */
-    if (st->radar_active && g_sb.RadarPlotRGBA && g_dbPack) {
+    if (sb_roster_shown() && g_dbPack) {
+        /* The list, not the plot, and in the same box on both HUDs because it is the same
+           1995 control: the DOS hole is 72x69, this one is 136x120, and the only thing
+           that changes is how many rows fit. radar_active was raised for the list by
+           sb_fill_dos_state just above -- Draw_Names' unconditional ACTIVATED bezel,
+           radar.cpp:1871-1873 -- so hud640_draw_bar blits these pixels instead of the
+           faction emblem (hud640.c:345-353) with or without a radar. */
+        sb_roster_rgba(g_h6Radar, H6_RADAR_W, H6_RADAR_H, g_dbPack);
+        st->radar_rgba = g_h6Radar;
+    } else if (st->radar_active && g_sb.RadarPlotRGBA && g_dbPack) {
         g_sb.RadarPlotRGBA(g_h6Radar, H6_RADAR_W, H6_RADAR_H, g_dbPack, 1);
         st->radar_rgba = g_h6Radar;
     }
@@ -1534,6 +2010,10 @@ static void h6_fill_state(H6_State* st)
     st->sell_frame   = sb_frame_for(SBH_SELL,   -1, g_sbSellOn   ? 1 : 0);
     st->map_frame    = sb_frame_for(SBH_MAP,    -1, 0);
     st->options_frame = sb_frame_for(SBH_OPTIONS, -1, 0);
+    /* THE OPEN CODEX LATCHES THE PLATE DOWN. The tab strips carry three frames, not the
+       four the buttons carry, so "latched" is the PRESSED frame rather than a fourth
+       that does not exist -- asking for H6_FR_ACTIVE here would index past the strip. */
+    st->database_frame = g_sbCodexUp ? H6_FR_PRESSED : sb_frame_for(SBH_DATABASE, -1, 0);
     st->credits_frame = sb_frame_for(SBH_CREDITS, -1, 0);
     /* The handle reads "engaged" while the drawer is closed, which is the one piece of
        state a player cannot otherwise see once the bar is off screen. */
@@ -1598,7 +2078,7 @@ static void h6_fill_state(H6_State* st)
                 cp = g_dbPack;
             }
             if (!cameo || !cp) continue;
-            /* The supplied art is keyed by the buildable's own ident, so it is independent of
+            /* the project owner's art is keyed by the buildable's own ident, so it is independent of
                which DOS/C&C95 pack supplied the shape and the overlays. NULL simply means
                he has not drawn this one and the old path stands. */
             tdr = h6_tdr_find(it->cameo);
@@ -1645,7 +2125,7 @@ static void h6_fill_state(H6_State* st)
                cameo. `zoom` is the only difference between the two paths. */
             {
             const int zoom = (cw * 2 <= H6_CAMEO_W) ? 2 : 1;
-            /* THE TRUE-COLOUR PATH. If the supplied art has this buildable, the cameo pixels
+            /* THE TRUE-COLOUR PATH. If the project owner's art has this buildable, the cameo pixels
                come from it and only the OVERLAYS come from the palette. Which is which is
                decided per pixel against the cameo-only reference:
 
@@ -1756,6 +2236,12 @@ static GLuint g_tipTex = 0;
 /* What the last draw resolved, so a script can assert it without reading pixels. */
 static char g_tipName[32] = {0};
 static int  g_tipCost = -1;
+/* AND WHAT SIZE IT CAME OUT AT: the DOS-pixel box that was rasterised and the whole step
+   it was magnified by, both zero when the last frame drew no plate. Same argument as the
+   two above. The zoom is kept as well as the box because a plate at the wrong size and a
+   plate at a fractional zoom look alike in a photograph and are different faults. */
+static int   g_tipDrawW = 0, g_tipDrawH = 0;
+static float g_tipDrawZoom = 0.0f;
 
 static const char* sb_title_for(const char* asset)
 {
@@ -1773,7 +2259,8 @@ static const char* sb_hover_subject(int* cost)
     if (g_sbHover == SBH_REPAIR)  return g_sb.nod ? "SB_DEMOLISH" : "SB_REPAIR";
     if (g_sbHover == SBH_SELL)    return g_sb.nod ? "SB_DEMOLISH" : "SB_SELL";
     if (g_sbHover == SBH_MAP)     return "SB_MAP";
-    if (g_sbHover == SBH_OPTIONS) return "SB_OPTIONS";
+    if (g_sbHover == SBH_OPTIONS)  return "SB_OPTIONS";
+    if (g_sbHover == SBH_DATABASE) return "SB_DATABASE";
     if (g_sbHover != SBH_ITEM || g_sbHoverCol < 0 || g_sbHoverSlot < 0) return 0;
     /* THE CLICK PATH'S OWN EXPRESSION, copied rather than re-derived. g_sbTop is the
        term a second copy gets wrong, and the bug only shows after the player scrolls. */
@@ -1807,6 +2294,10 @@ static bool sb_tip_resolve(void)
 
 static void sb_draw_tooltip(int fbw, int fbh)
 {
+    /* Cleared ahead of the first refusal below, so a frame that draws no plate reads as
+       0x0 rather than as whatever the last hover left behind. */
+    g_tipDrawW = g_tipDrawH = 0;
+    g_tipDrawZoom = 0.0f;
     if (!sb_tip_resolve() || !g_dbPack) return;
     const int cost = g_tipCost;
     const char* title = g_tipName;
@@ -1867,8 +2358,17 @@ static void sb_draw_tooltip(int fbw, int fbh)
         ix0 = g_mouseScrC; iy0 = g_mouseScrR;
         ix1 = ix0; iy1 = iy0;
     }
-    const float sc = (float)fbh / (float)DB_SCREEN_H;
+    /* The plate is rasterised in DOS pixels, so it is magnified by whatever a DOS pixel
+       is worth in the HUD that is on screen. This used to be the window height over the
+       200-row DOS screen, which is neither HUD's zoom.
+
+       HALF a DOS pixel, though, not a whole one: at the full zoom the plate came out at
+       twice the size it wants. At 1280x720 the 640 HUD drew "Med. Tank" at 88x44 beside a
+       bar 160 wide and the longest name in the table at 228 across; halved they are 44x22
+       and 114x22. sb_dos_px_half carries why the half is taken in whole steps. */
+    const float sc = sb_dos_px_half();
     const float tw = (float)w * sc, th = (float)h * sc;
+    g_tipDrawW = w; g_tipDrawH = h; g_tipDrawZoom = sc;
     float x1 = ix0 - 2.0f, x0 = x1 - tw;
     float y0 = iy0,        y1 = y0 + th;
     if (x0 < 0.0f) { x0 = 0.0f; x1 = tw; }
@@ -1903,9 +2403,17 @@ static void sb_draw_tooltip(int fbw, int fbh)
 static unsigned char g_qdPx[SBQD_W * SBQD_H];
 static unsigned char g_qdRGBA[SBQD_W * SBQD_H * 4];
 static GLuint g_qdTex = 0;
+/* The DOS-pixel box the last draw rasterised and the whole step it was magnified by, kept
+   for the same reason the tooltip keeps its own pair: a script can then read the size off
+   the renderer instead of counting pixels in a picture. Every queued cameo in a frame
+   draws the same one-digit box, so the last one written is the size of all of them. */
+static int   g_qdDrawW = 0, g_qdDrawH = 0;
+static float g_qdDrawZoom = 0.0f;
 
 static void sb_draw_queue_digits(int fbw, int fbh)
 {
+    g_qdDrawW = g_qdDrawH = 0;
+    g_qdDrawZoom = 0.0f;
     if (!g_sbQueueOn || g_sbQueue.empty() || !g_dbPack || !g_sbState.valid) return;
     const DB_Font* f = db_font(g_dbPack, "6POINT");
     if (!f) return;
@@ -1948,9 +2456,15 @@ static void sb_draw_queue_digits(int fbw, int fbh)
         glBindTexture(GL_TEXTURE_2D, g_qdTex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SBQD_W, SBQD_H, 0,
                      GL_RGBA, GL_UNSIGNED_BYTE, g_qdRGBA);
-        /* bottom-right of the cameo, the corner the build clock does not use */
-        const float sc = (float)fbh / (float)DB_SCREEN_H;
+        /* bottom-right of the cameo, the corner the build clock does not use. Same
+           DOS-pixel magnification as the tooltip, and for the same reason: this plate is
+           rasterised in DOS pixels too, so the digit has to keep its size relative to the
+           cameo it is sitting on in either HUD. HALF a DOS pixel, though, not a whole
+           one: at the full zoom the badge came out at twice the size it wants, 18x18 on a
+           61x45 cameo at 1280x720 and 27x27 on the DOS bar's 96x72 one. */
+        const float sc = sb_dos_px_half();
         const float dw = (float)w * sc, dh = (float)hh * sc;
+        g_qdDrawW = w; g_qdDrawH = hh; g_qdDrawZoom = sc;
         const float qx1 = x1 - 1.0f, qx0 = qx1 - dw;
         const float qy1 = y1 - 1.0f, qy0 = qy1 - dh;
         const float u1 = (float)w / (float)SBQD_W, v1 = (float)hh / (float)SBQD_H;
@@ -2011,13 +2525,26 @@ static void sb_draw_panel_640(int fbw, int fbh)
     h6_upload(&g_h6TexOpt, g_h6Tab, H6_BAR_W, H6_TAB_H);
     h6_tex_quad(g_h6TexOpt, H6_BAR_W, H6_TAB_H, 0.0f, by, bw, by + th);
 
+    /* DATABASE, in the plate-width slot right of OPTIONS. That slot is where the 1995
+       pre-release strip put this very caption, and it is the slot this HUD has been
+       leaving empty. Enhanced HUD only -- see codex_available(). */
+    if (codex_available()) {
+        hud640_draw_tab(g_h6Tab, g_h6Pack, "DATABASE", 0, st.database_frame);
+        h6_upload(&g_h6TexDb, g_h6Tab, H6_BAR_W, H6_TAB_H);
+        h6_tex_quad(g_h6TexDb, H6_BAR_W, H6_TAB_H, bw, by, bw * 2.0f, by + th);
+    }
+
     /* THE HANDLE, drawn LAST so it sits over the bar for the whole travel. Its word used
        to be baked into the chassis art, which meant it could not survive the bar sliding
        out from under it -- so it is its own quad now, lettered from the game's own
        GRAD6FNT exactly the way OPTIONS is. */
     hud640_draw_tab(g_h6Tab, g_h6Pack, "SIDEBAR", 0, st.sidebar_frame);
     h6_upload(&g_h6TexSide, g_h6Tab, H6_BAR_W, H6_TAB_H);
+    /* GREYED WHILE THE CODEX IS UP. The drawer is folded away and cannot be pulled back
+       out without closing the screen, so the handle says so instead of pretending. */
+    if (g_sbCodexUp) glColor4f(0.42f, 0.42f, 0.44f, 1.0f);
     h6_tex_quad(g_h6TexSide, H6_BAR_W, H6_TAB_H, px, by, px + bw, by + th);
+    if (g_sbCodexUp) glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
     glDisable(GL_TEXTURE_2D);
 }
@@ -2042,6 +2569,14 @@ static void sb_draw_panel_640(int fbw, int fbh)
  * depth test off. */
 static void sb_place_cell_tris(int cx, int cz, int fbw, int fbh)
 {
+    /* WorldToScreen IS CHECKED FOR THE SAME REASON TerrainCornerY ALWAYS WAS, and it was
+       the one pointer here that was not. The host wires these hooks when the sidebar comes
+       up and they are absent while it is being rebuilt, which is exactly what opening a
+       different map from inside the editor does. An overlay drawn in that window called
+       straight through a null and the editor died on the spot: EXC_BAD_ACCESS,
+       KERN_INVALID_ADDRESS at 0x0, reported from a map open. Guarding one pointer and not
+       its neighbour is not a guard, it is a coin toss. */
+    if (!g_sb.WorldToScreen) return;
     const float yNW = g_sb.TerrainCornerY ? g_sb.TerrainCornerY(cx,     cz)     : 0.0f;
     const float ySW = g_sb.TerrainCornerY ? g_sb.TerrainCornerY(cx,     cz + 1) : 0.0f;
     const float yNE = g_sb.TerrainCornerY ? g_sb.TerrainCornerY(cx + 1, cz)     : 0.0f;
@@ -2054,6 +2589,95 @@ static void sb_place_cell_tris(int cx, int cz, int fbw, int fbh)
     g_sb.WorldToScreen(x + 1.0f, ySE, z + 1.0f, fbw, fbh, &cSE, &rSE);
     glVertex2f(cNW, rNW); glVertex2f(cSW, rSW); glVertex2f(cNE, rNE);
     glVertex2f(cNE, rNE); glVertex2f(cSW, rSW); glVertex2f(cSE, rSE);
+}
+
+/* THE CAPTION ON A REFUSED CELL.
+ *
+ * SAME PLATE AS THE CAMEO TOOLTIP above, deliberately: a 6POINT string on opaque black
+ * inside a one-pixel coloured rect, rasterised in DOS pixels and magnified by whatever a
+ * DOS pixel is worth in the HUD on screen. That is help.cpp:259-285's own plate and it is
+ * already in the build, so telling the player what is in the way invents no new idiom.
+ *
+ * IT IS RED where the cameo tooltip is green, and the colour is the whole of the link:
+ * the overlay has already painted the cell red, and a red plate belongs to a red cell
+ * without anybody having to be taught a legend.
+ *
+ * ONE WORD, AND IT IS THE GAME'S OWN. CONQUER.ENG holds no refusal sentence to borrow,
+ * so composing one would be inventing 1995 text. The noun is enough once the cell under
+ * it is already red.
+ *
+ * NO POINTER, NO PLATE. A scripted run with no cursor would otherwise park it in the
+ * corner of the screen, which is a caption pointing at nothing.
+ */
+#define SBPT_W 96                          /* DOS px: wider than any name this can print */
+#define SBPT_H 12                          /* one 6POINT line inside its box */
+static unsigned char g_ptPx[SBPT_W * SBPT_H];
+static unsigned char g_ptRGBA[SBPT_W * SBPT_H * 4];
+static GLuint g_ptTex = 0;
+
+static void sb_draw_place_tip(int fbw, int fbh)
+{
+    if (!g_sbTips || !g_dbPack) return;
+    if (g_mouseScrC < 0.0f || g_mouseScrR < 0.0f) return;
+    const char* what = sb_place_blocker(g_sbHoverX, g_sbHoverY);
+    if (!what) return;
+
+    const DB_Font* f = db_font(g_dbPack, "6POINT");
+    if (!f) return;
+    const int w = db_string_width(f, what, DB_FONT6_XSPACING) + 4;
+    const int h = SBPT_H;
+    if (w > SBPT_W) return;
+
+    DB_Surface surf; surf.w = SBPT_W; surf.h = SBPT_H; surf.px = g_ptPx;
+    db_clip_reset(&surf);
+    memset(g_ptPx, DB_BLACK, sizeof g_ptPx);
+    unsigned char fp[16];
+    db_font_palette(fp, DB_RED, DB_TBLACK);
+    db_print(&surf, f, what, 2, 1, fp, DB_FONT6_XSPACING);
+    db_line_h(&surf, 0, w - 1, 0,     DB_RED);
+    db_line_h(&surf, 0, w - 1, h - 1, DB_RED);
+    db_line_v(&surf, 0,     0, h - 1, DB_RED);
+    db_line_v(&surf, w - 1, 0, h - 1, DB_RED);
+    {
+        DB_Surface c; c.w = SBPT_W; c.h = SBPT_H; c.px = g_ptPx;
+        db_clip_reset(&c);
+        db_surface_to_rgba(&c, g_dbPack->pal8, g_ptRGBA, 0);
+    }
+    if (!g_ptTex) {
+        glGenTextures(1, &g_ptTex);
+        glBindTexture(GL_TEXTURE_2D, g_ptTex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+    glBindTexture(GL_TEXTURE_2D, g_ptTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SBPT_W, SBPT_H, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, g_ptRGBA);
+
+    /* Right-aligned flush to the LEFT of the pointer, top edges level, then clamped on
+       screen: help.cpp:315-331's own placement. Leftward is also away from the panel, so
+       a caption raised at the panel's edge cannot slide under a bar drawn after it. */
+    const float sc = sb_dos_px();
+    const float tw = (float)w * sc, th = (float)h * sc;
+    float x1 = g_mouseScrC - 2.0f, x0 = x1 - tw;
+    float y0 = g_mouseScrR,        y1 = y0 + th;
+    if (x0 < 0.0f) { x0 = 0.0f; x1 = tw; }
+    if (y1 > (float)fbh) { y1 = (float)fbh; y0 = y1 - th; }
+
+    const float u1 = (float)w / (float)SBPT_W, v1 = (float)h / (float)SBPT_H;
+    glEnable(GL_TEXTURE_2D);
+    glDisable(GL_BLEND);          /* opaque, the same black plate 1995 draws */
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f); glVertex2f(x0, y0);
+    glTexCoord2f(u1,   0.0f); glVertex2f(x1, y0);
+    glTexCoord2f(u1,   v1);   glVertex2f(x1, y1);
+    glTexCoord2f(0.0f, v1);   glVertex2f(x0, y1);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+    (void)fbw;
 }
 
 static void sb_draw_placement(int fbw, int fbh)
@@ -2082,11 +2706,11 @@ static void sb_draw_placement(int fbw, int fbh)
         && g_sbPlaceIdx < (int)g_sbState.entry.size()) {
         const SbEntry& e = g_sbState.entry[g_sbPlaceIdx];
         bool ok = sb_legal_origin(g_sbHoverX, g_sbHoverY);
-        int origin = g_sbHoverY * 128 + g_sbHoverX;
+        int origin = g_sbHoverY * SB_STRIDE + g_sbHoverX;
         glBegin(GL_TRIANGLES);
         for (size_t k = 0; k < e.occupy.size(); k++) {
             int c = origin + e.occupy[k];
-            int cxx = c % 128, cyy = c / 128;
+            int cxx = c % SB_STRIDE, cyy = c / SB_STRIDE;
             int gi = sb_grid_index(cxx, cyy);
             bool cellok = (gi >= 0 && g_sbPlaceClear[gi]);
             glColor4f(cellok ? 0.2f : 1.0f, cellok ? 1.0f : 0.2f, 0.2f, ok ? 0.45f : 0.35f);
@@ -2095,6 +2719,11 @@ static void sb_draw_placement(int fbw, int fbh)
         glEnd();
     }
     glDisable(GL_BLEND);
+
+    /* 3. and what is standing on it, if the player cannot see that for themselves. Drawn
+          from in here rather than added to the host's overlay list because it belongs to
+          the cursor above it and nothing else may raise it. */
+    sb_draw_place_tip(fbw, fbh);
 }
 
 /* ==================================================================================== *
@@ -2285,10 +2914,25 @@ static bool sb_click(float col, float row, int fbw, int fbh, bool right)
             }
             return true;
         }
+        if (ch == SBH_DATABASE) {
+            if (!right) {
+                g_sbPress = ch; g_sbHover = ch;
+                g_sbDatabaseReq = true;
+                printf("SIDEBAR-INPUT|database|toggle\n");
+                fflush(stdout);
+            }
+            return true;
+        }
         if (ch == SBH_CREDITS)
             return true;              /* a readout, not a button */
         if (ch == SBH_SIDEBAR) {
-            if (!right) {
+            /* NOT WHILE THE CODEX HOLDS THE SCREEN. The handle is drawn dimmed there
+               because the drawer is folded away and cannot come back until the page
+               closes -- but dimming it only changed how it looked. The click still
+               toggled g_h6SlideTarget, and codex_close() then overwrote that with the
+               position it had remembered, so the press did nothing and said nothing. A
+               control that looks dead has to be dead. */
+            if (!right && !g_sbCodexUp) {
                 g_sbPress = ch; g_sbHover = ch;
                 g_h6SlideTarget = g_h6SlideTarget ? 0 : H6_BAR_W;
                 printf("SIDEBAR-INPUT|slide|%s\n", g_h6SlideTarget ? "hide" : "show");
@@ -2326,10 +2970,36 @@ static bool sb_click(float col, float row, int fbw, int fbh, bool right)
     if (hit == SBH_SELL)   { if (!right) sb_toggle_sell();   return true; }
     if (hit == SBH_MAP) {
         if (!right) {
-            if (!g_sbState.radarActive && !g_sbRadarForce)
-                { printf("SIDEBAR-INPUT|map|DISABLED\n"); return true; }
-            g_sbRadarShown = !g_sbRadarShown;
-            printf("SIDEBAR-INPUT|map|radar %s\n", g_sbRadarShown ? "on" : "off");
+            /* sidebar.cpp:2626-2650 Zoom_Mode_Control, which is what the Map button
+               calls. Two arms, and the campaign takes neither of the new ones.
+                 radar live (:2634):  zoomed | GAME_NORMAL -> zoom;  otherwise player
+                              names, and the press after that clears them and zooms back.
+                 radar down (:2645):  nothing at all in a campaign; in multiplayer it
+                              still toggles the player names, because the list needs no
+                              radar.
+               There is no zoom in this renderer -- the Map button has always been the
+               plot's on/off switch here, which is our addition and not 1995's -- so the
+               three 1995 states map onto plot, list, nothing, in that order. A skirmish
+               player who wants the hole empty presses twice instead of once; nothing the
+               button could do before has been taken away. */
+            const bool live = (g_sbState.radarActive || g_sbRadarForce);
+            if (!g_sb.Roster) {                       /* campaign: exactly as before */
+                if (!live) { printf("SIDEBAR-INPUT|map|DISABLED\n"); return true; }
+                g_sbRadarShown = !g_sbRadarShown;
+                printf("SIDEBAR-INPUT|map|radar %s\n", g_sbRadarShown ? "on" : "off");
+                return true;
+            }
+            if (!live) {                              /* Zoom_Mode_Control's else arm */
+                g_sbRoster = !g_sbRoster;
+                printf("SIDEBAR-INPUT|map|players %s|no radar\n",
+                       g_sbRoster ? "on" : "off");
+                return true;
+            }
+            if (g_sbRoster)          { g_sbRoster = false; g_sbRadarShown = false; }
+            else if (g_sbRadarShown) { g_sbRoster = true; }
+            else                     { g_sbRadarShown = true; }
+            printf("SIDEBAR-INPUT|map|%s\n",
+                   g_sbRoster ? "players" : (g_sbRadarShown ? "radar" : "off"));
         }
         return true;
     }
@@ -2432,13 +3102,21 @@ static void sb_scroll_at(float col, float row, int fbw, int fbh, int dir)
 static void sb_set_hover(int cellx, int celly) { g_sbHoverX = cellx; g_sbHoverY = celly; }
 
 /* The radar toggle: one flag, shared by the MAP button, the M key, --nominimap and the
-   minimapon/minimapoff script verbs. */
+   minimapon/minimapoff script verbs.
+   sb_radar_shown answers "is the PLOT on screen", and it is FALSE while the player list
+   covers the hole. That is not a nicety: minimap_hit refuses a camera jump on this
+   answer, and radar.cpp:1390-1393 makes the 1995 radar gadget swallow the click and do
+   nothing for exactly as long as the names are up. */
 static bool sb_radar_shown(void)
 {
-    return g_sbRadarShown && (g_sbState.radarActive || g_sbRadarForce);
+    return g_sbRadarShown && !sb_roster_shown()
+           && (g_sbState.radarActive || g_sbRadarForce);
 }
-static void sb_toggle_radar(void) { g_sbRadarShown = !g_sbRadarShown; }
-static void sb_set_radar(bool on) { g_sbRadarShown = on; }
+/* The M key, --nominimap and the minimapon/minimapoff verbs are ours, not 1995's, and
+   they mean "the map, on or off". Dropping the list first keeps that promise: M always
+   lands on a radar or on an empty hole, never on a roster nobody asked to keep. */
+static void sb_toggle_radar(void) { g_sbRoster = false; g_sbRadarShown = !g_sbRadarShown; }
+static void sb_set_radar(bool on) { g_sbRoster = false; g_sbRadarShown = on; }
 static void sb_force_radar(bool f) { g_sbRadarForce = f; }
 
 /* ==================================================================================== *
@@ -2485,6 +3163,10 @@ static void sb_report(const char* tag)
  *    sbclickitem NAME     left-click that button at its own drawn centre
  *    sbrclickitem NAME    right-click it
  *    sbitem NAME          print the on-screen rectangle of that button, for sbclick
+ *    sbmap                click the Map button at its own drawn centre
+ *    sbroster             print the player list the Map button's third state draws
+ *    sbplates             print the tooltip's and the queue count's last drawn size:
+ *                         the DOS box, the whole magnification step, and the product
  *    sbhold C R           press and HOLD there (also parks the pointer on it)
  *    sbrelease            let the held button back up
  *    sbstates             print the frame each control would draw: normal/hover/
@@ -2509,9 +3191,29 @@ static void sb_placemap(void)
     for (int y = 0; y < g_sb.mapH; y++)
         for (int x = 0; x < g_sb.mapW; x++)
             if (sb_legal_origin(g_sb.mapX + x, g_sb.mapY + y)) legal++;
-    printf("PLACEMAP|origin=%d,%d|size=%dx%d|cells=%d|prox=%d|clear=%d|legal=%d\n",
+    /* HOW BIG THE UNREADABLE PART OF THE REFUSAL IS. noart counts cells inside the
+       buildable region that will not take a foundation and carry something this renderer
+       draws no pixels for: that set IS the reported fault, so a gate can watch it shrink
+       to nothing rather than photograph a plate. noartname comes from the caption's own
+       resolver instead of from the cell test beside it, so the word printed here is the
+       word the plate would print, range guard and footprint walk included. */
+    int noart = 0;
+    const char* noartname = 0;
+    if (g_sb.CellBlocker) {
+        for (int y = 0; y < g_sb.mapH; y++) {
+            for (int x = 0; x < g_sb.mapW; x++) {
+                const int cx = g_sb.mapX + x, cy = g_sb.mapY + y;
+                const int i = y * g_sb.mapW + x;
+                if (g_sbPlaceProx[i] && !g_sbPlaceClear[i] && g_sb.CellBlocker(cx, cy))
+                    noart++;
+                if (!noartname) noartname = sb_place_blocker(cx, cy);
+            }
+        }
+    }
+    printf("PLACEMAP|origin=%d,%d|size=%dx%d|cells=%d|prox=%d|clear=%d|legal=%d"
+           "|noart=%d|noartname=%s\n",
            g_sb.mapX, g_sb.mapY, g_sb.mapW, g_sb.mapH, g_sb.mapW * g_sb.mapH,
-           prox, clear, legal);
+           prox, clear, legal, noart, noartname ? noartname : "-");
     printf("PLACEMAP|  # legal origin, p proximity only, c clear only, . neither\n");
     for (int y = 0; y < g_sb.mapH; y++) {
         printf("PLACEMAP|%3d ", g_sb.mapY + y);
@@ -2674,8 +3376,14 @@ static bool sb_script_verb(const char* v, const char* a1, const char* a2, const 
 
     if (!strcasecmp(v, "hover")) {
         sb_set_hover(a1 ? atoi(a1) : -1, a2 ? atoi(a2) : -1);
-        printf("SCRIPT|hover|%d,%d|legal=%d\n", g_sbHoverX, g_sbHoverY,
-               sb_legal_origin(g_sbHoverX, g_sbHoverY) ? 1 : 0);
+        {   /* The caption the overlay would raise here, as text. What can be wrong with
+               a caption is whether it appears and which word it uses, and both are
+               strings the renderer looked up: a photograph passes on the wrong word in
+               the right font. */
+            const char* why = sb_place_blocker(g_sbHoverX, g_sbHoverY);
+            printf("SCRIPT|hover|%d,%d|legal=%d|blocked=%s\n", g_sbHoverX, g_sbHoverY,
+                   sb_legal_origin(g_sbHoverX, g_sbHoverY) ? 1 : 0, why ? why : "-");
+        }
         return true;
     }
 
@@ -2703,6 +3411,44 @@ static bool sb_script_verb(const char* v, const char* a1, const char* a2, const 
         return true;
     }
 
+    /* sbmap -- press the Map button at its own drawn centre, through sb_click, so a
+       script exercises the same path the mouse does without having to be told the window
+       size. sbclickitem cannot do it: that verb resolves BUILDABLES by name.
+       sbroster -- what the list would draw right now, in text, so the rows, the ink each
+       name is printed in and the kill totals can be asserted without reading pixels. */
+    if (!strcasecmp(v, "sbmap")) {
+        float mc, mr;
+        bool hit;
+        sb_poll();
+        sb_layout(fbw, fbh);
+        sb_map_button_centre(&mc, &mr);
+        hit = sb_click(mc, mr, fbw, fbh, false);
+        sb_pointer_up();
+        printf("SCRIPT|sbmap|at %.0f,%.0f|onpanel=%d%s\n", mc, mr, hit ? 1 : 0,
+               hit ? "" : "|FAIL the click missed the Map button");
+        if (!hit) g_sbFails++;
+        if (tick) tick(1);
+        sb_poll();
+        return true;
+    }
+    if (!strcasecmp(v, "sbroster")) {
+        int i;
+        sb_roster_refresh();
+        printf("SBROSTER|available=%d|shown=%d|radar=%d|rows=%d\n",
+               g_sb.Roster ? 1 : 0, sb_roster_shown() ? 1 : 0,
+               sb_radar_shown() ? 1 : 0, g_sbRosterN);
+        for (i = 0; i < g_sbRosterN; i++) {
+            const SbRosterRow& r = g_sbRosterRow[i];
+            const int ci = (r.colour >= 0 && r.colour < 8) ? r.colour : 0;
+            printf("SBROW|%d|name=%s|house=%d|colour=%d|ink=%d|kills=%d|defeated=%d\n",
+                   i, r.name, r.house, r.colour,
+                   r.defeated ? DB_DKGREY : (int)SB_ROSTER_TCOLOR[ci],
+                   r.kills, r.defeated);
+        }
+        fflush(stdout);
+        return true;
+    }
+
     if (!strcasecmp(v, "sbitem")) {
         sb_poll();
         sb_layout(fbw, fbh);
@@ -2713,6 +3459,28 @@ static bool sb_script_verb(const char* v, const char* a1, const char* a2, const 
                    a1, i, x0, y0, x1, y1, (x0 + x1) * 0.5f, (y0 + y1) * 0.5f);
         else
             printf("SBRECT|%s|not visible\n", a1 ? a1 : "");
+        return true;
+    }
+
+    /* sbplates -- the size the two DOS-pixel overlays were last DRAWN at. Two things can
+       be wrong with either plate and a photograph separates neither: it can be the wrong
+       size, and it can be at a magnification that is not a whole number, which is what
+       makes it change shape from one window size to the next. Both are numbers here: the
+       DOS box the renderer rasterised, the whole step it was blown up by, and the product
+       that landed on screen. These are what the LAST FRAME drew, so a script takes a shot
+       before asking, exactly as the tooltip's own verb needs. */
+    if (!strcasecmp(v, "sbplates")) {
+        sb_layout(fbw, fbh);
+        const float full = sb_dos_px(), half = sb_dos_px_half();
+        printf("SBPLATE|zoom|full=%.0f|half=%.0f|whole=%d|hud=%s\n", full, half,
+               half == floorf(half) ? 1 : 0, (g_hudNew && g_h6Pack) ? "640" : "dos");
+        printf("SBPLATE|tip|dos=%dx%d|zoom=%.0f|px=%dx%d\n",
+               g_tipDrawW, g_tipDrawH, g_tipDrawZoom,
+               (int)(g_tipDrawW * g_tipDrawZoom), (int)(g_tipDrawH * g_tipDrawZoom));
+        printf("SBPLATE|queue|dos=%dx%d|zoom=%.0f|px=%dx%d\n",
+               g_qdDrawW, g_qdDrawH, g_qdDrawZoom,
+               (int)(g_qdDrawW * g_qdDrawZoom), (int)(g_qdDrawH * g_qdDrawZoom));
+        fflush(stdout);
         return true;
     }
 
@@ -2820,7 +3588,17 @@ static bool sb_init(const SbHooks& h, const char* cameopack, const char* dospack
     g_sb = h;
     /* The N64 cameo pack is still loaded: FONT.SHP out of it is what the camera HUD and
        the debug overlays print with. The SIDEBAR's art now comes entirely from the DOS
-       pack, which is the one the player sees. */
+       pack, which is the one the player sees.
+
+       AND THE CARTRIDGE'S OWN CAMEOS ARE IN THAT SAME PACK, which is easy to miss because
+       nothing in this file draws them. cameos.pack holds 53 records at a native 32x25
+       (RMBO alone is 32x24), the GDI colourway only, straight out of the ROM. All 53 are
+       uploaded here as GL textures, and the map editor's palette draws them, magnified to
+       whatever rectangle its layout gives it. So on the GDI side the console art is
+       already resident and already paid for; what the build column lacks is a draw path,
+       not an asset. The Nod colourway is a further 48 records that no pack carries yet,
+       and the two sets are separately drawn art rather than one set under two palettes,
+       so a side-correct build column would need both. */
     sb_load_cameos(cameopack);
 
     /* The 640x480 HUD is OPTIONAL and OFF by default: it is signed off on look but not
@@ -2845,7 +3623,7 @@ static bool sb_init(const SbHooks& h, const char* cameopack, const char* dospack
         g_hudNew = (g_h6Pack && g_hudNewWish == 1);
         if (g_hudNew)
             fprintf(stderr, "sidebar: drawing the 640x480 HUD\n");
-        /* The true-colour cameos, beside the HUD pack. Absent is not an error: every
+        /* the project owner's true-colour cameos, beside the HUD pack. Absent is not an error: every
            buildable he has not drawn keeps the palette path it had. */
         {
             std::string tdr(h6path);
@@ -2919,6 +3697,8 @@ static void sb_free(void)
     g_sbRepairOn = g_sbSellOn = false;
     g_sbRadarShown = true;
     g_sbRadarForce = false;      /* see the declaration: faithful by default */
+    g_sbRoster = false;          /* a mission latch like the two above */
+    g_sbRosterN = 0;
     g_sbFails = 0;
     /* THE ARMED SPECIAL IS A MISSION LATCH TOO, and it is the one that bites hardest.
        While the latch was an INDEX into g_sbState.entry a leftover was inert: both

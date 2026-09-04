@@ -27,7 +27,7 @@
  * stops being the idle animation, measured from the per-frame node motion in the baked
  * pack; 0 means the whole clip idles. Only the Construction Yard has one, and its second
  * segment is its BSTATE_ACTIVE animation -- which is what plays while it is BUILDING
- * something. Running the whole clip as one loop is exactly the bug reported on the
+ * something. Running the whole clip as one loop is exactly the bug the project owner reported on the
  * desktop build ("the yard's idle is the animation that belongs to building something").
  * ---------------------------------------------------------------------------------- */
 typedef struct { const char *type; float per_stage; int rate; int folded; int seg1; } T1_Arm;
@@ -50,7 +50,7 @@ static const T1_Arm T1_ARMS[] = {
 #define T1_NARMS ((int)(sizeof T1_ARMS / sizeof T1_ARMS[0]))
 
 /* The console runs its display at roughly 30 Hz and `rate` is counted against the 15 Hz
- * GAME tick, so a counter advanced once per VIDEO frame runs at exactly twice ours. That
+ * GAME tick, so a counter advanced once per VIDEO frame runs at exactly twice ours. the project owner
  * arrived at the same factor independently by eye on the Barracks flag and confirmed it.
  * IT IS A HYPOTHESIS, NOT A DECODE: the console's clock source was never found. If
  * someone reads it out of the ROM, this constant is the thing to delete. */
@@ -168,7 +168,7 @@ float t1_anim_object(const T1_MeshBank *b, int mi, const W98_Object *o, long tic
     if (!t1_mesh_clip(b, mi, &frames, 0, 0, 0, 0) || frames <= 1) return -1.0f;
 
     /* THE CONSTRUCTION YARD HOLDS ITS REST POSE UNLESS IT IS BUILDING SOMETHING, and
-     * this is a measurement rather than a preference. Differencing the original console
+     * this is a measurement rather than a preference. Differencing the project owner's own console
      * capture frame by frame, the only thing that moves on that building is the two fan
      * discs: the crane does not swing and the roof plate does not shift. FACT's clip has
      * two segments (the arm table gives it seg1 = 50) and the second one is the yard
@@ -177,7 +177,7 @@ float t1_anim_object(const T1_MeshBank *b, int mi, const W98_Object *o, long tic
      * building is going up and returns to 1 when it finishes. Driving the IDLE segment
      * from a free counter is what detached the plate from the vault on the desktop build.
      *
-     * Deliberately NOT a blanket rule: the Barracks flag was confirmed to animate, so
+     * Deliberately NOT a blanket rule: the project owner confirmed the Barracks flag animates, so
      * other structures really do play theirs. FACT is named because FACT is what the
      * capture shows. */
     if (building && strcmp(o->name, "FACT") == 0 && o->doing != T1_BSTATE_ACTIVE)
@@ -207,7 +207,7 @@ static int g_seenfirst;      /* the first object dump has been and gone */
 
 /* The facing audit's tally: how far, in DirType units, the direction a unit MOVED sat
  * from the facing the engine reported for it. Zero is a perfect match; 128 is backwards;
- * 64 is sideways. Per type as well as overall, because the two bugs reported were
+ * 64 is sideways. Per type as well as overall, because the two bugs the project owner reported were
  * one type each. */
 static long g_audit_n, g_audit_sum, g_audit_max;
 static struct { char name[12]; long n, sum, max; } g_audit[8];
@@ -362,7 +362,7 @@ float t1_anim_build_frac(const W98_Object *o, long ticks)
     }
     if (u < 0.0f) return 1.0f;
 
-    /* The console's assembly runs at TWICE the engine's buildup clock (measured by comparing
+    /* The console's assembly runs at TWICE the engine's buildup clock (the project owner, comparing
      * the desktop build against the real cartridge): a placed building is fully assembled
      * halfway through and then stands complete for the rest of the span. */
     f = 2.0f * u;

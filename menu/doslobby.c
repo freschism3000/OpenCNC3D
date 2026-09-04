@@ -95,11 +95,13 @@ enum
     SK_ST_CRATES_ON,
     SK_ST_CRATES_OFF,
     SK_ST_COL_HUMAN,
+    SK_ST_NO_MAPS,
+    SK_ST_UNITS_RISK,
     SK_ST_COUNT
 };
 
 static const char *const SK_STATUS[SK_ST_COUNT] = {
-    "Colours name players; armies wear their side's.",
+    "Each player's army wears that player's colour.",
     "You play GDI; every computer plays Nod.",
     "You play Nod; every computer plays GDI.",
     "Bases stay on: the match would end in a second.",
@@ -115,7 +117,28 @@ static const char *const SK_STATUS[SK_ST_COUNT] = {
      * of a change they made to somebody else's row, and that is the one thing this
      * picker must never do. So the player's own square is drawn locked on every other
      * row and says so instead of being silently inert. */
-    "That colour is the player's own."
+    "That colour is the player's own.",
+    /* THE ONE LINE ON THIS SCREEN A PLAYER MAY ACTUALLY NEED. With nothing installed
+     * the list says NO MAPS INSTALLED in 102 pixels, which is room for the symptom and
+     * none for the remedy, so the remedy goes in the status row where there are 272.
+     * It names the FILES rather than the symptom: a folder holding the mission INIs
+     * and no packs looks complete to anyone who has not been told what to look for. */
+    "No SCM map packs here. Reinstall the game.",
+    /* THE GAUGE THAT DAMAGES THE OPENING MINUTE, and the reason it says so rather than
+       being capped. docs/design-skirmish-lobby.md 7.5 swept all nine maps at both start
+       positions: 0 leaves 17 of 18 starts deployable, 1 leaves 10, 2 leaves 9, 5 leaves
+       4, and 6 or more leaves NONE. The engine scatters the escort within about four
+       cells of the MCV and a unit standing inside the Construction Yard's 3x3 pad makes
+       the player's first click do nothing. That doc ruled the control out of v1 and said
+       that if it were ever wanted it belonged behind the same kind of warning the Bases
+       box gets; the slider was then asked for, so this is that warning.
+       It is a WARNING and not a cap: the range the engine offers is the range the player
+       gets, and the risk is stated rather than taken away.
+       KEEP IT UNDER 272 PIXELS. The first draft of this line was 52 characters and
+       measured 294, and the lobby's own fit check caught it before a human did:
+       LOBBY|OVERFLOW|status|294 > 272. The status row is the widest text on this screen
+       and it is still a budget. */
+    "Extra units can block your MCV. 0 is safest."
 };
 
 static const char *sk_status_side(int side)
@@ -371,7 +394,7 @@ static int sk_seat_with_colour(const SK_State *st, int c)
     return -1;
 }
 
-/* THE LOWEST COLOUR NOBODY IS USING, which is the rule stated literally rather than
+/* THE LOWEST COLOUR NOBODY IS USING, which is the project owner's rule stated literally rather than
  * inferred. With the permutation invariant there is exactly one such colour at the
  * moment this is called -- the one the seat that is moving has just let go of -- so the
  * scan cannot fail; it is written as a scan anyway so the rule is in the code and not
@@ -507,12 +530,18 @@ static void sk_set_value(SK_State *st, int ctrl, int v)
     case SK_I_AI: st->ai = v; break;
     case SK_I_BUILD: st->build = v; break;
     case SK_I_CREDITS: st->credits = v; break;
-    case SK_I_UNITS: st->units = v; break;
+    case SK_I_UNITS:
+        st->units = v;
+        /* Said on every move of this gauge, including back to zero, because a player who
+           has just undone the risk should see the line that told them about it rather
+           than be left wondering what it said. */
+        st->status = SK_STATUS[SK_ST_UNITS_RISK];
+        break;
     default: break;
     }
 }
 
-/* SEATS FILL THE MAP (by request). Choosing a map SETS the opponent
+/* SEATS FILL THE MAP (26 Aug 2026, the project owner's request). Choosing a map SETS the opponent
  * count to what that map seats rather than only capping it, so picking an eight start
  * map hands you seven opponents instead of a gauge to drag. sk_ai_cap already computed
  * the number -- starts minus the human, clamped to SK_AI_MIN..SK_AI_MAX -- and the only
@@ -567,7 +596,7 @@ void sk_init(SK_State *st, const SK_Map *maps, int count, const SK_Prev *prev)
     st->pressed = SK_HIT_NONE;
     st->drag = -1;
     st->popup = -1;
-    /* THE RULE, in one line: eight players, eight teams, everybody on their own.
+    /* the project owner's RULE, in one line: eight players, eight teams, everybody on their own.
      * Nothing is allied with anything until somebody says so. house_set stays zero, so
      * every computer follows the side buttons onto the opposite side the way it always
      * did, and the drop down changes nothing for a player who never opens one.
@@ -598,10 +627,12 @@ void sk_result(const SK_State *st, SK_Lobby *out)
     out->credits = st->credits;
     out->superweapons = st->super ? 1 : 0;
     /* Bases and tiberium are drawn locked ON and these are the values those locks stand
-     * for. Crates are drawn locked OFF; sk_item_disabled carries the reason.
-     * STARTING UNITS IS NOW THE PLAYER'S (26 Aug 2026, FR-20260825-77A9E9). It used to be
-     * hardcoded to zero here with the note that zero was the measured best, and it still
-     * DEFAULTS to zero for that reason: the engine scatters the escort within about four
+     * for. CRATES ARE NOT LOCKED and this comment said they were: sk_item_disabled
+     * un-locks them and the box is drawn and clickable, so the sentence claiming
+     * otherwise was false before this change and visibly false after it.
+     * STARTING UNITS IS THE PLAYER'S, through a gauge that was fully built and simply
+     * never drawn: the draw loop stopped one item short of it, so it took input and
+     * showed nothing. It still DEFAULTS to zero, and for a measured reason: the engine scatters the escort within about four
      * cells of the MCV and a unit landing inside the Construction Yard's 3x3 pad makes the
      * player's first click do nothing. That is a good default, not a good prohibition, so
      * the gauge offers 0..10 and the risk is the player's to take. The ASSORTMENT the
@@ -686,7 +717,12 @@ const char *sk_item_label(const SK_State *st, int item)
     case SK_I_AI: return "AI Players:";
     case SK_I_BUILD: return "Tech Level:";
     case SK_I_CREDITS: return "Credits:";
-    case SK_I_UNITS: return "Starting Units:";
+    /* TXT_COUNT's own words, identical in both 1995 games (tiberiandawn/conquer.h:655,
+     * redalert/conquer.h:315), and what nulldlg.cpp prints beside this same slider.
+     * Measured in GRAD6FNT it is 61 pixels against the caption column's 78; the invented
+     * "Starting Units:" it replaces measured 85 and would have printed from x=15, one
+     * pixel outside the dialog's left edge. */
+    case SK_I_UNITS: return "Unit Count:";
     case SK_I_BASES: return "Bases";
     /* nulldlg.cpp:377's own wording. Red Alert calls the same field Ore Spreads. */
     case SK_I_TIBERIUM: return "Tiberium Regrows";
@@ -710,7 +746,7 @@ int sk_item_disabled(const SK_State *st, int item)
      * the human -- so a change to a computer's row would silently repaint the player.
      * The square is drawn locked rather than hidden, and clicking it says why. On the
      * player's OWN row every square is live: taking a colour off a computer moves that
-     * computer, which is exactly what was asked for. */
+     * computer, which is exactly what the project owner asked for. */
     if (SK_IS_POP_COL(item)) {
         if (!st || st->popup < 0)
             return 1;
@@ -1039,7 +1075,7 @@ static void sk_select_map(SK_State *st, int ix)
     /* THE MAP DECIDES THE SEATS. It used to only clamp -- a map with fewer starts took
      * opponents away and said so, and a map with more left the gauge where it was, so an
      * eight start map opened with one opponent on it and the player had to notice.
-     * Selecting a map now SETS the count to what the map seats, which is the request
+     * Selecting a map now SETS the count to what the map seats, which is the project owner's request
      * and the answer nine times out of ten. The gauge is untouched and still moves. */
     if (sk_seat_the_map(st))
         st->status = SK_STATUS[SK_ST_SEATED];
@@ -1567,7 +1603,7 @@ static void sk_column_label(DB_Surface *s, const DB_Font *f, const char *text, i
 }
 
 /* ONE COLOUR SQUARE, which is the whole of the picker's vocabulary: a filled rectangle
- * of that colour, and a RIM when it is the chosen one. No glyph goes near it -- the
+ * of that colour, and a RIM when it is the chosen one. No glyph goes near it -- the project owner's
  * ruling is that a colour is shown and never named -- so the rim is the only thing a
  * square can say about itself and it has to be unmistakable.
  *
@@ -1991,18 +2027,31 @@ void sk_draw(DB_Surface *s, const DB_Pack *p, const SK_State *st)
     sk_button(s, grad, sk_item_label(st, SK_I_NOD), SK_NOD_X, SK_SIDE_Y, SK_SIDE_W,
               SK_SIDE_H, st->pressed == SK_I_NOD, st->side == 1, 0);
 
-    for (i = SK_I_AI; i <= SK_I_CREDITS; i++)
+    /* EVERY GAUGE, and the bound is sk_is_gauge's own. It used to stop at Credits while
+     * SK_I_UNITS already had a range, a rectangle, a caption, a mouse arm, a keyboard arm
+     * and a field in the result, so Unit Count was a live control that drew nothing: Tab
+     * reached it, the arrows moved it, and the value was visible nowhere. */
+    for (i = SK_I_AI; i <= SK_I_UNITS; i++)
         sk_draw_gauge(s, grad, st, i);
     sk_draw_check(s, grad, st, SK_I_BASES, 1);
     sk_draw_check(s, grad, st, SK_I_TIBERIUM, 1);
     sk_draw_check(s, grad, st, SK_I_SUPER, st->super);
-    /* The fourth row of both columns is laid out and left empty on purpose. It is where
-     * Unit Count and Crates go if they ever earn their place, and leaving the slot
-     * means adding them later moves nothing. */
+    /* THE SAME OMISSION ONE COLUMN OVER. SK_I_CRATES is not locked, takes clicks and Space,
+     * and writes MPlayerGoodies, so leaving it undrawn made crates a setting the player
+     * could switch by accident and could not read. */
+    sk_draw_check(s, grad, st, SK_I_CRATES, st->crates);
 
     if (grad) {
         db_font_palette_grad(fp, DM_TEXT_MEDIUM, DB_TBLACK);
-        if (st->status)
+        /* WITH NOTHING TO PLAY, NOTHING ELSE THIS ROW COULD SAY IS WORTH SAYING. Every
+         * other status line describes a match, and on an empty list there is no match
+         * to describe: the row would open talking about sides and then answer clicks
+         * about gauges while the only fact that matters sat in the map box. So the
+         * empty state owns the row and no control on the screen can push it off. */
+        if (st->count <= 0)
+            sk_print_fit(s, grad, SK_STATUS[SK_ST_NO_MAPS], SK_STATUS_X, SK_STATUS_Y,
+                         SK_STATUS_W, fp);
+        else if (st->status)
             sk_print_fit(s, grad, st->status, SK_STATUS_X, SK_STATUS_Y, SK_STATUS_W, fp);
         db_font_palette_grad(fp, DM_TEXT_DISABLED, DB_TBLACK);
         sk_print_fit(s, grad, SK_STATUS[SK_ST_FOOT], SK_STATUS_X, SK_STATUS_Y2,
@@ -2205,13 +2254,13 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
 
     /* The gauge captions are right aligned to end at SK_GLABEL_R, so their room is the
      * distance from the dialog's own content edge to that column. */
-    for (i = SK_I_AI; i <= SK_I_CREDITS; i++)
+    for (i = SK_I_AI; i <= SK_I_UNITS; i++)
         bad += sk_fits(f, "gauge.label", sk_item_label(st, i),
                        SK_GLABEL_R - (SK_DLG_X + 6), &checked);
     /* The printed value at the widest either gauge can show. */
     bad += sk_fits(f, "gauge.value", "10000", SK_CHK_X - SK_READ_X - 2, &checked);
 
-    for (i = SK_I_BASES; i <= SK_I_SUPER; i++)
+    for (i = SK_I_BASES; i <= SK_I_CRATES; i++)
         bad += sk_fits(f, "check.label", sk_item_label(st, i),
                        SK_CHK_X + SK_CHK_ROW_W - SK_CHK_LABEL_X, &checked);
 
@@ -2220,7 +2269,7 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
     for (i = 0; i < SK_I_COUNT; i++) {
         /* Rows and drop down controls are measured above, against the columns and the
          * box they actually print into rather than against a button's margin. */
-        if (i == SK_I_MAPS || sk_is_gauge(i) || (i >= SK_I_BASES && i <= SK_I_SUPER))
+        if (i == SK_I_MAPS || sk_is_gauge(i) || (i >= SK_I_BASES && i <= SK_I_CRATES))
             continue;
         if (SK_IS_ROW(i) || SK_IS_POP(i))
             continue;
@@ -2273,7 +2322,7 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
      * because this is the one function the harness already calls to be told that
      * something it cannot see is still true.
      *
-     * It is proved twice, and the first is the case asked for, in the original terms: "If
+     * It is proved twice, and the first is the case the project owner asked for IN HIS OWN TERMS: "If
      * the player picks a color already used by an ai opponent, that opponents color
      * should automatically change to another." So the table is printed before, the
      * player is given a colour a computer is holding, and the table is printed after --

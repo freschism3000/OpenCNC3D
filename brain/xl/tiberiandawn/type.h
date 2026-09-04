@@ -270,7 +270,7 @@ public:
         strncpy((char*)IniName, buf, sizeof(IniName));
         ((char&)IniName[sizeof(IniName) - 1]) = '\0';
     };
-    virtual unsigned short Get_Ownable(void) const;
+    virtual uint64_t Get_Ownable(void) const;
 };
 
 /***************************************************************************
@@ -533,7 +533,7 @@ public:
     **	to take possession of an object type otherwise not normally allowed.
     **	This event usually occurs as a result of capture.
     */
-    unsigned short Ownable;
+    uint64_t Ownable;
 
     /*
     **	This is the small icon image that is used to display the object in
@@ -596,7 +596,7 @@ public:
     virtual void const* Get_Cameo_Data(void) const;
     virtual int Cost_Of(void) const;
     virtual int Time_To_Build(HousesType house) const;
-    virtual unsigned short Get_Ownable(void) const;
+    virtual uint64_t Get_Ownable(void) const;
 
 #ifdef USE_RA_AI
     int Legal_Placement(CELL pos) const; // From RA for AI. ST - 7/24/2019 5:20PM

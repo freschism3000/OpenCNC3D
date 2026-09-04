@@ -86,11 +86,11 @@ ScenarioClass::ScenarioClass(void)
  * Start_Scenario -- Starts the scenario.                                                      *
  *                                                                                             *
  *    This routine will start the scenario. In addition to loading the scenario data, it will  *
- *    play the briefing and action movies.                                                     *
+ *    play the mission briefing and action movies.                                                     *
  *                                                                                             *
  * INPUT:   root     -- Pointer to the filename root for this scenario (e.g., "SCG01EA").      *
  *                                                                                             *
- *          briefing -- Should the briefing be played? Normally this is true except when the   *
+ *          briefing -- Should the mission briefing be played? Normally this is true except when the   *
  *                      scenario is restarting.                                                *
  *                                                                                             *
  * OUTPUT:  Was the scenario started without error?                                            *
@@ -764,7 +764,7 @@ bool Restate_Mission(char const* name, int button1, int button2)
         }
 #else
         /*
-        **	Make sure that if there is no briefing movie, that the briefing text is
+        **	Make sure that if there is no briefing movie, that the mission briefing text is
         **	the only option available.
         */
         bool brief = true;

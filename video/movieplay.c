@@ -410,7 +410,7 @@ int mov_play(SDL_Window *win, const char *path, const MOV_Opts *opts,
     /* conquer.cpp:2190 -- Play_Movie calls Keyboard->Clear() here, immediately before
        VQA_Alloc/VQA_Open/VQA_Play, so that whatever the player did on the screen that
        led into this movie cannot end the movie itself. intro.cpp:250 does the same for
-       Choose_Side, which plays the briefing with VQA_Play directly. SDL_QUIT is
+       Choose_Side, which plays the mission briefing with VQA_Play directly. SDL_QUIT is
        deliberately NOT flushed: closing the window during a movie must still work. */
     SDL_PumpEvents();
     SDL_FlushEvent(SDL_KEYDOWN);
@@ -498,7 +498,7 @@ int mov_play(SDL_Window *win, const char *path, const MOV_Opts *opts,
                away by that Keyboard->Clear() without ending the movie. The test that
                used to live here ended on any key or any button, so the first click a
                player made after the side select killed the 37 second GDI1 briefing at
-               frame 0. That is why the briefing looked like it never played. */
+               frame 0. That is why the mission briefing looked like it never played. */
             if (!o.no_skip && e.type == SDL_KEYDOWN &&
                 e.key.keysym.sym == SDLK_ESCAPE) {
                 rc = MOV_SKIPPED;

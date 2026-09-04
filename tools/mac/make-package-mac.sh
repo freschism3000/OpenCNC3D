@@ -79,6 +79,16 @@ need_dir() {
 need_file cnc3d
 need_file cnc_eyes
 
+# THE CONNECTIVITY TOOL. It has no game in it: it opens one UDP socket, runs three hundred
+# lockstep turns against the other end and prints a digest of the orders both sides
+# executed. Identical digests mean the two ends can lockstep; different ones mean they
+# cannot, and say so before anybody blames the match for it.
+#
+# It ships rather than staying a build-tree tool because the person who needs it is the
+# person whose game will not start, and that person has a zip rather than a compiler. It
+# is 40 KB and it links nothing the package does not already carry.
+need_file netcheck
+
 # THE LAUNCHER. C&C3D.app's script execs this; without it the bundle falls back to
 # running the game directly, which works but silently ships a package with no way
 # to see the version, read the changelog or take an update. That fallback is there
@@ -191,11 +201,11 @@ _n=$(ls -A "$OUT"/*.command 2>/dev/null | wc -l | tr -d ' ')
 [ "$_n" = "0" ] || die "a .command launcher reached the package ($_n of them). The macOS
        package ships C&C3D.app and nothing else to double-click; see the note above."
 
-# THE APP OPENS THE LAUNCHER. (Reported: "Make sure its the default
+# THE APP OPENS THE LAUNCHER. (the project owner, 24 Aug 2026: "Make sure its the default
 # executeable / app for Windows / Mac, from release v0.6.3 and going forward.")
 #
 # C&C3D.app is a tracked script wrapper, because a binary cannot be committed
-#, and that script has a DELIBERATE FALLBACK: if cnc3d-launcher
+# (repository rules rule 2), and that script has a DELIBERATE FALLBACK: if cnc3d-launcher
 # is not beside the game it runs the game directly. That fallback exists so a Mac
 # can always play, not so a release can quietly lose its front door, and the two
 # are indistinguishable from inside the package. So both halves are checked here:
@@ -222,6 +232,23 @@ echo "   C&C3D.app opens cnc3d-launcher, which can reach the site"
        That file is the macOS package's README and it is tracked; restore it rather than
        falling back to whatever is in $SRC."
 cp "$ROOT/tools/launchers/READ-ME.txt" "$OUT/"
+
+# ---- THE LICENCE AND THE NOTICE, and they are not optional -----------------------
+#
+# THIS PROGRAM IS A SINGLE WORK BUILT ON EA's GPL SOURCE, so a binary package that
+# carries neither the licence nor the notice of modification is not a compliant
+# distribution. Every release up to and including v0.6.4 shipped without them, which
+# is a defect in the builds already in players' hands and not only in the next one.
+# They are copied from the TRACKED masters at the repo root, never from the play
+# folder, for the same reason READ-ME.txt is: an untracked copy goes stale in silence.
+# NOTICE.md is the file that names all 33 modified engine files and says plainly that
+# the modifications reach the simulation.
+for f in LICENSE NOTICE.md; do
+    [ -f "$ROOT/$f" ] || die "$f is missing from the repo root.
+       It is on the package's allow-list because a GPL binary distribution has to carry
+       it. Restore it rather than shipping without it."
+    cp "$ROOT/$f" "$OUT/"
+done
 
 # ---- what is deliberately NOT above, named so the omission is visible -------------
 #

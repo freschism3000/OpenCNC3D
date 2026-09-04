@@ -164,11 +164,17 @@ static void fxp_after_change(const FxParam* p)
 {
     if (p && !strcmp(p->key, "bilinear"))
         fx_filter_set(g_fx.bilinear);
+    if (p && !strcmp(p->key, "texset"))
+        fx_texset_set((int)g_fx.texset);
+    if (p && !strcmp(p->key, "infset"))
+        fx_infset_set((int)g_fx.infset);
 }
 
 static void fxp_apply_all_side_effects(void)
 {
     fx_filter_set(g_fx.bilinear);
+    fx_texset_set((int)g_fx.texset);
+    fx_infset_set((int)g_fx.infset);
 }
 
 /* ---- Row layout -------------------------------------------------------------------

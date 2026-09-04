@@ -62,9 +62,38 @@ void cnc_audio_set_listener(CncAudio *au, int cx, int cy, int view_w, int view_h
 
 /* --------------------------------------------------------- engine callbacks */
 
+/* A NEW ENGINE TICK, and with it a new duplicate window. Call it immediately BEFORE the
+ * advance that raises the tick's events, from whichever loop owns the clock.
+ *
+ * Effects arrive in bursts from one advance: a flame tank catching a squad raises a dozen
+ * deaths inside a single call, they all reach the mixer before the next block is rendered,
+ * and copies of ONE clip started that way begin at the same sample of it. Identical
+ * waveforms in lockstep sum COHERENTLY -- twelve of them is twelve times the amplitude of
+ * one, which is distortion rather than loudness. cnc_audio_on_sound_effect lets only a
+ * couple of copies of any one clip start per window and refuses the rest.
+ *
+ * THE WINDOW IS THE ENGINE TICK, never wall time and never a count of ringing voices. A
+ * script advances the same number of times whatever the frame rate and whatever the
+ * machine, so the same script keeps producing the same recording, which is what the audio
+ * gates compare. A voice count would not: voices retire only when something renders the
+ * mix, so a run with a device open would refuse different sounds than a headless one, and
+ * a two second clip would refuse the fifth shot of an ordinary exchange of fire.
+ *
+ * A host that never calls this is never capped, deliberately. The mixer harnesses fire
+ * sixteen copies of one clip at once ON PURPOSE, to prove the voice pool steals correctly,
+ * and they have no tick to key a window on. It is also the safe direction for a host that
+ * forgets the call: it gets the old behaviour, never silence. */
+void cnc_audio_begin_tick(CncAudio *au);
+
+/* What cnc_audio_on_sound_effect returns for a copy refused by that rule. It is NOT a
+ * missing sound and must never be reported as one: -1 keeps its old meaning of "not on the
+ * disc, or not audible from here". A caller that only tests `>= 0` needs no change. */
+#define CNC_SFX_DUPLICATE (-2)
+
 /* CALLBACK_EVENT_SOUND_EFFECT. x and y are ev.SoundEffect.PixelX / PixelY; the
  * engine passes -1, -1 for a sound with no map position. Returns the voice handle,
- * or -1 if it was dropped or the sound is not on the disc. */
+ * -1 if it was dropped or the sound is not on the disc, or CNC_SFX_DUPLICATE if this
+ * tick has already had its fill of that clip. */
 int cnc_audio_on_sound_effect(CncAudio *au, int sfx_index, int variation, int x, int y);
 
 /* CALLBACK_EVENT_SPEECH. EVA is one line at a time: a new line CUTS the current one

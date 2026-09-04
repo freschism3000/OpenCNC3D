@@ -26,6 +26,11 @@ DELIBERATELY NOT MODELLED: record +0x0C and +0x10. Every load in the damage path
 two fields are dead in the shipped build. Implementing them would be implementing behaviour
 the cartridge does not have.
 
+TWO DIFFERENT +0x0C FIELDS, AND ONLY ONE OF THEM IS DEAD. The paragraph above is about the
+DAMAGE record. The EMITTER records on the chains hanging off damage record +0x00 (healthy)
+and +0x08 (damaged) have a +0x0C of their own, and that one is the particle template. It is
+read below.
+
 Writes tools/bakery/damage_art.json, the analogue of debris_chunks.json, so a bake never
 needs the ROM. data/ still never enters git; this JSON is bakery data derived from it.
 """
@@ -45,6 +50,61 @@ def r32(rom, off):
 
 def ram2rom_resident(ram):
     return ram - RAM2ROM
+
+def f32(rom, off):
+    return struct.unpack_from(">f", rom, off)[0]
+
+# ---- the emitter chains, RAM 0x8009A980..0x8009B34C -----------------------------------
+# 33 records of 0x4C bytes, one contiguous array, reachable ONLY from the damage records'
+# +0x00 (healthy) and +0x08 (damaged) chain heads. A record is
+#   +0x00 next in chain (walked to NULL at RAM 0x800568BC)
+#   +0x04 a frame mask; the emitter fires when (frameCounter & mask) == 0
+#   +0x08 a float velocity jitter
+#   +0x0C a 0x40-byte PARTICLE NODE IMAGE
+#
+# That last field is not a format of its own and needs no decoder. The walker at
+# RAM 0x800567C0 hands emitter+0x0C straight to RAM 0x8004E62C (ROM 0x057400 jal, delay
+# slot addiu $a1,$s1,0xc), which allocates a 0x80-byte node and copies 0x40 bytes of the
+# template into it VERBATIM, four words at a time, the loop bounded by
+# addiu $v1,$a1,0x40 at ROM 0x04F274. It then does lbu +0x30 / sb +0x39 to arm the life
+# counter, and that is the whole of it. So the template IS the node that the field-by-field
+# allocator at RAM 0x8004E6DC builds argument by argument, and that allocator's own stores
+# give the layout: +0x04..+0x0C position, +0x10..+0x18 velocity, +0x1C..+0x24 acceleration,
+# +0x28 size, +0x2C size growth per tick, +0x30 life in ticks, +0x31 alpha ramp slope,
+# +0x32..+0x35 ARGB. Field for field that is the record EfxSourceRec in game/efx_recipes.h
+# already models for the source table's visual sub-records: one struct, two tables.
+#
+# After the copy the walker translates the node's position by the draw command's own vec3
+# and adds (rand8 - 0x7F) * jitter to each velocity component. Every chain feeds particle
+# system 0, Intensity, materialised at ROM 0x04D430 as RAM 0x800EC1B0.
+#
+# Positions are OFFSETS from the building, in world units at 256 to the cell -- the same
+# unit EFX_U already uses, not the 1024-per-cell space the model geometry is in.
+EMIT_LO, EMIT_HI, EMIT_STRIDE = 0x8009A980, 0x8009B34C, 0x4C
+
+def read_emitter(rom, ram):
+    b = ram2rom_resident(ram)
+    t = b + 0x0C
+    return {
+        "ram":       ram,
+        "fire_mask": r32(rom, b + 0x04),
+        "jitter":    round(f32(rom, b + 0x08), 6),
+        "pos":       [round(f32(rom, t + 0x04 + 4 * i), 4) for i in range(3)],
+        "vel":       [round(f32(rom, t + 0x10 + 4 * i), 6) for i in range(3)],
+        "accel":     [round(f32(rom, t + 0x1C + 4 * i), 6) for i in range(3)],
+        "size":      round(f32(rom, t + 0x28), 4),
+        "grow":      round(f32(rom, t + 0x2C), 6),
+        "life":      rom[t + 0x30],
+        "arate":     rom[t + 0x31],
+        "argb":      [rom[t + 0x32], rom[t + 0x33], rom[t + 0x34], rom[t + 0x35]],
+    }
+
+def walk_chain(rom, head):
+    out = []
+    while head:
+        out.append(read_emitter(rom, head))
+        head = r32(rom, ram2rom_resident(head))
+    return out
 
 # The 24 damage slots. Names are the engine's own StructType idents, in the order the ROM's
 # jump table assigns them -- which is now READ AND ASSERTED below rather than asserted
@@ -83,6 +143,11 @@ def main():
         (0x03E93C, 0x000288C0, "sll $s1,$v0,3 (the draw-flag bit)"),
         (0x04D3E0, 0x32A20008, "andi $v0,$s5,8 (the geometry arm's bit-3 test)"),
         (0x04D2C0, 0x32A20008, "andi $v0,$s5,8 (the animation arm's bit-3 test)"),
+        (0x057400, 0x0C01398B, "jal 0x8004e62c (the chain walker's spawn call)"),
+        (0x057404, 0x2625000C, "addiu $a1,$s1,0xc (the template starts at emitter +0x0C)"),
+        (0x04F274, 0x24A30040, "addiu $v1,$a1,0x40 (0x40 bytes copied verbatim)"),
+        (0x04D430, 0x3C04800F, "lui $a0,0x800f (the chains feed particle system 0...)"),
+        (0x04D434, 0x2484C1B0, "addiu $a0,$a0,-0x3e50 (...RAM 0x800EC1B0, Intensity)"),
     ]
     for off, want, what in checks:
         got = r32(rom, off)
@@ -135,6 +200,8 @@ def main():
             "forced_frame": frame,
             "dl_ram": 0,
             "dl_rom": 0,
+            "healthy_chain": walk_chain(rom, healthy),
+            "damaged_chain": walk_chain(rom, damaged),
         }
         if stub:
             # the stub is two commands: gsSPDisplayList(real) then gsSPEndDisplayList()
@@ -164,6 +231,22 @@ def main():
     assert dls == EXPECT_DL_ROM, ("the display-list set moved:\n  missing %s\n  extra   %s"
                                   % (sorted(EXPECT_DL_ROM - dls), sorted(dls - EXPECT_DL_ROM)))
     assert len(forced) == 3, "expected 3 forced frames, got %s" % (forced,)
+
+    # ---- the emitter chains ---------------------------------------------------------
+    emits = [e for r in rows for e in (r["healthy_chain"] + r["damaged_chain"])]
+    addrs = sorted(e["ram"] for e in emits)
+    assert len(addrs) == 33, "expected 33 emitters, got %d" % len(addrs)
+    assert len(set(addrs)) == 33, "an emitter is on two chains: %s" % (addrs,)
+    assert addrs[0] == EMIT_LO and addrs[-1] + EMIT_STRIDE == EMIT_HI, \
+        "the emitter array moved: 0x%08X..0x%08X" % (addrs[0], addrs[-1] + EMIT_STRIDE)
+    assert all(addrs[i + 1] - addrs[i] == EMIT_STRIDE for i in range(len(addrs) - 1)), \
+        "the emitter array is no longer 33 contiguous 0x%02X-byte records" % EMIT_STRIDE
+    masks = sorted(set(e["fire_mask"] for e in emits))
+    assert masks == [0, 1, 3, 0x1F], "the fire masks moved: %s" % (masks,)
+    print("  %d emitters, 0x%08X..0x%08X, %d healthy chains and %d damaged"
+          % (len(emits), EMIT_LO, EMIT_HI,
+             sum(1 for r in rows if r["healthy_chain"]),
+             sum(1 for r in rows if r["damaged_chain"])))
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:

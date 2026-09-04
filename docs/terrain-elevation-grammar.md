@@ -1,6 +1,6 @@
 # The elevation grammar of the N64 maps
 
-**Question :** every map has a heightmap, and every heightmap seems to
+**Question (the project owner, 23 Aug 2026):** every map has a heightmap, and every heightmap seems to
 use the same kinds of rise and fall, tied to particular tile types used in particular
 ways. Why?
 
@@ -198,6 +198,22 @@ organised the 1995 cliff art, and **the N64 heightmap agrees with it on all 38 t
 without a single exception.** The mean rise per template runs 18 to 32 bytes per cell,
 which is the next section.
 
+**Asked per PLACEMENT rather than per cell, the same table answers 97.96% of the time.**
+The averages above are taken over cells. The map editor's AUTO HEIGHTMAP works on whole
+stamped templates instead, so `tools/romdump/cliff_compass.py` asks the question that
+way: of the 4603 SLOPE placements sitting wholly inside their map's playable rectangle,
+4509 have a mean gradient agreeing with the entry above, 18 point the other way and 76
+are level (under 3 bytes per cell). Run it to reproduce those four numbers:
+
+```
+python3 tools/romdump/cliff_compass.py
+```
+
+The fit does not write those gradients into the corners directly. It reduces them to one
+TIER per 2x2 block and writes the ground through `elev_coarse` and `elev_heights`, the
+same path a brush stroke takes, so every corner it writes lands on a rung and the map it
+hands back is on the ladder rather than off it.
+
 ---
 
 ## 4. A climb takes a template, not an edge
@@ -291,7 +307,7 @@ Two departures survive in the shipped data.
 3. **The 24 flat cartridge maps are flat on the console too**, and every one of them is
    expansion or debug content no retail menu reaches. If they ever look wrong in our build,
    the cartridge looks the same way, and inventing heights for them would be a departure
-   that must be written down before it belongs in the renderer.
+   that belongs in `known-gap notes` before it belongs in the renderer.
 4. **`app/cnc3d.cpp`'s SPECIAL OPS list is not the cartridge's.** `specops_scan` offers 27
    missions (everything numbered 20..89 that has a pack); the console offers four. It also
    cannot ever offer SCG90EA, because its probe loop is `for (n = 20; n < 90; n++)` and so
@@ -300,7 +316,7 @@ Two departures survive in the shipped data.
    heightmap (range 62..255), its own tint map and its own briefing. Not this session's
    file to change, but it is worth a look. If those ever look wrong
    in our build, the cartridge looks the same way, and inventing heights for them would be
-   a departure that must be written down before it belongs in the renderer.
+   a departure that belongs in `known-gap notes` before it belongs in the renderer.
 
 ---
 
@@ -308,7 +324,7 @@ Two departures survive in the shipped data.
 
 The first version of this file called the five debug-tail scenarios (SCG71EB, SCG72EA,
 SCG73EA, SCG74EA, SCB70EA) "the five behind the SPECIAL OPS menu", and folded SCG30EA,
-SCG90EA, SCB21EA and SCB22EB into the campaign. Both were wrong, and it was caught from
+SCG90EA, SCB21EA and SCB22EB into the campaign. Both were wrong, and the project owner caught it from
 the shape of the data rather than the code: he said the Special Ops missions were
 N64-exclusive and all had heightmaps, which is true of the four and false of the five. The
 correction came from the menu dispatcher and, more plainly, from the cartridge's own

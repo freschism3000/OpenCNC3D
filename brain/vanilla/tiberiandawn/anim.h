@@ -14,9 +14,13 @@
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
 // MODIFIED for C&C 3D in August 2026. This is not EA's original file.
-// The change is additive and does not alter the game simulation; the complete
-// diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
-// lists every modified file.
+// Adds one read only inline accessor, CNC3D_Stage(), to AnimClass, which
+// returns the animation's current frame by calling Fetch_Stage() on the
+// private StageClass base so external code can read it. Nothing else is
+// changed.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
 //
 
 /* $Header:   F:\projects\c&c\vcs\code\anim.h_v   2.20   16 Oct 1995 16:45:40   JOE_BOSTIC  $ */

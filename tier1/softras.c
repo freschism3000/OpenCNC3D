@@ -197,7 +197,7 @@ long sr_triangle(SR_Target *t, const SR_Vertex *a, const SR_Vertex *b,
     const unsigned int  *shade = g_shade;
     int twmask, thmask, twshift, tckey;
 
-    /* NEAR REJECT. No clipper yet: see the header.
+    /* NEAR REJECT. No clipper yet: see the header and known-gap notes.
      *
      * Written as !(w > x) rather than (w <= x) so that a NaN is rejected too: every
      * comparison against NaN is false, so the obvious spelling lets NaN through and then

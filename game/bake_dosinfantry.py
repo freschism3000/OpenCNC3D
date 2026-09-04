@@ -59,11 +59,16 @@ CROP + ANCHOR (measured, not assumed):
   ground x. Vertically we anchor the FEET at the ground point: the crop is the
   union of the body bounding boxes (indices other than 0/transparent and
   4/shadow) over all frames of the strip, made symmetric about column 27, and
-  the quad's bottom edge is the crop's bottom row. STAND and WALK of the same
-  type share a unified bottom row so the feet line cannot jump 1 px between
-  standing and walking. Deaths keep their own bottom (the sprawl IS the ground
-  contact). The DOS "+4 rows below centre" is a 2.5D projection nicety that a
-  true 3D billboard must not replicate.
+  the quad's bottom edge is the crop's bottom row. Every pose a man plays ON HIS
+  BOOTS -- stand, walk, fire, both idles, lie down, get up -- shares one bottom
+  row per type, so the ground cannot move under him between poses. A pose whose
+  body genuinely reaches lower keeps its own row rather than be cropped to the
+  feet line. Where idata.cpp's DO_PRONE row is DO_FIRE_PRONE's stage 0 (same
+  Frame, same Jump, so literally the same art) those two share a row as well,
+  taken from the body, so the muzzle flash of the firing stages cannot redefine
+  the ground. Deaths keep their own bottom (the sprawl IS the ground contact).
+  The DOS "+4 rows below centre" is a 2.5D projection nicety that a true 3D
+  billboard must not replicate.
 
 FORMAT (all little-endian), magic "DOSINF01" version 4:
 
@@ -481,14 +486,62 @@ def main():
                 bx1, by1 = max(bx1, x1), max(by1, y1)
             half = max(ANCHOR_COL - bx0, bx1 - ANCHOR_COL)
             crops.append([ANCHOR_COL - half, by0, ANCHOR_COL + half, by1])
-        # unified feet line for the live poses (STAND, WALK, FIRE): the ground
-        # anchor must not jump a pixel when a standing man raises his rifle.
-        # Deaths keep their own bottom (the sprawl IS the ground contact).
+        # THE FEET LINE, AND WHY IT CANNOT BE EACH SLOT'S OWN INK BOTTOM.
+        #
+        # The renderer plants the crop's BOTTOM ROW on the ground, so that row is the
+        # only way this baker can say where the man touches it. The 1995 engine never
+        # had to say: Draw_It blits every frame of every DO row SHAPE_CENTERed at one
+        # origin, so all 532 frames of E1.SHP share an anchor and a pose may carry ink
+        # above or below it freely. Cropping each slot to its own union ink bbox
+        # throws that shared origin away and hands the ground to whatever ink happens
+        # to reach lowest in that slot: a muzzle flash, a flame, the one facing whose
+        # body sprawls furthest down-screen.
+        #
+        # Measured on E1, in E1.SHP frame rows, against a feet line of 20:
+        #   PRONE bottoms on 23 and FIRE_PRONE on 26 -- yet DO_FIRE_PRONE (192,6,8) is
+        #   DO_PRONE (192,1,8) plus five more stages, so PRONE IS FIRE_PRONE stage 0,
+        #   the same eight frames. The three extra rows are the muzzle flash of stages
+        #   2 and 4 in the SW/S/SE facings: rows 21..25 there hold palette 16/22/24/26
+        #   (the yellow flash ramp) and nothing from the gold body band 176..191. The
+        #   union applied that to all 48 frames, so the engine flipped Doing 2 <-> 8
+        #   with the art unchanged and the man rose three rows.
+        #   IDLE1 and IDLE2 bottom on 19, one row above the feet line, so a man sank a
+        #   row the moment the guard machine gave him something to do with his hands
+        #   (three rows for a civilian, five for MOEBIUS and CHAN).
+        #
+        # So: every pose he plays on his BOOTS shares one row, and the two slots that
+        # are the same art share one row. PADDING ONLY. A slot whose body truly reaches
+        # lower keeps its own ground row and says so, because cropping it to the feet
+        # line would cut the pose -- E6's lie-down ends in the prone pose five rows
+        # further down, and E3 stands up out of one.
         FIRE_SLOT = SLOT_NAMES.index("FIRE")
         live = [0, 1] + ([FIRE_SLOT] if crops[FIRE_SLOT] is not None else [])
         feet = max(crops[s][3] for s in live)
-        for s in live:
-            crops[s][3] = feet
+        upright = live + [SLOT_NAMES.index(n)
+                          for n in ("IDLE1", "IDLE2", "LIEDOWN", "GETUP")]
+        for s in upright:
+            if crops[s] is None:
+                continue
+            if crops[s][3] < feet:
+                crops[s][3] = feet
+            elif crops[s][3] > feet:
+                print("  %s %s: body reaches %d row(s) below the feet line; keeping "
+                      "its own ground row rather than cropping the pose"
+                      % (ini, SLOT_NAMES[s], crops[s][3] - feet))
+        # The prone pair, wherever the engine's own table says the two are one
+        # animation. A flash is not a foot: the shared row is the body's.
+        PRONE_SLOT = SLOT_NAMES.index("PRONE")
+        FPRONE_SLOT = SLOT_NAMES.index("FPRONE")
+        pr, fp = do_rows[PRONE_SLOT], do_rows[FPRONE_SLOT]
+        if pr and fp and pr[0] == fp[0] and pr[2] == fp[2]:
+            if crops[FPRONE_SLOT][3] != crops[PRONE_SLOT][3]:
+                print("  %s FPRONE: ground row %d -> %d (the firing stages' flash "
+                      "reaches below the body; PRONE is this row's stage 0)"
+                      % (ini, crops[FPRONE_SLOT][3], crops[PRONE_SLOT][3]))
+            crops[FPRONE_SLOT][3] = crops[PRONE_SLOT][3]
+            assert crops[FPRONE_SLOT][3] > crops[FPRONE_SLOT][1], \
+                (ini, "FPRONE crop collapsed", crops[FPRONE_SLOT], crops[PRONE_SLOT])
+        # Deaths keep their own bottom (the sprawl IS the ground contact).
 
         row_ids = []
         for hname, remap in houses:
@@ -538,7 +591,7 @@ def main():
             row_ids.append(row_ids[0])
         types.append((ini, row_ids))
         report[ini] = {
-            "shp": shpname + ".SHP", "shp_frames": shp.frames,
+            "shp": shpname + ".SHP", "shp_frames": shp.frames, "feet_row": feet,
             "crops": {SLOT_NAMES[i]: {"box": crops[i],
                                       "fw": crops[i][2] - crops[i][0] + 1,
                                       "fh": crops[i][3] - crops[i][1] + 1}
@@ -583,7 +636,13 @@ def main():
                    "use is byte-identical in DESERT.PAL; content/TEMPERAT.MIX is "
                    "repacked and carries a wrong palette, never source it)",
         "anchor": "crop symmetric about frame column 27 (Draw_It ground x); quad "
-                  "bottom = crop bottom = feet line (STAND/WALK unified per type)",
+                  "bottom = crop bottom = feet line. Every upright pose (STAND, "
+                  "WALK, FIRE, IDLE1, IDLE2, LIEDOWN, GETUP) shares that row per "
+                  "type, padded down to it, never cropped to it; a pose whose body "
+                  "reaches lower keeps its own row and the bake log names it. Where "
+                  "the PRONE row is the FIRE_PRONE row's stage 0 the two share the "
+                  "body's row, so the firing flash cannot set the ground. Deaths "
+                  "and CRAWL keep their own bottom.",
         "shadow": "index 4 kept in data, renderer maps it to alpha 0",
         "facing_order": "facing-major, facenum 0..7 CCW from N per HumanShape[32]",
         "slots": SLOT_NAMES,

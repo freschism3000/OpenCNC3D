@@ -3,7 +3,7 @@
 # The death SHED (G90) drops a killed building's display-list sections one by one, which
 # makes the building dissolve where it stands. It is the right event and the wrong
 # picture: sections VANISH, so what the player sees is holes opening in a building that
-# never moves. Reported: "instead of a bunch of cut out triangles
+# never moves. the project owner's words on 24 Aug 2026: "instead of a bunch of cut out triangles
 # appearing, the actual pieces of the building fall and collapse with a physics pulse
 # applied from the center outwards".
 #

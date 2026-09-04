@@ -2980,11 +2980,20 @@ short const* UnitClass::Overlap_List(void) const
         return (&_gunboat[0]);
     }
 
+    /*
+    **	CNC3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
+    **	the bigger half. ICON_PIXEL_W * 2 is 48, and the _gigundo test is a strict greater
+    **	than, so a selected vehicle took the by-hand branch at maxsize 24 and got the full
+    **	3x3 ring. For a unit that is already IsFiring, IsGigundo, IsAnimAttached or Flagged
+    **	the size was 48 either way, so for those this is a no-op in both modes.
+    */
+    bool selected = !CNC3D_Lockstep && Is_Selected_By_Player();
+
     size = ICON_PIXEL_W;
-    if (Is_Selected_By_Player() || IsFiring) {
+    if (selected || IsFiring) {
         size += 24;
     }
-    if (Is_Selected_By_Player() || Class->IsGigundo || IsAnimAttached || Flagged != HOUSE_NONE) {
+    if (selected || Class->IsGigundo || IsAnimAttached || Flagged != HOUSE_NONE) {
         size = ICON_PIXEL_W * 2;
     }
     return (Coord_Spillage_List(Coord, size) + 1);

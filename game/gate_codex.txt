@@ -1,0 +1,31 @@
+# G147 -- the DATABASE tab. Driven through the same functions the plate and the keyboard
+# call, so a green here is evidence about what a player gets.
+expectres 1280 720
+codex state
+# The hit test, before anything is opened. 240,16 is the middle of the plate-width slot
+# right of OPTIONS at the HUD's own scale, and 80,16 is the middle of OPTIONS itself --
+# the control shot, so a run where the whole strip has moved fails loudly instead of
+# reporting that DATABASE alone is missing.
+codex hit 80 16
+codex hit 240 16
+codex open
+codex settle
+codex state
+shot shots/g147_open.png
+codex cat 2
+codex row 3
+codex state
+codex cat 1
+codex state
+codex cat 3
+codex state
+codex house nod
+codex cat 0
+codex state
+codex close
+codex state
+# The plate UNLATCHED, which is the shot the pixel leg reads. It cannot read the OPEN one:
+# an open page draws its plate in the PRESSED frame, whose whole job is to be lit
+# differently from the plate beside it, so correlating the two would be asking the latch
+# not to work. Enhanced with the page closed puts DATABASE and OPTIONS in the same frame.
+shot shots/g147_plate.png

@@ -2,6 +2,14 @@
 # ============================================================================
 #  Install Editor.app into playable/.
 #
+#  THIS IS A DEVELOPMENT TOOL AND IT IS NOT WHAT A PLAYER GETS. A player presses
+#  EDITOR in the launcher, which runs the shipped cnc_eyes with --edit from the
+#  install folder; no app bundle is involved and neither packager copies one. What
+#  this bundle adds is the things only a working tree can do: it stages the newest
+#  binary forward from the build folder, warns when the sources are newer than the
+#  binary that would run, refreshes itself from its own tracked master, and keeps a
+#  log. Do not put it in a package; the package has a button.
+#
 #  playable/ is gitignored, so the app that lives there cannot be committed and
 #  would not survive a fresh clone. tools/launchers/Editor.app is the tracked
 #  master; this puts a copy where it can be double-clicked.

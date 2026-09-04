@@ -1,8 +1,14 @@
 #
 # MODIFIED for C&C 3D in August 2026. This is not EA's original file.
-# The change is additive and does not alter the game simulation; the complete
-# diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
-# lists every modified file.
+# Adds an EIGHTPLAYERS build option, on by default, and passes it to both
+# the TiberianDawn and VanillaTD targets, so the engine is compiled with an
+# eight house multiplayer roster (Multi7 and Multi8) instead of the stock
+# six unless the option is turned off. It also adds Microsoft extension
+# compiler flags for non MSVC compilers and excludes the Windows only COM
+# map editor interface, dllinterfaceeditor.cpp, from non Windows builds.
+# It DOES change the game simulation.
+# The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+# and NOTICE.md lists every modified file.
 #
 set(TIBDAWN_SRC
     aadata.cpp

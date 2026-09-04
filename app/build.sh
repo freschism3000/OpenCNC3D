@@ -67,6 +67,21 @@ for f in ../game/dosbar.c ../game/hud640.c ../game/dosopt.c ../game/dossave.c ..
 done
 for f in $AUDIO_SRC; do AUDIO_OBJ="$AUDIO_OBJ $(basename "$f" .c).o"; done
 
+# THE LOCKSTEP NETWORKING, compiled here as well as in the renderer build because this
+# binary links its own objects and this is the binary that ships. The Windows build has
+# always put both into cnc3d.exe as well as cnc_eyes.exe; without these two lines the two
+# platforms disagree about what the program contains, and the source-list guard cannot see
+# it because it unions the two macOS scripts into one list.
+#
+# NOT folded into the loop above, and that is the whole reason they are their own lines:
+# that loop is -std=gnu89 with SDL's cflags, while lockstep.c is held to strict C89 with no
+# I/O and no platform header in it at all. net_udp.c is the one file that knows what a
+# socket is and needs gnu89 for the platform headers. Same split, same dialects and same
+# reasoning as the renderer build.
+cc -std=c89   -O2 -g -c ../net/lockstep.c -o lockstep.o
+cc -std=gnu89 -O2 -g -c ../net/net_udp.c  -o net_udp.o
+cc -std=gnu89 -O2 -g -c ../net/netmatch.c -o netmatch.o
+
 # The C++ half: the tactical renderer as a library, plus the state machine.
 clang++ -std=c++14 -O2 -g \
     -fms-extensions -fdeclspec -D__int64="long long" -DCNC3D_NO_MAIN \
@@ -81,7 +96,7 @@ clang++ -std=c++14 -O2 -g -c cnc3d.cpp -o cnc3d.o -I"$HDR" $INC $(sdl2-config --
 # fit anyway, but that is luck, not a property, and it stops being true the moment the
 # library or the prefix is renamed.
 clang++ -o cnc3d cnc3d.o cnc_eyes.o dosbar.o hud640.o dosopt.o dossave.o dosmenu.o dosops.o doslobby.o dosmenu_shell.o \
-    vqaplay.o movieplay.o moviesnd.o pngwrite.o campaign.o logo3d.o $AUDIO_OBJ \
+    vqaplay.o movieplay.o moviesnd.o pngwrite.o campaign.o logo3d.o lockstep.o net_udp.o netmatch.o $AUDIO_OBJ \
     $(sdl2-config --libs) -Wl,-headerpad_max_install_names -framework OpenGL -lz
 
 # MAKE THE BINARY LOAD SDL FROM BESIDE ITSELF, not from the build machine's Homebrew.
@@ -93,4 +108,14 @@ clang++ -o cnc3d cnc3d.o cnc_eyes.o dosbar.o hud640.o dosopt.o dossave.o dosmenu
 # that app/cnc3d is runnable in place and so the fix cannot be skipped by a hand build.
 sh ../tools/bundle-sdl.sh . cnc3d
 
-echo "built ./cnc3d"
+# STAGE IT, for the same reason game/build.sh stages cnc_eyes: the play folder is what is
+# actually run and what the suite gates, and a binary that stops at app/ is a correct fix
+# nobody can see. G30 catches the gap by comparing the DEPLOYED binaries against their
+# sources, and it has caught exactly this twice, both times because the copy was a
+# separate step somebody had to remember. It is not a separate step now.
+if [ -d ../playable ]; then
+    cp cnc3d ../playable/cnc3d
+    echo "built ./cnc3d  (and staged to ../playable/)"
+else
+    echo "built ./cnc3d"
+fi

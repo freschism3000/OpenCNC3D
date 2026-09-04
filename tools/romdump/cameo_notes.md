@@ -28,8 +28,19 @@ damaged records and they hold no data. They are **name lists in sidebar slot ord
 |---|---|---|
 | `0x019EE70` | 53 | sidebar order, GDI colourway (`CAM_*`) |
 | `0x019F380` | 53 | sidebar order, Nod colourway (`CAM*2`) |
-| `0x019F890` | 10 | the radar/logo plates, both sides (section 6) |
+| `0x019F890` | **4** | the radar/logo plates, both sides, 96x77 (section 6) |
+| `0x019F8F0` | **6** | the bottom plates, three per side, 96x35 |
 | `0x0460540` | 1422 | the MAIN table. The actual art lives here, 102 CAM records |
+
+**CORRECTED: `0x019F890` is TWO arrays, not one of ten.** Adjacency made them look like a
+single table. They are separate C arrays and the sidebar's art loader is called with each
+one and its own count: `(0x801FDAA0, 4)` at ROM `0x16C370` and `(0x801FDB00, 6)` at ROM
+`0x16C380`. They also cannot be one atlas, because the cell sizes differ: the first four are
+96x77 radar and logo plates, the last six are 96x35 bottom plates. Records 0..3 are
+`GLOGOTP` `GRADARTP` `NLOGOTP` `NRADARTP` and records 4..9 are `GDI_BOT1..3` `NOD_BOT1..3`,
+which is readable straight out of the ROM at 24 bytes a record. A third structure begins at
+`0x019F980` and is not a name table at all: it is seven pointers, the localised READY and
+HOLD plates in three languages plus `BRACKETS`.
 
 The art records carry real offsets against data base `0x0468A90` and none of them are
 compressed.
@@ -139,3 +150,9 @@ than a finished asset. Extracted to `data/assets/sidebar_plates_n64/`.
   scale to that by an integer factor (1.9x / 1.8x). Upscaling cartridge art into those
   wells would be a visible compromise; this is a project decision, not a fact from the
   ROM, and it is recorded as a known gap.
+
+  **ANSWERED: the cartridge cameos do not go into our HUD at all.** The project's own
+  cameo art was redone on purpose and stands. The console set belongs to a separate
+  optional feature recreating the console's whole sidebar, which is a 3D object rather
+  than a 2D panel, so no fit against our wells is needed and the integer-factor problem
+  does not arise. The scaling question above is therefore closed, not deferred.

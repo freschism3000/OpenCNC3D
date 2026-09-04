@@ -17,7 +17,7 @@ its approximation is.
 
 The recon's own conclusion (`node-language-design.md` §5.3) was that a visual language
 must therefore refuse to offer boolean composition, because an `AND` node would have to
-compile to something that is not an AND. A project decision was to keep the honesty and lift the
+compile to something that is not an AND. the project owner's call was to keep the honesty and lift the
 constraint instead: **make it work in Enhanced mode only, and tag the maps that use it.**
 
 So there are two tiers, and the boundary is not a matter of taste:

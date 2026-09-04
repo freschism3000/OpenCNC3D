@@ -5,7 +5,7 @@ WHAT THIS IS FOR
     The score screen ends a mission with a slowly spinning faction logo in the
     top right. 1995 had a flat LOGOS.SHP for Nod only (score.cpp:775-776 draws
     frame 1 at 0,0 when house == HOUSE_BAD) and nothing at all for GDI. The N64
-    cartridge carries a real 3D model for BOTH sides, used by the briefing code,
+    cartridge carries a real 3D model for BOTH sides, used by the mission briefing code,
     so the score screen can show the thing the cartridge already had.
 
 WHERE THEY LIVE
@@ -48,17 +48,48 @@ import textures as TX            # noqa: E402
 # THE THIRD ENTRY IS BOTH LOGOS IN ONE MODEL. GDI_LOGO_TITLE_ROOT is the title
 # screen's, and it is not a third emblem: its SIX materials are exactly the GDI
 # logo's two (0x1E14E0, 0x1E48E0) plus the Nod logo's three (0x1E24E0, 0x1E2CE0,
-# 0x1E34E0) plus one untextured, and it is 68 units thick in Z against the briefing
+# 0x1E34E0) plus one untextured, and it is 68 units thick in Z against the mission briefing
 # logos' 36 and 46. It is the two emblems back to back on one disc -- which is the
 # version with a BACKSIDE, and the one to draw when a logo is going to turn all the
 # way round. Face it at 0 degrees for GDI and at 180 for Nod.
 #
-# The display lists, from the briefing name table described above.
-LOGOS = [("GDI", 0x01E9A50), ("NOD", 0x01EF058), ("TITLE", 0x01F52A0)]
+# The display lists, from the mission briefing name table described above.
+#
+# THE FOURTH IS THE EVA WORDMARK, and it is added for the DATABASE screen, which stands
+# it in the top right the way the faction emblem stands in the top left. It comes out of
+# the same briefing table as the other three (BRF_EVA_ROOT).
+LOGOS = [("GDI", 0x01E9A50), ("NOD", 0x01EF058), ("TITLE", 0x01F52A0),
+         ("EVA", 0x01FC798)]
 
 # What the ROM held when this was written. A mismatch means the extraction moved
 # under us, and a silently different logo is worse than a failed bake.
-EXPECT = {"GDI": (464, 908, 2), "NOD": (458, 717, 3), "TITLE": (581, 978, 6)}
+EXPECT = {"GDI": (464, 908, 2), "NOD": (458, 717, 3), "TITLE": (581, 978, 6),
+          "EVA": (60, 112, 1)}
+
+# WHERE EACH ONE'S VERTEX RGB BYTES COME FROM, and it is not the same answer for all four.
+#
+# The three emblems pack a unit NORMAL into the Vtx RGB and the runtime lights them
+# (logo3d.c). EVA does not: tools/romdump/fbx_export.py measures its 150 vertices as
+# THREE distinct grey values, all r==g==b, which is a shaded palette and not a direction
+# field -- read as normals those three greys become three arbitrary directions and the
+# wordmark lights as nonsense. So EVA's normals are SYNTHESISED here from the triangle
+# geometry (the face normal, per vertex), and this comment is the statement that the
+# lighting on the EVA wordmark is OURS while the lighting on the three emblems is the
+# cartridge's own. The pack format does not change: it stores normals either way.
+KIND = {"GDI": "normal", "NOD": "normal", "TITLE": "normal", "EVA": "colour"}
+
+
+def face_normal(positions, tri):
+    """The geometric normal of one triangle, for a mesh whose Vtx RGB is colour rather
+    than a packed normal. Right-handed cross product over the winding the display list
+    already carries, normalised; a degenerate triangle falls back to +Z rather than
+    dividing by zero, and there is exactly one of those to fall back for."""
+    (ax, ay, az), (bx, by, bz), (cx, cy, cz) = (positions[i] for i in tri)
+    ux, uy, uz = bx - ax, by - ay, bz - az
+    vx, vy, vz = cx - ax, cy - ay, cz - az
+    nx, ny, nz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
+    L = (nx * nx + ny * ny + nz * nz) ** 0.5
+    return (0.0, 0.0, 1.0) if L == 0 else (nx / L, ny / L, nz / L)
 
 
 def bake_one(rom, name, off):
@@ -66,7 +97,8 @@ def bake_one(rom, name, off):
     got = (len(m["positions"]), len(m["polys"]), len(m["mats"]))
     assert got == EXPECT[name], "%s: expected %s positions/tris/mats, got %s" % (
         name, EXPECT[name], got)
-    assert m["kind"] == "normal", "%s: vertex RGB is %s, not normals" % (name, m["kind"])
+    assert m["kind"] == KIND[name], "%s: vertex RGB is %s, expected %s" % (
+        name, m["kind"], KIND[name])
 
     # Centre on the bounding box and measure the radius, so both logos fill the
     # same on-screen box whatever the cartridge's own units were.
@@ -109,7 +141,8 @@ def bake_one(rom, name, off):
         for k in range(3):
             vi = fi * 3 + k
             x, y, z = m["positions"][tri[k]]
-            nx, ny, nz = m["poly_nrm"][vi]
+            nx, ny, nz = (m["poly_nrm"][vi] if KIND[name] == "normal"
+                          else face_normal(m["positions"], tri))
             u, v = m["poly_uv"][vi]
             batches[mi].append((x - cx, y - cy, z - cz, nx, ny, nz, u, v))
 

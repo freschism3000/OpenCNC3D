@@ -55,7 +55,7 @@ PAYLOAD=$(cd "$PAYLOAD" && pwd)
 
 # THE LAUNCHER MUST BE IN IT. An installer whose Start Menu shortcut points at a
 # file that is not there installs a broken game and says nothing, so this is
-# checked here rather than discovered on Windows.
+# checked here rather than discovered on the Windows test machine.
 [ -f "$PAYLOAD/C&C3D.exe" ] || {
     echo "no C&C3D.exe (the launcher) in $PAYLOAD." >&2
     echo "Run tools/win/build-launcher-win.sh and re-stage." >&2

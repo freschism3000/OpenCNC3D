@@ -175,9 +175,16 @@ static float efx_ground(float wx, float wz)
    deliberately nothing about meshes, the object list or facings, so the host answers
    the one question it cannot. Given the anim's attref -- the engine heap slot of the
    object the anim is attached to, which the brain already exports -- it fills in the
-   world position of that object's muzzle and returns 1. 0 means "no such object, or it
-   has no turret", and the caller falls back to what it did before. */
-static int (*g_efxMuzzleAt)(int attref, float* wx, float* wy, float* wz) = 0;
+   world position of that object's weapon and returns 1. 0 means "no such object, or one
+   whose weapon the host cannot place", and the caller falls back to what it did before.
+
+   attkind is that object's RTTI, which the brain exports beside attref, and it is not
+   decoration: attref is a slot in the object's OWN heap, so an infantryman and a tank
+   can carry the same number and only the kind tells them apart. -1 is a brain older than
+   the export; the host then matches on the heap id alone, exactly as it did before the
+   kind was passed. */
+static int (*g_efxMuzzleAt)(int attref, int attkind,
+                            float* wx, float* wy, float* wz) = 0;
 
 /* ------------------------------------------------- the N64 effect art (efx.pack) */
 
@@ -787,7 +794,15 @@ static float efx_r8(unsigned h) { return (float)(h & 0xFFu) / 256.0f; }
 struct EfxPart {
     float x, y, z;            /* position, CELLS                                     */
     float vx, vy, vz;         /* velocity, cells per engine tick                     */
-    float ay;                 /* y acceleration, cells/tick^2 (visual +0x20)         */
+    /* ALL THREE ACCELERATION COMPONENTS, not just the vertical one. The recipe table's
+       visual sub-record is read for its y acceleration and for a damping term, and two
+       further floats in it are still unnamed, so ay was all this struct ever carried. The cartridge's
+       PER-BUILDING emitter templates store the full vector at +0x1C..+0x24, and 19 of the
+       25 damaged-building nodes lean on it -- 17 of them with the same accel z of -0.1,
+       the tip that carries a damage plume off the vertical as it climbs. A pool that held
+       only ay could not run those chains without throwing away two thirds of their
+       acceleration, which is why the damage smoke sat decoded and unwired. */
+    float ax, ay, az;         /* acceleration, cells/tick^2 (template +0x1C..+0x24)  */
     float hw, grow;           /* HALF-width in cells, and its growth per tick        */
     float sx, sy, sz;         /* where it was born, for the "did it move" witness    */
     unsigned char arate;      /* visual +0x31: the ALPHA RAMP SLOPE, not a frame rate */
@@ -1106,7 +1121,13 @@ static void efx_emit(const EfxSourceRec& s, float ex, float ey, float ez,
         p.y  = ey + 3.0f * p.vy;
         p.z  = ez + 3.0f * p.vz;
         p.sx = p.x; p.sy = p.y; p.sz = p.z;
+        /* Zero because a RECIPE particle has never been given a lateral acceleration,
+           not because the cartridge says it has none: two floats in that sub-record are
+           still unnamed and either could turn out to be one. Set, not left over from the
+           stack: EfxPart is a plain struct with no constructor. */
+        p.ax = 0.0f;
         p.ay = s.yacc * EFX_U;
+        p.az = 0.0f;
         /* size_base/size_rand are the billboard's HALF-EXTENT in world units, NOT its
            diameter. The cartridge builds the quad from UNIT camera axes and offsets each
            corner by size * corner, so the drawn side is 2 * size. The old comment here
@@ -1170,7 +1191,13 @@ static void efx_emit_chunks(const EfxSourceRec& s, float ex, float ey, float ez,
         c.y  = ey + 3.0f * c.vy;
         c.z  = ez + 3.0f * c.vz;
         c.sx = c.x; c.sy = c.y; c.sz = c.z;
+        /* Chunks fall straight down and bounce; nothing in the debris path ever gives one
+           a sideways acceleration, and the chunk loop above deliberately does not read ax
+           or az -- a parked chunk zeroes its velocity and must stay parked. Set anyway,
+           because these bytes are dumped and compared. */
+        c.ax = 0.0f;
         c.ay = EFX_CHUNK_YACC * EFX_U;
+        c.az = 0.0f;
         /* DECODED NOW, replacing the measured-from-reference-frames guess that used to
            live here. The source record's `size` (0.25) is the chunk's MESH SCALE, and
            the console shrinks it by the visual record's +0x2C = -0.005 every tick
@@ -1257,9 +1284,31 @@ static void efx_fire_slot(const EfxAnim& an, const EfxSlot& sl, int slotIdx,
        the wrapper calls the ground-height function at RAM 0x801F7DFC with (x,z) and
        adds dy to its result (disassembly RAM 0x801FC8F0-0x801FC92C). g_efxGroundY is
        the renderer's heightfield sampler, so this lands on the drawn ground. */
-    const float ex = an.wx + (float)sl.dx * EFX_U;
-    const float ey = efx_ground(an.wx, an.wz) + (float)sl.dy * EFX_U;
-    const float ez = an.wz + (float)sl.dz * EFX_U;
+    float bx = an.wx, by = efx_ground(an.wx, an.wz), bz = an.wz;
+
+    /* A FLAMETHROWER'S TONGUE STARTS AT THE NOZZLE, NOT UNDER HIS BOOTS. Every FLAME_*
+       recipe carries dy 0, so all eight of them took that base unchanged and lit their
+       fire at ground level inside the man holding the gun -- the same defect the cannon
+       flash had, hiding the same way, because the particle pass is depth TESTED against
+       the sprite already drawn.
+
+       ONLY THE HEIGHT IS WRONG, and that is the engine's own arrangement rather than an
+       accident: the flame thrower is the one infantry type whose firing coordinate is its
+       own centre with no forward shift, and the anim is attached to the firer, so it
+       already rides him. The horizontal position is therefore left exactly where the
+       engine put it and the host is asked only for the weapon's world position, through
+       the same hook the cannon flash uses. Asking every tick also means the tongue
+       follows a trooper who walks while he burns, which is what an attached anim does.
+
+       A firer the host cannot place -- it died inside the tongue's own ten-tick life, or
+       it is a vehicle with no weapon geometry -- keeps the ground-level base, so the
+       fallback is the old behaviour rather than a new one. */
+    if (g_efxMuzzleAt && an.attref >= 0 && !strncmp(rname, "FLAME_", 6))
+        g_efxMuzzleAt(an.attref, an.attkind, &bx, &by, &bz);
+
+    const float ex = bx + (float)sl.dx * EFX_U;
+    const float ey = by + (float)sl.dy * EFX_U;
+    const float ez = bz + (float)sl.dz * EFX_U;
 
     /* Counted under the anim's DOS ART NAME, because that is the key the harness and
        every existing gate already speak (expectefx FRAG1). The unambiguous cartridge
@@ -1335,7 +1384,7 @@ static void efx_integrate_once(void)
             e.x = c.x; e.y = c.y; e.z = c.z;
             e.sx = c.x; e.sy = c.y; e.sz = c.z;
             e.vx = e.vy = e.vz = 0.0f;
-            e.ay = 0.0f;
+            e.ax = e.ay = e.az = 0.0f;
             /* Embers are half a chunk (p080/p084). g_efxTrailScale is applied HERE
                and only here, because this is the one place an ember is created --
                it has no recipe source to key a system-based dial off. c.hw itself is
@@ -1361,7 +1410,12 @@ static void efx_integrate_once(void)
     for (int i = 0; i < g_efxNPart; i++) {
         EfxPart& p = g_efxPart[i];
         p.x += p.vx; p.y += p.vy; p.z += p.vz;
-        p.vy += p.ay;
+        /* All three components, in the node integrator's own order: position off the old
+           velocity first, then velocity off the acceleration. Reading only ay here would
+           leave a damaged building's sideways acceleration stored and never applied, which
+           looks identical to a correct build in every dump that prints the table and
+           different in every frame that draws the plume. */
+        p.vx += p.ax; p.vy += p.ay; p.vz += p.az;
         p.hw += p.grow;
         if (p.hw < 0.0f) p.hw = 0.0f;
         p.age++;
@@ -1494,7 +1548,7 @@ static void efx_step(int frame)
                            than no flash at all. */
                         float mx = an.wx, my = efx_ground(an.wx, an.wz) + 0.10f, mz = an.wz;
                         if (g_efxMuzzleAt && an.attref >= 0)
-                            g_efxMuzzleAt(an.attref, &mx, &my, &mz);
+                            g_efxMuzzleAt(an.attref, an.attkind, &mx, &my, &mz);
                         efx_emit(cs, mx, my, mz,
                                  n, (unsigned)key, la.bornFrame, 0, k);
                         g_efxRecipeParts[an.name] += n;
@@ -1729,7 +1783,7 @@ static void efx_draw_nuke_meshes(void)
            fires it whether the cell is mapped or not -- Place_Special_Blast has no
            visibility test of any kind (house.cpp). Culling the draw here meant the
            charge was spent, the strike happened, and nothing appeared, which is
-           indistinguishable from a dead button. Reported: "When trying to
+           indistinguishable from a dead button. the project owner, 26 Aug 2026: "When trying to
            use a Superweapon on Fog of War, it doesnt work. It should launch the
            superweapon, regardless of wether theres fog of war (Shroud) or not."
            Measured before and after: same script, same camera, same target cell
@@ -1798,7 +1852,7 @@ static void efx_draw_ion_meshes(void)
            fires it whether the cell is mapped or not -- Place_Special_Blast has no
            visibility test of any kind (house.cpp). Culling the draw here meant the
            charge was spent, the strike happened, and nothing appeared, which is
-           indistinguishable from a dead button. Reported: "When trying to
+           indistinguishable from a dead button. the project owner, 26 Aug 2026: "When trying to
            use a Superweapon on Fog of War, it doesnt work. It should launch the
            superweapon, regardless of wether theres fog of war (Shroud) or not."
            Measured before and after: same script, same camera, same target cell

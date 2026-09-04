@@ -111,7 +111,7 @@ int AbstractTypeClass::Full_Name(void) const
 {
     return FullName;
 };
-unsigned short AbstractTypeClass::Get_Ownable(void) const
+uint64_t AbstractTypeClass::Get_Ownable(void) const
 {
     return 0xffff;
 };

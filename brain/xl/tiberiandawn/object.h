@@ -96,7 +96,7 @@ public:
 
     // Added a mask instead of bool for selecting players. This is because we must now support multiplayer.
     // - 6/26/2019
-    unsigned short IsSelectedMask;
+    uint64_t IsSelectedMask;
 
     /*
     **	If an animation is attached to this object, then this flag will be true.
@@ -173,7 +173,7 @@ public:
     **	It is cleared by Init(), which Clear_Scenario() calls, so it cannot survive into the
     **	next scenario. Default is OFF.
     */
-    static unsigned CNC3D_InvincibleHouses;
+    static uint64_t CNC3D_InvincibleHouses;
     static void CNC3D_Set_Invincible(HousesType house, bool on);
     bool CNC3D_Is_Invincible(void) const;
 
@@ -187,7 +187,7 @@ public:
     virtual bool Is_Techno(void) const;
     // EIGHTPLAYERS: widened from unsigned char to match the 16-bit ownable mask
     // (see TechnoTypeClass::Ownable); the narrow type truncated houses above bit 7.
-    virtual unsigned short Get_Ownable(void) const;
+    virtual uint64_t Get_Ownable(void) const;
     virtual ObjectTypeClass const& Class_Of(void) const = 0;
     virtual int Full_Name(void) const;
     virtual bool Can_Repair(void) const;

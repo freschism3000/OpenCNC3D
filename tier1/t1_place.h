@@ -1,7 +1,7 @@
 /*
  * t1_place.h -- the building placement preview.
  *
- * Reported: "Placing buildings have no preview of the structure and where its being placed,
+ * the project owner: "Placing buildings have no preview of the structure and where its being placed,
  * when moving the mouse around." They did not. Placement mode was a boolean and one
  * click: the player picked a cameo, the pointer changed nothing, and wherever the next
  * click landed a building either appeared or silently did not.
@@ -15,7 +15,7 @@
  *      red where it is not. This is the building's own occupy list out of the engine, so
  *      it is the right shape for every structure without a table of our own.
  *   3. The BUILDING ITSELF, its real mesh, translucent, standing where it would stand.
- *      That is the part asked for and the part a cell grid cannot give: a Weapons
+ *      That is the part the project owner asked for and the part a cell grid cannot give: a Weapons
  *      Factory and a Barracks both occupy a 3x3 and look nothing alike.
  *
  * The legality is the ENGINE's verdict, never ours: GAME_STATE_PLACEMENT reports, per

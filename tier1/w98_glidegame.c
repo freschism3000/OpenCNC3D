@@ -110,7 +110,7 @@ static W98_Object  g_objs[WB_MAX_OBJECTS];
  * Everything is authored pointing SOUTH except the gunboat, whose hull runs east-west
  * with the bow at -x, and the Nod gun turret's barrel, which points north.
  *
- * THIS IS THE BUG SEEN TWICE. The Tier 1 loop was handing the mesh the engine's raw
+ * THIS IS THE BUG the project owner SAW TWICE. The Tier 1 loop was handing the mesh the engine's raw
  * facing with no bias at all: 128 out on every vehicle, which is a tank driving exactly
  * backwards ("MCV is driving in wrong directions"), and 64 out on the gunboat, which is
  * a boat sailing exactly sideways. One missing term, two symptoms. */
@@ -170,7 +170,7 @@ static SR_Texture    g_sbsr;
 /* The mouse pointer.
  *
  * There is no window and therefore no system cursor: a fullscreen Glide app owns the
- * screen outright and Windows draws nothing on it, which is why it could not be tested with
+ * screen outright and Windows draws nothing on it, which is why the project owner could not test with
  * a mouse at all. So the pointer is art, and it lives in the SPARE CORNER OF THE SIDEBAR
  * PAGE rather than in a texture of its own. The sidebar column is 80 wide in a 256 wide
  * page, so there is a great deal of unused room, and sharing the page means the cursor
@@ -240,7 +240,7 @@ static void sidebar_to_texture(void)
             g_sbtex[y * SB_TEX + x] = g_surf8[y * DB_SCREEN_W + (DB_SIDE_X + x)];
 }
 
-/* THE 640x480 HUD. The direction for this build: use the new bar, not the 1995 one.
+/* THE 640x480 HUD. the project owner's direction for this build: use the new bar, not the 1995 one.
  *
  * It is the project's own game/hud640.c, compiled unedited, wrapped by tier1/t1_hud.c
  * which owns the buffers and gets them onto the card. The DOS bar below stays compiled
@@ -301,7 +301,7 @@ static void chunk_mesh_draw(int family, int idx, float wx, float wy, float wz,
     mp.wx = wx; mp.wy = wy; mp.wz = wz;
     /* One free axis of tumble, off the hash and the age. The console tumbles on all
      * three; this renderer's mesh path yaws about Y only, so the other two are
-     *, registered as an open gap rather than faked with a second draw. */
+     * registered in known-gap notes rather than faked with a second draw. */
     mp.facing = (int)((seed >> 3) + (unsigned)(age * 11)) & 255;
     mp.animT = -1.0f;
     mp.build_frac = 1.0f;
@@ -1062,7 +1062,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
      * (scenario.cpp:117/:143/:174 queue THEME_AOI as the scenario comes up).
      *
      * This build started Act on Instinct at LOAD, so the mission's theme played under the
-     * menu -- which is the reported "wrong music for the main menu", and half of his "test map
+     * menu -- which is the project owner's "wrong music for the main menu", and half of his "test map
      * plays behind the main menu" as well. The menu gets MAP1 and the mission theme now
      * waits until there is a mission. */
     if (g_au)
@@ -1160,7 +1160,18 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
          * and it showed up here as a hundred particles spawned before anyone had chosen
          * to play. */
         if (g_inmenu && g_menuok) acc = 0.0;
-        while (acc >= 1.0 / 15.0) { wb_tick(); ++ticks; acc -= 1.0 / 15.0; }
+        /* A NEW TICK IS A NEW SOUND WINDOW. Everything this advance raises reaches
+         * on_engine_event and then the mixer before the next block is rendered, so copies
+         * of one clip raised here start at the same sample and sum coherently. The audio
+         * engine caps how many of one clip may do that; this is where it is told the
+         * window moved. Without the call the tier is simply uncapped, as it is today. */
+        while (acc >= 1.0 / 15.0)
+        {
+            cnc_audio_begin_tick(g_au);
+            wb_tick();
+            ++ticks;
+            acc -= 1.0 / 15.0;
+        }
         if ((frame % 8) == 0 || redump)
         {
             nobj = wb_objects(g_objs, WB_MAX_OBJECTS);
@@ -1316,7 +1327,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
             g_lbnow = lb;
 
             /* ESCAPE IS AN EDGE, NOT A LEVEL. A hand holds a key for a fifth of a
-             * second, which at 60 FPS is a dozen frames -- so ESC to skip the briefing
+             * second, which at 60 FPS is a dozen frames -- so ESC to skip the mission briefing
              * skipped it AND, on the very next frame, quit the game. From the player's
              * side that reads as "GDI 1 cannot be started". One press is one event, and
              * whichever block consumes it says so. */
@@ -1770,7 +1781,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
                     report("music: %s (the mission)",
                            cnc_music_current(g_au) ? cnc_music_current(g_au) : "(none)");
                 }
-                /* THE BRIEFING. GDI mission 1's own movie, out of the 1995 CD, played
+                /* THE MISSION BRIEFING. GDI mission 1's own movie, out of the 1995 CD, played
                  * once before the mission. A missing file is never fatal: the game just
                  * starts. */
                 if (g_movieok && !g_briefed)
@@ -1846,7 +1857,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
          *
          * The ground and the veil used to be drawn over the whole PLAYABLE RECTANGLE,
          * every frame, whatever the camera was looking at. On GDI mission 1 that is 700
-         * cells and it went unnoticed; the first map with a full-sized playable area is
+         * cells and the failure was missed; the first map with a full-sized playable area is
          * 62 x 50, which is 3,100 -- and the frame went from 19 ms to 44 ms, almost all
          * of it terrain and shroud, for cells that are nowhere near the screen.
          *

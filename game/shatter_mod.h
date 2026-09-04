@@ -110,7 +110,22 @@ struct ShatterLive {
     float px, py, pz, vx, vy, vz;    /* world, cells and cells/tick */
     float ppx, ppy, ppz;             /* previous tick, for the sub-tick lerp */
     float ex, ey, ez, pex, pey, pez; /* euler, radians */
-    float rx, ry, rz;                /* the rolling axis, once it rolls */
+    /* TWO ROTATIONS, AND THEY MUST NOT SHARE STORAGE. The tumble is a per-tick euler
+       RATE, the cartridge's 0.05 * (byte - 127) law, which at the shipped
+       shatter_spin of 0.295 (fx_state.h:432) is bounded by 0.033 rad/tick, about
+       1.9 degrees per axis. It reaches the dial's 0.11 rad/tick only at spin = 1.0,
+       which is the cartridge's own chunk rate and not what anybody plays.
+       The roll is a UNIT-LENGTH AXIS that the angle accumulated in rolled turns about
+       at draw time. One triple used to hold whichever of the two had been written
+       last, and the cost was this: a piece that had rolled once and then left the
+       ground added a unit vector to its euler every tick, about a radian, some thirty
+       times the intended tumble and independent of the spin dial entirely. Downhill
+       that is nearly every tick, because py does not move on the tick after a roll
+       while the ground under the new px/pz has already dropped, so a rounded piece
+       rolling off a slope spun itself into a blur and kept it up until the backstop
+       caught it. */
+    float tx, ty, tz;                /* the euler tumble RATE, radians per tick */
+    float rx, ry, rz;                /* the rolling AXIS, unit length once it rolls */
     float cmx, cmy, cmz;             /* the piece's centroid in MESH units */
     float r, low, high, mass;
     bool  flat, resting, launched;
@@ -651,9 +666,10 @@ static void shatter_note_death(int id, int mi, int face, int house,
         /* the CARTRIDGE'S tumble law and its three-byte extraction */
         L.ex = L.ey = L.ez = 0.0f;
         L.pex = L.pey = L.pez = 0.0f;
-        L.rx = 0.05f * ((float)((h2 >> 8) & 0xFF) - 127.0f) * g_fx.shatter_spin * 0.01745f;
-        L.ry = 0.05f * ((float)((h2 >> 4) & 0xFF) - 127.0f) * g_fx.shatter_spin * 0.01745f;
-        L.rz = 0.05f * ((float)( h2       & 0xFF) - 127.0f) * g_fx.shatter_spin * 0.01745f;
+        L.tx = 0.05f * ((float)((h2 >> 8) & 0xFF) - 127.0f) * g_fx.shatter_spin * 0.01745f;
+        L.ty = 0.05f * ((float)((h2 >> 4) & 0xFF) - 127.0f) * g_fx.shatter_spin * 0.01745f;
+        L.tz = 0.05f * ((float)( h2       & 0xFF) - 127.0f) * g_fx.shatter_spin * 0.01745f;
+        L.rx = L.ry = L.rz = 0.0f;      /* no roll axis until the roll arm sets one */
         L.resting = false; L.launched = false; L.restTick = 0; L.bounces = 0; L.groundTick = 0; L.rolled = 0.0f;
         g_shatLive.push_back(L);
         made++; tris += pc.tri1 - pc.tri0;
@@ -760,7 +776,7 @@ static void shatter_step(int frame)
                            L.id, L.k, frame, L.px, L.py, L.pz, gy - L.low);
                 L.vy = reb;
                 L.vx *= el; L.vz *= el;
-                L.rx *= el; L.ry *= el; L.rz *= el;
+                L.tx *= el; L.ty *= el; L.tz *= el;
                 L.bounces++;
             } else {
                 /* ROLL. OURS -- the cartridge's chunks do not have it, and it is the part
@@ -793,7 +809,18 @@ static void shatter_step(int frame)
                        bounding-sphere radius is worth precomputing. */
                     L.rx = -L.vz / sped; L.ry = 0.0f; L.rz = L.vx / sped;
                     L.rolled += sped / L.r;
-                } else { L.rx = L.ry = L.rz = 0.0f; }
+                }
+                /* ON THE GROUND THE FREE TUMBLE ENDS, rolled or not: what turns the
+                   piece from here is the roll, or nothing. That is the behaviour this
+                   arm always had, because both of its branches used to overwrite the
+                   tumble; it is now said once and on purpose. The ROLL AXIS is
+                   deliberately NOT cleared here. Clearing it is what the shared triple
+                   did, and since shat_axis falls back to identity on a zero axis while
+                   rolled is still positive, a piece that had rolled snapped back to its
+                   launch orientation on the very tick it settled -- friction subtracts a
+                   fixed amount and so takes the horizontal speed to exactly zero, which
+                   lands in this branch and rested on the same tick. */
+                L.tx = L.ty = L.tz = 0.0f;
             }
 
             /* REST: the chunk pool's own 0.002 cells/tick threshold, or the backstop.
@@ -804,12 +831,20 @@ static void shatter_step(int frame)
                 const int to = (frame - L.groundTick > 60) ? 1 : 0;
                 L.resting = true; L.restTick = frame;
                 L.vx = L.vy = L.vz = 0.0f;
-                printf("SHATTER|rest|id=%d|k=%d|frame=%d|at=%.3f,%.3f,%.3f|ground=%.3f|low=%.3f|bounces=%d|rolled=%.3f|to=%d\n",
+                /* THE EULER GOES IN BEFORE to=, NEVER AFTER IT. The backstop leg of the
+                   shatter gate anchors to=1 to the END of this line, so a field appended
+                   past it stops matching in silence. It is printed at all because the
+                   rotation is otherwise unobservable from outside the renderer, and
+                   every existing leg of that gate reads positions: a piece whose
+                   rotation has run away rests with euler terms in the tens of radians,
+                   where flight alone can only put a few there. */
+                printf("SHATTER|rest|id=%d|k=%d|frame=%d|at=%.3f,%.3f,%.3f|ground=%.3f|low=%.3f|bounces=%d|rolled=%.3f|euler=%.2f,%.2f,%.2f|to=%d\n",
                        L.id, L.k, frame, L.px, L.py, L.pz,
-                       efx_ground(L.px, L.pz), L.low, L.bounces, L.rolled, to);
+                       efx_ground(L.px, L.pz), L.low, L.bounces, L.rolled,
+                       L.ex, L.ey, L.ez, to);
             }
         }
-        if (!L.resting && L.vy != 0.0f) { L.ex += L.rx; L.ey += L.ry; L.ez += L.rz; }
+        if (!L.resting && L.vy != 0.0f) { L.ex += L.tx; L.ey += L.ty; L.ez += L.tz; }
         i++;
     }
     fflush(stdout);
@@ -877,7 +912,7 @@ static void shatter_draw(int pass, bool fadingPass)
                    reads as a slab being deleted; a settling one reads as rubble the
                    ground is taking back, and the terrain's own depth buffer does the
                    work -- the piece is progressively occluded by the hill it is lying
-                   on rather than dissolving in mid-air. This was asked for by name on
+                   on rather than dissolving in mid-air. the project owner asked for this by name on
                    24 Aug 2026 after seeing the shrink.
                    The distance is the piece's own full height, so it is exactly buried
                    at the end whatever its size, plus a hair so nothing pokes through. */

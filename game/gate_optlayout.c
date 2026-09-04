@@ -60,8 +60,10 @@
  *      A page whose dopt_page_count went to zero returns no rectangles, so no leg can
  *      fail and the gate goes green on a dialog that has vanished. OPTLAYOUT_EXPECT is
  *      the sum of the five page enums at compile time, so this binary catches a page
- *      that stops answering; gates.sh asserts the literal 38 as the outer belt, so
- *      ADDING a button is a deliberate edit to the gate and not a silent drift.
+ *      that stops answering. THE NUMBER IS COMPUTED, not written down: it is the sum of
+ *      the six page counts (with the Advanced page contributing its VIEW rows plus OK and
+ *      the bar, not its element count). It was 41 before the Gameplay page went in and it
+ *      is 45 after. gates.sh asserts no literal of its own.
  *
  * TWO EXEMPTIONS, both named rather than papered over by loosening leg (b):
  *   - DOPT_S_STOP and DOPT_S_PLAY print a GLYPH and not their label (dosopt.h:247-250:
@@ -85,8 +87,14 @@
 #include "dosopt.h"
 
 /* Anti-vacuity rule 2. Compile time, out of the page enums themselves. */
+/* THE ADVANCED PAGE IS THE ONE PAGE WHOSE RECTANGLE COUNT IS NOT ITS ITEM COUNT. It is
+ * a scrolling list: it holds DOPT_VE_COUNT elements and shows DOPT_A_VIEW_ROWS of them,
+ * so what it answers with is those rows plus OK plus the scroll bar. Summing
+ * DOPT_A_COUNT here would demand a rectangle for every element at once, which is exactly
+ * what scrolling means it must not give. */
 #define OPTLAYOUT_EXPECT                                                                 \
-    (DOPT_ITEM_COUNT + DOPT_C_COUNT + DOPT_V_COUNT + DOPT_A_COUNT + DOPT_S_COUNT)
+    (DOPT_ITEM_COUNT + DOPT_C_COUNT + DOPT_V_COUNT + (DOPT_A_VIEW_ROWS + 2)              \
+     + DOPT_S_COUNT + DOPT_G_COUNT)
 
 /* goptions.cpp:130 walks the stack in steps of OButtonHeight + 2. The 2 is the gap. */
 #define OPT_MIN_SEP 2
@@ -120,7 +128,17 @@ static void page(DOPT_State *st, const DB_Pack *p, int pg, const char *name, int
 
     for (i = 0; i < n; i++) {
         if (!dopt_item_rect(st, i, &x, &y, &w, &h)) {
-            /* Anti-vacuity: an item that answers with no rectangle is not a pass. */
+            /* Anti-vacuity: an item that answers with no rectangle is not a pass --
+               EXCEPT an Advanced page element that is outside the well, which genuinely
+               has none. That is the same answer dopt_hit_test reads, so a row with no
+               rectangle is a row no click can reach, which is what scrolling has to mean.
+               The exemption is narrow on purpose: it applies only to element rows, only
+               on that page, and only when the row is actually outside the window advTop
+               opens. OK and the scroll bar are never exempt, and the per-page count below
+               is what stops this swallowing a page that has stopped answering. */
+            if (pg == DOPT_PAGE_ADVANCED && i < DOPT_VE_COUNT
+                && (i < st->advTop || i >= st->advTop + DOPT_A_VIEW_ROWS))
+                continue;
             printf("  FAIL no rectangle: item %d (%s)\n", i, dopt_item_label(st, i));
             fails++;
             continue;
@@ -149,7 +167,12 @@ static void page(DOPT_State *st, const DB_Pack *p, int pg, const char *name, int
            A NEW non-button item will now produce a false FAIL rather than a silent skip.
            That is deliberate: a loud wrong answer gets the item named here in a minute,
            and a silent one hid a real defect for a release. */
+        /* THE SCROLL BAR IS THE FOURTH NAMED EXEMPTION. It is DOPT_A_BAR_H tall, which no
+           height rule below would ever cover, and it prints nothing: it carries a name
+           only so the scripted click verb can address it. Named here rather than absorbed
+           by loosening the height test, which is what this leg's own header asks for. */
         if (h != 5 && h != 6 && h != 7 && h != 73
+            && !(pg == DOPT_PAGE_ADVANCED && i == DOPT_A_BAR)
             && !(pg == DOPT_PAGE_SOUND && (i == DOPT_S_STOP || i == DOPT_S_PLAY))) {
             sw = db_string_width(fnt, dopt_item_label(st, i), DB_FONT6_XSPACING);
             tx = x + (w >> 1) - 1 - (sw >> 1); /* dopt_draw_button, dosopt.c:903 */
@@ -197,6 +220,17 @@ static void page(DOPT_State *st, const DB_Pack *p, int pg, const char *name, int
             }
         }
     }
+    /* THE ADVANCED PAGE'S OWN NUMBER, because it is the one page that does not answer
+       with its item count and therefore cannot lean on the total at the bottom. The well
+       must give back exactly the rows it shows, plus OK, plus the bar: fewer means a row
+       fell out of the window that should have been in it, more means the scroll offset is
+       not being applied at all. */
+    if (pg == DOPT_PAGE_ADVANCED && here != DOPT_A_VIEW_ROWS + 2) {
+        printf("  FAIL the Advanced page returned %d rectangles, want %d (%d rows in the "
+               "well, OK and the scroll bar)\n",
+               here, (int)(DOPT_A_VIEW_ROWS + 2), (int)DOPT_A_VIEW_ROWS);
+        fails++;
+    }
     printf("OPTLAYOUT|page=%s|checked=%d\n", name, here);
 }
 
@@ -236,6 +270,46 @@ int main(int argc, char **argv)
     page(&st, p, DOPT_PAGE_ADVANCED, "ADVANCED", DOPT_V_X, DOPT_V_Y, DOPT_V_W, DOPT_V_H);
     page(&st, p, DOPT_PAGE_SOUND, "SOUND", DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W,
          DOPT_SND_H);
+    page(&st, p, DOPT_PAGE_GAMEPLAY, "GAMEPLAY", DOPT_V_X, DOPT_V_Y, DOPT_V_W,
+         DOPT_V_H);
+
+    /* THE ADVANCED PAGE AGAIN, AT THE BOTTOM OF TRAVEL.
+     *
+     * Every leg above measures the page as it opens, which is the one scroll offset
+     * guaranteed to be tidy. An offset is arithmetic that can put a row through the OK
+     * button just as easily as a step can, and the whole point of this round is that the
+     * offset is no longer always zero. So the page is scrolled to the end and read again,
+     * through dopt_scroll, which is the function both dialog loops hand the wheel to.
+     *
+     * `checked` is put back afterwards because the total leg counts each page once; the
+     * second pass is here to fail on a rectangle, not to be counted. */
+    {
+        int before = checked;
+        int x, y, w, h;
+        const int wantTop = (DOPT_VE_COUNT > DOPT_A_VIEW_ROWS)
+                                ? DOPT_VE_COUNT - DOPT_A_VIEW_ROWS : 0;
+        st.page = DOPT_PAGE_ADVANCED;
+        dopt_scroll(&st, DOPT_VE_COUNT); /* far past the end; it must clamp */
+        if (st.advTop != wantTop) {
+            printf("  FAIL the Advanced page scrolled to %d, want %d: dopt_scroll is not "
+                   "clamping to the bottom of travel\n", st.advTop, wantTop);
+            fails++;
+        }
+        if (wantTop > 0 && dopt_item_rect(&st, 0, &x, &y, &w, &h)) {
+            printf("  FAIL the first element still has a rectangle at the bottom of "
+                   "travel: x=%d..%d y=%d..%d. dopt_hit_test would find a row that is not "
+                   "on the screen\n", x, x + w - 1, y, y + h - 1);
+            fails++;
+        }
+        if (!dopt_item_rect(&st, DOPT_VE_COUNT - 1, &x, &y, &w, &h)) {
+            printf("  FAIL the last element has no rectangle even at the bottom of "
+                   "travel, so nothing on this page can ever reach it\n");
+            fails++;
+        }
+        page(&st, p, DOPT_PAGE_ADVANCED, "ADVANCED-BOTTOM", DOPT_V_X, DOPT_V_Y, DOPT_V_W,
+             DOPT_V_H);
+        checked = before;
+    }
 
     if (checked != OPTLAYOUT_EXPECT) {
         printf("  FAIL checked %d rectangles, the five pages declare %d\n", checked,

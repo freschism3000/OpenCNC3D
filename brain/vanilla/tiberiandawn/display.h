@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Declares the Build Anywhere interface on DisplayClass inside the existing
+// USE_RA_AI block: the static per-house bitmask CNC3D_BuildAnywhereHouses
+// and the two static functions CNC3D_Set_Build_Anywhere and
+// CNC3D_Build_Anywhere, with a comment noting that a set bit lifts the base
+// adjacency rule only.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\display.h_v   2.15   16 Oct 1995 16:47:42   JOE_BOSTIC  $ */
 /***********************************************************************************************

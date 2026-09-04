@@ -1,0 +1,48 @@
+# ====================================================================================
+# CNC3D -- the DATABASE tab, driven from a script so a gate can prove it.
+#
+#   cd playable && ../game/cnc_eyes --scen SCG01EB --pack SCG01EA.pack --build 98 \
+#        --gfx --script ../scripts/codex.script
+#
+# --gfx is NOT optional and neither is CNC3D_HUD=new. The tab is Enhanced-only and it
+# lives in the Enhanced HUD's tab strip; a bare --script run has g_fx.enabled == 0 and
+# the classic DOS bar, so the plate is correctly absent and every line below would be
+# measuring its absence. The first `codex state` prints avail= so a run that forgot
+# them says so in its own log instead of reporting a green nothing.
+# ====================================================================================
+
+expectres 1280 720
+codex state
+
+codex open
+codex settle
+codex state
+shot codex_1_structures.png
+
+codex row 6
+shot codex_2_structure_late.png
+
+codex cat 2
+codex state
+shot codex_3_vehicles.png
+
+codex row 8
+codex state
+shot codex_4_vehicle_late.png
+
+codex cat 1
+codex state
+shot codex_5_infantry.png
+
+codex cat 3
+codex state
+shot codex_6_aircraft.png
+
+codex house gdi
+codex cat 2
+codex state
+shot codex_7_gdi_vehicles.png
+
+codex close
+codex state
+shot codex_8_closed.png

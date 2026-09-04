@@ -1,0 +1,250 @@
+--- game/cnc_eyes.cpp
++++ game/cnc_eyes.cpp
+@@ -6439,42 +6439,6 @@
+             const DostibSlot& s = g_dostibSlot[(size_t)kind * g_dostibFrames + stage];
+             if ((int)s.sheet != bound) {
+                 if (bound >= 0) glEnd();
+-
+-        /* ---- THE BONUS CRATES, on the same pass and the same rules ------------------
+-           A crate is a terrain overlay like the tiberium above, so it is drawn here
+-           rather than with the objects: alpha-tested cutout, depth writes off, depth
+-           test on, shroud culled by cell_shown.
+-           NOT CELL-SIZED, which is the one difference. The DOS cell is 24 pixels and the
+-           sprite is 10x11, so the quad is that fraction of a cell and sits in the middle
+-           of it. A cell-sized crate would be the size of a Construction Yard pad.
+-           Flat white, not the terrain's shade: a crate is a placed object sitting ON the
+-           ground rather than a growth OF it, and shading it with the corner light made it
+-           read as a scorch mark. */
+-        if (g_doscrateHave && !g_crates.empty()) {
+-            int cbound = -1;
+-            for (size_t i = 0; i < g_crates.size(); i++) {
+-                const CrateCell& cc = g_crates[i];
+-                if (!cell_shown(cc.x, cc.y))
+-                    continue;
+-                const int k = cc.steel ? 1 : 0;
+-                if (k != cbound) {
+-                    if (cbound >= 0) glEnd();
+-                    glBindTexture(GL_TEXTURE_2D, g_doscrateTex[k]);
+-                    glBegin(GL_QUADS);
+-                    cbound = k;
+-                }
+-                const float hw = (float)g_doscrateW[k] / DOSCRATE_CELL_PX * 0.5f;
+-                const float hh = (float)g_doscrateH[k] / DOSCRATE_CELL_PX * 0.5f;
+-                const float cx = (float)cc.x + 0.5f, cz = (float)cc.y + 0.5f;
+-                const float y  = terrain_y(cx, cz) + 0.012f;   /* just over the tiberium */
+-                glColor4ub(255, 255, 255, 255);
+-                glTexCoord2f(0.0f, 0.0f); glVertex3f(cx - hw, y, cz - hh);
+-                glTexCoord2f(1.0f, 0.0f); glVertex3f(cx + hw, y, cz - hh);
+-                glTexCoord2f(1.0f, 1.0f); glVertex3f(cx + hw, y, cz + hh);
+-                glTexCoord2f(0.0f, 1.0f); glVertex3f(cx - hw, y, cz + hh);
+-            }
+-            if (cbound >= 0) glEnd();
+-        }
+                 glBindTexture(GL_TEXTURE_2D, g_dostibTex[s.sheet]);
+                 glBegin(GL_TRIANGLES);   /* the ground's own split; see the vertex block */
+                 bound = (int)s.sheet;
+@@ -7376,7 +7340,155 @@
+     }
+     g_meshGroundPerVertex = false;
+ }
++
++/* ---- THE BONUS CRATES -------------------------------------------------------------
++   The cartridge's own 3D crate. It lives HERE, beside draw_walls and after draw_mesh,
++   for the same three reasons that one does: it needs draw_mesh, it needs g_pack, and it
++   needs the MODE_ constants. It took this long to arrive because a crate is a terrain
++   OVERLAY on a cell and not an object in any heap, so nothing the object walk reaches
++   ever names it and the baker had no entry for it.
+ 
++   WHICH MODELS, read out of the ROM rather than chosen. The console keeps one
++   cell-decoration draw table at RAM 0x8020FF58, 39 records of {mode, descriptor}, indexed
++   by bits 15..20 of the cell object's word at +8. Record 34's descriptor at RAM 0x8020FF48
++   is the two s32 {88, -1} and record 36's at RAM 0x8020FF50 is {90, -1}: body model id 88
++   with NO shadow set, and body 90 with no shadow set. Model slot = type id + 10, the same
++   bias the walls and terrain take, so those are model-table slots 98 and 100, scene-graph
++   nodes RAM 0x801B775C and RAM 0x801B6930, display lists 0x011D4C8 (grey steel) and
++   0x010F3C8 (olive wood). Ten triangles each: a cube with its unseen bottom face left off.
++
++   THE NAMES ARE THE ENGINE'S OWN, which is why the pack keys below need no translation.
++   The 30 OverlayTypeClass registrations pass the overlay enum as a1, the IniName pointer
++   as a2 and the draw index as a3. The call whose jal is at ROM 0x195A18 passes a1 = 29,
++   a2 -> "SCRATE", a3 = 34; the one at ROM 0x1959C4 passes a1 = 28, a2 -> "WCRATE",
++   a3 = 36. 29 and 28 are OVERLAY_STEEL_CRATE and OVERLAY_WOOD_CRATE counted from the
++   engine's own enum in tiberiandawn/defines.h, so enum, name and draw index agree three
++   ways and neither binding is a guess.
++
++   SEVEN SLOTS, ONE MESH, and this is the question the model table poses. Records 99, 100,
++   101, 102, 103, 104 and 105 all carry the IDENTICAL node pointer RAM 0x801B6930, and the
++   cartridge's name catalogue calls all eight of 98..105 ANY_STR_CRATESZ1. They are not
++   seven crates and not seven crate contents: the mode-2 draw arm at RAM 0x801F57B4 takes
++   a piece index from bits 9..14 of the cell word, indexes the 16-record table at
++   RAM 0x802100D0 and ADDS that record's first word to the body id (RAM 0x801F5848). Those
++   offsets run 0..3, so the run of duplicates is what keeps ids 90..93 all landing on a
++   crate rather than on some unrelated model. Every crate the engine places carries
++   OverlayData 0 (Place_Random_Crate in tiberiandawn/map.cpp writes it), so the offset is
++   always 0 and exactly two cubes can ever draw. One mesh per kind is the whole of the art,
++   which is why there are two entries below and not eight.
++
++   IT IS SMALLER THAN THE SPRITE IT REPLACES, and that is the cartridge's number rather
++   than a mistake: the cube measures 185 x 185 x 184 mesh units, 0.18 of a cell on a side,
++   while the 1995 sprite is 10x11 of a 24-pixel DOS cell, 0.42 of a cell. So the crate
++   reads as a smaller object than it used to. It is also authored CENTRED on its cell
++   (x[-92,+93], z[-94,+90]) and STANDING on the ground (y starts at +2), so the draw anchor
++   is the cell centre and no lift is wanted.
++
++   THE 1995 SPRITES STAY, as the fallback and not as an alternative. A pack baked before
++   these two entries carries no SCRATE and no WCRATE type at all, and a crate that
++   disappeared would be worse than a flat one: the bonus would go back to arriving with no
++   picture. So an old pack keeps the sprite, and says so on stderr once. */
++static bool g_cratesDraw = true;          /* the gate's control leg; see `crates` */
++static int  g_crateMesh[2] = { -1, -1 };  /* [0] wood, [1] steel: CrateCell::steel */
++static bool g_crateArtReady = false;
++
++static void crate_art_init(void)
++{
++    /* wall_mesh_named is the generic pack-type lookup with the confidence floor on it;
++       it is named for its first caller rather than for its job. Same rule applies here:
++       a type entry the bake could only guess at must not become art. */
++    g_crateArtReady = true;
++    g_crateMesh[0] = wall_mesh_named("WCRATE");
++    g_crateMesh[1] = wall_mesh_named("SCRATE");
++    if (g_crateMesh[0] >= 0 && g_crateMesh[1] >= 0)
++        fprintf(stderr, "crates: the cartridge's own 3D cubes, WCRATE mesh %d and "
++                        "SCRATE mesh %d, resolved from the pack\n",
++                g_crateMesh[0], g_crateMesh[1]);
++    else
++        fprintf(stderr, "crates: this pack has no 3D crate (WCRATE mesh %d, SCRATE mesh "
++                        "%d) -- drawing the 1995 sprites instead. Re-bake with "
++                        "tools/bakery/bake5.py for the cartridge's own cubes.\n",
++                g_crateMesh[0], g_crateMesh[1]);
++}
++
++static void draw_crates(void)
++{
++    if (!g_cratesDraw)
++        return;
++    if (g_crates.empty())
++        return;
++    if (!g_crateArtReady)
++        crate_art_init();
++
++    /* BOTH or NEITHER. A pack that resolved one kind and not the other would draw a
++       steel crate where a wooden one stands, or the reverse, and a wrong crate is worse
++       than a flat one because the steel crate means something different in play. */
++    if (g_crateMesh[0] >= 0 && g_crateMesh[1] >= 0) {
++        for (size_t i = 0; i < g_crates.size(); i++) {
++            const CrateCell& cc = g_crates[i];
++            /* The same two tests every drawn object gets, and the same two the wall pass
++               above applies: inside the terrain the pack carries, and out of the shroud. */
++            if (!cell_shown(cc.x, cc.y) || shroud_cell_hidden(cc.x, cc.y))
++                continue;
++            /* Facing -1: the console's cell-decoration path passes yaw 0 on a piece whose
++               connectivity is 0, and a cube has no facing to carry anyway. All ten of the
++               mesh's triangles bake MODE_OPAQUE (measured on the baked pack), so this one
++               pass draws the whole cube and no cutout or shadow leg is owed. */
++            draw_mesh(g_crateMesh[cc.steel ? 1 : 0],
++                      (float)cc.x + 0.5f, (float)cc.y + 0.5f, -1, MODE_OPAQUE);
++        }
++        return;
++    }
++
++    /* ---- the fallback: the 1995 DOS art out of doscrate.pack ----------------------
++       It used to ride inside the tiberium pass and inherit that pass's state, which had
++       two consequences worth naming rather than repeating: a map with crates and NO
++       tiberium drew no crate at all (draw_tiberium returns early on an empty field), and
++       the block sat inside the per-sheet rebind so it re-emitted itself once per texture
++       change. Standing on its own it sets and restores its own state.
++       Alpha-tested cutout, depth writes off, depth test on: a sprite lying on the ground
++       is a decal and must not occlude. Flat white, not the terrain's shade: a crate is a
++       placed object sitting ON the ground rather than a growth OF it, and shading it with
++       the corner light made it read as a scorch mark. */
++    if (!g_doscrateHave)
++        return;
++    glEnable(GL_TEXTURE_2D);
++    glEnable(GL_ALPHA_TEST);
++    glAlphaFunc(GL_GREATER, 0.5f);
++    glDepthMask(GL_FALSE);
++    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
++    int cbound = -1;
++    for (size_t i = 0; i < g_crates.size(); i++) {
++        const CrateCell& cc = g_crates[i];
++        if (!cell_shown(cc.x, cc.y) || shroud_cell_hidden(cc.x, cc.y))
++            continue;
++        const int k = cc.steel ? 1 : 0;
++        if (k != cbound) {
++            if (cbound >= 0) glEnd();
++            glBindTexture(GL_TEXTURE_2D, g_doscrateTex[k]);
++            glBegin(GL_QUADS);
++            cbound = k;
++        }
++        /* NOT CELL-SIZED. The DOS cell is 24 pixels and the sprite is 10x11, so the quad
++           is that fraction of a cell and sits in the middle of it. A cell-sized crate
++           would be the size of a Construction Yard pad. */
++        const float hw = (float)g_doscrateW[k] / DOSCRATE_CELL_PX * 0.5f;
++        const float hh = (float)g_doscrateH[k] / DOSCRATE_CELL_PX * 0.5f;
++        const float cx = (float)cc.x + 0.5f, cz = (float)cc.y + 0.5f;
++        const float y  = terrain_y(cx, cz) + 0.012f;   /* just over the tiberium */
++        glColor4ub(255, 255, 255, 255);
++        glTexCoord2f(0.0f, 0.0f); glVertex3f(cx - hw, y, cz - hh);
++        glTexCoord2f(1.0f, 0.0f); glVertex3f(cx + hw, y, cz - hh);
++        glTexCoord2f(1.0f, 1.0f); glVertex3f(cx + hw, y, cz + hh);
++        glTexCoord2f(0.0f, 1.0f); glVertex3f(cx - hw, y, cz + hh);
++    }
++    if (cbound >= 0) glEnd();
++    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
++    glDepthMask(GL_TRUE);
++    glDisable(GL_ALPHA_TEST);
++    glDisable(GL_TEXTURE_2D);
++}
++
+ /* The console's world-space cursor. Included HERE, not up with the other modules, for
+    the same reason draw_walls lives here: it is built on draw_mesh, g_pack and the
+    MODE_ constants, all of which are defined immediately above. */
+@@ -16688,6 +16800,12 @@
+     /* Sandbag and brick walls are opaque geometry (their display lists carry real
+        vertex colours and an authored texture), so their bodies belong here. */
+     draw_walls(WALLPASS_OPAQUE);
++    /* The bonus crates go with the walls and for the same reason: both are cell
++       overlays that the console draws through one cell-decoration path, and both bake
++       as ordinary opaque meshes. All ten of the crate cube's triangles are MODE_OPAQUE,
++       so this is its only pass. The sprite fallback inside draw_crates sets and restores
++       its own state, so it is safe in this slot too. */
++    draw_crates();
+ 
+     /* 4: shadows -- blended, depth tested, no depth write.
+        AFTER the bodies, not before. In every cartridge model that has one, the
+@@ -20105,6 +20223,35 @@
+            g_wallsDraw); it changes nothing the brain reports. */
+         g_wallsDraw = (atoi(arg) != 0);
+         printf("WALLS|draw=%d\n", g_wallsDraw ? 1 : 0);
++    } else if (!strcmp(cmd, "crates")) {
++        /* crates 0|1 -- draw the crate pass or not, exactly as `walls` does for the
++           walls, and for exactly the same reason: the crate gate proves the pass puts
++           PIXELS on the glass by shooting the identical frame twice and diffing, which
++           needs a way to take the crates back out again. A presentation switch, not a
++           gameplay one: the brain still exports every crate cell and cratedump still
++           reports them. */
++        g_cratesDraw = (atoi(arg) != 0);
++        printf("CRATES|draw=%d\n", g_cratesDraw ? 1 : 0);
++    } else if (!strcmp(cmd, "cratedump")) {
++        /* Every crate cell the brain reported, which kind it is, which mesh resolved
++           for it, and whether it actually reached the screen. This is the leg no
++           picture can fake: mesh=-1 on both kinds means the pack was not re-baked and
++           the 1995 sprites are drawing, and drawn=0 on a cell the camera is looking at
++           means the cull is wrong rather than the art. */
++        if (!g_crateArtReady) crate_art_init();
++        int drawn = 0;
++        for (size_t i = 0; i < g_crates.size(); i++) {
++            const CrateCell& cc = g_crates[i];
++            const int mi = g_crateMesh[cc.steel ? 1 : 0];
++            const bool vis = cell_shown(cc.x, cc.y) && !shroud_cell_hidden(cc.x, cc.y);
++            if (vis) drawn++;
++            printf("CRATE|%d|%d|%s|mesh=%d|drawn=%d\n", cc.x, cc.y,
++                   cc.steel ? "SCRATE" : "WCRATE", mi, vis ? 1 : 0);
++        }
++        printf("CRATEDUMP|cells=%zu|drawn=%d|wood=%d|steel=%d|art=%s\n",
++               g_crates.size(), drawn, g_crateMesh[0], g_crateMesh[1],
++               (g_crateMesh[0] >= 0 && g_crateMesh[1] >= 0) ? "cube" : "sprite");
++        fflush(stdout);
+     } else if (!strcmp(cmd, "walldump")) {
+         /* Every wall cell the brain reported, the variant and rotation the table
+            resolved for it, the mesh that resolved, and whether it actually reached the

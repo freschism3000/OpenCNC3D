@@ -2,11 +2,11 @@
 
 The click path is **not** broken. Clicks reach `eui_hit`, and `eui_hit`'s rectangles agree with `eui_draw`'s pixels exactly. What is broken is the **other end**: several of the panel's most button-looking controls are hit-tested and then thrown away, the handler prints nothing at all, and one very natural keystroke (ESC) silently puts a modal in front of the whole panel.
 
-Also, **both files were changing during this analysis.** `edit_mod.h` changed twice while it was being read (`EUI_ACT` and a DPI scale factor `L.s` appeared mid-analysis, and a `--uitest` harness is uncommitted). Line numbers below are **live as of this moment**; my analysis snapshot is `<scratch>/cnc_eyes.snap.cpp` (sha1 `be86abb`) and `.../edit_mod.snap.h` (sha1 `c163239`).
+Also, **a concurrent edit is editing both files right now.** `edit_mod.h` changed twice while I was reading it (`EUI_ACT` and a DPI scale factor `L.s` appeared mid-analysis, and a `--uitest` harness is uncommitted). Line numbers below are **live as of this moment**; my analysis snapshot is `<scratch>/cnc_eyes.snap.cpp` (sha1 `be86abb`) and `.../edit_mod.snap.h` (sha1 `c163239`).
 
 ---
 
-## Hard evidence from an actual run
+## Hard evidence from the project owner's actual run
 
 `playable/Editor.log` is the 22:51:04 run (170 s, ended 22:53) -- the one being reported. It proves several things:
 
@@ -93,7 +93,7 @@ Order, top-level, inside `while (SDL_PollEvent(&e))`:
 
 Both `eui_draw` (`edit_mod.h:582`) and `eui_hit` (`edit_mod.h:903`) call the same `eui_layout` (`edit_mod.h:426`) with the same `fbw/fbh`, and `eui_draw` sets its ortho with `begin_overlay(fbw, fbh)` → `glOrtho(0, fbw, fbh, 0, …)` (`cnc_eyes.cpp:10143`), y-down pixel space, matching the hit test's coordinate convention. `begin_overlay` does **not** set the viewport, but `draw_frame` leaves it at `glViewport(0,0,rw,rh)` with `rw==fbw` when the Tier-2 chain is off (`cnc_eyes.cpp:12166,12177`), and `fx_present` restores `glViewport(0,0,g_fxW,g_fxH)` when it is on (`fx_post.h:886`). No mismatch.
 
-I re-implemented `eui_layout`+`eui_hit` exactly and probed every drawn control (with a standalone simulation of the layout). At 1280×720 (the default, `cnc_eyes.cpp:15844`):
+I re-implemented `eui_layout`+`eui_hit` exactly and probed every drawn control (script at `scratch work`). At 1280×720 (the default, `cnc_eyes.cpp:15844`):
 
 ```
 sideX=940  grid=317..493  tile=77.8x78.9  rows=2
@@ -130,7 +130,7 @@ Yes. Set once at `cnc_eyes.cpp:16565` in `game_boot` from `o->edit`; `--edit` se
 
 ## Ranked candidate causes
 
-**1. Six of the panel's most button-shaped controls are hit-tested and then discarded.** `cnc_eyes.cpp:17786` -- `default: break; /* MODE, DEAD: nothing yet */`. `EUI_MODE` (the three 46px-tall `OBJECTS / TERRAIN / ELEVATION` tabs, drawn at `edit_mod.h:584-597`, the first thing under the radar) and `EUI_ACT` (the `UNDO / REDO / REVERT` row, drawn at `edit_mod.h:776`) both fall into `default:`. `EUI_ACT` did not even *exist* in the build that was run -- the row had no hit rectangle at all; `EUI_ACT` was later added to the enum (`edit_mod.h:330`) and to `eui_hit` (`:944-950`) in the last few minutes, but **the switch in `cnc_eyes.cpp` still has no `case EUI_ACT:` as of right now**, so those three buttons are *still* dead. This alone reproduces "clicking the panel does nothing" for the two rows a user reaches for first.
+**1. Six of the panel's most button-shaped controls are hit-tested and then discarded.** `cnc_eyes.cpp:17786` -- `default: break; /* MODE, DEAD: nothing yet */`. `EUI_MODE` (the three 46px-tall `OBJECTS / TERRAIN / ELEVATION` tabs, drawn at `edit_mod.h:584-597`, the first thing under the radar) and `EUI_ACT` (the `UNDO / REDO / REVERT` row, drawn at `edit_mod.h:776`) both fall into `default:`. `EUI_ACT` did not even *exist* in the build the project owner ran -- the row had no hit rectangle at all; the a concurrent edit added `EUI_ACT` to the enum (`edit_mod.h:330`) and to `eui_hit` (`:944-950`) in the last few minutes, but **the switch in `cnc_eyes.cpp` still has no `case EUI_ACT:` as of right now**, so those three buttons are *still* dead. This alone reproduces "clicking the panel does nothing" for the two rows a user reaches for first.
 
 **2. ESC opens the 1995 pause dialog on top of the editor and swallows every subsequent click.** `cnc_eyes.cpp:17593` -- `case SDLK_ESCAPE: if (!sim_over) opt_show(o->scen); break;`. `opt_show` (`:10793`) has **no `g_editOn` guard** and sets `g_optOpen = true` at `:10830`. From then on `else if (g_optOpen)` at `:17479` sits above the mouse branch and consumes 100% of button events, while `eui_draw` at `:18095` keeps drawing the panel (it is gated on `g_editOn` only). ESC is exactly what a user presses to get out of the editor -- the launcher's own comment says *"ESC is how you leave the editor"* -- so this is a one-keystroke trap into a totally dead panel. Not the cause of the 22:51 run specifically (no `OPTIONS|` line), but the highest-severity latent one. The same hole exists for `*` → `cheat_show` (`:10779`), also unguarded.
 
@@ -142,7 +142,7 @@ Yes. Set once at `cnc_eyes.cpp:16565` in `game_boot` from `o->edit`; `--edit` se
 
 **6. `edit_update_hover` does not exclude the sidebar.** `edit_mod.h:78-84` -- `g_editOverMap = (mouseC >= 0.0f) && screen_to_cell(...)` with no `mx < sideX` test. The cell cursor and footprint keep being computed and drawn for a map cell *behind* the panel while the pointer is over the panel. Harmless for clicks (the `ehit != EUI_MAP` arm wins first) but it makes the panel look unresponsive-yet-alive, and it is the mirror image of the bug that would occur if the branch order were ever reversed.
 
-**7. `gridH` clamp can swallow SAVE/PLAY on a short window.** `edit_mod.h:465` -- `if (L->gridH < 60 * S) L->gridH = 60 * S;` while `saveY/playY` stay pinned to the bottom. `eui_hit` tests the grid rectangle **before** SAVE and PLAY (`:932` vs `:951-952`) and returns `EUI_DEAD` for any grid-interior miss, so below roughly 463 drawable pixels of height the grid rect overlaps the SAVE bar and eats it. Not the reported case at 720p, but a real trap once the window is resizable.
+**7. `gridH` clamp can swallow SAVE/PLAY on a short window.** `edit_mod.h:465` -- `if (L->gridH < 60 * S) L->gridH = 60 * S;` while `saveY/playY` stay pinned to the bottom. `eui_hit` tests the grid rectangle **before** SAVE and PLAY (`:932` vs `:951-952`) and returns `EUI_DEAD` for any grid-interior miss, so below roughly 463 drawable pixels of height the grid rect overlaps the SAVE bar and eats it. Not the project owner's case at 720p, but a real trap once the window is resizable.
 
 **8. `--autoplay` would silently drop every real click.** `:17454-17459` filters `e.button.which != AP_WHICH`. Not reachable from `--edit`, listed for completeness.
 

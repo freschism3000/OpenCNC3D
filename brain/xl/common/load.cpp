@@ -12,6 +12,12 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// The change is additive and does not alter the game simulation; the complete
+// diff against upstream is brain/patches/vanilla-cnc3d.patch, and NOTICE.md
+// lists every modified file.
+//
 
 /* $Header: g:/library/wwlib32/file/rcs/load.cpp 1.4 1994/04/22 12:42:21 scott_bowen Exp $ */
 /***************************************************************************

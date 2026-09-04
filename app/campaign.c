@@ -22,7 +22,7 @@
 #include "../audio/mixer.h"
 #include "../audio/mixfile.h"
 #include "../audio/audioboot.h"
-/* CMD+F / ALT+ENTER on the briefing, score and map screens too. */
+/* CMD+F / ALT+ENTER on the mission briefing, score and map screens too. */
 #include "../game/fullscreen.h"
 
 /* THE SCORE SCREEN'S FACTION LOGO BOX, in 320x200 PLATE pixels.
@@ -37,7 +37,7 @@
 
    The box below is that slot. It is deliberately NOT the "blank space" this first
    shipped in: the top right band between TOTAL SCORE and CASUALTIES was clear, but
-   clear is not where the emblem belongs, and it was settled with a shot of the
+   clear is not where the emblem belongs, and the project owner settled it with a shot of the
    1995 Nod screen -- "not the correct size or placed in the correct location", the
    reference showing the hexagon filling the top left corner. */
 #define LOGO_PX   0
@@ -618,7 +618,7 @@ static void camp_draw(Camp *c)
        is the synthetic clock under --flowtest, so a flow shot is reproducible. */
     if (c->logo_ok && c->logo_side >= 0) {
         /* EACH FACTION DRAWS ITS OWN BRIEFING LOGO, and never the title disc.
-           Reported, over a recording of a GDI score screen turning its Nod
+           the project owner, 26 Aug 2026, over a recording of a GDI score screen turning its Nod
            face forward: "Both Logos combined into onw", then "use BRF_LOGO_GDI
            (dl_01E9A50) for the GDI score screen, and BRF_LOGO_NOD (dl_01EF058) for
            the Nod screen." Those are slots 0 and 1 of the pack.
@@ -627,8 +627,8 @@ static void camp_draw(Camp *c)
            one model, so a full revolution shows the OTHER faction for half of every
            turn. That reads as one logo morphing into the other, which is what he saw.
 
-           AND THE BRIEFING MEDALLIONS ARE NOT FLAT PLATES, which is why they can take
-           a full turn where the title disc could not. Reported, on a viewer capture of
+           AND THE MISSION BRIEFING MEDALLIONS ARE NOT FLAT PLATES, which is why they can take
+           a full turn where the title disc could not. the project owner, on a viewer capture of
            BRF_LOGO_NOD: "The ones I sent you are not onesided." They are solid
            medallions -- 717 triangles for Nod, 908 for GDI, 46 and 36 units thick --
            with a real bevelled edge and a dark backing face. Turned all the way round
@@ -1897,7 +1897,7 @@ int camp_score(Camp *c, const CampScore *s, int side, int scenario)
     static const int nodtxx[2] = {150, 224}, nodtxy[2] = {102, 102};
     static const int bldggy[2] = {138, 128}, bldgny[2] = {150, 140};
 
-    /* BOTH FACTIONS WEAR NOD'S SCORE SCREEN. Reported: "Apply the Nod
+    /* BOTH FACTIONS WEAR NOD'S SCORE SCREEN. the project owner, 26 Aug 2026: "Apply the Nod
        Scorescreen to GDI mission (with the GDI music and emblem), and we'll test
        that out."
 
@@ -1955,8 +1955,8 @@ int camp_score(Camp *c, const CampScore *s, int side, int scenario)
        houses even though the same function branches on house for the palette and the
        background art, so NOD_WIN1.AUD -- 372,405 bytes of it, sitting in the shipped
        SCORES.MIX -- was written, pressed and never played. It is in no theme table and
-       referenced by no code in the 1995 source. It was asked to be restored.
-       A DELIBERATE DEVIATION from 1995, and registered as such. */
+       referenced by no code in the 1995 source. the project owner asked for it back on 26 Aug 2026.
+       A DELIBERATE DEVIATION from 1995 and registered as one in known-gap notes. */
     if (c->au) {
         cnc_music_stop(c->au);
         cnc_music_play_theme(c->au, side ? "NOD_WIN1" : "WIN1", 1);
@@ -2212,7 +2212,7 @@ static const MapRow camp_country[27] = {
     /*  3 */ {{3, 3}, {32, 32}, {35, 35},
               {{0x81, 0x82, 0x83}, {0x81, 0x82, 0x83}}, {{3, 3, 1}, {3, 3, 1}},
               {{'W', 'W', 'E'}, {0, 0, 0}}, {{'A', 'B', 'A'}, {0, 0, 0}}},
-    /*  4 */ /* DELIBERATE DEVIATION FROM THE 1995 TABLE, and the only one in here.
+    /*  4 */ /* DELIBERATE DEVIATION FROM THE 1995 TABLE, the first of the two in here.
                  mapsel.cpp's own row 4 reads {{SVA, SVA, SVN}, {SVA, SVB, SVN}}: the two
                  EAST choices both name variant A, so both click areas lead to SCG05EA and
                  SCG05EB -- which ships, and whose INI and BIN are installed beside the
@@ -2245,7 +2245,23 @@ static const MapRow camp_country[27] = {
     /* 11 */ {{2, 1}, {179, 0}, {182, 0},
               {{0x90, 0x91, 0}, {0, 0, 0}}, {{14, 15, 0}, {0, 0, 0}},
               {{'E', 'E', 0}, {0, 0, 0}}, {{'A', 'B', 0}, {0, 0, 0}}},
-    /* 12 */ {{2, 1}, {195, 0}, {198, 0},
+    /* 12 */ /* DELIBERATE DEVIATION FROM THE 1995 TABLE, the second of the two in here.
+                 mapsel.cpp's own row 12 offers TWO east choices, colours 0x92 and 0x93,
+                 leading to SCG13EA and SCG13EB -- but the globe never marks the second.
+                 The blink under SELECT TERRITORY TO ATTACK is the cycling palette slots
+                 249..254 painted into EUROPE's ContAnim+12 frame. Counting those pixels
+                 inside each candidate's own CLICK_E area: of the 24 choice slots GDI
+                 rows 1..13 can reach, 23 are lit on their own blink frame and one is
+                 not -- 0x93 on row 12's frame 210, at 0 of its 335 pixels, beside 79 of
+                 228 for 0x92. The same 0x93 IS lit on row 13's frame 226, where it is
+                 the sole choice, so the reel gives that territory to the next mission.
+                 Row 12's second click area is an unlit patch that silently swallows a
+                 click aimed at the lit one. Nothing is lost by closing it: SCG13EA and
+                 SCG13EB carry byte-identical INI and BIN on the 1995 disc, so both
+                 choices always ran the same scenario. Only the COUNT changes; the 0x93
+                 and 'B' entries stay and the hit test stops before them. Restore the 2
+                 for 1995's behaviour. */
+             {{1, 1}, {195, 0}, {198, 0},
               {{0x92, 0x93, 0}, {0, 0, 0}}, {{12, 12, 0}, {0, 0, 0}},
               {{'E', 'E', 0}, {0, 0, 0}}, {{'A', 'B', 0}, {0, 0, 0}}},
     /* 13 */ {{1, 1}, {211, 0}, {214, 0},
@@ -2367,7 +2383,7 @@ int camp_mapsel(Camp *c, int side, int scenario, char *dir, char *var)
     /* NOD HAS ITS OWN REELS AS OF 26 Aug 2026. This was `if (side != 0) return 0`
        with a note calling them a registered gap needing CD-2. They were never
        missing: EARTH_A.WSA, AFRICA.WSA and CLICK_A.CPS sit in the GENERAL.MIX we
-       already ship, beside the GDI three, and nobody had looked. Reported:
+       already ship, beside the GDI three, and nobody had looked. the project owner, 26 Aug:
        "There are no NOD map screens between any NOD campaign missions currently."
        Only the three that name a continent differ: GREYERTH and E-BWTOCL are
        shared, being the same grey globe and the same fade to colour. */

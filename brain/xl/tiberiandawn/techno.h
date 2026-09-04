@@ -247,7 +247,7 @@ public:
     // EIGHTPLAYERS: widened from unsigned char -- the ownable mask is 16 bits
     // (TechnoTypeClass::Ownable) and HOUSEF_MULTI5 upward live above bit 7, so the
     // narrow return truncated the multiplayer houses off the mask.
-    virtual unsigned short Get_Ownable(void) const;
+    virtual uint64_t Get_Ownable(void) const;
     virtual bool Can_Player_Fire(void) const;
     virtual bool Can_Player_Move(void) const;
     virtual bool Is_Weapon_Equipped(void) const;

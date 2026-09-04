@@ -12,6 +12,19 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Adds a per-house invincibility switch: a static bitmask on ObjectClass, a
+// setter and a query, with the query added as a fourth condition on the
+// damage test in Take_Damage so objects owned by a flagged house take no
+// damage, plus a reset of the mask in Init(). Separately widens
+// ObjectClass::Get_Ownable from unsigned char to unsigned short and its
+// default return from 0xff to 0xffff so house bits above bit 7 are not
+// truncated.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\object.cpv   2.17   16 Oct 1995 16:49:22   JOE_BOSTIC  $ */
 /***********************************************************************************************

@@ -68,6 +68,15 @@ int hud640_bar_h(int rows);
 int hud640_arrow_y(int rows);
 int hud640_meter_h(int rows);
 
+/* THE METER'S ONE SCALE. hud640_meter_segs is how many whole segments the channel holds;
+   hud640_meter_y is the y of the TOP EDGE of the fill a 0..100 level produces.
+   Anything that has to be read AGAINST the fill goes through hud640_meter_y and never
+   through a fraction of H6_METER_H: the fill is quantised to whole H6_METER_PITCH
+   segments tiled up from the channel floor, so it travels segs * H6_METER_PITCH, ten
+   pixels short of the channel, and the two are not the same scale. */
+int hud640_meter_segs(int rows);
+int hud640_meter_y(int rows, int level);
+
 /* How many rows fit in `avail` bar-space pixels (screen height divided by the zoom),
    clamped to H6_ROWS..H6_MAX_ROWS. Never fewer than the five that were authored. */
 int hud640_rows_for(int avail);
@@ -148,6 +157,12 @@ typedef struct
     int power_color;                 /* 0 green (healthy), 1 yellow, 2 red.
                                         1995's watt rule: yellow when drain exceeds
                                         output, red when it exceeds twice it. */
+    int power_drain_level;           /* 0..100 on the SAME scale as power_level: what the
+                                        base is DRAWING. The reported defect is that the
+                                        meter is output alone, so a base overdrawing its
+                                        plants fills exactly like a base drawing nothing.
+                                        0 marks nothing, which is what a caller that does
+                                        not know its drain gets. */
     int credits;                     /* printed on the credits tab */
     /* Frame indices into the baked control strips. The order is a contract with
      * tools/sidebar_redesign/states.py, which authors the art:
@@ -160,6 +175,9 @@ typedef struct
        h6_fill_state memsets the struct and nothing set it, so the button could not light
        up even once it was hit-testable. */
     int options_frame, credits_frame, sidebar_frame;
+    /* The DATABASE plate's frame. A fourth pinned plate, drawn only in Enhanced with the
+       Enhanced HUD; see codex_mod.h. */
+    int database_frame;
     int radar_active;                /* 0 -> draw the faction emblem instead of a map */
     int nod;                         /* which emblem: 0 GDI, 1 Nod */
     /* Sized for the tallest bar we will ever compose. `rows` says how many of them

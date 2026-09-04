@@ -1,7 +1,8 @@
 # The model gallery
 
 Every 3D asset on the Command & Conquer cartridge, in a browser, with a thumbnail, a
-real name, a category, and an export button. 202 models, 11,080 triangles.
+real name, a category, and an export button. 240 models, 13,400 triangles, counted from
+the generated table rather than remembered.
 
 It replaces `tools/bakery/sharecopy/assets/model-viewer.html`, which was a rescued
 build artifact from 13 August 2026 with no generator anywhere in the repository, and
@@ -54,7 +55,11 @@ order. A wall's `S` suffix is re-checked against the mesh: it is only labelled a
 shadow piece if every one of its triangles actually draws in a blended pass.
 
 Anything with no name in any source keeps its cartridge code, and `export.py` prints
-the list rather than letting a guess through. Today that list is empty.
+the list rather than letting a guess through. That list is currently 37 codes: the
+twenty `*DMG` damage overlays, the fifteen `ION0..ION14` frames, `NUKEFX` and
+`RALLYFL`. Every one of them is an effect or damage variant of a mesh that IS named,
+so nothing unnamed is a model in its own right, but the list is not empty and this
+line used to say it was.
 
 ## What counts as one asset
 
@@ -133,7 +138,7 @@ The page must be **served**, not opened from the filesystem: it fetches `geo.bin
   stand in for a clip. The clip does go out with the FBX.
 * **The briefing meshes' light is ours**, not the cartridge's own briefing light. It
   is the console's resident directional light, applied because those lists run with
-  `G_LIGHTING` on and carry no baked colour to modulate. Which light the briefing
+  `G_LIGHTING` on and carry no baked colour to modulate. Which light the mission briefing
   screen actually sets has not been read out of the ROM.
 * **`packinspect.py` is one format version behind on the pack tail** (1,732 unparsed
   bytes on a v14 pack). It does not touch the mesh or texture tables, so nothing here

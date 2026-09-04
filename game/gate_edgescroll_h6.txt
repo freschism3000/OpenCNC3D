@@ -1,20 +1,25 @@
 # RIGHT EDGE SCROLLING, THE 640x480 HUD AND ITS DRAWER.
 #
-# The same fault as the DOS bar arm, plus the two things only this HUD has: the bar can
-# slide out of the way, and it keeps a handle plate pinned to the window edge when it
-# does. Run at 1280x960, where the bar is 160 wide, so the map ends at x=1120 deployed
-# and at the window edge once the drawer is hidden.
+# The same two strips as the DOS arm, plus the two things only this HUD has: the bar can
+# slide out of the way, and it keeps plates pinned to the WINDOW when it does. Run at
+# 1280x960, where the whole-number zoom is 2 and the bar is therefore 320 wide, so the
+# map ends at x=960 deployed and reaches the window edge once the drawer is hidden. The
+# window strip is [1268,1280) either way.
 #
 #   1  deployed: the map's right edge scrolls EAST
-#   2  deployed: the window's right edge is on the bar and moves nothing
-#   3  hidden: the map now reaches the window edge, and that edge scrolls EAST the same
+#   2  deployed: the window's right edge is ON the bar and scrolls EAST just the same
+#   3  deployed: the middle of the bar, between the two strips, moves nothing
+#   4  hidden: the map now reaches the window edge, and that edge scrolls EAST the same
 #      distance, so the drawer no longer changes the answer
-#   4  hidden: the handle plate still owns its own rows, and scrolling is still refused
-#      there, or reaching for the control that brings the bar back would pan the map
+#   5  hidden: the SIDEBAR handle plate keeps its veto even though it sits INSIDE the
+#      window strip, or reaching for the control that brings the bar back would pan the
+#      map. This is the one thing the strip's exemption is not allowed to swallow.
 cam 45 38
 edge R 20
 cam 45 38
 edgeat 1278 400 20
+cam 45 38
+edgeat 1200 400 20
 sbslide hide
 sbslide settle
 cam 45 38

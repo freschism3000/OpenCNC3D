@@ -124,7 +124,7 @@ public:
     VQType IntroMovie;
 
     /*
-    **	The filename of the briefing movie.
+    **	The filename of the mission briefing movie.
     */
     VQType BriefMovie;
 
@@ -151,13 +151,13 @@ public:
     VQType LoseMovie;
 
     /*
-    **	The filename of the movie to play right after the briefing and
+    **	The filename of the movie to play right after the mission briefing and
     **	just before the game.
     */
     VQType ActionMovie;
 
     /*
-    **	This is the full text of the briefing. This text will be
+    **	This is the full text of the mission briefing. This text will be
     **	displayed when the player commands the "restate mission
     **	objectives" operation.
     */

@@ -24,8 +24,14 @@
 #      long before anything could carry it. This is the number that proves the pip work
 #      from v0.5.9 now reaches aircraft rather than just harvesters.
 #
-#   3. PARKED AIRCRAFT SIT ON THE GROUND. alt 0 gives lift 0. A non-zero lift here would
-#      mean a helicopter hovering off its own pad.
+#   3. PARKED AIRCRAFT STAND ON THE PAD. Altitude 0 means "on the floor", and on a
+#      helipad the floor is the model's landing plate rather than the terrain: the
+#      cartridge's HPAD mesh carries exactly one flat face, 1.38 square cells at mesh
+#      y 154, so a docked helicopter is drawn 154/1024 = 0.1504 cells up. All four
+#      aircraft in this mission are parked on one of its four helipads. This arm read
+#      lift 0.0000 from the day the Aircraft heap first arrived, which is an Apache
+#      buried to 51 percent of its own height in the deck; 0.0000 here again means the
+#      deck lookup found nothing.
 #
 #   4. THE AIRSTRIKE ARRIVES. Firing it adds THREE A-10s (Bound(BuildLevel/3, 1, 3)) and
 #      each flies at alt 24, which is AircraftClass::FLIGHT_LEVEL (aircraft.h:83). This is

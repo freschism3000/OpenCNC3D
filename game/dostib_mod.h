@@ -104,7 +104,7 @@ static bool dostib_load(const char* path)
         glBindTexture(GL_TEXTURE_2D, id);
         /* GL_NEAREST, and NOT through fx_filter_mode: tiberium is the one ground
            texture the bilinear switch must never reach, in either visual mode.
-           Reported: "In enhanced mode and classic mode, bilinear filtering
+           the project owner, 26 Aug 2026: "In enhanced mode and classic mode, bilinear filtering
            should not be applied to tiberium."
            WHY IT IS WORSE HERE than on the terrain it sits on. A tiberium cell is an
            alpha-tested CUTOUT, not an opaque tile: the field's shape comes out of the

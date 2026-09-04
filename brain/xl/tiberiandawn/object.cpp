@@ -91,7 +91,7 @@ void const* ObjectTypeClass::PipShapes = 0;
 **	because Init() below resets it and Clear_Scenario() calls Init(). See object.h for
 **	why the switch lives on ObjectClass rather than in the DLL layer.
 */
-unsigned ObjectClass::CNC3D_InvincibleHouses = 0;
+uint64_t ObjectClass::CNC3D_InvincibleHouses = 0;
 
 /***********************************************************************************************
  * ObjectClass::CNC3D_Set_Invincible -- Turns damage immunity on or off for one house.         *
@@ -115,9 +115,9 @@ void ObjectClass::CNC3D_Set_Invincible(HousesType house, bool on)
         return;
     }
     if (on) {
-        CNC3D_InvincibleHouses |= (1 << house);
+        CNC3D_InvincibleHouses |= (1ULL << house);
     } else {
-        CNC3D_InvincibleHouses &= ~(1 << house);
+        CNC3D_InvincibleHouses &= ~(1ULL << house);
     }
 }
 
@@ -477,7 +477,7 @@ bool ObjectClass::Is_Techno(void) const
  * HISTORY:                                                                                    *
  *   08/13/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
-unsigned short ObjectClass::Get_Ownable(void) const
+uint64_t ObjectClass::Get_Ownable(void) const
 {
     return (0xffff);
 }

@@ -326,7 +326,7 @@ def briefings():
 # labels a campaign row by its number and files the exclusives under the plain header
 # ";; N64 Special Ops" in ENG/MISSION.ENG.
 #
-# So the names below come from the community record, as instructed, and the
+# So the names below come from the community record, at the project owner's instruction, and the
 # viewer marks them as such rather than passing them off as cartridge data. Sources:
 # the Command & Conquer Wiki's "GDI/Nod '99 Special Ops M1/M2" pages, which confirm
 # the count is four and match the four the ROM's own SPECIAL OPS pointer array holds;
@@ -354,7 +354,7 @@ EXTERNAL_NAMES = {
 # Covert Operations, the full 15 as the record has them, for cross-checking the INI
 # titles the cartridge does carry. 13 of the 15 match a cartridge INI exactly; the
 # 14th ("Eviction Notice") is the map the N64 reused for Nod Special Ops M1, and
-# "Deceit" is on neither the cartridge nor the reference CD.
+# "Deceit" is on neither the cartridge nor the project owner's CD.
 COVERT_OPS_RECORD = {
     "GDI": ["Blackout", "Hell's Fury", "Infiltrated", "Elemental Imperative",
             "Ground Zero", "Twist of Fate", "Blindsided"],
@@ -403,7 +403,7 @@ def main():
           f"{sum(1 for v in brief_tag.values() if 'Special Ops' in v)} tagged N64 Special Ops")
     # The cartridge ships GDI and Nod scenarios and nothing else: checked straight
     # against the ROM, which holds zero SCM entries. The shared extracted tree is a
-    # working directory that other tooling also writes to, and DOS-derived SCM*.MAP
+    # working directory a concurrent edit also writes to, and DOS-derived SCM*.MAP
     # files have appeared in it; those are not cartridge files and the DOS half of
     # this exporter reads their originals out of GENERAL.MIX anyway, so anything that
     # is not SCG/SCB is skipped here rather than mislabelled as ROM content.

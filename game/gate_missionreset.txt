@@ -1,6 +1,6 @@
 # G104. A NEW MISSION STARTS FRESH: THE CLOCK AND THE RUBBLE.
 #
-# Reported: "When winning a skirmish map, and starting a new match, it starts
+# the project owner, 25 Aug 2026: "When winning a skirmish map, and starting a new match, it starts
 # when the last one ended, instead of starting a fresh map."
 #
 # TWO DEFECTS THAT COMPOSED, which is why this reached him.

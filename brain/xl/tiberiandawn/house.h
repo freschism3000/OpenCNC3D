@@ -486,7 +486,7 @@ public:
     bool Is_Ally(HousesType house) const;
     bool Is_Ally(HouseClass const* house) const;
     bool Is_Ally(ObjectClass const* object) const;
-    unsigned int Get_Allies(void) const
+    uint64_t Get_Allies(void) const
     {
         return Allies;
     }
@@ -740,7 +740,7 @@ private:
     **	this house. It is presumed that any house that isn't an ally, is therefore
     **	an enemy. A house is always considered allied with itself.
     */
-    unsigned Allies;
+    uint64_t Allies;
 
     /*
     **	This is the standard delay time between announcements concerning the

@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// Adds two 256-entry palette remap tables, RemapGrey and RemapBrown, for
+// multiplayer houses 7 and 8, compiled only when EIGHTPLAYERS is defined.
+// Each table remaps only the gold house colour band (indices 176 to 191)
+// onto grey or brown ramps and leaves every other index identical.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\const.cpv   2.17   16 Oct 1995 16:52:24   JOE_BOSTIC  $ */
 /***********************************************************************************************

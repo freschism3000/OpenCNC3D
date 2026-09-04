@@ -62,8 +62,8 @@ float t1_anim_object(const T1_MeshBank *b, int mi, const W98_Object *o, long tic
  * So the renderer keeps the clock: a building assembles over the engine's own five
  * seconds from the moment it is first seen, and only if the engine said CONSTRUCTION when
  * it was first seen -- otherwise every structure already standing at mission start would
- * build itself again. The DURATION is the engine's; the COUNTER is ours. Registered
- * as an open question, and the thing that deletes it is a brain that can load MAKE.SHP.
+ * build itself again. The DURATION is the engine's; the COUNTER is ours. Registered in
+ * known-gap notes, and the thing that deletes it is a brain that can load MAKE.SHP.
  * ---------------------------------------------------------------------------------- */
 #define T1_BUILDUP_TICKS 75            /* 5 * TICKS_PER_SECOND, BDATA.CPP:3845 */
 

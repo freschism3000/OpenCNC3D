@@ -135,6 +135,12 @@ typedef struct GameOpts {
        click do nothing at all. Which counts are safe is a measured property of the engine's
        own scatter, and no value is safe everywhere. Zero is the measured best. */
     int unit_count;
+    /* ---- A NETWORK MATCH (Phase 3). 0 is no network, which is every path above. 1 hosts
+       on net_port and waits for one joiner; 2 joins net_addr:net_port. Either implies
+       skirmish, and the joiner's own skirmish settings lose to what the host sends. */
+    int net_mode;
+    const char* net_addr;
+    int net_port;
     int ticks;              /* --ticks, warm-up for shot/script    */
     int w, h;               /* requested framebuffer size          */
     int dumpobj;
@@ -153,7 +159,7 @@ enum {
     GAME_EXIT_WON = 3,      /* the engine declared the mission won (game-over event) */
     GAME_EXIT_LOST = 4,     /* the engine declared it lost */
     /* Restart Mission from the abort confirmation. The shell re-enters the SAME scenario
-       without replaying the briefing, which is what 1995's Do_Restart does: it calls
+       without replaying the mission briefing, which is what 1995's Do_Restart does: it calls
        Start_Scenario with briefing = false (scenario.cpp:728). An enum value rather than
        a field on a diagnostic line, so no gate pattern is disarmed by it. */
     GAME_EXIT_RESTART = 5
@@ -213,6 +219,28 @@ void game_get_campaign(int* active, int* side, int* scenario, int* dir, int* var
  * `preset` is loaded if it exists and ignored in silence if it does not, because a
  * first run has no saved config and that is not an error. */
 void game_visuals_default_enhanced(const char* preset);
+
+/* THE PLAYER'S GAME CONTROLS, REMEMBERED, AND THE SHELL DECIDES THAT TOO.
+ *
+ * Speed, scroll rate, music, sound and speech used to live in a static for the length of
+ * one process and were then thrown away. `path` names a small text file in the working
+ * folder, beside the Visuals preset and treated the same way: read here if it exists,
+ * ignored in silence if it does not, and rewritten when the player closes the pause
+ * dialog having actually moved something.
+ *
+ * CALLING THIS IS AN OPT IN, and that is not tidiness. A remembered SPEED sets the engine
+ * tick rate, so a settings file that every run picked up merely by being in the folder
+ * would retime the whole gate suite from whatever happened to be lying there. cnc_eyes
+ * never calls it, so its gates cannot see one; the shell calls it on a player's launch
+ * and not on an automated one. NULL or "" turns remembering back off.
+ *
+ * Call it AFTER game_set_audio: restoring the volumes pushes them straight at the mixer.
+ */
+void game_controls_remember(const char* path);
+/* AND THE SAME FOR THE VISUALS AND INPUT PRESET. An empty path means remember nothing:
+   no load, no save, not one fopen. Only the shell's non-automated launch and the explicit
+   --visualscfg turn it on, so no automated run can inherit a preset. */
+void game_visuals_remember(const char* path);
 
 /* Headless modes, kept out of the shell: they are measuring instruments, and each
    one ends the process. Call after game_boot. */

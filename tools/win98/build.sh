@@ -180,7 +180,7 @@ echo "   built  : $OUT/w98braintest.exe ($(wc -c < "$OUT/w98braintest.exe" | tr 
 # the one thing here that needs a third-party SDK.
 #
 # Run tools/win98/setup-glide.sh once to assemble it: headers from sezero/glide, and
-# an import library built with dlltool from the REAL glide2x.dll off the Voodoo 2 machine, so we
+# an import library built with dlltool from the REAL glide2x.dll off the project owner's box, so we
 # link against exactly the entry points that driver exports.
 # ---------------------------------------------------------------------------
 GLIDE="${CNC3D_GLIDE_SDK:-$HOME/.cnc3d-win98sdk/glide}"

@@ -20,7 +20,7 @@ WHAT IS CONVERTED AND WHY
   Per-vertex RGBA -> a scalar light.  The rasteriser interpolates one brightness, not
   three channels. 82.9% of mesh vertices are already pure grey and collapse exactly.
   The other 17.1% desaturate, and the saturated reds and greens are the visible loss.
-  Written down as an open question rather than hidden.
+  Written into known-gap notes rather than hidden.
 
   Untextured triangles -> a 1x1 texture.  1,204 of 7,902 triangles carry texture -1 and
   are vertex-coloured only. Each becomes a one-texel texture holding the nearest palette

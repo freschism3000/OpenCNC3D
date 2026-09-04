@@ -287,11 +287,9 @@ void SmudgeClass::Read_INI(CCINIClass& ini)
                 int data = 0;
                 CELL cell = atoi(ptr);
                 /*
-                ** Convert the normal cell position to a new big map position.
+                ** Convert from the scenario's OWN stride into this build's (function.h).
                 */
-                if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-                    cell = Confine_Old_Cell(cell);
-                }
+                cell = Confine_Scenario_Cell(cell, Map.MapBinaryVersion);
                 ptr = strtok(NULL, ",");
                 if (ptr)
                     data = atoi(ptr);
@@ -340,8 +338,10 @@ void SmudgeClass::Write_INI(CCINIClass& ini)
                 char uname[10];
                 char buf[127];
 
-                sprintf(uname, "%03d", index);
-                sprintf(buf, "%s,%d,%d", stype->IniName, index, ptr->SmudgeData);
+                /* the scenario's own stride, not ours -- see Scenario_Cell_Of */
+                CELL out = Scenario_Cell_Of(index, Map.MapBinaryVersion);
+                sprintf(uname, "%03d", out);
+                sprintf(buf, "%s,%d,%d", stype->IniName, out, ptr->SmudgeData);
                 ini.Put_String(INI_Name(), uname, buf);
             }
         }

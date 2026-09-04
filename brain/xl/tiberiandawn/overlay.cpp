@@ -347,11 +347,12 @@ void OverlayClass::Read_INI(CCINIClass& ini)
         CELL cell = atoi(entry);
         OverlayType classid = ini.Get_OverlayType(INI_Name(), entry, OVERLAY_NONE);
         /*
-        ** Convert the normal cell position to a new big map position.
+        ** Convert from the scenario's OWN stride into this build's (function.h). This used to
+        ** run for MAP_VERSION_NORMAL only, which was right in a 128-wide build where a
+        ** mega cell number needed no conversion, and wrong here: XL is 1024 wide, so a
+        ** mega scenario's cells need confining too.
         */
-        if (Map.MapBinaryVersion == MAP_VERSION_NORMAL) {
-            cell = Confine_Old_Cell(cell);
-        }
+        cell = Confine_Scenario_Cell(cell, Map.MapBinaryVersion);
         /*
         **	Don't allow placement of crates in the multiplayer scenarios.
         */
@@ -400,7 +401,8 @@ void OverlayClass::Write_INI(CCINIClass& ini)
         if (cellptr->Overlay != OVERLAY_NONE) {
             char uname[10];
             char buf[128];
-            sprintf(uname, "%03d", index);
+            /* the scenario's own stride, not ours -- see Scenario_Cell_Of */
+            sprintf(uname, "%03d", Scenario_Cell_Of(index, Map.MapBinaryVersion));
             sprintf(buf, "%s", OverlayTypeClass::As_Reference(cellptr->Overlay).IniName);
             ini.Put_String(INI_Name(), uname, buf);
         }

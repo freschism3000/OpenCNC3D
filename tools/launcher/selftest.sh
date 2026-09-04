@@ -142,7 +142,7 @@ printf 'version 0.6.1\ndata_id %s\n' "$MACDATA" > "$OLD/cnc3d-install.txt"
 
 # ---------------------------------------------------------------- the fake site
 # A FREE PORT, NOT A CHOSEN ONE, AND THEN PROOF THAT THE SERVER ANSWERING IS OURS.
-# An earlier version of this test hardcoded 8099, and another process on this machine
+# An earlier version of this test hardcoded 8099, a concurrent edit on this machine
 # already had it, the bind failed, and eleven assertions then ran against THAT
 # server's 404s. Not one of them said the host was not ours.
 say "a fake cnc3dgame.com"

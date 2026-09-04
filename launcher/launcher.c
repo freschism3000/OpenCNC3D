@@ -11,9 +11,17 @@
  * the 1995 title plate out of TITLE.CPS: the build that is installed, the build
  * that is available, that build's changelog in a scrolling panel, and three
  * buttons. Play starts the game and gets out of the way. When the host has a
- * newer build, Play becomes Update. Editor is drawn disabled, in the engine's own
- * BOXSTYLE_GREEN_DIS_RAISED, because there is an editor being built and there is
- * not yet one to launch.
+ * newer build, Play becomes Update. EDITOR OPENS THE MAP EDITOR, which is a flag on
+ * the renderer rather than a program of its own, so that button runs cnc_eyes with
+ * --edit and a starting map instead of running the game.
+ *
+ * That button used to be drawn disabled, in the engine's own BOXSTYLE_GREEN_DIS_RAISED,
+ * for as long as the editor existed in the tree and not in anything a player was
+ * handed. Enabling it is one line here; keeping it honest is a refusal in both
+ * packagers, which now stop a build that does not carry the editor binary and the maps
+ * it opens. The enable and that refusal are ONE change: an enabled button over a
+ * package with no editor behind it fails in front of the player at the moment it is
+ * pressed, which is worse than a grey one.
  *
  * WHY IT IS NOT A NEW UI TOOLKIT. game/dosbar.c and menu/dosmenu.c already
  * rasterise every piece of chrome this needs, they need nothing but libc, and
@@ -21,7 +29,7 @@
  * of them cannot drift away from the game's look, cross compiles with the
  * toolchain the game already uses, and adds no runtime the player has to install.
  *
- * TIER 1. Everything here is one 320x200 texture and one
+ * TIER 1 (repository rules rule 1). Everything here is one 320x200 texture and one
  * textured quad in fixed-function OpenGL 1.1, which is what the Voodoo 2 target
  * can draw through Glide. There are no shaders and no render targets. The only
  * Tier 2 dependency is SDL2 itself, exactly as the game has.
@@ -129,7 +137,7 @@ typedef struct
     char status[256];
     LU_State *up;
     int quit;
-    int play_after; /* leave the loop and start the game */
+    int play_after; /* leave the loop and start something: 1 the game, 2 the editor */
 } L_App;
 
 /* ------------------------------------------------------------------------ *
@@ -260,7 +268,7 @@ static void l_read_installed(L_App *a)
  * straight to the game. The macOS bundle passes "--w 1600 --h 960" this way,
  * which is not a number the launcher should know: the sidebar magnifies by whole
  * numbers only, so the window height has to be a multiple of 480, and that is a
- * fact about the renderer, recorded as an open gap. Forwarding rather than
+ * fact about the renderer recorded in known-gap notes. Forwarding rather than
  * hardcoding keeps it in the one place it was already written down. */
 static char *l_game_args[16];
 static int l_game_argc;
@@ -323,9 +331,24 @@ static int l_launch(const char *dir, const char *exe, char *err, int errlen)
 
 #ifdef _WIN32
 #define L_GAME_EXE "cnc3d.exe"
+#define L_EDIT_EXE "cnc_eyes.exe"
 #else
 #define L_GAME_EXE "cnc3d"
+#define L_EDIT_EXE "cnc_eyes"
 #endif
+
+/* THE EDITOR IS A FLAG ON THE OTHER BINARY, not a third program. cnc3d links the
+ * same object file, but its entry point goes to the 1995 menu and never reads
+ * --edit, so the button has to run cnc_eyes or it runs nothing. Both packages
+ * already carried that binary before this button was live; what nothing checked
+ * was that they had to.
+ *
+ * The map is named rather than left to cnc_eyes' own default, which is a Nod
+ * campaign mission. This is the first GDI mission: the temperate donor the editor
+ * reaches for when it is asked to make a new map, and the map the development app
+ * has opened on since it was written. Everything else the editor needs it resolves
+ * itself against the working directory l_launch moves to. */
+#define L_EDIT_SCEN "SCG01EA"
 
 /* ------------------------------------------------------------------------ *
  * Presentation: one 320x200 texture, one quad, all OpenGL 1.1.
@@ -444,7 +467,7 @@ static void l_set_buttons(L_App *a)
         a->btn[i].disabled = 0;
     }
 
-    /* Reported: "if theres a new version available the play button
+    /* the project owner, 24 Aug 2026: "if theres a new version available the play button
      * should say Update". One button, two jobs, and the label is the only place
      * the difference shows: a second button that is usually inert would make the
      * common case look like the exceptional one. */
@@ -455,17 +478,25 @@ static void l_set_buttons(L_App *a)
     else if (ph == LU_DONE)
         a->btn[L_BTN_PLAY].label = "Play";
 
-    /* Drawn, disabled, and honest, the same way the menu's Multiplayer button is:
-     * the map editor exists in the tree and does not yet exist as something a
-     * player can be handed, so the button says where it will be rather than
-     * pretending it is not coming. */
-    a->btn[L_BTN_EDITOR].disabled = 1;
-
-    /* Nothing is clickable while a download is in flight except Quit, which stays
+    /* THE EDITOR BUTTON IS LIVE, and the enable is not the whole of the change.
+     * It was drawn disabled because the editor existed in the tree and not in a
+     * package, and an enabled button over a package with no editor in it is worse
+     * than a grey one: it fails at the moment it is pressed, in front of the
+     * player, with no way back. So the Windows packager and the release script now
+     * refuse a build that does not carry the editor binary and the maps this opens,
+     * under the gate id for this change. The enable and that refusal are one change
+     * and must stay one.
+     *
+     * Nothing is clickable while a download is in flight except Quit, which stays
      * live on purpose: a player who wants out during a 500 MB transfer should not
-     * have to kill the process. */
-    if (ph == LU_DOWNLOADING || ph == LU_APPLYING)
+     * have to kill the process. THE EDITOR BELONGS IN THAT LIST, and it did not
+     * need to while it was disabled: pressing it LEAVES this process, execing on
+     * POSIX and exiting on Windows, so a press mid-download kills the transfer and
+     * there is nothing left running to say what happened to it. */
+    if (ph == LU_DOWNLOADING || ph == LU_APPLYING) {
         a->btn[L_BTN_PLAY].disabled = 1;
+        a->btn[L_BTN_EDITOR].disabled = 1;
+    }
 }
 
 static void l_draw(L_App *a)
@@ -587,11 +618,20 @@ static void l_activate(L_App *a, int item)
             a->quit = 1;
         }
         break;
+    case L_BTN_EDITOR:
+        /* 2 rather than 1: the same leave-the-loop-and-launch path Play takes, with
+         * the editor's executable at the end of it instead of the game's. Leaving
+         * rather than spawning keeps the rule Play already follows, so there is no
+         * launcher sitting behind the editor in the dock and no running program to
+         * stop the next update replacing it. */
+        a->play_after = 2;
+        a->quit = 1;
+        break;
     case L_BTN_QUIT:
         a->quit = 1;
         break;
     default:
-        break; /* Editor is disabled and cannot get here */
+        break;
     }
 }
 
@@ -850,7 +890,7 @@ int main(int argc, char **argv)
         /* A message box rather than stderr: this program is double-clicked, and a
          * double-clicked program that writes to a console nobody opened has said
          * nothing at all. That is the exact defect the .bat launchers left behind
-         * ("Seventeen launchers"). */
+         * (known-gap notes, "Seventeen launchers"). */
         char msg[3072];
         snprintf(msg, sizeof msg,
                  "C&C 3D could not find its game files.\n\n"
@@ -985,7 +1025,27 @@ int main(int argc, char **argv)
     SDL_DestroyWindow(a.win);
     SDL_Quit();
 
-    if (a.play_after && !l_launch(a.dir, L_GAME_EXE, err, sizeof err)) {
+    /* The editor's own two arguments go on the END of whatever was forwarded after
+     * `--`, which on macOS is the window size the app bundle passes. Room is
+     * CHECKED rather than assumed: silently dropping --edit would start the
+     * renderer in a mission, which looks like the game misbehaving rather than
+     * like the editor failing to open. */
+    if (a.play_after == 2) {
+        int room = (int)(sizeof l_game_args / sizeof *l_game_args) - l_game_argc;
+        if (room < 3) {
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "C&C 3D",
+                                     "too many forwarded arguments to add the "
+                                     "editor's own", NULL);
+            return 1;
+        }
+        l_game_args[l_game_argc++] = "--edit";
+        l_game_args[l_game_argc++] = "--scen";
+        l_game_args[l_game_argc++] = L_EDIT_SCEN;
+    }
+
+    if (a.play_after && !l_launch(a.dir,
+                                  a.play_after == 2 ? L_EDIT_EXE : L_GAME_EXE,
+                                  err, sizeof err)) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "C&C 3D", err, NULL);
         return 1;
     }

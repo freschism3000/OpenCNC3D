@@ -140,6 +140,14 @@ public:
     bool Read_Binary_Big(char const* fname, uint32_t* crc);
     bool Write_Binary_Big(char const* root);
 
+    /*
+    **	And the XL-native format: sparse like the big one, but with a header that
+    **	names the stride its cell numbers are at, so it can be refused rather than
+    **	misread. MAP_VERSION_XL in defines.h says why the other two could not grow.
+    */
+    bool Read_Binary_XL(char const* fname, uint32_t* crc);
+    bool Write_Binary_XL(char const* root);
+
     CellClass& operator[](unsigned index)
     {
         return Array[index];

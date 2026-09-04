@@ -19,7 +19,7 @@
 #   [event] DEBUG_PRINT   Failed to load scenario file
 #
 # With WIN9X=ON it is _WIN32_WINNT=0x400 and plain ANSI fopen. This is upstream's own
-# switch, so it costs us no patch to brain/vanilla, which the repository conventions keeps our hands out of.
+# switch, so it costs us no patch to brain/vanilla, which repository rules keeps our hands out of.
 #
 # -fms-extensions -fpermissive -flifetime-dse=1 are NOT ours to choose: they are what the
 # modern Windows build already passes (tools/win/build-win.sh:147-151) and each one is

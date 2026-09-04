@@ -6,13 +6,13 @@
 
 # THE CNC3D MAP EDITOR: THE PLAN
 
-*Written for the reader first, implementer second. Every design claim from the web carries a URL; every claim from the code carries a file and line. Where the evidence does not reach, it says UNPROVEN.*
+*Written for the project owner first, implementer second. Every design claim from the web carries a URL; every claim from the code carries a file and line. Where the evidence does not reach, it says UNPROVEN.*
 
 ---
 
 ## 0. DECIDED, 24 Aug 2026
 
-Section 7 asked the questions that change what gets built. All three were answered,
+Section 7 asked the project owner the questions that change what gets built. He answered all three,
 so they are no longer open and the build order below is the one that follows.
 
 1. **v1 must be PLAYABLE, not export-only.** The finish line is a map made in the browser
@@ -45,7 +45,7 @@ Two things to do before slice 1 writes a single byte:
   so from that moment `MAP.h` is the renderer's cosmetic building pads and not the map's
   authored elevation. An editor that saved `MAP.h` would write pads to disk as terrain.
   Keep the authored heights in a field the renderer never touches.
-* **Commit the viewer.** `tools/heightmap-viewer/` is untracked, and per the repository's rule 3
+* **Commit the viewer.** `tools/heightmap-viewer/` is untracked, and per repository rules rule 3
   untracked work does not exist. The editor is going to be built on top of it.
 
 ---
@@ -53,7 +53,7 @@ Two things to do before slice 1 writes a single byte:
 ## 0b. BUILT, 24 Aug 2026
 
 Slices 1 and 2 shipped, and then **terrain painting (slice 3) shipped ahead of slice
-4**, out of the order section 0 decided. That was a project decision, made after using slices
+4**, out of the order section 0 decided. That was the project owner's call, made after using slices
 1 and 2: he asked for terrain next. Slice 4a is therefore **still not done**, and its
 consequence still stands: `bake5.build` has no `heights` parameter, so elevation cannot
 reach the game and the converted skirmish maps are still flat in play. Terrain painting
@@ -108,7 +108,7 @@ round trip of the heightmap, and facing control on units.
 
 ## 0c. ELEVATION, CLIFFS AND BRIDGES, 24 Aug 2026
 
-The instruction: *"Terrain painting should not use Cliffs. Cliffs should instead be
+the project owner's instruction: *"Terrain painting should not use Cliffs. Cliffs should instead be
 part of the terrain tool. So if someone decides to change the heightmap, and paint
 that, the cliff edges should automatically appear there, with the option to place
 ramps."* That inverts section 4a's question and answers it: the tier is authored, the
@@ -216,7 +216,7 @@ check would fail the cartridge's own maps (SCG14EA 42.5% → 98.9%).
 
 ### Bridges
 
-Requirement: *"they should only be possible to place on proper rivers where they fit."*
+the project owner: *"they should only be possible to place on proper rivers where they fit."*
 
 The first rule derived for this was thrown out under adversarial check: its counts did
 not reproduce, its mouth table listed deck cells as water and omitted water cells, and
@@ -267,7 +267,7 @@ went through.
 The 8-connected sealed-plateau check does not run in the linter yet. The `.HGT` file
 the editor now writes has no CLI baker beside it — the recipe is in the save panel but
 a one-command wrapper would be better. And whether a 2x2-locked tier brush feels good
-to use is a project decision, not a measurement.
+to use is the project owner's call, not a measurement.
 
 ---
 
@@ -277,7 +277,7 @@ The editor had been growing inside the heightmap viewer's chrome: two permanent 
 columns, the 100-map browser as prominent as the tools, and the palette three tiles
 wide in a 221px slot. Five directions were drawn as working mockups (a game-sidebar
 direction, a Photoshop-style tool rail, floating islands over a full-bleed viewport, a
-two-screen browse-then-build split, and a radial menu at the cursor). The one picked was the
+two-screen browse-then-build split, and a radial menu at the cursor). the project owner picked the
 first, and the editor was rebuilt to it.
 
 **The organising idea: the editor speaks the game's own language.** A tall right-hand
@@ -325,14 +325,14 @@ toggles `.on`; and Undo/Redo staying disabled after an edit because the only cod
 re-enabled them ran from `ui()`, which an edit does not call. All are fixed and each
 fix is verified in the live page at 1280×800, 1600×1000 and 2560×1440.
 
-The four directions not chosen are kept as working HTML outside this repository;
+The four directions not chosen are kept as working HTML in the scratch work;
 they are worth a look before the next big UI decision rather than re-deriving them.
 
 ---
 
 ## 0e. THE EDITOR GOES NATIVE — 24 Aug 2026
 
-After seeing the browser editor working: *"I dont want this to be a browser editor
+the project owner, after seeing the browser editor working: *"I dont want this to be a browser editor
 in the end. In the end it has to be a native Windows and Mac application"*, and *"Play in
 editor should launch the map inside the editor window. Not separately."*
 
@@ -396,7 +396,7 @@ Terrain painting joins that loop unchanged in slice 3: the palette just gains bl
 
 ## 2. WHAT IT FEELS LIKE TO USE
 
-You open `localhost:8931`, the same page you already look at maps on. There is a new button in the corner: **Edit**. You click it.
+the project owner opens `localhost:8931`, which is the same page he already looks at maps on. There is a new button in the corner: **Edit**. He clicks it.
 
 The camera stops responding to the left mouse button. That is the first thing he notices, and it is deliberate: the left button now belongs entirely to the editor, and the camera moved to the right button and the wheel. The status line at the bottom, which until now said things like `cell 31,44 SLOPE3 icon 2, corners 64 64 128 128`, now says: `Nothing armed. Click a palette item to place. Right-drag to look around.`
 
@@ -447,7 +447,7 @@ Twenty minutes, and he has a playable skirmish map.
 
 | Feature | One line |
 |---|---|
-| Arm-and-stamp ghost using the real mesh at 50% alpha | The pointermove raycast and `groundAt` already do the snapping (`tools/heightmap-viewer/public/app.js:620`, `:1098-1126`); this is the cheapest item on the board and it is literally what was asked for. |
+| Arm-and-stamp ghost using the real mesh at 50% alpha | The pointermove raycast and `groundAt` already do the snapping (`tools/heightmap-viewer/public/app.js:620`, `:1098-1126`); this is the cheapest item on the board and it is literally what the project owner asked for. |
 | Footprint snap with per-cell valid/invalid decals, invalid drawn over the ghost | Validity is a mixture, never one verdict (`brain/vanilla/tiberiandawn/cell.cpp:1114-1123` picks TRANS.ICN frame 0 or 2 per cell), and drawing red on top is one `renderOrder` field for the whole readability win. |
 | Bib correction on the footprint: `Width x (Height+1)` when `IsBibbed` | `brain/vanilla/tiberiandawn/bdata.cpp:4467-4494`; without it a 3x2 Construction Yard looks legal in the editor and is refused in game. |
 | Four-slot owner selector recolouring palette and ghost instantly, plus Tab to cycle | Measured: no shipped map uses more than four houses (distribution 0:16, 1:2, 2:31, 3:48, 4:3), so a ten-slot Multi1..6 UI is dead weight. |
@@ -518,13 +518,13 @@ Corner-mask cliff autotiling on new maps only, with the ramp swap in the same co
 
 1. **It cannot reach the game today.** `game/bake5.py:259` defines `bake_heights(scen)` with **no parameter and no override**: it looks the scenario name up in the ROM and falls back to `FLAT.IMG`, 4225 zero bytes, when the name is not a cartridge one. `build(scen, outpath, verbose=True)` at `game/bake5.py:1507` calls it at `:1647` with nothing but the name. I verified the consequence on shipped artefacts rather than by reading: `playable/SCM01EA.pack` and `SCM03EA.pack` each contain exactly **one distinct height value, 0**, in their 4225-byte heightmap block, while `SCG01EA.pack` contains 68 values from 28 to 130. **The nine converted skirmish maps are flat in the game right now.** Any elevation feature shipped before this is fixed is unplayable by construction.
 2. **Art to height is not recoverable.** See 4a. There is no rule.
-3. **Height to art is clean, but a tier model cannot round-trip a shipped map.** Over the 55 heightmapped maps, inside the playable rectangle only: 148,495 corners, **255 distinct byte values, 58.7% exactly on the 0/64/128/191/255 ladder, 72.8% within four**. The first time anyone opens `SCB01EA`, raises one square and saves, a tier tool must requantise up to 40% of that map's corners in places he never touched. He will read that as the editor being broken and he will be right.
+3. **Height to art is clean, but a tier model cannot round-trip a shipped map.** Over the 55 heightmapped maps, inside the playable rectangle only: 148,495 corners, **255 distinct byte values, 58.7% exactly on the 0/64/128/191/255 ladder, 72.8% within four**. The first time the project owner opens `SCB01EA`, raises one square and saves, a tier tool must requantise up to 40% of that map's corners in places he never touched. He will read that as the editor being broken and he will be right.
 
 **What that gives up.** The half-rung insets, the deliberate art/height departures two shipped scenarios actually use (SCG05EA and SCG05WA have byte-identical tile maps and 2259 differing corners, `docs/terrain-elevation-grammar.md` section 6), and per-variant cliff choice.
 
 **Escape hatch, and it is cheap.** PNG import/export of the 65x65 heightmap on a five-value grey palette. It is how the original artists worked, it is how Spring and Beyond All Reason still do elevation (https://springrts.com/wiki/Mapcomponents:_heightmap), it is a power tool we do not have to build, and it is the only way to express anything the tier tool cannot. Ship the PNG round trip before the height brush, and possibly instead of it.
 
-**When elevation does come back, the policy is:** tier authoring on **new maps only**, art and heights both derived from the tier layer (the StarCraft 1 ISOM pattern, http://staredit.net/wiki/index.php/Terrain), the departure from the cartridge, registered as an open gap per this repo's own rule, and the UI saying so in words rather than letting it be discovered the hard way.
+**When elevation does come back, the policy is:** tier authoring on **new maps only**, art and heights both derived from the tier layer (the StarCraft 1 ISOM pattern, http://staredit.net/wiki/index.php/Terrain), the departure from the cartridge registered in `known-gap notes` per this repo's own rule, and the UI saying so in words rather than letting the project owner discover it.
 
 ---
 
@@ -575,7 +575,7 @@ Three gates, and the third is where maps die silently.
 - **Route A, borrow (works today, zero new tooling).** Copy a theater-matched pack and rename it. This is what `game/missions/make_testmap.py` and `make_skirmish_map.py` already do with `--pack`. **Valid only if you changed no tiles.** The pack carries the per-map terrain cell records (4096 x 21 bytes, `game/bake5.py:1764-1772`), so an edited `.BIN` with a borrowed pack means the collision layer and the rendered art disagree, invisibly. This route is the entire objects-and-ownership MVP.
 - **Route B, bake (needed the moment one tile changes).** `tools/bin_to_n64map.py` (`.BIN` to `.MAP`, self-tested bit-exact on 78 of 78 cartridge maps), then `n64_terrain.py`, then `game/bake5.py`. Needs `data/rom/cnc_eu.z64` plus the extracted asset tree, takes about 5.5 s, and the authored map must be staged into `tools/bakery/sharecopy/assets/extracted/` first because `n64_terrain.py:76` and `:265` read from there. **The baked heightmap will be flat**, per section 4b.
 
-**One correction to the brief.** The pack does not carry a per-map terrain composite. `game/bake5.py:1513` opens `terr["atlas"]`, which is always `TEMPERAT_tiles.png` or `DESERT_tiles.png`. The atlas is **per theater**. What is per map is the 4096 cell records, the 65x65 heightmap, the 65x65 CM tint and the 16-byte name, which is why two same-theater packs of 7,810,842 bytes differ in only about 25,000 bytes, the first at 0x10 and the rest in the last 102,506. This makes both routes easier than the brief implies, and it makes a **pack byte-patcher** plausible as a third route. Nobody has built one, so that stays UNPROVEN.
+**One correction to the requirement.** The pack does not carry a per-map terrain composite. `game/bake5.py:1513` opens `terr["atlas"]`, which is always `TEMPERAT_tiles.png` or `DESERT_tiles.png`. The atlas is **per theater**. What is per map is the 4096 cell records, the 65x65 heightmap, the 65x65 CM tint and the 16-byte name, which is why two same-theater packs of 7,810,842 bytes differ in only about 25,000 bytes, the first at 0x10 and the rest in the last 102,506. This makes both routes easier than the requirement implies, and it makes a **pack byte-patcher** plausible as a third route. Nobody has built one, so that stays UNPROVEN.
 
 ### One bug to fix before any write path exists
 
@@ -587,28 +587,28 @@ Three gates, and the third is where maps die silently.
 
 **Slice 1: the ghost. One evening. Proves the interaction is not fighting the browser or the camera.**
 Load a shipped map as today. An Edit button. A palette of object types. Click to arm; the real mesh follows the cursor at 50% alpha, snapped by the existing raycast; left click stamps; brush stays armed; Esc disarms. Footprint decals green and red, red drawn over. Clamp the anchor to `[0, 64-w] x [0, 64-h]` so it can never hang off the map (`brain/vanilla/tiberiandawn/display.cpp:940-1010` does exactly this). Four-button owner selector. Delete and drag-to-move. Every edit a Do/Undo object, Ctrl+Z. Fix `padHeights` first.
-*Browser hygiene, all named because each has bitten someone:* set `controls.mouseButtons.LEFT = null` while editing (OrbitControls calls `setPointerCapture` on this exact canvas at `public/vendor/OrbitControls.js:1550`); attach pointermove and pointerup to `window`, never capture (pointer capture stole a click in the original GamedevTycoon map, commit `5c97631`); add `touch-action: none` to the canvas, which `index.html` currently lacks; clean up on `pointercancel` as well as `pointerup`; `preventDefault` the contextmenu OrbitControls binds at `:502`. Rebuild `buildAssets` on mouse-**up**.
-**Shows:** a building that follows the cursor and lands where you click.
+*Browser hygiene, all named because each has bitten someone:* set `controls.mouseButtons.LEFT = null` while editing (OrbitControls calls `setPointerCapture` on this exact canvas at `public/vendor/OrbitControls.js:1550`); attach pointermove and pointerup to `window`, never capture (pointer capture stole a click in the project owner's own GamedevTycoon map, commit `5c97631`); add `touch-action: none` to the canvas, which `index.html` currently lacks; clean up on `pointercancel` as well as `pointerup`; `preventDefault` the contextmenu OrbitControls binds at `:502`. Rebuild `buildAssets` on mouse-**up**.
+**Shows the project owner:** a building that follows his cursor and lands where he clicks.
 
 **Slice 2: the truth layer and the file. One evening. Proves a browser-authored map reaches the lobby.**
 Ship the four static tables. Compute the no-go hatch in the browser and **diff it cell for cell against `make_skirmish_map.py`'s Python answer on all 94 shipped maps; zero disagreements or the port is wrong.** Auto-show while armed, pin on a key. The `.INI` writer and download. The linter, lifting the checks already in `make_skirmish_map.py`'s `check()` (the 3x3 buildable start pad for MCV deploy, tiberium only on bare buildable cells per `brain/vanilla/tiberiandawn/overlay.cpp:253`, the contiguous waypoint run, which `app/cnc3d.cpp:317-370` already computes correctly and `scenarioini.cpp:1567` indexes without a bound check). Autosave. Mode-aware status line.
-**Shows:** you make a skirmish map and play it. **Stop here and confirm that before writing another line.**
+**Shows the project owner:** he makes a skirmish map and plays it. **Stop here and confirm that before writing another line.**
 
 **Slice 3: ground. A few days. Proves terrain art round-trips.**
 Six-entry semantic Ground palette restricted to bank-present `(template, icon)` pairs, which is provably safe: the maps use 960 of DESERT's 973 pairs and 745 of TEMPERAT's 758, and exactly **six cells in the entire 94-map corpus** reference a pair the bank lacks (ROAD33 and ROAD43). Block ghost, anti-smear drag, randomisation, flood fill, block-aware eraser. `.BIN` writer. A user-maps source in `export.py`. A shell script for the bake, not a button.
-**Shows:** you paint a road and it is there in the game.
+**Shows the project owner:** he paints a road and it is there in the game.
 
 **Slice 4: the bake5 parameter and the PNG. Half a day plus an afternoon. Proves elevation can reach the game at all.**
 `build(scen, outpath, heights=None, cmvals=None)`, defaulting to the ROM lookup; insertion points `game/bake5.py:1647` and `:1657`, write at `:1797-1798`. Roughly five lines, and it is the highest-value change in this whole document, because until it runs every elevation feature anyone proposes is unshippable. Then PNG import/export of the 65x65 map on a five-value grey palette.
-**Shows:** a map with hills in it.
+**Shows the project owner:** a map with hills in it.
 
 **Slice 5 and beyond.** The corner-mask cliff tool, on new maps only, with the ramp swap and the reachability flood fill in the same commit. Then water. Then, if ever, path tiling with preview and re-randomise, and copy/paste.
 
-**Write down before slice 1 ships,** because these are the expensive findings and they outlast every brush: the twelve-entry corner-mask table with SLOPE29-32 as outer corners and SLOPE33-36 as inner, plus the per-template confidence figures, into `docs/terrain-elevation-grammar.md`; and the 4.4% stencil null result, the 58.7% off-ladder figure, and the flat-heightmap consequence of `bake_heights`, all recorded as open questions.
+**Write down before slice 1 ships,** because these are the expensive findings and they outlast every brush: the twelve-entry corner-mask table with SLOPE29-32 as outer corners and SLOPE33-36 as inner, plus the per-template confidence figures, into `docs/terrain-elevation-grammar.md`; and the 4.4% stencil null result, the 58.7% off-ladder figure, and the flat-heightmap consequence of `bake_heights` into `known-gap notes`.
 
 ---
 
-## 7. THE OPEN QUESTIONS
+## 7. THE OPEN QUESTIONS FOR the project owner
 
 1. **Does v1 have to produce a map you can play, or is a map you can design and export enough?** If playable, slice 2 is the finish line and terrain painting waits; if export-only is fine, we can go straight at the ground brushes and worry about packs later.
 2. **Does the first version edit existing maps, or author new ones?** Objects can do both. Terrain and elevation effectively cannot: a tier tool would requantise about 40% of a shipped map's corners the first time you save it.

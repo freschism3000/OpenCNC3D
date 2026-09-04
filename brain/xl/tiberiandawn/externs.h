@@ -72,6 +72,29 @@ extern bool ForceEnglish;
 */
 typedef MixFileClass<CCFileClass> MFCD;
 
+/*
+**	CNC3D_Lockstep -- is this simulation one peer of a deterministic lockstep match?
+**
+**	FALSE unless the host calls CNC3D_Set_Lockstep, so the campaign and skirmish behave
+**	exactly as they did in 1995 and nothing below this flag can move them. It exists
+**	because the two things we want are in tension: a network match needs every machine to
+**	compute one identical world, and the campaign needs to keep the behaviour thirty years
+**	of players remember. Where those disagree, this flag picks, and the 1995 answer is the
+**	default rather than the exception.
+**
+**	Use it ONLY where a peer would otherwise read state that is local to its own machine
+**	(the camera, the viewport, the local player, a wall clock, libc rand(), the local
+**	selection). It is not a general "new engine" switch and must never gate a balance or
+**	content change.
+*/
+extern bool CNC3D_Lockstep;
+
+/*
+**	How many u32 slots CNC3D_Event_ABI reports. Grows at the END only, so a host built
+**	against an older count still reads the slots it knows correctly.
+*/
+#define CNC3D_EVENT_ABI_SLOTS 11
+
 extern bool Debug_Quiet;
 extern bool Debug_Cheat;
 extern bool Debug_Remap;
