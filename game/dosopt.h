@@ -29,7 +29,7 @@
  * mission, i.e. it returns to the main menu. There is no Exit Game button in the 1995
  * pause dialog; Exit Game lives on the main menu (conquer.h:81 TXT_EXIT_GAME).
  *
- * DOPT_EXIT is therefore OURS, in the same spirit as the main menu's DM_TESTMAP: an
+ * DOPT_EXIT is therefore OURS, in the same spirit as the main menu's DM_SPECIAL: an
  * eighth item, in the engine's own idiom, doing the thing the engine's main menu button
  * of that name does (close the program).
  *
@@ -460,8 +460,154 @@ typedef enum
        VISUALS because four gates match the page numbers as LITERALS (measured:
        page=3 ADVANCED, page=4 SOUND, page=5 CHEATS, page=6 and page=0 for CONFIRM
        and OPTIONS). Inserting would renumber three of them silently. */
-    DOPT_PAGE_GAMEPLAY
+    DOPT_PAGE_GAMEPLAY,
+    /* The Restate box (scenario.cpp:780 Restate_Mission), appended for the same
+       reason. Page 8. */
+    DOPT_PAGE_RESTATE,
+    /* The slot dialog (loaddlg.cpp LoadOptionsClass), for Load, Save and Delete
+       Mission alike. Page 9. */
+    DOPT_PAGE_SLOTS,
+    /* OURS: a notice with a caption, a few lines of text and a lone OK, for a mission
+       start that was refused. The Restate box's geometry and wrap, with no pause page
+       under it and the caption supplied by the caller. Page 10. */
+    DOPT_PAGE_NOTICE
 } DOPT_Page;
+
+/* ------------------------------------------------------------------------ *
+ * THE SLOT DIALOG. loaddlg.cpp:106-260 LoadOptionsClass::Process, factor 1: ONE
+ * dialog for the three pause buttons, told which it is by its Style (LOAD, SAVE or
+ * WWDELETE). A 250x156 box centred on the screen; a caption of Load Mission (53),
+ * Save Mission (54) or Delete Mission (55); a ListClass 236 wide and 104 tall (74 in
+ * SAVE mode, which gives 30 rows to the edit field); in SAVE mode an EditClass 236x13
+ * under a "Mission Description" (217) label; and two 40x13 buttons on the bottom row,
+ * Load (56) / Save (57) / Delete (58) on the left of centre and Cancel (27) on the
+ * right. Every number below is that routine's, with its line.
+ *
+ * The rows are "(GDI) description" newest first (loaddlg.cpp:610-690: the house
+ * prefix, then the description, sorted on the file's date). SAVE mode puts
+ * "[EMPTY SLOT]" (249) first, carrying the lowest unused file number
+ * (loaddlg.cpp:661-680), and a click on an existing row copies its description into
+ * the edit field with the prefix stripped (loaddlg.cpp:466-495). Save with an empty
+ * description is refused: 1995 raises "You must enter a description!" (246); this
+ * dialog greys the Save button until something is typed, which is the same refusal
+ * without a second box. Delete asks "Delete this file?" (248) with Yes and No, and
+ * stays in the dialog afterwards so several can go (loaddlg.cpp:447-461).
+ *
+ * WHAT THE DIALOG OWNS AND WHAT THE HOST DOES. The dialog holds the rows, the
+ * selection, the edit buffer and the geometry. It asks the host for the rows through
+ * the `slots` seam in DOPT_Bind when the page opens and after a delete, because the
+ * host is the one that can read the slot index, and it reports DOPT_ACT_LOAD,
+ * DOPT_ACT_SAVE or DOPT_ACT_DELETE with the chosen file number readable through
+ * dopt_slot_pick (and the typed text through dopt_slot_descr). The host does the file
+ * work, exactly as it does for every other action here.
+ *
+ * ListClass has no scroll arrows on this build (BTN-UP.SHP and BTN-DN.SHP are baked
+ * into no pack, the same gap the jukebox and the Advanced page have), so a list longer
+ * than its well scrolls with the wheel and the keys, the way those two do. Sixteen
+ * slots plus the empty row is seventeen against a well of thirteen (nine in SAVE).
+ * ------------------------------------------------------------------------ */
+#define DOPT_SL_W 250                       /* d_dialog_w    loaddlg.cpp:112 */
+#define DOPT_SL_H 156                       /* d_dialog_h    loaddlg.cpp:113 */
+#define DOPT_SL_X ((DOPT_SCREEN_W - DOPT_SL_W) / 2)   /*         loaddlg.cpp:114 */
+#define DOPT_SL_Y ((DOPT_SCREEN_H - DOPT_SL_H) / 2)   /*         loaddlg.cpp:115 */
+#define DOPT_SL_CX (DOPT_SL_X + DOPT_SL_W / 2)        /* d_dialog_cx  :116     */
+#define DOPT_SL_TXT8_H 11                   /* d_txt8_h      loaddlg.cpp:117 */
+#define DOPT_SL_MARGIN 7                    /* d_margin      loaddlg.cpp:118 */
+#define DOPT_SL_LIST_X (DOPT_SL_X + DOPT_SL_MARGIN)                /* :122 */
+#define DOPT_SL_LIST_Y (DOPT_SL_Y + DOPT_SL_MARGIN + DOPT_SL_TXT8_H + DOPT_SL_MARGIN) /* :123 */
+#define DOPT_SL_LIST_W (DOPT_SL_W - DOPT_SL_MARGIN * 2)            /* :120 */
+#define DOPT_SL_LIST_H 104                  /* d_list_h      loaddlg.cpp:121 */
+#define DOPT_SL_LIST_H_SAVE (DOPT_SL_LIST_H - 30)   /* list_ht -= 30 in SAVE, :221 */
+#define DOPT_SL_ROW_H 8                     /* one 6 point line and a row of air    */
+#define DOPT_SL_EDIT_X DOPT_SL_LIST_X                              /* :127 */
+#define DOPT_SL_EDIT_W DOPT_SL_LIST_W                              /* :125 */
+#define DOPT_SL_EDIT_H 13                   /* d_edit_h      loaddlg.cpp:126 */
+#define DOPT_SL_EDIT_Y (DOPT_SL_LIST_Y + DOPT_SL_LIST_H - 30 + DOPT_SL_MARGIN + DOPT_SL_TXT8_H) /* :128 */
+#define DOPT_SL_LABEL_Y (DOPT_SL_EDIT_Y - DOPT_SL_TXT8_H)          /* :369 */
+#define DOPT_SL_BTN_W 40                    /* d_button_w    loaddlg.cpp:133 */
+#define DOPT_SL_BTN_H 13                    /* d_button_h    loaddlg.cpp:135 */
+#define DOPT_SL_BTN_X (DOPT_SL_CX - DOPT_SL_BTN_W - DOPT_SL_MARGIN)   /* :136 */
+#define DOPT_SL_BTN_Y (DOPT_SL_Y + DOPT_SL_H - DOPT_SL_BTN_H - DOPT_SL_MARGIN) /* :137 */
+#define DOPT_SL_CANCEL_X (DOPT_SL_CX + DOPT_SL_MARGIN)             /* :146 */
+#define DOPT_SL_DESCR_MAX 40                /* EditClass(..., game_descr, 40, ...) :199 */
+#define DOPT_SL_ROWS_MAX 17                 /* sixteen slots and the empty row */
+#define DOPT_SL_ROW_TEXT 64                 /* "(GDI) " and a 44 char description */
+
+#define DOPT_SL_EMPTY_S "[EMPTY SLOT]"      /* TXT_EMPTY_SLOT 249 */
+#define DOPT_SL_DESCR_S "Mission Description"   /* TXT_MISSION_DESCRIPTION 217 */
+#define DOPT_SL_DELQ_S "Delete this file?"  /* TXT_DELETE_FILE_QUERY 248 */
+
+typedef enum { DOPT_SL_LOAD = 0, DOPT_SL_SAVE = 1, DOPT_SL_DELETE = 2 } DOPT_SlotMode;
+
+typedef enum
+{
+    DOPT_SL_LIST = 0, /* the whole list well; the row is worked out from the y   */
+    DOPT_SL_EDIT,     /* the description field, SAVE mode only                   */
+    DOPT_SL_OK,       /* Load / Save / Delete                                    */
+    DOPT_SL_CANCEL,
+    DOPT_SL_COUNT
+} DOPT_SlotItem;
+
+/* One row as the host supplies it: the file number and the text to print, which the
+   host builds as "(GDI) description" so the dialog need not know what a house is. */
+typedef struct
+{
+    int slot;
+    char text[DOPT_SL_ROW_TEXT];
+} DOPT_SlotRow;
+
+typedef struct
+{
+    int mode;                          /* DOPT_SlotMode                          */
+    DOPT_SlotRow rows[DOPT_SL_ROWS_MAX];
+    int nrows;
+    int sel;                           /* the highlighted row                    */
+    int top;                           /* the first visible row                  */
+    char descr[DOPT_SL_DESCR_MAX + 1]; /* the edit field, SAVE mode              */
+    char deflt[DOPT_SL_DESCR_MAX + 1]; /* what the empty slot's field opens with */
+    int prev;                          /* the pause page's selection, for Cancel */
+    int pick;                          /* the file number the last action named  */
+    int have;                          /* occupied slots at the last count       */
+    int from_menu;                     /* opened with no pause page under it     */
+} DOPT_Slots;
+
+/* ------------------------------------------------------------------------ *
+ * RESTATE. goptions.cpp:373 BUTTON_RESTATE calls Restate_Mission(Scen.ScenarioName,
+ * TXT_VIDEO, TXT_OPTIONS), scenario.cpp:780-836, which raises
+ *     WWMessageBox(TXT_OBJECTIVE).Process(Scen.BriefingText, button1, button2)
+ * over the pause dialog: the caption "Mission Objective" (646), the mission briefing text
+ * wrapped to 255 pixels (msgbox.cpp:150 Format_Window_String), and two buttons,
+ * "Video" (642) on the left and "Options" (65) on the right. Video plays the
+ * briefing movie (BriefMovie, or ActionMovie when there is no brief) and then
+ * CLOSES the pause dialog (goptions.cpp:375-390 `process = false`); Options puts
+ * the pause page back. When NEITHER movie file exists, scenario.cpp:797-803 turns
+ * the box into a single "OK" (TXT_OK 37) and nothing plays. When there is no
+ * briefing TEXT at all, Restate_Mission returns false and goptions plays the movie
+ * straight away, with no box.
+ *
+ * The text is the engine's Scen.BriefingText, which scenarioini.cpp:472-483 reads
+ * from the mission INI's [Briefing] block and, when that is empty, from the block
+ * named after the scenario in MISSION.INI. The host reads the same two places
+ * (game/brief_mod.h) and hands the joined text over through dopt_set_briefing;
+ * the dialog wraps it, sizes the box the way msgbox.cpp sizes it, and reports
+ * DOPT_ACT_VIDEO when the player asks for the movie. The buffer is 512 because
+ * scenario.h:86 makes it 512: every briefing on both discs fits.
+ * ------------------------------------------------------------------------ */
+typedef enum
+{
+    DOPT_R_LEFT = 0, /* "Video" (msgbox button1), or the lone "OK" centred     */
+    DOPT_R_RIGHT,    /* "Options" (msgbox button2); no rectangle when OK stands */
+    DOPT_R_COUNT
+} DOPT_Restate;
+
+#define DOPT_R_CAPTION "Mission Objective"  /* TXT_OBJECTIVE 646 */
+#define DOPT_R_VIDEO_S "Video"              /* TXT_VIDEO 642     */
+#define DOPT_R_OPTIONS_S "Options"          /* TXT_OPTIONS 65    */
+#define DOPT_R_OK_S "OK"                    /* TXT_OK 37         */
+#define DOPT_R_WRAP_W 255   /* msgbox.cpp:150 Format_Window_String(buffer, 255, ...) */
+#define DOPT_R_TEXT_MAX 512 /* Scen.BriefingText, scenario.h:86                     */
+#define DOPT_R_MAX_LINES 24 /* 512 chars at 255 px cannot need more                 */
+#define DOPT_N_CAPTION_MAX 48 /* the notice page's caption, drawn where Restate's is */
 
 /* THE ABORT CONFIRMATION, which 1995 raises from the same button.
  *
@@ -486,6 +632,27 @@ typedef enum
 
 /* The three strings, quoted from the disc. */
 #define DOPT_CF_MSG     "Do you want to abort the mission?"
+/* A MATCH IS NOT A MISSION, so the row that ends it is not called the same thing and does
+   not offer the same choices. There is nothing to restart in a game other people are
+   playing, and leaving is not aborting: you resign, and then you may stay and watch. */
+#define DOPT_CF_MSG_SURR  "Do you want to surrender?"
+/* TWO LINES, BECAUSE ONE DID NOT FIT. msgbox.cpp sizes the box to its text and
+   centres it, which works while the question is short and runs the box off both
+   edges of a 320 wide screen when it is not: this one drew straight through the
+   frame. A second line costs the box one row of height and keeps the 1995
+   arithmetic, where widening past the screen cannot. The other two questions are
+   short enough to stay on one line and pass NULL for the second. */
+#define DOPT_CF_MSG_LEAVE  "Do you want to leave"
+#define DOPT_CF_MSG_LEAVE2 "the match?"
+/* A MATCH ANSWERS YES OR NO. The three-button box is the campaign's -- Abort,
+   Restart, Cancel -- and a match has nothing to restart, which left the middle
+   button standing there with no meaning. Asked a plain question, the box now
+   offers a plain pair, and RESTART is disabled rather than renumbered so that
+   every index, rectangle and keyboard stop below stays exactly where it was. */
+#define DOPT_CF_YES_S     "Yes"
+#define DOPT_CF_NO_S      "No"
+#define DOPT_CF_SURR_S    "Surrender"
+#define DOPT_CF_LEAVE_S   "Leave"
 #define DOPT_CF_ABORT_S "Abort"
 #define DOPT_CF_RESTART_S "Restart"
 #define DOPT_CF_CANCEL_S  "Cancel"
@@ -543,7 +710,7 @@ typedef struct
 /* Geometry: the Game Controls box again, exactly as the Advanced page reuses it. SEVEN
    rows at a step of 11 start at DOPT_CH_TOP and still end clear of the rows below, so
    unlike the Advanced column this one needs no tightened step. Worked through when the
-   seventh row went in on 26 Aug 2026 rather than assumed: DOPT_GC_Y is 29 and
+   seventh row went in rather than assumed: DOPT_GC_Y is 29 and
    DOPT_GC_TOP_MARGIN is 30, so the rows run 61, 72 ... 127 and the last one ends at
    134. The Instant Win / Instant Lose pair sits at 143 and the OK row at 156, so there
    are nine clear pixels above the buttons and four below them. */
@@ -585,13 +752,44 @@ typedef enum
        so it goes where the eye lands. It is a button under ENHANCED called Smooth
        Animations, on by default; with it off the original non-interpolated animations
        are used. */
-    DOPT_VE_SMOOTH = 0,
+    /* THE DISPLAY ROWS, AT THE TOP (5 Sep 2026, by request, in this order). The first
+       three are a radio triple over DOPT_Visuals::dispmode -- one lit at a time; the
+       Resolution row is a drop list over ::residx, greyed under Windowed Borderless
+       because the desktop decides; Reset puts every Advanced row back to fx_defaults;
+       UI scaling is a drop list over ::uiscale, Enhanced only. None of them is a boolean
+       in elem[], for the reason texset is not. */
+    DOPT_VE_FULLSCREEN = 0,
+    DOPT_VE_WINDOWED,
+    DOPT_VE_BORDERLESS,
+    DOPT_VE_RESOLUTION,
+    DOPT_VE_RESET,
+    DOPT_VE_UISCALE,
+    /* PERSPECTIVE (v0.6.8): a two-way drop list, Classic / Isometric. The value lives
+       in DOPT_Visuals::perspective, like the other drop rows; see FxState::perspective. */
+    DOPT_VE_PERSPECTIVE,
+    DOPT_VE_SMOOTH,
     /* A button called New HUD, enabled by default under ENHANCED mode; Classic mode
        keeps the old DOS HUD. Like the two above it this is not a post pass; it selects which sidebar the
        game draws. It was previously reachable only through the CNC3D_HUD=new environment
        variable, which is a developer's switch and not a player's. */
     DOPT_VE_NEWHUD,
     DOPT_VE_BILINEAR,
+    /* WATER SHADER: the shore-aware sea (a soft coast, shallows, a flow,
+       rivers that run) in place of the cartridge's two-tile wash. A presentation row
+       like the HUD and the filter, because it changes what is DRAWN; on by default
+       under ENHANCED and, like everything on this page, unreachable under CLASSIC,
+       whose sea is the cartridge's. FxState::water_fx. */
+    DOPT_VE_WATER,
+    /* 3D TREES: the rigged tree models in place of the cartridge's, beside the sea and
+       for the same reason, a presentation row that changes what is DRAWN. On by default
+       under ENHANCED; CLASSIC draws the cartridge's trees whatever the tick says, and the
+       tick stands so choosing ENHANCED again gives them back. FxState::tree3d.
+
+       GRASS AND RAIN HAVE NO ROW HERE, deliberately. Both ship off under ENHANCED as
+       well as CLASSIC and are reachable only through the tuning panel until their look
+       is settled, which means a release build, whose panel is compiled out, cannot turn
+       either of them on. That is the intended state, not an oversight. */
+    DOPT_VE_TREES,
     /* WHICH TERRAIN TILE ART DRAWS, and the one row on this page that is not a
        checkbox: it is a three-way drop list. Sits with the other presentation rows
        rather than in the post chain, because like the HUD and the filter it changes
@@ -622,6 +820,16 @@ typedef enum
 #define DOPT_A_BAR (DOPT_VE_COUNT + 1)
 #define DOPT_A_COUNT (DOPT_VE_COUNT + 2)
 
+/* THE RESOLUTION LIST'S TWO SIZES. DOPT_RES_MAX is how many sizes it HOLDS: every size
+   the display offers, up to this many, the desktop's own first. DOPT_RES_VIEW is how
+   many rows the open list SHOWS at once: seven is what fits between its row and the OK
+   button without the open list running through it, and the rest are reached by
+   scrolling the list, the way the Advanced well scrolls. They used to be one number,
+   which capped the list at the seven largest sizes the driver offered; a driver that
+   lists sizes above the panel (a 4K mode on a 1080p display) then pushed every size
+   that actually fit off the end. */
+enum { DOPT_RES_MAX = 32, DOPT_RES_VIEW = 7 };
+
 typedef struct
 {
     int enhanced;                 /* 0 = CLASSIC, 1 = ENHANCED              */
@@ -631,12 +839,30 @@ typedef struct
     int texset;
     /* DOPT_VE_INFSET's value: one of DOPT_TEX_*, the same numbering. */
     int infset;
+    /* THE DISPLAY ROWS' VALUES. dispmode is one of DOPT_DISP_*; uiscale is
+       0..3 for 1x, -2x, -3x, -4x; res_w/res_h[] is the list the host enumerated from the
+       display, nres of them, and residx the chosen one. Entry 0 is the desktop's own
+       size and prints as "Desktop"; the rest follow largest first. res_fit[] is the
+       host's word on whether a bordered window of that size fits the desktop's usable
+       room: an entry that does not is greyed and refused under WINDOWED, with a tip
+       that says why, and pickable under FULLSCREEN, where it is a real mode. */
+    int dispmode;
+    int uiscale;
+    int perspective;              /* 0 Classic, 1 Isometric (v0.6.8)             */
+    int nres, residx;
+    int res_w[DOPT_RES_MAX], res_h[DOPT_RES_MAX], res_fit[DOPT_RES_MAX];
     /* Whether the Remastered entry can be chosen at all -- the host sets this from
        whether it found an install. A false here greys the entry and gives it the
        tooltip; it never hides it, because 1995 draws a disabled gadget rather than
        removing it (gadget.cpp:632) and a player has to be able to see the option
        exists before they understand what would unlock it. */
     int remaster_ok;
+    /* Whether the DOS entry can be chosen -- the host sets this from whether THIS MAP'S
+       pack actually carries a second terrain atlas. Two theaters (SNOW, SAND) have no
+       1995 original at all, and a pack baked before the DOS art existed carries none
+       either; in both cases picking DOS silently drew the cartridge and the control
+       looked broken. Same rule as remaster_ok: greyed with a reason, never hidden. */
+    int dos_tex_ok;
     /* Set when the MAIN MENU opened this screen directly rather than the pause dialog
        walking to it. OK then closes the whole dialog instead of stepping back to a
        pause menu that is not on screen. */
@@ -647,6 +873,12 @@ typedef struct
    numbering one for one, deliberately: the dialog and the renderer must not need a
    translation table between them. */
 enum { DOPT_TEX_N64 = 0, DOPT_TEX_DOS = 1, DOPT_TEX_REMASTER = 2, DOPT_TEX_COUNT = 3 };
+/* The display modes, the same numbers as fullscreen.h's FS_MODE_*; and the UI scale
+   entries. The Resolution list's own two sizes are DOPT_RES_MAX and DOPT_RES_VIEW,
+   declared above the struct that holds the list. */
+enum { DOPT_DISP_WINDOWED = 0, DOPT_DISP_BORDERLESS = 1, DOPT_DISP_FULLSCREEN = 2 };
+enum { DOPT_UI_COUNT = 2 };                     /* 1x and -2x: the two presets the page offers */
+enum { DOPT_PERSP_COUNT = 2 };                  /* Classic, Isometric (v0.6.8)          */
 
 
 
@@ -727,11 +959,20 @@ enum { DOPT_TEX_N64 = 0, DOPT_TEX_DOS = 1, DOPT_TEX_REMASTER = 2, DOPT_TEX_COUNT
 #define DOPT_A_BAR_W 5   /* MSlider_Height                       sounddlg.cpp:102 */
 #define DOPT_A_BAR_GAP 2 /* the layout gate's own minimum        goptions.cpp:130 */
 #define DOPT_A_ROW_W (DOPT_V_W - 32 - DOPT_A_BAR_W - DOPT_A_BAR_GAP)
-/* The texture row's value box: right-aligned in the row, wide enough for the longest
-   entry ("Remastered Textures") at GRAD6FNT's spacing plus the arrow and the padding. */
+/* THE VALUE BOX ON A DROP ROW starts DOPT_A_DROP_GAP columns after that row's own
+   printed label and runs to the row's right edge (DOPT_A_BOX_X + DOPT_A_ROW_W). The
+   label widths are MEASURED at layout time (labw[] in DOPT_State): one right-aligned
+   width for every row, sized to the widest art entry, put "Resolution", "UI scaling"
+   and "Perspective" under the plate, and no rectangle audit saw it because
+   a label's ink is not a rectangle. DOPT_A_DROP_GAP is goptions.cpp:130's own 2, the
+   gap gate_optlayout demands between any two controls; DOPT_A_DROP_PAD is the 14 the
+   old measure already paid (3 left pad, the 5-wide arrow, its margin, 2 clear), the
+   least width a box needs beyond its widest entry, which the audit now checks each box
+   against. DOPT_A_DROP_W is ONLY the width used when no font could be loaded. */
+#define DOPT_A_DROP_GAP 2
+#define DOPT_A_DROP_PAD 14
 #define DOPT_A_DROP_W 86
 #define DOPT_A_DROP_H (DOPT_A_BOX + 2)
-#define DOPT_A_DROP_X (DOPT_A_BOX_X + DOPT_A_ROW_W - DOPT_A_DROP_W)
 
 #define DOPT_A_BAR_X (DOPT_A_BOX_X + DOPT_A_ROW_W + DOPT_A_BAR_GAP)
 #define DOPT_A_BAR_Y DOPT_A_TOP
@@ -760,6 +1001,11 @@ typedef enum
     /* ON, holding the right button and moving past the click threshold PUSHES the view.
        ON by default. OFF, the right button never moves the camera at all. */
     DOPT_G_RPUSH,
+    /* ON, the credits readout sounds a tone on every step it takes toward the bank, up
+       and down, as the 1995 game and the cartridge both did. ON by default. OFF, the
+       readout still steps, silently. A sound rather than a picture, so it lives here and
+       not on the Visuals page, for the reason the two above it do. */
+    DOPT_G_CASHTICK,
     DOPT_G_TOGGLES,
     DOPT_G_OK = DOPT_G_TOGGLES,
     DOPT_G_COUNT
@@ -774,12 +1020,13 @@ typedef struct
 #define DOPT_ACT_NONE 0
 #define DOPT_ACT_RESUME 1 /* close the dialog and let the world tick again  */
 #define DOPT_ACT_ABORT 2  /* end the mission, show the main menu            */
+#define DOPT_ACT_SURRENDER 20 /* resign the match; the house dies or converts  */
+#define DOPT_ACT_LEAVE 21 /* a spectator walks out: score screen, then the menu */
 #define DOPT_ACT_EXIT 3   /* close the program                              */
 /* THE SAVE LAYER. The dialog does not touch a file: it reports the intent and the host
    calls game_save_slot / game_load_slot, which is the same split every other action here
-   uses. There is no slot-picker dialog yet -- 1995's LoadOptionsClass is a 250x156 box
-   with a ListClass and an EditClass -- so SAVE takes the next free slot and LOAD takes the
-   newest slot belonging to the mission that is running. Recorded as a known gap. */
+   uses. Both come out of the slot dialog (DOPT_PAGE_SLOTS), which names the file number
+   through dopt_slot_pick and, for a save, the typed description through dopt_slot_descr. */
 #define DOPT_ACT_SAVE 4
 #define DOPT_ACT_LOAD 5
 /* Restart the mission from the beginning. 1995's Do_Restart calls Start_Scenario with
@@ -791,6 +1038,12 @@ typedef struct
    verdict and the mission ends on its own a tick later. */
 #define DOPT_ACT_CHEAT_WIN 7
 #define DOPT_ACT_CHEAT_LOSE 8
+/* Restate's Video button: close the dialog and play the mission briefing movie. The host
+   knows which file exists; the dialog only knows one was promised (dopt_set_briefing). */
+#define DOPT_ACT_VIDEO 9
+/* Delete Mission, answered Yes: the host removes the slot dopt_slot_pick names and then
+   calls dopt_slots_reload so the list shows what is left. The dialog stays up. */
+#define DOPT_ACT_DELETE 10
 
 /* Keys, so this file does not include SDL. */
 #define DOPT_KEY_UP 1
@@ -799,6 +1052,7 @@ typedef struct
 #define DOPT_KEY_RIGHT 4
 #define DOPT_KEY_ENTER 5
 #define DOPT_KEY_ESC 6
+#define DOPT_KEY_BACKSPACE 7   /* the description field, SAVE mode only */
 
 /* ------------------------------------------------------------------------ *
  * Settings, and the one seam the mixer plugs into.
@@ -819,6 +1073,15 @@ typedef struct
 #define DOPT_VOL_MAX 255   /* sounddlg.cpp:231                                 */
 #define DOPT_VOL_THUMB 16  /* sounddlg.cpp:232                                 */
 #define DOPT_VOL_TOP (DOPT_VOL_MAX - DOPT_VOL_THUMB) /* the real top of travel */
+
+/* THE SHIPPED GAME SPEED, one step up from the 1995 default of 3 and the only one of the
+   five Game Controls values that stands off the 1995 block above. It is named rather
+   than written into dopt_settings_init as a bare literal because two other things have
+   to agree with it: the renderer's tick rate before the pause dialog has ever been
+   opened, and the speed a network or skirmish match opens at (NM_DEFAULT_SPEED, kept on
+   its own side of the network seam and checked against this one at compile time). A
+   number that two other places must match wants somewhere to be read from. */
+#define DOPT_DEFAULT_SPEED 4
 
 typedef struct
 {
@@ -844,6 +1107,10 @@ typedef struct
     /* The same seam for the Visuals pages. NULL is legal and means the toggles move,
        draw and remember, and nothing happens to the picture. */
     void (*applyvis)(void *user, const DOPT_Visuals *v);
+    /* RESET TO DEFAULTS on the Advanced page: the host rewrites the block from its ONE
+       source of defaults (fx_defaults in game/fx_state.h) and the page then applies it.
+       The dialog holds no copy of the numbers; NULL means the button does nothing. */
+    void (*resetvis)(void *user, DOPT_Visuals *v);
     /* And the same seam again for the cheat page. NULL means the switches move, draw and
        remember, and nothing in the game changes. */
     void (*applych)(void *user, const DOPT_Cheats *c);
@@ -851,6 +1118,11 @@ typedef struct
        two more booleans on DOPT_Visuals ON PURPOSE: the host's visuals arm CANNOT
        reach the input settings even by accident. */
     void (*applygp)(void *user, const DOPT_Gameplay *g);
+    /* THE SLOT LIST. Called when the slot dialog opens and after a delete: the host
+       fills `out` with the occupied slots, newest first, each as its file number and
+       its "(GDI) description" row, and returns how many. NULL means no save system,
+       and the three buttons are then drawn disabled. */
+    int (*slots)(void *user, DOPT_SlotRow *out, int max);
 } DOPT_Bind;
 
 /* ------------------------------------------------------------------------ */
@@ -876,9 +1148,15 @@ typedef struct
        and neither could say which of them a click belongs to. */
     int texdrop;
     int texhot;
-    /* The drop control's width, measured from its widest entry at layout time the way
-       btnw and okw are, rather than written down. */
-    int texw;
+    /* THE RESOLUTION LIST'S FIRST VISIBLE ENTRY, the same kind of number advTop is for
+       the well: the open list holds up to DOPT_RES_MAX entries and shows DOPT_RES_VIEW,
+       so the wheel and the slider well down the list's right edge move this. Set so the
+       current entry is in view when the list opens; meaningless while it is shut. */
+    int restop;
+    /* Every Advanced row's printed label width, measured at layout time the way btnw
+       and okw are; a drop row's value box starts DOPT_A_DROP_GAP after its own. 0 with
+       no font, the one case dopt_texset_box_rect_of falls back to DOPT_A_DROP_W. */
+    int labw[DOPT_VE_COUNT];
     int trkPlaying; /* the row the caller says is sounding, or -1              */
     int shuffle;  /* Options.IsScoreShuffle                                    */
     int repeat;   /* Options.IsScoreRepeat                                     */
@@ -895,6 +1173,12 @@ typedef struct
     DOPT_Settings set;
     DOPT_Visuals  vis;
     DOPT_Cheats   cheat;
+    int cheats_locked;   /* a network match: every switch drawn, none clickable */
+    /* WHAT KIND OF GAME THIS IS, and how far through it this player is. A match renames
+       the row that ends it and offers a different confirmation; a player who has already
+       resigned is a spectator, and the only thing left to do is leave. */
+    int match;           /* a Skirmish or a network match, not a campaign mission */
+    int surrendered;     /* this player has resigned and is watching */
     DOPT_Gameplay gp;
     DOPT_Bind bind;
 
@@ -913,6 +1197,29 @@ typedef struct
     int cfbw;                /* Abort and Cancel share msgbox's bwidth           */
     int cf3w;                /* Restart auto sizes (textbtn.cpp:74-84)           */
     int cfprev;              /* the pause page's selection, restored by Cancel   */
+    /* THE RESTATE BOX. `brief` is the text as handed over; `brwrap` is the same
+       text with a NUL at every line break, which is exactly what Format_Window_String
+       leaves behind, and `brline[]` indexes the start of each line in it. Wrapped in
+       dopt_layout because the wrap needs the font. */
+    char brief[DOPT_R_TEXT_MAX];
+    char brwrap[DOPT_R_TEXT_MAX];
+    int brline[DOPT_R_MAX_LINES];
+    int brlines;
+    int rvideo;              /* a briefing movie can be played: two buttons, not OK */
+    int rw, rh, rx, ry;      /* the box, msgbox.cpp:150-158                     */
+    int rbw;                 /* both buttons share msgbox's bwidth               */
+    int rprev;               /* the pause page's selection, restored by Options  */
+    /* THE NOTICE PAGE's caption. The box itself is the Restate box (brief, brwrap,
+       rx..rh above), opened with no movie so it carries the lone OK. */
+    char ncaption[DOPT_N_CAPTION_MAX];
+    /* THE SLOT DIALOG's state, and which question the confirmation box is asking:
+       0 the abort question (goptions.cpp:425), 1 "Delete this file?" (loaddlg.cpp:450).
+       One box, because msgbox.cpp is one box. */
+    DOPT_Slots sl;
+    int cfkind;
+    /* The font dopt_layout measured with, borrowed from the pack like `tracks`, so a
+       box whose question changes later can be measured again without the pack. */
+    const DB_Font *font;
     int laidout;
 } DOPT_State;
 
@@ -928,6 +1235,7 @@ void dopt_bind(DOPT_State *st, void *user, void (*apply)(void *, const DOPT_Sett
 /* The Visuals seam. Call after dopt_bind (which sets `user`); fires once immediately so
    the host and the checkboxes start in agreement. */
 void dopt_bind_visuals(DOPT_State *st, void (*applyvis)(void *, const DOPT_Visuals *));
+void dopt_bind_visuals_reset(DOPT_State *st, void (*resetvis)(void *, DOPT_Visuals *));
 /* Push the host's current truth INTO the dialog, for the case where something else
    changed it (the F5 panel, a preset loaded from the command line). */
 void dopt_set_visuals(DOPT_State *st, const DOPT_Visuals *v);
@@ -946,6 +1254,17 @@ void dopt_cheats_defaults(DOPT_Cheats *c);
 /* Read them back, and be told when one changes. The dialog holds the switches; what they
    MEAN is the host's business, exactly as the volume sliders work. */
 void dopt_set_cheats(DOPT_State *st, const DOPT_Cheats *c);
+/* A NETWORK MATCH: every switch on the page is drawn and none is clickable; only OK
+   answers. The renderer refuses to open the page at all in a match, so this is what
+   makes the page correct if that refusal is ever relaxed to "open it read-only". */
+void dopt_set_cheats_locked(DOPT_State *st, int locked);
+void dopt_set_match(DOPT_State *st, int match, int surrendered);
+const char *dopt_abort_label(const DOPT_State *st);
+const char *dopt_confirm_msg(const DOPT_State *st);
+const char *dopt_confirm_yes(const DOPT_State *st);
+const char *dopt_confirm_no(const DOPT_State *st);
+/* The question's second line, or NULL when it fits on one. */
+const char *dopt_confirm_msg2(const DOPT_State *st);
 const DOPT_Cheats *dopt_cheats(const DOPT_State *st);
 void dopt_bind_cheats(DOPT_State *st, void (*applych)(void *, const DOPT_Cheats *));
 /* THE GAMEPLAY PAGE, and the same four calls the cheat page has, for the same reasons. */
@@ -959,6 +1278,46 @@ const char *dopt_gp_label(int item);
 int dopt_gp_head_rect(const DOPT_State *st, const DB_Pack *p, int *x, int *y, int *w,
                       int *h);
 const char *dopt_cheat_label(int item);
+
+/* RESTATE. The briefing text (joined, at most DOPT_R_TEXT_MAX - 1 characters; NULL or
+   empty means the mission has none) and whether a briefing movie exists to be played.
+   The Restate button is drawn disabled when neither is there, because the engine's own
+   answer to that case is to do nothing at all, and a live button that does nothing is
+   what this dialog refuses to draw. Call before dopt_open or any time after. */
+void dopt_set_briefing(DOPT_State *st, const char *text, int video);
+/* The wrapped lines, for a readout: line `i` of the box, or NULL past the end. */
+const char *dopt_brief_line(const DOPT_State *st, int i);
+
+/* THE NOTICE. Open the dialog directly on a captioned box holding `text` wrapped the
+   way the objective is, with a lone OK, and nothing under it. OK, Enter and Escape all
+   report DOPT_ACT_RESUME, "close me". It is the Restate box lent to a caller that has
+   something to say before the menu comes back, which is why it takes the pack and does
+   the layout itself: there is no pause page whose open would have done so. */
+void dopt_open_notice(DOPT_State *st, const DB_Pack *p, const char *caption,
+                      const char *text);
+
+/* THE SLOT DIALOG. The host binds the row supplier; the dialog opens the page itself
+   from the three pause buttons. After a DOPT_ACT_DELETE the host removes the file and
+   calls dopt_slots_reload, which asks for the rows again and, when none are left, puts
+   the pause page back (loaddlg.cpp:456-458 `if (listbtn.Count() == 0) process = false`). */
+void dopt_bind_slots(DOPT_State *st, int (*slots)(void *, DOPT_SlotRow *, int));
+void dopt_slots_reload(DOPT_State *st);
+/* What the description field opens with when the empty slot is chosen (the host names
+   the mission and how far in it is); the player types over it. */
+void dopt_slots_default(DOPT_State *st, const char *text);
+/* Open the slot dialog directly on one mode, for a caller with no pause page under it
+   (the main menu's Load Mission). Cancel then reports DOPT_ACT_RESUME, "close me". */
+void dopt_open_slots(DOPT_State *st, const DB_Pack *p, int mode);
+/* What the last DOPT_ACT_LOAD / SAVE / DELETE named: the file number, and the typed
+   description (SAVE). */
+int dopt_slot_pick(const DOPT_State *st);
+const char *dopt_slot_descr(const DOPT_State *st);
+/* The row under the highlight, for a readout: its text, or NULL. */
+const char *dopt_slot_row_text(const DOPT_State *st, int row);
+/* Typed characters for the description field: printable ASCII, appended under
+   EditClass::Handle_Key's own rules (letters, digits and inner spaces; at most 40;
+   never wider than the field). Ignored on every other page. */
+void dopt_text(DOPT_State *st, const char *utf8);
 
 /* THE JUKEBOX. The caller supplies the track list (it is the one that knows which
  * themes the campaign has unlocked) and a callback for the four verbs. Neither is
@@ -1007,18 +1366,42 @@ const char *dopt_texset_label(int which);
 /* The label for one entry of the drop list on `item` -- the terrain row names textures
    and the infantry row names sprites. */
 const char *dopt_drop_label(int item, int which);
+/* The same for EVERY drop row, resolution and UI scale included, and how many entries a
+   row has: the art rows have DOPT_TEX_COUNT, the UI scale DOPT_UI_COUNT, the resolution
+   row as many sizes as the host enumerated. */
+const char *dopt_drop_text(const DOPT_State *st, int item, int which);
+int dopt_drop_count(const DOPT_State *st, int item);
 
 /* The tooltip shown when the pointer rests on an entry that cannot be chosen, or NULL
-   when that entry is selectable. Only Remastered has one. */
+   when that entry is selectable: Remastered without an install, DOS on a map with no
+   1995 tiles, and a resolution too large for a window under WINDOWED. */
 const char *dopt_texset_tooltip(const DOPT_State *st, int which);
+/* The same tip, as its three separate lines. The drawing needs them apart; the script
+   diagnostic wants them joined, which is what the function above is for. */
+int dopt_texset_tip_lines(const DOPT_State *st, int which,
+                          const char **l1, const char **l2, const char **l3);
+/* A tip that only INFORMS: the Desktop entry of the resolution list names the size it
+   stands for. Not a refusal, so it is kept apart from the lines above, whose presence
+   is what makes an entry unpickable. Same joined form as dopt_texset_tooltip. */
+const char *dopt_texset_infotip(const DOPT_State *st, int which);
 
-/* The screen rectangle of one open drop-list entry, or 0 when the list is shut or the
-   texture row is scrolled out of the well. For the headless driver: the entries are not
-   dialog items, so dopt_item_rect cannot reach them. */
+/* The screen rectangle of one open drop-list entry, or 0 when the list is shut, the
+   texture row is scrolled out of the well, or the entry is outside the resolution list's
+   window of DOPT_RES_VIEW rows. For the headless driver: the entries are not dialog
+   items, so dopt_item_rect cannot reach them. */
 int dopt_texset_item_rect_pub(const DOPT_State *st, int item, int i,
                               int *x, int *y, int *w, int *h);
 int dopt_texset_box_rect_pub(const DOPT_State *st, int item,
                              int *x, int *y, int *w, int *h);
+/* OPEN A DROP LIST the way a click on its row does, with the resolution list scrolled so
+   its current entry is in view. For the headless driver, which used to poke texdrop. */
+void dopt_drop_open(DOPT_State *st, int item);
+/* THE RESOLUTION LIST'S SLIDER WELL, or 0 when the list is shut or holds no more than it
+   shows (then there is no well). For the driver, which has to press it. */
+int dopt_res_bar_rect(const DOPT_State *st, int *x, int *y, int *w, int *h);
+/* The least width a drop row's box needs: its widest entry at GRAD6FNT plus the arrow
+   and the padding (DOPT_A_DROP_PAD). For the layout audit and the ADVDROP readout. */
+int dopt_drop_need_pub(const DOPT_State *st, const DB_Pack *p, int item);
 
 /* Input, in DOS pixels. Each returns a DOPT_ACT_*; DOPT_ACT_NONE means it was handled
  * internally (page change, slider move, nothing hit). */

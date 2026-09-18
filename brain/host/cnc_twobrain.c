@@ -303,9 +303,44 @@ static void report_first_difference(const char* a, const char* b)
         size_t na = ea ? (size_t)(ea - la) : strlen(la);
         size_t nb = eb ? (size_t)(eb - lb) : strlen(lb);
         if (na != nb || memcmp(la, lb, na) != 0) {
-            printf("  first difference is on dump line %d\n", line);
-            printf("    A: %.*s\n", (int)(na > 200 ? 200 : na), la);
-            printf("    B: %.*s\n", (int)(nb > 200 ? 200 : nb), lb);
+            /* PRINT THE WHOLE LINE, and say WHERE it parts. This used to cap at 200
+               characters, and an OBJ| line's identity fields alone are exactly 200: every
+               difference in the ~26 fields that follow (nav, tar, dying, makecnt, door,
+               status, cstage, repairing, ...) printed as two lines that looked IDENTICAL.
+               A gate whose failure output cannot show the failure is the sixth way this
+               suite lies. The column and the two field names are what make it bisectable. */
+            size_t col = 0;
+            size_t lim = na < nb ? na : nb;
+            while (col < lim && la[col] == lb[col]) {
+                col++;
+            }
+            /* %lu with a cast, not %zu: this file is compiled by MinGW for the Windows
+               half of the same gate, and the Microsoft C runtime it links against has no
+               %zu. A format the runtime does not know prints the literal letters, and the
+               column is the number that makes a divergence bisectable. */
+            printf("  first difference is on dump line %d, at column %lu\n", line,
+                   (unsigned long)(col + 1));
+            printf("    A: %.*s\n", (int)na, la);
+            printf("    B: %.*s\n", (int)nb, lb);
+            /* The field each side is inside at that column, which is the answer the reader
+               actually wants. A field runs from the '|' before col to the '|' after it. */
+            {
+                size_t fa = col, fb = col;
+                const char *ea2, *eb2;
+                while (fa > 0 && la[fa - 1] != '|') {
+                    fa--;
+                }
+                while (fb > 0 && lb[fb - 1] != '|') {
+                    fb--;
+                }
+                ea2 = (const char*)memchr(la + fa, '|', na - fa);
+                eb2 = (const char*)memchr(lb + fb, '|', nb - fb);
+                printf("    the field that differs: A %.*s / B %.*s\n",
+                       (int)(ea2 ? (size_t)(ea2 - (la + fa)) : na - fa),
+                       la + fa,
+                       (int)(eb2 ? (size_t)(eb2 - (lb + fb)) : nb - fb),
+                       lb + fb);
+            }
             return;
         }
         if (!ea || !eb) {
@@ -315,7 +350,8 @@ static void report_first_difference(const char* a, const char* b)
         lb = eb + 1;
         line++;
     }
-    printf("  the dumps differ in length: A %zu bytes, B %zu bytes\n", strlen(a), strlen(b));
+    printf("  the dumps differ in length: A %lu bytes, B %lu bytes\n",
+           (unsigned long)strlen(a), (unsigned long)strlen(b));
 }
 
 static int load_brain(Brain* b, const char* src, const char* copy_path, const char* name)
@@ -1007,6 +1043,10 @@ int main(int argc, char** argv)
         printf("\n");
         printf("Loads the brain TWICE as two independent instances, runs the same scenario on\n");
         printf("both with CNC3D_Lockstep ON, and compares the full engine dump every tick.\n");
+        printf("\n");
+        printf("CNC3D_TB_WARM=<SCEN>  run that scenario on instance A first and throw it away,\n");
+        printf("                      so the two differ in what their process has already done.\n");
+        printf("CNC3D_TB_WARM_TICKS=N how long to run it (default 200).\n");
         return (2);
     }
 
@@ -1081,6 +1121,48 @@ int main(int argc, char** argv)
     A.Config(&rules);
     B.Config(&rules);
 
+    /*
+    **	THE WARM START, and it is the only leg here that can catch a whole class of defect
+    **	the rest of this file is blind to.
+    **
+    **	Every other leg starts its scenario as the FIRST thing its process ever runs, and
+    **	so does every peer in the loopback gate. That makes both sides identical for free
+    **	in any state that Clear_Scenario does not reset, and there is such state: the
+    **	synchronised simulation RNG, Scen.RandomNumber, is written only inside Init_Random,
+    **	which the DLL never reaches, so it holds RandomClass(0) on a fresh process and
+    **	whatever the last scenario left on a second one.
+    **
+    **	A real player reaches that in the obvious way as soon as there is a lobby: finish a
+    **	skirmish, host a match, and your stream is hundreds of draws along while a freshly
+    **	launched joiner's is at zero.
+    **
+    **	So with CNC3D_TB_WARM set, instance A runs that scenario first and throws it away,
+    **	and instance B does not. If anything survives a scenario change that the simulation
+    **	then reads, the two disagree and this gate says where.
+    */
+    {
+        const char* warm = getenv("CNC3D_TB_WARM");
+        if (warm != NULL && *warm != '\0') {
+            const char* wt = getenv("CNC3D_TB_WARM_TICKS");
+            int wticks = (wt != NULL && *wt != '\0') ? atoi(wt) : 200;
+            int w;
+            if (wticks < 1) {
+                wticks = 1;
+            }
+            printf("  warm start: A runs %s for %d ticks first and throws it away; B does not\n",
+                   warm, wticks);
+            if (!A.Start(content, scendir, warm, 1, 0)) {
+                printf("FAILED: the warm-up scenario %s did not start on A\n", warm);
+                return (1);
+            }
+            for (w = 0; w < wticks; w++) {
+                A.Advance(1ULL);
+            }
+            printf("  warm start: A has run %d ticks of %s and is about to start %s over it\n",
+                   wticks, warm, scenario);
+        }
+    }
+
     /* SCM* is this project's multiplayer map naming. A multiplayer map means the order leg
        can run, because the pump that executes a posted order is on the multiplayer arm. */
     int want_order_leg = (strncmp(scenario, "SCM", 3) == 0);
@@ -1106,7 +1188,7 @@ int main(int argc, char** argv)
     **	a player id that selects the LOCAL context (PlayerPtr) for the call, and a real
     **	match has a different local player on every machine. If anything in the tick
     **	reads that context, two peers diverge while two instances advanced under the
-    **	same id, as this gate did until 3 Sep 2026, would agree for ever. The renderer
+    **	same id, as this gate did, would agree for ever. The renderer
     **	relies on exactly this independence to keep the local human at id 0 on both
     **	machines (arm_skirmish), so the gate has to test it.
     */
@@ -1287,6 +1369,105 @@ int main(int argc, char** argv)
         }
         printf("  control: the same order given to A alone DID make them differ, so the\n");
         printf("           comparison can actually see this order take effect\n");
+
+        /* ---- THE LOOKAHEAD LEG, WHICH IS THE ONE THAT WAS MISSING -------------------
+        **
+        **	An order is stamped by the DRAIN with the frame it expects to execute on:
+        **	the current frame plus the delay the drain was handed. The scheduler then
+        **	holds that order for that many turns and posts it. The two numbers are passed
+        **	in separately, and the whole contract is that they are the SAME number.
+        **
+        **	They came apart once a room began measuring its own link. The scheduler took
+        **	the measured lookahead and the drain kept the compile-time default, so on any
+        **	link slow enough to raise it, every order arrived describing a frame that had
+        **	already gone and the engine refused all of them. No order any player gave
+        **	could execute, and a refused order ends the match.
+        **
+        **	NOTHING COULD SEE IT. Where the link is fast the measured number IS the
+        **	default, so the two agree by accident; and this gate, the one place that
+        **	drives the real drain and the real post, passed 3 to the drain and posted on
+        **	the very next line, which is the one delay at which a mismatch cannot show.
+        **	So this leg does the two things that were never done together: it drains with
+        **	a delay ABOVE the default, and it lets the engine advance that many frames
+        **	before posting.
+        **
+        **	Both directions are asserted. An order posted ON TIME must be accepted, or
+        **	the feature is broken; one posted LATE must be refused, or the engine has
+        **	stopped checking the stamp and this whole class of fault goes invisible
+        **	again. Both instances are asked, because both run the same check and a
+        **	one-sided answer would only prove half of it.
+        **
+        **	IT RUNS LAST, AFTER THE CONTROL ABOVE HAS DELIBERATELY LEFT THE TWO WORLDS
+        **	DIFFERENT, and this is the one leg for which that is safe: it asks what the
+        **	ENGINE does with a frame stamp and reads the return code, so it never
+        **	compares the two worlds and does not care that they no longer match.
+        **
+        **	It may NOT run earlier, which was tried. Beacon clears the caller's previous
+        **	beacon at once and locally, before any order crosses, so a leg that leaves a
+        **	beacon standing makes the next one-sided Beacon change that world on its own.
+        **	The order leg then fails its "the two still agree" check on scaffolding
+        **	rather than on the thing it is testing.
+        */
+        {
+            const int delay = 5;          /* above the default, as a measured link sets */
+            unsigned char lw[TB_EVENT_MAX * 64];
+            int ld, k, ra, rb;
+
+            printf("\n--- the lookahead leg: the drain's delay and the post must agree ---\n");
+
+            (void)A.Drain(lw, TB_EVENT_MAX, delay);      /* anything outstanding, gone */
+            A.Beacon(0, 1ULL, 300, 200);
+            ld = A.Drain(lw, TB_EVENT_MAX, delay);
+            if (ld < 1) {
+                printf("FAILED: no order to drain for the lookahead leg (drain=%d)\n", ld);
+                return (1);
+            }
+
+            /* Advance exactly the delay the order was stamped against, which is the
+               step this gate never took. */
+            for (k = 0; k < delay; k++) { A.Advance(1ULL); B.Advance(2ULL); }
+
+            for (k = 0; k < ld; k++) {
+                const void* ev = lw + ((size_t)k * (size_t)event_size);
+                ra = A.Post(ev);
+                rb = B.Post(ev);
+                if (ra != 1 || rb != 1) {
+                    printf("FAILED: an order drained with delay %d and posted %d frames\n",
+                           delay, delay);
+                    printf("        later was refused (A=%d B=%d). The delay handed to the\n", ra, rb);
+                    printf("        drain and the lookahead the scheduler holds an order for\n");
+                    printf("        must be the same number; -3 means the frame it was\n");
+                    printf("        stamped for had already passed, which is what a relayed\n");
+                    printf("        match hits the moment its link raises that number.\n");
+                    return (1);
+                }
+            }
+            printf("  an order stamped for %d turns ahead is accepted %d frames later\n",
+                   delay, delay);
+
+            /* THE OTHER DIRECTION: stamped short, delivered late, and it MUST be
+               refused. Without this the half above would still pass on an engine that
+               had stopped checking the stamp at all, which is the same blindness in a
+               different place. */
+            A.Beacon(0, 1ULL, 310, 210);
+            ld = A.Drain(lw, TB_EVENT_MAX, 3);           /* the old, wrong number */
+            if (ld < 1) {
+                printf("FAILED: no order to drain for the mismatch half (drain=%d)\n", ld);
+                return (1);
+            }
+            for (k = 0; k < delay; k++) { A.Advance(1ULL); B.Advance(2ULL); }
+            ra = A.Post(lw);
+            rb = B.Post(lw);
+            if (ra == 1 || rb == 1) {
+                printf("FAILED: an order stamped for 3 turns ahead was ACCEPTED %d frames\n", delay);
+                printf("        later (A=%d B=%d). The engine is no longer refusing a stale\n", ra, rb);
+                printf("        stamp, so the mismatch this leg exists to catch would pass\n");
+                printf("        by silently.\n");
+                return (1);
+            }
+            printf("  and one stamped for 3 is refused %d frames later (A=%d B=%d), as it must be\n",
+                   delay, ra, rb);
+        }
     }
 
     printf("\n  PASSED. Two independent brain instances, both in lockstep mode, ran %d ticks\n",

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build the current commit and refresh the Desktop test folder.
-# The packs and dylib come from LOCAL_DATA (game data never lives in git; see DATA.md).
+# The packs and dylib come from LOCAL_DATA (game data never lives in git; see BUILDING.md).
 set -e
 cd "$(dirname "$0")"
 # THE DESTINATION AND THE DATA BELONG TO THE WORKING COPY THIS SCRIPT LIVES IN, and both
@@ -102,7 +102,7 @@ cp ../menu/dosmenu.pack "$DEST/" 2>/dev/null || true
 # Note only that the RIGHT CONQUER.MIX is the 268366-byte one beside the other play data,
 # not the 2244000-byte archive of the same name in data/dosdata, which is a different file.
 
-# THE PACKS THE GAME ACTUALLY RUNS COME FROM THE BAKERY, and until 19 Aug 2026 nothing
+# THE PACKS THE GAME ACTUALLY RUNS COME FROM THE BAKERY, and nothing
 # put them here: this script copied the binaries and left whatever .pack files happened
 # to be sitting in the folder from some earlier hand copy. That is how a build can carry
 # a fix in its source and not in its data, which makes the build number on the menu a
@@ -131,6 +131,23 @@ python3 ../tools/sidebar_redesign/bake_pack.py >/dev/null || {
     echo "make-build.sh: bake_pack.py failed; hud640.pack would be stale" >&2; exit 1; }
 python3 bake_logos.py >/dev/null || {
     echo "make-build.sh: bake_logos.py failed; logos.pack would be stale" >&2; exit 1; }
+# AND THE SOLID TIBERIUM, for a different reason: the loop above DOES see game/, so a
+# baked tib3d.pack travels -- but it is gitignored like every other pack, so a machine
+# that has only ever pulled has never had one at all, and the feature is then simply
+# absent with one line on stderr saying so. It reads only committed inputs
+# (data/mods/original-tiberium-v4) and takes under a second, so bake it every time
+# rather than making a fresh clone remember.
+python3 bake_tib3d.py >/dev/null || {
+    echo "make-build.sh: bake_tib3d.py failed; the Enhanced crystals would be absent" >&2; exit 1; }
+
+# THE TREES ARE A COMMITTED ASSET, NOT A BAKE. bake_tree3d.py rebuilds tree3d.pack from
+# a Poly Haven glTF, and that glTF is a sixty-megabyte download per species which has no
+# business in this repository. The pack it produces is one megabyte, so the PACK is what
+# is committed, under data/trees, and a build copies it. Regenerating it is a deliberate
+# step with the model to hand, not something every build pays for.
+if [ -f "$REPO/data/trees/tree3d.pack" ]; then
+    cp "$REPO/data/trees/tree3d.pack" tree3d.pack
+fi
 # bake_pack.py writes into the REPO's playable, which is not necessarily $DEST.
 if [ "$REPO/playable/hud640.pack" != "$DEST/hud640.pack" ]; then
     cp "$REPO/playable/hud640.pack" "$DEST/hud640.pack"
@@ -148,7 +165,7 @@ done
 echo "packs: $n refreshed"
 rsync -a missions "$DEST/" 2>/dev/null || true
 
-# THE BRAIN TRAVELS WITH THE BUILD TOO, and until 22 Aug 2026 it did not.
+# THE BRAIN TRAVELS WITH THE BUILD TOO, and it did not.
 #
 # tools/mac/build-brain-mac.sh writes TiberianDawn.dylib into game/ and, unless you pass
 # it a second destination by hand, NOWHERE ELSE. This script copied binaries and packs and
@@ -183,7 +200,7 @@ else
     exit 1
 fi
 
-# THE GATE SUITE TRAVELS WITH THE BUILD, and until 20 Aug 2026 it did not.
+# THE GATE SUITE TRAVELS WITH THE BUILD, and it did not.
 #
 # tools/release.sh gates every release with `sh playable/gates.sh` (the gates block, the
 # line that sets RUNDIR to $ROOT/playable). playable/ is ignored in full (.gitignore:25)
@@ -302,6 +319,18 @@ done
   exit 1; }
 echo "macOS floor: cnc3d, cnc_eyes, netcheck and every .dylib in $DEST are $CNC3D_MACOS_MIN or older"
 
+# A COOKED PACKAGE CARRIES NO F5 PANEL. Same check as tools/win/make-build-win.sh, for
+# the same fail-open case: a cook that was asked for and not compiled in.
+if [ -n "$CNC3D_COOKED" ]; then
+  for b in cnc_eyes cnc3d; do
+    strings - "$DEST/$b" 2>/dev/null | grep -q 'unavailable in a cooked build' || {
+      echo "FAIL: $b was packaged as a cooked build but carries the F5 panel: it was" >&2
+      echo "compiled without CNC3D_COOKED. Rebuild with the packager, not by hand." >&2
+      exit 1; }
+  done
+  echo "cooked: cnc_eyes and cnc3d carry no F5 panel"
+fi
+
 # A COMPLETE PLAY FOLDER, OR A REFUSAL THAT NAMES WHAT IS MISSING AND WHO MAKES IT.
 #
 # Almost every one of these degrades quietly when absent rather than failing: no cameos
@@ -332,6 +361,8 @@ check_asset efx.pack           "game/bake_efx.py"
 check_asset dosmenu.pack       "menu/, copied above"
 check_asset verdict.pack       "game/bake_verdict.py"
 check_asset dostib.pack        "game/bake_dostiberium.py"
+check_asset tib3d.pack         "game/bake_tib3d.py       (Enhanced solid crystals; without it the flat overlay draws alone)"
+check_asset tree3d.pack        "data/trees/tree3d.pack   (Enhanced leafy trees; without it the cartridge tree model draws)"
 check_asset smudge.pack        "game/bake_smudges.py"
 check_asset logos.pack         "game/bake_logos.py       (the score screen's spinning faction logo)"
 check_asset hud640.pack        "tools/sidebar_redesign/bake_pack.py"

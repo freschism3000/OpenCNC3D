@@ -89,12 +89,30 @@ void cnc_audio_begin_tick(CncAudio *au);
  * missing sound and must never be reported as one: -1 keeps its old meaning of "not on the
  * disc, or not audible from here". A caller that only tests `>= 0` needs no change. */
 #define CNC_SFX_DUPLICATE (-2)
+/* What cnc_audio_on_ui_effect returns when the clip IS on the disc but mixer_play
+ * refused it a voice: every voice was busy and every one of them held a higher priority
+ * than the clip asked for, so nothing was worth stealing. A headless run that never
+ * renders the mix sees this constantly, because a voice only retires when something
+ * drains it; with a device or a WAV sink open it is rare. Not a missing sound either. */
+#define CNC_SFX_NOVOICE (-3)
 
 /* CALLBACK_EVENT_SOUND_EFFECT. x and y are ev.SoundEffect.PixelX / PixelY; the
  * engine passes -1, -1 for a sound with no map position. Returns the voice handle,
  * -1 if it was dropped or the sound is not on the disc, or CNC_SFX_DUPLICATE if this
  * tick has already had its fill of that clip. */
 int cnc_audio_on_sound_effect(CncAudio *au, int sfx_index, int variation, int x, int y);
+
+/* The 1995 engine's OTHER Sound_Effect: an effect with no map position and a volume of
+ * its own (audio.cpp, `Sound_Effect(VocType, VolType)`), which is how the credit
+ * counter's tick was played at VOL_1. The DLL build never routes that overload through
+ * the sound callback, so the caller that would have raised it raises it here instead.
+ * `gain` is mixer permille (MIX_UNITY is the volume an on-screen effect plays at) and is
+ * clamped to 0..MIX_GAIN_MAX; the pan is centre; the bus is the effects bus, so the
+ * effects slider scales it. The .JUV fallback and the per-tick duplicate window apply
+ * exactly as they do above. Returns the voice handle, CNC_SFX_DUPLICATE, CNC_SFX_NOVOICE
+ * when the clip exists but the mixer refused it a voice, and -1 only when the clip is
+ * not on the disc. */
+int cnc_audio_on_ui_effect(CncAudio *au, int sfx_index, int gain);
 
 /* CALLBACK_EVENT_SPEECH. EVA is one line at a time: a new line CUTS the current one
  * and starts immediately, so the newest always wins. That is a cut, not a crossfade,

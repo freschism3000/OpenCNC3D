@@ -41,10 +41,26 @@ typedef enum
 typedef struct LU_State LU_State;
 
 /* `dir` is the installed folder (the one holding dosmenu.pack). `version` is what
- * is installed now, as a bare number like "0.6.2". Never returns NULL: a state
- * that cannot work is still a state that can say why. */
+ * is installed now, as a bare number like "0.6.2", or NULL when it is not known
+ * yet. Never returns NULL: a state that cannot work is still a state that can say
+ * why.
+ *
+ * CALL IT BEFORE ANYTHING ELSE READS THE FOLDER. It takes the install lock and,
+ * holding it, finishes whatever an earlier update left unfinished, so the
+ * version, the menu art and everything else read afterwards describe one build
+ * rather than half of two. Only when it gets the lock and the undo is not refused:
+ * while another launcher holds the lock, or something still has open a file the
+ * undo has to move, it recovers nothing, says nothing, and the folder is read as it
+ * stands. lu_destroy releases the lock, and has to be called before the game is
+ * started.
+ *
+ * A folder that is not an install (lz_is_install) gets no lock and no recovery,
+ * and cannot be updated: the state still checks and still reports. */
 LU_State *lu_create(const char *dir, const char *version);
 void lu_destroy(LU_State *u);
+
+/* What is installed, read once lu_create has finished the folder. */
+void lu_set_installed(LU_State *u, const char *version);
 
 /* Both start a worker and return at once. Calling either while one is running is
  * ignored rather than queued. */

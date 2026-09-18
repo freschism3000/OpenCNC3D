@@ -447,7 +447,7 @@ Twenty minutes, and he has a playable skirmish map.
 
 | Feature | One line |
 |---|---|
-| Arm-and-stamp ghost using the real mesh at 50% alpha | The pointermove raycast and `groundAt` already do the snapping (`tools/heightmap-viewer/public/app.js:620`, `:1098-1126`); this is the cheapest item on the board and it is literally what the project owner asked for. |
+| Arm-and-stamp ghost using the real mesh at 50% alpha | The pointermove raycast and `groundAt` already do the snapping (`tools/heightmap-viewer/public/app.js:620`, `:1098-1126`); this is the cheapest item on the board and it is literally what the requirement asked for. |
 | Footprint snap with per-cell valid/invalid decals, invalid drawn over the ghost | Validity is a mixture, never one verdict (`brain/vanilla/tiberiandawn/cell.cpp:1114-1123` picks TRANS.ICN frame 0 or 2 per cell), and drawing red on top is one `renderOrder` field for the whole readability win. |
 | Bib correction on the footprint: `Width x (Height+1)` when `IsBibbed` | `brain/vanilla/tiberiandawn/bdata.cpp:4467-4494`; without it a 3x2 Construction Yard looks legal in the editor and is refused in game. |
 | Four-slot owner selector recolouring palette and ghost instantly, plus Tab to cycle | Measured: no shipped map uses more than four houses (distribution 0:16, 1:2, 2:31, 3:48, 4:3), so a ten-slot Multi1..6 UI is dead weight. |
@@ -622,7 +622,7 @@ Six-entry semantic Ground palette restricted to bank-present `(template, icon)` 
 
 ## Appendix: what a first pass measured before the plan was written
 
-Two numbers were checked by hand in the session that commissioned this, and both are
+Two numbers were checked by hand in the commit that commissioned this, and both are
 load-bearing enough to record here rather than leave in a transcript.
 
 **Template block layouts are recoverable from the shipped maps.** Scanning every

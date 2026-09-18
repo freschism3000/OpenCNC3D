@@ -1,0 +1,18 @@
+tick 30
+band 0 0 1279 500
+group 1 2
+tick 1
+unitcard
+cam 45 45
+edgeat 2 718 20
+cam 45 45
+edgeat 100 718 20
+cam 45 45
+edgeat 2 600 20
+cam 45 45
+edgeat 300 718 20
+cam 45 45
+edgeat 2 300 20
+lclick 5 714
+unitcard
+quit

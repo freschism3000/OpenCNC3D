@@ -22,6 +22,12 @@
 // the house's existing base; ground buildability is decided elsewhere and is
 // not affected.
 // It DOES change the game simulation.
+// MODIFIED again in September 2026: Init_Theater no longer copies the theater
+// palette from a NULL pointer when the theater archive is missing, empty or
+// damaged. The palette is zeroed, one line is printed for the host's log, and
+// the scenario goes on loading. Only reached when the archive is unusable;
+// with the archive present the function is unchanged. It does NOT change the
+// game simulation.
 // The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
 // and NOTICE.md lists every modified file.
 //
@@ -339,6 +345,29 @@ void DisplayClass::Init_IO(void)
 }
 
 /***********************************************************************************************
+ * CNC3D_Report_Missing_Palette -- Says, once per lookup, that a theater palette was not found. *
+ *                                                                                             *
+ *    C&C 3D. The host runs this engine as a library and keeps its log; the engine's own       *
+ *    debug print compiles to nothing in a release build, so the line goes out the way every   *
+ *    other host-facing readout in this modified engine does, as a prefixed line on stdout.    *
+ *                                                                                             *
+ * INPUT:   palname  -- the palette entry that was asked for (TEMPERAT.PAL and its kin)        *
+ *          root     -- the theater archive's root name (TEMPERAT, WINTER, DESERT)             *
+ *=============================================================================================*/
+static void CNC3D_Report_Missing_Palette(char const* palname, char const* root)
+{
+    char msg[160];
+    sprintf(msg,
+            "CNC3D|theater|%s is in no loaded archive: %s.MIX is missing, empty or damaged; "
+            "palette zeroed, mission continues",
+            palname,
+            root);
+    printf("%s\n", msg);
+    fflush(stdout);
+    GlyphX_Debug_Print(msg);
+}
+
+/***********************************************************************************************
  * DisplayClass::Init_Theater -- Performs theater-specific initialization (mixfiles, etc)      *
  *                                                                                             *
  * INPUT:                                                                                      *
@@ -422,7 +451,20 @@ void DisplayClass::Init_Theater(TheaterType theater)
     */
     sprintf(fullname, "%s.PAL", Theaters[theater].Root);
     void const* ptr = MFCD::Retrieve(fullname);
-    Mem_Copy((void*)ptr, GamePalette, 768);
+    /*
+    **	C&C 3D: the palette entry is looked up in the theater archive, and when that
+    **	archive is missing, empty or damaged the lookup answers NULL. Copying from NULL
+    **	is a fault inside mission start, so the palette is zeroed instead and the fault
+    **	is reported through the host's log. Nothing below depends on the palette holding
+    **	real colours: the fading tables are built from it and rebuilt from the same
+    **	(zeroed) bytes, and a host that draws with its own palette never reads it.
+    */
+    if (ptr != NULL) {
+        Mem_Copy((void*)ptr, GamePalette, 768);
+    } else {
+        CNC3D_Report_Missing_Palette(fullname, Theaters[theater].Root);
+        memset(GamePalette, 0, 768);
+    }
 
     Mem_Copy(GamePalette, OriginalPalette, 768);
 
@@ -527,7 +569,12 @@ void DisplayClass::Init_Theater(TheaterType theater)
     */
     sprintf(fullname, "%s.PAL", Theaters[theater].Root);
     ptr = MFCD::Retrieve(fullname);
-    Mem_Copy((void*)ptr, GamePalette, 768);
+    /* The same guard as above: the archive did not grow the entry meanwhile. */
+    if (ptr != NULL) {
+        Mem_Copy((void*)ptr, GamePalette, 768);
+    } else {
+        memset(GamePalette, 0, 768);
+    }
     Mem_Copy(GamePalette, OriginalPalette, 768);
 #endif
 

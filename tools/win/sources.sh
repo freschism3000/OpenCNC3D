@@ -21,7 +21,10 @@
 WIN_GAME_C="game/dosbar.c game/hud640.c game/dosopt.c game/dossave.c"
 
 # The 1995 menu shell and the movie player.
-WIN_MENU_C="menu/dosmenu.c menu/dosops.c menu/doslobby.c menu/dosmenu_shell.c"
+# mpbrowse.c is the internet game list as the screen sees it: it asks the list service for
+# open games and publishes this machine's own, both on a worker so the frame never waits.
+WIN_MENU_C="menu/dosmenu.c menu/dosops.c menu/doslobby.c menu/dosmp.c \
+            menu/dosmenu_shell.c menu/mpbrowse.c"
 WIN_VIDEO_C="video/vqaplay.c video/movieplay.c video/moviesnd.c video/pngwrite.c"
 
 # The audio engine. Every file here is portable C except audio_sdl.c, which owns the
@@ -44,10 +47,28 @@ WIN_APP_C="app/campaign.c app/logo3d.c"
 # renderer keeps between scene assembly and the graphics API. Windows needs -lws2_32 for
 # the second one; the link line below carries it.
 #
-# The gate and tool binaries beside them (gate_lockstep.c, gate_netloop.c, netcheck.c) are
-# NOT here on purpose: they are standalone, exactly like gate_optlayout.c and playvqa.c,
-# and tools/win/check-sources.sh excludes them by name for that reason.
-WIN_NET_C="net/lockstep.c net/net_udp.c net/netmatch.c"
+# netbeacon.c is the LAN announcement and the browser's side of it. It carries its own
+# <windows.h> branch for the millisecond clock, so it was written to cross-compile and is
+# not being made to.
+#
+# The gate and tool binaries beside them (gate_lockstep.c, gate_netloop.c, gate_tunnel.c,
+# gate_beacon.c,
+# gate_lobby.c, netcheck.c) are NOT here on purpose: they are standalone, exactly like
+# gate_optlayout.c and playvqa.c, and tools/win/check-sources.sh excludes them by name for
+# that reason.
+# roomcode.c is the room code: a relayed host's whole address, six characters of
+# Crockford base32 and the random draw behind it. Part of the game rather than a tool,
+# because both ends of a relayed match need it -- the host to publish one, the joiner to
+# read one. Its GATE (gate_roomcode.c) is standalone and excluded by check-sources.sh.
+WIN_NET_C="net/lockstep.c net/net_udp.c net/netmatch.c net/netbeacon.c net/roomcode.c"
+
+# THE HTTP CLIENT, SHARED WITH THE LAUNCHER RATHER THAN COPIED. The game needs it for one
+# thing only, the internet game list, and there is no reason for two clients in one tree
+# that would then disagree about timeouts and redirects. Both files include nothing of the
+# launcher's beyond their own headers, which is what makes sharing them free. Each platform
+# brings its own transport underneath: a system DLL on one, a library in the SDK on the
+# other, and neither is something a player has to install.
+WIN_HTTP_C="launcher/lnet.c launcher/ljson.c"
 
 # The C++ half.
 WIN_EYES_CPP="game/cnc_eyes.cpp"

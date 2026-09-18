@@ -46,6 +46,14 @@ LABEL="${1:-run}"
 # A run folder that EXISTS but holds no game is the same lie told more slowly, so say so
 # once and plainly rather than through 158 failures that each blame the code.
 [ -x ./cnc3d ] || { echo "FAIL: $RUNDIR is not a run folder (no cnc3d in it)" >&2; exit 1; }
+# THE PICTURE FOLDER EXISTS BEFORE THE FIRST GATE THAT WRITES INTO IT. Nothing below
+# created shots/ until G6 made a subfolder of it, two gates after G4 had written its two
+# determinism shots there. On a run folder built minutes earlier, G4 therefore could not
+# open shots/det_a.png, the run exited 1 and the gate reported "the run itself failed".
+# It passed on every other run folder only because shots/ had been left behind by an
+# earlier suite run: a gate green by leftover state, which is the family of fault this
+# suite exists to refuse. Measured on a fresh test folder of an otherwise green build.
+mkdir -p shots
 OUT="../gates/$LABEL.log"
 : > "$OUT" || { echo "FAIL: cannot write $RUNDIR/$OUT" >&2; exit 1; }
 BASE="--cameos cameos.pack --dospack dossidebar.pack --dosinf dosinfantry.pack --dylib TiberianDawn.dylib --dir missions/ --content content/"
@@ -62,6 +70,30 @@ PASS=0; FAIL=0
 # shell, not in the pipeline, and tools/release.sh still reads the footer and $?.
 ok()  { echo "PASS  $1" | tee -a "$OUT"; PASS=$((PASS+1)); }
 bad() { echo "FAIL  $1" | tee -a "$OUT"; FAIL=$((FAIL+1)); }
+# A GATE THAT DELIBERATELY DID NOT RUN, and it counts as neither a pass nor a fail so
+# that the summary line cannot read as coverage it does not have. See INTERACTIVE below.
+skip() { echo "SKIP  $1" | tee -a "$OUT"; SKIPPED=$((SKIPPED+1)); }
+SKIPPED=0
+
+# ---------------------------------------------------------------------------------
+# GATES THAT CANNOT RUN IN THE BACKGROUND, and the one switch that lets them.
+#
+# Almost everything here is headless: --script and --shot runs open a hidden window, take
+# no focus and make no sound, so a full suite can run while somebody works on the machine.
+# A very small number of gates cannot be written that way, because what they MEASURE is
+# the behaviour of a real focused window and a real pointer on a real desktop. G124 is the
+# whole list today: it reads SDL_WINDOW_INPUT_FOCUS and pushes the mouse PAST the window
+# edge, so it needs a visible window that has been raised, and it moves the operator's
+# actual pointer to do it.
+#
+# A TEST RUN MUST NOT TAKE THE SCREEN OR THE POINTER unasked, so a gate that can only work
+# by doing both is OFF by default and the suite says SKIP rather than quietly passing.
+#
+#   CNC3D_GATES_INTERACTIVE=1 sh gates.sh    run them, when nobody is using the machine
+#
+# THE COST IS REAL AND IS NOT HIDDEN: with this unset, the edge-scroll gesture through the
+# live loop is NOT covered. A release should run the suite once with it set.
+INTERACTIVE="${CNC3D_GATES_INTERACTIVE:-0}"
 
 # =====================================================================================
 # THE STALE-SHOT WRAPPER. Every gate that measures a PNG must go through this.
@@ -123,10 +155,16 @@ gshots() {
 
 echo "===== gates $LABEL $(date '+%F %H:%M:%S') =====" >> "$OUT"
 
-# G1 --picktest, both camera modes in one run
-L=$(./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE --picktest 2>&1 | tee -a "$OUT" | grep "UNPROJ| overall")
+# G1 --picktest, both camera modes in one run. The isometric dial cases (fov, tilt,
+# distance scale) are counted, because a sweep that silently dropped them would still
+# say PASS and prove nothing about the dials.
+G1L=$(./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE --picktest 2>&1 | tee -a "$OUT")
+L=$(echo "$G1L" | grep "UNPROJ| overall")
+G1ISO=$(echo "$G1L" | grep -c '^UNPROJ| iso ')
 case "$L" in
-  *"N64 PASS, OLD PASS -> PASS") ok "G1 picktest both cameras" ;;
+  *"N64 PASS, OLD PASS -> PASS")
+    if [ "${G1ISO:-0}" -ge 8 ]; then ok "G1 picktest both cameras, $G1ISO isometric dial cases swept"
+    else bad "G1 picktest passed but only $G1ISO isometric dial cases ran (want >= 8)"; fi ;;
   *) bad "G1 picktest [$L]" ;;
 esac
 
@@ -136,13 +174,23 @@ N=$(echo "$S" | sed -n 's/.*entries=\([0-9]*\).*/\1/p')
 if [ -n "$N" ] && [ "$N" -gt 0 ]; then ok "G2 sidebar entries=$N"; else bad "G2 sidebar [$S]"; fi
 
 # G3 self-play, SCG01EC and SCG90EA
+#
+# THE FAILURE COUNT IS READ AS A NUMBER, AND THE EXIT STATUS IS THE BINARY'S OWN. The
+# verdict used to be a suffix match on "0 failures", which a run ending "10 failures" or
+# "100 failures" satisfies just as well, and self-play can cascade past ten. The status was
+# lost inside a tee. The script runner exits 1 whenever it counted a failure, so on a sound
+# run the two agree, and a run that reports 0 and still exits nonzero died after its report.
 for pair in "SCG01EC selfplay.txt" "SCG90EA gate_90.txt"; do
   set -- $pair
-  R=$(./cnc_eyes --scen $1 --pack SCG01EA.pack $BASE --script $2 2>&1 | tee -a "$OUT" | grep -E "^SCRIPT\|end")
-  case "$R" in
-    *"0 failures") ok "G3 self-play $1 [$R]" ;;
-    *) bad "G3 self-play $1 [$R]" ;;
-  esac
+  G3L=$(./cnc_eyes --scen $1 --pack SCG01EA.pack $BASE --script $2 2>&1); G3RC=$?
+  echo "$G3L" >> "$OUT"
+  R=$(echo "$G3L" | grep -E "^SCRIPT\|end")
+  G3F=$(echo "$R" | sed -n 's/^SCRIPT|end .*: [0-9]* lines, \([0-9]*\) failures$/\1/p' | head -1)
+  if [ "$G3RC" = "0" ] && [ "$G3F" = "0" ]; then
+    ok "G3 self-play $1 [$R]"
+  else
+    bad "G3 self-play $1: exit=$G3RC(want 0) failures=${G3F:-none read}(want 0) [$R]"
+  fi
 done
 
 # G4 two-run --shot REPRODUCIBILITY. Note what this is and is not: it shoots the same
@@ -179,27 +227,41 @@ fi
 # scenario's name; the flume is now TSTBOAT and the campaign owns SCG10EA. The PACK is
 # still the real SCG10EA.pack: the flume needs a temperate map with water, not that
 # map's cell layout, and the gate passes on it unchanged.
-G=$(./cnc_eyes --scen TSTBOAT --pack SCG10EA.pack $BASE --script gate_gunboat.txt 2>&1 | tee -a "$OUT")
+G=$(./cnc_eyes --scen TSTBOAT --pack SCG10EA.pack $BASE --script gate_gunboat.txt 2>&1); G5RC=$?
+echo "$G" >> "$OUT"
 FW=$(echo "$G" | grep -E "^FACEWATCH\|" | shasum | cut -d' ' -f1)
 FN=$(echo "$G" | grep -cE "^FACEWATCH\|")
 TURNS=$(echo "$G" | grep -E "^FACEWATCH\|" | grep -cv "dF=+0")
 E5=$(echo "$G" | grep -E "^SCRIPT\|end")
+# "0 failures" is read as a number and the exit status is the binary's own: a suffix match
+# also accepted "10 failures", and the status used to be lost inside a tee.
+G5F=$(echo "$E5" | sed -n 's/^SCRIPT|end .*: [0-9]* lines, \([0-9]*\) failures$/\1/p' | head -1)
 REF=../gates/facewatch.sha
 [ -f "$REF" ] || echo "$FW" > "$REF"
-if [ "$FW" = "$(cat "$REF")" ] && [ "${E5}" != "${E5%0 failures}" ]; then
+if [ "$FW" = "$(cat "$REF")" ] && [ "$G5RC" = "0" ] && [ "$G5F" = "0" ]; then
   ok "G5 gunboat $FN FACEWATCH lines, $TURNS hull turns, digest ${FW:0:12}"
 else
-  bad "G5 gunboat digest ${FW:0:12} vs $(cut -c1-12 "$REF") [$E5]"
+  bad "G5 gunboat digest ${FW:0:12} vs $(cut -c1-12 "$REF") exit=$G5RC(want 0) failures=${G5F:-none read}(want 0) [$E5]"
 fi
 
-# G6 app: LOGO, INTRO2, then menu -> Test Map -> menu, twice in one process.
+# G6 app: LOGO, INTRO2, then menu -> Special Ops -> Test Map -> menu, sixteen times in
+# one process. (The Test Map is the last row of the Special Ops list; the harness clicks
+# the button and presses END and RETURN on the list.)
 # The pristine menu digest (HARNESS|menu0) is taken BEFORE the movies run, so every
 # later menu frame -- after the movies, after each mission -- must match a reference
 # nothing had a chance to poison. Movie-induced GL corruption now fails this gate;
 # the old order baked such damage into the reference and could not see it.
+#
+# SIXTEEN ROUNDS RATHER THAN TWO, because the memory half of this gate is a TREND and two
+# rounds are one difference, which is noise. The harness averages the first third of the
+# rounds against the last third and asserts on the drift between them; six is its minimum
+# and it says so rather than asserting on fewer. Eight was tried first and is not enough: a
+# clean build drifted +6762 KiB over eight rounds, which is inside the range a leaking build
+# gives. The extra rounds cost about four minutes and buy a separation that holds, because
+# the noise stays where it is while a leak grows with every round.
 rm -rf shots/h; mkdir -p shots/h
 H=$(./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
-      --harness 120 --rounds 2 --shotdir shots/h 2>>"$OUT")
+      --harness 120 --rounds 16 --shotdir shots/h 2>>"$OUT")
 echo "$H" >> "$OUT"
 E=$(echo "$H" | grep -E "^HARNESS\|end")
 M0=$(echo "$H" | grep -c "^HARNESS|menu0")
@@ -208,21 +270,25 @@ M0=$(echo "$H" | grep -c "^HARNESS|menu0")
 # HARNESS|FAIL line was looked for. That is exactly the "nothing objected" trap this
 # project keeps falling into, so the count is now read and asserted.
 NF=$(echo "$E" | sed -n 's/.*[,|] *\([0-9][0-9]*\) failure(s).*/\1/p')
-# G6 HAS GONE RED UNDER LOAD WITH NOTHING WRONG, and was undiagnosable, because the gate
-# printed only the end line and the harness's own reasons went to the log nobody read.
-# It has exactly one assertion whose answer depends on the machine rather than on the
-# build: the harness fails a round whose resident set grew more than RSS_GROWTH_LIMIT_KIB
-# (30 MB in app/cnc3d.cpp) over the previous round, and RSS on a box that is also
-# compiling is not the number it is on an idle one. That is not a licence to widen the
-# limit, which guards a real known leak. It is a reason to make the failure SAY so, so
-# the next occurrence is attributable instead of vanishing on a re-run.
+# G6 USED TO GO RED UNDER LOAD WITH NOTHING WRONG, and the memory assertion was the reason.
+# It read the process's RESIDENT SET, one cycle against the one before it, against a 30 MB
+# limit. Seven eighths of what that number moves by is clean pages the kernel has not
+# bothered to reclaim yet, so the answer depended on how much memory pressure the machine
+# was under rather than on the build: three runs of ONE unchanged binary on an idle machine
+# reported the first cycle's growth as 20288, 33864 and 45936 KiB. One pass, two failures,
+# same code. It is now the LIVE HEAP (what malloc has handed out and not taken back), and
+# it is a drift across the whole run rather than a single difference; app/cnc3d.cpp carries
+# the measurements both changes were made on. Proved on two builds of this tree, one with
+# three pack leaks in it and one with them fixed, sixteen rounds each: the leaking build
+# drifted +16003 and +23433 KiB and the clean one -114, +954 and -2473 KiB, against a limit
+# of 6000.
 G6WHY=$(echo "$H" | grep "^HARNESS|FAIL" | head -3 | tr '\n' ' ')
-G6RSS=$(echo "$H" | grep "^HARNESS|rss" | grep "growth" | tr '\n' ' ')
+G6RSS=$(echo "$H" | grep "^HARNESS|rss|trend" | tr '\n' ' ')
 if echo "$H" | grep -q "HARNESS|FAIL"; then bad "G6 app round trip: ${G6WHY:-no reason line} [$E] ${G6RSS}"
 elif [ "$M0" != "1" ]; then bad "G6 app round trip: no pre-movie pristine digest was taken"
 elif [ -z "$NF" ]; then bad "G6 app round trip: no failure count on the end line [$E]"
 elif [ "$NF" != "0" ]; then bad "G6 app round trip: $NF harness failure(s) ${G6WHY:-no reason line} [$E] ${G6RSS}"
-else ok "G6 app round trip, digest anchored pre-movie [$E]"; fi
+else ok "G6 app round trip, digest anchored pre-movie [$E] ${G6RSS}"; fi
 
 # G7 headless paths must not need an audio device.
 #
@@ -236,28 +302,78 @@ else ok "G6 app round trip, digest anchored pre-movie [$E]"; fi
 #
 # It now has a fourth leg that actually asks for a device with the bogus driver, and
 # asserts BOTH that the device refused AND that the run still completed and wrote its
-# output. The three original legs stay, and now assert the silent marker explicitly
+# output. The three original legs stay, and each asserts the silent marker explicitly
 # rather than inferring it from an exit code.
-rm -f shots/na.png shots/na4.png
+#
+# THE FOURTH LEG DID NOT ASK FOR A DEVICE EITHER, the first time it was written. It was a
+# --shot run, a --shot run is automated, and every automated run is silent unless it
+# records (confine_automated is the one list that decides). So it printed
+# AUDIO|out|silent like the other three, the bogus driver still reached no SDL call, and
+# the leg passed without a device ever being requested. --audiodevicetest lifts the
+# silence for that one run, and the renderer refuses it unless SDL_AUDIODRIVER is set, so
+# it cannot reach a real sound card. The leg now requires the refusal itself, one
+# AUDIO|out|none line and neither a silent nor a device line, and each check fails under
+# its own message.
+#
+# THE DEVICE LEG HAS A TIME LIMIT, because waiting for a device that never comes is one of
+# the ways a headless run can come to need one, and without a limit that run hangs the
+# suite with no verdict at all. A healthy run takes well under 20 s; 120 s is the limit,
+# and a run the limit had to stop is reported as exactly that.
+#
+# "AUDIO WAS BOOTED" IS READ OFF THE AUDIO|bank LINE, which audio_boot prints before it
+# requests any device. The AUDIO|out line is printed only once the request has returned,
+# so a run that dies INSIDE the request prints none, and reading AUDIO|out filed that
+# death under "the switch was not accepted". A usage error and the SDL_AUDIODRIVER guard
+# both exit before audio_boot, so neither prints AUDIO|bank.
+rm -f shots/na.png shots/na4.png shots/na1.log shots/na2.log shots/na3.log shots/na4.log
 NA=$(SDL_AUDIODRIVER=nonexistentdriver ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE \
-       --shot shots/na.png --ticks 60 2>&1 | tee -a "$OUT" | grep -cE "shot: wrote .* -> ok")
-NS=$(SDL_AUDIODRIVER=nonexistentdriver ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE \
-       --script selfplay.txt 2>&1 | tee -a "$OUT" | grep -E "^SCRIPT\|end")
+       --shot shots/na.png --ticks 60 2>&1 | tee -a "$OUT" shots/na1.log | grep -cE "shot: wrote .* -> ok")
+# THE SCRIPT LEG READS ITS FAILURE COUNT AS A NUMBER AND ITS OWN EXIT STATUS. A suffix
+# match on "0 failures" also accepted "10 failures", and a tee kept the status from being
+# read at all, so this leg writes its log first, as the device leg below does.
+SDL_AUDIODRIVER=nonexistentdriver ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE \
+       --script selfplay.txt > shots/na2.log 2>&1
+NSRC=$?
+cat shots/na2.log >> "$OUT"
+NS=$(grep -E "^SCRIPT\|end" shots/na2.log)
+NSF=$(echo "$NS" | sed -n 's/^SCRIPT|end .*: [0-9]* lines, \([0-9]*\) failures$/\1/p' | head -1)
 NP=$(SDL_AUDIODRIVER=nonexistentdriver ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE \
-       --picktest 2>&1 | tee -a "$OUT" | grep -c "N64 PASS, OLD PASS -> PASS")
+       --picktest 2>&1 | tee -a "$OUT" shots/na3.log | grep -c "N64 PASS, OLD PASS -> PASS")
+# One silent marker per headless leg, in the order shot, script, picktest.
+NQUIET="$(grep -c '^AUDIO|out|silent' shots/na1.log) $(grep -c '^AUDIO|out|silent' shots/na2.log) $(grep -c '^AUDIO|out|silent' shots/na3.log)"
 # The leg that exercises the seam the gate is named after: ask for a real device with a
 # driver that cannot exist, and require the run to survive it and still produce a picture.
 NDLOG=shots/na4.log
-SDL_AUDIODRIVER=nonexistentdriver ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE \
-       --shot shots/na4.png --ticks 40 --musicvol 255 --soundvol 255 > "$NDLOG" 2>&1
+SDL_AUDIODRIVER=nonexistentdriver perl -e 'alarm 120; exec @ARGV' ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE \
+       --shot shots/na4.png --ticks 40 --musicvol 255 --soundvol 255 --audiodevicetest > "$NDLOG" 2>&1
 ND=$?
 cat "$NDLOG" >> "$OUT"
 NDSHOT=0; [ -s shots/na4.png ] && NDSHOT=1
-if [ "$NA" -ge 1 ] && [ "$NP" -ge 1 ] && [ "${NS}" != "${NS%0 failures}" ] \
-   && [ "$ND" = "0" ] && [ "$NDSHOT" = "1" ]; then
-  ok "G7 headless with no audio driver (shot, script, picktest, and a device-requesting run that survived it)"
+NDNONE=$(grep -c '^AUDIO|out|none (' "$NDLOG")
+NDSIL=$(grep -c '^AUDIO|out|silent' "$NDLOG")
+NDDEV=$(grep -c '^AUDIO|out|device' "$NDLOG")
+NDBOOT=$(grep -c '^AUDIO|bank|' "$NDLOG")
+NDSAW=$(grep -E '^AUDIO\|out\||^audio: ' "$NDLOG" | head -2 | tr '\n' ' ')
+if [ "$NA" -lt 1 ] || [ "$NP" -lt 1 ] || [ "$NSRC" != "0" ] || [ "$NSF" != "0" ]; then
+  bad "G7 headless with no audio driver: a headless leg failed: shot=$NA picktest=$NP script=[$NS] script-exit=$NSRC(want 0) script-failures=${NSF:-none read}(want 0)"
+elif [ "$NQUIET" != "1 1 1" ]; then
+  bad "G7 headless with no audio driver: the shot, script and picktest runs printed AUDIO|out|silent [$NQUIET] times, want [1 1 1]. A headless mode that is not silent asks for a sound device on every automated run"
+elif [ "$ND" = "142" ]; then
+  bad "G7 headless with no audio driver: the run that asks for a device never finished and was stopped at the 120 s limit (a healthy run takes under 20 s), so a refused audio device hangs it [$NDSAW]"
+elif [ "$ND" != "0" ] && [ "$NDBOOT" = "0" ]; then
+  bad "G7 headless with no audio driver: the run that asks for a device exited $ND before audio was booted, so no refusal was tested. The binary does not accept --audiodevicetest or refused it: [$(head -1 "$NDLOG")]"
+elif [ "$ND" != "0" ]; then
+  bad "G7 headless with no audio driver: the run that asks for a device exited $ND after audio was booted [$NDSAW], so a refused audio device was fatal"
+elif [ "$NDSHOT" != "1" ]; then
+  bad "G7 headless with no audio driver: the run that asks for a device and is refused one wrote no shot [$NDSAW]"
+elif [ "$NDSIL" != "0" ]; then
+  bad "G7 headless with no audio driver: the device leg printed AUDIO|out|silent, so it never asked for a device and the bogus driver reached no SDL call. Surviving a refused device was not tested [$NDSAW]"
+elif [ "$NDDEV" != "0" ]; then
+  bad "G7 headless with no audio driver: a device OPENED under SDL_AUDIODRIVER=nonexistentdriver, so the driver name never reached SDL and no refusal was tested [$NDSAW]"
+elif [ "$NDNONE" != "1" ]; then
+  bad "G7 headless with no audio driver: the device leg printed $NDNONE AUDIO|out|none lines, want exactly 1, so no refusal was seen [$NDSAW]"
 else
-  bad "G7 headless with no audio driver: shot=$NA picktest=$NP script=[$NS] device-leg exit=$ND wrote=$NDSHOT"
+  ok "G7 headless with no audio driver: shot, script and picktest each passed and each printed the silent marker once, and a run that asked for a device was refused it [$NDSAW] and still exited 0 and wrote its shot"
 fi
 
 # G8 the sounds themselves: combat must ask for them, the disc must have them, and
@@ -294,35 +410,85 @@ fi
 # --musicvol 255 is REQUIRED here and is not decoration: a --script run is silent by
 # default (see the note in cnc_eyes.cpp where script implies hidden), and this gate is one
 # of the few that measures the score rather than merely tolerating it.
-M1=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE --script gate_playlist.txt \
-       --theme IND2 --musicvol 255 --audiowav shots/g_playlist.wav 2>>"$OUT" | grep "^MUSIC|play")
-echo "$M1" >> "$OUT"
-NTRACK=$(echo "$M1" | grep -c "^MUSIC|play")
+#
+# EACH SLIDER IS MOVED ON ITS OWN. With both at 0 a music slider cannot be told from an
+# effects slider, so a build with the two buses swapped used to pass here. Three runs of
+# SCG90EA, all recorded:
+#   score run    music 255, effects 0: at least two tracks start, and the recording is
+#                loud (RMS > 500) over its last 10 s and over the QUIET STRETCH
+#   battle run   music 0, effects 255: loud over the whole run, and silent to the sample
+#                over the quiet stretch
+#   muted run    both 0: peak 0, and a track was started, so the silence is the sliders'
+# THE QUIET STRETCH is 2.5 s to 5.0 s into the recording, where nothing on the effects or
+# speech bus sounds on this scenario: measured, the battle run is exact zero from 2.20 s
+# to 5.68 s, and the score plays straight through it. The recording is timed by game
+# ticks, so the stretch does not move with the frame rate. It is the part that tells the
+# buses apart. The last 10 s cannot: battle noise alone holds them near RMS 2907,
+# so a swapped build reads loud there too. If an effect ever lands in the stretch, the
+# battle run stops being silent there and the gate fails saying so, rather than passing on
+# a stretch that no longer separates anything.
+# PROVEN TO FAIL: with the music and effects bus gains swapped in cncaudio.c, the score
+# run reads RMS 0 over the stretch and the battle run peaks at 10485 there.
+#
 # THE SAME TRAP, ON AN ARTEFACT THAT IS NOT A PICTURE, and this one is sharper than any
 # of the PNG cases: a stale shots/g_mute.wav can only have been written by a previous
 # MUTED run, so its peak is 0 and "both sliders at 0 gives peak 0" passes on a run that
-# never happened. The existence/size guard inside the python catches a file that was never
-# written at all, which is exactly the case a persisting shots/ removes.
-gbegin shots/g_mute.wav
-grun - --scen SCG90EA --pack SCG01EA.pack $BASE --script gate_90.txt \
+# never happened. gbegin deletes every recording and log first, gshots requires all three
+# recordings, and a missing or empty one reads as -1 below, which no branch accepts.
+gbegin shots/g_playlist.wav shots/g_playlist.log shots/g_battle.wav shots/g_battle.log \
+       shots/g_mute.wav shots/g_mute.log
+grun shots/g_playlist.log --scen SCG90EA --pack SCG01EA.pack $BASE --script gate_playlist.txt \
+   --theme IND2 --musicvol 255 --soundvol 0 --audiowav shots/g_playlist.wav
+grun shots/g_battle.log --scen SCG90EA --pack SCG01EA.pack $BASE --script gate_playlist.txt \
+   --theme IND2 --musicvol 0 --soundvol 255 --audiowav shots/g_battle.wav
+grun shots/g_mute.log --scen SCG90EA --pack SCG01EA.pack $BASE --script gate_90.txt \
    --musicvol 0 --soundvol 0 --audiowav shots/g_mute.wav
-gshots shots/g_mute.wav
-MUTE=$(python3 - <<'PY'
-import wave, numpy as np
-import os, sys
-if not os.path.exists("shots/g_mute.wav") or os.path.getsize("shots/g_mute.wav") == 0:
-    print("G10MISSING|shots/g_mute.wav"); sys.exit(1)
-w=wave.open("shots/g_mute.wav")
-a=np.frombuffer(w.readframes(w.getnframes()),dtype='<i2')
-print(int(np.abs(a.astype(int)).max()))
+gshots shots/g_playlist.wav shots/g_battle.wav shots/g_mute.wav
+NTRACK=$(grep -c "^MUSIC|play" shots/g_playlist.log)
+MUTETRK=$(grep -c "^MUSIC|play" shots/g_mute.log)
+G10W=$(python3 - <<'PY'
+import os, wave
+import numpy as np
+def load(p):
+    if not os.path.exists(p) or os.path.getsize(p) == 0:
+        return None, 0
+    w = wave.open(p)
+    a = np.frombuffer(w.readframes(w.getnframes()), dtype='<i2').astype(float)
+    return a, w.getframerate() * w.getnchannels()
+def rms(a):
+    return int(round((a ** 2).mean() ** 0.5)) if len(a) else -1
+def peak(a):
+    return int(np.abs(a).max()) if len(a) else -1
+s, sn = load("shots/g_playlist.wav")
+b, bn = load("shots/g_battle.wav")
+m, mn = load("shots/g_mute.wav")
+if s is None or b is None or m is None:
+    print("-1 -1 -1 -1 -1")
+else:
+    q0, q1 = 5, 10          # the quiet stretch, in half seconds: 2.5 s to 5.0 s
+    print(rms(s[-10 * sn:]), rms(s[q0 * sn // 2:q1 * sn // 2]),
+          rms(b), peak(b[q0 * bn // 2:q1 * bn // 2]), peak(m))
 PY
 )
+G10TAIL=$(echo "$G10W" | cut -d' ' -f1)
+G10QS=$(echo "$G10W" | cut -d' ' -f2)
+G10BAT=$(echo "$G10W" | cut -d' ' -f3)
+G10QB=$(echo "$G10W" | cut -d' ' -f4)
+MUTE=$(echo "$G10W" | cut -d' ' -f5)
 if [ "$GRC" != "0" ]; then
-  bad "G10 score: the muted run failed or wrote no wav (GRC=$GRC) -- a stale mute wav reads as silence and would have passed"
-elif [ "$NTRACK" -ge 2 ] && [ "$MUTE" = "0" ]; then
-  ok "G10 score: $NTRACK tracks played in sequence, both sliders at 0 gives peak $MUTE"
+  bad "G10 score: a run failed or wrote no wav (GRC=$GRC) -- a stale wav from an earlier run would have been graded instead"
+elif [ "${NTRACK:-0}" -ge 2 ] && [ "${MUTETRK:-0}" -ge 1 ] && [ "${MUTE:--1}" = "0" ] \
+     && [ "${G10TAIL:--1}" -gt 500 ] && [ "${G10QS:--1}" -gt 500 ] \
+     && [ "${G10BAT:--1}" -gt 500 ] && [ "${G10QB:--1}" = "0" ]; then
+  ok "G10 score: $NTRACK tracks played in sequence; the music slider alone carries the score (RMS $G10QS over the quiet stretch, $G10TAIL over the last 10 s) and the effects slider alone carries the battle (RMS $G10BAT) with that stretch silent to the sample; both sliders at 0 gives peak $MUTE with a track playing"
 else
-  bad "G10 score: tracks=$NTRACK muted-peak=$MUTE"
+  G10WHY=""
+  if [ "${G10QS:--1}" -le 500 ] && [ "${G10QB:--1}" -gt 0 ]; then
+    G10WHY=" The score is heard on the effects slider and not on the music slider: the two buses are swapped."
+  elif [ "${G10QS:--1}" -gt 500 ] && [ "${G10QB:--1}" -gt 0 ]; then
+    G10WHY=" Something on the effects slider now sounds inside the quiet stretch, so it no longer separates the buses: measure a new stretch."
+  fi
+  bad "G10 score: tracks=$NTRACK(want >=2) score-run stretch RMS=$G10QS(want >500) score-run tail RMS=$G10TAIL(want >500) battle-run RMS=$G10BAT(want >500) battle-run stretch peak=$G10QB(want 0) muted peak=$MUTE(want 0) muted-run tracks=$MUTETRK(want >=1).$G10WHY"
 fi
 
 # G11 the movies: both play, both put lit pixels on the glass, and the menu drawn
@@ -361,15 +527,19 @@ fi
 # the mouse reaches, not through a setter no player can touch.
 O=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE --script gate_options.txt \
       --nosound 2>>"$OUT")
+ORC=$?
 echo "$O" >> "$OUT"
 OEND=$(echo "$O" | grep -E "^SCRIPT\|end")
+# The failure count as a number, not a suffix match on "0 failures", which "10 failures"
+# also satisfies; and the binary's own exit status.
+OFAIL=$(echo "$OEND" | sed -n 's/^SCRIPT|end .*: [0-9]* lines, \([0-9]*\) failures$/\1/p' | head -1)
 OMUS=$(echo "$O" | grep "slider|Music" | sed -n 's/.*audio_music=\([0-9]*\).*/\1/p')
 ORES=$(echo "$O" | grep -c "click|Resume Mission|.*act=1")
-if [ "${OEND}" != "${OEND%0 failures}" ] && [ -n "$OMUS" ] && [ "$OMUS" -lt 120 ] && \
+if [ "$ORC" = "0" ] && [ "$OFAIL" = "0" ] && [ -n "$OMUS" ] && [ "$OMUS" -lt 120 ] && \
    [ "$ORES" = "1" ]; then
   ok "G12 pause dialog: both pages, music slider reached the mixer at $OMUS/255, Resume returned"
 else
-  bad "G12 pause dialog: [$OEND] music=$OMUS resume=$ORES"
+  bad "G12 pause dialog: exit=$ORC(want 0) failures=${OFAIL:-none read}(want 0) [$OEND] music=$OMUS resume=$ORES"
 fi
 
 # G13 the pause actually pauses, and Abort returns to the menu. ESC at 3 s, then the
@@ -397,7 +567,7 @@ fi
 # 0 == 0 is a perfectly good pause. But it is a throughput measurement, so a loaded
 # machine can still fail it.
 #
-# It did, on 1 Sep 2026, with seven analysis agents running beside the suite: the gate
+# It did,, with seven analysis agents running beside the suite: the gate
 # read opened=1 aborted=1 dwelled=1 frame_open=0 frame_abort=0 ticks=0. Note what that
 # says: the two frames AGREE, so the pause worked perfectly; the game simply had not
 # reached its first tick when ESC arrived. Standalone on the same binary a minute later
@@ -437,14 +607,28 @@ fi
       --dosinf dosinfantry.pack > shots/flow14.log 2>>"$OUT" &
 FP=$!; FW=0
 while kill -0 $FP 2>/dev/null && [ $FW -lt 300 ]; do sleep 1; FW=$((FW+1)); done
-kill $FP 2>/dev/null; wait $FP 2>/dev/null
+# A FLOW THAT HAS STOPPED PUMPING EVENTS IGNORES SIGTERM. SDL turns the signal into a quit
+# event, and a loop that is stuck never reads its events, so a plain kill followed by wait
+# blocked here for ever and the gate printed no verdict. The flow gets ten seconds to act
+# on the TERM and is then killed outright.
+FTIMEOUT=0
+if kill -0 $FP 2>/dev/null; then
+  FTIMEOUT=1
+  kill $FP 2>/dev/null
+  FK=0
+  while kill -0 $FP 2>/dev/null && [ $FK -lt 10 ]; do sleep 1; FK=$((FK+1)); done
+  kill -9 $FP 2>/dev/null
+fi
+wait $FP 2>/dev/null
 FL=$(cat shots/flow14.log)
 echo "$FL" >> "$OUT"
 FDONE=$(echo "$FL" | grep -c "FLOWTEST|complete")
 FMOV=$(echo "$FL" | grep -cE "CAMPAIGN\|movie\|(GDI1|LANDING|CONSYARD|GDI2)\|played")
 FSCORE=$(echo "$FL" | grep -c "CAMPAIGN|score|")
 FMAP=$(echo "$FL" | grep -c "CAMPAIGN|mapsel|picked")
-if [ "$FDONE" = "1" ] && [ "$FMOV" = "4" ] && [ "$FSCORE" = "1" ] && [ "$FMAP" = "1" ]; then
+if [ "$FTIMEOUT" = "1" ]; then
+  bad "G14 campaign flow: the flow was still running after ${FW}s and had to be killed, so it stopped moving: complete=$FDONE movies=$FMOV score=$FSCORE map=$FMAP (the last of those it printed is where it stopped)"
+elif [ "$FDONE" = "1" ] && [ "$FMOV" = "4" ] && [ "$FSCORE" = "1" ] && [ "$FMAP" = "1" ]; then
   ok "G14 campaign flow: side select, 4 movies played, score, map, mission 2 booted"
 else
   bad "G14 campaign flow: complete=$FDONE movies=$FMOV score=$FSCORE map=$FMAP"
@@ -571,46 +755,86 @@ rm -rf "$GL"
 #
 # The two paths tessellate differently (hard: one quad per cell; soft: a core quad plus
 # a feather fan), so they disagree along the shroud EDGE by about a pixel. That is not a
-# leak and must not fail the gate: the hard-black mask is eroded by 2 px first, and the
-# threshold comes from a MEASUREMENT of both states on SCG01EA tick 8 rather than from
-# taste -- with the ramped quads restored: 48146 lit pixels; with them fixed: 753, all of
-# it boundary seam. 5000 sits ~6x above the healthy value and ~10x below the bug.
-# Delete first: shots/ persists between suite runs, so a run that died at startup used
-# to leave this gate measuring the PREVIOUS run's PNGs and passing green.
-rm -f shots/g17_soft.png shots/g17_hard.png
-printf 'tick 8\nshroudsoft 1\nshot shots/g17_soft.png\nquit\n' > /tmp/g17a.txt
-printf 'tick 8\nshroudsoft 0\nshot shots/g17_hard.png\nquit\n' > /tmp/g17b.txt
-./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --script /tmp/g17a.txt >> "$OUT" 2>&1
-./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --script /tmp/g17b.txt >> "$OUT" 2>&1
-LEAK=$(python3 - <<'PY'
+# leak and must not fail the gate: the hard-black mask is eroded by 2 px first.
+#
+# THE SOFT SHOT IS TAKEN WITH `shroudlight 0`, and without it this gate is blind. The
+# soft path darkens the ground's own vertex light by the shroud's corner coverage (G84),
+# so ground under deep shroud is already drawn black before the blanket goes over it, and
+# a lid that sinks under the terrain uncovers black ground that the brightness test cannot
+# tell from the lid. Measured on SCG01EA tick 8 with the ramped quads restored in a
+# scratch build: 0 lit pixels in the shipped look, exactly what a healthy build scores,
+# against 33715 with `shroudlight 0` (healthy: 835, all of it boundary seam). 5000 sits
+# ~6x above the healthy value and ~6x below the bug. The hard path ignores `shroudlight`,
+# so both shots come from one run of one world.
+#
+# A ZERO IS ONLY EVIDENCE IF THERE WAS SOMETHING TO EXAMINE, so three things are checked
+# before the leak count is read, each with its own verdict: the run exited cleanly and
+# acknowledged soft, unlit, then hard, in that order; the hard shot holds a real area of
+# deep shroud (390944 px measured; the same frame with the shroud and the rim lifted still
+# has 83479 px that dark, so the floor is 200000); and the two shots differ by far more
+# than the edge seam (248397 px measured, 0 when both come from one path; floor 50000),
+# which is what shows they came from two different drawing paths. A frame with no shroud
+# in it, or a `shroudsoft` that stopped switching, used to score a clean 0 here.
+#
+# AND `shroudlight 0` HAS TO HAVE LIT THE GROUND, or the leak count is blind for the reason
+# above: with the ground under the lid still darkened, a sunken lid uncovers black ground
+# and scores 0 whatever the lid does. The verb acknowledging itself proves only that it
+# parsed. So the soft path is shot a second time with `shroudlight 1`, and inside the deep
+# shroud mask the two soft shots must differ by a real area; this check has its own
+# verdict, ahead of the leak count.
+printf 'tick 8\nshroudsoft 1\nshroudlight 0\nshot shots/g17_soft.png\nshroudlight 1\nshot shots/g17_softlit.png\nshroudsoft 0\nshot shots/g17_hard.png\nquit\n' > /tmp/g17.txt
+gbegin shots/g17_soft.png shots/g17_softlit.png shots/g17_hard.png shots/g17.log
+grun shots/g17.log --scen SCG01EA --pack SCG01EA.pack $BASE --script /tmp/g17.txt
+gshots shots/g17_soft.png shots/g17_softlit.png shots/g17_hard.png
+G17SW=$(grep -aE '^SHROUD(SOFT|LIGHT)\|' shots/g17.log | cut -d' ' -f1 | tr '\n' ',')
+G17L=$(python3 - <<'PY'
 from PIL import Image, ImageFilter
+import numpy as np
 import os, sys
-for _f in ('shots/g17_soft.png', 'shots/g17_hard.png'):
+for _f in ('shots/g17_soft.png', 'shots/g17_softlit.png', 'shots/g17_hard.png'):
     if not os.path.exists(_f) or os.path.getsize(_f) == 0:
-        print('G17MISSING|' + _f); sys.exit(1)
+        print('G17MISSING|' + _f); sys.exit(0)
 soft = Image.open('shots/g17_soft.png').convert('RGB')
+softlit = Image.open('shots/g17_softlit.png').convert('RGB')
 hard = Image.open('shots/g17_hard.png').convert('RGB')
 # deep shroud per the exact path, eroded 2 px so the boundary seam is not counted
 mask = hard.point(lambda v: 255 if v < 12 else 0).convert('L')
-mask = mask.filter(ImageFilter.MinFilter(5))
-m, s = mask.load(), soft.load()
-leak = 0
-for y in range(soft.size[1]):
-    for x in range(1040):             # left of the sidebar only
-        if y < 40 and x < 320:        # the CAM/FOV HUD plate
-            continue
-        if m[x, y] < 128:
-            continue
-        sr, sg, sb = s[x, y]
-        if sr + sg + sb > 120:        # lit ground showing through deep shroud
-            leak += 1
-print(leak)
+mask = np.asarray(mask.filter(ImageFilter.MinFilter(5))) >= 128
+s = np.asarray(soft).astype(int)
+l = np.asarray(softlit).astype(int)
+h = np.asarray(hard).astype(int)
+reg = np.zeros(mask.shape, bool)
+reg[:, :1040] = True          # left of the sidebar only
+reg[:40, :320] = False        # the CAM/FOV HUD plate
+mask &= reg
+diff = int((reg & (s != h).any(2)).sum())
+# what `shroudlight 0` changed under deep shroud: unlit soft against the lit soft path
+relit = int((mask & (s != l).any(2)).sum())
+leak = int((mask & (s.sum(2) > 120)).sum())   # lit ground showing through deep shroud
+print('G17|mask=%d|diff=%d|relit=%d|leak=%d' % (int(mask.sum()), diff, relit, leak))
 PY
 )
-if [ -n "$LEAK" ] && [ "$LEAK" -lt 5000 ]; then
-  ok "G17 shroud is watertight over the heightfield ($LEAK lit pixels in deep shroud, 48146 when the ramped quads are restored)"
+echo "$G17L" >> "$OUT"
+G17MASK=$(echo "$G17L" | sed -n 's/^G17|mask=\([0-9]*\)|.*/\1/p')
+G17DIFF=$(echo "$G17L" | sed -n 's/^G17|.*|diff=\([0-9]*\)|.*/\1/p')
+G17RELIT=$(echo "$G17L" | sed -n 's/^G17|.*|relit=\([0-9]*\)|.*/\1/p')
+G17LEAK=$(echo "$G17L" | sed -n 's/^G17|.*|leak=\([0-9]*\)$/\1/p')
+if [ "$GRC" != "0" ]; then
+  bad "G17 shroud watertight: the run failed or a shot was not written (exit $GRC): $(grep -a '^SCRIPT|' shots/g17.log | tr '\n' ' ')"
+elif [ "$G17SW" != "SHROUDSOFT|1,SHROUDLIGHT|0,SHROUDLIGHT|1,SHROUDSOFT|0," ]; then
+  bad "G17 shroud watertight: the run acknowledged [$G17SW], want soft unlit, soft lit, then hard; the shots are not the paths this gate compares"
+elif [ -z "$G17MASK" ] || [ -z "$G17DIFF" ] || [ -z "$G17RELIT" ] || [ -z "$G17LEAK" ]; then
+  bad "G17 shroud watertight: nothing measurable came back ($G17L)"
+elif [ "$G17MASK" -lt 200000 ]; then
+  bad "G17 shroud watertight: the hard shot holds only $G17MASK px of deep shroud (want >=200000, measured 390944, 83479 with no shroud drawn); there is no shroud to examine, so a leak count of $G17LEAK proves nothing"
+elif [ "$G17DIFF" -lt 50000 ]; then
+  bad "G17 shroud watertight: the soft and hard shots differ in only $G17DIFF px (want >=50000, measured 248397); they did not come from two different shroud paths, so a leak count of $G17LEAK proves nothing"
+elif [ "$G17RELIT" -lt 20000 ]; then
+  bad "G17 shroud watertight: inside the deep shroud the soft path with shroudlight 0 differs from the same path with shroudlight 1 in only $G17RELIT px (want >=20000, measured 83047); shroudlight 0 did not relight the ground under the shroud, so a lid sunk under the terrain would uncover black ground and the leak count of $G17LEAK cannot see it"
+elif [ "$G17LEAK" -lt 5000 ]; then
+  ok "G17 shroud is watertight over the heightfield ($G17LEAK lit pixels in $G17MASK px of deep shroud with the ground under it lit; 835 healthy, 33715 when the ramped quads are restored)"
 else
-  bad "G17 shroud leaks: $LEAK lit pixels inside deep shroud (the ramped-quad bug is back)"
+  bad "G17 shroud leaks: $G17LEAK lit pixels inside $G17MASK px of deep shroud (want <5000, healthy 835; the ramped-quad bug is back)"
 fi
 
 # G18 the ground SAMPLER matches the ground the console DRAWS. draw_terrain rasterises
@@ -677,10 +901,20 @@ cat shots/g19.log >> "$OUT"
 PFAIL=$(grep -cE "^(EXPECTPART|EXPECTMOVE|EXPECTEFX)\|.*\|FAIL$" shots/g19.log)
 PCHUNK=$(sed -n 's/^EXPECTPART|FBALL1|chunk|.*have=\([0-9]*\)|.*/\1/p' shots/g19.log)
 PMOVE=$(sed -n 's/^EXPECTMOVE|.*have=\([0-9.]*\)|.*/\1/p' shots/g19.log)
-if [ "$PFAIL" = "0" ] && [ -n "$PCHUNK" ]; then
-  ok "G19 particles: impact=ART-EXP1 (sprites, no chunks -- the cartridge's own bullet table), death=FBALL1 with $PCHUNK ballistic chunks, best particle moved $PMOVE cells"
+# ALL FIVE CHECKS MUST HAVE RUN, not merely raised no FAIL. A verb the binary no longer
+# knows prints "SCRIPT|unknown command" instead of its EXPECT line, so counting FAIL lines
+# alone passed with that check simply absent: with expectmove renamed, this gate said
+# PASS with an empty move distance while the script's own end line read 1 failures. So
+# the verdict also wants exactly five EXPECT PASS lines, the end line reporting zero
+# failures (anchored on the comma, so 10 failures cannot match), and a move distance.
+PPASS=$(grep -cE "^(EXPECTPART|EXPECTMOVE|EXPECTEFX)\|.*\|PASS$" shots/g19.log)
+PEND=$(grep '^SCRIPT|end ' shots/g19.log | tail -1)
+PEND0=$(grep -c '^SCRIPT|end .*: [0-9]* lines, 0 failures$' shots/g19.log)
+if [ "$PFAIL" = "0" ] && [ "$PPASS" = "5" ] && [ "$PEND0" = "1" ] \
+   && [ -n "$PCHUNK" ] && [ -n "$PMOVE" ]; then
+  ok "G19 particles: impact=ART-EXP1 (sprites, no chunks -- the cartridge's own bullet table), death=FBALL1 with $PCHUNK ballistic chunks, best particle moved $PMOVE cells, all $PPASS checks ran"
 else
-  bad "G19 particles: $PFAIL assertion(s) failed (chunks=$PCHUNK move=$PMOVE)"
+  bad "G19 particles: $PFAIL assertion(s) failed, $PPASS of 5 checks reported PASS (fewer means a check never ran; look for SCRIPT|unknown command), script end [$PEND](want 0 failures) chunks=$PCHUNK move=$PMOVE(want a number)"
 fi
 
 # G20 WALLS reach the renderer at all. A playtest report: "Walls are not appearing,
@@ -803,6 +1037,17 @@ CJEEP=$(echo "$C" | grep -c '^CARGO|JEEP#[0-9]*|kind=1|at=48\.[0-9]*,59\.[0-9]*|
 CTRUTH=$(echo "$C" | grep -c '^OBJ|JEEP#0|UNIT|GoodGuy|cell=127,127|')
 CLIMBO=$(echo "$C" | grep -c '^CARGO|riders=1|limboed=1$')
 CSELR=$(echo "$C" | grep -c '^SEL|UNIT|JEEP|')
+# THE UNSELECTABLE LEG MUST HAVE HAD SOMETHING TO SELECT. selectable=0 is only a finding
+# when the band over the deck actually took somebody: a band that takes nothing prints
+# took=0, counts no script failure, and an empty selection holds no jeep either. So the
+# band's own selection count must be at least one and agree with the engine's SEL-BEGIN
+# count. The clickobj before it cannot reach the rider at all: the engine's copy of the
+# jeep sits at 127,127, outside the tactical rectangle, so the verb skips it. That skip is
+# asserted as what it is, and so is the expectsel that follows it.
+CBAND=$(echo "$C" | sed -n 's/^BAND|0,0\.\.1030,700|took=[0-9]*|selection=\([0-9]*\)$/\1/p' | tail -1)
+CSELN=$(echo "$C" | sed -n 's/^SEL-BEGIN count=\([0-9]*\) .*/\1/p' | tail -1)
+CXSEL=$(echo "$C" | grep -c '^EXPECTSEL|want=0|have=0|PASS$')
+CSKIP=$(echo "$C" | grep -c '^CLICKOBJ|JEEP#0 at 127,127|NOT DRAWN')
 CPIX=$(python3 - <<'PY'
 from PIL import Image
 import numpy as np
@@ -825,12 +1070,14 @@ CZERO=$(printf 'tick 300\ncargodump\nquit\n' > /tmp/g21z.txt; \
         | tee -a "$OUT" | grep -c '^CARGO|riders=0|limboed=0$')
 if [ "$GRC" != "0" ]; then
   bad "G21 riders: the run itself failed or wrote no shot (GRC=$GRC)"
+elif [ "${CBAND:-0}" -lt 1 ] || [ "$CSELN" != "$CBAND" ] || [ "$CXSEL" != "1" ] || [ "$CSKIP" != "1" ]; then
+  bad "G21 riders: the unselectable leg examined nothing -- band-selection=$CBAND(want >=1; 0 means the band took nobody, so selectable=0 is empty) sel-begin-count=$CSELN(want $CBAND) expectsel-0-passed=$CXSEL(want 1) clickobj-skipped-the-limboed-jeep=$CSKIP(want 1)"
 elif [ "$CFAIL" = "0" ] && [ "$CINF" = "3" ] && [ "$CJEEP" = "1" ] && [ "$CTRUTH" -ge 1 ] \
    && [ "$CLIMBO" = "1" ] && [ "$CSELR" = "0" ] && [ "$CZERO" = "1" ] \
    && [ -n "$CIN" ] && [ "$CIN" -ge 700 ] && [ "$COUT" = "0" ] && [ "$CCOL" = "1" ]; then
-  ok "G21 riders: 3 riflemen and 1 jeep resolve onto the LST deck, jeep still limboed at 127,127, unselectable, $CIN deck pixels turn to GDI sand (972 measured)"
+  ok "G21 riders: 3 riflemen and 1 jeep resolve onto the LST deck, jeep still limboed at 127,127, not among the $CBAND the band selected, $CIN deck pixels turn to GDI sand (972 measured)"
 else
-  bad "G21 riders: asserts=$CFAIL inf=$CINF(want 3) jeep=$CJEEP(want 1) truth127=$CTRUTH limbo=$CLIMBO selectable=$CSELR(want 0) freezero=$CZERO deckpx=$CIN(want >=700) outside=$COUT(want 0) sand=$CCOL"
+  bad "G21 riders: asserts=$CFAIL inf=$CINF(want 3) jeep=$CJEEP(want 1) truth127=$CTRUTH limbo=$CLIMBO selectable=$CSELR(want 0, of a band selection of $CBAND) freezero=$CZERO deckpx=$CIN(want >=700) outside=$COUT(want 0) sand=$CCOL"
 fi
 
 rm -f shots/g22_near.png shots/g22_far.png shots/g22_sn.png shots/g22_sf.png shots/g22_panel.png
@@ -1412,19 +1659,61 @@ fi
 #    Mission_Attack writes, at frames 0..200. Every sample must obey that formula, and
 #    an idle SAM with nothing to shoot must HOLD at frame 0 rather than cycle -- which
 #    is exactly what it did before it had an arm.
+#
+#    TWO RUNS, because the first cannot reach the tracking branch. SCG08EB gives the SAM
+#    nothing to shoot, so every sample it yields is status 0 at stage 0: it proves the
+#    hold and only the hold. The second is SCG13EA under an air strike
+#    (gate_structanim_samtrack.txt says why each line of that script is there), where the
+#    SAMs rise, turn to follow the aircraft and lower again. That run must yield tracking
+#    samples at two or more facings, samples part way up or down, and idle samples;
+#    otherwise the formula check has nothing in the branch it exists to check, and the
+#    gate says so instead of passing.
+#
+#    THE COLUMNS. Split on | and =, an ANIM line reads
+#      ANIM|SAM|id=N|bstate=B|stage=S|door=D|status=T|face=F|frames=501|rig=R|frame=X
+#    so stage is $8, door $10, status $12, face $14 and the frame $NF. This check once
+#    took $10 for the status and $12 for the facing, a mistake the idle run could never
+#    expose because door and status are both 0 there.
+#
+#    THE HOLD IS ITS OWN CHECK, over the idle run alone. The formula cannot stand in for
+#    it: an idle SAM whose stage cycles draws the frame its stage asks for, so every sample
+#    is on the formula while the launcher rises and sinks for no reason. Every idle sample
+#    must be status 0, stage 0 and frame 0.
+#
+#    THE ENGAGING RUN MUST SHOW BOTH HALVES OF THE RISE. Stages 1..32 draw the launcher
+#    rising and 33..63 fold back to draw it lowering, and samples of the rise alone would
+#    leave the fold unchecked, so at least one lowering sample is required as well.
+#    STATUS 3 IS NOT SAMPLED by this scene (measured: statuses 0, 1, 2, 4, 5, 6 and 7 turn
+#    up, 3 never does), so a tracking frame wrong for status 3 alone would not be seen.
 SM=$(./cnc_eyes --scen SCG08EB --pack SCG01EA.pack $BASE \
      --script gate_structanim_sam.txt 2>&1 | tee -a "$OUT" | grep -E "^ANIM\|SAM")
 SMN=$(echo "$SM" | grep -c .)
-SMBAD=$(echo "$SM" | awk -F'[|=]' '{
-    st=$10; sg=$8; fa=$12; f=$NF;
+ST=$(./cnc_eyes --scen SCG13EA --pack SCG13EA.pack $BASE --noshroud --nosound --w 1280 --h 800 \
+     --script "$GATEDIR/gate_structanim_samtrack.txt" 2>&1 | tee -a "$OUT" | grep -E "^ANIM\|SAM")
+STN=$(echo "$ST" | grep -c .)
+SMOFF=$(printf '%s\n%s\n' "$SM" "$ST" | grep . | awk -F'[|=]' '{
+    st=$12; sg=$8; fa=$14; f=$NF;
     if (st==2 || st==3 || st==6) { x=fa*0.15625; if (x>40) x-=40; e=(40-x)*5+200 }
     else { if (sg>=33) sg=64-sg; e=sg*12.5 }
-    if ((f-e)>0.02 || (e-f)>0.02) print }' | wc -l | tr -d ' ')
-SMMOVE=$(echo "$SM" | awk -F'[|=]' '$10==0 && $NF!=0.00' | wc -l | tr -d ' ')
-if [ "${SMN:-0}" -ge 8 ] && [ "$SMBAD" = "0" ] && [ "$SMMOVE" = "0" ]; then
-  ok "G31c SAM site: $SMN samples over 2360 ticks, every one on the cartridge's formula, and every underground sample held at frame 0"
+    if ((f-e)>0.02 || (e-f)>0.02) print }')
+SMBAD=$(echo "$SMOFF" | grep -c .)
+SMHELD=$(echo "$SM" | grep . | awk -F'[|=]' '$NF!=0.00 || $12!=0 || $8!=0')
+SMHOLD=$(echo "$SMHELD" | grep -c .)
+STTRK=$(echo "$ST" | awk -F'[|=]' '$12==2 || $12==3 || $12==6' | wc -l | tr -d ' ')
+STFACE=$(echo "$ST" | awk -F'[|=]' '$12==2 || $12==3 || $12==6 { print $14 }' | sort -u | wc -l | tr -d ' ')
+STRISE=$(echo "$ST" | awk -F'[|=]' '$12!=2 && $12!=3 && $12!=6 && $8>0 && $8<64' | wc -l | tr -d ' ')
+STLOWER=$(echo "$ST" | awk -F'[|=]' '$12!=2 && $12!=3 && $12!=6 && $8>=33 && $8<64' | wc -l | tr -d ' ')
+STIDLE=$(echo "$ST" | awk -F'[|=]' '$12==0' | wc -l | tr -d ' ')
+if [ "${SMN:-0}" -lt 8 ]; then
+  bad "G31c SAM site: the idle run on SCG08EB gave $SMN samples (want >=8)"
+elif [ "$SMHOLD" != "0" ]; then
+  bad "G31c SAM site: an idle SAM with nothing to shoot left frame 0: $SMHOLD of $SMN idle samples on SCG08EB are not status 0, stage 0, frame 0 (want 0), so the launcher is cycling instead of holding; first such sample: $(echo "$SMHELD" | head -1)"
+elif [ "$STTRK" -lt 1 ] || [ "$STFACE" -lt 2 ] || [ "$STRISE" -lt 1 ] || [ "$STLOWER" -lt 1 ] || [ "$STIDLE" -lt 1 ]; then
+  bad "G31c SAM site: the engaging run on SCG13EA did not exercise the arm: tracking=$STTRK(want >=1) facings=$STFACE(want >=2) rising-or-lowering=$STRISE(want >=1) lowering=$STLOWER(want >=1; stage 33 or more, the half of the rise that folds back) idle=$STIDLE(want >=1) of $STN samples, so the formula check cannot see every branch. Check the air strike still reaches the SAMs"
+elif [ "$SMBAD" != "0" ]; then
+  bad "G31c SAM site: off-formula=$SMBAD(want 0) over $SMN idle and $STN engaging samples; first off-formula sample: $(echo "$SMOFF" | head -1)"
 else
-  bad "G31c SAM site: samples=$SMN(want >=8) off-formula=$SMBAD(want 0) moved-while-underground=$SMMOVE(want 0)"
+  ok "G31c SAM site: $SMN idle samples over 2360 ticks held at status 0, stage 0, frame 0, and under an air strike $STTRK tracking samples at $STFACE facings, $STRISE rising or lowering ($STLOWER of them lowering) and $STIDLE idle; all $((SMN + STN)) on the cartridge's formula (status 3 is never sampled by this scene)"
 fi
 
 # D: the refinery. Its arm (RAM 0x8003DFD8) emits a SECOND model command, slot 20, for
@@ -1482,11 +1771,17 @@ if [ "$PPRC" != "0" ]; then
   bad "G31e refinery placement: the run itself failed (exit $PPRC)"
 elif [ -z "$PPBOX" ] || [ "${PPN:-0}" -lt 1 ]; then
   bad "G31e refinery placement: this run never put a refinery into BSTATE_CONSTRUCTION -- window samples=$PPN(want >=1) crop=[$PPBOX]"
+elif [ "$((PPL - PPF))" -lt 10 ]; then
+  # THE PIXEL LEG MUST HAVE PAIRS TO COMPARE. It differences frames FIRST..LAST, so a
+  # window of one sample compares no pairs at all and reports 0 moving pairs, which reads
+  # exactly like a still refinery. Measured: frames 35..55, 20 pairs. Before the original
+  # fix 7 of those 20 pairs moved, so a window much shorter than that can miss the rig.
+  bad "G31e refinery placement: the pixel leg would compare only $((PPL - PPF)) frame pairs (frames $PPF..$PPL, want >=10), and no moving pairs out of that few is no evidence the rig stayed off the screen"
 else
   set -- $(python3 "$GATEDIR/gate_procplace.py" shots pp "$PPBOX" "$PPF" "$PPL" | tr '|' ' ')
   PPPAIRS="$2"; PPCH="$4"
   if [ "${PPBAD:-1}" = "0" ] && [ "${PPPAIRS:-1}" = "0" ]; then
-    ok "G31e refinery placement: $PPN samples where the arm's formula was live while the refinery was still going up, the unload rig drawn on 0 of them, and frames $PPF..$PPL byte-identical inside its own silhouette $PPBOX"
+    ok "G31e refinery placement: $PPN samples where the arm's formula was live while the refinery was still going up, the unload rig drawn on 0 of them, and frames $PPF..$PPL ($((PPL - PPF)) pairs) byte-identical inside its own silhouette $PPBOX"
   else
     bad "G31e refinery placement: rig-drawn-during-BSTATE_CONSTRUCTION=$PPBAD(want 0 of $PPN) moving-frame-pairs=$PPPAIRS(want 0) changed-pixels=$PPCH(want 0) over frames $PPF..$PPL"
   fi
@@ -1556,8 +1851,8 @@ else
   fi
 fi
 
-# G44 A DYNAMIC LIGHT FADES WHEN ITS SOURCE ENDS. 19 Aug: "When it appears alongside
-# the muzzleflash, it instantly disappears again... it should fade out." The lights are
+# G44 A DYNAMIC LIGHT FADES WHEN ITS SOURCE ENDS. A light that appeared with a muzzle
+# flash vanished the instant the flash did, where it should fade out. The lights are
 # gathered from the engine's LIVE anim list, so before this they ceased to exist the frame
 # their anim did -- for a muzzle flash totally, because GUNFIRE reports stages = 1 and its
 # own ramp therefore never ran.
@@ -1566,49 +1861,126 @@ fi
 # the light from everything else moving in a live mission. Two claims, because either alone
 # would pass on a lie: the light must SURVIVE its source, and it must be strictly FALLING
 # while it does. One that lingered at constant brightness is as wrong as one that snaps off.
-# BOTH fade dials are set, and set LONG on purpose. This gate is about the MECHANISM --
-# that a light outlives its source and falls while it does -- not about the taste values
-# that ship (0.45s for blasts and fire, 0.15s for muzzles, which tuned by eye). It failed
-# the moment the muzzle got its own dial, because the light it happens to measure is a
-# muzzle light and it was still only setting light_fade: exactly the kind of silent
-# coupling a gate is supposed to surface. An exaggerated setting keeps the ramp long
-# enough to sample at this script's 3-tick spacing.
-cat > gfx_g44_lit.cfg <<'CFG'
+# ONE ARM PER LIGHT CLASS, because a light's fade is decided by its class. A muzzle light
+# fades over light_fade_muzzle and every other light (blasts, fire) over light_fade, and
+# in this window BOTH classes leave a tail: measured, the muzzle lights alone fall for 7
+# frames and the other lights alone for 9. A single arm with both dials set therefore
+# passed a build whose muzzle lights vanished with their flash, which is the very defect
+# named above, because the blast lights' tail carried it, and a build whose other lights
+# vanished passed on the muzzle tail. So each arm lengthens ONE dial and holds the other
+# at 0: the muzzle arm sees only muzzle lights outlive their source, the blast arm only
+# the others. Each must fall for at least four frames. The dials are set LONG on purpose:
+# this gate is about the MECHANISM, that a light outlives its source and falls while it
+# does, not about the values that ship, and a long ramp can be sampled at this script's
+# 3-tick spacing.
+#
+# THE CONTROL ARM is what makes "after its source ended" a measurement instead of a fact
+# about one scene. A falling tail after the brightest frame is also what a light looks like
+# while its source is still ALIVE and dimming on its own clip (a blast carries a (1-t)^2
+# ramp), so a build whose lights vanish with their source passes the two claims above
+# whenever such a light owns the window. Measured with that break compiled in, the two
+# claims alone passed this scene started at ticks 255, 275, 285, 480, 690, 710 and 720,
+# seven of sixteen starts tried. Tick 200 is honest only because its brightest light is
+# alive in a single sampled frame. So a further run sets both fade dials to 0, which ends
+# every light with its source, and each arm must peak on the frame the control peaks on,
+# while the control falls for at most one frame after it. If the dials stop mattering, an
+# arm and the control are the same pictures, and both demands cannot hold at once.
+#
+# A LIGHT THAT HOLDS ITS BRIGHTNESS after its source ends does not fall, and it shows in
+# one of two ways: its arm's brightest frame arrives LATER than the control's, and
+# brighter, or the brightest frame is shared and the frames after it stay bright without
+# falling. Both are reported as the light holding on, not as the arms measuring different
+# lights and not as a light snapping off.
+cat > gfx_g44_muz.cfg <<'CFG'
+enabled 1
+lights_on 1
+light_intensity 4.0
+light_radius 12
+light_fade 0
+light_fade_muzzle 2.0
+CFG
+cat > gfx_g44_blast.cfg <<'CFG'
 enabled 1
 lights_on 1
 light_intensity 4.0
 light_radius 12
 light_fade 2.0
-light_fade_muzzle 2.0
+light_fade_muzzle 0
+CFG
+cat > gfx_g44_ctl.cfg <<'CFG'
+enabled 1
+lights_on 1
+light_intensity 4.0
+light_radius 12
+light_fade 0
+light_fade_muzzle 0
 CFG
 cat > gfx_g44_dark.cfg <<'CFG'
 enabled 1
 lights_on 0
 CFG
-rm -f shots/g44l_*.png shots/g44n_*.png
-python3 - <<'PYG' > /tmp/g44_lit.txt
+G44SHOTS=$(python3 -c "print(' '.join('shots/g44%s_%02d.png' % (a, i) for a in 'mbnc' for i in range(20)))")
+gbegin $G44SHOTS shots/g44_muz.log shots/g44_blast.log shots/g44_ctl.log shots/g44_dark.log
+python3 - <<'PYG' > /tmp/g44_muz.txt
 lines=['tick 200']
 for i in range(20):
-    lines += ['shot shots/g44l_%02d.png' % i, 'tick 3']
+    lines += ['shot shots/g44m_%02d.png' % i, 'tick 3']
 lines.append('quit')
 print('\n'.join(lines))
 PYG
-sed 's#g44l_#g44n_#' /tmp/g44_lit.txt > /tmp/g44_dark.txt
-./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --gfx gfx_g44_lit.cfg \
-    --script /tmp/g44_lit.txt  >>"$OUT" 2>&1
-./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --gfx gfx_g44_dark.cfg \
-    --script /tmp/g44_dark.txt >>"$OUT" 2>&1
-if [ ! -s shots/g44l_00.png ] || [ ! -s shots/g44n_00.png ]; then
-  bad "G44 light fade: a shot was not written"
-else
-  set -- $(python3 "$GATEDIR/gate_lightfade.py" "shots/g44n_%02d.png" "shots/g44l_%02d.png" 20 \
-           | sed 's/[A-Za-z|]*=/ /g')
-  LFPK="$1"; LFST="$2"
-  if [ "${LFPK:-0}" -ge 5000 ] && [ "${LFST:-0}" -ge 4 ]; then
-    ok "G44 dynamic light fades: peak $LFPK lit pixels, then $LFST frames of strictly falling light after its source ended"
-  else
-    bad "G44 light fade: peak=$LFPK(want >=5000) decay-steps=$LFST(want >=4) -- the light is snapping off, not fading"
+sed 's#g44m_#g44b_#' /tmp/g44_muz.txt > /tmp/g44_blast.txt
+sed 's#g44m_#g44n_#' /tmp/g44_muz.txt > /tmp/g44_dark.txt
+sed 's#g44m_#g44c_#' /tmp/g44_muz.txt > /tmp/g44_ctl.txt
+grun shots/g44_muz.log   --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --gfx gfx_g44_muz.cfg   --script /tmp/g44_muz.txt
+grun shots/g44_blast.log --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --gfx gfx_g44_blast.cfg --script /tmp/g44_blast.txt
+grun shots/g44_ctl.log   --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --gfx gfx_g44_ctl.cfg   --script /tmp/g44_ctl.txt
+grun shots/g44_dark.log  --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --gfx gfx_g44_dark.cfg  --script /tmp/g44_dark.txt
+gshots $G44SHOTS
+G44PRE="$(grep -ac '^FX|preset|gfx_g44_muz.cfg: 6 applied, 0 unknown$' shots/g44_muz.log)$(grep -ac '^FX|preset|gfx_g44_blast.cfg: 6 applied, 0 unknown$' shots/g44_blast.log)$(grep -ac '^FX|preset|gfx_g44_ctl.cfg: 6 applied, 0 unknown$' shots/g44_ctl.log)$(grep -ac '^FX|preset|gfx_g44_dark.cfg: 2 applied, 0 unknown$' shots/g44_dark.log)"
+set -- $(python3 "$GATEDIR/gate_lightfade.py" "shots/g44n_%02d.png" "shots/g44m_%02d.png" 20 \
+         | sed 's/[A-Za-z|]*=/ /g')
+G44MPK="$1"; G44MST="$2"; G44MPF="$3"; G44MAF="$4"
+set -- $(python3 "$GATEDIR/gate_lightfade.py" "shots/g44n_%02d.png" "shots/g44b_%02d.png" 20 \
+         | sed 's/[A-Za-z|]*=/ /g')
+G44BPK="$1"; G44BST="$2"; G44BPF="$3"; G44BAF="$4"
+set -- $(python3 "$GATEDIR/gate_lightfade.py" "shots/g44n_%02d.png" "shots/g44c_%02d.png" 20 \
+         | sed 's/[A-Za-z|]*=/ /g')
+G44CPK="$1"; G44CST="$2"; G44CPF="$3"; G44CAF="$4"
+echo "G44|muzzle|peak=$G44MPK|frame=$G44MPF|decaysteps=$G44MST|after=$G44MAF|blast|peak=$G44BPK|frame=$G44BPF|decaysteps=$G44BST|after=$G44BAF|control|peak=$G44CPK|frame=$G44CPF|decaysteps=$G44CST|after=$G44CAF" >> "$OUT"
+# g44_arm LABEL PEAK FRAME STEPS AFTER: the first thing wrong with one class's arm, or
+# nothing. AFTER is the arm's lit pixels on the frame after its brightest. Measured with
+# the light held at full power until its fade ends: the muzzle arm stays at about 92000 on
+# every frame after the peak (a good build falls from 86345), so its falling run is noise
+# a few frames long, while a light that snaps off is at the control's 0 there.
+g44_arm() {
+  if [ "${2:-0}" -lt 5000 ]; then
+    echo "the $1 arm peaks at only ${2:-no} lit pixels (want >=5000), so there is no $1 light in this window to watch fade"
+  elif [ "${3:--1}" -gt "${G44CPF:--1}" ] && [ "${2:-0}" -ge "${G44CPK:-0}" ]; then
+    echo "the $1 light held or rose after its source ended instead of falling: its arm is brightest on frame $3 at $2 lit pixels, later than the control's frame $G44CPF at $G44CPK, and falls for only $4 frames after that"
+  elif [ "$3" != "$G44CPF" ]; then
+    echo "the control peaks on frame $G44CPF and the $1 arm on frame $3, so the two are not measuring the same light"
+  elif [ "${4:-0}" -lt 4 ] && [ $(( ${5:-0} - ${G44CAF:-0} )) -ge 5000 ]; then
+    echo "the $1 light held its brightness after its source ended instead of falling: on the frame after the brightest it still lights $5 pixels against the control's ${G44CAF:-0}, and it falls for only $4 frames (want >=4)"
+  elif [ "${4:-0}" -lt 4 ]; then
+    echo "the $1 light is snapping off, not fading: decay-steps=$4 (want >=4; $G44CST with both fade dials at 0), so a $1 light ends with its source"
   fi
+}
+G44MWHY=$(g44_arm muzzle "$G44MPK" "$G44MPF" "$G44MST" "$G44MAF")
+G44BWHY=$(g44_arm blast "$G44BPK" "$G44BPF" "$G44BST" "$G44BAF")
+if [ "$GRC" != "0" ]; then
+  bad "G44 light fade: a run failed or a shot was not written (exit $GRC)"
+elif [ "$G44PRE" != "1111" ]; then
+  bad "G44 light fade: a graphics preset did not apply cleanly (muzzle, blast, control, dark = $G44PRE, want 1111), so the arms are not the settings this gate describes"
+elif [ "${G44CPK:-0}" -lt 5000 ]; then
+  bad "G44 light fade: the control peaks at only ${G44CPK:-no} lit pixels (want >=5000) -- there is no light in this window to watch fade"
+elif [ "${G44CST:-99}" -gt 1 ]; then
+  bad "G44 light fade: with both fade dials at 0 the light still falls for $G44CST frames after its peak (want <=1); this window's tail is a live source dimming on its own clip, or a fade dial at 0 no longer ends a light with its source, so the gate cannot see a light that vanishes with its source"
+elif [ -n "$G44MWHY" ]; then
+  bad "G44 light fade: $G44MWHY"
+elif [ -n "$G44BWHY" ]; then
+  bad "G44 light fade: $G44BWHY"
+else
+  ok "G44 dynamic light fades, for each light class on its own: muzzle lights fall for $G44MST frames and the other lights for $G44BST after the brightest frame ($G44CPF, shared with the control), against $G44CST with both fade dials at 0, so each tail is a light outliving its source"
 fi
 
 # G48 THE JUKEBOX. 20 Aug: "Jukebox is missing and should be implemented." It is
@@ -1941,8 +2313,19 @@ for SSEL in 52 14; do
   # Clouds off in both arms: they are the same in each and would therefore look like a
   # control, but they are not one. The cloud and the shadow combine with max(), so a cloud
   # swallows the softer half of the blob under a man and the per-man band roughly halves.
-  printf 'enabled 1\nshadow_on 1\nsun_az %s\nsun_el %s\ncloud_on 0\n' "$SSAZ" "$SSEL" > gfx_g52_on.cfg
-  printf 'enabled 1\nshadow_on 0\nsun_az %s\nsun_el %s\ncloud_on 0\n' "$SSAZ" "$SSEL" > gfx_g52_off.cfg
+  # AND THE COLOUR GRADE, PINNED, which the preset did not name and
+  # should have. This gate counts DARKENED PIXELS, and the grade is a post-process that
+  # moves every pixel's value: changing the shipped exposure, contrast and gain moved the
+  # aggregate from 228 to 199 against a threshold of 200 and turned this gate red on a
+  # build whose shadows were perfect. The header two screens up already claims the preset
+  # "names EVERY dial it depends on"; it did not name these, and the claim is what made
+  # the failure so confusing. They are the values the thresholds below were calibrated
+  # against, and they are pinned so the measurement is about the SHADOW and not about
+  # whatever the picture happens to look like this month. Change them only with the
+  # thresholds, and say so.
+  G52GRADE='grade_on 1\nexposure -0.03571\ncontrast 1.07589\nsaturation 1.08000\ntemperature 0.12500\ntint 0.0\nlift 0.0\ngain 1.10268\n'
+  printf "enabled 1\nshadow_on 1\nsun_az %s\nsun_el %s\ncloud_on 0\ninf_scale 1.0\nsun_lambert 0\n$G52GRADE" "$SSAZ" "$SSEL" > gfx_g52_on.cfg
+  printf "enabled 1\nshadow_on 0\nsun_az %s\nsun_el %s\ncloud_on 0\ninf_scale 1.0\nsun_lambert 0\n$G52GRADE" "$SSAZ" "$SSEL" > gfx_g52_off.cfg
   rm -f shots/sprshadow_on.png shots/sprshadow_off.png shots/g52.log
   ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --nominimap --nosidebar \
       --gfx gfx_g52_on.cfg --w 1000 --h 650 --script gate_sprshadow.txt > shots/g52.log 2>&1
@@ -1951,13 +2334,13 @@ for SSEL in 52 14; do
       --gfx gfx_g52_off.cfg --w 1000 --h 650 --script gate_sprshadow_off.txt >> shots/g52.log 2>&1
   SSRC2=$?
   cat shots/g52.log >> "$OUT"
-  SSPRE=$(grep -c "FX|preset|gfx_g52_o[nf]*\.cfg: 5 applied, 0 unknown" shots/g52.log)
+  SSPRE=$(grep -c "FX|preset|gfx_g52_o[nf]*\.cfg: 15 applied, 0 unknown" shots/g52.log)
   SSBOX=$(sed -n 's/^CLICKOBJ|want=E1[^|]*|silhouette=\([0-9]*\),\([0-9]*\)\.\.\([0-9]*\),\([0-9]*\).*/\1,\2,\3,\4/p' shots/g52.log | head -4 | tr '\n' ' ')
   SSNB=$(echo $SSBOX | wc -w | tr -d ' ')
   if [ "$SSRC" != "0" ] || [ "$SSRC2" != "0" ]; then
     bad "G52 infantry shadows at sun $SSAZ/$SSEL: the run itself failed (exit $SSRC / $SSRC2)"
   elif [ "$SSPRE" != "2" ]; then
-    bad "G52 infantry shadows at sun $SSAZ/$SSEL: the preset did not apply in both arms -- $SSPRE of 2 runs said '5 applied, 0 unknown', so the numbers below would be the DEFAULT sun and not the one this gate asked for"
+    bad "G52 infantry shadows at sun $SSAZ/$SSEL: the preset did not apply in both arms -- $SSPRE of 2 runs said '15 applied, 0 unknown', so the numbers below would be the DEFAULT sun and the DEFAULT grade rather than the ones this gate asked for"
   elif [ "$SSNB" != "4" ]; then
     bad "G52 infantry shadows at sun $SSAZ/$SSEL: the squad is not in frame -- $SSNB of 4 silhouettes [$SSBOX]"
   elif [ ! -s shots/sprshadow_on.png ] || [ ! -s shots/sprshadow_off.png ]; then
@@ -2038,11 +2421,19 @@ SVSLOT=$(echo "$SVL" | grep -c "^SLOT|0|")
 echo "$SVL" | awk '/^OBJDUMP-BEGIN/{n++} n==1&&/^(OBJ\||TIB\||WALL\|)/{print}' > /tmp/g54_a.txt
 echo "$SVL" | awk '/^OBJDUMP-BEGIN/{n++} n==3&&/^(OBJ\||TIB\||WALL\|)/{print}' > /tmp/g54_c.txt
 SVLINES=$(wc -l < /tmp/g54_a.txt | tr -d ' ')
+# THE WORLD MUST HAVE MOVED BETWEEN THE SAVE AND THE LOAD, or identical dumps either side
+# of the load prove nothing: a load that restored nothing at all would pass over a world
+# that stood still. So the middle dump has to differ from the first, and the brain's own
+# frame counter on the three OBJDUMP-END lines has to read 300, then 500, then 300 again.
+echo "$SVL" | awk '/^OBJDUMP-BEGIN/{n++} n==2&&/^(OBJ\||TIB\||WALL\|)/{print}' > /tmp/g54_b.txt
+SVMOVED=$(diff /tmp/g54_a.txt /tmp/g54_b.txt | grep -c '^>')
+SVFRAMES=$(echo "$SVL" | sed -n 's/^OBJDUMP-END total=[0-9]* frame=\([0-9]*\)$/\1/p' | paste -sd' ' -)
 if [ "${SVSAVE:-0}" -ge 1 ] && [ "${SVLOAD:-0}" -ge 1 ] && [ "${SVSLOT:-0}" -ge 1 ] \
-   && [ "${SVLINES:-0}" -ge 50 ] && diff -q /tmp/g54_a.txt /tmp/g54_c.txt >/dev/null 2>&1; then
-  ok "G54 save/load: round trip exact, $SVLINES dump lines identical across save -> +200 ticks -> load"
+   && [ "${SVLINES:-0}" -ge 50 ] && [ "${SVMOVED:-0}" -ge 1 ] && [ "$SVFRAMES" = "300 500 300" ] \
+   && diff -q /tmp/g54_a.txt /tmp/g54_c.txt >/dev/null 2>&1; then
+  ok "G54 save/load: round trip exact, $SVLINES dump lines identical across save -> +200 ticks -> load, over a world in which $SVMOVED lines changed during those ticks"
 else
-  bad "G54 save/load: saved=$SVSAVE(want 1) loaded=$SVLOAD(want 1) listed=$SVSLOT(want 1) lines=$SVLINES(want >=50) dump-identical=$(diff -q /tmp/g54_a.txt /tmp/g54_c.txt >/dev/null 2>&1 && echo yes || echo NO)"
+  bad "G54 save/load: saved=$SVSAVE(want 1) loaded=$SVLOAD(want 1) listed=$SVSLOT(want 1) lines=$SVLINES(want >=50) moved-between-save-and-load=$SVMOVED(want >=1; 0 means the world stood still and the identical dumps prove nothing about the load) dump-frames=[$SVFRAMES](want 300 500 300) dump-identical=$(diff -q /tmp/g54_a.txt /tmp/g54_c.txt >/dev/null 2>&1 && echo yes || echo NO)"
 fi
 
 # G55 THE SCREEN-EDGE SCROLL ARROWS. Two claims: the model is in the PACK (a renderer that
@@ -2185,7 +2576,7 @@ fi
 
 # G46 SPECIAL OPS. 19 Aug: "Main menu should have a button called 'Special Ops',
 # which should list the missions" -- "All of the Special Ops missions and the Covert Ops
-# missions (Special Ops had some N64 exclusive missions)." Three claims, because a menu
+# missions (Special Ops had some N64 exclusive missions)." Four claims, because a menu
 # that lists a mission it cannot start is worse than no menu:
 #
 #   a  the BUTTON exists, which is the app's own menu item table
@@ -2228,11 +2619,32 @@ for s in SCG22EA SCG30EA SCB70EA; do
   [ -z "$M" ] && SOMISS="$SOMISS $s(no-draw-line)"
   [ "${M:-0}" -ge 20 ] && SODRAW=$((SODRAW+1))
 done
+#   d  the list is FILED, and the Test Map is its last row. The main menu's own Test
+#      Map button is gone; the map lives under a TEST MAPS heading at the bottom of this
+#      list, after the four faction-and-source sections. --specopsshot opens the list at
+#      boot, prints every heading and row in draw order and writes a PNG of the first
+#      page and of the last, so the order is asserted as text and the pictures are there
+#      to look at. The mission count must be the INI count plus one, the Test Map, so a
+#      row that dropped out of the filing cannot pass as "still 27".
+rm -rf shots/so; mkdir -p shots/so
+SOLOG=$(./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+          --specopsshot shots/so 2>&1)
+SORC=$?
+echo "$SOLOG" >> "$OUT"
+SOEND=$(echo "$SOLOG" | grep -m1 '^SPECOPSSHOT|rows=')
+SOORDER=$(echo "$SOEND" | sed -n 's/.*|order=\([^|]*\)|.*/\1/p')
+SOLAST=$(echo "$SOEND" | sed -n 's/.*|last=\([^|]*\)|.*/\1/p')
+SOLISTED=$(echo "$SOEND" | sed -n 's/.*|missions=\([0-9]*\)|.*/\1/p')
+SOWANT="GDI COVERT OPERATIONS,GDI SPECIAL OPS,NOD COVERT OPERATIONS,NOD SPECIAL OPS,TEST MAPS"
+SOPNG=0; [ -s shots/so/specops_top.png ] && [ -s shots/so/specops_end.png ] && SOPNG=1
+SOMENU=$(LC_ALL=C tr -c '[:print:]' '\n' < ./cnc3d 2>/dev/null | grep -c '^Test Map$')
 if [ "${SOBTN:-0}" -ge 1 ] && [ "${SOINI:-0}" -ge 20 ] && [ "$SOINI" = "$SOPACK" ] \
-   && [ "${SODRAW:-0}" -eq 3 ]; then
-  ok "G46 Special Ops: the menu carries the button, $SOINI missions installed with a pack each, 3 of 3 sampled load and draw"
+   && [ "${SODRAW:-0}" -eq 3 ] && [ "$SORC" = "0" ] && [ "$SOORDER" = "$SOWANT" ] \
+   && [ "$SOLAST" = "SCG90EA" ] && [ "${SOLISTED:-0}" -eq $((SOINI + 1)) ] \
+   && [ "$SOPNG" = "1" ] && [ "${SOMENU:-0}" -eq 1 ]; then
+  ok "G46 Special Ops: the menu carries the button, $SOINI missions installed with a pack each, 3 of 3 sampled load and draw, the list is filed as [$SOORDER] with the Test Map ($SOLISTED rows) last and the main menu has no Test Map button of its own"
 else
-  bad "G46 Special Ops: button=$SOBTN(want 1) inis=$SOINI(want >=20) with-pack=$SOPACK(want $SOINI, missing:$SOMISS) loaded=$SODRAW(want 3)"
+  bad "G46 Special Ops: button=$SOBTN(want 1) inis=$SOINI(want >=20) with-pack=$SOPACK(want $SOINI, missing:$SOMISS) loaded=$SODRAW(want 3) shot-rc=$SORC(want 0) order=[$SOORDER](want [$SOWANT]) last=$SOLAST(want SCG90EA) listed=$SOLISTED(want $((SOINI + 1))) pngs=$SOPNG(want 1) test-map-strings=$SOMENU(want exactly 1, the list row's)"
 fi
 
 # G45 THE BUILDING PAD. 19 Aug: "The Conyard still has a missing texture." The
@@ -2388,7 +2800,7 @@ CFG
 # CLOUDS ARE OFF IN THIS CFG for the same reason bloom, occlusion, the lights, the grade
 # and the CRT are: what is being measured is the SUN, and everything else that touches the
 # same pixels is held still so the difference between the two arms is the one thing under
-# test. Clouds joined that list on 4 Sep 2026 when they were switched on by default, and
+# test. Clouds joined that list when they were switched on by default, and
 # they belong in it more than most: the cloud and the cast shadow combine with max(), so a
 # cloud sitting over the scene raises the floor and SWALLOWS every part of a shadow weaker
 # than itself. Left on, this gate read 133961 darkened pixels at 40 degrees and only
@@ -2482,12 +2894,19 @@ else
     bad "G36c NOT deterministic with the chain on: 5 runs produced $G36NH distinct digests"
   fi
 
+  # THE LOW-SUN FACTOR WENT FROM 3x TO 2x, with the smooth ground: every
+  # shadow edge now carries a penumbra (12 taps over 0.08 cells), and a soft band
+  # counts as darkened on both sides of every edge at the high sun as well as the
+  # low one, so the high-sun count nearly doubled (8690 -> 15270 on this scene) for
+  # the same shadows. The ordering claims stand: on darker than off, and a lower sun
+  # darkens more. A picture of where the darkened pixels lie was read before this
+  # number moved: under the units, the boat, the sandbags and the cliff's far side.
   # (d) the sun is a sun
   if [ "${G36SD:-0}" -ge 1000 ] && [ "${G36SB:-0}" -ge 200 ] && \
-     [ "${G36LOW:-0}" -ge $((G36SD * 3)) ]; then
+     [ "${G36LOW:-0}" -ge $((G36SD * 2)) ]; then
     ok "G36d the sun is a sun: $G36SD px darkened and $G36SB px brightened (the cartridge's own shadows withdrawing), and dropping it to 18 deg lengthens the shadows to $G36LOW px"
   else
-    bad "G36d sun: darker=$G36SD(want >=1000) brighter=$G36SB(want >=200) low-sun=$G36LOW(want >=3x $G36SD)"
+    bad "G36d sun: darker=$G36SD(want >=1000) brighter=$G36SB(want >=200) low-sun=$G36LOW(want >=2x $G36SD)"
   fi
 
   # (f) BILINEAR REACHES THE WORLD AND NOT THE UI, and the second half is the half that
@@ -2506,6 +2925,12 @@ fi
 
 # (e) the preset file round-trips. The panel's SAVE writes it and --gfx reads it; if the
 # two disagree about one dial, a tuning session comes back incomplete and nothing says so.
+# BOTH FILES ARE DELETED FIRST AND EVERY STEP MUST SAY IT HAPPENED. The files live in the
+# run folder and outlast the run, so a save that fails leaves the previous run's pair
+# standing, and two files from a good run compare byte identical whatever this build does.
+# The exit status, the three GFX lines and a clean script end are what tie the pair to
+# this run.
+rm -f gfx_rt_a.cfg gfx_rt_b.cfg
 cat > gate_gfx_rt.txt <<'TXT'
 tick 5
 gfx bilinear 1
@@ -2515,16 +2940,34 @@ gfx ss_scale 2.75
 gfx shadow_res 3072
 gfx crt_on 1
 gfx saturation 1.42
+gfx iso_dist 1.15
+gfx iso_yaw -30
 gfxsave gfx_rt_a.cfg
 gfxload gfx_rt_a.cfg
 gfxsave gfx_rt_b.cfg
 quit
 TXT
-G36RT=$(./cnc_eyes --scen SCG01EB --pack SCG01EA.pack $BASE --script gate_gfx_rt.txt --gfx 2>&1 \
-        | tee -a "$OUT" | grep -E "^FX\|preset" | sed -n 's/.*: \([0-9]*\) applied, \([0-9]*\) unknown/\1 \2/p')
+G36RTLOG=$(./cnc_eyes --scen SCG01EB --pack SCG01EA.pack $BASE --script gate_gfx_rt.txt --gfx 2>&1)
+G36RTRC=$?
+printf '%s\n' "$G36RTLOG" >> "$OUT"
+# The loader's count is read from the line naming gfx_rt_a.cfg only: any other preset the
+# run happens to load prints the same shape of line with a different count.
+G36RT=$(printf '%s\n' "$G36RTLOG" | grep -E '^FX\|preset\|gfx_rt_a\.cfg: ' \
+        | sed -n 's/.*: \([0-9]*\) applied, \([0-9]*\) unknown$/\1 \2/p' | head -1)
 G36RTA=$(echo "$G36RT" | awk '{print $1}'); G36RTU=$(echo "$G36RT" | awk '{print $2}')
-G36DIALS=$(grep -cE '^[a-z_]+ ' gfx_rt_a.cfg 2>/dev/null)
-if cmp -s gfx_rt_a.cfg gfx_rt_b.cfg && [ "${G36RTU:-1}" -eq 0 ] && \
+G36RTSA=$(printf '%s\n' "$G36RTLOG" | grep -cx 'GFX|saved|gfx_rt_a\.cfg')
+G36RTL=$(printf '%s\n' "$G36RTLOG" | grep -cx 'GFX|loaded|gfx_rt_a\.cfg')
+G36RTSB=$(printf '%s\n' "$G36RTLOG" | grep -cx 'GFX|saved|gfx_rt_b\.cfg')
+G36RTEND=$(printf '%s\n' "$G36RTLOG" | grep -c '^SCRIPT|end gate_gfx_rt\.txt: [0-9]* lines, 0 failures$')
+# DIAL NAMES CARRY DIGITS. tib3d and its ten friends are dial names too, and a
+# class of just [a-z_] counted 138 of the 149 the loader applied, which failed a
+# gate on a build whose round trip was perfect. The count must match the writer's
+# own idea of a name, not a narrower one.
+G36DIALS=$(grep -cE '^[a-z_][a-z_0-9]* ' gfx_rt_a.cfg 2>/dev/null)
+if [ "$G36RTRC" != "0" ] || [ "$G36RTSA" != "1" ] || [ "$G36RTL" != "1" ] || [ "$G36RTSB" != "1" ] \
+   || [ "$G36RTEND" != "1" ] || [ ! -s gfx_rt_a.cfg ] || [ ! -s gfx_rt_b.cfg ]; then
+  bad "G36e preset round trip: the save, load and second save did not all happen on this run, so no pair of files belongs to it: exit=$G36RTRC(want 0) saved-a=$G36RTSA loaded-a=$G36RTL saved-b=$G36RTSB(want 1 each) clean-script-end=$G36RTEND(want 1). The run said: [$(printf '%s\n' "$G36RTLOG" | grep -E '^GFX\|(save|load) FAILED|^SCRIPT\|end' | tr '\n' ' ')]"
+elif cmp -s gfx_rt_a.cfg gfx_rt_b.cfg && [ "${G36RTU:-1}" -eq 0 ] && \
    [ -n "$G36RTA" ] && [ "${G36RTA:-0}" -eq "${G36DIALS:-0}" ]; then
   ok "G36e preset round-trips: all $G36DIALS dials written, all $G36RTA read back, 0 unknown, save->load->save byte identical"
 else
@@ -2621,11 +3064,22 @@ G37LOG=$(./cnc_eyes --scen SCB01EA --pack SCB01EA.pack $BASE \
 G37RS=$(echo "$G37LOG" | grep -c "^RESIZE|asked 1280x720|window now 900x620")
 G37RT=$(echo "$G37LOG" | sed -n 's/^AUTOPLAY|band|roundtrip=\([0-9.]*\) px.*/\1/p' | head -1)
 G37F=$(echo "$G37LOG" | sed -n 's/^AUTOPLAY|end|[0-9]* step(s) run, \([0-9]*\) failure(s)/\1/p' | head -1)
+# THE STEP COUNT IS READ TOO, because a step that never ran reports no failure. The plan
+# is paced by frames (one step every 12, from frame 24) and --run 9 is a wall clock, so a
+# slow frame rate ends the run before the plan ends, and "0 failure(s)" still comes out.
+# All 16 steps must have run and all 7 of the plan's checks must have printed PASS.
+# PROVEN TO FAIL: with every frame slowed to 20 fps the plan stopped at 13 of its 16
+# steps with 6 checks made and none failed, which this gate used to pass.
+# --run 9 stays: in this resized window the plan's Abort confirmation is never clicked,
+# so the run always ends on the clock. Removing the clock needs that exit fixed first.
+G37N=$(echo "$G37LOG" | sed -n 's/^AUTOPLAY|end|\([0-9]*\) step(s) run, .*/\1/p' | head -1)
+G37P=$(echo "$G37LOG" | grep -c '^AUTOPLAY|PASS|')
 G37OK=$(awk -v v="${G37RT:-999}" 'BEGIN { print (v < 3.0) ? 1 : 0 }')
-if [ "${G37RS:-0}" -ge 1 ] && [ "${G37F:-1}" = "0" ] && [ "$G37OK" = "1" ]; then
-  ok "G37 resized window: all 16 autoplay steps pass at 900x620 after asking for 1280x720, and the band's 3D box lands ${G37RT} px from the drag it was made with"
+if [ "${G37RS:-0}" -ge 1 ] && [ "${G37F:-1}" = "0" ] && [ "${G37N:-0}" = "16" ] \
+   && [ "${G37P:-0}" = "7" ] && [ "$G37OK" = "1" ]; then
+  ok "G37 resized window: all $G37N autoplay steps ran and all $G37P checks passed at 900x620 after asking for 1280x720, and the band's 3D box lands ${G37RT} px from the drag it was made with"
 else
-  bad "G37 resized window: resize-line=$G37RS(want >=1) autoplay-failures=$G37F(want 0) band-roundtrip=${G37RT}px(want <3)"
+  bad "G37 resized window: resize-line=$G37RS(want >=1) steps-run=$G37N(want 16; fewer means the 9 s clock ended the run before the plan did, so its later checks were never made) checks-passed=$G37P(want 7) autoplay-failures=$G37F(want 0) band-roundtrip=${G37RT}px(want <3)"
 fi
 
 # =====================================================================================
@@ -2699,9 +3153,13 @@ fi
 #   motion_eaten=0  the panel did not swallow the event (the regression itself)
 #   onmap=0  so the game knows the pointer left the battlefield
 #   sprite=1 so the DOS pointer is what draws there
+# THE PANEL IS OPENED BY THE SCRIPT'S OWN FIRST LINE (gfxpanel 1) and not by --gfxpanel:
+# a cooked build (tools/release.sh) compiles the switch and the F5 key out, and the
+# release runs this suite on the cooked binaries. The script verb is the harness's door
+# and stays in every build, so this gate proves the panel's pointer on what ships.
 G39L=$(./cnc_eyes --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE \
            --w 1280 --h 720 --resize 3008 1692 --script "$GATEDIR/gate_panelcursor.txt" \
-           --gfx --gfxpanel 2>&1 | tee -a "$OUT" | grep '^PANELPROBE|')
+           --gfx 2>&1 | tee -a "$OUT" | grep '^PANELPROBE|')
 G39MAP=$(echo "$G39L" | grep -c 'panel=0|motion_eaten=0|onmap=1|sprite=0')
 G39PAN=$(echo "$G39L" | grep -c 'panel=1|motion_eaten=0|onmap=0|sprite=1')
 if [ "${G39MAP:-0}" -eq 2 ] && [ "${G39PAN:-0}" -eq 1 ]; then
@@ -3195,11 +3653,12 @@ fi
 # G58 ANIMATION IS BLENDED BETWEEN ENGINE TICKS, NOT STAIR-STEPPED ONTO THEM.
 #
 # Reported: vehicle and structure animations ran at a visibly lower framerate than the
-# game itself. They did, and it was arithmetic. The brain
-# ticks at 15 Hz, the window presents at 60, and every animation clock in the renderer was
-# an INTEGER expression over g_engineFrame, so each pose was held for four presented
-# frames. draw_mesh had been resolving two keyframes and lerping between them since PKB
-# landed; every driver handed it a whole number, so the mix was always 0.
+# game itself. They did, and it was arithmetic. The brain ticks well below the rate the
+# window presents at (15 Hz against 60 when this was measured; the shipped speed setting
+# is 18 Hz now and every setting on the slider is below 60), and every animation clock in
+# the renderer was an INTEGER expression over g_engineFrame, so each pose was held for
+# several presented frames. draw_mesh had been resolving two keyframes and lerping between
+# them since PKB landed; every driver handed it a whole number, so the mix was always 0.
 #
 # THIS GATE ASSERTS ENGINE STATE FIRST AND PIXELS SECOND, because the state is exact and
 # the pixels only prove it reached the screen. Measured on the day, one engine tick
@@ -3484,24 +3943,39 @@ else
   bad "G68 silo strip: housestore=$SILHOUSE(want >=1, 0 means tiberium/capacity are still being thrown away) readout=$SILRO(want 1; 0 means it fell back to the clock) steady=$SILST(want 1; 0 means it is still an animation) clock-moved=$SILMV(want 1, else the steadiness proves nothing) [$SILRES]"
 fi
 
-# G69 THE POWER INDICATOR: the colour is decided on watts, as 1995 decides it.
+# G69 THE POWER INDICATOR: the colour both sidebars DRAW is decided on watts, as 1995
+# decides it.
 #
 # The DOS bar compared bar PIXELS (`dh > ph`, `dh > ph*2`) where power.cpp:475-482
 # compares PlayerPtr->Drain against PlayerPtr->Power. Power_Height saturates -- a sixth
 # of what is left per 100 units -- so the two rules genuinely disagree and RED was very
 # nearly unreachable. The 640 art HUD had no warning of any kind and now shares the rule.
 #
-# ARM 1 is a MEASUREMENT: SCB35EA starts overdrawn (430 produced, 475 drained), so the
-# live reading must be YELLOW and the watts must arrive unchanged from the brain.
-# ARM 2 is a CALCULATION and is labelled as one: no shipped scenario begins with drain
-# above twice production, so the RED threshold is exercised against the transcribed
-# Power_Height instead of in a mission. It asserts the divergence EXISTS, which is the
-# thing that makes the fix worth having.
+# WHAT IS READ. powerdump's colour_by_watts is calculated inside the verb, so on its own
+# it cannot see a sidebar that chose its colour some other way. The verdict comes from
+# `powerdrawn`, which reports the colour read back out of the pixels each sidebar
+# rasterised on its last frame: the DOS bar's fill as a palette index, and every pixel of
+# the art HUD's lit meter fill sorted green, amber or red. The script shoots once per
+# sidebar. The HUD's counts are checked as well as its majority: a warning that reached
+# only part of the fill would win the vote on the part it reached while the player sees a
+# mostly green meter, so the fill must hold NO pixel of another class (measured on a good
+# build: 0 of either other class in both parts, against 2373 green pixels when the warning
+# reaches only the bottom segment). The DOS bar is still read at one pixel of its fill.
 #
-# PROVEN TO FAIL: put `dh`/`ph` back into db_draw_power and arm 1 still passes (both
-# rules say yellow at 430/475) while arm 2's divergence count is what changes -- which is
-# exactly why arm 2 is here and not left as a comment.
-rm -f shots/power_01.png
+# PART 1, SCB35EA as it starts (430 produced, 475 drained): the watts must arrive
+# unchanged from the brain and both sidebars must draw YELLOW. Both rules say yellow
+# there, so this part cannot tell the rules apart.
+#
+# PART 2 is the part that can. `powerforce 200 500` replaces the brain's two numbers where
+# the sidebar receives them, because no shipped scenario starts with drain above twice
+# production. 200 against 500 is 33 bar pixels against 63: RED by watts, YELLOW by pixels.
+# The gate first requires powerdump to show exactly that disagreement, since without it
+# the drawn colours prove nothing, and then requires both sidebars to draw RED.
+#
+# PROVEN TO FAIL: `dh > ph` restored in db_draw_power fails the DOS branch of part 2 with
+# the bar-pixel message; the art HUD's st->power_color computed from bar pixels fails the
+# HUD branch of part 2; DB_GREEN hardcoded in db_draw_power fails part 1.
+rm -f shots/power_01.png shots/power_02.png shots/power_03.png shots/power_04.png
 PWLOG=$(./cnc_eyes --scen SCB35EA --pack SCG01EA.pack $BASE --noshroud --nosound \
             --w 1280 --h 800 --script gate_power.txt 2>&1)
 PWRC=$?
@@ -3511,31 +3985,44 @@ PWSRC=$(echo "$PWLINE" | sed -n 's/.*|src=\([0-9]*\)\/\([0-9]*\).*/\1 \2/p')
 PWW=$(echo "$PWLINE" | sed -n 's/^POWER|watts=\([0-9]*\)\/\([0-9]*\)|.*/\1 \2/p')
 PWCW=$(echo "$PWLINE" | sed -n 's/.*|colour_by_watts=\([0-9]*\)|.*/\1/p')
 PWMATCH=$([ "$PWSRC" = "$PWW" ] && echo 1 || echo 0)
-PWDIV=$(python3 - <<'PY'
-# Power_Height, power.cpp:425, transcribed. lim = DB_POW_HEIGHT - 2 = 108.
-lim = 108
-def ph(value):
-    v = max(0, value); num = v // 100; ret = 0
-    for _ in range(num):
-        ret += (lim - ret) // 6; v -= 100
-    if v: ret += ((lim - ret) // 6) * v // 100
-    return max(0, min(lim, ret))
-def cw(P, D): return 2 if D > P * 2 else (1 if D > P else 0)
-def cp(P, D):
-    p, d = ph(P), ph(D)
-    return 2 if d > p * 2 else (1 if d > p else 0)
-n = sum(1 for P in range(100, 1001, 50) for D in range(100, 2001, 50) if cw(P, D) != cp(P, D))
-print(n)
-PY
-)
+# Part 1's drawn colours are the POWERDRAWN line before the force; part 2's reading and
+# drawn colours are the first POWER and POWERDRAWN lines after it.
+PWD1=$(echo "$PWLOG" | awk '/^POWERFORCE\|/{exit} /^POWERDRAWN\|/{print; exit}')
+PWFLINE=$(echo "$PWLOG" | awk '/^POWERFORCE\|on=1\|/{f=1; next} f && /^POWER\|/{print; exit}')
+PWD2=$(echo "$PWLOG" | awk '/^POWERFORCE\|on=1\|/{f=1; next} f && /^POWERDRAWN\|/{print; exit}')
+PWD1DOS=$(echo "$PWD1" | sed -n 's/.*|dos=\(-*[0-9]*\)|.*/\1/p')
+PWD1HUD=$(echo "$PWD1" | sed -n 's/.*|hud=\(-*[0-9]*\)|.*/\1/p')
+PWFW=$(echo "$PWFLINE" | sed -n 's/^POWER|watts=\([0-9]*\/[0-9]*\)|.*/\1/p')
+PWFCW=$(echo "$PWFLINE" | sed -n 's/.*|colour_by_watts=\([0-9]*\)|.*/\1/p')
+PWFCP=$(echo "$PWFLINE" | sed -n 's/.*|colour_by_pixels=\([0-9]*\)|.*/\1/p')
+PWD2DOS=$(echo "$PWD2" | sed -n 's/.*|dos=\(-*[0-9]*\)|.*/\1/p')
+PWD2HUD=$(echo "$PWD2" | sed -n 's/.*|hud=\(-*[0-9]*\)|.*/\1/p')
+# The art HUD's per-class pixel counts over the whole lit fill, part 1 then part 2.
+PWD1HG=$(echo "$PWD1" | sed -n 's/.*|hud_green=\([0-9]*\)|.*/\1/p')
+PWD1HR=$(echo "$PWD1" | sed -n 's/.*|hud_red=\([0-9]*\)|.*/\1/p')
+PWD2HG=$(echo "$PWD2" | sed -n 's/.*|hud_green=\([0-9]*\)|.*/\1/p')
+PWD2HA=$(echo "$PWD2" | sed -n 's/.*|hud_amber=\([0-9]*\)|.*/\1/p')
+PWKEY="0 green, 1 yellow, 2 red, -1 no power colour in the pixels, -2 that sidebar never drew"
 if [ "$PWRC" != "0" ]; then
   bad "G69 power indicator: the run itself failed (exit $PWRC)"
-elif [ ! -s shots/power_01.png ]; then
-  bad "G69 power indicator: no shot was written"
-elif [ -n "$PWW" ] && [ "$PWMATCH" = "1" ] && [ "$PWCW" = "1" ] && [ "${PWDIV:-0}" -ge 50 ]; then
-  ok "G69 power indicator: the brain's watts reach both sidebars unchanged ($PWW), an overdrawn base reads YELLOW on 1995's own watt rule, and the pixel rule it replaced disagrees with that rule on $PWDIV of the sampled power/drain pairs"
+elif [ ! -s shots/power_01.png ] || [ ! -s shots/power_02.png ] || [ ! -s shots/power_03.png ] || [ ! -s shots/power_04.png ]; then
+  bad "G69 power indicator: a shot was not written (power_01..04), so a sidebar was not drawn"
+elif [ -z "$PWW" ] || [ "$PWMATCH" != "1" ] || [ "$PWCW" != "1" ]; then
+  bad "G69 power indicator: watts=$PWW src-matches=$PWMATCH(want 1) colour_by_watts=$PWCW(want 1=yellow; SCB35EA starts 430/475) [$PWLINE]"
+elif [ "$PWD1DOS" != "1" ] || [ "$PWD1HUD" != "1" ]; then
+  bad "G69 power indicator: at SCB35EA's real 430/475 the DOS bar drew $PWD1DOS and the art HUD drew $PWD1HUD (want 1 YELLOW on both; $PWKEY) [$PWD1]"
+elif [ "${PWD1HG:-x}" != "0" ] || [ "${PWD1HR:-x}" != "0" ]; then
+  bad "G69 power indicator: at 430/475 the art HUD's lit meter is mostly YELLOW but ${PWD1HG:-an unknown number of} green and ${PWD1HR:-an unknown number of} red pixels remain in it (want 0 of each), so the warning is not reaching the whole meter the player sees [$PWD1]"
+elif [ "$PWFW" != "200/500" ] || [ "$PWFCW" != "2" ] || [ "$PWFCP" != "1" ]; then
+  bad "G69 power indicator: the forced reading does not separate the two rules, so the drawn colours prove nothing: watts=$PWFW(want 200/500) colour_by_watts=$PWFCW(want 2) colour_by_pixels=$PWFCP(want 1) [$PWFLINE]"
+elif [ "$PWD2DOS" != "2" ]; then
+  bad "G69 power indicator: at 200/500 the DOS bar drew $PWD2DOS, want 2 RED by the watt rule; 1 YELLOW means db_draw_power is deciding on bar pixels again ($PWKEY) [$PWD2]"
+elif [ "$PWD2HUD" != "2" ]; then
+  bad "G69 power indicator: at 200/500 the art HUD drew $PWD2HUD, want 2 RED by the watt rule; 1 YELLOW means its power_color is being decided on bar pixels again ($PWKEY) [$PWD2]"
+elif [ "${PWD2HG:-x}" != "0" ] || [ "${PWD2HA:-x}" != "0" ]; then
+  bad "G69 power indicator: at 200/500 the art HUD's lit meter is mostly RED but ${PWD2HG:-an unknown number of} green and ${PWD2HA:-an unknown number of} amber pixels remain in it (want 0 of each), so the warning is not reaching the whole meter the player sees [$PWD2]"
 else
-  bad "G69 power indicator: watts=$PWW src-matches=$PWMATCH(want 1) colour=$PWCW(want 1=yellow; SCB35EA starts 430/475) divergent-pairs=$PWDIV(want >=50; if this is 0 the pixel rule is not actually different and this fix is pointless) [$PWLINE]"
+  ok "G69 power indicator: the brain's watts reach both sidebars unchanged ($PWW) and both draw YELLOW there; at a forced 200/500, where the watt rule says RED and the bar-pixel rule YELLOW, both sidebars DRAW red [$PWD2]"
 fi
 
 # G70 AIRCRAFT: the heap the object dump walked past for the whole life of the project.
@@ -3706,7 +4193,7 @@ if [ "${ESAIM:-0}" -ge 1 ] && [ "${ESPASS:-0}" -ge 1 ] && [ "${ESBLK:-0}" -ge 1 
    && [ "${ESH6P:-0}" -ge 1 ] && [ "${ESH6B:-0}" -ge 1 ] && [ "${ESVERDICT:-0}" = "1" ]; then
   ok "G79 right edge scroll (the SHARED CORE only; the live gesture is G124's). Only the SCREEN edge scrolls east: the window's own last 12 columns pan from 1278 ($ESWIN) although that pixel is on the bar, the same distance the left edge pans west, and the same distance as the --nosidebar control ($ESCTL) whose map edge and window edge are the same columns. THE MAP-SIDE STRIP REFUSES: aiming at tacRight-2 with the guard passing moves nothing ($ESEAST), so sliding the pointer off the map onto the sidebar no longer drags the map. A pixel just left of it at 1020 ($ESOFF), the middle of the bar at 1200 ($ESBAR) and the last column before the window strip at 1267 ($ESLIP) all refuse too. On the 640x480 HUD it pans east from the window edge deployed ($ESH6WIN) and with the drawer hidden ($ESH6HID), while the map edge deployed ($ESH6OUT), the middle of the bar ($ESH6BAR) and the SIDEBAR handle plate inside the window strip ($ESH6TAB) all refuse"
 else
-  bad "G79 right edge scroll: aimed-at-map=$ESAIM(want >=1; 0 means the verb is aiming at the window edge again) window-edge-passes=$ESPASS(want >=1; 0 means the last 12 columns are still vetoed by the panel) bar-blocked=$ESBLK(want >=1) h6-window-passes=$ESH6P(want >=1) h6-bar-blocked=$ESH6B(want >=1) east=$ESEAST west=$ESWEST window=$ESWIN control=$ESCTL mid-bar=$ESBAR before-strip=$ESLIP off-strip=$ESOFF h6-out=$ESH6OUT h6-window=$ESH6WIN h6-hidden=$ESH6HID h6-mid-bar=$ESH6BAR h6-tab=$ESH6TAB (start 45.000; WEST, WINDOW and CONTROL must differ from it by one same amount, and EAST must EQUAL it because the map-side strip was removed on 1 Sep 2026 -- a non-zero east means that strip is back and the pointer drags the map on its way onto the sidebar; mid-bar, before-strip and off-strip must equal it; on the 640 HUD h6-window and h6-hidden must differ by one same amount and h6-out, h6-mid-bar and h6-tab must equal it)"
+  bad "G79 right edge scroll: aimed-at-map=$ESAIM(want >=1; 0 means the verb is aiming at the window edge again) window-edge-passes=$ESPASS(want >=1; 0 means the last 12 columns are still vetoed by the panel) bar-blocked=$ESBLK(want >=1) h6-window-passes=$ESH6P(want >=1) h6-bar-blocked=$ESH6B(want >=1) east=$ESEAST west=$ESWEST window=$ESWIN control=$ESCTL mid-bar=$ESBAR before-strip=$ESLIP off-strip=$ESOFF h6-out=$ESH6OUT h6-window=$ESH6WIN h6-hidden=$ESH6HID h6-mid-bar=$ESH6BAR h6-tab=$ESH6TAB (start 45.000; WEST, WINDOW and CONTROL must differ from it by one same amount, and EAST must EQUAL it because the map-side strip was removed -- a non-zero east means that strip is back and the pointer drags the map on its way onto the sidebar; mid-bar, before-strip and off-strip must equal it; on the 640 HUD h6-window and h6-hidden must differ by one same amount and h6-out, h6-mid-bar and h6-tab must equal it)"
 fi
 
 
@@ -3881,11 +4368,20 @@ fi
 # object constructor's sentinel coordinate (cell 255.996) every tick of the voyage, and
 # step off on engine frame 243. The gate springs its own trap first: frame 242 must really
 # say riders=3|limboed=3, or the assertions below are being made about an empty deck.
+#   - drawpos picks a unit by its POSITION among the riflemen, and a position is not an
+#     id, so the three lines printed on 243 must name exactly the three ids the 242 dump
+#     lists in limbo, once each. Sampling by position is how this arm once watched a man
+#     who was never aboard, reported him as a rider that failed to snap, and never looked
+#     at the third real rider at all.
 #   - on 243 every one of the three must have wx == ex and wz == ez EXACTLY. Before this
-#     fix the first of them was drawn 254.56 cells from where the engine had put it.
-#   - on the four ticks after, the gap must stay inside the filter's own trail (0.05
-#     cells; the steady-state trail for a walking rifleman is 0.068 of a cell at phase
-#     0.5, and it is unchanged by this fix).
+#     fix every one of them was drawn about 254.6 cells from where the engine had put it
+#     (254.56 for the first), and on the fourth tick after it was still 20 cells out.
+#   - on the four ticks after, every rider is sampled once per tick, four samples each and
+#     no fewer, and the gap must stay inside the filter's own trail (0.05 cells; measured
+#     0.0137 on those ticks). A FIFTH tick would not: by then the window has refilled and
+#     the gap is the steady-state trail for a walking rifleman, 0.068 of a cell at phase
+#     0.5, which this fix does not change. The count is asserted because a trail test that
+#     starts from zero and skips what it cannot match passes on no samples at all.
 #
 # ARM B, pixels, on SCG01EC's gunboat, the same subject G60 uses because it is on Hunt and
 # actually travelling. ONE engine tick is drawn twice, at sub-tick phase 0.0 and 0.999.
@@ -3897,30 +4393,44 @@ fi
 #     pictures with the white pixels masked out. Agreement inside 1 px.
 # The crop and the camera are locked together: changing cam, zoom, --w or --h moves the
 # boat and the numbers with it.
-gbegin shots/g81_a0.png shots/g81_a9.png
-SJL=$(./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --noshroud --nosound \
-      --script gate_smoothjump.txt 2>&1 | tee -a "$OUT")
-case "$SJL" in *"DRAWPOS|E1|16|"*) ;; *) GRC=93 ;; esac
-SJABOARD=$(echo "$SJL" | grep -c '^CARGO|riders=3|limboed=3$')
-SJASHORE=$(echo "$SJL" | grep -c '^CARGO|riders=0|limboed=0$')
-SJSNAP=$(echo "$SJL" | grep '^DRAWPOS|E1|' | python3 -c '
-import sys, re
-n = 0
-for L in list(sys.stdin)[:3]:          # the three men on the tick they leave limbo
-    m = re.match(r"^DRAWPOS\|E1\|\d+\|ex=([-\d.]+)\|ez=([-\d.]+)\|wx=([-\d.]+)\|wz=([-\d.]+)", L)
-    if m and m.group(1) == m.group(3) and m.group(2) == m.group(4):
-        n += 1
-print(n)')
-SJTRAIL=$(echo "$SJL" | grep '^DRAWPOS|E1|14|' | python3 -c '
-import sys, re
-worst = 0.0
-for L in sys.stdin:
-    m = re.match(r"^DRAWPOS\|E1\|14\|ex=([-\d.]+)\|ez=([-\d.]+)\|wx=([-\d.]+)\|wz=([-\d.]+)", L)
-    if not m: continue
-    ex, ez, wx, wz = (float(v) for v in m.groups())
-    worst = max(worst, abs(wx - ex), abs(wz - ez))
-print("%.4f" % worst)')
-SJTRAILOK=$(awk -v w="${SJTRAIL:-9}" 'BEGIN{print (w<=0.05)?1:0}')
+gbegin shots/g81a.log shots/g81_a0.png shots/g81_a9.png
+# Through grun, so a script failure (a DRAWPOS|MISSING is one, and exits 1) fails the gate
+# instead of vanishing into a pipeline.
+grun shots/g81a.log --scen SCG01EA --pack SCG01EA.pack $BASE --noshroud --nosound \
+     --script gate_smoothjump.txt
+SJABOARD=$(grep -c '^CARGO|riders=3|limboed=3$' shots/g81a.log)
+SJASHORE=$(grep -c '^CARGO|riders=0|limboed=0$' shots/g81a.log)
+set -- $(python3 - shots/g81a.log <<'PY1'
+import re, sys
+deck, land, trail, smooth = [], [], [], []
+for L in open(sys.argv[1], errors="replace"):
+    m = re.match(r"^CARGO\|limbo\|E1#(\d+)\|", L)
+    if m:
+        deck.append(m.group(1))
+        continue
+    m = re.match(r"^DRAWPOS\|E1\|(\d+)\|ex=([-\d.]+)\|ez=([-\d.]+)\|wx=([-\d.]+)\|wz=([-\d.]+)\|smooth=(\d)\|", L)
+    if m:
+        smooth.append(m.group(6))
+        (land if len(land) < 3 else trail).append(m.groups()[:5])
+# the first three lines are the landing tick: the deck's own three men, once each
+ids = sorted(p[0] for p in land)
+riders = int(len(deck) == 3 and len(set(deck)) == 3 and ids == sorted(deck))
+snapped = sum(1 for p in land if p[0] in deck and p[1] == p[3] and p[2] == p[4])
+# the rest are the trail: nobody else, and exactly four samples of each rider
+fours = int(bool(deck) and all(p[0] in deck for p in trail)
+            and all(sum(1 for p in trail if p[0] == i) == 4 for i in deck))
+gaps = [max(abs(float(p[3]) - float(p[1])), abs(float(p[4]) - float(p[2])))
+        for p in trail if p[0] in deck]
+# and every one of those lines drawn with the filter ON: with it off the drawn position is
+# engine truth on every tick, so both the snap and the trail hold trivially
+print(",".join(sorted(deck)) or "none", ",".join(ids) or "none", riders, snapped,
+      len(gaps), fours, ("%.4f" % max(gaps)) if gaps else "none",
+      sum(1 for v in smooth if v == "1"), len(smooth))
+PY1
+)
+SJDECK="$1"; SJLANDED="$2"; SJRIDERS="$3"; SJSNAP="$4"; SJTRAILN="$5"; SJFOURS="$6"; SJTRAIL="$7"
+SJSMON="$8"; SJSMN="$9"
+SJTRAILOK=$(awk -v w="${SJTRAIL:-none}" -v f="${SJFOURS:-0}" 'BEGIN{print (f==1 && w!="none" && w+0<=0.05)?1:0}')
 
 grun shots/g81b.log --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --nosound \
      --w 1280 --h 720 --script gate_smoothbracket.txt
@@ -3968,12 +4478,14 @@ SJN="$1"; SJBRACKET="$2"; SJHULL="$3"; SJGAP="$4"
 SJPIXOK=$(awk -v n="${SJN:-0}" -v b="${SJBRACKET:-0}" -v h="${SJHULL:-0}" -v g="${SJGAP:-9}" \
           'BEGIN{print (n>=40 && b>1.0 && h>1.0 && g<1.0)?1:0}')
 if [ "$GRC" != "0" ]; then
-  bad "G81 smoothing discontinuity: a run failed or wrote no shot (GRC=$GRC)"
-elif [ "$SJABOARD" = "1" ] && [ "$SJASHORE" = "1" ] && [ "$SJSNAP" = "3" ] \
+  bad "G81 smoothing discontinuity: a run failed, a script verb failed (DRAWPOS|MISSING is one) or a shot was not written (GRC=$GRC)"
+elif [ "${SJSMN:-0}" != "15" ] || [ "${SJSMON:-0}" != "15" ]; then
+  bad "G81 discontinuity: arm A drew its riflemen with smoothing on in ${SJSMON:-0} of ${SJSMN:-0} DRAWPOS samples (want 15 of 15). With the filter off every drawn position is engine truth, so the snap and the trail it would measure prove nothing about the filter"
+elif [ "$SJABOARD" = "1" ] && [ "$SJASHORE" = "1" ] && [ "$SJRIDERS" = "1" ] && [ "$SJSNAP" = "3" ] \
    && [ "$SJTRAILOK" = "1" ] && [ "$SJPHASE" = "1" ] && [ "$SJPIXOK" = "1" ]; then
-  ok "G81 discontinuity: all 3 riflemen leaving an LST are drawn AT engine truth on the tick they land (wx==ex to 4dp, was 254.56 cells out), the filter trail over the next four ticks stays at $SJTRAIL cells, and a moving gunboat's selection bracket now shifts $SJBRACKET px between sub-tick phases against the hull's $SJHULL px (gap $SJGAP px; it used to shift 0.000)"
+  ok "G81 discontinuity: all 3 riflemen leaving an LST (ids $SJDECK, the deck's own) are drawn AT engine truth on the tick they land (wx==ex to 4dp, was 254.56 cells out), the filter trail over the next four ticks stays at $SJTRAIL cells across $SJTRAILN samples, four per rider, and a moving gunboat's selection bracket now shifts $SJBRACKET px between sub-tick phases against the hull's $SJHULL px (gap $SJGAP px; it used to shift 0.000)"
 else
-  bad "G81 discontinuity: aboard-at-242=$SJABOARD(want 1) ashore-at-243=$SJASHORE(want 1) snapped=$SJSNAP(want 3) trail=$SJTRAIL(want <=0.05) phases-differ=$SJPHASE(want 1) bracket=$SJBRACKET px hull=$SJHULL px gap=$SJGAP px whitepx=$SJN(want >=40)"
+  bad "G81 discontinuity: aboard-at-242=$SJABOARD(want 1) ashore-at-243=$SJASHORE(want 1) deck=$SJDECK landed=$SJLANDED riders-sampled=$SJRIDERS(want 1; 0 means the landing lines are not the deck's three men, so drawpos is sampling someone who was never aboard) snapped=$SJSNAP(want 3) trail-samples=$SJTRAILN four-per-rider=$SJFOURS(want 12 and 1) trail=$SJTRAIL(want <=0.05) phases-differ=$SJPHASE(want 1) bracket=$SJBRACKET px hull=$SJHULL px gap=$SJGAP px whitepx=$SJN(want >=40)"
 fi
 
 # =====================================================================================
@@ -4228,8 +4740,12 @@ fi
 rm -f shots/g84_lit.png shots/g84_off.png shots/g84_on.png
 printf 'tick 8\nshot shots/g84_lit.png\nquit\n' > /tmp/g84a.txt
 printf 'tick 8\nshroudsoft 1\nshroudlight 0\nshot shots/g84_off.png\nshroudlight 1\nshot shots/g84_on.png\nquit\n' > /tmp/g84b.txt
-./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --noshroud --script /tmp/g84a.txt >> "$OUT" 2>&1
-./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --script /tmp/g84b.txt >> "$OUT" 2>&1
+# --norim on both arms: the map's edge ring is now shroud that --noshroud
+# does not lift (G221), so without it the unshrouded reference frame carries a black
+# border and the trap below trips on a leak count that has nothing to do with the light
+# term this gate measures.
+./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --noshroud --norim --script /tmp/g84a.txt >> "$OUT" 2>&1
+./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --norim --script /tmp/g84b.txt >> "$OUT" 2>&1
 SHL=$(python3 - <<'PY'
 import os, sys
 from PIL import Image
@@ -4583,25 +5099,41 @@ else
   bad "G73 the opening click: cursor-reads-deploy=$SKCUR(want 1; 0 means the pad is blocked and the first click is dead) player-conyard=$SKFACT(want >=1)"
 fi
 
-# G74 THE SIDE REACHES THE ART. Same map, same seed, the two sides swapped. If the side
-# were not driving the house textures the two frames would be identical.
-rm -f shots/sk_gdi.png shots/sk_nod.png
-./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi \
-   --shot shots/sk_gdi.png --ticks 400 >>"$OUT" 2>&1
-SKRG=$?
-./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod \
-   --shot shots/sk_nod.png --ticks 400 >>"$OUT" 2>&1
-SKRN=$?
-if [ "$SKRG" != "0" ] || [ "$SKRN" != "0" ]; then
-  bad "G74 side reaches the art: a run failed (exit $SKRG / $SKRN)"
-elif [ ! -s shots/sk_gdi.png ] || [ ! -s shots/sk_nod.png ]; then
-  bad "G74 side reaches the art: a shot was not written"
+# G74 THE SIDE REACHES THE HOUSE TEXTURES. Same map, same seed, the two sides swapped, and
+# the player's MCV at the start has to be drawn from the other texture set.
+#
+# BOTH RUNS HAVE TEAM COLOURS OFF. With them on, which is the skirmish default, a unit
+# wears its seat's colour rather than its side's, and the MCV in view is byte-identical
+# between the two runs. --noteamcolours leaves the side alone to pick the texture set.
+#
+# ONLY THE BATTLEFIELD IS COUNTED. The sidebar's radar plate is a GDI or a Nod logo chosen
+# by the side too, and a whole-frame comparison passed on that plate alone: 38277 pixels
+# differed, every one of them in the sidebar and not one in the map view, so a build whose
+# units ignored the side still passed. The count is taken over the map view left of the
+# sidebar (x < 1040 at 1280x720), split into a box around the player's MCV at its start
+# cell and everything else. The box has to change, and nothing outside it may, so a
+# camera or a scene that differs between the two runs cannot pay for the verdict.
+# Measured on a good build: 512 pixels inside the box and 0 outside it. With obj_side()
+# made to ignore act=, so that every skirmish house falls back to one texture set: 0 and 0.
+gbegin shots/sk_gdi.png shots/sk_nod.png
+grun - --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --noteamcolours \
+     --w 1280 --h 720 --shot shots/sk_gdi.png --ticks 400
+grun - --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --noteamcolours \
+     --w 1280 --h 720 --shot shots/sk_nod.png --ticks 400
+gshots shots/sk_gdi.png shots/sk_nod.png
+if [ "$GRC" != "0" ]; then
+  bad "G74 side reaches the house textures: a run failed or wrote no shot (GRC=$GRC)"
 else
-  SG=$(shasum shots/sk_gdi.png | cut -d' ' -f1); SN=$(shasum shots/sk_nod.png | cut -d' ' -f1)
-  if [ "$SG" != "$SN" ]; then
-    ok "G74 the chosen side reaches the picture: playing GDI and playing Nod render differently on the same map (${SG:0:12} vs ${SN:0:12})"
+  SKBOX=$(python3 "$GATEDIR/gate_gfx.py" rect shots/sk_gdi.png shots/sk_nod.png 590 290 690 400 | cut -d'|' -f2)
+  SKFIELD=$(python3 "$GATEDIR/gate_gfx.py" rect shots/sk_gdi.png shots/sk_nod.png 0 0 1040 720 | cut -d'|' -f2)
+  if [ -z "$SKBOX" ] || [ -z "$SKFIELD" ]; then
+    bad "G74 side reaches the house textures: the pixel counts could not be read (box=[$SKBOX] field=[$SKFIELD])"
+  elif [ "$((SKFIELD - SKBOX))" != "0" ]; then
+    bad "G74 side reaches the house textures: $((SKFIELD - SKBOX)) battlefield pixels differ OUTSIDE the box around the player's MCV (want 0), so the two runs do not show the same scene and the $SKBOX pixels inside the box cannot be credited to the texture set"
+  elif [ "$SKBOX" -lt 256 ]; then
+    bad "G74 the chosen side does NOT reach the house textures: only $SKBOX pixels of the player's MCV differ between playing GDI and playing Nod with team colours off (want >=256; a good build measures 512), so both sides are drawn from one texture set"
   else
-    bad "G74 the chosen side does NOT reach the picture: both sides rendered the identical frame ${SG:0:12}, so the side is being ignored"
+    ok "G74 the chosen side reaches the house textures: with team colours off, the player's MCV at the start differs by $SKBOX pixels between playing GDI and playing Nod, and no other battlefield pixel differs (the sidebar, whose radar plate also follows the side, is not counted)"
   fi
 fi
 
@@ -4737,6 +5269,15 @@ LBSHOTS=$(ls shots/lobby/*.png 2>/dev/null | wc -l | tr -d ' ')
 # Bonus Crates on. Undrawn, units stays 0 and crates stays 0.
 LBUNITS=$(echo "$LBLOG" | sed -n 's/^LOBBYSHOT|.*|units=\([0-9]*\).*/\1/p')
 LBCRATES=$(echo "$LBLOG" | sed -n 's/^LOBBYSHOT|.*|crates=\([0-9]*\).*/\1/p')
+# THE START PICKER. The script gives COMPUTER 1 start 4 and PLAYER start 1,
+# and has PLAYER ask for COMPUTER 1's start first, which must be refused. Seat 2 picks
+# none and must be reported -1 (the engine deals it one). Read off the per-seat lines the
+# app prints, so a pick that stayed on the screen and never reached the settings block
+# cannot pass.
+LBST0=$(echo "$LBLOG" | sed -n 's/^APP|lobby|player=0|.*|start=\(-*[0-9]*\).*/\1/p' | tail -1)
+LBST1=$(echo "$LBLOG" | sed -n 's/^APP|lobby|player=1|.*|start=\(-*[0-9]*\).*/\1/p' | tail -1)
+LBST2=$(echo "$LBLOG" | sed -n 's/^APP|lobby|player=2|.*|start=\(-*[0-9]*\).*/\1/p' | tail -1)
+LBSTRULE=$(echo "$LBLOG" | grep -c '^LOBBY|starts|seat 1 took start 1, seat 2 was refused it')
 # And the PIXELS, because a number in a log line is not a control on a screen: every value
 # above was already correct on the build that drew neither of these rows. The frame is read
 # out of the run by the control's own printed LABEL rather than typed in as an index, so
@@ -4744,12 +5285,28 @@ LBCRATES=$(echo "$LBLOG" | sed -n 's/^LOBBYSHOT|.*|crates=\([0-9]*\).*/\1/p')
 # control's own rectangle in menu pixels times the shot's 3x scale, and is clear of where
 # the pointer stands in either frame. Undrawn, both counts are exactly 0.
 LBUSHOT=$(echo "$LBLOG" | grep -A1 '^LOBBY|click|Unit Count:|' | sed -n 's/^LOBBY|shot|\([^|]*\)|.*/\1/p' | head -1)
-LBCSHOT=$(echo "$LBLOG" | grep -A1 '^LOBBY|click|Bonus Crates|' | sed -n 's/^LOBBY|shot|\([^|]*\)|.*/\1/p' | head -1)
+LBCSHOT=$(echo "$LBLOG" | grep -A1 '^LOBBY|click|Crates|' | sed -n 's/^LOBBY|shot|\([^|]*\)|.*/\1/p' | head -1)
 LBUD=0; LBCD=0
-# the gauge trough, menu x 103..144 y 141..145: it goes from empty to full travel
-[ -n "$LBUSHOT" ] && LBUD=$(python3 "$GATEDIR/gate_pixdiff.py" shots/lobby/lobby00.png "$LBUSHOT" 309,423,434,437 2>/dev/null)
-# the check box, menu x 186..192 y 140..146: raised and empty to pressed and filled
-[ -n "$LBCSHOT" ] && LBCD=$(python3 "$GATEDIR/gate_pixdiff.py" shots/lobby/lobby00.png "$LBCSHOT" 558,420,578,440 2>/dev/null)
+# THE BOXES ARE THE CONTROL'S OWN RECTANGLE TIMES THREE, recomputed and never widened:
+# for an inclusive menu rectangle x0..x1, y0..y1 the shot box is 3*x0, 3*y0, 3*x1+2, 3*y1+2.
+# The relayout of 5 Sep 2026 put Unit Count in the third gauge column (rect 212,113,44,7)
+# and Crates at the bottom of the box column left of the preview (rect 124,64,111,7).
+# the gauge trough, menu x 213..254 y 114..118: it goes from empty to full travel
+[ -n "$LBUSHOT" ] && LBUD=$(python3 "$GATEDIR/gate_pixdiff.py" shots/lobby/lobby00.png "$LBUSHOT" 639,342,764,356 2>/dev/null)
+# the check box, menu x 124..130 y 64..70: raised and empty to pressed and filled
+[ -n "$LBCSHOT" ] && LBCD=$(python3 "$GATEDIR/gate_pixdiff.py" shots/lobby/lobby00.png "$LBCSHOT" 372,192,392,212 2>/dev/null)
+# THE MAP PICKER DRAWS: the frame after the first Change Map click against the open
+# frame, over the picker's list well (menu 24..231 x 45..164). A window that laid out and
+# painted nothing is the failure the fourth control row once shipped with.
+LBPSHOT=$(echo "$LBLOG" | grep -A1 '^LOBBY|click|Change Map|' | sed -n 's/^LOBBY|shot|\([^|]*\)|.*/\1/p' | head -1)
+LBPD=0
+[ -n "$LBPSHOT" ] && LBPD=$(python3 "$GATEDIR/gate_pixdiff.py" shots/lobby/lobby00.png "$LBPSHOT" 72,135,695,494 2>/dev/null)
+# The map the run ended on (3 = SCM04EA, the fourth official row), the opponent count the
+# screen reported (SCM04EA seats six: five computers, one of them BLOCKed = 4) and the
+# blocked seat itself (mode 3 on seat 4), all off the settings block.
+LBMAP=$(echo "$LBLOG" | sed -n 's/^LOBBYSHOT|.*|map=\([0-9]*\)(.*/\1/p' | tail -1)
+LBAI=$(echo "$LBLOG" | sed -n 's/^LOBBYSHOT|.*|ai=\([0-9]*\).*/\1/p' | tail -1)
+LBBLK=$(echo "$LBLOG" | grep -c '^APP|lobby|player=4|.*|mode=3|')
 # The map count the app scanned. Asserted, not assumed: packs are gitignored build
 # products, so a clean checkout has none, and a lobby with an empty map list must fail
 # this gate rather than quietly pass it having proved nothing.
@@ -4762,10 +5319,14 @@ elif [ "${LBSHOTS:-0}" -lt 8 ]; then
   bad "G86 lobby screen: only $LBSHOTS frames were written, so the controls were not driven"
 elif [ "${LBMEAS:-0}" -ge 30 ] && [ "${LBOVER:-1}" = "0" ] \
      && [ "${LBUNITS:-0}" = "9" ] && [ "${LBCRATES:-0}" = "1" ] \
-     && [ "${LBUD:-0}" -ge 200 ] && [ "${LBCD:-0}" -ge 20 ]; then
-  ok "G86 lobby screen: every control drives over $LBMAPS maps, $LBSHOTS frames rendered, all $LBMEAS strings it draws fit inside their own boxes, and the fourth row of both columns both paints and answers (Unit Count $LBUD pixels of travel, ends at $LBUNITS; Bonus Crates $LBCD pixels, ends at $LBCRATES)"
+     && [ "${LBUD:-0}" -ge 200 ] && [ "${LBCD:-0}" -ge 20 ] \
+     && [ "${LBST0:-x}" = "0" ] && [ "${LBST1:-x}" = "3" ] && [ "${LBST2:-x}" = "-1" ] \
+     && [ "${LBSTRULE:-0}" -ge 1 ] \
+     && [ "${LBMAP:-x}" = "3" ] && [ "${LBAI:-x}" = "4" ] && [ "${LBBLK:-0}" -ge 1 ] \
+     && [ "${LBPD:-0}" -ge 400 ]; then
+  ok "G86 lobby screen: every control drives over $LBMAPS maps, $LBSHOTS frames rendered, all $LBMEAS strings it draws fit inside their own boxes, and the fourth row of both columns both paints and answers (Unit Count $LBUD pixels of travel, ends at $LBUNITS; Crates $LBCD pixels, ends at $LBCRATES); the start picker gives COMPUTER 1 start 4 and PLAYER start 1, refuses PLAYER the taken one, and leaves seat 2 unpicked for the engine to deal; the map picker opened, painted $LBPD pixels of list, took the fourth official row (map $LBMAP) and discarded a second visit on Escape; COMPUTER 4 was BLOCKed through its SEAT row and the screen reports $LBAI computers"
 else
-  bad "G86 lobby screen: strings measured=$LBMEAS(want >=30; a low count means the check ran on an empty screen and proved nothing) overflowing=$LBOVER(want 0) unit-count=$LBUNITS(want 9: dragged to 10 by mouse then nudged down one by the keyboard; 0 means the gauge took neither) crates=$LBCRATES(want 1) unit-count-pixels=$LBUD(want >=200; ZERO IS THE ROW NOT BEING DRAWN AT ALL, which is exactly how this shipped) crates-pixels=$LBCD(want >=20; zero is the same fault one column over)"
+  bad "G86 lobby screen: map=$LBMAP(want 3: the fourth OFFICIAL row through the picker) ai=$LBAI(want 4: SCM04EA's five computers less the BLOCKed seat 4) blocked-seat-4=$LBBLK(want >=1) picker-pixels=$LBPD(want >=400) starts player0=$LBST0(want 0) player1=$LBST1(want 3) player2=$LBST2(want -1) start-rule=$LBSTRULE(want >=1) strings measured=$LBMEAS(want >=30; a low count means the check ran on an empty screen and proved nothing) overflowing=$LBOVER(want 0) unit-count=$LBUNITS(want 9: dragged to 10 by mouse then nudged down one by the keyboard; 0 means the gauge took neither) crates=$LBCRATES(want 1) unit-count-pixels=$LBUD(want >=200; ZERO IS THE ROW NOT BEING DRAWN AT ALL, which is exactly how this shipped) crates-pixels=$LBCD(want >=20; zero is the same fault one column over)"
 fi
 
 # G87 THE ROUTE. The screen drawing correctly is not the feature; the feature is that what
@@ -4793,16 +5354,24 @@ LPPLAYERS=$(echo "$LPGOT" | sed -n 's/^skirmish: \([0-9]*\) player.*/\1/p')
 LPGOTSIDE=$(echo "$LPGOT" | sed -n 's/.*human plays \([A-Za-z]*\).*/\1/p')
 LPGOTCR=$(echo "$LPGOT" | sed -n 's/.*, \([0-9]*\) credits.*/\1/p')
 LPDONE=$(echo "$LPLOG" | grep -c '^LOBBYPLAY|complete')
+# THE HOLE IN THE ROSTER REACHES THE ENGINE. The script BLOCKs COMPUTER 4 and leaves the
+# colours 3,2,1,0,4,5,6,7 on seats 0..7; with seat 4 skipped the engine's line for seat 5
+# must exist and wear colour 5, and no line for seat 4 may exist. Under the old prefix
+# rule seat 4 would have been seated and the last computer dropped.
+LPBLK=$(echo "$LPLOG" | grep -c '^APP|lobby|player=4|.*|mode=3|')
+LPSEAT4=$(echo "$LPLOG" | grep -c '^skirmish: seat=4|')
+LPSEAT5C=$(echo "$LPLOG" | sed -n 's/^skirmish: seat=5|.*|colour=\([0-9]*\)|.*/\1/p' | head -1)
 if [ "${LPMAPS:-0}" -lt 1 ]; then
   bad "G87 lobby route: this tree has ${LPMAPS:-0} skirmish maps installed, so there is no match to start and the gate proves nothing. Run tools/stage-skirmish-maps.sh first."
 elif [ "$LPRC" != "0" ] || [ "${LPDONE:-0}" != "1" ]; then
   bad "G87 lobby route: the run did not complete (exit $LPRC, complete=$LPDONE)"
 elif [ -n "$LPSIDE" ] && [ "$LPSIDE" = "$LPGOTSIDE" ] \
      && [ -n "$LPCR" ] && [ "$LPCR" = "$LPGOTCR" ] \
-     && [ -n "$LPAI" ] && [ "$LPPLAYERS" = "$((LPAI + 1))" ]; then
-  ok "G87 lobby route: clicking through the lobby and pressing Play starts exactly that match -- the screen asked for $LPSIDE, $LPAI opponents and $LPCR credits, and the engine reports $LPPLAYERS players, human plays $LPGOTSIDE, $LPGOTCR credits"
+     && [ -n "$LPAI" ] && [ "$LPPLAYERS" = "$((LPAI + 1))" ] \
+     && [ "${LPBLK:-0}" -ge 1 ] && [ "${LPSEAT4:-1}" = "0" ] && [ "${LPSEAT5C:-x}" = "5" ]; then
+  ok "G87 lobby route: clicking through the lobby and pressing Play starts exactly that match -- the screen asked for $LPSIDE, $LPAI opponents and $LPCR credits, with seat 4 BLOCKed, and the engine seated the seats around the hole (no seat 4, seat 5 wears colour 5) and reports $LPPLAYERS players, human plays $LPGOTSIDE, $LPGOTCR credits"
 else
-  bad "G87 lobby route: what the screen sent and what the engine got disagree. screen side=$LPSIDE ai=$LPAI credits=$LPCR; engine players=$LPPLAYERS side=$LPGOTSIDE credits=$LPGOTCR"
+  bad "G87 lobby route: what the screen sent and what the engine got disagree. screen side=$LPSIDE ai=$LPAI credits=$LPCR blocked-seat-4=$LPBLK(want >=1); engine players=$LPPLAYERS side=$LPGOTSIDE credits=$LPGOTCR seat-4-lines=$LPSEAT4(want 0) seat-5-colour=$LPSEAT5C(want 5)"
 fi
 
 # G88 CONTROL GROUPS GO THROUGH THE ENGINE, AND COME BACK.
@@ -4885,7 +5454,7 @@ fi
 #
 # The anti-vacuity leg is the DEATHSHED|begin line. Without it a script that failed to kill
 # anything would produce two identical runs, zero difference, and a confident green.
-rm -f shots/g90_*.png shots/g90off_*.png
+rm -f shots/g90_*.png shots/g90on_*.png
 DSLOG=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud \
             --script gate_deathshed.txt 2>&1)
 DSRC=$?
@@ -5048,9 +5617,12 @@ USRESTBAD=$(echo "$USGROUND" | cut -d" " -f2)
 #    The "pieces eventually leave" claim is G91's, on a scenario that can hold still.
 USDROP=$(echo "$USLOG" | grep -c '^SHATTERDUMP|live=[0-9]*|tris=[0-9]*|dropped=0|')
 #
-# RUN B: THE GUARDS. A long ordinary game on SCG01EA -- the MCV deploys, harvesters run
-# tiberium to the refinery for two thousand ticks, landing craft come and go.
-UGLOG=$(./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE \
+# RUN B: THE GUARDS, on SCG90EA: the MCV deploys, and both of the map's harvesters dock at
+# its refinery. With this script the first is limboed inside from about frame 1000 to 1560
+# and the second from about 1800 until the refinery is destroyed around it at frame 2182,
+# which deletes it still limboed. This run used to be SCG01EA, which has no harvester and
+# no refinery, so the harvester leg had nothing to look at and passed on that.
+UGLOG=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE \
             --script gate_unitshatter_guard.txt 2>&1)
 UGRC=$?
 echo "$UGLOG" >> "$OUT"
@@ -5058,20 +5630,72 @@ echo "$UGLOG" >> "$OUT"
 #    Asserting only "no MCV shattered" would pass on a build where the sweep never ran.
 UGMCVNO=$(echo "$UGLOG" | grep -c '^UNITDEATH|MCV|.*|verdict=shatter$')
 UGMCVSEEN=$(echo "$UGLOG" | grep -cE '^UNITDEATH\|MCV\|.*\|verdict=skip-(bldcell|nobang)$')
-# 7. NO HARVESTER EVER SHATTERS. This is the regression that turns every tiberium delivery
-#    in the game into an exploding harvester, and it is one line away at all times: a
-#    docking harvester goes limbo=1 and STAYS IN THE DUMP, so the sweep is safe only
-#    because refresh_objects pushes limboed objects into g_objects. Anyone who "tidies"
-#    the sweep by skipping limboed objects fires this leg.
-UGHARV=$(echo "$UGLOG" | grep -c '^UNITDEATH|HARV|.*|verdict=shatter$')
+# 7. A DOCKED HARVESTER NEVER LEAVES THE SWEEP. A docking harvester goes limbo=1 and STAYS
+#    IN THE DUMP, and the sweep lets it stay only because it keeps limboed objects as
+#    members and refuses them at clause 3. Anyone who "tidies" the sweep by skipping
+#    limboed objects makes every delivery a death candidate. Measured on a build with
+#    exactly that filter: NOTHING SHATTERS. Each harvester reaching the refinery printed
+#    limbo=0|verdict=skip-bldcell and the building-cell clause refused it, so a count of
+#    harvester shatters stays at zero on the broken build and cannot see the regression.
+#    Three counts over the same log:
+#    - docked: dump samples showing a harvester limboed. Zero means nothing docked and the
+#      other two are about nothing.
+#    - phantom: of those, samples of a harvester the sweep had ALREADY reported gone.
+#      Nonzero is the regression itself.
+#    - refused: a harvester deleted while docked, refused for being in limbo. Only a sweep
+#      whose members include limboed objects can print that line at all.
+#    There is deliberately no "no harvester shattered" count. SCG90EA is a battle and a
+#    harvester really is destroyed on it less than a hundred ticks after this run ends; a
+#    check that holds only because the run stops first could only ever go red on a
+#    working build.
+UGHARV=$(echo "$UGLOG" | python3 -c '
+import sys, re
+gone, docked, phantom = set(), 0, 0
+for ln in sys.stdin:
+    m = re.match(r"^UNITDEATH\|HARV\|id=(\d+)\|", ln)
+    if m:
+        gone.add(m.group(1))
+        continue
+    m = re.match(r"^CARGO\|limbo\|HARV#(\d+)\|", ln)
+    if m:
+        docked += 1
+        phantom += m.group(1) in gone
+print("%d %d" % (docked, phantom))
+')
+UGDOCK=$(echo "$UGHARV" | cut -d" " -f1)
+UGPHANTOM=$(echo "$UGHARV" | cut -d" " -f2)
+UGREFUSED=$(echo "$UGLOG" | grep -c '^UNITDEATH|HARV|.*|limbo=1|.*|verdict=skip-limbo$')
+# THE HARVESTER VERDICT IS READ IN ORDER, because three different faults all end in "the
+# counts are wrong" and each needs a reader pointed at different code:
+#   - a harvester the sweep saw leave while it was LIMBOED, given any verdict but
+#     skip-limbo: clause 3 is not refusing limboed candidates.
+#   - no dump sample holds a limboed harvester, yet harvesters vanished INTO the
+#     refinery (limbo=0, refused by the building-cell clause): they docked, and limboed
+#     objects are being dropped before the sweep ever sees them.
+#   - neither: nothing docked, and the counts after it are about nothing.
+# Only then are the phantom and refused counts read.
+UGLIMBOBAD=$(echo "$UGLOG" | grep '^UNITDEATH|HARV|.*|limbo=1|.*|verdict=' | grep -v '|verdict=skip-limbo$')
+UGLIMBOBADN=$(echo "$UGLIMBOBAD" | grep -c .)
+UGBLDIN=$(echo "$UGLOG" | grep -c '^UNITDEATH|HARV|.*|limbo=0|.*|verdict=skip-bldcell$')
 if [ "$USRC" != "0" ] || [ "$UGRC" != "0" ]; then
   bad "G92 vehicle shatter: a run failed (exit $USRC / $UGRC)"
-elif [ "${USDIED:-0}" -ge 1 ] && [ "${USPIECES:-0}" -ge 1 ] && [ "${USTURRET:-0}" -ge 1 ] \
-     && [ "${USRESTN:-0}" -ge 6 ] && [ "${USRESTBAD:-1}" -eq 0 ] && [ "${USDROP:-0}" -ge 1 ] \
-     && [ "${UGMCVNO:-1}" -eq 0 ] && [ "${UGMCVSEEN:-0}" -ge 1 ] && [ "${UGHARV:-1}" -eq 0 ]; then
-  ok "G92 vehicle shatter: a Medium Tank came apart into 6 pieces / 91 triangles with its 41-triangle turret whole, $USRESTN pieces rest on the terrain at ground+underside within 0.01 cells and no piece was ever refused a slot; and over an ordinary game the MCV deploy was considered and REFUSED ($UGMCVSEEN skip verdict) while no harvester ever shattered"
+elif [ "${USDIED:-0}" -lt 1 ] || [ "${USPIECES:-0}" -lt 1 ] || [ "${USTURRET:-0}" -lt 1 ] \
+     || [ "${USRESTN:-0}" -lt 6 ] || [ "${USRESTBAD:-1}" -ne 0 ] || [ "${USDROP:-0}" -lt 1 ]; then
+  bad "G92 vehicle shatter: died=$USDIED(want >=1; zero means the script killed nothing and every leg is vacuous) pieces6tris91=$USPIECES(want >=1) turret41=$USTURRET(want >=1; zero means the role weld regressed to plain sections) rested=$USRESTN(want >=6) off-ground=$USRESTBAD(want 0) nothing-dropped=$USDROP(want >=1)"
+elif [ "${UGMCVNO:-1}" -ne 0 ] || [ "${UGMCVSEEN:-0}" -lt 1 ]; then
+  bad "G92 vehicle shatter: mcv-shattered=$UGMCVNO(want 0) mcv-refused=$UGMCVSEEN(want >=1; zero means the sweep never even saw the deploy, so the guard is vacuous)"
+elif [ "${UGLIMBOBADN:-0}" -gt 0 ]; then
+  bad "G92 vehicle shatter: $UGLIMBOBADN harvester(s) left the dump while limboed and were given a verdict other than skip-limbo, so clause 3 of the vanish sweep is not refusing limboed candidates: $(echo "$UGLIMBOBAD" | head -1)"
+elif [ "${UGDOCK:-0}" -lt 1 ] && [ "${UGBLDIN:-0}" -ge 1 ]; then
+  bad "G92 vehicle shatter: $UGBLDIN harvester(s) vanished into the refinery (limbo=0, refused by the building-cell clause), so harvesters did dock, but no dump sample holds a limboed harvester (harv-docked=0): limboed objects are being dropped before the sweep sees them"
+elif [ "${UGDOCK:-0}" -lt 1 ]; then
+  bad "G92 vehicle shatter: harv-docked=0(want >=1) and no harvester vanished into the refinery either, so no harvester docked in this run and the phantom and refused counts ($UGPHANTOM, $UGREFUSED) are about nothing"
+elif [ "${UGPHANTOM:-1}" -ne 0 ]; then
+  bad "G92 vehicle shatter: harv-phantom=$UGPHANTOM(want 0) of $UGDOCK docked samples are of a harvester the sweep had already reported gone while the engine still held it, which is a limbo filter on the sweep MEMBERSHIP"
+elif [ "${UGREFUSED:-0}" -lt 1 ]; then
+  bad "G92 vehicle shatter: harv-refused-in-limbo=0(want >=1): $UGDOCK docked samples and no phantom, but no harvester deleted while docked was refused for being in limbo, so no limboed harvester was ever seen leaving as a member of the sweep"
 else
-  bad "G92 vehicle shatter: died=$USDIED(want >=1; zero means the script killed nothing and every leg is vacuous) pieces6tris91=$USPIECES(want >=1) turret41=$USTURRET(want >=1; zero means the role weld regressed to plain sections) rested=$USRESTN(want >=6) off-ground=$USRESTBAD(want 0) nothing-dropped=$USDROP(want >=1) mcv-shattered=$UGMCVNO(want 0) mcv-refused=$UGMCVSEEN(want >=1; zero means the sweep never even saw it, so the guard is vacuous) harv-shattered=$UGHARV(want 0; nonzero means somebody added a limbo filter to the sweep MEMBERSHIP and every tiberium delivery now explodes)"
+  ok "G92 vehicle shatter: a Medium Tank came apart into 6 pieces / 91 triangles with its 41-triangle turret whole, $USRESTN pieces rest on the terrain at ground+underside within 0.01 cells and no piece was ever refused a slot; and over an ordinary game the MCV deploy was considered and REFUSED ($UGMCVSEEN skip verdict), a harvester was caught docked in the refinery in $UGDOCK dump samples without the sweep ever having reported it gone, and $UGREFUSED harvester deleted while docked was refused for being in limbo"
 fi
 
 # ==================================================================================
@@ -5080,12 +5704,16 @@ fi
 # See gate_damage.txt for the decode. Short version: Health_Ratio() < 0x80 sets draw-flag
 # bit 3 and the model handler APPENDS an overlay display list over the intact building.
 # Four of the five legs are read out of the renderer's own state, not out of pixels.
-rm -f shots/g93_*.png shots/g93off_*.png
+# The damaged run's shots are kept as g93on_*, so that is the name deleted here; and g93_*
+# is deleted again once copied, so the --nodamageart run cannot leave the damaged run's own
+# pictures standing to be compared with their copies.
+rm -f shots/g93_*.png shots/g93on_*.png
 DMLOG=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud \
             --script gate_damage.txt 2>&1)
 DMRC=$?
 echo "$DMLOG" >> "$OUT"
 for n in 0 1 2 3 4 5 6; do cp -f shots/g93_$n.png shots/g93on_$n.png 2>/dev/null; done
+rm -f shots/g93_*.png
 DMOFFLOG=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nodamageart \
                --script gate_damage.txt 2>&1)
 DMRC2=$?
@@ -5151,13 +5779,19 @@ log = open(os.environ.get('DMLOGF', '/dev/null')).read()
 # which samples were damaged, in order
 drawn = [int(m) for m in re.findall(r'^DMGART\|NUKE\|id=1\|.*\|drawn=(\d)$', log, re.M)]
 firstOn = next((k for k, d in enumerate(drawn) if d), -1)
-worst = 0
+# A pair that cannot be read is a MISS, not a match. diff() answers -1 for it, and -1 is
+# never larger than a worst of 0, so an uncounted miss used to read as pixel-identical.
+worst = 0; cmp = 0; miss = 0
 for k, d in enumerate(drawn):
     if d: continue
     n = diff('shots/g93on_%d.png' % k, 'shots/g93_%d.png' % k)
+    if n < 0:
+        miss += 1
+        continue
+    cmp += 1
     if n > worst: worst = n
 onpix = diff('shots/g93on_%d.png' % firstOn, 'shots/g93_%d.png' % firstOn) if firstOn >= 0 else -1
-print("%d %d %d" % (firstOn, onpix, worst))
+print("%d %d %d %d %d" % (firstOn, onpix, worst, cmp, miss))
 PY3
 )
 # 6. THE COLOUR OF WHAT IT DREW. This is the leg that would have caught the bug the first
@@ -5198,16 +5832,21 @@ DMBADHUE=$(echo "$DMHUE" | cut -d" " -f2)
 DMFIRST=$(echo "$DMPIX" | cut -d" " -f1)
 DMONPIX=$(echo "$DMPIX" | cut -d" " -f2)
 DMHEALTHYPIX=$(echo "$DMPIX" | cut -d" " -f3)
+DMHEALTHCMP=$(echo "$DMPIX" | cut -d" " -f4)
+DMHEALTHMISS=$(echo "$DMPIX" | cut -d" " -f5)
 if [ "$DMRC" != "0" ] || [ "$DMRC2" != "0" ]; then
   bad "G93 damaged-building art: a run failed (exit $DMRC / $DMRC2)"
+elif [ "${DMSEEN:-0}" -ge 1 ] && { [ "${DMHEALTHMISS:-1}" != "0" ] || [ "${DMHEALTHCMP:-0}" -lt 1 ]; }; then
+  bad "G93 damaged-building art: healthy-pairs-compared=$DMHEALTHCMP(want >=1) healthy-pairs-missing=$DMHEALTHMISS(want 0). A healthy sample whose two shots cannot both be read was not compared, so no claim that every healthy sample is pixel-identical to --nodamageart can be made from this run"
 elif [ "${DMSEEN:-0}" -ge 1 ] && [ "${DMPACK:-0}" -ge 1 ] && [ "${DMTOT:-0}" -ge 6 ] \
      && [ "${DMBAD:-1}" -eq 0 ] && [ "${DMON:-0}" -ge 1 ] && [ "${DMOFF:-0}" -ge 1 ] \
      && [ "${DMONPIX:--1}" -ge 40 ] && [ "${DMHEALTHYPIX:--1}" -eq 0 ] \
+     && [ "${DMHEALTHCMP:-0}" -ge 1 ] && [ "${DMHEALTHMISS:-1}" -eq 0 ] \
      && [ "${DMWARM:--1}" -ge 50 ] && [ "${DMBADHUE:-100}" -le 25 ] \
      && [ "${DMSUP:-0}" -eq "${DMTOT:--1}" ]; then
-  ok "G93 damaged-building art: the pack carries 21 codes / 20 meshes / 345 triangles, the cartridge's own rule (ratio < 0x80) held on all $DMTOT observations with $DMON damaged and $DMOFF healthy, the overlay put $DMONPIX pixels on screen the first sample it was due, and every healthy sample is pixel-identical to --nodamageart; a second structure (the Construction Yard) drew ${DMWARM}% warm saturated pixels against ${DMBADHUE}% green-or-magenta, so no overlay is being modulated by a packed normal"
+  ok "G93 damaged-building art: the pack carries 21 codes / 20 meshes / 345 triangles, the cartridge's own rule (ratio < 0x80) held on all $DMTOT observations with $DMON damaged and $DMOFF healthy, the overlay put $DMONPIX pixels on screen the first sample it was due, and all $DMHEALTHCMP healthy samples are pixel-identical to --nodamageart; a second structure (the Construction Yard) drew ${DMWARM}% warm saturated pixels against ${DMBADHUE}% green-or-magenta, so no overlay is being modulated by a packed normal"
 else
-  bad "G93 damaged-building art: seen=$DMSEEN(want >=1; zero means nothing was observed and every leg is vacuous) pack=$DMPACK(want 1; zero means these packs were never re-baked with bake5.py) samples=$DMTOT(want >=6) rule-violations=$DMBAD(want 0; nonzero means drawn disagrees with ratio<0x80, the <= off-by-one) damaged=$DMON(want >=1) healthy=$DMOFF(want >=1) first-damaged-sample=$DMFIRST changed-px-when-damaged=$DMONPIX(want >=40; zero means it resolved a mesh and drew nothing) sup-fields=$DMSUP(want == samples; a shortfall means a DMGART line carries no sup= or an unknown one) warm-pct=$DMWARM(want >=50) green-or-magenta-pct=$DMBADHUE(want <=25; a high value means an overlay inherits G_LIGHTING and the bake did not whiten it, so the texture is modulated by a direction vector and draws rainbow) changed-px-when-healthy=$DMHEALTHYPIX(want 0; nonzero means the overlay leaks onto full-health buildings or --nodamageart does not reach the draw)"
+  bad "G93 damaged-building art: seen=$DMSEEN(want >=1; zero means nothing was observed and every leg is vacuous) pack=$DMPACK(want 1; zero means these packs were never re-baked with bake5.py) samples=$DMTOT(want >=6) rule-violations=$DMBAD(want 0; nonzero means drawn disagrees with ratio<0x80, the <= off-by-one) damaged=$DMON(want >=1) healthy=$DMOFF(want >=1) first-damaged-sample=$DMFIRST changed-px-when-damaged=$DMONPIX(want >=40; zero means it resolved a mesh and drew nothing) sup-fields=$DMSUP(want == samples; a shortfall means a DMGART line carries no sup= or an unknown one) warm-pct=$DMWARM(want >=50) green-or-magenta-pct=$DMBADHUE(want <=25; a high value means an overlay inherits G_LIGHTING and the bake did not whiten it, so the texture is modulated by a direction vector and draws rainbow) changed-px-when-healthy=$DMHEALTHYPIX(want 0; nonzero means the overlay leaks onto full-health buildings or --nodamageart does not reach the draw) healthy-pairs-compared=$DMHEALTHCMP(want >=1) healthy-pairs-missing=$DMHEALTHMISS(want 0)"
 fi
 
 # ==================================================================================
@@ -5310,21 +5949,17 @@ RLOG=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud \
            --script gate_rally.txt 2>&1)
 RRC=$?
 echo "$RLOG" >> "$OUT"
-# the SAME script with no rally set: the control arm of the A/B
-cat > /tmp/g96_ctl.txt <<'CTL'
-tick 30
-cam 57 52
-zoom max
-count E1
-build E1
-tick 140
-obj E1 10
-CTL
+# THE CONTROL ARM IS gate_rally.txt ITSELF WITH ONLY THE RALLY CLICK TAKEN OUT. It still
+# selects the barracks, right-clicks the selection away and builds on the same tick, so the
+# one thing the two runs differ in is whether a rally point was set. A shorter hand-written
+# control that skipped the selection built six ticks earlier and was a different run. The
+# pattern allows leading blanks because the script reader skips them.
+sed '/^[[:space:]]*actclick /d' gate_rally.txt > /tmp/g96_ctl.txt
 RCTL=$(./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud \
            --script /tmp/g96_ctl.txt 2>&1)
 RRC2=$?
 echo "$RCTL" >> "$OUT"
-# 1. THE LEFT CLICK set it, and the brain stored it. Left and not right: the project owner asked for
+# 1. THE LEFT CLICK set it, and the brain stored it. Left and not right: the requirement asked for
 #    right first, tried it, and changed his mind on 25 Aug. The gesture needs no rung of
 #    its own -- once BuildingClass::What_Action answers ACTION_MOVE for a factory the
 #    ordinary order path carries it.
@@ -5340,16 +5975,26 @@ RSURVIVE=$(echo "$RLOG" | grep -c '^RALLY|PYLE|id=[0-9]*|cell=57,55$')
 # 3. THE PRODUCED UNIT WENT THERE -- and the control proves it went somewhere ELSE without
 #    a rally point. Asserting only that the rally was stored would pass on a build where
 #    the unit ignored it.
-RWENT=$(echo "$RLOG" | grep -c '^OBJ|E1#10|INFANTRY|GoodGuy|cell=57,55|')
-RCTLCELL=$(echo "$RCTL" | sed -n 's/^OBJ|E1#10|INFANTRY|GoodGuy|cell=\([0-9,]*\)|.*/\1/p' | tail -1)
+RWENT=$(echo "$RLOG" | grep -c '^OBJ|E1:GoodGuy#4|INFANTRY|GoodGuy|cell=57,55|')
+RCTLCELL=$(echo "$RCTL" | sed -n 's/^OBJ|E1:GoodGuy#4|INFANTRY|GoodGuy|cell=\([0-9,]*\)|.*/\1/p' | tail -1)
+# 4. E1:GoodGuy#4 IS THE UNIT THIS BUILD PRODUCED, in both arms, and that is shown rather
+#    than assumed: obj reads a position in the object list. The script counts GDI
+#    Minigunners before and after the build, and only four then five makes index 4 the
+#    new one. Scoped to the house because an unscoped index counts Nod's soldiers too,
+#    and one of those dies on this map around tick 170, which moved every later index.
+RCNT=$(echo "$RLOG" | sed -n 's/^COUNT|E1:GoodGuy|have=\([0-9]*\)$/\1/p' | paste -sd, -)
+RCTLCNT=$(echo "$RCTL" | sed -n 's/^COUNT|E1:GoodGuy|have=\([0-9]*\)$/\1/p' | paste -sd, -)
+# 5. AND THE CONTROL REALLY HAS NO RALLY POINT: its rallydumps must name none.
+RCTLRALLY=$(echo "$RCTL" | grep -c '^RALLY|PYLE|')
 if [ "$RRC" != "0" ] || [ "$RRC2" != "0" ]; then
   bad "G96 rally points: a run failed (exit $RRC / $RRC2)"
 elif [ "${RSET:-0}" -ge 1 ] && [ "${RGOT:-0}" -ge 1 ] && [ "${RDESEL:-0}" -ge 1 ] \
      && [ "${RNORIGHT:-1}" -eq 0 ] && [ "${RSURVIVE:-0}" -ge 2 ] \
-     && [ "${RWENT:-0}" -ge 1 ] && [ "${RCTLCELL:-57,55}" != "57,55" ]; then
-  ok "G96 rally points: a LEFT click on the ground set the barracks' rally to 57,55 and the brain stored it, a right click still deselects and leaves the rally untouched, and the Minigunner it built walked to 57,55 -- where the same build with no rally point ends at $RCTLCELL instead"
+     && [ "${RWENT:-0}" -ge 1 ] && [ "${RCTLCELL:-57,55}" != "57,55" ] \
+     && [ "$RCNT" = "4,5" ] && [ "$RCTLCNT" = "4,5" ] && [ "${RCTLRALLY:-1}" -eq 0 ]; then
+  ok "G96 rally points: a LEFT click on the ground set the barracks' rally to 57,55 and the brain stored it, a right click still deselects and leaves the rally untouched, and the Minigunner it built walked out through the door and on to 57,55 -- where the same script with only the rally click taken out, and no rally point stored, ends at $RCTLCELL instead. In both runs GDI's Minigunners went from 4 to 5, so E1:GoodGuy#4 is the unit each build produced"
 else
-  bad "G96 rally points: leftclick-order=$RSET(want >=1; zero means What_Action stopped answering MOVE for a factory and all four brain gates need checking together) brain-stored=$RGOT(want >=1) right-deselects=$RDESEL(want >=1; zero means right-click stopped cancelling, which is what putting the rally back on it would do) rally-on-right=$RNORIGHT(want 0; nonzero means the right-button rung came back) rally-survived-right-click=$RSURVIVE(want >=2) unit-at-rally=$RWENT(want >=1; zero means the rally was stored and the produced unit ignored it, the four-gates-must-move-together failure) control-cell=$RCTLCELL(want anything BUT 57,55)"
+  bad "G96 rally points: leftclick-order=$RSET(want >=1; zero means What_Action stopped answering MOVE for a factory and all four brain gates need checking together) brain-stored=$RGOT(want >=1) right-deselects=$RDESEL(want >=1; zero means right-click stopped cancelling, which is what putting the rally back on it would do) rally-on-right=$RNORIGHT(want 0; nonzero means the right-button rung came back) rally-survived-right-click=$RSURVIVE(want >=2) unit-at-rally=$RWENT(want >=1; zero means the rally was stored and the produced unit ignored it, the four-gates-must-move-together failure) control-cell=$RCTLCELL(want anything BUT 57,55) e1-count=$RCNT(want 4,5; anything else means E1:GoodGuy#4 is not the unit this build produced, so where it stands says nothing about the rally) control-e1-count=$RCTLCNT(want 4,5) control-rallies=$RCTLRALLY(want 0; nonzero means the control stored a rally point too, so it is not the run without one)"
 fi
 
 # G97. THE NUCLEAR STRIKE'S MUSHROOM. See gate_nuke.txt for why the script ticks 356
@@ -5538,7 +6183,7 @@ elif [ "${RFSET:-0}" -lt 1 ]; then
 elif [ "${RFDIFF:-0}" -ge 300 ] && [ "${RFDES:-99999}" -lt "${RFSEL:-0}" ]; then
   ok "G103 rally flag: with the Barracks selected and a rally point at 57,54 the flag stands there in the player's GOLD ($RFSEL gold pixels against $RFDES with nothing selected, so $RFDIFF of flag), and it goes away with the selection"
 else
-  bad "G103 rally flag: selected=$RFSEL deselected=$RFDES flag=$RFDIFF(want >=300). Zero or near-zero means either the flag is not being drawn at all, or it is drawn in the cartridge's own RED instead of the house colour -- the texture is a solid (132,16,8) and this test counts gold, so a red flag scores nothing. A NEGATIVE number means it is drawn when nothing is selected, which is the other half of what the project owner asked for"
+  bad "G103 rally flag: selected=$RFSEL deselected=$RFDES flag=$RFDIFF(want >=300). Zero or near-zero means either the flag is not being drawn at all, or it is drawn in the cartridge's own RED instead of the house colour -- the texture is a solid (132,16,8) and this test counts gold, so a red flag scores nothing. A NEGATIVE number means it is drawn when nothing is selected, which is the other half of what the requirement asked for"
 fi
 
 # G104. A NEW MISSION STARTS FRESH. See gate_missionreset.txt for the two defects.
@@ -5589,16 +6234,37 @@ NODFLOW=shots/flow105.log
 # 2026 against a game/campaign.pack twelve days stale, reported mapsel=0 missing-reels=0,
 # and read as a renderer or flow regression until the stderr was looked at by hand.
 NODERR=shots/flow105.err
+# THE PICTURES ARE DELETED BEFORE THE RUN, AND ITS ENDING IS READ AFTER IT. Neither used
+# to be. flow_globe.png and flow_map.png are the same names G14's GDI flow writes into
+# this folder earlier in the suite, so a Nod flow that never shot its own map screen was
+# graded on the GDI pictures. And the watchdog's kill was graded exactly like a clean
+# exit, so a Nod flow that stopped anywhere after the map pick still passed on the score
+# and map-pick lines. FLOWTEST|complete is printed only once mission two has booted and
+# returned, so it is required, and a timeout or a non-zero exit is the first branch.
+rm -f flow_globe.png flow_map.png "$NODFLOW" "$NODERR"
 ./cnc3d --flowtest 20 --flowside nod --dylib ./TiberianDawn.dylib --dir ./missions/ \
       --content ./content/ --cameos cameos.pack --dospack dossidebar.pack \
       --dosinf dosinfantry.pack > "$NODFLOW" 2>"$NODERR" &
 NP=$!; NW=0
 while kill -0 $NP 2>/dev/null && [ $NW -lt 300 ]; do sleep 1; NW=$((NW+1)); done
-kill $NP 2>/dev/null; wait $NP 2>/dev/null
+# A FLOW THAT HAS STOPPED PUMPING EVENTS IGNORES SIGTERM: SDL turns it into a quit event
+# that a stuck loop never reads, so `kill; wait` blocked here for ever and this timeout
+# branch could only ever report a flow that was still moving. The TERM gets ten seconds,
+# then the flow is killed outright.
+if kill -0 $NP 2>/dev/null; then
+  kill $NP 2>/dev/null
+  NK=0
+  while kill -0 $NP 2>/dev/null && [ $NK -lt 10 ]; do sleep 1; NK=$((NK+1)); done
+  kill -9 $NP 2>/dev/null
+  wait $NP 2>/dev/null; NPRC=timeout
+else
+  wait $NP; NPRC=$?
+fi
 NL=$(cat "$NODFLOW")
 echo "$NL" >> "$OUT"
 NMAP=$(echo "$NL" | grep -c "CAMPAIGN|mapsel|picked")
 NSCORE=$(echo "$NL" | grep -c "CAMPAIGN|score|")
+NDONE=$(echo "$NL" | grep -c "FLOWTEST|complete")
 # The three reels the old pack was missing. camp_entry prints this line and then
 # camp_mapsel returns 0, so its ABSENCE is the whole point of the check.
 cat "$NODERR" >> "$OUT"
@@ -5611,11 +6277,13 @@ NMISS=$(grep -cE "pack has no entry (EARTH_A|AFRICA|CLICK_A)" "$NODERR" 2>/dev/n
 NMISS=${NMISS:-0}
 NGLOBE=0; [ -s flow_globe.png ] && NGLOBE=1
 NMAPPNG=0; [ -s flow_map.png ] && NMAPPNG=1
-if [ "$NMAP" = "1" ] && [ "$NSCORE" = "1" ] && [ "$NMISS" = "0" ] \
+if [ "$NPRC" != "0" ]; then
+  bad "G105 Nod campaign flow: the run did not end cleanly: exit=$NPRC after ${NW}s (timeout means the watchdog killed a flow that had stopped moving) mapsel=$NMAP score=$NSCORE complete=$NDONE"
+elif [ "$NMAP" = "1" ] && [ "$NSCORE" = "1" ] && [ "$NMISS" = "0" ] && [ "$NDONE" = "1" ] \
    && [ "$NGLOBE" = "1" ] && [ "$NMAPPNG" = "1" ]; then
-  ok "G105 Nod campaign flow: score screen, grey globe and the Africa map all ran, and the pack carries EARTH_A/AFRICA/CLICK_A"
+  ok "G105 Nod campaign flow: score screen, grey globe and the Africa map all ran and were shot by this run, mission two booted and returned (FLOWTEST|complete), and the pack carries EARTH_A/AFRICA/CLICK_A"
 else
-  bad "G105 Nod campaign flow: mapsel=$NMAP(want 1) score=$NSCORE(want 1) missing-reels=$NMISS(want 0; non-zero means campaign.pack is STALE -- re-run game/bake_campaign.py and copy it next to the binary) globe.png=$NGLOBE map.png=$NMAPPNG"
+  bad "G105 Nod campaign flow: mapsel=$NMAP(want 1) score=$NSCORE(want 1) complete=$NDONE(want 1; 0 on a clean exit means the flow ended before mission two booted and returned) missing-reels=$NMISS(want 0; non-zero means campaign.pack is STALE -- re-run game/bake_campaign.py and copy it next to the binary) globe.png=$NGLOBE map.png=$NMAPPNG(want 1 each; both are deleted before the run, so 0 means this run never shot that screen)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -5668,7 +6336,7 @@ elif [ -z "$BA_P0" ] || [ -z "$BA_P1" ]; then
 elif [ "$BA_HAVE" != "1" ]; then
   bad "G107 build anywhere: the switch never reached the brain (no CHEAT|buildanywhere|1 line) -- this TiberianDawn build may have no CNC3D_Set_Build_Anywhere export"
 elif [ "${BA_C1:-99999}" -gt "${BA_C0:-0}" ]; then
-  bad "G107 build anywhere: the switch OPENED UP buildable ground (clear $BA_C0 -> $BA_C1). The cheat is only allowed to lift base adjacency; ground that will not take a foundation must still refuse one, which is the whole of what the project owner asked for."
+  bad "G107 build anywhere: the switch OPENED UP buildable ground (clear $BA_C0 -> $BA_C1). The cheat is only allowed to lift base adjacency; ground that will not take a foundation must still refuse one, which is the whole of what the requirement asked for."
 elif [ "${BA_P1:-0}" -ge $(( ${BA_P0:-0} * 2 )) ] && [ "${BA_L1:-0}" -gt "${BA_L0:-0}" ]; then
   ok "G107 build anywhere: the switch opens the map up -- proximity cells $BA_P0 -> $BA_P1 and legal origins $BA_L0 -> $BA_L1 -- while buildable ground does not gain a single cell ($BA_C0 -> $BA_C1)"
 else
@@ -5734,12 +6402,20 @@ VOVER=$(echo "$VWLOG" | awk -F'|' '/^CHEATRECT\|/ {
     for (i=1;i<=n;i++) for (j=i+1;j<=n;j++)
       if (X[i] < X[j]+W[j] && X[j] < X[i]+W[i] && Y[i] < Y[j]+H[j] && Y[j] < Y[i]+H[i]) c++;
     print c }')
+# THE WALK MUST HAVE HAD EVERY CONTROL TO WALK. It prints 0 overlaps when it was handed
+# no rectangles or only one, so a control that loses its rectangle drops out of the walk
+# and the page still reads clean. The count is hardcoded on purpose, the way G121 and G143
+# hold theirs: seven switches, Instant Win, Instant Lose, Reset and OK. A control added
+# to the page has to be added here too, which is the moment to re-check the geometry.
+VRECTS=$(echo "$VWLOG" | grep -c '^CHEATRECT|')
 if [ "$VWRC" != "0" ] || [ "$VLRC" != "0" ]; then
   bad "G108 instant verdict: a run failed (win exit $VWRC, lose exit $VLRC)"
+elif [ "${VRECTS:-0}" != "11" ]; then
+  bad "G108 instant verdict: the cheat page reported $VRECTS control rectangles (want exactly 11: seven switches, Win, Lose, Reset, OK), so the overlap walk did not examine every control"
 elif [ "${VOVER:-99}" != "0" ]; then
   bad "G108 instant verdict: $VOVER pairs of controls overlap on the cheat page -- something was added without re-checking DOPT_CH_STEP and DOPT_CH_BTN_Y against the box height"
 elif [ "$VWIN" = "1" ] && [ "$VLOSE" = "1" ]; then
-  ok "G108 instant verdict: both buttons end the mission through the engine's own chain (GAMEOVER|WIN and GAMEOVER|LOSE), and no two controls on the page overlap"
+  ok "G108 instant verdict: both buttons end the mission through the engine's own chain (GAMEOVER|WIN and GAMEOVER|LOSE), and no two of the page's $VRECTS controls overlap"
 else
   bad "G108 instant verdict: win=$VWIN lose=$VLOSE (want 1 each). A CHEAT|verdict line with flagged=1 and no GAMEOVER means the flag was raised and HouseClass::AI never acted on it; no CHEAT|verdict line at all means the button did not route to DOPT_ACT_CHEAT_WIN/LOSE."
 fi
@@ -5968,7 +6644,11 @@ fi
 # read once by hb_should_show:
 #     0  off                   nothing carries a bar
 #     1  selected only         the vanilla DOS default (special.h:75 HB_SELECTED)
-#     2  selected or damaged   what this renderer has always drawn, and the default
+#     2  selected or damaged   what this renderer shipped on
+#
+# Position 1 is the DEFAULT. This gate drives all three explicitly and so
+# does not depend on which one that is; it is said here because the comment above used to
+# name 2 and a reader who trusted it would misread every arm below.
 #
 # THE SETUP HAS TO MANUFACTURE A DAMAGED, UNSELECTED OBJECT or positions 1 and 2 are
 # indistinguishable and every arm below is vacuous. It borrows G93's arrangement -- a
@@ -6355,10 +7035,10 @@ CONFRC=$?
 echo "$CONFL" >> "$OUT"
 CONFC=$(echo "$CONFL" | sed -n 's/^CONFINETEST|cases=\([0-9]*\)|failures=[0-9]*/\1/p' | head -1)
 CONFF=$(echo "$CONFL" | sed -n 's/^CONFINETEST|cases=[0-9]*|failures=\([0-9]*\)/\1/p' | head -1)
-if [ "$CONFRC" = "0" ] && [ "${CONFC:-0}" = "21" ] && [ "${CONFF:-1}" = "0" ]; then
-  ok "G117 pointer cage: all $CONFC decision cases pass -- it opens only for a player who asked, on two or more displays, fullscreen, focused, outside the editor and outside the pause dialog, and each of the eleven automated entry points refuses it on its own"
+if [ "$CONFRC" = "0" ] && [ "${CONFC:-0}" = "35" ] && [ "${CONFF:-1}" = "0" ]; then
+  ok "G117 pointer cage: all $CONFC decision cases pass -- it opens only for a player who asked, on two or more displays, fullscreen, focused, outside the editor and outside the pause dialog; each of the twelve automated entry points refuses it on its own; and every one of the thirteen is asked SEPARATELY whether it still needs a real focused window, which only --edgeplay does. That second question is why the count moved from 21: folding three drifted automation lists into one handed --edgeplay a hidden window along with its silence, G124 could then never take focus, and a release was the first thing that could see it"
 else
-  bad "G117 pointer cage: exit=$CONFRC cases=$CONFC(want 21; a different number means the table gained or lost a case without this gate being told) failures=$CONFF(want 0)"
+  bad "G117 pointer cage: exit=$CONFRC cases=$CONFC(want 35; a different number means the table gained or lost a case without this gate being told) failures=$CONFF(want 0)"
 fi
 
 # G118 THE ELEVATION MODEL, AND THE HEIGHTMAP IMPORTER THAT RIDES ON IT.
@@ -6378,15 +7058,20 @@ fi
 # terrace, that RE-IMPORTING the map's own ground is a no-op, that a whole-map import is
 # ONE undo step, and that an unsupported PCX is refused with a reason a person can act on.
 # The importer has no UI route yet, so this is the only thing exercising it.
-rm -f /tmp/g118_elev.png
-G118LOG=$(./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --elevtest \
-              --shot /tmp/g118_elev.png 2>&1 | tee -a "$OUT")
-G118RC=$?
+#
+# THE EXIT STATUS IS THE BINARY'S, READ THROUGH grun. The run used to be captured through
+# a tee and $? read afterwards, which is the tee's status, so the "run itself failed"
+# branch could never fire and a run that printed its PASSED line and then crashed on the
+# way out passed. No gshots: the self-check returns before the shot is written.
+gbegin /tmp/g118_elev.png /tmp/g118.log
+grun /tmp/g118.log --scen SCG01EA --pack SCG01EA.pack $BASE --elevtest \
+     --shot /tmp/g118_elev.png
+G118LOG=$(cat /tmp/g118.log 2>/dev/null)
 G118P=$(echo "$G118LOG" | grep -c "^ELEVTEST|PASSED|0 failures")
 G118OK=$(echo "$G118LOG" | grep -c "^ELEVTEST|ok  |")
 G118IMP=$(echo "$G118LOG" | grep -c "^ELEVTEST|ok  |a whole-map import is ONE undo step")
-if [ "$G118RC" != "0" ]; then
-  bad "G118 elevation and import: the run itself failed (exit $G118RC)"
+if [ "$GRC" != "0" ]; then
+  bad "G118 elevation and import: the run itself failed (exit $GRC) after printing [$(echo "$G118LOG" | grep -E '^ELEVTEST\|(PASSED|FAILED)' | head -1)]"
 elif [ "${G118P:-0}" -ge 1 ] && [ "${G118OK:-0}" -ge 8 ] && [ "${G118IMP:-0}" -ge 1 ]; then
   ok "G118 elevation and import: $G118OK checks pass with 0 failures, the importer terraces a sheer face, re-importing the map's own ground changes nothing, and a whole-map import is a single undo step"
 else
@@ -6996,7 +7681,7 @@ fi
 #
 # THE TEN ARMS, and each is separately capable of going red:
 #   0 the map-side strip, two points inside the tactical view's right edge  nothing
-#     (it was `east` until 1 Sep 2026. Sliding the pointer off the map onto the bar
+#     (it was `east`. Sliding the pointer off the map onto the bar
 #      dragged the map with it, so only the SCREEN edge scrolls now.)
 #   1 the window's own last column, which is ON the bar                         east
 #   2 PUSHED PAST the window's right edge                    east   <-- the report
@@ -7043,6 +7728,13 @@ fi
 # DOS run would quietly inherit the 640 HUD from the run before it.
 ep_run() {
   ge_n="$1"; ge_hud="$2"; shift 2
+  # SEE "GATES THAT CANNOT RUN IN THE BACKGROUND" at the top of this file. --edgeplay
+  # needs a raised, focused window and warps the operator's real pointer, so it is the one
+  # thing here that cannot share a desk with somebody working. Off unless asked for.
+  if [ "$INTERACTIVE" != "1" ]; then
+    echo "G124 run $ge_n SKIPPED (needs a focused window and the real pointer)" >>"$OUT"
+    return 0
+  fi
   # perl's alarm because macOS has no timeout(1). The driver ends its own run on every
   # refusal it can name, so this only catches one it cannot: a window that never draws.
   CNC3D_HUD="$ge_hud" perl -e 'alarm 240; exec @ARGV' ./cnc_eyes --scen SCG01EB \
@@ -7078,7 +7770,9 @@ EPV=$(awk -v a="${EPH6:-9}" -v b="${EPDOS:-9}" -v c="${EPHI:-9}" \
           -v s="${EPSTRIP:-0}" -v sh="${EPSTRIPH:-0}" -v x="${EPSCALE:-0}" '
 BEGIN{ print (a == 0 && b == 0 && c == 0 && g > 1.0 && gd > 1.0 && gh > 1.0 \
               && s > 11.5 && s < 12.5 && sh > 11.5 && sh < 12.5 && x > 1.5) ? 1 : 0 }')
-if [ "${EPV:-0}" = "1" ]; then
+if [ "$INTERACTIVE" != "1" ]; then
+  skip "G124 edge gesture through the live loop: needs a raised, focused window and warps the real pointer, so it does not run while somebody is using the machine. Run it with CNC3D_GATES_INTERACTIVE=1. THE EDGE GESTURE THROUGH THE LIVE LOOP IS NOT COVERED BY THIS RUN; G79 still covers the shared core it calls"
+elif [ "${EPV:-0}" = "1" ]; then
   ok "G124 edge gesture through the live loop: all ten arms pass on the 640x480 HUD at 1600x960, on the DOS bar at 1280x720, and on a 2x drawable ($EPSCALE) where the strip still measures $EPSTRIPH window points. A pointer thrown PAST the window's right edge, which is what the report was about and what pans 0.000 without the fix, pans east $EPGEST cells on the 640 HUD, $EPGESTD on the DOS bar and $EPGESTH at 2x; the window's own last point lands on column $EPREACH, inside the east strip; the sidebar handle plate hovered inside the window still refuses ($EPPLATE) while the same height pushed past the window scrolls ($EPPUSHPL); the middle of the bar refuses ($EPMID) and so does one point further in than the strip reaches ($EPLIP); at 2x a point eleven points inside the window edge scrolls ($EPIN), which is the arm the old drawable-pixel strip failed. $EPRETRY probe(s) were re-run after the desk interfered"
 else
   bad "G124 edge gesture through the live loop: failures h6=$EPH6 dos=$EPDOS hidpi=$EPHI (want 0 0 0; read the EDGEPLAY|probe lines in the log, each one prints the pointer, the guard, focus, armed and the camera) pushed-past-the-window=$EPGEST/$EPGESTD/$EPGESTH(want >1 each; 0.000 with placed=1 and focus=1 is the reported bug back again, and means the loop is reading the tracked pointer instead of edge_push_from_outside) strip-points=$EPSTRIP/$EPSTRIPH(want 12 at every backing; 6 at mscaleX=$EPSCALE means EDGE_PT is being used as drawable pixels again) 11-points-in-at-2x=$EPIN(want >1) handle-hovered=$EPPLATE(want 0.000; nonzero means the map pans out from under a pointer reaching for the only control that brings a hidden drawer back) handle-pushed=$EPPUSHPL(want >1; 0.000 means the veto is following the pointer out of the window, where there is no control to protect) mid-bar=$EPMID(want 0.000) inside-the-lip=$EPLIP(want 0.000) last-point-lands-on=$EPREACH retries=$EPRETRY(a large number means the pointer could not be held still, so look at placed=, slip= and focuslost= before believing any arm)"
@@ -7276,8 +7970,15 @@ echo "$TBB" >> "$OUT"
 TBBACK=$(printf '%s' "$TBB" | grep -c '^EDITERASE|at 26,26|erased|.*|tiberium=24$')
 # THE MISSION CHECK, asked three ways: a map with a field, the same map without one, and
 # a cartridge mission whose seventeen cells all lie outside its playable rectangle.
-TBC1=$(./cnc_eyes --scripttest --shot /tmp/g126_s1.png --ticks 1 --scen "$TBMAP" \
-        --pack SCG01EA.pack $BASE --dir "$TBDIR/" 2>&1 | grep '^CHECK|')
+# THE SILENCE ON THE FIELD MAP IS ONLY READ ONCE THE CHECK IS KNOWN TO HAVE RUN THERE.
+# The harness can return before it reaches the mission check (a failed write does), and
+# a run that never checked prints nothing about tiberium either. The check closes with
+# exactly one CHECK|TOTAL line, so that line has to be in this run's log. The exit status
+# is not the proof: round-trip failures that have nothing to do with the check set it too.
+./cnc_eyes --scripttest --shot /tmp/g126_s1.png --ticks 1 --scen "$TBMAP" \
+        --pack SCG01EA.pack $BASE --dir "$TBDIR/" > /tmp/g126_c1.log 2>&1
+TBC1=$(grep '^CHECK|' /tmp/g126_c1.log)
+TBC1RAN=$(grep -c '^CHECK|TOTAL|' /tmp/g126_c1.log)
 TBC2=$(./cnc_eyes --scripttest --shot /tmp/g126_s2.png --ticks 1 --scen "$TBBARE" \
         --pack SCG01EA.pack $BASE --dir "$TBDIR/" 2>&1 | grep '^CHECK|')
 TBC3=$(./cnc_eyes --scripttest --shot /tmp/g126_s3.png --ticks 1 --scen SCG01EA \
@@ -7298,11 +7999,11 @@ TBSTORE=$(printf '%s' "$TBP" | sed -n 's/^HOUSESTORE|GoodGuy|tiberium=\([0-9]*\)
 if [ "${TBPUT:-0}" -eq 25 ] && [ "${TBROW0:-0}" -ge 1 ] && [ "${TBWALL:-0}" -ge 1 ] \
    && [ "${TBOCC:-0}" -ge 1 ] && [ "${TBERAS:-0}" -eq 1 ] && [ "${TBWROTE:-0}" -eq 25 ] \
    && [ "${TBROWS:-0}" -eq 25 ] && [ "${TBDUPE:-1}" -eq 0 ] && [ "${TBHARV:-0}" -eq 1 ] \
-   && [ "${TBBACK:-0}" -eq 1 ] && [ "${TBQUIET:-1}" -eq 0 ] && [ "${TBCRY:-0}" -ge 1 ] \
+   && [ "${TBBACK:-0}" -eq 1 ] && [ "${TBC1RAN:-0}" -eq 1 ] && [ "${TBQUIET:-1}" -eq 0 ] && [ "${TBCRY:-0}" -ge 1 ] \
    && [ "${TBOUT:-0}" -ge 1 ] && [ "${TBSTORE:-0}" -gt 0 ] && [ "$TBMIS" = "Harvest" ]; then
   ok "G126 the economy is placeable: 25 cells of tiberium painted from the palette onto a map made from nothing, written as 25 [OVERLAY] rows from cell $TBFIRST to $TBLAST with no cell written twice; refused on the engine's top row, on a walled cell and on a building's footprint, each with the reason; erased and repainted through the eraser, and after a reopen -- where the field is the brain's own, not the editor's copy -- the eraser still bites into it; the mission check says nothing about tiberium on this map, calls the same map without any an error ($TBCRY), and reports the first GDI mission's seventeen unreachable cells ($TBOUT); and played for 1600 ticks the harvester goes out on $TBMIS and puts $TBSTORE tiberium into the refinery"
 else
-  bad "G126 the economy is placeable: painted=$TBPUT(want 25; ZERO IS THE STATE THIS GATE EXISTS FOR -- nothing in the palette places tiberium) refused-top-row=$TBROW0(want >=1) refused-on-a-wall=$TBWALL(want >=1) refused-on-a-building=$TBOCC(want >=1) erased=$TBERAS(want 1; zero means the eraser cannot see a tiberium cell) written=$TBWROTE(want 25) overlay-rows=$TBROWS(want 25, $TBFIRST..$TBLAST) duplicate-cells=$TBDUPE(want 0; nonzero means two overlays claim one cell and whichever is read last wins) harvester-order=$TBHARV(want 1; zero means a placed harvester saves as Guard again and the map earns nothing with a field under its nose) erase-after-reload=$TBBACK(want 1; zero means the brain did not read the field back, so the round trip is broken rather than the eraser) check-quiet-on-a-good-map=$TBQUIET(want 0) check-calls-a-bare-map-an-error=$TBCRY(want >=1) check-sees-unreachable-cells=$TBOUT(want >=1) harvester-mission=$TBMIS(want Harvest) stored-tiberium=$TBSTORE(want >0; zero means the map has cells and still no income)"
+  bad "G126 the economy is placeable: painted=$TBPUT(want 25; ZERO IS THE STATE THIS GATE EXISTS FOR -- nothing in the palette places tiberium) refused-top-row=$TBROW0(want >=1) refused-on-a-wall=$TBWALL(want >=1) refused-on-a-building=$TBOCC(want >=1) erased=$TBERAS(want 1; zero means the eraser cannot see a tiberium cell) written=$TBWROTE(want 25) overlay-rows=$TBROWS(want 25, $TBFIRST..$TBLAST) duplicate-cells=$TBDUPE(want 0; nonzero means two overlays claim one cell and whichever is read last wins) harvester-order=$TBHARV(want 1; zero means a placed harvester saves as Guard again and the map earns nothing with a field under its nose) erase-after-reload=$TBBACK(want 1; zero means the brain did not read the field back, so the round trip is broken rather than the eraser) check-ran-on-the-field-map=$TBC1RAN(want 1; zero means the check never ran there, so its silence below says nothing, and /tmp/g126_c1.log says where it stopped) check-quiet-on-a-good-map=$TBQUIET(want 0) check-calls-a-bare-map-an-error=$TBCRY(want >=1) check-sees-unreachable-cells=$TBOUT(want >=1) harvester-mission=$TBMIS(want Harvest) stored-tiberium=$TBSTORE(want >0; zero means the map has cells and still no income)"
 fi
 rm -f "$TBDIR/$TBMAP.INI"  "$TBDIR/$TBMAP.BIN"  "$TBDIR/$TBMAP.HGT"
 rm -f "$TBDIR/$TBBARE.INI" "$TBDIR/$TBBARE.BIN" "$TBDIR/$TBBARE.HGT"
@@ -7492,12 +8193,703 @@ if [ -x ./gate_lockstep ]; then
 else
   LSRC=99
 fi
+TNRC=0; TNPASS=0; TNOUT=""
+if [ -x ./gate_tunnel ]; then
+  TNOUT=$(./gate_tunnel 2>&1); TNRC=$?
+  TNPASS=$(printf '%s' "$TNOUT" | grep -c '^OK')
+else
+  TNRC=99
+fi
 NLRC=0; NLPASS=0
 if [ -x ./gate_netloop ]; then
   NLOUT=$(./gate_netloop 2>&1); NLRC=$?
   NLPASS=$(printf '%s' "$NLOUT" | grep -c '^OK')
 else
   NLRC=99
+fi
+RCRC=0; RCPASS=0; RCOUT=""
+# G230 THE INTERNET GAME LIST: a game can be listed, found, and taken off again.
+#
+# WHAT THIS IS FOR, because a list that merely works is not what needs guarding. It checks
+# that a RELAYED row carries no address, so a host who chose the safe kind of room stays
+# unfindable; that a plain-HTTP address is REFUSED, so a direct host's own address cannot
+# be talked out of this build in clear; that a name full of quotes does not break a
+# document the game writes by hand, because there is no JSON writer in the tree and a
+# player types that name; and that a list which is not there FAILS instead of hanging,
+# because all of it runs on a worker the frame is never allowed to wait for.
+#
+# IT STARTS ITS OWN SERVICE on a port nobody else is using and stops it again, so it needs
+# nothing configured, nothing hosted and no network beyond this machine.
+#
+# WHAT A GREEN RUN DOES NOT PROVE: anything about a real service across a real network, and
+# anything about the screen that draws these rows. Both are exercised by hand.
+
+# A LIST SERVICE IS UP WHEN THE ONE THE GATE STARTED HAS BOUND ITS PORT AND ANSWERS ON IT.
+# G230 and G231 both wait through this, and a bare "does anything answer" loop could not
+# tell those two things apart.
+#
+# A COUNT OF PROBES IS NOT A TIME LIMIT. Sixty refused probes, each its own interpreter
+# launch, take about six seconds, so a service slow to start on a loaded machine read as
+# "never came up". One interpreter polls instead, for up to fifteen seconds.
+#
+# AN ANSWER ON THE PORT IS NOT AN ANSWER FROM THIS RUN. With a list service from an earlier
+# run still holding the port, the one the gate started died on "address already in use"
+# and every check still passed, against the leftover. The service prints its "listening
+# on" line only after its bind has succeeded, into a log the gate has just truncated, so
+# that line proves the port belongs to this run; and a service that has already exited is
+# reported as exited rather than waited out.
+#
+#   gl_wait PYTHON PORT PID LOG      prints up, exited or timeout
+gl_wait() {
+  "$1" - "$2" "$3" "$4" <<'PY'
+import os, sys, time, urllib.request
+port, pid, log = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+end = time.time() + 15
+while time.time() < end:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        print("exited")
+        sys.exit(0)
+    try:
+        bound = "gamelist: listening on" in open(log, errors="replace").read()
+    except OSError:
+        bound = False
+    if bound:
+        try:
+            urllib.request.urlopen("http://127.0.0.1:%s/" % port, timeout=1)
+            print("up")
+            sys.exit(0)
+        except Exception:
+            pass
+    time.sleep(0.1)
+print("timeout")
+PY
+}
+GLPORT=8137
+GLPY=""
+for c in python3 python; do command -v $c >/dev/null 2>&1 && GLPY=$c && break; done
+if [ -z "$GLPY" ]; then
+  skip "G230 the internet game list: no python on this machine to run the list service"
+elif [ ! -x ./gate_mpbrowse ]; then
+  bad "G230 the internet game list: gate_mpbrowse was not in the run folder (game/build.sh makes it)"
+else
+  $GLPY "$RUNDIR/../tools/gamelist/gamelist.py" --host 127.0.0.1 --port $GLPORT --ttl 60 \
+      > /tmp/g230_service.log 2>&1 &
+  GLPID=$!
+  GLUP=$(gl_wait $GLPY $GLPORT $GLPID /tmp/g230_service.log)
+  if [ "$GLUP" = "exited" ]; then
+    bad "G230 the internet game list: the list service this gate started exited before it answered on port $GLPORT, so nothing was checked ($(tail -1 /tmp/g230_service.log 2>/dev/null))"
+  elif [ "$GLUP" != "up" ]; then
+    bad "G230 the internet game list: the list service did not answer on port $GLPORT within 15 s ($(tail -1 /tmp/g230_service.log 2>/dev/null))"
+  else
+    MBOUT=$(./gate_mpbrowse "http://127.0.0.1:$GLPORT/" 2>&1); MBRC=$?
+    MBN=$(printf '%s' "$MBOUT" | sed -n 's/^gate_mpbrowse: \([0-9]*\) checks.*/\1/p')
+    if [ "$MBRC" = "0" ]; then
+      ok "G230 the internet game list: $MBN checks against a real service. A game was listed, read back with its room code, its map, its seats, its padlock and the two numbers a joiner is refused against, and taken off again. A RELAYED ROW CARRIED NO ADDRESS, a plain-http address out on the internet was refused, a name full of quotes did not break the hand-written row, and a list that was not there failed in words rather than hanging. THIS SAYS NOTHING about a real service across a real network, nor about the screen that draws the rows"
+    else
+      bad "G230 the internet game list: gate_mpbrowse exit=$MBRC. $(printf '%s' "$MBOUT" | grep -E '^  FAILED' | head -3 | tr '\n' ' ')"
+    fi
+  fi
+  kill $GLPID 2>/dev/null
+  wait $GLPID 2>/dev/null
+fi
+
+# G231 THE BROWSER, PRESSED. G230 proves the game's half of the list against a real
+# service; it never touches the screen. --mpshot draws that screen from a state it was
+# handed and --mpaddr calls its pure functions, so neither one presses anything, and for
+# the whole of the browser's life the three questions that matter about it had no answer
+# in this tree: does a row take the highlight when it is clicked, does clicking one and
+# pressing JOIN reach a lobby, and does the ROOM CODE field four pixels under the last row
+# take a typed code rather than letting the press fall through to the row behind it.
+#
+# This drives the real dms_multiplayer loop with synthetic presses on the same queue a
+# hand fills, against a list service it starts itself. A row is addressed by NUMBER and
+# its pixel found by walking mp_row_at, so a scripted click cannot land where a hand could
+# not, and every leg asserts that all of ITS steps ran -- the watchdog that ends a stuck
+# leg answers DMS_CANCEL, which is what a correct ESC answers too, so without that count a
+# leg could pass on the timeout it was meant to fail on.
+#
+# THE HOST LEG IS NOT RUN HERE. Pressing HOST with INTERNET GAME ticked arms a relay and
+# the screen dials the built-in one, so it would reach a public server somebody else pays
+# for on every suite run. Add --mpclickhost by hand when hunting the crash reported on
+# that action.
+#
+# WHAT A GREEN RUN DOES NOT PROVE: anything about a real service across a real network, or
+# about how the screen FEELS. It is a press, not a pair of eyes.
+MCPORT=8138
+MCPY=""
+for c in python3 python; do command -v $c >/dev/null 2>&1 && MCPY=$c && break; done
+if [ -z "$MCPY" ]; then
+  skip "G231 the browser, pressed: no python on this machine to run the list service"
+else
+  $MCPY "$RUNDIR/../tools/gamelist/gamelist.py" --host 127.0.0.1 --port $MCPORT --ttl 60 \
+      > /tmp/g231_service.log 2>&1 &
+  MCPID=$!
+  # The same wait as G230's: this run's own service, answering, within fifteen seconds.
+  MCUP=$(gl_wait $MCPY $MCPORT $MCPID /tmp/g231_service.log)
+  if [ "$MCUP" = "exited" ]; then
+    bad "G231 the browser, pressed: the list service this gate started exited before it answered on port $MCPORT, so nothing was pressed ($(tail -1 /tmp/g231_service.log 2>/dev/null))"
+  elif [ "$MCUP" != "up" ]; then
+    bad "G231 the browser, pressed: the list service did not answer on port $MCPORT within 15 s ($(tail -1 /tmp/g231_service.log 2>/dev/null))"
+  else
+    ./cnc3d $BASE --mplist "http://127.0.0.1:$MCPORT/" --mpclick > /tmp/g231.log 2>&1
+    MCRC=$?
+    cat /tmp/g231.log >> "$OUT"
+    MCN=$(sed -n 's/^MPCLICK|done|checks=\([0-9]*\)|.*/\1/p' /tmp/g231.log | head -1)
+    MCBAD=$(sed -n 's/^MPCLICK|done|checks=[0-9]*|fails=\([0-9]*\)$/\1/p' /tmp/g231.log | head -1)
+    MCFAIL=$(grep -a '^MPCLICK|FAIL|' /tmp/g231.log | head -3 | tr '\n' ' ')
+    # The count is asserted with the failures, for the reason G219 learned the hard way:
+    # a leg that stops running stops being asserted. Raise it when you add one.
+    if [ "${MCBAD:-1}" = "0" ] && [ "${MCN:-0}" -ge 20 ] && [ "$MCRC" = "0" ]; then
+      ok "G231 the browser, pressed: $MCN checks through the screen's own loop. A game published to a real service was fetched by the screen's own poll and drawn, clicking its row selected it, JOIN went through the first-run YOUR NAME box and reached a lobby, the ROOM CODE field under the rows took a typed code instead of the press falling through to the row behind it, and LIST PUBLICLY dropped its tick when the relay box was walked in and out, so a choice about one kind of room cannot put a home address on a public list for another. THIS SAYS NOTHING about a real service across a real network, nor about how the screen feels to use"
+    else
+      bad "G231 the browser, pressed: checks=$MCN(want >=20) fails=$MCBAD(want 0) exit=$MCRC(want 0). $MCFAIL"
+    fi
+  fi
+  kill $MCPID 2>/dev/null
+  wait $MCPID 2>/dev/null
+fi
+
+# G234 THE GAME LIST SORTS, SCROLLS AND FILTERS, AND REMEMBERS HOW.
+#
+# The list is ten rows under a clickable header, with a scroll bar and two HIDE boxes, and
+# it holds its selection by the game's identity rather than by position. That last part is
+# the one worth a gate: the list is sorted, and refilled from the network ten times a
+# second, and a selection held by position lands on a different game the moment one more
+# game arrives above it. JOIN then joins that other game.
+#
+# FIVE HALVES, and a green verdict needs all of them.
+#   A  --mpsort: the rules, asked of the screen's own functions with no network. One order
+#      whatever order rows arrive in, joinable games first, a tie-break down to the key;
+#      the selection following its game through a refill, a missing fetch and its return;
+#      HIDE LOCKED and HIDE GREYED; the thumb's size and its end stops, and no thumb at
+#      all with ten rows or none, on a track a press or a drag does nothing to; track, drag
+#      and wheel; HOME, END and the page keys; presses that must not select; the keys rows are
+#      held by; every sentence the status line can say about a row; the PING cell, which is
+#      empty on a LAN row, and a PING sort on the LAN list, which is all ties ordered by name.
+#   B  --mpsortclick: the real dms_multiplayer loop against a list service this block
+#      starts and seeds with fourteen games, with snapshots between presses: the default
+#      order, a row click, PLAYERS both ways, a real refetch, END, the track, both HIDE
+#      boxes and the YOUR NAME box, then a third visit in which ESC shuts that box and the
+#      screen is left with it open. The expected orders are worked out by the harness from
+#      the list itself.
+#   S  the settings file: a visit that changes nothing writes none, a visit that changes
+#      the sort, a box and the name writes one, a SEPARATE process reads the same values
+#      back, and a damaged file and a missing one both leave the defaults.
+#   C  --mpshot: ten pictures, and the layout audit finds nothing that does not fit. On
+#      the INTERNET list's picture the scroll thumb is measured against its well, and
+#      has to be a clearly lighter plate; on the hidden list's picture, and on the drawn
+#      surface at ten rows and at none, the track has no thumb. Their comments are below.
+#   P  --mpping: the PING column measured through the real loop against two live rooms and
+#      a relay stand-in, and a direct room left unprobed until it is selected, judged from
+#      the room's own log. Its own comment is below.
+#
+# THE FLOORS were set at the first green counts and move up in the same edit as any new
+# case, which is G219's lesson. Before this gate landed, cases 1 (one order whatever the
+# arrival order), 5 (the selection follows its game) and 10 (a released thumb does not
+# scroll) were each run against a deliberately broken rule and went red.
+#
+# WHAT A GREEN RUN DOES NOT PROVE: the look, beyond the scroll thumb standing out from its
+# well. shots/g234_mp_join-net.png (sorted downward),
+# shots/g234_mp_join-hidden.png (sorted upward) and shots/g234_mp_join-net-live.png (the
+# measured column) have to be looked at by eye at their rendered scale, the header strip
+# and the two sort triangles above all, and nothing here does that. The numbers in
+# g234_mp_join-net.png are set by hand. Nor does it prove anything about a round trip across
+# a real network: every number P measures is on loopback.
+G234PORT=8139
+G234PY=""
+for c in python3 python; do command -v $c >/dev/null 2>&1 && G234PY=$c && break; done
+G234WHY=""
+G234SKIP=""
+G234AN=0; G234BN=0
+
+# ---- A ----
+./cnc3d $BASE --mpsort > /tmp/g234_sort.log 2>&1
+G234ARC=$?
+cat /tmp/g234_sort.log >> "$OUT"
+G234AN=$(sed -n 's/^MPSORT|done|checks=\([0-9]*\)|.*/\1/p' /tmp/g234_sort.log | head -1)
+G234ABAD=$(sed -n 's/^MPSORT|done|checks=[0-9]*|fails=\([0-9]*\)$/\1/p' /tmp/g234_sort.log | head -1)
+if [ "${G234ABAD:-1}" != "0" ] || [ "${G234AN:-0}" -lt 108 ] || [ "$G234ARC" != "0" ]; then
+  G234WHY="$G234WHY --mpsort checks=$G234AN(want >=108) fails=$G234ABAD(want 0) exit=$G234ARC(want 0): $(grep -a '^MPSORT|FAIL|' /tmp/g234_sort.log | head -3 | tr '\n' ' ')."
+fi
+
+# ---- C ----
+rm -f shots/g234_mp_*.png
+./cnc3d $BASE --mpshot shots/g234_mp > /tmp/g234_shot.log 2>&1
+G234CRC=$?
+cat /tmp/g234_shot.log >> "$OUT"
+G234SHOTS=$(sed -n 's/^MPSHOT|shots=\([0-9]*\)|.*/\1/p' /tmp/g234_shot.log | head -1)
+G234OVER=$(sed -n 's/^MPSHOT|shots=[0-9]*|overflow=\([-0-9]*\)$/\1/p' /tmp/g234_shot.log | head -1)
+if [ "${G234SHOTS:-0}" != "10" ] || [ "${G234OVER:-1}" != "0" ] || [ "$G234CRC" != "0" ] \
+   || [ ! -s shots/g234_mp_join-net.png ] || [ ! -s shots/g234_mp_join-hidden.png ]; then
+  G234WHY="$G234WHY --mpshot shots=$G234SHOTS(want 10) overflow=$G234OVER(want 0) exit=$G234CRC(want 0): $(grep -a '^MPLAYOUT|' /tmp/g234_shot.log | head -3 | tr '\n' ' ')."
+fi
+# THE SCROLL THUMB IS A PLATE A PLAYER CAN FIND, measured on the picture this run just
+# wrote rather than on the palette index the draw asked for. The thumb used to be filled
+# with its well's own green, told apart by a one pixel edge, and was hard to see.
+#
+# WHAT IS MEASURED: the INTERNET list, scrolled so the thumb is mid-travel with well above
+# and below it. --mpshot prints the bar's rectangle and the thumb's top and height in menu
+# pixels; the picture's scale is its width over 320. The mean luminance
+# (0.299 R + 0.587 G + 0.114 B) of the thumb's inside, one menu pixel in from each edge so
+# no bevel is counted, against the well's inside above and below the thumb, one pixel clear
+# of it. The old thumb measured 68.7 against a well of 68.7, a difference of 0.0; the
+# lighter plate measures 113.5 against 68.7, a difference of 44.9. The floor is 20, well
+# clear of both.
+G234BAR=$(grep -a '^MPSHOT|bar|join-net|' /tmp/g234_shot.log | head -1)
+G234CONTRAST=""
+G234THUMB=""
+if [ -z "$G234PY" ]; then
+  : # said in the skip sentence below, with the other halves no python leaves unrun
+elif [ -z "$G234BAR" ] || [ ! -s shots/g234_mp_join-net.png ]; then
+  G234WHY="$G234WHY --mpshot never said where the INTERNET list's scroll bar is, or drew no picture of it, so the thumb's contrast was not measured."
+else
+  G234THUMB=$($G234PY - shots/g234_mp_join-net.png "$G234BAR" <<'G234EOF'
+import sys
+try:
+    from PIL import Image
+except Exception as exc:
+    print("THUMB|nopil|%s" % exc)
+    sys.exit(0)
+f = dict(kv.split("=", 1) for kv in sys.argv[2].split("|") if "=" in kv)
+x, y, w, h = int(f["x"]), int(f["y"]), int(f["w"]), int(f["h"])
+ty, th = int(f["thumb_y"]), int(f["thumb_h"])
+im = Image.open(sys.argv[1]).convert("RGB")
+sc = im.width // 320
+if sc < 1 or im.height != 200 * sc:
+    print("THUMB|size|%dx%d" % (im.width, im.height))
+    sys.exit(0)
+def add(acc, x0, y0, x1, y1):
+    for yy in range(y0 * sc, (y1 + 1) * sc):
+        for xx in range(x0 * sc, (x1 + 1) * sc):
+            r, g, b = im.getpixel((xx, yy))
+            acc[0] += 0.299 * r + 0.587 * g + 0.114 * b
+            acc[1] += 1
+thumb, well = [0.0, 0], [0.0, 0]
+add(thumb, x + 1, ty + 1, x + w - 2, ty + th - 2)
+if ty - 2 >= y + 1:
+    add(well, x + 1, y + 1, x + w - 2, ty - 2)
+if ty + th + 1 <= y + h - 2:
+    add(well, x + 1, ty + th + 1, x + w - 2, y + h - 2)
+if not thumb[1] or not well[1]:
+    print("THUMB|empty|thumb=%d|well=%d" % (thumb[1], well[1]))
+    sys.exit(0)
+t, wl = thumb[0] / thumb[1], well[0] / well[1]
+print("THUMB|thumb=%.1f|well=%.1f|diff=%.1f" % (t, wl, t - wl))
+G234EOF
+)
+  echo "$G234THUMB" >> "$OUT"
+  G234TDIFF=$(printf '%s\n' "$G234THUMB" | sed -n 's/^THUMB|thumb=[-0-9.]*|well=[-0-9.]*|diff=\([-0-9.]*\)$/\1/p' | head -1)
+  if [ -z "$G234TDIFF" ]; then
+    G234WHY="$G234WHY the thumb's contrast could not be measured: $(printf '%s' "$G234THUMB" | tr '\n' ' ')."
+  elif ! awk -v d="$G234TDIFF" 'BEGIN { exit !(d >= 20) }'; then
+    G234WHY="$G234WHY the scroll thumb is not a lighter plate than its well: $G234THUMB (want diff >=20)."
+  else
+    G234CONTRAST="$G234THUMB"
+  fi
+fi
+
+# WITH NOTHING TO SCROLL THERE IS NO THUMB. When every shown game fits in the ten rows,
+# including when none is shown at all, the thumb used to fill the whole track, and a thumb
+# that long reads as a border round the well rather than as something to hold. The track
+# is now drawn empty in that case, and a press or a drag on it does nothing (--mpsort
+# asserts that half).
+#
+# TWO MEASUREMENTS. First the drawn surface: --mpshot draws the INTERNET list with eleven,
+# ten and no games and compares the bar's rectangle pixel by pixel with an empty track,
+# printing off, the pixels that differ. Eleven is the control and must differ, because it
+# has a thumb; ten and none must not differ by one pixel, and must report thumb_h=0.
+# Then the picture: on shots/g234_mp_join-hidden.png, where both HIDE boxes empty the list,
+# the bar line must say thumb_h=0, and the track's inside (one menu pixel in from each
+# edge, luminance as above) must be ONE colour whose luminance is the well's, as the check
+# above measured the well on the INTERNET list's picture. The ceiling is 5 either way.
+#
+# MEASURED. The drawn surface with the old full-length thumb: off=450 and thumb_h=90 at ten
+# games and at none, which is every pixel of the bar; with the track drawn empty, off=0 and
+# thumb_h=0 at both, and off=404 with thumb_h=81 at eleven either way. The picture with the
+# old thumb: inside=113.5 in one colour against a well of 68.7, a difference of 44.8, which
+# is the lighter plate filling the track; drawn empty, inside=68.7 in one colour, a
+# difference of 0.0. Every one of these checks, and the new --mpsort cases, was run against
+# the old list code with everything else unchanged, and went red.
+G234TRACK=""
+for G234TR in 11 10 0; do
+  G234TL=$(grep -a "^MPSHOT|track|rows=$G234TR|" /tmp/g234_shot.log | head -1)
+  G234TH=$(printf '%s\n' "$G234TL" | sed -n 's/^MPSHOT|track|rows=[0-9]*|thumb_h=\([0-9]*\)|off=[0-9]*$/\1/p')
+  G234TO=$(printf '%s\n' "$G234TL" | sed -n 's/^MPSHOT|track|rows=[0-9]*|thumb_h=[0-9]*|off=\([0-9]*\)$/\1/p')
+  if [ -z "$G234TH" ] || [ -z "$G234TO" ]; then
+    G234WHY="$G234WHY --mpshot never drew the scroll track with $G234TR games shown [$G234TL]."
+  elif [ "$G234TR" = "11" ]; then
+    if [ "$G234TH" = "0" ] || [ "$G234TO" = "0" ]; then
+      G234WHY="$G234WHY with eleven games, one more than fit, the drawn track shows no thumb ($G234TL), so the probe cannot see one and proves nothing at ten or none."
+    fi
+  elif [ "$G234TH" != "0" ] || [ "$G234TO" != "0" ]; then
+    G234WHY="$G234WHY with $G234TR games shown, every one in view, a thumb is drawn in the track: $G234TL (want thumb_h=0 off=0)."
+  fi
+  G234TRACK="$G234TRACK rows=$G234TR thumb_h=$G234TH off=$G234TO;"
+done
+G234HBAR=$(grep -a '^MPSHOT|bar|join-hidden|' /tmp/g234_shot.log | head -1)
+G234TWELL=$(printf '%s\n' "$G234THUMB" | sed -n 's/^THUMB|thumb=[-0-9.]*|well=\([-0-9.]*\)|diff=[-0-9.]*$/\1/p' | head -1)
+G234EMPTY=""
+# The bar line and the picture are judged separately, so a picture with a plate in it is
+# measured and reported even when the line has already owned up to a thumb.
+if [ -n "$G234HBAR" ] && ! printf '%s\n' "$G234HBAR" | grep -q '|thumb_h=0$'; then
+  G234WHY="$G234WHY with every game hidden --mpshot reports a thumb in the track: $G234HBAR (want thumb_h=0)."
+fi
+if [ -z "$G234PY" ]; then
+  : # said in the skip sentence below
+elif [ -z "$G234HBAR" ] || [ ! -s shots/g234_mp_join-hidden.png ]; then
+  G234WHY="$G234WHY --mpshot never said where the hidden list's scroll bar is, or drew no picture of it, so its empty track was not measured."
+elif [ -z "$G234TWELL" ]; then
+  G234WHY="$G234WHY the well was not measured on the INTERNET list's picture, so the hidden list's empty track had nothing to be compared with."
+else
+  G234HT=$($G234PY - shots/g234_mp_join-hidden.png "$G234HBAR" "$G234TWELL" <<'G234EOF'
+import sys
+try:
+    from PIL import Image
+except Exception as exc:
+    print("TRACK|nopil|%s" % exc)
+    sys.exit(0)
+f = dict(kv.split("=", 1) for kv in sys.argv[2].split("|") if "=" in kv)
+x, y, w, h = int(f["x"]), int(f["y"]), int(f["w"]), int(f["h"])
+well = float(sys.argv[3])
+im = Image.open(sys.argv[1]).convert("RGB")
+sc = im.width // 320
+if sc < 1 or im.height != 200 * sc:
+    print("TRACK|size|%dx%d" % (im.width, im.height))
+    sys.exit(0)
+seen, total, n = set(), 0.0, 0
+for yy in range((y + 1) * sc, (y + h - 1) * sc):
+    for xx in range((x + 1) * sc, (x + w - 1) * sc):
+        r, g, b = im.getpixel((xx, yy))
+        seen.add((r, g, b))
+        total += 0.299 * r + 0.587 * g + 0.114 * b
+        n += 1
+if not n:
+    print("TRACK|empty")
+    sys.exit(0)
+t = total / n
+d = round(t - well, 1) + 0.0
+print("TRACK|inside=%.1f|colours=%d|well=%.1f|diff=%.1f" % (t, len(seen), well, d))
+G234EOF
+)
+  echo "$G234HT" >> "$OUT"
+  G234HC=$(printf '%s\n' "$G234HT" | sed -n 's/^TRACK|inside=[-0-9.]*|colours=\([0-9]*\)|well=[-0-9.]*|diff=[-0-9.]*$/\1/p' | head -1)
+  G234HD=$(printf '%s\n' "$G234HT" | sed -n 's/^TRACK|inside=[-0-9.]*|colours=[0-9]*|well=[-0-9.]*|diff=\([-0-9.]*\)$/\1/p' | head -1)
+  if [ -z "$G234HC" ] || [ -z "$G234HD" ]; then
+    G234WHY="$G234WHY the hidden list's empty track could not be measured: $(printf '%s' "$G234HT" | tr '\n' ' ')."
+  elif [ "$G234HC" != "1" ] || ! awk -v d="$G234HD" 'BEGIN { exit !(d <= 5 && d >= -5) }'; then
+    G234WHY="$G234WHY the hidden list's scroll track is not one flat colour of the well's green, so a thumb or a plate is drawn in it: $G234HT (want colours=1 and diff within 5)."
+  else
+    G234EMPTY="$G234HT"
+  fi
+fi
+
+# ---- B and S ----
+if [ -z "$G234PY" ]; then
+  G234SKIP="no python on this machine to run the list service or read a picture, so the pressed half, the settings file, the scroll thumb's contrast and the hidden list's empty track in its picture did not run"
+else
+  $G234PY "$RUNDIR/../tools/gamelist/gamelist.py" --host 127.0.0.1 --port $G234PORT --ttl 120 \
+      --per-source 32 > /tmp/g234_service.log 2>&1 &
+  G234PID=$!
+  G234UP=0
+  i=0
+  while [ $i -lt 60 ]; do
+    if $G234PY -c "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:$G234PORT/',timeout=1)" >/dev/null 2>&1; then G234UP=1; break; fi
+    i=$((i+1))
+  done
+  if [ "$G234UP" != "1" ]; then
+    G234WHY="$G234WHY the list service never came up on port $G234PORT ($(tail -1 /tmp/g234_service.log 2>/dev/null))."
+  else
+    # FOURTEEN GAMES, BY THE SAME POST A HOST MAKES. Relayed rows carry room codes and
+    # direct rows distinct ports. 0x5EED0001 is the abi --mpsortclick passes, so the two
+    # rows on 0x0BAD0BAD are another build; KILO is full; three rows are locked, and
+    # fewest-players-first ends on LIMA, which is locked and from another build.
+    G234SEED=$($G234PY - "$G234PORT" <<'G234EOF'
+import json, sys, urllib.request
+port = int(sys.argv[1])
+A, BAD = 0x5EED0001, 0x0BAD0BAD
+rows = [
+    ("ALPHA BASE", "GREEN ACRES",       1, 4, False, "#AAA-001", 0,     A),
+    ("alpha base", "BLUE LAKES",        2, 4, False, None,       20001, A),
+    ("BRAVO",      "MOOSEHEAD BARRENS", 3, 8, True,  "#AAA-002", 0,     A),
+    ("BRAVO",      "RIVER RAID",        1, 2, False, None,       20002, 0),
+    ("CHARLIE",    "GREEN ACRES",       5, 8, False, "#AAA-003", 0,     A),
+    ("DELTA",      "ALPINE",            2, 6, True,  None,       20003, A),
+    ("ECHO",       "ZEBRA",             4, 8, False, "#AAA-004", 0,     A),
+    ("FOXTROT",    "CANYON",            6, 8, False, None,       20004, A),
+    ("GOLF",       "DESERT",            3, 4, False, "#AAA-005", 0,     A),
+    ("HOTEL",      "HILLS",             1, 4, False, None,       20005, A),
+    ("INDIA",      "MESA",              7, 8, False, "#AAA-006", 0,     A),
+    ("JULIET",     "BAYOU",             2, 8, False, None,       20006, BAD),
+    ("KILO",       "LAGOON",            6, 6, False, "#AAA-007", 0,     A),
+    ("LIMA",       "SWAMP",             7, 8, True,  None,       20007, BAD),
+]
+listed = 0
+for i, (name, mapname, players, most, locked, room, port_no, abi) in enumerate(rows):
+    body = {"v": 1, "id": "%032x" % (0x5EED0000 + i), "token": "%032x" % (0xACCE5500 + i),
+            "name": name, "map": mapname, "scenario": "SCM01EA", "players": players,
+            "max": most, "locked": locked, "abi": abi, "scen": 0,
+            "relay": room is not None, "open": True}
+    if room:
+        body["room"] = room
+    else:
+        body["port"] = port_no
+    req = urllib.request.Request("http://127.0.0.1:%d/" % port, data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as reply:
+            if json.load(reply).get("listed"):
+                listed += 1
+    except Exception as exc:
+        print("SEEDFAIL|%s|%s" % (name, exc))
+print("SEEDED|%d" % listed)
+G234EOF
+)
+    echo "$G234SEED" >> "$OUT"
+    if ! printf '%s\n' "$G234SEED" | grep -q '^SEEDED|14$'; then
+      G234WHY="$G234WHY the seed did not list fourteen games: $(printf '%s' "$G234SEED" | tr '\n' ' ')."
+    else
+      G234P=/tmp/g234_prefs.cfg
+      rm -f "$G234P"
+      ./cnc3d $BASE --mplist "http://127.0.0.1:$G234PORT/" --mpsortclick --mpprefs "$G234P" \
+          > /tmp/g234_click.log 2>&1
+      G234BRC=$?
+      cat /tmp/g234_click.log >> "$OUT"
+      G234BN=$(sed -n 's/^MPSORTCLICK|done|checks=\([0-9]*\)|.*/\1/p' /tmp/g234_click.log | head -1)
+      G234BBAD=$(sed -n 's/^MPSORTCLICK|done|checks=[0-9]*|fails=\([0-9]*\)$/\1/p' /tmp/g234_click.log | head -1)
+      if [ "${G234BBAD:-1}" != "0" ] || [ "${G234BN:-0}" -lt 33 ] || [ "$G234BRC" != "0" ]; then
+        G234WHY="$G234WHY --mpsortclick checks=$G234BN(want >=33) fails=$G234BBAD(want 0) exit=$G234BRC(want 0): $(grep -a '^MPSORTCLICK|FAIL|' /tmp/g234_click.log | head -3 | tr '\n' ' ')."
+      fi
+      # THE RELAUNCH: a new process reads what the last one wrote.
+      G234READ=$(./cnc3d $BASE --mpprefsread "$G234P" 2>&1 | tee -a "$OUT" | grep -a '^MPPREFS|' | head -1)
+      if [ "$G234READ" != "MPPREFS|file=1|sort=players|order=up|hide_locked=0|hide_greyed=1|handle=ACE" ]; then
+        G234WHY="$G234WHY a relaunch read back [$G234READ], want PLAYERS fewest first, HIDE GREYED ticked and the name ACE."
+      fi
+      # A DAMAGED FILE: plausible keys with impossible values, a control character in the
+      # name, and bytes that are not text. Every default must stand, and reading must not
+      # have rewritten the file.
+      printf 'sort banana\norder sideways\nhide_locked 7\nhide_greyed yes\nhandle A\001B\n\377\376\375 not a line\n' > /tmp/g234_bad.cfg
+      G234BADSUM=$(cksum < /tmp/g234_bad.cfg)
+      G234READ=$(./cnc3d $BASE --mpprefsread /tmp/g234_bad.cfg 2>&1 | tee -a "$OUT" | grep -a '^MPPREFS|' | head -1)
+      if [ "$G234READ" != "MPPREFS|file=1|sort=game|order=up|hide_locked=0|hide_greyed=0|handle=" ]; then
+        G234WHY="$G234WHY a damaged settings file read back [$G234READ], want the defaults."
+      fi
+      if [ "$(cksum < /tmp/g234_bad.cfg)" != "$G234BADSUM" ]; then
+        G234WHY="$G234WHY reading the damaged settings file changed it."
+      fi
+      rm -f /tmp/g234_none.cfg
+      G234READ=$(./cnc3d $BASE --mpprefsread /tmp/g234_none.cfg 2>&1 | tee -a "$OUT" | grep -a '^MPPREFS|' | head -1)
+      if [ "$G234READ" != "MPPREFS|file=0|sort=game|order=up|hide_locked=0|hide_greyed=0|handle=" ]; then
+        G234WHY="$G234WHY a missing settings file read back [$G234READ], want the defaults."
+      fi
+      if [ -e /tmp/g234_none.cfg ]; then
+        G234WHY="$G234WHY reading a missing settings file created one."
+      fi
+    fi
+  fi
+  kill $G234PID 2>/dev/null
+  wait $G234PID 2>/dev/null
+fi
+
+# ---- P ---- THE PING COLUMN, MEASURED, and who it is allowed to measure.
+#
+# A DIRECT ROOM IS PROBED ONLY ONCE THE PLAYER SELECTS IT, because a direct probe carries the
+# browsing player's own address to that host. That is the claim this half exists for, and it
+# is judged from the ROOM'S side: the direct room's own log, and a quiet port that counts
+# every datagram that reaches it, rather than the browser's word for what it did.
+#
+# Everything is on this machine: a second list service; a relay stand-in with the public
+# servers' two rules that matter here (an id is registered by the first datagram it sends,
+# and a datagram only goes to an id already registered), logging every id the first time;
+# a DIRECT headless room listed at its address; a RELAYED headless room listed by its code;
+# and eleven seeded rows (nine relayed rooms nobody holds, a direct row on the quiet port,
+# a full relayed room). The direct room holds its door open with --mpwait, so for the length
+# of this half it also announces itself on this network, as any such room does.
+#
+# --mpping then asserts, through the real screen loop: a relayed room reads a number with
+# nobody selecting it; rooms nobody holds read "--"; a full room and both direct rooms stay
+# blank and are never handed to the prober; ten relayed rooms are asked at most eight at a
+# time with the rest waiting; PING sorts unknowns last both ways; the direct room's log shows
+# no probe until the click and one round after it; REFRESH asks the relayed room again; and on
+# a third visit the arrow keys walk over both direct rooms without either being asked, HOME
+# with the caret in ROOM CODE selects nothing, and Enter joins the typed address. This
+# block adds what the browser cannot see: the relay saw exactly two registrations (the
+# relayed room's and one for every probe the browser sent, across two visits and a REFRESH),
+# the quiet port received nothing at all, and the direct room's log read independently at
+# the byte offset the harness took just before the click.
+#
+# RED BEFORE IT LANDED: the same run against a build whose screen probed direct rows the
+# moment they were listed went red on the blank cells, the prober's own table, the direct
+# room's log and the quiet port.
+G234PPORT=8145
+G234RPORT=8141
+G234QPORT=8143
+G234PN=0
+if [ -n "$G234PY" ]; then
+  if [ ! -s SCM01EA.pack ] || [ ! -s missions/SCM01EA.INI ]; then
+    G234WHY="$G234WHY the ping half needs SCM01EA in the run folder to open its two rooms."
+  else
+    rm -f /tmp/g234_pingsvc.log /tmp/g234_relay.log /tmp/g234_direct.log /tmp/g234_relayed.log \
+          /tmp/g234_ping.log shots/g234_mp_join-net-live*.png shots/g234_mp_join-net-probing.png
+    $G234PY "$RUNDIR/../tools/gamelist/gamelist.py" --host 127.0.0.1 --port $G234PPORT --ttl 120 \
+        --per-source 32 > /tmp/g234_pingsvc.log 2>&1 &
+    G234PSVC=$!
+    $G234PY - $G234RPORT $G234QPORT /tmp/g234_relay.log > /dev/null 2>&1 <<'G234RELAY' &
+import select, socket, struct, sys
+rport, qport, path = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+out = open(path, "a", buffering=1)
+relay = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+relay.bind(("127.0.0.1", rport))
+quiet = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+quiet.bind(("127.0.0.1", qport))
+out.write("RELAY|up|%d|%d\n" % (rport, qport))
+at = {}
+heard = 0
+while True:
+    ready, _, _ = select.select([relay, quiet], [], [], 1.0)
+    for s in ready:
+        data, src = s.recvfrom(4096)
+        if s is quiet:
+            heard += 1
+            out.write("QUIET|datagram|n=%d|bytes=%d\n" % (heard, len(data)))
+            continue
+        if len(data) < 8:
+            continue
+        snd, rcv = struct.unpack_from("<II", data, 0)
+        if snd == 0 and rcv == 0:
+            if len(data) == 50:
+                relay.sendto(data[:12], src)
+            continue
+        if snd == 0 or snd == 0xFFFFFFFF or snd == rcv:
+            continue
+        if snd not in at:
+            out.write("RELAY|register|id=%08x|port=%d\n" % (snd, src[1]))
+        at[snd] = src
+        if rcv == 0 or rcv not in at or at[rcv] == src:
+            continue
+        relay.sendto(data, at[rcv])
+G234RELAY
+    G234RELPID=$!
+    G234PUP=0
+    i=0
+    while [ $i -lt 60 ]; do
+      if grep -q '^RELAY|up|' /tmp/g234_relay.log 2>/dev/null \
+         && $G234PY -c "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:$G234PPORT/',timeout=1)" >/dev/null 2>&1; then
+        G234PUP=1; break
+      fi
+      sleep 0.25
+      i=$((i+1))
+    done
+    if [ "$G234PUP" != "1" ]; then
+      G234WHY="$G234WHY the ping half's list service or relay stand-in never came up ($(tail -1 /tmp/g234_pingsvc.log 2>/dev/null) $(tail -1 /tmp/g234_relay.log 2>/dev/null))."
+    else
+      ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+          --mphost 40 --mpwait 90 --mppublic --mplist "http://127.0.0.1:$G234PPORT/" \
+          --mpname "A DIRECT HOST" --w 1024 --h 640 > /tmp/g234_direct.log 2>&1 &
+      G234DPID=$!
+      ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+          --mphost 40 --mpwait 90 --mprelay "127.0.0.1:$G234RPORT" \
+          --mplist "http://127.0.0.1:$G234PPORT/" \
+          --mpname "B RELAYED ROOM" --w 1024 --h 640 > /tmp/g234_relayed.log 2>&1 &
+      G234RPID=$!
+      i=0
+      while [ $i -lt 60 ]; do
+        if grep -aq '^MPLOBBY|host|open' /tmp/g234_direct.log 2>/dev/null \
+           && grep -aq '^MPLOBBY|host|room=' /tmp/g234_relayed.log 2>/dev/null; then break; fi
+        sleep 1
+        i=$((i+1))
+      done
+      G234SEEDP=$($G234PY - "$G234PPORT" "$G234QPORT" <<'G234EOF'
+import json, sys, urllib.request
+port, quiet = int(sys.argv[1]), int(sys.argv[2])
+rows = [("GONE %d" % n, "#G0N-E0%d" % n, 1, 4, None) for n in range(1, 10)]
+rows.append(("C QUIET DIRECT", None, 1, 4, quiet))
+rows.append(("D FULL ROOM", "#F00-100", 2, 2, None))
+listed = 0
+for i, (name, room, players, most, port_no) in enumerate(rows):
+    body = {"v": 1, "id": "%032x" % (0x9E4D0000 + i), "token": "%032x" % (0x70CE0000 + i),
+            "name": name, "map": "GREEN ACRES", "scenario": "SCM01EA", "players": players,
+            "max": most, "locked": False, "abi": 0, "scen": 0,
+            "relay": room is not None, "open": True}
+    if room:
+        body["room"] = room
+    else:
+        body["port"] = port_no
+    req = urllib.request.Request("http://127.0.0.1:%d/" % port, data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as reply:
+            if json.load(reply).get("listed"):
+                listed += 1
+    except Exception as exc:
+        print("SEEDFAIL|%s|%s" % (name, exc))
+print("SEEDED|%d" % listed)
+G234EOF
+)
+      echo "$G234SEEDP" >> "$OUT"
+      if ! grep -aq '^MPLOBBY|host|room=' /tmp/g234_relayed.log || ! grep -aq '^MPLOBBY|host|open' /tmp/g234_direct.log; then
+        G234WHY="$G234WHY the ping half's two rooms did not both open: $(grep -a 'MPLOBBY|FAIL' /tmp/g234_direct.log /tmp/g234_relayed.log | head -2 | tr '\n' ' ')."
+      elif ! printf '%s\n' "$G234SEEDP" | grep -q '^SEEDED|11$'; then
+        G234WHY="$G234WHY the ping half's seed did not list eleven rows: $(printf '%s' "$G234SEEDP" | tr '\n' ' ')."
+      else
+        ./cnc3d $BASE --mplist "http://127.0.0.1:$G234PPORT/" --mprelay "127.0.0.1:$G234RPORT" \
+            --mpping --mppingdirect /tmp/g234_direct.log --mppingrelayed /tmp/g234_relayed.log \
+            --mppingshot shots/g234_mp > /tmp/g234_ping.log 2>&1
+        G234PRC=$?
+        cat /tmp/g234_ping.log >> "$OUT"
+        G234PN=$(sed -n 's/^MPPING|done|checks=\([0-9]*\)|.*/\1/p' /tmp/g234_ping.log | head -1)
+        G234PBAD=$(sed -n 's/^MPPING|done|checks=[0-9]*|fails=\([0-9]*\)$/\1/p' /tmp/g234_ping.log | head -1)
+        if [ "${G234PBAD:-1}" != "0" ] || [ "${G234PN:-0}" -lt 38 ] || [ "$G234PRC" != "0" ]; then
+          G234WHY="$G234WHY --mpping checks=$G234PN(want >=38) fails=$G234PBAD(want 0) exit=$G234PRC(want 0): $(grep -a '^MPPING|FAIL|' /tmp/g234_ping.log | head -3 | tr '\n' ' ')."
+        fi
+        G234REG=$(grep -ac '^RELAY|register|' /tmp/g234_relay.log)
+        G234OPEN=$(grep -ac '^NET|probe-relay|open' /tmp/g234_ping.log)
+        if [ "$G234REG" != "2" ] || [ "$G234OPEN" != "1" ]; then
+          G234WHY="$G234WHY the relay saw $G234REG registrations (want 2: the relayed room and one for the browser) and the browser opened its probe registration $G234OPEN times (want 1, across two visits and a REFRESH)."
+        fi
+        G234QUIET=$(grep -ac '^QUIET|' /tmp/g234_relay.log)
+        if [ "$G234QUIET" != "0" ]; then
+          G234WHY="$G234WHY $G234QUIET datagrams reached the direct row nobody selected (want 0)."
+        fi
+        # THE DIRECT ROOM'S LOG, read here and not only by the harness: nothing up to the byte
+        # offset the harness took just before its click, and one round of four answers after.
+        G234AT=$(sed -n 's/^MPPING|direct-log|before-select|bytes=\([0-9]*\)|.*/\1/p' /tmp/g234_ping.log | head -1)
+        if [ -z "$G234AT" ]; then
+          G234WHY="$G234WHY the harness never said where the direct room's log stood before the click."
+        else
+          G234DBEFORE=$(head -c "$G234AT" /tmp/g234_direct.log | grep -ac '^NET|probes|')
+          G234DAFTER=$(tail -c +"$((G234AT + 1))" /tmp/g234_direct.log | sed -n 's/^NET|probes|answered=\([0-9]*\)|.*/\1/p' | awk '{s+=$1} END{print s+0}')
+          if [ "$G234DBEFORE" != "0" ] || [ "$G234DAFTER" != "4" ]; then
+            G234WHY="$G234WHY the direct room's own log shows $G234DBEFORE probe lines before the click (want 0) and $G234DAFTER answers after it (want 4)."
+          fi
+        fi
+        if [ ! -s shots/g234_mp_join-net-live.png ]; then
+          G234WHY="$G234WHY no picture of the live list was written."
+        fi
+      fi
+      kill -9 $G234DPID $G234RPID 2>/dev/null
+      wait $G234DPID $G234RPID 2>/dev/null
+      cat /tmp/g234_direct.log /tmp/g234_relayed.log /tmp/g234_relay.log >> "$OUT"
+    fi
+    kill $G234RELPID $G234PSVC 2>/dev/null
+    wait $G234RELPID $G234PSVC 2>/dev/null
+  fi
+fi
+
+if [ -n "$G234WHY" ]; then
+  bad "G234 the game list sorts, scrolls and filters:$G234WHY"
+elif [ -n "$G234SKIP" ]; then
+  skip "G234 the game list sorts, scrolls and filters: --mpsort ($G234AN checks) and --mpshot passed, but $G234SKIP"
+else
+  ok "G234 the game list sorts, scrolls and filters, and remembers how: $G234AN checks on the rules and $G234BN through the screen's own loop against a real service. Six arrival orders give one order under every column in both directions, joinable games always first; the selection is held by the game's key, so a game arriving above it moves the highlight with its game, a fetch without it leaves nothing selected and JOIN grey, and its return selects it again; HIDE LOCKED and HIDE GREYED hold back exactly those rows and count a locked grey row once; the thumb is flush at both ends, and with ten rows or none there is no thumb and a press or a drag on the track scrolls, holds and selects nothing; the track pages, a released thumb scrolls nothing, the wheel and the four keys stop at the ends; only the rows band selects; the status line names why a row is grey and what to type for a locked one; a LAN row's PING cell is empty and a PING sort on the LAN list is ordered by name. Pressed for real, PLAYERS sorted both ways kept the same game selected through a refetch, END and the track moved as asked, and HIDE LOCKED dropped and restored the selected game. The YOUR NAME box is modal: a press or a list key behind it moves nothing, its OK asks again whether JOIN still means the same game, ESC shuts it and drops the name nobody confirmed, and leaving the screen with it open does the same while the sort and HIDE boxes are still written; with the caret in ROOM CODE the list keys select nothing; a thumb whose release never came scrolls nothing. A visit that changed nothing wrote no settings file, one that did wrote the sort, a box and the name, a new process read them back, and a damaged file and a missing one both left the defaults. Ten pictures, nothing overflowing, and on the INTERNET list's picture the scroll thumb is a lighter plate than its well ($G234CONTRAST, want diff >=20). With nothing to scroll there is no thumb: the drawn track matches an empty one at ten games and at none and not at eleven ($G234TRACK), and on the hidden list's picture the track is one flat colour of the well's green ($G234EMPTY, want colours=1 and diff within 5). And $G234PN checks on the PING column through the screen's own loop against two live rooms and a relay stand-in: the relayed room read a round trip with nobody selecting it, rooms nobody holds read --, a full room was never asked, ten relayed rooms went through one relay registration and no more than eight were asked at once, PING sorted the unknowns last both ways, REFRESH asked again and a refetch did not; the direct room was not probed until it was selected, by its own log and by a quiet port that heard nothing, and was probed once when it was; arrow keys walked over both direct rooms without either being probed, and HOME in ROOM CODE neither selected nor probed anything, so Enter joined the typed address. BEYOND THE THUMB'S CONTRAST THIS SAYS NOTHING about how the list looks, which has to be judged by eye from shots/g234_mp_join-net.png and shots/g234_mp_join-net-live.png, nor about a round trip across a real network, since every number measured here is on loopback"
+fi
+
+if [ -x ./gate_roomcode ]; then
+  RCOUT=$(./gate_roomcode 2>&1); RCRC=$?
+  RCPASS=$(printf '%s' "$RCOUT" | sed -n 's/^ROOMCODE OK: \([0-9]*\) checks.*/\1/p')
+else
+  RCRC=99
 fi
 NCRC=0; NCOUT=""; NCDIG="none"
 if [ -x ./netcheck ]; then
@@ -7510,10 +8902,11 @@ if [ -x ./netcheck ]; then
 else
   NCRC=99
 fi
-if [ "$LSRC" = "0" ] && [ "$NLRC" = "0" ] && [ "$NCRC" = "0" ]; then
-  ok "G130 lockstep scheduler: $LSPASS legs green with no network (loss in both directions, four peers, scrambled arrival, forged and malformed packets, turn overflow reported rather than dropped) and $NLPASS more over real loopback datagrams, and the shipped netcheck selftest agrees with itself at ORDER DIGEST $NCDIG. Proves peers AGREE; it does not pin which sequence they agree on, and the gate file says so"
+if [ "$LSRC" = "0" ] && [ "$NLRC" = "0" ] && [ "$NCRC" = "0" ] && [ "$TNRC" = "0" ] \
+   && [ "$RCRC" = "0" ]; then
+  ok "G130 lockstep scheduler: $LSPASS legs green with no network (loss in both directions, four peers, scrambled arrival, forged and malformed packets, turn overflow reported rather than dropped) and $NLPASS more over real loopback datagrams, and the shipped netcheck selftest agrees with itself at ORDER DIGEST $NCDIG. $TNPASS more run the RELAYED transport against a relay small enough to read: a peer is still told WHO sent a packet when every packet arrives from one relay address, the payload comes out the size it went in, and the two kinds of address refuse each other rather than being silently interchangeable. Proves peers AGREE; it does not pin which sequence they agree on, and the gate file says so. And $RCPASS more on the ROOM CODE, which is a relayed host's whole address: every boundary id and a hundred thousand others survive the round trip, a code read aloud survives being mis-copied (I and L read as 1, O as 0), and five symbols, seven symbols, a missing sigil and a letter outside the alphabet are each REFUSED rather than half-read -- a prefix that silently decoded would send a player to a room that does not exist"
 else
-  bad "G130 lockstep scheduler: gate_lockstep exit=$LSRC gate_netloop exit=$NLRC netcheck-selftest exit=$NCRC (99 means the binary was not built; game/build.sh makes all three). First failures: $(printf '%s\n%s\n%s' "$LSOUT" "$NLOUT" "$NCOUT" | grep -E '^FAIL|^  FAILED' | head -3 | tr '\n' ' ')"
+  bad "G130 lockstep scheduler: gate_lockstep exit=$LSRC gate_netloop exit=$NLRC netcheck-selftest exit=$NCRC gate_tunnel exit=$TNRC gate_roomcode exit=$RCRC (99 means the binary was not built; game/build.sh makes all five). First failures: $(printf '%s\n%s\n%s\n%s\n%s' "$LSOUT" "$NLOUT" "$NCOUT" "$TNOUT" "$RCOUT" | grep -E '^FAIL|^  FAILED' | head -3 | tr '\n' ' ')"
 fi
 
 # ---------------------------------------------------------------------------
@@ -7556,11 +8949,19 @@ $TBOUT2"
 else
   TBRC=99
 fi
+printf '%s\n' "$TBOUT" >>"$OUT"
 TBHASH=$(printf '%s' "$TBOUT" | grep -o 'layout hash [0-9A-F]*' | head -1 | awk '{print $3}')
-if [ "$TBRC" = "0" ]; then
-  ok "G194 two brains in lockstep: two INDEPENDENT instances of the engine (isolation proven by setting the lockstep flag on one and reading it back false on the other, not assumed), both with CNC3D_Lockstep ON, agreeing on the full object dump after every one of 2000 ticks of SCB01EA at order-wire layout $TBHASH; and in a two-human SCM01EA match an order made on one instance was drained off it, posted to both, executed on both and left them byte identical, with the control that the SAME order given to one instance alone DID make them differ so the comparison can see it take effect. G4 proves one binary repeats; this proves two copies AGREE and that an order crosses between them, which is the property lockstep is built on. Since 3 Sep 2026 the same match also proves the four gestures that used to bypass the order queue are orders now: repair, sell, wall sell and placement each changed NOTHING on the instance that clicked until the order crossed, then changed both worlds alike (the sell with no visible effect headless, because Sell_Back needs build-up art the stubs do not carry), and two placement clicks in one window placed exactly one building"
+# THE TICKS ARE READ, NOT ASSUMED. cnc_twobrain also exits 0 when a scenario ends itself,
+# so a mission won or lost in its first ticks would pass having compared a handful of
+# dumps. Each leg's PASSED line says how many ticks it actually ran, and neither leg may
+# have ended early.
+TBN=$(printf '%s\n' "$TBOUT" | sed -n 's/.*lockstep mode, ran \([0-9]*\) ticks.*/\1/p' | sed -n 1p)
+TBN2=$(printf '%s\n' "$TBOUT" | sed -n 's/.*lockstep mode, ran \([0-9]*\) ticks.*/\1/p' | sed -n 2p)
+TBEND=$(printf '%s\n' "$TBOUT" | grep -c 'the scenario ended itself')
+if [ "$TBRC" = "0" ] && [ "$TBN" = "2000" ] && [ "$TBN2" = "300" ] && [ "$TBEND" = "0" ]; then
+  ok "G194 two brains in lockstep: two INDEPENDENT instances of the engine (isolation proven by setting the lockstep flag on one and reading it back false on the other, not assumed), both with CNC3D_Lockstep ON, agreeing on the full object dump after every one of $TBN ticks of SCB01EA at order-wire layout $TBHASH; and in a two-human SCM01EA match of $TBN2 ticks an order made on one instance was drained off it, posted to both, executed on both and left them byte identical, with the control that the SAME order given to one instance alone DID make them differ so the comparison can see it take effect. G4 proves one binary repeats; this proves two copies AGREE and that an order crosses between them, which is the property lockstep is built on. The same match also proves the four gestures that used to bypass the order queue are orders now: repair, sell, wall sell and placement each changed NOTHING on the instance that clicked until the order crossed, then changed both worlds alike (the sell with no visible effect headless, because Sell_Back needs build-up art the stubs do not carry), and two placement clicks in one window placed exactly one building"
 else
-  bad "G194 two brains in lockstep: exit=$TBRC (99 means cnc_twobrain or the brain was not in the run folder; game/build.sh makes the binary). $(printf '%s' "$TBOUT" | grep -E '^FAILED|first difference|DIVERGED' | head -2 | tr '\n' ' ')"
+  bad "G194 two brains in lockstep: exit=$TBRC(want 0; 99 means cnc_twobrain or the brain was not in the run folder; game/build.sh makes the binary) ticks=$TBN(want 2000) match-ticks=$TBN2(want 300) ended-early=$TBEND(want 0; a scenario that ends itself compares only the dumps before it ended). $(printf '%s' "$TBOUT" | grep -E '^FAILED|first difference|DIVERGED|ended itself' | head -2 | tr '\n' ' ')"
 fi
 
 # ---------------------------------------------------------------------------
@@ -7620,6 +9021,336 @@ else
   bad "G195 two peers over loopback: host exit=$NHRC joiner exit=$NJRC (99: cnc_eyes or $SKMAP not in the run folder) hash-reports-agreeing=$NAGREE(want >=10) disagreeing=$NDIS(want 0) desync-alarms=$NDESYNC(want 0) host-placed=$NPLACED(want >=1) joiner-sees-plant=$NJNUKE(want >=1). $(grep -hE '^NET\|error|^NETDESYNC|^TICK\|brain refused' net_host.log net_join.log 2>/dev/null | head -3 | tr '\n' ' ')"
 fi
 
+# ---------------------------------------------------------------------------
+# G198 A PEER THAT HAS ALREADY PLAYED AGREES WITH ONE THAT HAS JUST LAUNCHED.
+#
+# WHAT THIS CATCHES THAT NOTHING ELSE COULD. Every other lockstep gate in this suite, and
+# both peers in G195, start their scenario as the FIRST thing their process ever runs. That
+# makes the two sides identical for free in any state a scenario change does not reset, and
+# there is such state. It is the one that matters most: Scen.RandomNumber, the SYNCHRONISED
+# simulation RNG that the house selection loop and every Random_Pick draw from.
+#
+# It is written in exactly two places, both inside Init_Random (init.cpp), and Init_Random
+# is never reached in the DLL because it sits inside Select_Game, which returns early when
+# RunningAsDLL. The multiplayer design leans on that, and reasons correctly from it, to
+# conclude that no seed has to cross the wire: every peer holds RandomClass(0). What the
+# reasoning missed is that this is true only for a process's FIRST scenario. Clear_Scenario
+# resets every heap and every subsystem and does not touch this generator.
+#
+# WHAT THAT COSTS A PLAYER, in the ordinary case and not a contrived one. Finish a skirmish,
+# host a match: your stream is hundreds of draws along and a freshly launched joiner's is at
+# zero. Measured here, with the fix taken out, the two instances DEAL THEMSELVES DIFFERENT
+# HOUSES and diverge at tick 1, dump line 2 column 22, A on Multi4 against B's Multi1. Not a
+# drift that shows up minutes in: a different game from the first frame.
+#
+# Today a match is armed from the command line, so it is always a process's first scenario
+# and both peers really do start at zero. This gate exists because that is an accident of
+# there being no lobby yet, and Phase 5 removes it.
+#
+# HOW THE LEG WORKS. CNC3D_TB_WARM makes instance A run a throwaway scenario first and B not,
+# so the two differ in exactly one way: what their process has already done. Then both start
+# the real scenario and must agree on every tick, as they must in every other leg.
+#
+# MUTATION TESTED. With the reset removed from Clear_Scenario this leg reports the Multi4
+# against Multi1 divergence above and exits non-zero; with it in, 120 ticks byte identical.
+# ---------------------------------------------------------------------------
+if [ -x ./cnc_twobrain ] && [ -f ./TiberianDawn.dylib ]; then
+  WSOUT=$(CNC3D_TB_WARM=SCB01EA CNC3D_TB_WARM_TICKS=200 \
+      ./cnc_twobrain ./TiberianDawn.dylib content/ missions/ SCM01EA 120 2>&1)
+  WSRC=$?
+  # The warm-up must actually have happened, or this leg is G194 again under a new number.
+  WSWARM=$(printf '%s' "$WSOUT" | grep -c 'warm start: A has run')
+else
+  WSRC=99; WSWARM=0
+fi
+if [ "$WSRC" = "0" ] && [ "${WSWARM:-0}" -ge 1 ]; then
+  ok "G198 a warm process agrees with a cold one: instance A played 200 ticks of SCB01EA and threw it away, instance B played nothing, and the two then ran 120 ticks of SCM01EA byte identical including the whole gesture leg. That is the one difference between two peers that every other gate here gives away for free by starting every scenario in a fresh process, and it is the difference between a player who hosts after a skirmish and a joiner who just launched. Without the reset in Clear_Scenario the two deal themselves different houses and diverge at tick 1"
+else
+  bad "G198 a warm process agrees with a cold one: exit=$WSRC(99 means cnc_twobrain or the brain was not in the run folder) warm-start-ran=$WSWARM(want >=1; 0 means the leg measured nothing and is G194 again). $(printf '%s' "$WSOUT" | grep -E '^FAILED|first difference|the field that differs' | head -3 | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# G197 THE SCENARIO'S OWN BYTES ARE PART OF THE HANDSHAKE (design Phase 3's "scenario CRC").
+#
+# WHAT IT DEFENDS. Two peers can agree on every word of the match setup, the scenario NAME
+# included, and still start from different WORLDS: an edited map, a user map copied half
+# way, a different mission set, one side's .INI touched by the editor. Nothing in the setup
+# can see that. The handshake succeeds, the match begins, and it desyncs on the first tick
+# with the alarm truthfully reporting a mismatch and naming no cause at all. So the peers
+# now exchange a hash of what the SIMULATION reads -- the .INI and the .BIN, not the art --
+# and refuse each other by name before a tick is run.
+#
+# LEG 1 IS THE REFUSAL and it uses a difference that changes NOTHING the engine reads: a
+# comment line appended to the joiner's copy of the .INI. That is deliberate and it states
+# the honest cost of this check out loud. These two peers would in fact have played
+# perfectly, and they are refused anyway, because a byte comparison cannot know which bytes
+# matter and the conservative answer is the only safe one. A gate built on a difference
+# that DID change the simulation would pass for the wrong reason: it would not distinguish
+# "the hash caught it" from "the map failed to load".
+#
+# LEG 2 IS THE CONTROL, and without it this gate is worthless. A build that refused EVERY
+# joiner would sail through leg 1. So leg 2 runs the same two commands with the same bytes
+# on both sides and requires the handshake to SUCCEED, both seats reporting the same
+# scenario hash. Leg 1 says the check fires; leg 2 says it fires only when it should.
+#
+# BOTH ENDS ARE CHECKED, which is why leg 1 accepts a refusal logged by either: the host
+# reads the joiner's hash out of the HELLO, and the joiner re-checks the host's out of the
+# WELCOME, because a joiner started with no --scen of its own has nothing to hash until the
+# welcome tells it the name. Whichever end speaks first, the reason word must be the same,
+# and it comes from one table in netmatch.c so the two cannot disagree.
+#
+# WHAT HAS NO LEG HERE, said plainly rather than implied. netmatch.c checks at both ends,
+# and only the HOST'S check is exercised: the host reads the joiner's hash out of the HELLO
+# and refuses before the joiner's own re-check of the WELCOME can ever run. That second
+# check exists for a joiner started with no --scen of its own, which has nothing to hash
+# until the welcome names the map, and no leg below reaches it.
+#
+# MUTATION TESTED, per the rule this suite learned the hard way. With the comparison taken
+# out of BOTH ends of netmatch.c, leg 1 reports host-refused=0, joiner-said-why=0 and
+# joiner-reached-a-match-anyway=1, while leg 2's control stayed green at
+# control-handshake-succeeded=1 and both-seats-same-hash=1. So the gate fails on the thing
+# that broke and not on everything, and neither leg can pass on the absence of a line.
+# ---------------------------------------------------------------------------
+SCENH_REF=0; SCENH_HOST=0; SCENH_JOIN=0; SCENH_NOMATCH=0; SCENH_OK=0; SCENH_SAME=0; SCENRC=99
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  SCENRC=0
+  rm -rf /tmp/g197_missions
+  mkdir -p /tmp/g197_missions
+  cp "missions/$SKMAP.INI" "missions/$SKMAP.BIN" /tmp/g197_missions/ 2>/dev/null
+  printf '; G197: these bytes differ and mean exactly the same thing\n' >> "/tmp/g197_missions/$SKMAP.INI"
+  cat > /tmp/g197_script.txt <<'G197EOF'
+tick 30
+quit
+G197EOF
+  SCENALT="--cameos cameos.pack --dospack dossidebar.pack --dosinf dosinfantry.pack --dylib TiberianDawn.dylib --dir /tmp/g197_missions/ --content content/"
+
+  # --- leg 1: different bytes, same name. The joiner must be refused. ---
+  rm -f net_scen1_host.log net_scen1_join.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --host 17433 --script /tmp/g197_script.txt > net_scen1_host.log 2>&1 &
+  SH1=$!
+  sleep 2
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SCENALT --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17433 --script /tmp/g197_script.txt > net_scen1_join.log 2>&1
+  # The host is still sitting in its 120 second wait for a joiner it will never accept.
+  # kill -9 AND NOT PLAIN kill: a plain TERM is swallowed here, and the first version of
+  # this gate sat through the entire two minute wait before continuing. With -9 the leg
+  # takes three seconds. If this ever needs to be gentle again, give the host a shorter
+  # wait rather than a softer signal.
+  kill -9 $SH1 2>/dev/null
+  wait $SH1 2>/dev/null
+  SCENH_REF=$(grep -c 'reason=map bytes' net_scen1_join.log net_scen1_host.log 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
+  # BOTH ENDS MUST SAY SO. The host reads the joiner's hash out of the HELLO and refuses
+  # first, and the joiner prints what it was refused for. Requiring both is what stops this
+  # passing on a joiner that merely failed to connect.
+  SCENH_HOST=$(grep -c '^NET|refused|.*reason=map bytes' net_scen1_host.log 2>/dev/null)
+  SCENH_JOIN=$(grep -c '^NET|refused-by-host|reason=map bytes' net_scen1_join.log 2>/dev/null)
+  # THE ASSERTION THAT MATTERS: the joiner never got into a match. A refusal line that
+  # arrived while the match ran anyway would be a log message, not a defence.
+  SCENH_NOMATCH=$(grep -c '^NET|match|seat=1' net_scen1_join.log 2>/dev/null)
+
+  # --- leg 2, the control: same bytes on both sides. The handshake must SUCCEED. ---
+  rm -f net_scen2_host.log net_scen2_join.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --host 17434 --script /tmp/g197_script.txt > net_scen2_host.log 2>&1 &
+  SH2=$!
+  sleep 2
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17434 --script /tmp/g197_script.txt > net_scen2_join.log 2>&1
+  wait $SH2 2>/dev/null
+  SCENH_OK=$(grep -c '^NET|match|seat=1' net_scen2_join.log 2>/dev/null)
+  # Both seats must report the SAME scenario hash, which is the number leg 1 acted on.
+  SCEN_H=$(grep -o 'scen=[0-9A-F]*' net_scen2_host.log 2>/dev/null | head -1)
+  SCEN_J=$(grep -o 'scen=[0-9A-F]*' net_scen2_join.log 2>/dev/null | head -1)
+  if [ -n "$SCEN_H" ] && [ "$SCEN_H" = "$SCEN_J" ]; then SCENH_SAME=1; fi
+  cat net_scen1_host.log net_scen1_join.log net_scen2_host.log net_scen2_join.log >> "$OUT"
+fi
+if [ "$SCENRC" = "0" ] && [ "${SCENH_HOST:-0}" -ge 1 ] && [ "${SCENH_JOIN:-0}" -ge 1 ] \
+   && [ "${SCENH_NOMATCH:-0}" = "0" ] && [ "${SCENH_OK:-0}" -ge 1 ] && [ "${SCENH_SAME:-0}" = "1" ]; then
+  ok "G197 the scenario's bytes are in the handshake: a joiner holding a $SKMAP.INI that differs from the host's by one comment line -- a difference that changes NOTHING the engine reads -- was refused by name with reason 'map bytes' and never reached a match, while the control pair with identical bytes handshook cleanly and both seats reported the same scenario hash $SCEN_H. Two peers that agree on the map's NAME and hold different FILES used to get as far as playing and then desync on the first tick with no cause named; they now get a sentence instead. Refusing a pair that would have played is the deliberate cost: a byte comparison cannot know which bytes matter"
+else
+  bad "G197 the scenario's bytes are in the handshake: host-refused=$SCENH_HOST(want >=1) joiner-said-why=$SCENH_JOIN(want >=1) joiner-reached-a-match-anyway=$SCENH_NOMATCH(want 0) control-handshake-succeeded=$SCENH_OK(want >=1) both-seats-same-hash=$SCENH_SAME(want 1) rc=$SCENRC(99: cnc_eyes or $SKMAP not in the run folder). $(grep -hE '^NET\|refused|^NET\|error' net_scen1_join.log net_scen1_host.log net_scen2_join.log 2>/dev/null | head -3 | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# G201 HOSTING, JOINING, READYING AND STARTING, end to end with no screen.
+#
+# The multiplayer screens own no socket: they answer what the player asked for and the
+# shell calls the lobby functions. So "does hosting and joining actually work" is a
+# question about that layer, and it is answerable here with no SDL, no window and no
+# second machine. A gate that drove the pixels would be slower, flakier, and would still
+# be testing this.
+#
+# THE LEG THAT MATTERS MOST is the third: the host's START must be REFUSED while a seated
+# joiner has not readied. That is the whole promise of the ready column, and it is the one
+# thing a screenshot cannot show, because it is about a button NOT working.
+#
+# IT FOUND A REAL BUG THE FIRST TIME IT RAN, and it is the kind no screenshot ever shows.
+# A joiner acknowledges the start and may say goodbye a fraction later; both arrived in the
+# SAME drain, the acknowledgement set the flag and the goodbye then unseated the player and
+# cleared it. The host went on waiting for an acknowledgement from somebody who had already
+# gone, with no timeout, for ever. A goodbye during a start now aborts the start, and a
+# start nobody answers gives up after fifteen seconds.
+# ---------------------------------------------------------------------------
+if [ -x ./gate_lobby ]; then
+  GLOUT=$(./gate_lobby 2>&1); GLRC=$?
+else
+  GLRC=99; GLOUT=""
+fi
+GLCHK=$(printf '%s' "$GLOUT" | sed -n 's/.*PASSED\. \([0-9]*\) checks.*/\1/p')
+if [ "$GLRC" = "0" ]; then
+  ok "G201 hosting, joining, readying and starting: ${GLCHK:-?} checks. A host opens a room and reports itself waiting; a joiner is seated and both ends agree on the seat number; the host's START is REFUSED while that joiner has not readied and allowed the moment it has; both ends then reach the same match on the same scenario and the same seat count; and a joiner with the wrong passcode is refused BY NAME rather than left to time out"
+else
+  bad "G201 hosting, joining, readying and starting: gate_lobby exit=$GLRC (99 means it was not in the run folder; game/build.sh makes it). $(printf '%s' "$GLOUT" | grep -E '^FAIL|^FAILED|never-started' | head -3 | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# G200 A GAME ON THE LAN CAN BE FOUND, which is the server browser's whole foundation.
+#
+# WHY THIS RUNS BEFORE ANY BROWSER PIXEL EXISTS. A server browser that lists nothing looks
+# exactly like a network with nobody on it. That makes a discovery bug invisible: it does
+# not read as broken, it reads as quiet. So the wire is proven headless first, in one
+# process, with no game and no second machine.
+#
+# IT HAS ALREADY EARNED ITS KEEP. Writing it turned up two defects the browser would have
+# inherited as "the list is always empty", and a third in the socket layer underneath:
+#   1. A send to 255.255.255.255 FAILS on macOS, returning -1. Per-interface subnet
+#      broadcast works, and as a bonus arrives from the host's real LAN address, which is
+#      the address a joiner has to type.
+#   2. NetAddr is an opaque buffer plus a LEN, not a sockaddr_in. An address built by
+#      casting the struct leaves len at 0, which every net_udp function reads as "unset",
+#      so every datagram was dropped before it reached the socket.
+#   3. net_close never released its pool slot, so the socket pool was a budget of four for
+#      the PROCESS'S LIFE. A browser refreshing five times would have silently stopped.
+#
+# The gate itself runs 15 checks and takes about seven seconds, most of it deliberately
+# waiting for a row to go stale, which is the one property that cannot be tested quickly.
+# ---------------------------------------------------------------------------
+if [ -x ./gate_beacon ]; then
+  GBOUT=$(./gate_beacon 2>&1); GBRC=$?
+else
+  GBRC=99; GBOUT=""
+fi
+GBCHK=$(printf '%s' "$GBOUT" | sed -n 's/.*PASSED\. \([0-9]*\) checks.*/\1/p')
+if [ "$GBRC" = "0" ]; then
+  ok "G200 a game on the LAN can be found: ${GBCHK:-?} checks. A host announces itself by broadcast and a browser lists it exactly once, with its name, map, player counts, padlock and both fingerprints intact, at THE ADDRESS THE DATAGRAM CAME FROM rather than one it claimed; a host re-announcing updates its row instead of adding one; a game on another port is another row; a game that stops announcing leaves the list without saying goodbye; and REFRESH empties it at once. $(printf '%s' "$GBOUT" | sed -n 's/^  listed: /listed: /p')"
+else
+  bad "G200 a game on the LAN can be found: gate_beacon exit=$GBRC (99 means it was not in the run folder; game/build.sh makes it). $(printf '%s' "$GBOUT" | grep -E '^FAIL|^FAILED' | head -3 | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# G199 EIGHT PEERS, ONE MATCH: the design's Phase 3 gate, at the roster it asks for.
+#
+# G195 proves two copies of the game play one match. This proves EIGHT do, which is a
+# different claim in three ways and each one has broken something already:
+#
+#   1. THE SCHEDULER WAITS ON EVERY SEAT. With two peers "everyone has reported" and "the
+#      other one has reported" are the same sentence. With eight, a scheduler initialised
+#      with the wrong seat count waits for a peer that will never speak, and the match
+#      stops dead rather than desyncing, which looks like a hang and not like a bug.
+#   2. THE HOST RELAYS. A joiner's orders reach the other six joiners only because the
+#      host forwards them. If the relay drops, loops or reorders, seat 3's order reaches
+#      seat 1 and not seat 5, and the two worlds part. Two peers never exercise it at all.
+#   3. EVERY SEAT NEEDS ITS OWN ENGINE ID. The renderer names the local player to the
+#      brain as id 0 and every other seat as i + 1. The expression this replaced handed 1
+#      to EVERY non-local human, which two peers cannot distinguish from correct.
+#
+# WHAT IS ASSERTED. All eight processes exit cleanly; all eight report a match and the
+# eight seats are 0..7 with no seat claimed twice; no peer ever raises the desync alarm;
+# and -- the assertion that does the real work -- every frame that more than one peer
+# reported a world hash for has exactly ONE distinct hash across all eight logs. That last
+# one is stronger than G195's pairwise comparison and simpler: it cannot pass because two
+# particular logs happened to agree. Its floor is counted per log: at least ten frames
+# after frame 0 must be hashed by EVERY one of the eight logs, because a frame only one
+# log reported can never show a split.
+#
+# AND AN ORDER HAS TO CROSS. The host deploys, builds a Power Plant and places it; every
+# joiner must finish with that plant standing in its own world. A joiner sees it only if
+# the host's order reached it, so seven joiners seeing it is seven deliveries.
+#
+# NO PROCESS SUBSTITUTION: this suite runs under sh, where `<(...)` is a syntax error that
+# reports as a blank rather than a failure. The hash comparison is a sort and an awk.
+# ---------------------------------------------------------------------------
+N8_HOSTRC=99; N8_MATCHES=0; N8_SEATS=0; N8_DESYNC=0; N8_FRAMES=0; N8_SPLIT=0
+N8_PLACED=0; N8_SAWPLANT=0; N8_JOINRC=0; N8_EXITBAD=0
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  rm -f net8_*.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --players 8 --host 17436 --script gate_net_host.txt > net8_h.log 2>&1 &
+  N8HP=$!
+  sleep 3
+  J=1
+  while [ $J -le 7 ]; do
+    ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+        --join 127.0.0.1 17436 --script gate_net_join.txt > net8_j$J.log 2>&1 &
+    eval "N8JP$J=\$!"
+    J=$((J + 1))
+  done
+  wait $N8HP; N8_HOSTRC=$?
+  J=1
+  while [ $J -le 7 ]; do
+    eval "P=\$N8JP$J"
+    wait $P; RC=$?
+    [ "$RC" = "0" ] || N8_EXITBAD=$((N8_EXITBAD + 1))
+    J=$((J + 1))
+  done
+  cat net8_*.log >> "$OUT"
+  N8_MATCHES=$(cat net8_*.log | grep -c '^NET|match|seat=')
+  # Eight DISTINCT seats. A seat claimed twice is the handshake handing one out twice,
+  # which would otherwise show up only as a desync much later.
+  N8_SEATS=$(cat net8_*.log | sed -n 's/^NET|match|seat=\([0-9]*\)|.*/\1/p' | sort -u | grep -c .)
+  N8_DESYNC=$(cat net8_*.log | grep -c '^NETDESYNC|')
+  cat net8_*.log | sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' \
+      | sort -u > /tmp/g199_fh.txt
+  # A frame with two DIFFERENT hashes appears twice after sort -u. That is a split world.
+  N8_SPLIT=$(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/g199_fh.txt)
+  # THE FLOOR IS COUNTED LOG BY LOG, NOT OVER THE MERGED SET ABOVE. A frame that only one
+  # log reported has nothing to disagree with, so a count taken after merging is met by
+  # the host's hashes alone while seven joiners hash nothing. Each log names each of its
+  # frames once, and only a frame named by all eight counts. The logs are listed by name,
+  # so a log that is missing is a missing reporter rather than one file fewer to read.
+  # Frame 0 is left out: it is hashed before the first turn runs, so it proves one boot,
+  # not one match.
+  for f in net8_h.log net8_j1.log net8_j2.log net8_j3.log net8_j4.log net8_j5.log net8_j6.log net8_j7.log; do
+    sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=.*/\1/p' "$f" 2>/dev/null | sort -u
+  done | sort | uniq -c > /tmp/g199_reporters.txt
+  N8_FRAMES=$(awk '$1 == 8 && $2 > 0 {n++} END{print n+0}' /tmp/g199_reporters.txt)
+  # AND THE FLOOR REACHES THE END OF THE MATCH. Ten frames all eight logs hashed can all
+  # fall before the host has built anything, so a peer that stops hashing once the host's
+  # build order reaches it passes the count above while its world is never compared again.
+  # Two more demands. From the host's first hash after its placement order on, every one of
+  # the eight logs must hash at least 8 frames (the host plays 150 ticks after that order
+  # and hashes every 15, so a good build measures 10). And the last frame the host hashed
+  # must be one all eight logs hashed (measured: the host's last is 615, every joiner's 630).
+  N8_HOSTPF=$(sed -n '/^SCRIPT|place|auto/,$p' net8_h.log | sed -n 's/^NETSYNC|frame=\([0-9]*\)|.*/\1/p' | head -1)
+  N8_HOSTEND=$(sed -n 's/^NETSYNC|frame=\([0-9]*\)|.*/\1/p' net8_h.log | tail -1)
+  N8_AFTER=$(awk -v t="${N8_HOSTPF:-999999}" '$1 == 8 && $2 >= t {n++} END{print n+0}' /tmp/g199_reporters.txt)
+  N8_ENDALL=$(awk -v t="${N8_HOSTEND:--1}" '$1 == 8 && $2 == t {n++} END{print n+0}' /tmp/g199_reporters.txt)
+  N8_ENDS=$(for f in net8_h.log net8_j1.log net8_j2.log net8_j3.log net8_j4.log net8_j5.log net8_j6.log net8_j7.log; do
+    printf '%s:%s ' "${f%.log}" "$(sed -n 's/^NETSYNC|frame=\([0-9]*\)|.*/\1/p' "$f" 2>/dev/null | tail -1)"; done)
+  N8_PLACED=$(grep -c '^SIDEBAR-PLACE|NUKE|' net8_h.log)
+  # Every joiner must END with the host's plant standing in its own world.
+  J=1
+  while [ $J -le 7 ]; do
+    if grep '^OBJ|BUILDING|NUKE|' net8_j$J.log | grep -q '|limbo=0|'; then
+      N8_SAWPLANT=$((N8_SAWPLANT + 1))
+    fi
+    J=$((J + 1))
+  done
+fi
+if [ "$N8_HOSTRC" = "0" ] && [ "${N8_EXITBAD:-1}" = "0" ] && [ "${N8_MATCHES:-0}" = "8" ] \
+   && [ "${N8_SEATS:-0}" = "8" ] && [ "${N8_DESYNC:-1}" = "0" ] && [ "${N8_SPLIT:-1}" = "0" ] \
+   && [ "${N8_FRAMES:-0}" -ge 10 ] && [ "${N8_PLACED:-0}" -ge 1 ] && [ "${N8_SAWPLANT:-0}" = "7" ] \
+   && [ -n "$N8_HOSTPF" ] && [ "${N8_AFTER:-0}" -ge 8 ] && [ "${N8_ENDALL:-0}" = "1" ]; then
+  ok "G199 eight peers, one match: a host and SEVEN joiners armed one eight-human skirmish from the handshake and played it in lockstep. All eight took a distinct seat 0..7, all eight exited clean, no peer raised the desync alarm, no frame that any two logs both hashed carried two different hashes, and $N8_FRAMES frames after frame 0 were hashed by every one of the eight logs with exactly ONE hash -- not two logs agreeing, eight -- $N8_AFTER of them from the host's placement (frame $N8_HOSTPF) on, through the host's last hashed frame $N8_HOSTEND. The Power Plant the host placed stands in all $N8_SAWPLANT joiners' worlds, so its order crossed the wire, was relayed by the host and executed on seven machines that never clicked"
+elif [ "$N8_HOSTRC" = "0" ] && [ "${N8_EXITBAD:-1}" = "0" ] && [ "${N8_MATCHES:-0}" = "8" ] \
+   && [ "${N8_SEATS:-0}" = "8" ] && [ "${N8_DESYNC:-1}" = "0" ] && [ "${N8_SPLIT:-1}" = "0" ] \
+   && [ "${N8_FRAMES:-0}" -ge 10 ] && [ "${N8_PLACED:-0}" -ge 1 ] && [ "${N8_SAWPLANT:-0}" = "7" ]; then
+  bad "G199 eight peers, one match: the eight worlds stop being compared before the match ends. From the host's first hash after its placement order (frame ${N8_HOSTPF:-none}) on, only ${N8_AFTER:-0} frames were hashed by every one of the eight logs (want >=8; a good build measures 10), and the host's last hashed frame ${N8_HOSTEND:-none} was hashed by all eight in ${N8_ENDALL:-0} case (want 1). A peer that stops hashing part way is never compared again, and the host's build and placement are then checked only by the plant. Last hashed frame per log: $N8_ENDS"
+else
+  bad "G199 eight peers, one match: host exit=$N8_HOSTRC joiners-with-bad-exit=$N8_EXITBAD(want 0) matches-reported=$N8_MATCHES(want 8) distinct-seats=$N8_SEATS(want 8) desync-alarms=$N8_DESYNC(want 0) frames-with-a-split-hash=$N8_SPLIT(want 0) frames-hashed-by-all-eight-logs=$N8_FRAMES(want >=10) host-placed=$N8_PLACED(want >=1) joiners-seeing-the-plant=$N8_SAWPLANT(want 7). $(grep -hE '^NET\|error|^NETDESYNC|^NET\|refused' net8_*.log 2>/dev/null | head -3 | tr '\n' ' ')"
+fi
+
 # =====================================================================================
 # G131 THE ATTACK CURSOR: WHEN IT APPEARS, AND THE THREE STATES WHERE IT MUST NOT.
 #
@@ -7658,7 +9389,7 @@ fi
 # selection rather than on what was in it. One unit exchanged for one other unit does not
 # move the size, so with the pointer held still on a visible enemy, recalling a Medium
 # Tank over a Harvester left the pointer reading MOVE for the full 15 engine ticks the age
-# test allows -- one second at 15 Hz -- and the mirror left it reading ATTACK for a unit
+# test allows, which is about a second of play -- and the mirror left it reading ATTACK for a unit
 # that carries no weapon. Control groups make that the common case, not a corner. The leg
 # walks harvester, tank, harvester with no tick in between and asserts move, attack, move.
 #
@@ -7903,6 +9634,19 @@ fi
 #   unseen, the pointer is the move pointer, the order line says MOVE|shroud, and the click
 #   really is degraded to a move by the engine: a live NavCom and NO TarCom.
 #
+#   AND THE FOG-ON ORDER LINE NAMES BARE GROUND, target=ground, WHICH IS THE POINT OF THAT
+#   LEG AND NOT AN INCIDENTAL FIELD. `target` is what the RENDERER's silhouette pick found
+#   under the pointer, and under unexplored shroud it must find nothing: the Light Tank is
+#   not drawn there, so it may not be picked there either. This leg was written asserting
+#   target=LTNK and passed for a week, because shroud_vis_at read the corner-coverage field
+#   WITHOUT syncing it, so the object cull in visible() never fired and the pick could see
+#   an enemy standing in ground the player had never lifted. That is not cosmetic: on a
+#   picked object ui_order_at retargets the order to the object's own Target_Coord cell, so
+#   a click on open ground beside a shrouded tank was silently re-aimed onto the tank. The
+#   sync in shroud_vis_at closed it and the pick now answers bare ground. Proved both ways
+#   on one binary: deleting that one sync call restores target=LTNK, and restoring it
+#   restores target=ground, with every other field on the line byte-identical.
+#
 #   FOG OFF is the fix. The export reports the cell visible AND mapped, the pointer offers
 #   the attack, the order line says ATTACK with no shroud note, and the tank ends the leg
 #   on MISSION_ATTACK with a live TarCom. What makes that last line mean anything is the
@@ -7958,7 +9702,7 @@ grun /tmp/g137_off.log --scen SCG90EA --pack SCG01EA.pack $BASE --nosound --scri
 FGONSEL=$(grep -c '^SELECT|.*|type=MTNK|house=GoodGuy|.*|selected$' /tmp/g137_on.log)
 FGONSH=$(grep -c '^SHROUDAT|cell=56,38|visible=0|mapped=0|shadow=-1|gate=shrouded$' /tmp/g137_on.log)
 FGONCUR=$(grep -c '^CURSORCELL|cell=56,38|.*|shape=move$' /tmp/g137_on.log)
-FGONORD=$(grep -c '^ORDER|.*|cell=56,38|.*|target=LTNK|probe=5|MOVE|shroud$' /tmp/g137_on.log)
+FGONORD=$(grep -c '^ORDER|.*|cell=56,38|.*|target=ground|probe=5|MOVE|shroud$' /tmp/g137_on.log)
 FGONSD=$(grep -c '^SEL|UNIT|MTNK|.*|navcell=4920|tarcell=-1$' /tmp/g137_on.log)
 # fog OFF: the fix
 FGOFFSH=$(sed -n '1,/^ECHO|G137-backon/p' /tmp/g137_off.log \
@@ -7977,9 +9721,9 @@ elif [ "${FGONSEL:-0}" -ge 1 ] && [ "${FGONSH:-0}" = "1" ] && [ "${FGONCUR:-0}" 
      && [ "${FGOFFSH:-0}" = "1" ] && [ "${FGOFFCUR:-0}" = "1" ] && [ "${FGOFFORD:-0}" = "1" ] \
      && [ "${FGOFFIDLE:-0}" -ge 1 ] && [ "${FGOFFATK:-0}" -ge 1 ] && [ "${FGBACK:-0}" = "1" ] \
      && [ "${FGCLEAN:-0}" = "1" ]; then
-  ok "G137 fog of war reaches the cursor: with the cheat ON, cell 56,38 -- ground this player has never seen -- exports visible=1 mapped=1, the pointer over the Nod Light Tank standing there offers the ATTACK, the order line says ATTACK rather than MOVE|shroud, and the click puts an idle Medium Tank on MISSION_ATTACK with a live TarCom; switching fog back on returns the export to unseen; and with the cheat OFF the same cell exports visible=0, the pointer is the move pointer and the identical click is degraded to a move with no target"
+  ok "G137 fog of war reaches the cursor: with the cheat ON, cell 56,38 -- ground this player has never seen -- exports visible=1 mapped=1, the pointer over the Nod Light Tank standing there offers the ATTACK, the order line says ATTACK rather than MOVE|shroud, and the click puts an idle Medium Tank on MISSION_ATTACK with a live TarCom; switching fog back on returns the export to unseen; and with the cheat OFF the same cell exports visible=0, the pointer is the move pointer, the silhouette pick names bare ground rather than the tank it may not see, and the identical click is degraded to a move with no target"
 else
-  bad "G137 fog of war reaches the cursor: fogon-selected=$FGONSEL(want >=1; zero means the tank was never picked and nothing below is about the right unit) fogon-shrouded=$FGONSH(want 1) fogon-cursor-move=$FGONCUR(want 1) fogon-order-MOVE|shroud=$FGONORD(want 1) fogon-moved-no-target=$FGONSD(want >=1) FOGOFF-visible=$FGOFFSH(want 1; ZERO IS THE BUG ITSELF -- Get_Shroud_State is not folding in Debug_Unshroud, so our copy of the map still says this cell is unseen while the engine says it is not) fogoff-cursor-attack=$FGOFFCUR(want 1) fogoff-order-ATTACK=$FGOFFORD(want 1) fogoff-idle-before=$FGOFFIDLE(want >=1; zero means the tank was NOT idle before the click, so the attack line proves nothing) fogoff-attacked=$FGOFFATK(want >=1) back-on-shrouded=$FGBACK(want 1; zero means the export latched instead of reading the flag) script-clean=$FGCLEAN(want 1)"
+  bad "G137 fog of war reaches the cursor: fogon-selected=$FGONSEL(want >=1; zero means the tank was never picked and nothing below is about the right unit) fogon-shrouded=$FGONSH(want 1) fogon-cursor-move=$FGONCUR(want 1) fogon-order-groundMOVE|shroud=$FGONORD(want 1; the whole line is 'target=ground|probe=5|MOVE|shroud' -- target=LTNK instead means the silhouette pick is seeing an enemy in unexplored shroud again, which also re-aims a nearby ground order onto that enemy's cell) fogon-moved-no-target=$FGONSD(want >=1) FOGOFF-visible=$FGOFFSH(want 1; ZERO IS THE BUG ITSELF -- Get_Shroud_State is not folding in Debug_Unshroud, so our copy of the map still says this cell is unseen while the engine says it is not) fogoff-cursor-attack=$FGOFFCUR(want 1) fogoff-order-ATTACK=$FGOFFORD(want 1) fogoff-idle-before=$FGOFFIDLE(want >=1; zero means the tank was NOT idle before the click, so the attack line proves nothing) fogoff-attacked=$FGOFFATK(want >=1) back-on-shrouded=$FGBACK(want 1; zero means the export latched instead of reading the flag) script-clean=$FGCLEAN(want 1)"
 fi
 
 # G132 HOLD THE RIGHT BUTTON TO DRAG THE CAMERA.
@@ -8459,12 +10203,26 @@ fi
 #
 # THE PIXEL COUNTS ARE RECTANGLE-LIMITED, and that is not decoration. Every verb that
 # presses the Map button advances the world one tick, so a whole-frame diff across a press
-# mixes the radar hole with whatever moved on the battlefield. The rectangle is the DOS
-# radar hole in screen pixels at the default 1280x720: the bar is 240 wide at scale 3 so
-# g_dbX0 is 1040, DB_RAD_X + DB_RAD_OFF_X is DOS x 244 -> 1052 and DB_RAD_I_WIDTH 72 -> 216
-# wide; g_dbY0 is (720-600)/2 = 60, DB_RAD_Y + DB_RAD_OFF_Y is DOS y 8 -> 84 and
-# DB_RAD_I_HEIGHT 69 -> 207 tall. The art HUD's box is measured the same way at 1280x960,
-# where g_h6Scale is 2: H6_RADAR_X/Y 11,31 -> 982,62 and H6_RADAR_W/H 136x120 -> 272x240.
+# mixes the radar hole with whatever moved on the battlefield. Two counts cross a press
+# anyway, because "nothing changed outside the hole" cannot be measured inside it: the
+# radar frame against the list frame, and the art HUD's emblem frame against its list
+# frame. They are trusted only after a STILLNESS check: each run's first frame is shot
+# again once the presses have brought it back, ticks later, and the BATTLEFIELD of the two
+# must match to the pixel. If it does not, the verdict says the battlefield moved instead of
+# blaming the list. The stillness check reads the battlefield only (left of the bar, x below
+# 1040 at 1280x720 and below 960 on the art HUD at 1280x960), because the bar is where every
+# list defect shows: a cycle that does not put the plot back and a list whose ground is not
+# released both leave those two frames apart INSIDE the bar, and measured over the whole
+# frame they read as a moving battlefield and hide the legs that name them. So the whole
+# frame of the first frame and its return is ALSO asserted, as its own leg, after the
+# stillness check. Every other whole-frame pair compares two runs at the same tick.
+#
+# The rectangle is the DOS radar hole in screen pixels at the default 1280x720: the bar is
+# 240 wide at scale 3 so g_dbX0 is 1040, DB_RAD_X + DB_RAD_OFF_X is DOS x 244 -> 1052 and
+# DB_RAD_I_WIDTH 72 -> 216 wide; g_dbY0 is (720-600)/2 = 60, DB_RAD_Y + DB_RAD_OFF_Y is
+# DOS y 8 -> 84 and DB_RAD_I_HEIGHT 69 -> 207 tall. The art HUD's box is measured the same
+# way at 1280x960, where g_h6Scale is 2: H6_RADAR_X/Y 11,31 -> 982,62 and H6_RADAR_W/H
+# 136x120 -> 272x240.
 #
 # WHAT THIS GATE DOES NOT CARRY. The campaign leg asserts that a campaign mission reaches
 # no roster at all, that the Map button prints the two lines it always printed, and that
@@ -8491,6 +10249,7 @@ sbroster
 shot shots/g135_none.png
 sbmap
 sbroster
+shot shots/g135_radar2.png
 quit
 SCRIPT
 cat > /tmp/g135_nr.txt <<'SCRIPT'
@@ -8502,6 +10261,7 @@ sbroster
 shot shots/g135_nr_list.png
 sbmap
 sbroster
+shot shots/g135_nr_none.png
 quit
 SCRIPT
 cat > /tmp/g135_press.txt <<'SCRIPT'
@@ -8543,13 +10303,15 @@ shot shots/g135_h6_off.png
 sbmap
 sbroster
 shot shots/g135_h6_list.png
+sbmap
+shot shots/g135_h6_off2.png
 quit
 SCRIPT
 
-gbegin shots/g135_radar.png shots/g135_list.png shots/g135_none.png \
-       shots/g135_nr_off.png shots/g135_nr_list.png \
+gbegin shots/g135_radar.png shots/g135_list.png shots/g135_none.png shots/g135_radar2.png \
+       shots/g135_nr_off.png shots/g135_nr_list.png shots/g135_nr_none.png \
        shots/g135_c1.png shots/g135_c2.png shots/g135_c3.png \
-       shots/g135_h6_off.png shots/g135_h6_list.png
+       shots/g135_h6_off.png shots/g135_h6_list.png shots/g135_h6_off2.png
 grun /tmp/g135_a.log $G135S --ai 3 --forceradar --script /tmp/g135_cycle.txt
 grun /tmp/g135_b.log $G135S --ai 3 --script /tmp/g135_nr.txt
 # NOT through grun: mmclick counts a press outside the plotted radar as a script
@@ -8566,10 +10328,10 @@ grun /tmp/g135_e.log --scen SCG01EA --pack SCG01EA.pack $BASE --forceradar \
 CNC3D_HUD=new ./cnc_eyes $G135S --ai 3 --w 1280 --h 960 --script /tmp/g135_h6.txt \
     >/tmp/g135_f.log 2>&1; G135FRC=$?
 cat /tmp/g135_f.log >> "$OUT"
-gshots shots/g135_radar.png shots/g135_list.png shots/g135_none.png \
-       shots/g135_nr_off.png shots/g135_nr_list.png \
+gshots shots/g135_radar.png shots/g135_list.png shots/g135_none.png shots/g135_radar2.png \
+       shots/g135_nr_off.png shots/g135_nr_list.png shots/g135_nr_none.png \
        shots/g135_c1.png shots/g135_c2.png shots/g135_c3.png \
-       shots/g135_h6_off.png shots/g135_h6_list.png
+       shots/g135_h6_off.png shots/g135_h6_list.png shots/g135_h6_off2.png
 
 # The cycle, in the order the three presses printed it.
 G135CYC=$(grep '^SIDEBAR-INPUT|map|' /tmp/g135_a.log | sed 's/^SIDEBAR-INPUT|map|//' | tr '\n' ',')
@@ -8593,10 +10355,11 @@ G135ALL=$(python3 "$GATEDIR/gate_gfx.py" diff shots/g135_radar.png shots/g135_li
 G135PLATE=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g135_list.png shots/g135_none.png $G135HOLE_R | cut -d'|' -f2)
 # THE BLOCKING ASSERTION. radar.cpp:1871-1873 lights the bezel and blacks the hole with no
 # test in front of it, so the list frame must not depend on having a radar at all. Both
-# runs are the same seed at the same tick, so anything but 0 is the roster sitting on
-# different ground -- the faction emblem, if the ACTIVATED frame was not forced.
+# pairs are the same seed at the same tick (41 for the list, 42 for the empty hole), so
+# anything but 0 is the roster sitting on different ground -- the faction emblem, if the
+# ACTIVATED frame was not forced.
 G135BEZEL=$(python3 "$GATEDIR/gate_gfx.py" diff shots/g135_list.png shots/g135_nr_list.png | cut -d'|' -f2)
-G135EMPTY=$(python3 "$GATEDIR/gate_gfx.py" diff shots/g135_none.png shots/g135_nr_off.png | cut -d'|' -f2)
+G135EMPTY=$(python3 "$GATEDIR/gate_gfx.py" diff shots/g135_none.png shots/g135_nr_none.png | cut -d'|' -f2)
 # sidebar.cpp:2645-2648: no radar, not a campaign -> the list toggles anyway.
 G135NR=$(grep -c '^SIDEBAR-INPUT|map|players on|no radar$' /tmp/g135_b.log)
 G135NR2=$(grep -c '^SIDEBAR-INPUT|map|players off|no radar$' /tmp/g135_b.log)
@@ -8618,15 +10381,38 @@ G135CBACK=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g135_c1.png shots/g135_c3.
 G135H6=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g135_h6_off.png shots/g135_h6_list.png $G135H6_R | cut -d'|' -f2)
 G135H6ALL=$(python3 "$GATEDIR/gate_gfx.py" diff shots/g135_h6_off.png shots/g135_h6_list.png | cut -d'|' -f2)
 G135H6R=$(grep -c '^SBROSTER|available=1|shown=1|radar=0|rows=4' /tmp/g135_f.log)
+# THE STILLNESS CHECK. g135_radar2 is the radar frame again at tick 43, three presses after
+# g135_radar at tick 40; g135_h6_off2 is the art HUD's emblem frame again at tick 42, two
+# presses after g135_h6_off. Zero pixels apart ON THE BATTLEFIELD means nothing moved there
+# across the presses, which is what lets the two whole-frame counts be read as the list's.
+# The bar is left out of these two on purpose: see the header.
+G135FIELD_R="0 0 1040 720"
+G135H6FIELD_R="0 0 960 960"
+G135STILL=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g135_radar.png shots/g135_radar2.png $G135FIELD_R | cut -d'|' -f2)
+G135H6STILL=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g135_h6_off.png shots/g135_h6_off2.png $G135H6FIELD_R | cut -d'|' -f2)
+# THE SAME TWO PAIRS OVER THE WHOLE FRAME, each its own leg. With the battlefield still,
+# anything left here is in the bar: the third press did not bring the plot back (radar), or
+# dropping the list did not give the art HUD its emblem back (h6).
+G135BACK=$(python3 "$GATEDIR/gate_gfx.py" diff shots/g135_radar.png shots/g135_radar2.png | cut -d'|' -f2)
+G135H6BACK=$(python3 "$GATEDIR/gate_gfx.py" diff shots/g135_h6_off.png shots/g135_h6_off2.png | cut -d'|' -f2)
+# THE RADARLESS BAR BEFORE THE LIST AND AFTER IT. G135EMPTY compares two runs that took the
+# same two presses, so a leftover common to both cancels out there. This compares the
+# radarless run against ITSELF before it was pressed at all, over the bar only (x 1040 and
+# right; the battlefield has had two ticks to move): the list's lit bezel and black fill
+# must be let go of once the list is dropped, leaving the untouched emblem frame.
+G135NRBAR=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g135_nr_off.png shots/g135_nr_none.png 1040 0 1280 720 | cut -d'|' -f2)
 
 if [ "$GRC" != "0" ]; then
   bad "G135 the Map button's player list: a run failed or wrote no shot (GRC=$GRC)"
+elif [ "${G135STILL:-1}" != "0" ] || [ "${G135H6STILL:-1}" != "0" ]; then
+  bad "G135 the Map button's player list: the battlefield moved while the Map button was being pressed: left of the bar, the radar frame at tick 40 and again at tick 43 is $G135STILL pixels apart, and the art HUD's emblem frame at ticks 40 and 42 is $G135H6STILL apart (want 0 each). The whole-frame counts compare shots one tick apart, so they say nothing about where the list drew until the battlefield holds still; this is not evidence of a fault in the list"
 elif [ "$G135CYC" = "players,off,radar," ] && [ "${G135SHOWN:-0}" -ge 1 ] \
      && [ "${G135OFF:-0}" -ge 1 ] && [ "${G135ME:-0}" = "4" ] && [ "${G135AI:-0}" = "12" ] \
      && [ "${G135INK:-0}" = "4" ] && [ "${G135ORD:-0}" = "1" ] \
      && [ "${G135HOLE:-0}" -ge 2000 ] && [ "${G135ALL:-1}" = "${G135HOLE:-0}" ] \
      && [ "${G135PLATE:-0}" -ge 20000 ] \
      && [ "${G135BEZEL:-1}" = "0" ] && [ "${G135EMPTY:-1}" = "0" ] \
+     && [ "${G135BACK:-1}" = "0" ] && [ "${G135H6BACK:-1}" = "0" ] && [ "${G135NRBAR:-1}" = "0" ] \
      && [ "${G135NR:-0}" -ge 1 ] && [ "${G135NR2:-0}" -ge 1 ] \
      && [ "${G135MISS:-0}" = "1" ] && [ "${G135CRC:-0}" = "1" ] \
      && [ "$G135CAM" = "20.000,20.000 50.500,50.500 20.000,20.000 20.000,20.000 " ] \
@@ -8637,7 +10423,7 @@ elif [ "$G135CYC" = "players,off,radar," ] && [ "${G135SHOWN:-0}" -ge 1 ] \
      && [ "${G135H6:-0}" = "65280" ] && [ "${G135H6ALL:-0}" = "65280" ]; then
   ok "G135 the Map button's player list: in a skirmish the button cycles plot -> list -> house-logo plate -> plot, the list carries one row per seat in ascending house order with $G135INK distinct inks off the 1995 text ramp and exactly one PLAYER among three COMPUTERs, $G135HOLE pixels of names appear inside the 216x207 radar hole and not one pixel outside it, $G135PLATE of that hole go back to the faction plate when the names are dropped, THE LIST FRAME IS PIXEL-IDENTICAL WITH AND WITHOUT A RADAR ($G135BEZEL pixels apart) so the ACTIVATED bezel and the black fill are as unconditional here as they are in Draw_Names, the radar stops taking camera jumps while the list covers it (one refused press, camera held at 20,20 where the same press had jumped it to 50.5,50.5), the kill column starts at $G135K0 and reaches $G135K1 with the defeated row greyed, the 640x480 art HUD replaces all $G135H6 pixels of its faction emblem with the same list and changes nothing else, and a campaign mission reaches no roster at all (available=0 three times), says exactly the two lines it always said, and its own Map button still swaps $G135CHOLE pixels of radar for the emblem and back"
 else
-  bad "G135 the Map button's player list: cycle=[$G135CYC](want players,off,radar,) list-shown=$G135SHOWN(want >=1) list-off=$G135OFF(want >=1) player-rows=$G135ME(want 4, one per sbroster) computer-rows=$G135AI(want 12) distinct-inks=$G135INK(want 4; fewer means two seats print the same colour and MPlayerTColors is not being indexed by PlayerColorType) house-order=$G135ORD(want 1) names-in-hole=$G135HOLE(want >=2000; 0 means the list draws nothing) whole-frame=$G135ALL(want the same number as names-in-hole; larger means the list painted outside the radar hole) hole-reverted=$G135PLATE(want >=20000) list-frame-with-vs-without-radar=$G135BEZEL(want 0; anything else means the list is standing on different ground when the player has no radar -- the faction emblem, because the ACTIVATED bezel and the BLACK fill of radar.cpp:1871-1873 were not forced) empty-frame-with-vs-without-radar=$G135EMPTY(want 0) no-radar-on=$G135NR(want >=1) no-radar-off=$G135NR2(want >=1; zero for either means the button no longer follows Zoom_Mode_Control's else arm and a radarless skirmish cannot see the list) refused-presses=$G135MISS(want exactly 1) refusal-run-exit=$G135CRC(want 1, the refused press and nothing else) cameras=[$G135CAM](want the second reading moved and the last two did not) kills-at-start=$G135K0(want 0) kills-after=$G135K1(want >=1; 0 means the column is frozen, not that nothing died -- check the defeated flag beside it) defeated-rows=$G135DEF(want >=1) art-hud-exit=$G135FRC(want 0) art-hud-rows=$G135H6R(want >=1) art-hud-box=$G135H6(want 65280, the whole 136x120 emblem box at scale 2; less means part of the emblem is still showing through the list) art-hud-frame=$G135H6ALL(want 65280, the same number: more means the list changed something outside its box) campaign-roster-absent=$G135CAV(want 3) campaign-button=[$G135CL](want radar off,radar on,) campaign-hole=$G135CHOLE(want >=20000) campaign-radar-back=$G135CBACK(want <=2000)"
+  bad "G135 the Map button's player list: cycle=[$G135CYC](want players,off,radar,) list-shown=$G135SHOWN(want >=1) list-off=$G135OFF(want >=1) player-rows=$G135ME(want 4, one per sbroster) computer-rows=$G135AI(want 12) distinct-inks=$G135INK(want 4; fewer means two seats print the same colour and MPlayerTColors is not being indexed by PlayerColorType) house-order=$G135ORD(want 1) names-in-hole=$G135HOLE(want >=2000; 0 means the list draws nothing) whole-frame=$G135ALL(want the same number as names-in-hole; larger means the list painted outside the radar hole) hole-reverted=$G135PLATE(want >=20000) list-frame-with-vs-without-radar=$G135BEZEL(want 0; anything else means the list is standing on different ground when the player has no radar -- the faction emblem, because the ACTIVATED bezel and the BLACK fill of radar.cpp:1871-1873 were not forced) empty-frame-with-vs-without-radar=$G135EMPTY(want 0) radar-frame-after-the-cycle=$G135BACK(want 0; anything else with the battlefield still means the third press did not bring back the frame the first press left) art-hud-emblem-after-the-list=$G135H6BACK(want 0; anything else means dropping the list did not give the emblem back) radarless-bar-after-the-list=$G135NRBAR(want 0; anything else means the list's lit bezel and black fill were not let go of when the list was dropped) still-battlefield-radar=$G135STILL still-battlefield-art-hud=$G135H6STILL(want 0 each) no-radar-on=$G135NR(want >=1) no-radar-off=$G135NR2(want >=1; zero for either means the button no longer follows Zoom_Mode_Control's else arm and a radarless skirmish cannot see the list) refused-presses=$G135MISS(want exactly 1) refusal-run-exit=$G135CRC(want 1, the refused press and nothing else) cameras=[$G135CAM](want the second reading moved and the last two did not) kills-at-start=$G135K0(want 0) kills-after=$G135K1(want >=1; 0 means the column is frozen, not that nothing died -- check the defeated flag beside it) defeated-rows=$G135DEF(want >=1) art-hud-exit=$G135FRC(want 0) art-hud-rows=$G135H6R(want >=1) art-hud-box=$G135H6(want 65280, the whole 136x120 emblem box at scale 2; less means part of the emblem is still showing through the list) art-hud-frame=$G135H6ALL(want 65280, the same number: more means the list changed something outside its box) campaign-roster-absent=$G135CAV(want 3) campaign-button=[$G135CL](want radar off,radar on,) campaign-hole=$G135CHOLE(want >=20000) campaign-radar-back=$G135CBACK(want <=2000)"
 fi
 fi
 
@@ -8739,14 +10525,11 @@ fi
 #      it sits, must reach rows it could not reach before, must stop showing the first
 #      row once it has moved off it, and must come back to exactly where it started.
 #
-#      THOSE ARE THE LEGS AGAIN, and they were briefly something else. When the mouse
-#      swap moved to the Gameplay page the count fell to eleven elements in an eleven row
-#      well, nothing scrolled, and the assertions were tightened to say so: every element
-#      visible at every offset, all three dumps identical. That is a statement about one
-#      transient count and not about the page, and the paragraph above -- left untouched
-#      through that change -- already said the opposite. The terrain art row makes twelve,
-#      the well scrolls again, and the legs are the behavioural ones once more. Adding a
-#      thirteenth must not require touching this gate a third time.
+#      THE LEGS STAY BEHAVIOURAL, AND SO DOES THE VERDICT TEXT. A leg or a message that says
+#      "every element visible at every offset, all three dumps identical" describes one row
+#      count that happens to fit the well, not the page, and it turns false as soon as the
+#      list outgrows the well. The message reports only what this run measured, so adding or
+#      removing a row must not require touching this gate.
 rm -f /tmp/g139_scroll.txt
 cat > /tmp/g139_scroll.txt <<'G139EOF'
 tick 30
@@ -8785,6 +10568,9 @@ D2HAS0=$(printf '%s\n' "$D2" | grep -c '^ADVROW|0|')
 # the overlap walk has to see the chrome as well.
 D1MAX=$(printf '%s\n' "$D1" | awk -F'|' '/^ADVROW\|/ && $3!="OK" && $3!="Scroll" {print $2}' | sort -n | tail -1)
 D2MAX=$(printf '%s\n' "$D2" | awk -F'|' '/^ADVROW\|/ && $3!="OK" && $3!="Scroll" {print $2}' | sort -n | tail -1)
+# For the verdict text: how many ELEMENT rows the well shows, and where the wheeled one starts.
+D1E=$(printf '%s\n' "$D1" | awk -F'|' '/^ADVROW\|/ && $3!="OK" && $3!="Scroll" {n++} END {print n+0}')
+D2MIN=$(printf '%s\n' "$D2" | awk -F'|' '/^ADVROW\|/ && $3!="OK" && $3!="Scroll" {print $2}' | sort -n | head -1)
 # No two controls may share a pixel at the BOTTOM of travel either. G108's walk, verbatim.
 D2OVER=$(printf '%s\n' "$D2" | awk -F'|' '/^ADVROW\|/ {
     split($4,p,","); split($5,d,"x");
@@ -8811,7 +10597,7 @@ elif [ "${D2OVER:-99}" != "0" ]; then
 elif [ "$D1" != "$D3" ]; then
   bad "G139 the Advanced page scrolls: scrolling to the end and back did not restore the page. The offset is not clamping symmetrically, so the well can be left somewhere it cannot be driven back from"
 else
-  ok "G139 the Advanced page scrolls: gate_optlayout runs and reads every rectangle on both the unscrolled and the wheeled page with no overlaps, and with the swap moved off to the Gameplay page the well of $D1N rows now holds the whole list, so the offset clamps to zero and all three dumps are identical (highest element row $D1MAX unscrolled, $D2MAX wheeled)"
+  ok "G139 the Advanced page scrolls: gate_optlayout reads every rectangle on both the unscrolled and the wheeled page with no failures, and the wheel moves the well of $D1E element rows from rows 0..$D1MAX to $D2MIN..$D2MAX: row 0 leaves view, the window keeps its $D1N lines (elements, OK and the bar) wherever it sits, no two controls overlap at the bottom of travel, and scrolling back restores the page exactly"
 fi
 
 # G140. THE PRIMARY FACTORY'S LABEL. See gate_primary.txt for why three legs are needed.
@@ -8857,6 +10643,17 @@ echo "$PRPIX" >> "$OUT"
 PRWS=$(echo "$PRPIX" | sed -n 's/^G140|white_sel=\(-*[0-9]*\).*/\1/p')
 PRWD=$(echo "$PRPIX" | sed -n 's/.*|white_desel=\(-*[0-9]*\)|.*/\1/p')
 PRWORD=$(echo "$PRPIX" | sed -n 's/.*|word=\(-*[0-9]*\)$/\1/p')
+# THE FLOOR FOLLOWS THE ZOOM THE FRAME REPORTED. A fixed 120 was justified by a wrong
+# minimum: sb_dos_px_half() clamps at 1, not 2, and the 640x480 HUD hits 1 at both
+# 1280x720 and 1280x800, which is what a player using the shipped HUD gets. At half=1 the
+# word is 41x11 real pixels and its ink is 85, under a 120 floor, so a fixed floor goes red
+# on a CORRECT build. 60*z*z is 60 at zoom 1 and 240 at zoom 2, a floor with margin at both.
+# IT IS SET HERE, BEFORE THE VERDICT, WITH NO DEFAULT. Set inside the verdict chain it only
+# existed once a branch above the ink test had already failed, so every pass was graded
+# against 60 whatever the zoom, and a label drawn at half scale at zoom 2 passed. A missing
+# zoom is its own failure below rather than an assumed zoom 1.
+PRFLOOR=""
+[ -n "$PRZOOM" ] && PRFLOOR=$(awk -v z="$PRZOOM" 'BEGIN{ printf "%d", 60*z*z }')
 if [ "$GRC" != "0" ]; then
   bad "G140 primary label: the run failed (exit $GRC)"
 elif [ -z "$PRID" ]; then
@@ -8867,16 +10664,12 @@ elif [ "${PRSEL:-0}" != "1" ] || [ "${PRNAME:-0}" != "1" ]; then
   bad "G140 primary label: with the barracks selected the frame would draw $PRSEL labels and $PRNAME of them name id=$PRID (want 1 and 1). Zero means the flag reached the brain and not the screen"
 elif [ "${PRDES:-9}" != "0" ]; then
   bad "G140 primary label: $PRDES labels would still be drawn with nothing selected (want 0). The word is supposed to be gated on the selection, and the flag is still set at this point, so a non-zero count means the is_selected test is missing"
-# THE FLOOR FOLLOWS THE ZOOM THE FRAME REPORTED. A fixed 120 was justified by a wrong
-# minimum: sb_dos_px_half() clamps at 1, not 2, and the 640x480 HUD hits 1 at both
-# 1280x720 and 1280x800, which is what a player using the shipped HUD gets. At half=1 the
-# word is 41x11 real pixels and its ink is 85, under a 120 floor, so a fixed floor goes red
-# on a CORRECT build. 60*z*z is 60 at zoom 1 and 240 at zoom 2, a floor with margin at both.
-PRFLOOR=$(awk -v z="${PRZOOM:-1}" 'BEGIN{ printf "%d", 60*z*z }')
-elif [ "${PRWORD:-0}" -ge "${PRFLOOR:-60}" ] && [ "${PRWD:-99999}" -lt "${PRWS:-0}" ]; then
+elif [ -z "$PRFLOOR" ] || [ "$PRFLOOR" -lt 60 ]; then
+  bad "G140 primary label: the label line for id=$PRID reported zoom='$PRZOOM' (want a number of at least 1.0; sb_dos_px_half clamps there), so the ink has no floor to be graded against. The floor is 60*zoom*zoom off that report, and guessing a zoom would grade a label drawn at any scale against the wrong number"
+elif [ "${PRWORD:-0}" -ge "$PRFLOOR" ] && [ "${PRWD:-99999}" -lt "${PRWS:-0}" ]; then
   ok "G140 primary label: the second click made barracks id=$PRID primary, the word stands in its own rectangle $PRRECT at zoom $PRZOOM ($PRWS white pixels against $PRWD with nothing selected, so $PRWORD of ink), and deselecting takes the word away while the engine keeps the flag"
 else
-  bad "G140 primary label: rect=$PRRECT zoom=$PRZOOM selected=$PRWS deselected=$PRWD word=$PRWORD (want >=120). The glyph ink of \"Primary\" is 85 DOS pixels, and the floor is 60*zoom*zoom off the zoom the frame itself reported, so 60 at half-zoom 1 (the 640x480 HUD at 1280x720 and 1280x800) and 240 at half-zoom 2 (the DOS bar there). sb_dos_px_half clamps at 1, not 2. Also note the selection brackets put about 18 white pixels inside this rectangle before a glyph is drawn. Zero means the rectangle is being reported but nothing is drawn in it -- most likely the 8POINT font failed to resolve, which prints its own line, or the alpha test is discarding every texel. A NEGATIVE number means the word is drawn when nothing is selected"
+  bad "G140 primary label: rect=$PRRECT zoom=$PRZOOM selected=$PRWS deselected=$PRWD word=$PRWORD (want >=$PRFLOOR). The glyph ink of \"Primary\" is 85 DOS pixels, and the floor is 60*zoom*zoom off the zoom the frame itself reported, so 60 at half-zoom 1 (the 640x480 HUD at 1280x720 and 1280x800) and 240 at half-zoom 2 (the DOS bar there). sb_dos_px_half clamps at 1, not 2. Also note the selection brackets put about 18 white pixels inside this rectangle before a glyph is drawn. Zero means the rectangle is being reported but nothing is drawn in it -- most likely the 8POINT font failed to resolve, which prints its own line, or the alpha test is discarding every texel. A NEGATIVE number means the word is drawn when nothing is selected"
 fi
 
 # =====================================================================================
@@ -9064,8 +10857,9 @@ fi
 # G143 THE GAMEPLAY PAGE EXISTS, IS REACHED FROM THE PAUSE MENU, AND FITS.
 #
 # Input is not part of the picture, so the two mouse switches live on a page of their own
-# reached from the pause menu as Options > Gameplay. Its heading is "Enhanced Mode" and
-# NOTHING on it is gated on the CLASSIC / ENHANCED master switch.
+# reached from the pause menu as Options > Gameplay, and the credit tick's switch, a sound
+# and not a picture either, sits under them as the third row. Its heading is "Enhanced
+# Mode" and NOTHING on it is gated on the CLASSIC / ENHANCED master switch.
 #
 # THE PAGE NUMBER IS 7 and that is deliberate: DOPT_PAGE_GAMEPLAY is APPENDED after
 # DOPT_PAGE_CONFIRM rather than inserted beside VISUALS, because four gates in this file
@@ -9081,6 +10875,8 @@ optgp
 optclick Swap mouse buttons
 optgp
 optclick Right button scrolls
+optgp
+optclick Credit tick sound
 optgp
 optclick OK
 optgp
@@ -9124,9 +10920,10 @@ GPHEAD=$(echo "$GP1" | grep -c '|head=1|')
 GPHR=$(echo "$GP1" | sed -n 's/.*|headrect=\([0-9]*\),\([0-9]*\) \([0-9]*\)x\([0-9]*\)|.*/\1 \3/p')
 GPHOK=$(awk -v v="$GPHR" -v b="$GPBOX" 'BEGIN{ split(v,V," "); split(b,B," ");
   print (V[1] > B[1] && V[1]+V[2]-1 < B[2]) ? 1 : 0 }')
-GPDEF=$(echo "$GP1" | grep -c '|swap=0|fx_swap=0|push=1|fx_push=1|')
-GPSWAP=$(echo "$GP2" | grep -c '|swap=1|fx_swap=1|push=1|fx_push=1|')
-GPPUSH=$(echo "$GP3" | grep -c '|swap=1|fx_swap=1|push=0|fx_push=0|')
+GPDEF=$(echo "$GP1" | grep -c '|swap=0|fx_swap=0|push=1|fx_push=1|cash=1|fx_cash=1|')
+GPSWAP=$(echo "$GP2" | grep -c '|swap=1|fx_swap=1|push=1|fx_push=1|cash=1|fx_cash=1|')
+GPPUSH=$(echo "$GP3" | grep -c '|swap=1|fx_swap=1|push=0|fx_push=0|cash=1|fx_cash=1|')
+GPCASH=$(echo "$GP4" | grep -c '|swap=1|fx_swap=1|push=0|fx_push=0|cash=0|fx_cash=0|')
 GPBACK=$(echo "$GPLOG" | grep -c '^OPTIONS|script|click|OK|.*|page=0$')
 GPADVN=$(echo "$ADLOG" | grep -c '^ADVRECT|')
 GPADVSWAP=$(echo "$ADLOG" | grep -c '^ADVRECT|.*|Swap mouse buttons|')
@@ -9135,8 +10932,8 @@ if [ "$GPRC" != "0" ] || [ "$ADRC" != "0" ]; then
   bad "G143 the Gameplay page: a run failed (page exit $GPRC, advanced exit $ADRC)"
 elif [ "${GPPAGE:-0}" != "1" ]; then
   bad "G143 the Gameplay page: clicking Gameplay on the pause menu did not land on page 7 [$GP1]. 7 is DOPT_PAGE_GAMEPLAY, APPENDED after CONFIRM so that ADVANCED, SOUND, CHEATS and CONFIRM keep 3, 4, 5 and 6, which four gates in this file match as literals"
-elif [ "${GPRECTS:-0}" != "3" ]; then
-  bad "G143 the Gameplay page: the page answered with $GPRECTS distinct rectangles, want 3 (two checkbox rows and OK). Fewer means a control has no rectangle and no click can reach it"
+elif [ "${GPRECTS:-0}" != "4" ]; then
+  bad "G143 the Gameplay page: the page answered with $GPRECTS distinct rectangles, want 4 (three checkbox rows and OK). Fewer means a control has no rectangle and no click can reach it"
 elif [ "${GPOVER:-99}" != "0" ]; then
   bad "G143 the Gameplay page: $GPOVER pairs of controls share a pixel. A row through the OK button makes OK partly unclickable"
 elif [ "${GPOUT:-99}" != "0" ]; then
@@ -9144,9 +10941,9 @@ elif [ "${GPOUT:-99}" != "0" ]; then
 elif [ "${GPHEAD:-0}" != "1" ] || [ "${GPHOK:-0}" != "1" ]; then
   bad "G143 the Gameplay page: the category heading measured=$GPHEAD (want 1) and inside-the-box=$GPHOK (want 1). Its rectangle is $GPHR against box $GPBOX. The heading is not a control, so one shared function measures it for both the draw and this dump; if it cannot be measured the font did not resolve"
 elif [ "${GPDEF:-0}" != "1" ]; then
-  bad "G143 the Gameplay page: the switches do not start at their defaults [$GP1]. Swapped buttons is OFF out of the box and the right button push is ON out of the box, and both the checkbox and the dial behind it must say so"
-elif [ "${GPSWAP:-0}" != "1" ] || [ "${GPPUSH:-0}" != "1" ]; then
-  bad "G143 the Gameplay page: clicking a box did not move the dial behind it. after-swap-click=[$GP2] after-push-click=[$GP3]"
+  bad "G143 the Gameplay page: the switches do not start at their defaults [$GP1]. Swapped buttons is OFF out of the box, the right button push and the credit tick are ON out of the box, and both the checkbox and the dial behind it must say so"
+elif [ "${GPSWAP:-0}" != "1" ] || [ "${GPPUSH:-0}" != "1" ] || [ "${GPCASH:-0}" != "1" ]; then
+  bad "G143 the Gameplay page: clicking a box did not move the dial behind it. after-swap-click=[$GP2] after-push-click=[$GP3] after-tick-click=[$GP4]"
 elif [ "${GPBACK:-0}" -lt 1 ]; then
   bad "G143 the Gameplay page: OK did not step back to the pause menu (no click line reporting page=0)"
 elif [ "${GPADVN:-0}" != "13" ]; then
@@ -9156,7 +10953,7 @@ elif [ "${GPADVSWAP:-1}" != "0" ]; then
 elif [ "${GPFAIL:-1}" != "0" ]; then
   bad "G143 the Gameplay page: the run reported $GPFAIL script failures"
 else
-  ok "G143 the Gameplay page: Options > Gameplay opens page 7 with three rectangles that fit inside its own box $GPBOX and share no pixel, its heading is measured at $GPHR and lands inside the plate, the switches start OFF and ON and both boxes move the dial behind them, OK steps back to the pause menu, and the Advanced page is back to thirteen rectangles with no Swap mouse buttons among them"
+  ok "G143 the Gameplay page: Options > Gameplay opens page 7 with four rectangles that fit inside its own box $GPBOX and share no pixel, its heading is measured at $GPHR and lands inside the plate, the switches start OFF, ON and ON and all three boxes move the dial behind them, OK steps back to the pause menu, and the Advanced page is back to thirteen rectangles with no Swap mouse buttons among them"
 fi
 
 # =====================================================================================
@@ -10072,7 +11869,11 @@ fi
 # misses and it takes the fallback arm. That is a truer test than an old pack, because it
 # is THIS pack with only the crate binding removed. Nothing is substituted in the run
 # folder; the fixture lives in /tmp and the shipped pack is untouched.
-python3 - "$RUNDIR/SCG32EA.pack" /tmp/g175_crateless.pack <<'G175PY' >> "$OUT" 2>&1
+# THE FIXTURE IS DELETED BEFORE IT IS BUILT AND THE BUILDER'S STATUS IS READ. The file
+# outlasts the run, so a builder that trips its own assertion on a rebaked pack would leave
+# the previous run's fixture standing, and both runs below would test that pack instead.
+gbegin shots/g175_on.png shots/g175_off.png shots/g175.log /tmp/g175_crateless.pack
+G175FXLOG=$(python3 - "$RUNDIR/SCG32EA.pack" /tmp/g175_crateless.pack 2>&1 <<'G175PY'
 import sys
 src, dst = sys.argv[1], sys.argv[2]
 b = bytearray(open(src, "rb").read())
@@ -10085,9 +11886,12 @@ for old, new in ((b"SCRATE\x00\x00", b"\x01CRATE\x00\x00"),
 open(dst, "wb").write(bytes(b))
 print("G175FIXTURE|%s|%d bytes" % (dst, len(b)))
 G175PY
+)
+G175FX=$?
+printf '%s\n' "$G175FXLOG" >> "$OUT"
+G175FXOK=$(printf '%s\n' "$G175FXLOG" | grep -c '^G175FIXTURE|/tmp/g175_crateless\.pack|[0-9]* bytes$')
 sed 's#shots/crate_x.png#shots/g175_on.png#'  "$GATEDIR/gate_crate3d.txt"     > /tmp/g175on.txt
 sed 's#shots/crate_x.png#shots/g175_off.png#' "$GATEDIR/gate_crate3d_off.txt" > /tmp/g175off.txt
-gbegin shots/g175_on.png shots/g175_off.png shots/g175.log
 grun shots/g175.log --scen SCG32EA --pack /tmp/g175_crateless.pack $BASE --noshroud --script /tmp/g175on.txt
 grun - --scen SCG32EA --pack /tmp/g175_crateless.pack $BASE --noshroud --script /tmp/g175off.txt
 gshots shots/g175_on.png shots/g175_off.png
@@ -10100,7 +11904,9 @@ SN=$(printf '%s\n' "$SPIX" | sed -n 's/.*steel_n=\([0-9]*\) .*/\1/p')
 SW=$(printf '%s\n' "$SPIX" | sed -n 's/.*steel_w=\([0-9]*\) .*/\1/p')
 SRB=$(printf '%s\n' "$SPIX" | sed -n 's/.*steel_rb=\(-\{0,1\}[0-9]*\)|.*/\1/p')
 SWN=$(printf '%s\n' "$SPIX" | sed -n 's/.*wood_n=\([0-9]*\) .*/\1/p')
-if [ "$GRC" != "0" ]; then
+if [ "$G175FX" != "0" ] || [ "$G175FXOK" != "1" ] || [ ! -s /tmp/g175_crateless.pack ]; then
+  bad "G175 the 1995 crate sprites still draw: the crateless fixture was not built on this run (builder exit=$G175FX, want 0; fixture lines=$G175FXOK, want 1), so the runs had no pack of this run's to load and nothing they report is about the fallback. The builder said: [$(printf '%s\n' "$G175FXLOG" | tail -1)]"
+elif [ "$GRC" != "0" ]; then
   bad "G175 the 1995 crate sprites still draw: a run failed (exit $GRC). Any number below would be read off a stale shot"
 elif [ "$SART" != "sprite" ]; then
   bad "G175 the 1995 crate sprites still draw: on a pack with no crate mesh the renderer must fall back, and it reported art=$SART. The fixture removes only the two type NAMES, so a 'cube' here means the lookup found them anyway and the fallback arm was never entered"
@@ -10244,11 +12050,29 @@ G176TREES=$(grep -cE '^P\|3\|T[0-9][0-9]\|' /tmp/g176_place.log)
 # THE GRID, NOT THE PLAYABLE RECT. wx/wz are grid coordinates, and the MAP line's size= is
 # the playable rectangle inside it (SCG01EA: size=28x25 within a 64 grid), so bounding by
 # that would red-flag legitimate objects. The pack line's cells= is the grid's own square.
+# NO DEFAULT WHEN IT CANNOT BE READ. This used to fall back to 256 whenever the pack line
+# was reworded or the scenario name did not match its pattern, which quietly put back the
+# very bound that could not fail. A cells= that is not the square of a grid at least 16
+# cells a side reads as 0 here, and the verdict refuses it by name.
 G176CELLS=$(sed -n 's/^pack [A-Z0-9]*: .*cells=\([0-9]*\).*/\1/p' /tmp/g176_place.log | head -1)
-G176DIM=$(awk -v c="${G176CELLS:-0}" 'BEGIN{ d=int(sqrt(c)+0.5); print (d>0)?d:256 }')
-G176OFFMAP=$(grep -E '^P\|3\|T[0-9][0-9]\|' /tmp/g176_place.log \
-  | sed -n 's/.*|wx=\([-0-9.]*\)|wz=\([-0-9.]*\)|.*/\1 \2/p' \
-  | awk -v lim="$G176DIM" '($1 < 0 || $2 < 0 || $1 > lim || $2 > lim) { n++ } END { print n+0 }')
+G176DIM=$(awk -v c="${G176CELLS:-0}" 'BEGIN{ d=int(sqrt(c)+0.5); print (d*d==c && d>=16)?d:0 }')
+# TWO BOUNDS PER TREE. The cell the engine stands it on must be a column and row of the
+# grid, 0..DIM-1. And the world position it is drawn at must sit on that cell's own corner
+# or past it by at most 2 cells in each direction: measured on SCB01EA, every T08 is drawn
+# 0.582,0.914 past its cell and every T18 1.375,1.664 (the T18 on cell 32,21 reports
+# wx=33.375 wz=22.664). Bounding the world position by the grid instead, with room for
+# that offset, admits a tree on the last row drawn nearly two cells past the edge. Held to
+# its own cell, a last-row T18 still passes at 64.664 and one drawn at 65.9 does not.
+# Every tree line must parse, or a reworded line would count as 0 off the map.
+G176POS=$(grep -E '^P\|3\|T[0-9][0-9]\|' /tmp/g176_place.log \
+  | sed -n 's/^P|3|\(T[0-9][0-9]\)|[^|]*|\([-0-9]*\)|\([-0-9]*\)|wx=\([-0-9.]*\)|wz=\([-0-9.]*\)|.*/\2 \3 \4 \5 \1/p' \
+  | awk -v lim="$G176DIM" '{ p++ }
+      ($1 < 0 || $2 < 0 || $1 >= lim || $2 >= lim ||
+       $3 - $1 < 0 || $3 - $1 > 2 || $4 - $2 < 0 || $4 - $2 > 2) {
+        n++; if (b == "") b = $5 "@" $1 "," $2 ":wx=" $3 ",wz=" $4 }
+      END { print p+0, n+0, (b == "" ? "none" : b) }')
+set -- $G176POS
+G176PARSED="$1"; G176OFFMAP="$2"; G176BAD="$3"
 if [ "$GRC" != "0" ]; then
   bad "G176 the running engine resolves the desert trees: a cnc_eyes run failed (exit $GRC), so every count below would be read off a run that did not finish"
 elif [ "$G176SAND" != "12 8 8 8" ]; then
@@ -10259,10 +12083,14 @@ elif [ "$G176TEMP" != "6 6 6 11" ]; then
   bad "G176 the running engine resolves the desert trees: on SCG01EA (Theater=TEMPERATE) dumpobj reports [$G176TEMP], wanted the temperate conifers [6 6 6 11]. This is the leg that proves the counter can tell the two apart, so a desert quadruple here means the swap is unconditional and nineteen temperate missions just grew cacti"
 elif [ "${G176TREES:-0}" -lt 5 ]; then
   bad "G176 the running engine resolves the desert trees: SCB01EA reported $G176TREES placed T-type terrain objects (want at least 5). A binding proved over a map with no trees on it proves nothing about anything standing anywhere"
+elif [ "${G176DIM:-0}" -lt 16 ]; then
+  bad "G176 the running engine resolves the desert trees: the SCB01EA run's pack line gave cells='$G176CELLS', which is not the square of a grid at least 16 cells a side, so there is no map size to hold the trees to. Falling back to 256 is what made this leg unable to fail, so an unread grid is refused rather than defaulted"
+elif [ "${G176PARSED:-0}" != "$G176TREES" ]; then
+  bad "G176 the running engine resolves the desert trees: the position parser read $G176PARSED of SCB01EA's $G176TREES placed tree lines, so an off-map count over them would be a count over nothing"
 elif [ "${G176OFFMAP:-0}" != "0" ]; then
-  bad "G176 the running engine resolves the desert trees: $G176OFFMAP of SCB01EA's $G176TREES placed trees report a world position off the map. A mesh bound correctly and planted nowhere is not a fix"
+  bad "G176 the running engine resolves the desert trees: $G176OFFMAP of SCB01EA's $G176TREES placed trees stand on a cell off its ${G176DIM}x${G176DIM} grid or are drawn somewhere other than within 2 cells past the corner of the cell they stand on (the first: $G176BAD). A mesh bound correctly and planted nowhere is not a fix"
 else
-  ok "G176 the running engine resolves the desert trees: loading the shipped packs, cnc_eyes resolves T04/T08/T09/T18 through its own type table to [12 8 8 8] on SCA01EA (Theater=DESERT, look name SAND) and on SCB01EA, and to the conifers [6 6 6 11] on SCG01EA, while SCB01EA stands $G176TREES T-type terrain objects on the map with every world position inside it"
+  ok "G176 the running engine resolves the desert trees: loading the shipped packs, cnc_eyes resolves T04/T08/T09/T18 through its own type table to [12 8 8 8] on SCA01EA (Theater=DESERT, look name SAND) and on SCB01EA, and to the conifers [6 6 6 11] on SCG01EA, while SCB01EA stands $G176TREES T-type terrain objects, every one standing on a cell of its ${G176DIM}x${G176DIM} grid and drawn within 2 cells of it"
 fi
 
 # =====================================================================================
@@ -10329,9 +12157,10 @@ grun shots/g181.log --scen SCG02EA --pack SCG02EA.pack $BASE --noshroud --nosoun
 gshots shots/g181_rest.png shots/g181_rest2.png shots/g181_anim.png shots/g181_seq.png
 # A sentinel that cannot pass: the python opens three PNGs, so on a run that wrote none it
 # would die rather than return a verdict. Evaluated only when the run succeeded.
-# Fifteen fields, in the python's own print order, every one of them a value that FAILS
-# its own leg: a run that could not be measured must not be able to report a pass.
-WR="-2 0 0 0 0 0 999 999 999 0 0 999 999 0 999"
+# Nineteen fields, in the python's own print order, every one of them a value that FAILS
+# its own leg: a run that could not be measured must not be able to report a pass. The
+# last is the list of dumps with no draw of their own frame, "none" when there are none.
+WR="-2 0 0 0 0 0 999 999 999 0 0 999 999 0 999 0 999 0 unmeasured"
 if [ "$GRC" = "0" ]; then
 WR=$(python3 - <<'PY'
 import re
@@ -10345,20 +12174,27 @@ log = open('shots/g181.log').read()
 blocks = log.split('WRENCHDUMP-BEGIN')[1:]
 mesh = tris = -1
 ndump = 0
+drawn = 0             # dumps that carry a draw record at all
+stale = 0             # draw records whose facing is not the facing this dump's frame has
+rest_ok = 0           # the first dump, frozen: drawn at face -1 on the collector's point
+unfresh = []          # dumps with no draw of their own frame, as dump-number@f<anim frame>
 countmin = 99
 blink = set()
 faces = []            # the drawn facing, animated samples only
 yawbad = 0
 anchorbad = 0
-for b in blocks:
+for bi, b in enumerate(blocks):
     b = b.split('WRENCHDUMP-END')[0]
     ndump += 1
     m = re.search(r'art=\d+ mesh=(-?\d+) count=(\d+) frames=(\d+) frame=(-?\d+) '
                   r'face=(-?\d+) tris=(\d+) opaque=(\d+) cutout=(\d+)', b)
     if not m:
         countmin = -1
+        unfresh.append('%d@unparsed' % (bi + 1))
         continue
     mesh, tris = int(m.group(1)), int(m.group(6))
+    hface = int(m.group(5))
+    hframe = int(m.group(4))
     countmin = min(countmin, int(m.group(2)))
     for w in re.findall(r'\|repairing=1\|wrench=([01])\|', b):
         blink.add(int(w))
@@ -10366,9 +12202,18 @@ for b in blocks:
                   r'\|ax=([-0-9.]+)\|az=([-0-9.]+)\|ay=([-0-9.]+)', b)
     q = re.search(r'WRENCHQUAD\|\S+?\|id=\d+\|dimw=\d+\|x0=([-0-9.]+)\|x1=([-0-9.]+)'
                   r'\|y0=([-0-9.]+)\|y1=([-0-9.]+)\|', b)
+    # A DUMP IS NOT A DRAW. A dump with no draw record is counted as undrawn rather than
+    # skipped, and a record is only this frame's if it carries the facing the dump header
+    # computes for this frame: the draw list survives a frame that did not draw, so a
+    # skipped draw prints the previous frame's record again.
     if not d:
+        unfresh.append('%d@f%d' % (bi + 1, hframe))
         continue
+    drawn += 1
     face = int(d.group(2)); yaw = float(d.group(3))
+    if face != hface:
+        stale += 1
+        unfresh.append('%d@f%d' % (bi + 1, hframe))
     ax, ay = float(d.group(4)), float(d.group(6))
     # THE YAW WITNESS. facing_rot turns a DirType into a CLOCKWISE angle, so the drawn
     # yaw must be face*360/256 to within the print's own rounding. face -1 is "no yaw"
@@ -10384,6 +12229,9 @@ for b in blocks:
             anchorbad += 1
         elif abs(ay - (float(q.group(3)) + float(q.group(4))) * 0.5) > 0.001:
             anchorbad += 1
+        elif bi == 0 and hface == -1 and face == -1:
+            # The rest pose G181's pixel legs compare against: drawn, frozen, in place.
+            rest_ok = 1
     if face >= 0:
         faces.append(face)
 
@@ -10410,7 +12258,8 @@ moved = px('g181_anim.png', 'g181_rest.png')
 control = px('g181_rest2.png', 'g181_rest.png')
 
 print(mesh, tris, ndump, countmin, len(blink), len(steps), dead, back, odd, rev,
-      distinct, yawbad, anchorbad, moved, control)
+      distinct, yawbad, anchorbad, moved, control, drawn, stale, rest_ok,
+      ','.join(unfresh) or 'none')
 PY
 )
 fi
@@ -10418,6 +12267,11 @@ set -- $WR
 W_MESH=$1; W_TRIS=$2; W_NDUMP=$3; W_COUNTMIN=$4; W_BLINK=$5; W_NSTEP=$6
 W_DEAD=$7; W_BACK=$8; W_ODD=$9; shift 9
 W_REV=$1; W_DISTINCT=$2; W_YAWBAD=$3; W_ANCHORBAD=$4; W_MOVED=$5; W_CONTROL=$6
+W_DRAWN=$7; W_STALE=$8; W_REST_OK=$9
+if [ $# -ge 10 ]; then shift 9; W_UNFRESH=$1; else W_UNFRESH=unmeasured; fi
+# A draw record counts for G182 only if it is that frame's own: a record printed again
+# from an earlier frame stands for a frame on which nothing was drawn.
+W_FRESH=$(( ${W_DRAWN:-0} - ${W_STALE:-0} ))
 
 # --- G180: the art and the placement --------------------------------------------------
 if [ "$GRC" != "0" ]; then
@@ -10428,10 +12282,16 @@ elif [ "${W_TRIS:-0}" != "65" ]; then
   bad "G180 the repair wrench is the cartridge's own CUR05: the resolved mesh has $W_TRIS triangles, and the cartridge's cursor model 0x05 has 65. A different mesh under the right type code is the failure this counts"
 elif [ "${W_NDUMP:-0}" -lt 28 ]; then
   bad "G180 the repair wrench is the cartridge's own CUR05: only $W_NDUMP wrenchdumps in the log, wanted 28. A short run cannot have walked a revolution"
+elif [ "${W_DRAWN:-0}" != "$W_NDUMP" ]; then
+  bad "G180 the repair wrench is the cartridge's own CUR05: only $W_DRAWN of $W_NDUMP wrenchdumps carry a draw record out of draw_mesh. A dump is not a draw: the frames without one drew no wrench"
+elif [ "${W_STALE:-1}" != "0" ]; then
+  bad "G180 the repair wrench is the cartridge's own CUR05: $W_STALE of $W_DRAWN draw records carry a facing other than the one their own dump computes for that frame. The draw list outlives a frame that skipped the draw, so these are an earlier frame's wrench printed again"
+elif [ "${W_REST_OK:-0}" != "1" ]; then
+  bad "G180 the repair wrench is the cartridge's own CUR05: the first dump, taken with the animation frozen, has no draw record at face -1 on the collector's point. The rest pose was not drawn, so the frozen frames show no wrench at all"
 elif [ "${W_ANCHORBAD:-1}" != "0" ]; then
   bad "G180 the repair wrench is the cartridge's own CUR05: $W_ANCHORBAD of $W_NDUMP frames put the model somewhere other than the point collect_wrenches computed for it. The anchor comes out of draw_mesh and the quad out of the collector, so these two disagreeing means the 3D draw is not standing where the sprite it replaces stood"
 else
-  ok "G180 the repair wrench is the cartridge's own CUR05: mesh $W_MESH, 65 triangles, drawn over the repairing barracks in all $W_NDUMP sampled frames, and draw_mesh's own anchor lands on the collector's point every time"
+  ok "G180 the repair wrench is the cartridge's own CUR05: mesh $W_MESH, 65 triangles, drawn over the repairing barracks in $W_DRAWN of $W_NDUMP sampled frames, each draw record carrying its own frame's facing, and draw_mesh's own anchor lands on the collector's point every time"
 fi
 
 # --- G181: it turns, and it turns the right way ---------------------------------------
@@ -10451,6 +12311,8 @@ elif [ "${W_DISTINCT:-0}" != "25" ]; then
   bad "G181 the repair wrench turns, clockwise, one revolution in 25 engine ticks: $W_DISTINCT distinct drawn facings, wanted the clock's 25"
 elif [ "${W_YAWBAD:-1}" != "0" ]; then
   bad "G181 the repair wrench turns, clockwise, one revolution in 25 engine ticks: on $W_YAWBAD frames the yaw draw_mesh built does not match the facing it was handed. The facing is being computed and then not spent, which no picture comparison can see"
+elif [ "${W_REST_OK:-0}" != "1" ]; then
+  bad "G181 the repair wrench turns, clockwise, one revolution in 25 engine ticks: the frozen rest pose was not drawn (no draw record at face -1 on the collector's point in the first dump), so the frozen control and the moved-pixels leg would measure whether a wrench is on screen at all, not whether it turns"
 elif [ "${W_CONTROL:-1}" != "0" ]; then
   bad "G181 the repair wrench turns, clockwise, one revolution in 25 engine ticks: the frozen control moved $W_CONTROL pixels. Two shots of the same tick with the animation off must be identical, or 'the picture changed' means nothing"
 elif [ "${W_MOVED:-0}" -lt 100 ]; then
@@ -10466,8 +12328,10 @@ elif [ "${W_BLINK:-0}" != "2" ]; then
   bad "G182 the repair wrench never blinks while the engine says the building is repairing: the engine's own IsWrenchVisible took $W_BLINK distinct values across the run, wanted both 0 and 1. With the blink bit stuck this leg cannot fire at all, so a re-added 'o.wrench' test would go unnoticed"
 elif [ "${W_COUNTMIN:-0}" != "1" ]; then
   bad "G182 the repair wrench never blinks while the engine says the building is repairing: on at least one frame the collector returned $W_COUNTMIN wrenches while the engine still said repairing=1. That is the 1995 fifteen-tick blink back, and with it a full revolution can never be seen"
+elif [ "$W_FRESH" != "$W_NDUMP" ] || [ "$W_UNFRESH" != "none" ]; then
+  bad "G182 the repair wrench never blinks while the engine says the building is repairing: the collector kept the wrench on every frame, but only $W_FRESH of $W_NDUMP dumps carry a draw record of their own frame out of draw_mesh ($W_DRAWN records, $W_STALE of them an earlier frame's printed again). The wrench was not drawn on dumps $W_UNFRESH (dump number @ animation frame), so it blinked there while the engine said repairing"
 else
-  ok "G182 the repair wrench never blinks while the engine says the building is repairing: across $W_NDUMP frames the engine's own IsWrenchVisible went both down and up and the wrench was drawn on every single one of them"
+  ok "G182 the repair wrench never blinks while the engine says the building is repairing: across $W_NDUMP frames the engine's own IsWrenchVisible went both down and up and a draw record carrying that frame's own facing came out of draw_mesh on all $W_FRESH of them"
 fi
 
 
@@ -10910,6 +12774,14 @@ G153FLATN=$(grep -ac '^SBRRAW|4[04],40|\|^SBRRAW|39,39|' /tmp/g153.log)
 G153FLAT=$(grep -a '^SBRRAW|4[04],40|\|^SBRRAW|39,39|' /tmp/g153.log | grep -avc "|raw=${G153FLATB:-x}|")
 G153H64=$(wc -c < missions/user_maps/USERG153.HGT 2>/dev/null | tr -d ' ')
 G153H128=$(wc -c < missions/user_maps/USERG15B.HGT 2>/dev/null | tr -d ' ')
+# A GATE TIDIES UP ITS OWN SCRATCH MAP. missions/user_maps is a PERSONAL folder -- it is
+# where the editor saves what a person makes -- so a suite run that leaves its workings in
+# it is putting rubbish in somebody's map list, and the packagers shipped
+# that folder wholesale. Removing it before the run is not enough; that only protects the
+# NEXT run, not the person.
+rm -f missions/user_maps/USERG153.INI missions/user_maps/USERG153.BIN \
+      missions/user_maps/USERG153.HGT missions/user_maps/USERG15B.INI \
+      missions/user_maps/USERG15B.BIN missions/user_maps/USERG15B.HGT
 if [ "$GRC" != "0" ]; then
   bad "G153 the brush is saved, is lit and moves the ground under a building: a run failed (exit $GRC)"
 elif [ -z "$G153FLATB" ] || [ -z "$G153FLATG" ]; then
@@ -10955,9 +12827,15 @@ fi
 # than writing them down.
 #
 # THE CELL IS FOUND, NOT WRITTEN DOWN, in the manner G152 finds its water: each map is
-# swept first, and the gate takes the driest cell whose sixteen core corners hold the
-# most corners that are ALREADY on that map's datum. That is what makes the last leg
-# possible -- ground nobody has touched, which ERASE must leave exactly where it is.
+# swept first, and the gate takes a dry cell whose sixteen core corners include at least
+# one ALREADY on that map's datum and at least four standing 4 bytes or more off it, and
+# of those the one with the most corners already on the datum. The corners already there
+# are ground nobody has touched, which ERASE must leave exactly where it is. The far ones
+# are what lets the paint leg see an ERASE that stops short: brought only halfway, a
+# corner 4 bytes off still reads 2 bytes off. A corner ONE byte off cannot show that,
+# because half a byte rounds back onto the datum, and choosing only by the corners
+# already on the datum picks exactly such a cell on SCG09EA (23,18: fifteen corners on 128
+# and one on 129), where an ERASE clamped halfway passed.
 #
 # THE FOUR LEGS, per map.
 #   the datum   SBRSTATE's flat= must equal the ground level the pack loader printed, and
@@ -10999,8 +12877,15 @@ for g154m in SCG01EA SCB01EA SCG09EA; do
         G154FAIL="on $g154m the datum reads 64, which is the constant the defect used. This gate needs three maps whose ground is NOT 64 or it cannot tell a datum from a constant"
         continue
     fi
-    # The driest cell whose sixteen core corners hold the most corners already on the
-    # datum. Both facts come out of the sweep this run just made.
+    # A dry cell with at least one core corner already on the datum and AT LEAST FOUR
+    # standing 4 bytes or more off it, and of those the most corners already on the datum.
+    # Every fact comes out of the sweep this run just made. A cell already level all over
+    # cannot tell a working ERASE from one that writes nothing: every reading is the datum
+    # before the stroke and after it, so the paint, level and no-op legs all turn into one
+    # no-op test. A cell whose off corners are only a byte away cannot tell a working ERASE
+    # from one that stops halfway, because the half it leaves rounds back onto the datum.
+    # Four corners at least 4 bytes off each still read at least 2 bytes off after a
+    # halfway ERASE, and the paint leg names them.
     set -- $(awk -v G="$g154D" -F'|' '
         /^SBRRAW\|/ { split($2,a,","); split($3,b,"="); R[a[1]","a[2]]=b[2]+0; next }
         /^HEIGHT\|/ { split($2,a,","); n=split($0,f,"|"); L[a[1]","a[2]]=f[n]; next }
@@ -11011,16 +12896,23 @@ for g154m in SCG01EA SCB01EA SCG09EA; do
             for (dy = -4; dy <= 4 && dry; dy++) for (dx = -4; dx <= 4 && dry; dx++)
               if (L[(x+dx)","(y+dy)] == "land=WATER") dry = 0
             if (!dry) continue
-            n = 0
-            for (dy = -1; dy <= 2; dy++) for (dx = -1; dx <= 2; dx++)
-              if (R[(x+dx)","(y+dy)] == G) n++
-            if (n > best) { best = n; bx = x; by = y }
+            n = 0; far = 0
+            for (dy = -1; dy <= 2; dy++) for (dx = -1; dx <= 2; dx++) {
+              d = R[(x+dx)","(y+dy)] - G
+              if (d == 0) n++
+              else if (d >= 4 || d <= -4) far++
+            }
+            if (n < 16 && far >= 4 && n > best) { best = n; bx = x; by = y; bf = far }
           }
-          print bx+0, by+0, best+0
+          print bx+0, by+0, (best < 0 ? 0 : best), bf+0
         }' "/tmp/g154_sweep_$g154m.log")
-    g154CX="$1"; g154CY="$2"; g154AT="$3"
-    if [ "${g154AT:-0}" -lt 1 ]; then
-        G154FAIL="the sweep of $g154m found no dry cell with a single corner already on that map's ground (best was ${g154AT:-none} at $g154CX,$g154CY). The last leg needs untouched ground to leave alone"
+    g154CX="$1"; g154CY="$2"; g154AT="$3"; g154FAR="$4"
+    if [ "${g154AT:-0}" -lt 1 ] || [ "${g154FAR:-0}" -lt 4 ]; then
+        G154FAIL="the sweep of $g154m found no dry cell with a core corner already on that map's ground and four core corners at least 4 bytes off it (the pick read ${g154AT:-none} on the datum and ${g154FAR:-none} that far off, at $g154CX,$g154CY). The last leg needs untouched ground to leave alone, and the paint leg needs corners far enough off that an ERASE stopping halfway still leaves them off the datum"
+        continue
+    fi
+    if [ "$g154AT" -gt 15 ]; then
+        G154FAIL="the sweep of $g154m chose $g154CX,$g154CY with $g154AT of its 16 core corners already on the datum $g154D. On a cell already level all over, an ERASE that writes nothing reads exactly like one that works, so the paint leg would measure nothing"
         continue
     fi
     { echo sbrstate
@@ -11079,7 +12971,7 @@ for g154m in SCG01EA SCB01EA SCG09EA; do
         G154FAIL="on $g154m a SECOND ERASE over ground already on the datum moved corners that were standing on $g154D. Erasing ground that is already at the map's own level has to be a no-op, or the tool digs every time it is used"
         continue
     fi
-    G154SAY="$G154SAY $g154m ground $g154D at $g154CX,$g154CY ($g154AT of its 16 core corners already there);"
+    G154SAY="$G154SAY $g154m ground $g154D at $g154CX,$g154CY ($g154AT of its 16 core corners already there, $g154FAR of them 4 bytes or more off it);"
 done
 if [ "$GRC" != "0" ] && [ -z "$G154FAIL" ]; then
   bad "G154 erase paints the map's own ground: a run failed (exit $GRC)"
@@ -11230,6 +13122,9 @@ G156U0=$(g156f "$G156S0" unlock); G156U1=$(g156f "$G156S1" unlock)
 G156U2=$(g156f "$G156S2" unlock); G156U3=$(g156f "$G156S3" unlock)
 G156OFF=$(g156f "$G156S0" offladder)
 G156KEY=$(grep -ac '^CNC3DSmooth=1' missions/user_maps/USERG156.INI 2>/dev/null)
+# Read first, then removed: see the note at G153.
+rm -f missions/user_maps/USERG156.INI missions/user_maps/USERG156.BIN \
+      missions/user_maps/USERG156.HGT
 G156SRC=$(grep -ac 'CNC3DSmooth' missions/SCG01EA.INI 2>/dev/null)
 G156NEW=$(grep -ac '^NEWMAP|rebooted' /tmp/g156.log)
 if [ "$GRC" != "0" ]; then
@@ -11281,9 +13176,15 @@ fi
 #               came out of ELEV_RUNG; the only ones left are the sea's, which it does
 #               not touch. A non-zero stray is the fit writing off the ladder.
 #   off A>=B    and the count itself never rises.
-#   ready=1     the elevation panel is usable AFTER the press. It was 0 before it on two
-#               of these maps: the fit is the way ONTO the ladder that reads the art
-#               instead of erasing it.
+#   ready=1     the elevation panel is usable AFTER the press. After a fit that moves
+#               corners that is the unlock the fit sets, not the off-the-ladder count
+#               reaching zero: SCB01EA keeps the sea's corners off the ladder. The proof
+#               that the fit put the ground ON the ladder is stray=0 on a map that was
+#               off it before the press.
+#   locked      SCB01EA and SCG10EA must ARRIVE locked: ready=0 on the first sbrstate,
+#               and A>0 in off=A/B. Every other leg here also passes on a map that needed
+#               no unlocking, so without this a loader or pack change that brought both
+#               up ready would leave the unlock unproven and the gate green.
 #   held>0      corners belonging to water, of which every one of these four maps has
 #               some, and wetkept=1 says not one of them moved -- a digest of exactly
 #               those corners, taken either side of the write. The first version of this
@@ -11325,6 +13226,11 @@ for g190m in SCB31EA SCB01EA SCG10EA SCB60EA; do
   [ "${g190b:-1}" -le "${g190a:-0}" ] 2>/dev/null || G190BAD="$G190BAD $g190m:off=$g190of-ROSE"
   [ "${g190o:-x}" = "${g190mk:-y}" ]   || G190BAD="$G190BAD $g190m:overlay=${g190o:-none}/marked=${g190mk:-none}"
   [ "${g190cv:-1}" = "0" ]             || G190BAD="$G190BAD $g190m:asked-for-CONVERT"
+  case "$g190m" in
+    SCB01EA|SCG10EA)
+      { [ "${g190r0:-x}" = "0" ] && [ "${g190a:-0}" -gt 0 ]; } 2>/dev/null \
+        || G190BAD="$G190BAD $g190m:arrived-unlocked(ready0=${g190r0:-none},offbefore=${g190a:-none})-precondition" ;;
+  esac
   G190SUM="$G190SUM $g190m(ready $g190r0->$g190rd, $g190pl places, off $g190of, $g190hd held and unmoved, $g190mk marked=$g190o drawn)"
 done
 # AND THE .HGT THE SAVE WRITES, on the last of them, with the files removed again: this
@@ -11340,7 +13246,7 @@ grun /tmp/g190_save.log $G190E --scen SCB60EA --pack SCB60EA.pack --script /tmp/
 G190HGT=$(grep -c 'edit: wrote .*SCB60EA\.HGT (4225 bytes)' /tmp/g190_save.log)
 rm -f missions/user_maps/SCB60EA.BIN missions/user_maps/SCB60EA.INI missions/user_maps/SCB60EA.HGT
 if [ "$GRC" = "0" ] && [ -z "$G190BAD" ] && [ "${G190HGT:-0}" -ge 1 ]; then
-  ok "G190 auto heightmap on shipped maps:$G190SUM -- every one of the four fits with no CONVERT asked for, leaves no corner off the ladder that is not the sea's (stray=0), never raises the off-the-ladder count, and hands the elevation panel back usable; SAVE writes a 4225-byte .HGT"
+  ok "G190 auto heightmap on shipped maps:$G190SUM -- every one of the four fits with no CONVERT asked for, leaves no corner off the ladder that is not the sea's (stray=0), never raises the off-the-ladder count, and hands the elevation panel back usable, SCB01EA and SCG10EA having arrived locked; SAVE writes a 4225-byte .HGT"
 else
   bad "G190 auto heightmap on shipped maps: exit=$GRC hgt4225=$G190HGT(want >=1; 0 means g_elevTouched was never set and the heightmap is silently not saved) failures:${G190BAD:- none} | readings:$G190SUM"
 fi
@@ -11426,6 +13332,16 @@ G191P6=$(grep '^AUTOHGT|' /tmp/g191.log | sed -n '6p')
 G191C4=$(g191f "$(grep '^SBRSTATE|' /tmp/g191.log | sed -n '5p')" corners)
 G191C5=$(g191f "$(grep '^SBRSTATE|' /tmp/g191.log | sed -n '6p')" corners)
 G191V6=$(g191f "$G191P6" valid);   G191K6=$(g191f "$G191P6" marked)
+# AND THERE MUST HAVE BEEN A REPORT FOR THE STROKE TO CLEAR. A cleared report after the
+# stroke proves nothing if the tail's fit never produced one. So the tail's first press
+# must arm again on the restored relief, its second must leave a valid report with marks
+# and nothing armed, and the ground it fitted must be the same corner digest the first
+# fit wrote, which is what shows the fit ran on the map the undo put back.
+G191P4=$(grep '^AUTOHGT|' /tmp/g191.log | sed -n '4p')
+G191P5=$(grep '^AUTOHGT|' /tmp/g191.log | sed -n '5p')
+G191A4=$(g191f "$G191P4" armed)
+G191V5=$(g191f "$G191P5" valid);   G191A5=$(g191f "$G191P5" armed)
+G191K5=$(g191f "$G191P5" marked)
 G191W0=$(grep '^HEIGHT|40,12|' /tmp/g191.log | sed -n '1p')
 G191W1=$(grep '^HEIGHT|40,12|' /tmp/g191.log | sed -n '2p')
 G191W2=$(grep '^HEIGHT|40,12|' /tmp/g191.log | sed -n '3p')
@@ -11441,11 +13357,13 @@ if [ "$GRC" = "0" ] && \
    [ "$G191UND" = "0" ] && \
    [ "$G191C3" = "$G191C0" ] && [ "$G191U3" = "0" ] && [ "$G191R3" = "$G191R0" ] && \
    [ "$G191O3" = "$G191O0" ] && [ "$G191V3" = "0" ] && [ "$G191K3" = "0" ] && \
+   [ "$G191A4" = "1" ] && [ "$G191V5" = "1" ] && [ "$G191A5" = "0" ] && \
+   [ "${G191K5:-0}" -gt 0 ] && [ "$G191C4" = "$G191C2" ] && \
    [ -n "$G191C4" ] && [ "$G191C4" != "$G191C5" ] && \
    [ "$G191V6" = "0" ] && [ "$G191K6" = "0" ]; then
-  ok "G191 auto heightmap guard rails on SCB01EA: the first press only ARMS and moves no byte (corners still $G191C0); the second fits -- $G191M2 corners moved, $G191H2 left to the water, the panel goes from locked to usable (ready $G191R0 -> $G191R2, off the ladder $G191O0 -> $G191O2) and the unlock that did it is inside the undo entry; the named water cell reads the same string before, after and after the undo ($G191W0); and ONE undo puts the ground back byte for byte ($G191C3), takes the unlock with it ($G191U3), returns the readout to $G191O3 and clears the report it no longer describes; and a fit followed by ONE rung stroke clears the report too (corners $G191C4 -> $G191C5), so no mark ever outlives the ground it was drawn about"
+  ok "G191 auto heightmap guard rails on SCB01EA: the first press only ARMS and moves no byte (corners still $G191C0); the second fits -- $G191M2 corners moved, $G191H2 left to the water, the panel goes from locked to usable (ready $G191R0 -> $G191R2, off the ladder $G191O0 -> $G191O2) and the unlock that did it is inside the undo entry; the named water cell reads the same string before, after and after the undo ($G191W0); and ONE undo puts the ground back byte for byte ($G191C3), takes the unlock with it ($G191U3), returns the readout to $G191O3 and clears the report it no longer describes; and a fit that left $G191K5 marks, followed by ONE rung stroke, has its report cleared too (corners $G191C4 -> $G191C5), so no mark ever outlives the ground it was drawn about"
 else
-  bad "G191 auto heightmap guard rails: exit=$GRC | press1 armed=$G191A1(want 1) valid=$G191V1(want 0) corners $G191C0->$G191C1(must be equal; unequal means it wrote without asking) warned=$G191WARN(want >=1) | press2 moved=$G191M2(want >0) held=$G191H2(want >0; 0 on a map with a coastline means the water test is not running) wetkept=$G191K2(want 1; 0 means the write went over the sea's own corners) ready $G191R0->$G191R2(want 0->1) unlock=$G191U2(want 1) off $G191O0->$G191O2 corners-changed=$([ "$G191C0" != "$G191C2" ] && echo yes || echo NO) | water '$G191W0' / '$G191W1' / '$G191W2'(all three must be the same string) | undo left=$G191UND(want 0; more means the fit pushed more than one entry) corners=$G191C3(want $G191C0) unlock=$G191U3(want 0) ready=$G191R3(want $G191R0) off=$G191O3(want $G191O0) report valid=$G191V3 marked=$G191K3(want 0 and 0) | after a later stroke: corners $G191C4 -> $G191C5(must DIFFER; equal means the stroke moved no byte and this leg measured nothing) report valid=$G191V6 marked=$G191K6(want 0 and 0; a standing report here is marks describing corners the stroke has since moved)"
+  bad "G191 auto heightmap guard rails: exit=$GRC | press1 armed=$G191A1(want 1) valid=$G191V1(want 0) corners $G191C0->$G191C1(must be equal; unequal means it wrote without asking) warned=$G191WARN(want >=1) | press2 moved=$G191M2(want >0) held=$G191H2(want >0; 0 on a map with a coastline means the water test is not running) wetkept=$G191K2(want 1; 0 means the write went over the sea's own corners) ready $G191R0->$G191R2(want 0->1) unlock=$G191U2(want 1) off $G191O0->$G191O2 corners-changed=$([ "$G191C0" != "$G191C2" ] && echo yes || echo NO) | water '$G191W0' / '$G191W1' / '$G191W2'(all three must be the same string) | undo left=$G191UND(want 0; more means the fit pushed more than one entry) corners=$G191C3(want $G191C0) unlock=$G191U3(want 0) ready=$G191R3(want $G191R0) off=$G191O3(want $G191O0) report valid=$G191V3 marked=$G191K3(want 0 and 0) | before the stroke: refit press armed=$G191A4(want 1) then valid=$G191V5 armed=$G191A5 marked=$G191K5(want 1, 0 and >0; anything else means no report existed for the stroke to clear) corners=$G191C4(want $G191C2, the first fit's ground) | after a later stroke: corners $G191C4 -> $G191C5(must DIFFER; equal means the stroke moved no byte and this leg measured nothing) report valid=$G191V6 marked=$G191K6(want 0 and 0; a standing report here is marks describing corners the stroke has since moved)"
 fi
 
 
@@ -11572,5 +13490,5674 @@ else
   ok "G193 the report does not outlive its map: a fit marked $G193MARK cells and left valid=1, and opening another map dropped it to valid=0"
 fi
 
-echo "----- $LABEL: $PASS pass, $FAIL fail -----" | tee -a "$OUT"
+# =====================================================================================
+# G202 A REMASTERED INFANTRYMAN STANDS ON THE GROUND WHATEVER HE IS DOING.
+#
+# THE REPORT (BUG-20260904-52C9E6): the remastered sprites are misaligned on their
+# ATTACKING poses and appear to jump upward -- minigunner prone attack, flamethrower
+# standing attack, bazooka standing attack, bazooka prone attack, commando prone attack.
+#
+# THE CAUSE was arithmetic, not art. Every Remastered frame is a tight crop of a logical
+# canvas constant per type; remaster_inf.h builds one strip per ACTION cropped to that
+# action's own union of crops, and dosinf_draw_sprite stood the strip's BOTTOM ROW on the
+# terrain. So a different logical row landed on the ground for every action -- and an
+# attack pose's crop reaches far below the man's feet, because the muzzle flash, the flame
+# jet and the rocket exhaust are drawn INTO the frame. The five poses in the report are
+# the five with the largest overhang: 39 logical rows for E1's prone fire, 41 for E3's,
+# 47 for E4's standing flame, 49 for RMBO's prone fire, against a man about 75 rows tall.
+#
+# THE FIX is one anchor per type, read off its STAND action, with every strip carrying its
+# own offset from it (DosStrip::ox / ::drop) for the draw to apply.
+#
+# TWO LEGS, because there are two ways to get this wrong and one binary cannot see both.
+#
+#   A. THE DERIVATION, in gate_rminf, against the player's own install and with no window:
+#      does each strip carry the offset the art actually has, is STAND exactly zero on both
+#      axes, and did the placement move the card rather than resize it. Mutation-tested:
+#      zeroing ri_build_strip's drop fails 18 of its checks.
+#
+#   B. THE APPLICATION, in the game: a strip can carry the right number and the draw can
+#      ignore it. The RMINF|place line is the card's base against the ground UNDER THE MAN
+#      and the fold at his ground line: up + flat must be fh with flat == max(drop, 0)
+#      and lift == max(-drop, 0), and dy must be exactly 0 for a cell with rows below the
+#      line (they lie on the ground, the base sits on it) and the raise's vertical part,
+#      0 < dy <= -drop/tpu, for a cell that stops short of it. A line with no fold fields
+#      at all is a draw that never read the offsets. STAND is the control: it is the
+#      anchor, so it must read 0 on every axis.
+#
+# LEG B GOES THROUGH THE REAL OPTIONS PATH -- pause, Visuals, Enhanced, Advanced, pick
+# Remastered Sprites, OK -- and not through a --gfx dial, because the dial writes g_fx and
+# only the dialog's apply calls fx_infset_set. A gate on the dial would prove nothing a
+# player can reach. It is checked: fx_infset=2 and drawing=Remastered before anything else
+# is read.
+#
+# NO INSTALL, NO GATE, AND IT SAYS SO. The art is the player's and is not in this tree.
+# gate_rminf exits 77 when there is none, and the gate SKIPS rather than passing quietly.
+#
+# AND THAT SKIP STOPS A RELEASE, WHICH IS WORTH KNOWING BEFORE IT HAPPENS. tools/release.sh
+# refuses any suite whose summary line says "skipped", on the reasoning that the release run
+# sets CNC3D_GATES_INTERACTIVE=1 and a skip therefore means a gate REFUSED to run rather
+# than that it was not asked. This gate's skip is a third thing again: the input data is a
+# product the player buys and the tree does not ship, so a machine without one cannot run
+# it however the switches are set. Cutting a build on a machine with no Remastered
+# Collection will abort here. That is a POLICY question and not a thing to work around by
+# dressing the skip up as a pass -- the day this gate reports green on a machine
+# that never measured anything is the day it stops being worth having.
+# =====================================================================================
+if [ ! -x ./gate_rminf ]; then
+  bad "G202 a remastered infantryman stands on the ground: ./gate_rminf is not in the run folder. game/build.sh makes it and stages it"
+else
+  GRIOUT=$(./gate_rminf 2>&1); GRIRC=$?
+  if [ "$GRIRC" = "77" ]; then
+    skip "G202 a remastered infantryman stands on the ground: no Remastered Collection on this machine, so there is no art to measure. THE REMASTERED SPRITE PLACEMENT IS NOT COVERED BY THIS RUN. $(printf '%s' "$GRIOUT" | head -1)"
+  elif [ "$GRIRC" != "0" ]; then
+    bad "G202 a remastered infantryman stands on the ground: the derivation is wrong. $(printf '%s' "$GRIOUT" | grep '^FAIL' | head -3 | tr '\n' ' ')"
+  else
+    # LEG B. Enter the firefight the mission starts with: every man here is on Hunt, so
+    # walking, prone and firing all happen without the script staging them.
+    gbegin /tmp/g202.log
+    { echo options; echo "optclick Visuals"; echo "optclick Enhanced"
+      echo "optclick Advanced..."; echo "optinf open"; echo "optinf pick 2"
+      echo "optinf close"; echo "optclick OK"
+      i=0; while [ $i -lt 30 ]; do echo "tick 60"; echo animdump; i=$((i+1)); done
+      echo quit; } > /tmp/g202.script
+    grun /tmp/g202.log --scen SCG01EA --pack SCG01EA.pack $BASE --nosound \
+         --w 1024 --h 768 --dumpanim --script /tmp/g202.script
+    G202DRAW=$(grep -ac 'fx_infset=2|drawing=Remastered' /tmp/g202.log)
+    G202N=$(grep -a '^RMINF|place|' /tmp/g202.log | sort -u | wc -l | tr -d ' ')
+    G202MOVED=$(grep -a '^RMINF|place|' /tmp/g202.log | sort -u | grep -c 'drop=[1-9]')
+    # THE CARD FOLDS AT THE GROUND LINE: up + flat == fh, flat == max(drop,0), lift ==
+    # max(-drop,0); dy is exactly 0 wherever there are rows below the line and the raise's
+    # vertical part, 0 < dy <= -drop/tpu, where the cell stops short of it. A line without
+    # the fold fields is a draw that sinks the card, the shipped bug. awk does the
+    # arithmetic rather than the shell.
+    G202BAD=$(grep -a '^RMINF|place|' /tmp/g202.log | sort -u | awk -F'|' '
+      { d=0; t=0; y=0; fh=-1; up=-1; fl=-1; li=-1
+        for (i=1;i<=NF;i++) {
+          if ($i ~ /^drop=/) { sub(/^drop=/,"",$i); d=$i+0 }
+          if ($i ~ /^tpu=/)  { sub(/^tpu=/,"",$i);  t=$i+0 }
+          if ($i ~ /^dy=/)   { sub(/^dy=/,"",$i);   y=$i+0 }
+          if ($i ~ /^fh=/)   { sub(/^fh=/,"",$i);   fh=$i+0 }
+          if ($i ~ /^up=/)   { sub(/^up=/,"",$i);   up=$i+0 }
+          if ($i ~ /^flat=/) { sub(/^flat=/,"",$i); fl=$i+0 }
+          if ($i ~ /^lift=/) { sub(/^lift=/,"",$i); li=$i+0 } }
+        if (t <= 0 || fh < 0 || up < 0 || fl < 0 || li < 0) { n++; next }
+        wf = d > 0 ? d : 0; wl = d < 0 ? -d : 0
+        if (up + fl != fh || fl != wf || li != wl) { n++; next }
+        if (d >= 0) { if (y > 0.00005 || y < -0.00005) n++; next }
+        if (y <= 0 || y > -d/t + 0.0005) n++ }
+      END { print n+0 }')
+    G202STAND=$(grep -a '^RMINF|place|.*|STAND|' /tmp/g202.log | sort -u | grep -c 'drop=0|ox=0|.*|dy=0.0000|dx=0.0000')
+    if [ "$GRC" != "0" ]; then
+      bad "G202 a remastered infantryman stands on the ground: the run failed (exit $GRC), so nothing below means anything"
+    elif [ "${G202DRAW:-0}" -lt 1 ]; then
+      bad "G202 a remastered infantryman stands on the ground: the options dialog never reached drawing=Remastered, so the men on screen were the DOS sprites and this leg measured the wrong art"
+    elif [ "${G202MOVED:-0}" -lt 3 ]; then
+      bad "G202 a remastered infantryman stands on the ground: only $G202MOVED of $G202N poses carry a non-zero drop. With nothing to move, the placement below is untested -- the mission did not reach walking, prone or firing"
+    elif [ "${G202STAND:-0}" -lt 1 ]; then
+      bad "G202 a remastered infantryman stands on the ground: STAND is the anchor and must place at exactly drop=0 ox=0 dy=0 dx=0; no such line was printed. $(grep -a '^RMINF|place|.*|STAND|' /tmp/g202.log | sort -u | head -1)"
+    elif [ "${G202BAD:-99}" != "0" ]; then
+      bad "G202 a remastered infantryman stands on the ground: $G202BAD of $G202N poses do not fold their card at the ground line (up + flat == fh, flat == max(drop,0), lift == max(-drop,0), base on the ground wherever there are rows below the line). A line with no fold fields, or with dy = -drop/tpu, is the card sunk into the terrain, which is the bug. $(grep -a '^RMINF|place|' /tmp/g202.log | sort -u | head -2 | tr '\n' ' ')"
+    else
+      ok "G202 a remastered infantryman stands on the ground: $(printf '%s' "$GRIOUT" | tail -1) off the player's own install -- every strip carries the offset its art has, STAND is exactly zero on both axes because it IS the anchor, and the cell was moved rather than resized. In the game, through the pause dialog's own Visuals/Advanced path to Remastered Sprites, $G202N poses drew and all of them put the man's ground line on the ground: $G202MOVED of them sit on a cell whose bottom row is up to $(grep -a '^RMINF|place|' /tmp/g202.log | sed -n 's/.*|drop=\([0-9]*\)|.*/\1/p' | sort -n | tail -1) texels below his feet and every one lays exactly those rows flat on the ground in front of him. $(grep -a '^RMINF|place|' /tmp/g202.log | sort -u | sed -n 's/^RMINF|place|\([A-Z0-9]*\)|\([A-Z0-9]*\)|drop=\([0-9-]*\).*/\1 \2 drop=\3/p' | tr '\n' ', ')"
+    fi
+  fi
+fi
+
+# =====================================================================================
+# G203 THE CHEMICAL WARRIOR SPRAYS, IN GREEN, IN THE DIRECTION HE IS FIRING.
+#
+# THE REPORT (BUG-20260904-52C9E6): the chem warrior displays no chem spray.
+#
+# WHAT WAS WRONG. The engine fires it -- TechnoClass::Fire_At turns the weapon's
+# ANIM_CHEM_N into ANIM_CHEM_N + Dir_Facing(Fire_Direction()), so one of eight
+# direction-specific anims is created on every shot. The CARTRIDGE has no chem effect at
+# all: efx_recipes.h maps all eight, and CHEM_BALL with them, to -1. So the anim reached
+# the renderer, found no recipe, and fell to a procedural billboard that efx_classify had
+# lumped in with MINIGUN and GUNFIRE. A chem warrior fired a rifle's muzzle flash.
+#
+# THE FIX, which is a decision and not a discovery: take the flamethrower's effect and
+# tint it green. The cartridge DOES have the flamethrower, whose eight direction anims
+# sit at DOS types 14..21 in the same compass order the chem anims use at 22..29, so
+# efx_recipe_index maps one onto the other by subtraction. Everything on screen is then
+# the console's -- the FLTHROW art, the per-direction angle cone, the emitter lifted to
+# the man's weapon by the FLAME_ nozzle hook, the speeds, the lives, the alpha ramp --
+# except three colour bytes applied to a COPY of the source record in efx_fire_slot.
+#
+# WHAT THIS GATE HAS TO PROVE, and why each leg exists:
+#
+#   THE BORROW HAPPENED. efxdump names the recipe that actually fired on every EFXSPAWN
+#   line, so CHEM-E must read recipe=ANIM_FLAME_E and CHEM-W must read ANIM_FLAME_W. Not
+#   one recipe for both: the direction is the cartridge's, and a fix that reached for
+#   ANIM_FLAME_N eight times would pass every other leg here.
+#
+#   THEY ARE CARTRIDGE PARTICLES, NOT A STAND-IN. EFXART must say `particles`, never
+#   `proc`, and no EFXNOREC|CHEM-* line may survive -- that counter is this project's
+#   marker for a real gap and it must stop naming one that has been closed. The chem runs
+#   also carry NO flamethrower, so every system-9 particle in them is the chem warrior's
+#   and a colour read off them cannot be somebody else's.
+#
+#   THE COLOUR IS ON THE CHEM SPRAY AND NOWHERE ELSE. This is the leg that would have
+#   caught the first attempt at this fix: the recolour was ambient state set at the spawn
+#   loop, and the ghost clock -- which fires nine of every ten puffs, because a Flame
+#   source is continuous -- never set it. A third run puts a FLAMETHROWER in the same cell
+#   firing at the same target, and its particles must still be the cartridge's 255,127,102.
+#
+#   IT POINTS WHERE HE FIRES, measured on the PARTICLES rather than on pixels. The screen
+#   is the wrong instrument here: the men wear bright green health bars, which a
+#   green-dominant pixel count reads as spray. EFXP carries each particle's own world
+#   position, so east and west are separated by arithmetic on the engine's numbers.
+#
+#   AND SOMETHING GREEN REACHED THE GLASS, which is the report itself and cannot be
+#   proven from state alone. Same scene, same tick, a chem warrior against a flamethrower:
+#   the chem run must put far more green on screen than the flame run does. Differencing
+#   the two runs is what makes the health bars cancel.
+# =====================================================================================
+gbegin /tmp/g203_chem_e.log /tmp/g203_chem_w.log /tmp/g203_flame_e.log
+rm -rf /tmp/g203_chem_e /tmp/g203_chem_w /tmp/g203_flame_e
+mkdir -p /tmp/g203_chem_e /tmp/g203_chem_w /tmp/g203_flame_e
+# The scratch map goes first, not last: a leftover from an interrupted run would be opened
+# instead of made, and the gate would be measuring somebody else's placement.
+rm -f missions/user_maps/USERCHEM.INI missions/user_maps/USERCHEM.BIN \
+      missions/user_maps/USERCHEM.HGT
+# ONE CELL APART. The chem sprayer's range is 0x0200 leptons -- two cells -- and both men
+# are on Guard, so at three cells they stand and look at each other and nothing fires at
+# all. That was the first version of this gate and it proved nothing.
+for g203r in "chem_e E5 31" "chem_w E5 29" "flame_e E4 31"; do
+  g203n=$(echo "$g203r" | cut -d' ' -f1)
+  g203t=$(echo "$g203r" | cut -d' ' -f2)
+  g203x=$(echo "$g203r" | cut -d' ' -f3)
+  { echo "newmap 1 1 0"
+    echo "editscen USERCHEM"
+    echo "editstart 6 30 30"
+    echo "editplace $g203t 30 30 0"
+    echo "editplace E1 $g203x 30 1"
+    echo "editsave"
+    echo "editplay play"
+    echo "cam 30.5 30.5"
+    g203i=1
+    while [ $g203i -le 12 ]; do
+      echo "tick 1"; echo "shot /tmp/g203_$g203n/f$g203i.png"; g203i=$((g203i+1))
+    done
+    echo efxdump
+    echo quit; } > /tmp/g203_$g203n.script
+  grun /tmp/g203_$g203n.log --edit --editmode 0 --noshroud --scen SCG01EA \
+       --pack SCG01EA.pack $BASE --nosound --w 1024 --h 768 \
+       --script /tmp/g203_$g203n.script
+done
+G203SUBE=$(grep -ac '^EFXSPAWN|CHEM-E|recipe=ANIM_FLAME_E|particles=' /tmp/g203_chem_e.log)
+G203SUBW=$(grep -ac '^EFXSPAWN|CHEM-W|recipe=ANIM_FLAME_W|particles=' /tmp/g203_chem_w.log)
+G203NOREC=$(cat /tmp/g203_chem_e.log /tmp/g203_chem_w.log | grep -ac '^EFXNOREC|CHEM-')
+G203ART=$(grep -ac '^EFXART|CHEM-E|particles|' /tmp/g203_chem_e.log)
+G203PROC=$(cat /tmp/g203_chem_e.log /tmp/g203_chem_w.log | grep -ac '^EFXART|CHEM-[EW]|proc')
+# A flamethrower in the chem runs would put its own particles in the same system-9 bucket
+# and a colour read off that bucket could not say whose they were.
+G203MIX=$(cat /tmp/g203_chem_e.log /tmp/g203_chem_w.log | grep -ac '^EFXSPAWN|FLAME-')
+# Per-particle colour and position, straight off EFXP. green/other are system-9 particles
+# wearing the chem colour and not wearing it; x is their mean world x, against a sprayer
+# standing at 30.5.
+g203p() {
+  grep -a '^EFXP|' "$1" | grep 'sys=9' | awk -F'|' -v want="$2" '
+    { c=""; x=""
+      for (i=1;i<=NF;i++) {
+        if ($i ~ /^rgba=/) c = substr($i,6)
+        if ($i ~ /^p=/)  { split(substr($i,3),q,","); x = q[1] } }
+      if (c == want) { good++ } else { bad++ }
+      if (x != "") { sx += x+0; n++ } }
+    END { printf "%d %d %.4f\n", good+0, bad+0, (n ? sx/n : 0) }'
+}
+set -- $(g203p /tmp/g203_chem_e.log "77,255,102,255"); G203EG="$1"; G203EB="$2"; G203EX="$3"
+set -- $(g203p /tmp/g203_chem_w.log "77,255,102,255"); G203WG="$1"; G203WB="$2"; G203WX="$3"
+set -- $(g203p /tmp/g203_flame_e.log "255,127,102,255"); G203FO="$1"; G203FB="$2"; G203FX="$3"
+G203SEP=$(awk -v e="${G203EX:-0}" -v w="${G203WX:-0}" 'BEGIN { print e - w }')
+# HOW MANY PARTICLES THERE WERE AT ALL, before asking what colour they are. Ordering the
+# two the other way round made a spray that fired perfectly in the WRONG COLOUR report
+# itself as "the sprayer did not fire" -- a gate that goes red for the wrong reason costs
+# more than one that stays green, because the reason is what the next person acts on.
+G203EN=$(( ${G203EG:-0} + ${G203EB:-0} ))
+G203WN=$(( ${G203WG:-0} + ${G203WB:-0} ))
+G203FN=$(( ${G203FO:-0} + ${G203FB:-0} ))
+# THE SCREEN, differenced against the flamethrower so the health bars cancel: green that
+# appears over the run's own first frame, summed across the run.
+G203PIX=$(python3 - <<'PYEOF' 2>>"$OUT"
+import numpy as np
+from PIL import Image
+out = []
+for side in ("chem_e", "flame_e"):
+    tot = 0
+    try:
+        base = np.asarray(Image.open("/tmp/g203_%s/f1.png" % side).convert("RGB")).astype(int)
+    except Exception:
+        out.append("0"); continue
+    gb = (base[:, :, 1] - np.maximum(base[:, :, 0], base[:, :, 2])) > 25
+    for i in range(2, 13):
+        try:
+            a = np.asarray(Image.open("/tmp/g203_%s/f%d.png" % (side, i)).convert("RGB")).astype(int)
+        except Exception:
+            continue
+        ga = (a[:, :, 1] - np.maximum(a[:, :, 0], a[:, :, 2])) > 25
+        n = int((ga & ~gb).sum())
+        if n > 150:
+            tot += n
+    out.append(str(tot))
+print(" ".join(out))
+PYEOF
+)
+set -- $G203PIX; G203CPIX="$1"; G203FPIX="$2"
+rm -rf /tmp/g203_chem_e /tmp/g203_chem_w /tmp/g203_flame_e
+# The scratch map goes at the END too, not only before the run: see the note at G153.
+rm -f missions/user_maps/USERCHEM.INI missions/user_maps/USERCHEM.BIN \
+      missions/user_maps/USERCHEM.HGT
+if [ "$GRC" != "0" ]; then
+  bad "G203 the chemical spray: a run failed (exit $GRC), so nothing below means anything"
+elif [ "${G203SUBE:-0}" -lt 1 ] || [ "${G203SUBW:-0}" -lt 1 ]; then
+  bad "G203 the chemical spray: the borrow did not happen. EFXSPAWN|CHEM-E|recipe=ANIM_FLAME_E seen $G203SUBE times and CHEM-W|ANIM_FLAME_W $G203SUBW (want >=1 each). $(cat /tmp/g203_chem_e.log /tmp/g203_chem_w.log | grep -a '^EFXSPAWN|CHEM\|^EFXNOREC|CHEM' | sort -u | head -3 | tr '\n' ' ')"
+elif [ "${G203NOREC:-1}" != "0" ]; then
+  bad "G203 the chemical spray: $G203NOREC EFXNOREC|CHEM-* lines survive. That counter is this project's marker for a real gap in the cartridge's art, and it must not go on naming one that has been closed"
+elif [ "${G203ART:-0}" -lt 1 ] || [ "${G203PROC:-1}" != "0" ]; then
+  bad "G203 the chemical spray: it is still being drawn procedurally. EFXART|CHEM-E|particles seen $G203ART times, EFXART|CHEM-[EW]|proc seen $G203PROC (want >=1 and 0). Both together would mean the spray is drawn TWICE, particles and billboard"
+elif [ "${G203MIX:-1}" != "0" ]; then
+  bad "G203 the chemical spray: a flamethrower fired in the chem runs ($G203MIX EFXSPAWN|FLAME- lines), so the system-9 particles the colour leg reads are not all the chem warrior's and it proves nothing"
+elif [ "$G203EN" -lt 5 ] || [ "$G203WN" -lt 5 ] || [ "$G203FN" -lt 5 ]; then
+  bad "G203 the chemical spray: too few particles to measure. System-9 particles of any colour: $G203EN east, $G203WN west, $G203FN in the flamethrower control (want >=5 each). The man did not fire, or the recipe emitted nothing -- the colour legs below would prove nothing either way"
+elif [ "${G203EB:-1}" != "0" ] || [ "${G203WB:-1}" != "0" ]; then
+  bad "G203 the chemical spray: it fired, in the wrong colour. Of its system-9 particles $G203EB east and $G203WB west are NOT 77,255,102 ($G203EG and $G203WG are). All-but-some means the recolour reaches part of the spray only, which is what happens when it is applied at the engine spawn and the ghost clock -- nine puffs of every ten -- is left out; all of them means it is not being applied at all"
+elif [ "${G203FB:-1}" != "0" ]; then
+  bad "G203 the chemical spray: the recolour LEAKED onto the flamethrower. $G203FB of its $G203FN system-9 particles are not the cartridge's own 255,127,102. The chem spray must be the only thing this changes"
+elif awk -v s="${G203SEP:-0}" 'BEGIN { exit (s >= 0.3) ? 1 : 0 }'; then
+  bad "G203 the chemical spray: it does not follow the target. Its particles average world x=$G203EX firing EAST and x=$G203WX firing WEST from a sprayer standing at 30.5, a separation of $G203SEP cells (want >=0.3 with east the larger). Zero means it ignores the direction; negative means it is mirrored"
+# THE THRESHOLD WAS RECALIBRATED ON 7 SEP 2026, DOWN, AND THE GATE GOT STRONGER FOR IT.
+# It was 3000, set when the shipped health-bar rule was selected-OR-DAMAGED: every damaged
+# thing in the scene wore a bar, health bars are GREEN (34,200,34), and both runs were
+# counting them. The control run scored 2160 green pixels without a green effect anywhere
+# in it. With the rule now selected-only -- vanilla's own default, special.h:76 -- the
+# control reads 0, which is the honest answer for a flame that is orange, and the chem run
+# reads about 2960, which is the spray and nothing else. So the separation went from
+# 5567-against-2160 to 2960-against-0: a smaller number on one side and a much larger
+# finding. The floor is set below the measured spray with room for ordinary variation, and
+# the control is now required to be actually near zero rather than merely smaller -- which
+# it could be while still being full of green that has nothing to do with this effect.
+elif [ "${G203CPIX:-0}" -lt 2000 ] || [ "${G203FPIX:-0}" -ge 500 ] \
+     || [ "${G203FPIX:-0}" -ge "${G203CPIX:-0}" ]; then
+  bad "G203 the chemical spray: nothing green reached the screen. Green pixels appearing over the run's own first frame: $G203CPIX with the chem warrior, $G203FPIX with a flamethrower in his place (want the chem run >=2000 and the flamethrower control under 500). This is the report itself -- a chem warrior firing with no spray. A control run in the HUNDREDS or more used to mean health bars were being counted as the effect; with the bars now selected-only it should be at or near zero"
+else
+  ok "G203 the chemical spray: a chem warrior one cell from his target fires, and the cartridge's flamethrower draws it. The engine picks its own directional anim and efxdump names the borrowed recipe on each: CHEM-E takes ANIM_FLAME_E and CHEM-W takes ANIM_FLAME_W, both reported as particles and neither as proc, with no EFXNOREC line left naming a gap that is closed. Every one of its system-9 particles wears 77,255,102 ($G203EG east, $G203WG west, 0 wearing anything else) while a FLAMETHROWER fired from the same cell at the same target keeps the cartridge's own 255,127,102 on all $G203FO of his -- so the recolour is on the chem spray and nowhere else, through both the engine path and the ghost clock that fires nine puffs of every ten. The particles average world x=$G203EX firing east against $G203WX firing west from a man standing at 30.5, a separation of $G203SEP cells in the direction he is shooting; and on the glass the chem run puts $G203CPIX green pixels up against the flamethrower run's $G203FPIX in the same scene on the same ticks -- a control at or near zero, because with health bars drawn only for a selected unit there is no other green in the picture to confuse with the spray"
+fi
+
+# =====================================================================================
+# G204 THE MULTIPLAYER SCREEN IS ON THE GLASS, not only in a surface.
+#
+# THE REPORT (5 Sep 2026, the day v0.6.6 shipped): click MULTIPLAYER on the main menu and
+# the entire menu freezes. It did not freeze. The screen came up, laid itself out, opened
+# the LAN browser and polled it ten times a second for as long as anyone cared to wait --
+# and drew all of it into an 8-bit surface that was never uploaded to the texture the
+# window shows. Every other screen goes through dms_redraw, which converts and uploads;
+# this one drew and then called dms_present, which only draws the TEXTURE and swaps. So
+# the window kept the last thing uploaded, the main menu, with the hardware cursor hidden
+# and the software one drawn where nobody could see it. Alive, invisible, and reported as
+# frozen, which from the chair is the same thing.
+#
+# WHY NO GATE SAW IT. --mpshot draws the screen and writes it with dms_write_shot, which
+# reads the SURFACE. The surface was perfect. The window was not the surface. A gate that
+# reads what was drawn cannot tell you what was shown, and this one had a release to prove
+# it. So this gate reads the BACK BUFFER, off game_grab_png, at two moments: the main menu
+# just before the click, and the multiplayer screen's leave frame just before its swap. The
+# two must differ -- by a lot, because one is a menu and the other is a dialog with tabs --
+# and the second must not be black. Under the bug they are byte-identical: the screen did
+# not change when the screen changed, which is the whole of the fault in one comparison.
+# =====================================================================================
+gbegin /tmp/g204.log
+rm -rf shots/g204; mkdir -p shots/g204
+# ./cnc3d BY NAME, not through grun: grun runs cnc_eyes, the renderer, which has no menu
+# and answers --mpplay with its usage text and exit 2. The first draft of this gate did
+# exactly that and reported "the run failed" -- true, and about the wrong program.
+./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+     --shotdir shots/g204 --mpplay 1500 --w 1280 --h 800 > /tmp/g204.log 2>&1
+GRC=$?
+cat /tmp/g204.log >> "$OUT"
+G204CLICK=$(grep -ac '^MPPLAY|click|Multiplayer' /tmp/g204.log)
+G204LEFT=$(grep -a '^MPPLAY|left|' /tmp/g204.log | head -1)
+G204FRAMES=$(echo "$G204LEFT" | sed -n 's/.*|frames=\([0-9]*\)|.*/\1/p')
+G204GRABS=$(grep -ac '^MPPLAY|grab|' /tmp/g204.log)
+G204PIX=$(python3 - <<'PYEOF' 2>>"$OUT"
+import numpy as np
+from PIL import Image
+try:
+    m = np.asarray(Image.open("shots/g204/mpplay_menu.png").convert("RGB")).astype(int)
+    s = np.asarray(Image.open("shots/g204/mpplay_screen.png").convert("RGB")).astype(int)
+except Exception as e:
+    print("0 0 0 0"); raise SystemExit
+same_shape = 1 if m.shape == s.shape else 0
+diff = int((np.abs(m - s).sum(axis=2) > 12).sum()) if same_shape else -1
+lit  = int((s.max(axis=2) > 24).sum())
+total = int(s.shape[0] * s.shape[1])
+print("%d %d %d %d" % (same_shape, diff, lit, total))
+PYEOF
+)
+set -- $G204PIX; G204SHAPE="$1"; G204DIFF="$2"; G204LIT="$3"; G204TOTAL="$4"
+if [ "$GRC" != "0" ]; then
+  bad "G204 the multiplayer screen is on the glass: the run failed (exit $GRC), so nothing below means anything"
+elif [ "${G204CLICK:-0}" -lt 1 ]; then
+  bad "G204 the multiplayer screen is on the glass: MULTIPLAYER was never clicked, so the screen was never reached"
+elif [ -z "$G204FRAMES" ] || [ "${G204FRAMES:-0}" -lt 30 ]; then
+  bad "G204 the multiplayer screen is on the glass: the screen did not run. MPPLAY|left says frames=${G204FRAMES:-none} (want >=30 in 1.5 s). If there is no left line at all the loop never came back, which IS a freeze and a different one from the report"
+elif [ "${G204GRABS:-0}" -lt 2 ]; then
+  bad "G204 the multiplayer screen is on the glass: only $G204GRABS of the two back-buffer grabs were written, so there is nothing to compare"
+elif [ "${G204SHAPE:-0}" != "1" ]; then
+  bad "G204 the multiplayer screen is on the glass: the two grabs are different sizes, which means the window was resized between them and the comparison is meaningless"
+elif [ "${G204LIT:-0}" -lt 20000 ]; then
+  bad "G204 the multiplayer screen is on the glass: the leave frame is dark ($G204LIT of $G204TOTAL pixels lit, want >=20000). Nothing was uploaded at all, or the window was not drawn"
+elif [ "${G204DIFF:--1}" -lt 15000 ]; then
+  bad "G204 the multiplayer screen is on the glass: the window on the multiplayer screen differs from the window on the main menu by only $G204DIFF pixels (want >=15000). THIS IS THE REPORT: the screen is drawn into a surface and never uploaded, so the window keeps showing the menu and the player sees a freeze. Compare shots/g204/mpplay_surface.png, which will look perfect, against mpplay_screen.png, which is the menu"
+else
+  ok "G204 the multiplayer screen is on the glass: MULTIPLAYER was clicked on the real menu, the screen ran $G204FRAMES frames in 1.5 s with its LAN browser live, and the window on its leave frame differs from the window on the main menu by $G204DIFF of $G204TOTAL pixels with $G204LIT lit -- read off the back buffer both times, not off the surface the screen drew into, because the surface was perfect on the day the window showed a frozen menu"
+fi
+
+# =====================================================================================
+# G205 A MATCH STARTED FROM THE LOBBY IS ONE MATCH, on every peer in it.
+#
+# G199 proves eight peers through the COMMAND-LINE handshake. That door arms the engine
+# at the bottom of net_match_prepare: it throws the brain's lockstep switch and hands
+# netmatch the two order sinks. The LOBBY path -- the MULTIPLAYER screen, the room, READY,
+# START -- reaches the same engine through a different door, and that
+# door threw no switch: the room said STARTED, every side booted, and each ran its own
+# game with empty turns on the wire. Nothing desynced, because nothing was compared. Two
+# people watching two matches. It shipped in v0.6.6, which was the first build to have the
+# screen at all, because the only gates on the lobby were the state machine with no
+# engine (G201) and the screen with no network (--mpshot).
+#
+# So this drives the REAL lobby state machine in two processes -- host opens a room on the
+# shipped SCM01EA, joiner joins at 127.0.0.1 and readies, host starts -- and then both
+# boot the match the room armed and play it, and the gate reads what the engine reports:
+#
+#   BOTH ARMED. "net: lockstep ON as seat N" from both, which only net_arm_lockstep
+#   prints, and which the lobby path never printed before.
+#   ONE WORLD. netmatch prints NETSYNC|frame=|hash= on both sides; every frame reported
+#   by both must carry ONE hash. Two hashes on one frame is two games.
+#   A JOINER IS ITS OWN SEAT. The joiner boots as seat 1 with seat 1's house, not seat
+#   0's: skirmish_apply took the side from the roster's first row, the host's, so a
+#   joiner used to be the host's faction in its own world and the worlds parted on the
+#   first order.
+#   ORDERS FLOW BOTH WAYS. Both sides play gate_mp_lobby.txt: deploy the MCV, build a
+#   Power Plant, place it, play on. A match that only ticks gives no orders, and two worlds
+#   nobody touched agree whether or not the order wire carries anything, so agreement
+#   there proved only that both sides booted the same map. Each side must count the
+#   other's three orders arriving, and in each side's world the other house's MCV must
+#   have become a Construction Yard and its Power Plant must have been built.
+#   EVERY COUNT IS PER LOG. The frames compared are the ones BOTH logs hashed; frame 0 is
+#   not counted, because it is hashed before the first turn runs; and at least twenty of
+#   them must come after both sides gave the order to place their plant. No side's own
+#   log may report one frame with two hashes.
+#   AND THE LIVE LOOP PLAYS IT TOO. A scripted match is advanced by the script runner,
+#   not by game_loop, which is the loop a player's lobby match runs in. So a second, short
+#   run with no script on either side must arm, take lockstep turns in game_loop and hash
+#   at least one frame after frame 0 in both logs with one hash. It has no orders in it,
+#   so it proves the live loop is wired to the turn gate, not that orders cross.
+#
+# 127.0.0.1 on purpose, like G199: what is under test is the arming and the agreement,
+# and a real network adds only the things a network adds.
+# =====================================================================================
+gbegin /tmp/g205_h.log /tmp/g205_j.log
+rm -f /tmp/g205_h.log /tmp/g205_j.log /tmp/g205_fh_h.txt /tmp/g205_fh_j.txt \
+      /tmp/g205n_h.log /tmp/g205n_j.log /tmp/g205n_fh_h.txt /tmp/g205n_fh_j.txt
+if [ ! -s SCM01EA.pack ] || [ ! -s missions/SCM01EA.INI ]; then
+  bad "G205 a match from the lobby is one match: SCM01EA is not in the run folder, so there is no shipped skirmish map to open a room on"
+elif [ ! -s gate_mp_lobby.txt ]; then
+  bad "G205 a match from the lobby is one match: gate_mp_lobby.txt is not in the run folder, so neither side has any orders to give"
+else
+  # The 40 is the tick bound a lobby match plays with no script. With --script the script
+  # plays the match instead and ends it with its own quit.
+  ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+       --mphost 40 --script gate_mp_lobby.txt --w 1024 --h 640 > /tmp/g205_h.log 2>&1 &
+  G205HP=$!
+  sleep 2
+  ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+       --mpjoin 40 --script gate_mp_lobby.txt --w 1024 --h 640 > /tmp/g205_j.log 2>&1 &
+  G205JP=$!
+  # Neither may hang the suite: the room gives up in 30 s, and a side that falls silent
+  # during the match is given up on after 30 s more.
+  g205w=0
+  while [ $g205w -lt 90 ] && { kill -0 $G205HP 2>/dev/null || kill -0 $G205JP 2>/dev/null; }; do
+    sleep 1; g205w=$((g205w+1))
+  done
+  # Both print MPLOBBY|done and exit on their own; 90 s is the backstop, not the plan.
+  G205DONE=$(cat /tmp/g205_h.log /tmp/g205_j.log | grep -ac '^MPLOBBY|done')
+  kill -9 $G205HP $G205JP 2>/dev/null
+  cat /tmp/g205_h.log /tmp/g205_j.log >> "$OUT"
+  G205STARTED=$(cat /tmp/g205_h.log /tmp/g205_j.log | grep -ac '^MPLOBBY|started|')
+  G205ARMED=$(cat /tmp/g205_h.log /tmp/g205_j.log | grep -ac '^net: lockstep ON as seat')
+  G205JSEAT=$(grep -a '^MPLOBBY|started|' /tmp/g205_j.log | sed -n 's/.*|seat=\([0-9]*\)|.*/\1/p' | head -1)
+  G205JARM=$(grep -a '^net: lockstep ON as seat' /tmp/g205_j.log | sed -n 's/.*as seat \([0-9]*\) of.*/\1/p' | head -1)
+  G205DESYNC=$(cat /tmp/g205_h.log /tmp/g205_j.log | grep -ac '^NETDESYNC\|DESYNC at frame')
+  G205FAIL=$(cat /tmp/g205_h.log /tmp/g205_j.log | grep -a '^MPLOBBY|FAIL\|^net: .*cannot play\|failed to start' | head -2 | tr '\n' ' ')
+  # EVERYTHING BELOW IS READ FROM EACH SIDE'S OWN LOG. Merged logs let one side's lines
+  # stand in for both, and let one side printing a line twice read as two sides agreeing.
+  #
+  # THE SCRIPT WAS PLAYED on each side, and played through with no failures. A match that
+  # desyncs ends early and every script line after that fails, so the clean end is judged
+  # only after the orders and the alarm, which name the cause.
+  G205HBEGIN=$(grep -ac '^SCRIPT|begin gate_mp_lobby.txt ' /tmp/g205_h.log)
+  G205JBEGIN=$(grep -ac '^SCRIPT|begin gate_mp_lobby.txt ' /tmp/g205_j.log)
+  G205HEND=$(grep -ac '^SCRIPT|end gate_mp_lobby.txt: [0-9]* lines, 0 failures$' /tmp/g205_h.log)
+  G205JEND=$(grep -ac '^SCRIPT|end gate_mp_lobby.txt: [0-9]* lines, 0 failures$' /tmp/g205_j.log)
+  # THE ORDERS THAT ARRIVED, as netmatch counts them on the way out. The other side's
+  # deploy, build and placement make three.
+  G205HIN=$(sed -n 's/^NET|leaving|.*|orders-in=\([0-9]*\)|.*/\1/p' /tmp/g205_h.log | head -1)
+  G205JIN=$(sed -n 's/^NET|leaving|.*|orders-in=\([0-9]*\)|.*/\1/p' /tmp/g205_j.log | head -1)
+  # WHAT THE ORDERS DID IN THE OTHER WORLD. Each side's own house is read from its own log,
+  # off the line that selected the MCV its deploy order moved. In the OTHER side's world
+  # that house must have a Construction Yard standing and no MCV left, which is the deploy,
+  # and a Power Plant, which is the build. The placement is not checked by cell, because
+  # where `place auto` puts a plant depends on the start a side draws; G236 holds placement
+  # at the map's edges. The world hashes show both worlds ran it the same way.
+  G205HHOUSE=$(sed -n 's/^SELECT|.*|type=MCV|house=\([A-Za-z0-9]*\)|.*|selected$/\1/p' /tmp/g205_h.log | head -1)
+  G205JHOUSE=$(sed -n 's/^SELECT|.*|type=MCV|house=\([A-Za-z0-9]*\)|.*|selected$/\1/p' /tmp/g205_j.log | head -1)
+  G205JFACT=$(grep -a "^OBJ|BUILDING|FACT|${G205HHOUSE:-none}|" /tmp/g205_j.log | grep -ac '|limbo=0|')
+  G205HFACT=$(grep -a "^OBJ|BUILDING|FACT|${G205JHOUSE:-none}|" /tmp/g205_h.log | grep -ac '|limbo=0|')
+  G205JMCV=$(grep -ac "^OBJ|UNIT|MCV|${G205HHOUSE:-none}|" /tmp/g205_j.log)
+  G205HMCV=$(grep -ac "^OBJ|UNIT|MCV|${G205JHOUSE:-none}|" /tmp/g205_h.log)
+  G205JNUKE=$(grep -ac "^OBJ|BUILDING|NUKE|${G205HHOUSE:-none}|" /tmp/g205_j.log)
+  G205HNUKE=$(grep -ac "^OBJ|BUILDING|NUKE|${G205JHOUSE:-none}|" /tmp/g205_h.log)
+  # THE FRAMES BOTH SIDES HASHED, each side's list from its own log. The later of the two
+  # sides' first hash after its own placement is the frame by which both orders had been
+  # given, and the floor counts shared frames from there on.
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' /tmp/g205_h.log | sort -u > /tmp/g205_fh_h.txt
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' /tmp/g205_j.log | sort -u > /tmp/g205_fh_j.txt
+  G205HPF=$(sed -n '/^SCRIPT|place|auto/,$p' /tmp/g205_h.log | sed -n 's/^NETSYNC|frame=\([0-9]*\)|.*/\1/p' | head -1)
+  G205JPF=$(sed -n '/^SCRIPT|place|auto/,$p' /tmp/g205_j.log | sed -n 's/^NETSYNC|frame=\([0-9]*\)|.*/\1/p' | head -1)
+  G205PF=${G205HPF:-999999}
+  [ "${G205JPF:-999999}" -gt "$G205PF" ] && G205PF=${G205JPF:-999999}
+  # One line out: shared frames after frame 0, how many of those are at or after that
+  # frame, and how many of ALL shared frames, frame 0 included, carry two hashes.
+  G205FS=$(awk -v t="$G205PF" 'NR == FNR {h[$1] = $2; next}
+      ($1 in h) {if (h[$1] != $2) s++; if ($1 > 0) n++; if ($1 >= t) a++}
+      END {print n+0, a+0, s+0}' /tmp/g205_fh_h.txt /tmp/g205_fh_j.txt)
+  G205BOTH=${G205FS%% *}; G205REST=${G205FS#* }
+  G205AFTER=${G205REST%% *}; G205SPLIT=${G205REST#* }
+  # ONE FRAME, ONE HASH, IN EACH SIDE'S OWN LOG. The comparison above keeps one host hash
+  # per frame, so a host that reported a frame twice with two different hashes has one of
+  # them never compared. Each side's own list (frame and hash pairs, sorted unique) must
+  # name each frame once.
+  G205DUPH=$(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/g205_fh_h.txt)
+  G205DUPJ=$(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/g205_fh_j.txt)
+  #
+  # THE SAME DOOR WITH NO SCRIPT, WHICH IS THE LOOP A PLAYER'S MATCH RUNS IN. A scripted
+  # lobby match is advanced by the script runner, whose own turn gate is not the live
+  # loop's, so the run above never enters game_loop. This short run gives both sides no
+  # script: the room arms the match and game_loop plays it for its 40-tick bound. Each
+  # side's own log must show the live loop ending (GAMELOOP|end, and no script begun),
+  # lockstep turns taken, and at least one frame after frame 0 hashed by both sides with
+  # one hash.
+  ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+       --mphost 40 --w 1024 --h 640 > /tmp/g205n_h.log 2>&1 &
+  G205NHP=$!
+  sleep 2
+  ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+       --mpjoin 40 --w 1024 --h 640 > /tmp/g205n_j.log 2>&1 &
+  G205NJP=$!
+  g205nw=0
+  while [ $g205nw -lt 90 ] && { kill -0 $G205NHP 2>/dev/null || kill -0 $G205NJP 2>/dev/null; }; do
+    sleep 1; g205nw=$((g205nw+1))
+  done
+  kill -9 $G205NHP $G205NJP 2>/dev/null
+  cat /tmp/g205n_h.log /tmp/g205n_j.log >> "$OUT"
+  # Two digits per quantity, host then joiner.
+  G205NSTART="$(grep -ac '^MPLOBBY|started|' /tmp/g205n_h.log)$(grep -ac '^MPLOBBY|started|' /tmp/g205n_j.log)"
+  G205NARM="$(grep -ac '^net: lockstep ON as seat' /tmp/g205n_h.log)$(grep -ac '^net: lockstep ON as seat' /tmp/g205n_j.log)"
+  G205NDONE="$(grep -ac '^MPLOBBY|done' /tmp/g205n_h.log)$(grep -ac '^MPLOBBY|done' /tmp/g205n_j.log)"
+  G205NLOOP="$(grep -ac '^GAMELOOP|end|' /tmp/g205n_h.log)$(grep -ac '^GAMELOOP|end|' /tmp/g205n_j.log)"
+  G205NSCR="$(grep -ac '^SCRIPT|begin' /tmp/g205n_h.log)$(grep -ac '^SCRIPT|begin' /tmp/g205n_j.log)"
+  G205NTH=$(sed -n 's/^NET|leaving|turns=\([0-9]*\)|.*/\1/p' /tmp/g205n_h.log | head -1)
+  G205NTJ=$(sed -n 's/^NET|leaving|turns=\([0-9]*\)|.*/\1/p' /tmp/g205n_j.log | head -1)
+  G205NKH=$(sed -n 's/^GAMELOOP|end|ticks=\([0-9]*\)|.*/\1/p' /tmp/g205n_h.log | head -1)
+  G205NKJ=$(sed -n 's/^GAMELOOP|end|ticks=\([0-9]*\)|.*/\1/p' /tmp/g205n_j.log | head -1)
+  G205NDESYNC=$(cat /tmp/g205n_h.log /tmp/g205n_j.log | grep -ac '^NETDESYNC\|DESYNC at frame')
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' /tmp/g205n_h.log | sort -u > /tmp/g205n_fh_h.txt
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' /tmp/g205n_j.log | sort -u > /tmp/g205n_fh_j.txt
+  G205NDUP="$(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/g205n_fh_h.txt) $(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/g205n_fh_j.txt)"
+  G205NFS=$(awk 'NR == FNR {h[$1] = $2; next}
+      ($1 in h) {if (h[$1] != $2) s++; if ($1 > 0) n++}
+      END {print n+0, s+0}' /tmp/g205n_fh_h.txt /tmp/g205n_fh_j.txt)
+  G205NBOTH=${G205NFS%% *}; G205NSPLIT=${G205NFS#* }
+  if [ "${G205STARTED:-0}" -lt 2 ]; then
+    bad "G205 a match from the lobby is one match: the room did not start on both sides ($G205STARTED of 2 reported MPLOBBY|started). $G205FAIL $(grep -a 'MPLOBBY' /tmp/g205_h.log /tmp/g205_j.log | tail -3 | tr '\n' ' ')"
+  elif [ "${G205ARMED:-0}" -lt 2 ]; then
+    bad "G205 a match from the lobby is one match: the room started on both sides and the lockstep switch was thrown on $G205ARMED of them (want 2). THIS IS THE FAULT THAT SHIPPED: the lobby path booted the engine without arming it, so every side played alone with empty turns on the wire"
+  elif [ -z "$G205JSEAT" ] || [ "$G205JSEAT" = "0" ] || [ "${G205JARM:-x}" != "$G205JSEAT" ]; then
+    bad "G205 a match from the lobby is one match: the joiner's seat is wrong. The room seated it as seat ${G205JSEAT:-none} and the engine armed it as seat ${G205JARM:-none} (want the same non-zero seat)"
+  elif [ "${G205DONE:-0}" -lt 2 ]; then
+    bad "G205 a match from the lobby is one match: only $G205DONE of 2 sides finished their match and exited (want 2) after $g205w s. A side that never comes back is a stall, and nothing below can be read off a match that did not end"
+  elif [ "${G205HBEGIN:-0}" != "1" ] || [ "${G205JBEGIN:-0}" != "1" ]; then
+    bad "G205 a match from the lobby is one match: the match did not play its script (script started: host $G205HBEGIN, joiner $G205JBEGIN, want 1 each). A lobby match that ignores --script has no hand on it, and two untouched worlds agreeing says nothing about lockstep"
+  elif [ "${G205HIN:-0}" -lt 1 ] || [ "${G205JIN:-0}" -lt 1 ]; then
+    bad "G205 a match from the lobby is one match: the orders did not cross. The host counted ${G205HIN:-no} orders arriving from the joiner and the joiner ${G205JIN:-no} from the host (want at least the deploy here, and three by the end). Both scripts were played, so the order wire is not carrying their orders"
+  elif [ "${G205JFACT:-0}" -lt 1 ] || [ "${G205JMCV:-1}" != "0" ] || [ "${G205JNUKE:-0}" -lt 1 ] \
+       || [ "${G205HFACT:-0}" -lt 1 ] || [ "${G205HMCV:-1}" != "0" ] || [ "${G205HNUKE:-0}" -lt 1 ]; then
+    bad "G205 a match from the lobby is one match: the orders arrived and did not happen. In the joiner's world the host's house (${G205HHOUSE:-unnamed}) has $G205JFACT Construction Yards standing, $G205JMCV MCVs and $G205JNUKE Power Plants; in the host's world the joiner's house (${G205JHOUSE:-unnamed}) has $G205HFACT, $G205HMCV and $G205HNUKE (want >=1, 0 and >=1 on each side)"
+  elif [ "${G205DESYNC:-0}" != "0" ]; then
+    bad "G205 a match from the lobby is one match: the desync alarm fired ($G205DESYNC). The two worlds parted: a rule or a roster row that did not travel, or an order that ran differently on the two sides"
+  elif [ "${G205HEND:-0}" != "1" ] || [ "${G205JEND:-0}" != "1" ] \
+       || [ "${G205HIN:-0}" -lt 3 ] || [ "${G205JIN:-0}" -lt 3 ]; then
+    bad "G205 a match from the lobby is one match: the match did not play its script through. Clean script ends: host $G205HEND, joiner $G205JEND (want 1 each); orders arriving: host $G205HIN, joiner $G205JIN (want >=3 each: the deploy, the build and the placement). $(grep -ah '^SCRIPT|end' /tmp/g205_h.log /tmp/g205_j.log | head -2 | tr '\n' ' ')"
+  elif [ "${G205DUPH:-1}" != "0" ] || [ "${G205DUPJ:-1}" != "0" ]; then
+    bad "G205 a match from the lobby is one match: a side's own log reports one frame with two different world hashes (frames with more than one hash: host $G205DUPH, joiner $G205DUPJ; want 0 and 0). That side ran two worlds or reported one frame twice, and the cross-side comparison keeps only one hash per frame, so it cannot see the second"
+  elif [ "${G205AFTER:-0}" -lt 20 ]; then
+    bad "G205 a match from the lobby is one match: only $G205AFTER frames from frame $G205PF on, after both sides gave the order to place their Power Plant, were hashed in both sides' own logs (want >=20; $G205BOTH shared frames after frame 0 in all). The match ended before the orders had played out, or one side stopped hashing"
+  elif [ "${G205SPLIT:-1}" != "0" ]; then
+    bad "G205 a match from the lobby is one match: $G205SPLIT of the frames both sides' own logs hashed carry two different world hashes. Two games. $(cat /tmp/g205_h.log /tmp/g205_j.log | grep -a '^NETSYNC' | sort | head -4 | tr '\n' ' ')"
+  elif [ "$G205NSTART" != "11" ] || [ "$G205NARM" != "11" ]; then
+    bad "G205 a match from the lobby is one match, through the live loop: the run with no script did not start and arm on both sides (started host/joiner = $G205NSTART, lockstep switch thrown = $G205NARM, want 11 and 11). $(grep -a 'MPLOBBY\|^net: ' /tmp/g205n_h.log /tmp/g205n_j.log | tail -3 | tr '\n' ' ')"
+  elif [ "$G205NDONE" != "11" ]; then
+    bad "G205 a match from the lobby is one match, through the live loop: the run with no script finished on host/joiner = $G205NDONE (want 11) after $g205nw s. A side that never comes back from its 40 ticks is a stall in the loop a player's match runs in"
+  elif [ "$G205NLOOP" != "11" ] || [ "$G205NSCR" != "00" ]; then
+    bad "G205 a match from the lobby is one match, through the live loop: the run with no script did not play in game_loop (GAMELOOP|end host/joiner = $G205NLOOP, want 11; scripts begun = $G205NSCR, want 00), so the live loop is not what played the match"
+  elif [ "${G205NKH:-0}" -lt 1 ] || [ "${G205NKJ:-0}" -lt 1 ]; then
+    bad "G205 a match from the lobby is one match, through the live loop: game_loop ended having advanced host ${G205NKH:-no}, joiner ${G205NKJ:-no} engine ticks of its 40 (want >=1 each), so the live loop never got a turn to play and a player's lobby match would sit frozen until the stall ends it. $(grep -ah '^net: ' /tmp/g205n_h.log /tmp/g205n_j.log | tail -2 | tr '\n' ' ')"
+  elif [ "${G205NTH:-0}" -lt 1 ] || [ "${G205NTJ:-0}" -lt 1 ]; then
+    bad "G205 a match from the lobby is one match, through the live loop: game_loop advanced the match (ticks host $G205NKH, joiner $G205NKJ) and took lockstep turns host ${G205NTH:-none}, joiner ${G205NTJ:-none} (want >=1 each). The live loop advanced the world without the turn gate, so each side played its own match and their hashes agree only because nobody gave an order"
+  elif [ "${G205NDESYNC:-0}" != "0" ] || [ "$G205NDUP" != "0 0" ]; then
+    bad "G205 a match from the lobby is one match, through the live loop: desync alarms $G205NDESYNC (want 0), frames a side's own log hashed twice with two hashes host/joiner $G205NDUP (want 0 0)"
+  elif [ "${G205NBOTH:-0}" -lt 1 ] || [ "${G205NSPLIT:-1}" != "0" ]; then
+    bad "G205 a match from the lobby is one match, through the live loop: $G205NBOTH frames after frame 0 were hashed in both sides' own logs (want >=1) and $G205NSPLIT of them carry two hashes (want 0), so the match game_loop played was not compared as one world"
+  else
+    ok "G205 a match from the lobby is one match: a host opened a room on SCM01EA through the real lobby state machine, a joiner joined at 127.0.0.1 and readied, the host started, and all development machines threw the lockstep switch on the way into the match -- the joiner as seat $G205JSEAT, which is its own seat and not the host's. Both sides then played it with orders: each deployed its MCV, built a Power Plant and gave the order to place it, each counted the other's orders arriving (host $G205HIN, joiner $G205JIN), and in each side's world the other house's MCV is a standing Construction Yard and its Power Plant has been built. Across $G205BOTH frames after frame 0 hashed in both sides' own logs, $G205AFTER of them from frame $G205PF on, after both placement orders were given, there was exactly one world hash, no side reported a frame twice, and the desync alarm never fired. And with no script, the loop a player's match runs in played the same door's match: both sides armed, took lockstep turns (host $G205NTH, joiner $G205NTJ) and hashed $G205NBOTH frames after frame 0 with one hash"
+  fi
+fi
+
+# =====================================================================================
+# G236 A BUILDING ON THE EDGE OF THE MAP STANDS, OR IS REFUSED WHERE THE PLAYER SEES IT.
+#
+# The placement grid the brain exports is the playable rectangle plus a ring one cell
+# wide, and neither of its two flags says that a foundation may not cover a ring cell.
+# The proximity flag stops testing the map's edge at the first footprint cell it finds
+# beside the base, and a bibbed building's footprint list starts with its bib. So the
+# overlay called an origin on the grid's top row legal, `place auto` chose it, and the
+# engine refused the order when it ran, because every foundation and bib cell must be on
+# the map (BuildingTypeClass::Legal_Placement): the Power Plant stayed in its factory at
+# the limbo sentinel and nothing was said. A building whose bib hangs below the map's last
+# row read legal the same way. In a lockstep match the refusal also ended placement mode.
+#
+# Three runs on SCM01EA, each judged from its own log:
+#   TOP ROW. Base at 17,11 (start 1), and 15,10 is grid row 0. The hover must read
+#   legal=0, the placement must be refused before it is sent ("REFUSED off the map", and
+#   no SIDEBAR-REQUEST line for that cell) and said in the match pane, placement mode must
+#   still be on, and a following `place auto`
+#   must choose another cell, where the plant must stand, with no plant of that house
+#   left in limbo.
+#   BOTTOM EDGE. Base at 32,57 (start 4). 35,58 is on the map but its bib covers row 60,
+#   one past the last. The same assertions.
+#   TOP ROW IN A MATCH. The joiner of a two seat loopback match owns the 17,11 base and
+#   plays the top row script. Its plant must stand in BOTH worlds after `place auto`, and
+#   the worlds must agree on every frame both hashed.
+# The `place auto` in each run is the control: it must stand, so a change that refused
+# every placement fails here as surely as the old overlay does.
+# =====================================================================================
+gbegin /tmp/g236_top.log /tmp/g236_bot.log /tmp/g236_h.log /tmp/g236_j.log \
+       /tmp/g236_fh_h.txt /tmp/g236_fh_j.txt
+# g236_judge LOG X Y: G236WHY is the first defect in that log for a refused cell X,Y, or
+# empty. It leaves g236_house and g236_auto behind for the match leg.
+# WHETHER A PLACEMENT WAS SENT IS READ FROM ITS SIDEBAR-REQUEST LINE, which is printed where
+# the order leaves for the engine. The SIDEBAR-PLACE line, refusal suffix and all, is
+# printed before the refusal returns, so a build that printed the refusal and sent the
+# order anyway printed exactly the lines a correct build does. The cell place auto chose
+# must have a request line, which is what shows the line is printed at all.
+# A defect about the refused cell also says what became of that house's Power Plants, so
+# a red line names a building lost in its factory rather than only what the overlay said.
+g236_judge() {
+  g236_l=$1; g236_rx=$2; g236_ry=$3; G236WHY=""
+  g236_house=$(sed -n 's/^SELECT|.*|type=MCV|house=\([A-Za-z0-9]*\)|.*|selected$/\1/p' "$g236_l" | head -1)
+  g236_hov=$(grep -ac "^SCRIPT|hover|$g236_rx,$g236_ry|legal=0|" "$g236_l")
+  g236_ref=$(grep -ac "^SIDEBAR-PLACE|NUKE|cell=$g236_rx,$g236_ry|grid=[0-9]*,[0-9]*|legal=0|REFUSED off the map\$" "$g236_l")
+  g236_sent=$(grep -ac "^SIDEBAR-REQUEST|PLACE|NUKE|cell=$g236_rx,$g236_ry|" "$g236_l")
+  g236_said=$(grep -ac '^MATCHMSG|nodeploy|' "$g236_l")
+  g236_mode=$(sed -n 's/^SCRIPT|place|placementmode now \([01]\)$/\1/p' "$g236_l" | head -1)
+  g236_auto=$(sed -n 's/^SCRIPT|place|auto -> cell \([0-9]*,[0-9]*\)$/\1/p' "$g236_l" | head -1)
+  g236_ax=${g236_auto%,*}; g236_ay=${g236_auto#*,}
+  g236_asent=0
+  if [ -n "$g236_auto" ]; then
+    g236_asent=$(grep -ac "^SIDEBAR-REQUEST|PLACE|NUKE|cell=$g236_auto|" "$g236_l")
+  fi
+  g236_up=$(grep -a "^OBJ|BUILDING|NUKE|${g236_house:-none}|newcell=[0-9]*|x=${g236_ax:-none}|y=${g236_ay:-none}|" "$g236_l" | grep -ac '|limbo=0|')
+  g236_stand=$(grep -a "^OBJ|BUILDING|NUKE|${g236_house:-none}|" "$g236_l" | grep -ac '|limbo=0|')
+  g236_limbo=$(grep -a "^OBJ|BUILDING|NUKE|${g236_house:-none}|" "$g236_l" | grep -ac '|limbo=1|')
+  g236_end=$(grep -ac '^SCRIPT|end gate_edge_[a-z_]*\.txt: [0-9]* lines, 0 failures$' "$g236_l")
+  g236_state="at the end this house has $g236_stand Power Plant(s) standing and $g236_limbo still in its factory"
+  if [ -z "$g236_house" ]; then
+    G236WHY="no MCV was selected, so there is no base to build beside"
+  elif [ "$g236_hov" != "1" ]; then
+    G236WHY="the overlay calls $g236_rx,$g236_ry legal, and a Power Plant there covers a cell off the map; $g236_state"
+  elif [ "$g236_sent" != "0" ]; then
+    G236WHY="the placement at $g236_rx,$g236_ry was sent to the engine instead of refused ($g236_sent place request(s) for that cell); $g236_state"
+  elif [ "$g236_ref" != "1" ]; then
+    G236WHY="the placement at $g236_rx,$g236_ry was not reported refused (no SIDEBAR-PLACE line with REFUSED for it); $g236_state"
+  elif [ "$g236_said" -lt 1 ]; then
+    G236WHY="the refusal at $g236_rx,$g236_ry was not said in the match pane"
+  elif [ "$g236_mode" != "1" ]; then
+    G236WHY="the refusal at $g236_rx,$g236_ry ended placement mode; $g236_state"
+  elif [ -z "$g236_auto" ] || [ "$g236_auto" = "$g236_rx,$g236_ry" ]; then
+    G236WHY="place auto chose ${g236_auto:-nothing}"
+  elif [ "$g236_asent" -lt 1 ]; then
+    G236WHY="no place request line names $g236_auto, the cell place auto chose, so the log cannot show that nothing was sent for $g236_rx,$g236_ry"
+  elif [ "$g236_up" != "1" ]; then
+    G236WHY="the plant place auto put at $g236_auto is not standing ($g236_up standing there)"
+  elif [ "$g236_limbo" != "0" ]; then
+    G236WHY="a $g236_house Power Plant is still in limbo at the end"
+  elif [ "$g236_end" != "1" ]; then
+    G236WHY="the script did not end with 0 failures"
+  fi
+}
+if [ ! -s SCM01EA.pack ] || [ ! -s missions/SCM01EA.INI ]; then
+  bad "G236 edge placement: SCM01EA is not in the run folder, so there is no map to build on"
+elif [ ! -s gate_edge_top.txt ] || [ ! -s gate_edge_bottom.txt ] \
+     || [ ! -s gate_edge_net_h.txt ] || [ ! -s gate_edge_net_j.txt ]; then
+  bad "G236 edge placement: the gate_edge_*.txt scripts are not in the run folder"
+else
+  grun /tmp/g236_top.log --scen SCM01EA --pack SCM01EA.pack $BASE --skirmish --side gdi --ai 0 \
+       --starts 1,0 --script gate_edge_top.txt
+  grun /tmp/g236_bot.log --scen SCM01EA --pack SCM01EA.pack $BASE --skirmish --side gdi --ai 0 \
+       --starts 4,0 --script gate_edge_bottom.txt
+  ./cnc_eyes --scen SCM01EA --pack SCM01EA.pack $BASE --skirmish --side gdi --ai 0 \
+       --players 2 --host 17437 --script gate_edge_net_h.txt > /tmp/g236_h.log 2>&1 &
+  G236HP=$!
+  sleep 3
+  ./cnc_eyes --scen SCM01EA --pack SCM01EA.pack $BASE --skirmish --side nod --ai 0 \
+       --join 127.0.0.1 17437 --script gate_edge_net_j.txt > /tmp/g236_j.log 2>&1 &
+  G236JP=$!
+  # Both end on their own script's quit; 90 s is the backstop, not the plan.
+  g236w=0
+  while [ $g236w -lt 90 ] && { kill -0 $G236HP 2>/dev/null || kill -0 $G236JP 2>/dev/null; }; do
+    sleep 1; g236w=$((g236w+1))
+  done
+  kill -9 $G236HP $G236JP 2>/dev/null
+  cat /tmp/g236_h.log /tmp/g236_j.log >> "$OUT"
+  g236_judge /tmp/g236_top.log 15 10; G236TOP=$G236WHY; G236TOPAUTO=$g236_auto
+  g236_judge /tmp/g236_bot.log 35 58; G236BOT=$G236WHY; G236BOTAUTO=$g236_auto
+  g236_judge /tmp/g236_j.log 15 10;   G236NET=$G236WHY; G236NETAUTO=$g236_auto
+  # THE HOST'S WORLD. The joiner's plant, by the joiner's house and the cell its own log
+  # chose, must stand there too, and no plant of that house may be left in limbo.
+  G236HUP=$(grep -a "^OBJ|BUILDING|NUKE|${g236_house:-none}|newcell=[0-9]*|x=${g236_ax:-none}|y=${g236_ay:-none}|" /tmp/g236_h.log | grep -ac '|limbo=0|')
+  G236HLIMBO=$(grep -a "^OBJ|BUILDING|NUKE|${g236_house:-none}|" /tmp/g236_h.log | grep -ac '|limbo=1|')
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' /tmp/g236_h.log | sort -u > /tmp/g236_fh_h.txt
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' /tmp/g236_j.log | sort -u > /tmp/g236_fh_j.txt
+  G236FS=$(awk 'NR == FNR {h[$1] = $2; next}
+      ($1 in h) {if (h[$1] != $2) s++; if ($1 > 0) n++}
+      END {print n+0, s+0}' /tmp/g236_fh_h.txt /tmp/g236_fh_j.txt)
+  G236BOTH=${G236FS%% *}; G236SPLIT=${G236FS#* }
+  G236DESYNC=$(cat /tmp/g236_h.log /tmp/g236_j.log | grep -ac '^NETDESYNC\|DESYNC at frame')
+  # EVERY RUN THAT FAILED IS NAMED, in one line, not only the first.
+  G236FAILS=""
+  if [ "$GRC" != "0" ]; then
+    G236FAILS="a skirmish run exited $GRC"
+  fi
+  if [ -n "$G236TOP" ]; then
+    G236FAILS="${G236FAILS:+$G236FAILS. }Top row: $G236TOP"
+  fi
+  if [ -n "$G236BOT" ]; then
+    G236FAILS="${G236FAILS:+$G236FAILS. }Bottom edge: $G236BOT"
+  fi
+  if [ "$g236w" -ge 90 ]; then
+    G236FAILS="${G236FAILS:+$G236FAILS. }In a match: the two sides were still running after 90 s and were killed"
+  elif [ -n "$G236NET" ]; then
+    G236FAILS="${G236FAILS:+$G236FAILS. }In a match (joiner): $G236NET"
+  elif [ "$G236HUP" != "1" ] || [ "$G236HLIMBO" != "0" ]; then
+    G236FAILS="${G236FAILS:+$G236FAILS. }In a match: the joiner's plant at $G236NETAUTO stands in its own world but not in the host's (standing=$G236HUP, in limbo=$G236HLIMBO)"
+  elif [ "${G236BOTH:-0}" -lt 10 ] || [ "$G236SPLIT" != "0" ] || [ "$G236DESYNC" != "0" ]; then
+    G236FAILS="${G236FAILS:+$G236FAILS. }In a match: $G236BOTH shared frames after frame 0 (want >= 10), $G236SPLIT with two hashes, $G236DESYNC desync alarms"
+  fi
+  if [ -n "$G236FAILS" ]; then
+    bad "G236 edge placement. $G236FAILS"
+  else
+    ok "G236 edge placement: 15,10 and 35,58 refused before sending with placement mode kept; place auto stood at $G236TOPAUTO and $G236BOTAUTO, and at $G236NETAUTO in both worlds of a match ($G236BOTH shared frames, one hash each)"
+  fi
+fi
+
+# G235 THE UNIT CARD: WHAT IS SELECTED, IN THE CORNER, AND ITS CONTROLS DO WHAT THEY SAY.
+# (This gate was once also numbered G194, a number the two-brain lockstep gate already
+# carried; G194 is that gate's alone.)
+#
+# The card is the selection readout in the bottom-left corner of the Enhanced HUD: the
+# selected unit's cameo, name, health and damage, a row of smaller cameos for the rest of
+# the selection, and ten control-group tabs. Four things are asserted, each against engine
+# state or a printed number rather than a threshold guessed at:
+#
+#   1  STATE. With four riflemen and the MCV selected, the card reports count=5 and its
+#      tabs report the groups the brain holds: group 1 keeps the five units it was given
+#      (the MCV having LEFT it when it was assigned to group 2, which is Handle_Team's own
+#      rule) and group 2 holds one.
+#   2  A TAB RECALLS ITS GROUP. cardclick tab 0 goes through the same uc_click a hand
+#      reaches, and the engine's answer is GROUP|recall with selection=5; the tab then
+#      reports frame=3, the amber ACTIVE state, because the selection IS the group.
+#   3  A SMALLER CAMEO PICKS ITS UNIT ALONE: UNITCARD|pick ... ok=1|selection=1.
+#   4  PIXELS, AGAINST A CONTROL FROM THE SAME ENHANCED RUN. Two shots on one tick: first
+#      with nothing selected, which the card reports as shown=0, then with the five banded.
+#      The card's 480x332 rectangle has to differ between them by at least 30000 pixels,
+#      and a rectangle of the same size directly above it, battlefield with nothing
+#      selected in it, by no more than 1000.
+#
+# WHY THE CONTROL IS NOT THE RUN WITHOUT ENHANCED. That run has the post-processing chain
+# off, and the chain changes nearly every battlefield pixel: against it the card's
+# rectangle and a rectangle with no card in it both differed in over 159000 of 159360
+# pixels, so a build with the card's draw call removed still passed. It cannot be made
+# into a control either, because uc_available() requires the chain. That run stays for the
+# one thing it can show, that the card reports itself unavailable.
+#
+# Measured on a good build: 157048 pixels in the card's rectangle and 0 above it. With the
+# uc_draw call removed: 7680 (the band outline, which is anchored in the world and moves
+# between the two shots, crosses the tab row) and 0. With the chain-off frame as the
+# control: 159312 above the card.
+#
+# The band coordinates and camera cells are chosen so the run is deterministic: the units
+# have not moved at tick 30 and the band covers the whole map view. group= on the OBJ|
+# line is what the tab counts read; a brain without it reports ten empty tabs and leg 1
+# goes red, which is the point.
+# =====================================================================================
+gbegin /tmp/g235.log /tmp/g235off.log shots/g235_nocard.png shots/g235_on.png
+printf 'enabled 1\n' > gfx_g235.cfg
+{ echo "tick 30"; echo "cam 56 55"; echo "tick 1"; echo "band 0 0 1279 900"
+  echo "group 1 2"; echo "cam 57 50"; echo "tick 1"; echo "lclickobj MCV 0"; echo "group 2 2"
+  echo "cam 56 53"; echo "tick 1"; echo "deselect"; echo "unitcard"
+  echo "shot shots/g235_nocard.png"
+  echo "band 0 0 1279 900"; echo "unitcard"
+  echo "shot shots/g235_on.png"
+  echo "cardclick tab 0"; echo "unitcard"; echo "cardclick mini 1"; echo "unitcard"
+  echo "cardclick tab 1"; echo "unitcard"; echo quit; } > /tmp/g235.script
+grep -v '^shot ' /tmp/g235.script > /tmp/g235off.script
+export CNC3D_HUD=new
+grun /tmp/g235.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 960 \
+     --gfx gfx_g235.cfg --script /tmp/g235.script
+grun /tmp/g235off.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 960 \
+     --script /tmp/g235off.script
+unset CNC3D_HUD
+gshots shots/g235_nocard.png shots/g235_on.png
+G235NOCARD=$(grep -a '^UNITCARD|shown=' /tmp/g235.log | head -1)
+G235STATE=$(grep -a '^UNITCARD|shown=1|count=5|' /tmp/g235.log | head -1)
+G235GROUPS=$(echo "$G235STATE" | sed -n 's/.*|groups=\([0-9]*,[0-9]*\),.*/\1/p')
+G235RECALL=$(grep -ac '^GROUP|recall|key=1|slot=0|selection=5$' /tmp/g235.log)
+G235ACTIVE=$(grep -ac '^UNITCARD|tab|key=1|slot=0|count=5|frame=3|' /tmp/g235.log)
+G235PICK=$(grep -ac '^UNITCARD|pick|E1|id=[0-9]*|ok=1|selection=1$' /tmp/g235.log)
+G235MCV=$(grep -ac '^UNITCARD|shown=1|count=1|main=MCV|' /tmp/g235.log)
+G235OFF=$(grep -ac '^UNITCARD|unavailable|enhanced=0|' /tmp/g235off.log)
+case "$G235NOCARD" in 'UNITCARD|shown=0|count=0|'*) G235CTL=1 ;; *) G235CTL=0 ;; esac
+if [ "$GRC" != "0" ]; then
+  bad "G235 unit card: a run failed or wrote no shot (GRC=$GRC)"
+else
+  G235PX=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g235_nocard.png shots/g235_on.png 0 628 480 960 | cut -d'|' -f2)
+  G235ABOVE=$(python3 "$GATEDIR/gate_gfx.py" rect shots/g235_nocard.png shots/g235_on.png 0 100 480 432 | cut -d'|' -f2)
+  if [ -z "$G235STATE" ]; then
+    bad "G235 unit card: no UNITCARD|shown=1|count=5 line. Either the card did not come up in Enhanced on the new HUD, or the band took a different selection: $(grep -a '^UNITCARD|shown\|^UNITCARD|unavail\|^BAND|' /tmp/g235.log | head -3 | tr '\n' ' ')"
+  elif [ "$G235GROUPS" != "5,1" ]; then
+    bad "G235 unit card: the tabs report groups=$G235GROUPS (want 5,1). Group 1 should hold the four riflemen and the gun boat, group 2 the MCV; a brain without group= on the OBJ| line reports 0,0"
+  elif [ "${G235RECALL:-0}" -lt 1 ] || [ "${G235ACTIVE:-0}" -lt 1 ]; then
+    bad "G235 unit card: clicking tab 1 did not recall its group (recall lines=$G235RECALL, active-frame lines=$G235ACTIVE)"
+  elif [ "${G235PICK:-0}" -lt 1 ]; then
+    bad "G235 unit card: clicking a smaller cameo did not make that rifleman the whole selection"
+  elif [ "${G235MCV:-0}" -lt 1 ]; then
+    bad "G235 unit card: clicking tab 2 did not put the MCV alone on the card"
+  elif [ "${G235OFF:-0}" -lt 1 ]; then
+    bad "G235 unit card: the run without Enhanced still had a card (want UNITCARD|unavailable|enhanced=0)"
+  elif [ "$G235CTL" != "1" ]; then
+    bad "G235 unit card: the control shot was not taken with the card down: the report before it reads [$G235NOCARD] (want UNITCARD|shown=0|count=0), so the corner comparison has no card-free side"
+  elif [ -z "$G235PX" ] || [ -z "$G235ABOVE" ]; then
+    bad "G235 unit card: the pixel counts could not be read (card=[$G235PX] above=[$G235ABOVE])"
+  elif [ "$G235ABOVE" -gt 1000 ]; then
+    bad "G235 unit card: the control frame is not like the card frame: $G235ABOVE pixels differ in the battlefield rectangle above the card, where nothing changes (want <=1000; a good build measures 0), and a comparison against an unlike frame differs everywhere, card or no card"
+  elif [ "$G235PX" -lt 30000 ]; then
+    bad "G235 unit card: only $G235PX pixels differ in the card's corner between nothing selected and five selected in the same Enhanced run (want >=30000; a good build measures 157048, the band outline alone about 7700); the card is not being drawn"
+  else
+    ok "G235 unit card: five selected, tabs read groups 5,1 off the brain, tab 1 recalled its five and lit amber, a smaller cameo picked one rifleman, tab 2 put the MCV up, and against a frame from the same Enhanced run with nothing selected the corner differs by $G235PX pixels while the battlefield above it differs by $G235ABOVE"
+  fi
+fi
+
+# =====================================================================================
+# G206 THE DISPLAY ROWS ON THE ADVANCED PAGE: True fullscreen / Windowed /
+# Windowed borderless as a radio triple, Resolution greyed under borderless, UI scaling
+# with -2x as the shipped default, and Reset to defaults. Each is two claims, the
+# dialog's value and the dial it wrote, read off OPTDISP the way G42 reads OPTVIS. The
+# window itself is NOT switched in this run (an automated run keeps its hidden window and
+# says DISPLAY|deferred); what is proved is that the rows write the dials, the greying
+# follows the mode, the divisor reaches the sidebar, and Reset comes back to the
+# compiled defaults. The row past the fold is reached by the driver scrolling to it,
+# which is also G42's whole fix.
+# =====================================================================================
+cat > /tmp/g206.txt <<'G206EOF'
+tick 30
+options
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optvis
+optclick True fullscreen
+optvis
+optclick Windowed
+optvis
+optclick Windowed borderless
+optvis
+optclick UI scaling
+opttex close
+optclick CRT
+optvis
+optclick Reset to defaults
+optvis
+quit
+G206EOF
+G206L=$(./cnc_eyes --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+           --script /tmp/g206.txt --gfx 2>&1 | tee -a "$OUT")
+G206D=$(echo "$G206L" | grep '^OPTDISP|')
+g206() { echo "$G206D" | sed -n "$1p"; }
+G206OK=1
+# 1: fresh, the shipped defaults: borderless, resolution greyed, UI -2x, divisor 2
+echo "$(g206 1)" | grep -q 'mode=1|.*uiscale=1|resdisabled=1|.*fx_mode=1|.*fx_ui=1|sb_div=2' || G206OK=0
+# 2: True fullscreen: mode 2 on both sides, resolution live
+echo "$(g206 2)" | grep -q 'mode=2|.*resdisabled=0|.*fx_mode=2'   || G206OK=0
+# 3: Windowed: mode 0, resolution live
+echo "$(g206 3)" | grep -q 'mode=0|.*resdisabled=0|.*fx_mode=0'   || G206OK=0
+# 4: Windowed borderless: mode 1, resolution greyed again
+echo "$(g206 4)" | grep -q 'mode=1|.*resdisabled=1|.*fx_mode=1'   || G206OK=0
+# 5: CRT is past the fold; the driver scrolled to it and the click landed (crt=1)
+G206SCROLL=$(echo "$G206L" | grep -c '^OPTIONS|script|scrolled|.*for=CRT')
+echo "$G206L" | grep '^OPTVIS|' | sed -n '5p' | grep -q 'crt=1|.*fx_crt=1' || G206OK=0
+# 6: Reset: crt back off, borderless, -2x
+echo "$G206L" | grep '^OPTVIS|' | sed -n '6p' | grep -q 'crt=0|.*fx_crt=0' || G206OK=0
+echo "$(g206 6)" | grep -q 'mode=1|.*uiscale=1|.*fx_mode=1|.*fx_ui=1|sb_div=2' || G206OK=0
+# 7: the display rows' value boxes start after their own labels (they ran
+# under them), read off the ADVDROP lines: label ink 73..132 / 73..130, box at 135 / 133
+echo "$G206L" | grep '^ADVDROP|' | grep -q '|Resolution|lab=73\.\.132|box=135,' || G206OK=0
+echo "$G206L" | grep '^ADVDROP|' | grep -q '|UI scaling|lab=73\.\.130|box=133,' || G206OK=0
+G206N=$(echo "$G206D" | wc -l | tr -d ' ')
+if [ "$G206OK" = "1" ] && [ "$G206N" = "6" ] && [ "${G206SCROLL:-0}" -ge 1 ]; then
+  ok "G206 the display rows: the page opens on the shipped defaults (borderless, resolution greyed, UI -2x, divisor 2 in the sidebar), True fullscreen and Windowed each write their mode and free the resolution row, borderless greys it again, a row past the fold is reached by scrolling, and Reset puts CRT off and the display back to the defaults"
+else
+  bad "G206 the display rows: ok=$G206OK lines=$G206N(want 6) scrolled-for-crt=$G206SCROLL(want >=1). OPTDISP: $(echo "$G206D" | tr '\n' ' ' | cut -c1-600)"
+fi
+
+# =====================================================================================
+# G207 THE PERSPECTIVE ROW (v0.6.8): Classic / Isometric on the Advanced page, the camera
+# turned 45 degrees under the same tilt. Three claims. THE DIALOG: the row reads Classic
+# on a fresh open, picking Isometric writes the dial AND turns the camera the same
+# instant (yaw 16, the shipped angle), and Reset to defaults comes back to Classic with the yaw at zero.
+# THE PICTURE: a frame shot in Isometric differs from the Classic frame over at least a
+# tenth of the screen, and Classic-after-Isometric is BYTE-IDENTICAL to Classic-before,
+# so the round trip leaves nothing behind (billboard basis, facing bias, painter order
+# and the band are rebuilt from the yaw, never toggled). Every other pixel gate in this
+# suite runs with the dial at its Classic default and is the proof that Classic is the
+# frame it always was.
+# =====================================================================================
+cat > /tmp/g207.txt <<'G207EOF'
+tick 30
+options
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optvis
+optpersp
+optpersp open
+optpersp pick 1
+optvis
+optclick Reset to defaults
+optvis
+quit
+G207EOF
+G207L=$(./cnc_eyes --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+           --script /tmp/g207.txt --gfx 2>&1 | tee -a "$OUT")
+G207P=$(echo "$G207L" | grep '^OPTPERSP|value=')
+g207() { echo "$G207P" | sed -n "$1p"; }
+G207OK=1
+# 1: fresh: Classic on both sides, the camera at the console's heading
+echo "$(g207 1)" | grep -q 'value=0|disabled=0|fx_persp=0|yaw=0.0|enhanced=1' || G207OK=0
+# the list itself: two entries, in this order, neither greyed
+echo "$G207L" | grep '^OPTPERSP|page=' | sed -n '1p' \
+  | grep -q '|0=Classic|1=Isometric|fx_persp=0|yaw=0.0' || G207OK=0
+# 2: Isometric picked: dial 1, and the yaw the same instant
+echo "$(g207 2)" | grep -q 'value=1|disabled=0|fx_persp=1|yaw=16.0' || G207OK=0
+# 3: Reset: Classic again, the yaw back to zero
+echo "$(g207 3)" | grep -q 'value=0|.*fx_persp=0|yaw=0.0' || G207OK=0
+# the row's own value box starts after its label (ink 73..138, box at 141): no clipping
+echo "$G207L" | grep '^ADVDROP|' | grep -q '|Perspective|lab=73\.\.138|box=141,' || G207OK=0
+G207N=$(echo "$G207P" | wc -l | tr -d ' ')
+# THE PICTURE. One run, three shots, no dialog: the verb is the row's own door.
+cat > /tmp/g207b.txt <<'G207EOF'
+tick 30
+persp
+shot shots/g207_classic.png
+persp iso
+shot shots/g207_iso.png
+persp classic
+shot shots/g207_back.png
+quit
+G207EOF
+gbegin shots/g207_classic.png shots/g207_iso.png shots/g207_back.png shots/g207.log
+grun shots/g207.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g207b.txt --gfx
+gshots shots/g207_classic.png shots/g207_iso.png shots/g207_back.png
+G207PX=-1; G207SAME=0
+if [ "$GRC" = "0" ]; then
+  cmp -s shots/g207_classic.png shots/g207_back.png && G207SAME=1
+  G207PX=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def px(a, b):
+    x = np.asarray(Image.open('shots/' + a).convert('RGB')).astype(int)
+    y = np.asarray(Image.open('shots/' + b).convert('RGB')).astype(int)
+    return int(((np.abs(x - y).sum(axis=2)) > 24).sum())
+print(px('g207_classic.png', 'g207_iso.png'))
+PY
+)
+fi
+G207Y=$(grep '^PERSP|' shots/g207.log | cut -d'|' -f2,3 | tr '\n' ' ')
+if [ "$G207OK" = "1" ] && [ "$G207N" = "3" ] && [ "$G207SAME" = "1" ] \
+   && [ "${G207PX:-0}" -ge 100000 ] && [ "$G207Y" = "0|yaw=0.0 1|yaw=16.0 0|yaw=0.0 " ]; then
+  ok "G207 the Perspective row: fresh reads Classic, Isometric turns the camera to 16 the same instant, Reset comes back to zero; the Isometric frame differs on $G207PX px and Classic-after-Isometric is byte-identical to Classic-before"
+else
+  bad "G207 the Perspective row: dialog=$G207OK lines=$G207N(want 3) roundtrip-identical=$G207SAME iso-differs=$G207PX(want >=100000) verbs='$G207Y'(want '0|yaw=0.0 1|yaw=16.0 0|yaw=0.0 '). $(echo "$G207P" | tr '\n' ' ' | cut -c1-400)"
+fi
+
+# =====================================================================================
+# G208 THE ISOMETRIC DIALS (F5 group 0): iso_yaw, iso_pitch, iso_fov, iso_dist. Four
+# claims. LIVE: each dial moved by the gfx verb is read back on the next persp line the
+# same instant (yaw -30, tilt 60, fov 70, distance 1.5 -> 17.58 cells at the default
+# zoom), and a pick taken straight after the dials moved lands where a pick after the
+# next frame lands, off centre and whole cells from a pick at the same pixel before the
+# dials moved: the hook reaches the camera, not the frame loop. TILT: iso_pitch 0
+# hands the console's zoom-linked lerp back (48.1 at the default distance). CLASSIC IS
+# DEAF TO THEM: with every dial parked off its default, a Classic shot is byte-identical
+# to the Classic shot taken before any dial moved, and the persp line still reports the
+# unscaled 11.72 cells beside the parked 1.50. RESET: the Advanced page's Reset to
+# defaults puts all four back, read through OPTPERSP's appended fields.
+# =====================================================================================
+cat > /tmp/g208.txt <<'G208EOF'
+tick 30
+shot shots/g208_classic0.png
+persp iso
+gfx iso_yaw -30
+persp
+gfx iso_pitch 60
+persp
+gfx iso_fov 70
+persp
+gfx iso_dist 1.5
+persp
+shot shots/g208_iso.png
+gfx iso_pitch 0
+persp
+gfx iso_pitch 60
+persp classic
+shot shots/g208_classic1.png
+quit
+G208EOF
+gbegin shots/g208_classic0.png shots/g208_iso.png shots/g208_classic1.png shots/g208.log
+grun shots/g208.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g208.txt --gfx
+gshots shots/g208_classic0.png shots/g208_iso.png shots/g208_classic1.png
+G208P=$(grep '^PERSP|' shots/g208.log)
+g208() { echo "$G208P" | sed -n "$1p"; }
+G208OK=1
+# `persp iso` prints a line of its own (the shipped angle), then one per dial moved
+echo "$(g208 1)" | grep -q '^PERSP|1|yaw=16.0|enhanced=1|mode=N64|pitch=53.0|fov=48.0|dist=1.10|cells=12.89' || G208OK=0
+echo "$(g208 2)" | grep -q '^PERSP|1|yaw=-30.0|enhanced=1|mode=N64|pitch=53.0|fov=48.0|dist=1.10|cells=12.89' || G208OK=0
+echo "$(g208 3)" | grep -q '|yaw=-30.0|.*|pitch=60.0|fov=48.0|dist=1.10|cells=12.89' || G208OK=0
+echo "$(g208 4)" | grep -q '|pitch=60.0|fov=70.0|dist=1.10|cells=12.89' || G208OK=0
+echo "$(g208 5)" | grep -q '|pitch=60.0|fov=70.0|dist=1.50|cells=17.58' || G208OK=0
+echo "$(g208 6)" | grep -q '|pitch=48.1|fov=70.0|dist=1.50|cells=17.58' || G208OK=0
+echo "$(g208 7)" | grep -q '^PERSP|0|yaw=0.0|enhanced=1|mode=N64|pitch=48.1|fov=50.0|dist=1.50|cells=11.72' || G208OK=0
+G208N=$(echo "$G208P" | wc -l | tr -d ' ')
+G208SAME=0; G208PX=-1
+if [ "$GRC" = "0" ]; then
+  cmp -s shots/g208_classic0.png shots/g208_classic1.png && G208SAME=1
+  G208PX=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def px(a, b):
+    x = np.asarray(Image.open('shots/' + a).convert('RGB')).astype(int)
+    y = np.asarray(Image.open('shots/' + b).convert('RGB')).astype(int)
+    return int(((np.abs(x - y).sum(axis=2)) > 24).sum())
+print(px('g208_classic0.png', 'g208_iso.png'))
+PY
+)
+fi
+# THE PICK AND THE RESET, in a run of their own: a click selects, and the dialog moves the
+# pointer, and neither may touch the byte-identity leg above.
+#
+# THE PICK IS TAKEN AWAY FROM THE CENTRE OF THE SCREEN. At the exact centre the camera's
+# angles, field of view and distance cancel out: every dial moved and the picked point
+# moved by 0.002 cells, so a pick there agrees before and after the frame whether or not
+# the dials reached the camera. At 200,150 the same change moves it by whole cells. A
+# control click at that pixel before any dial moves makes that visible: the two picks
+# after the change must agree exactly with each other and land at least a cell from it.
+cat > /tmp/g208b.txt <<'G208EOF'
+tick 30
+persp iso
+click 200 150
+gfx iso_yaw -30
+gfx iso_pitch 60
+gfx iso_fov 70
+gfx iso_dist 1.5
+click 200 150
+shot shots/g208_b.png
+click 200 150
+options
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optvis
+optclick Reset to defaults
+optvis
+persp
+quit
+G208EOF
+G208BL=$(./cnc_eyes --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+           --script /tmp/g208b.txt --gfx 2>&1 | tee -a "$OUT")
+G208PKN=$(echo "$G208BL" | grep -c '^PICK|')
+G208PC=$(echo "$G208BL" | grep '^PICK|' | sed -n '1p')
+G208P1=$(echo "$G208BL" | grep '^PICK|' | sed -n '2p')
+G208P2=$(echo "$G208BL" | grep '^PICK|' | sed -n '3p')
+G208PK=0; [ -n "$G208P1" ] && [ "$G208P1" = "$G208P2" ] && G208PK=1
+G208OFF=$(echo "$G208BL" | grep '^PICK|' | grep -c 'OFFMAP')
+# How far the pick moved when the dials did, in cells: the x and y distances added.
+G208MOVE=$(printf '%s\n%s\n' "$G208PC" "$G208P1" | sed -n 's/.*|world=\([-0-9.]*\),\([-0-9.]*\)|.*/\1 \2/p' \
+           | awk 'NR==1{x=$1; z=$2} NR==2{d=$1-x; e=$2-z; if(d<0)d=-d; if(e<0)e=-e; printf "%.3f", d+e}')
+G208FAR=0; awk -v m="${G208MOVE:-0}" 'BEGIN{exit !(m >= 1.0)}' && G208FAR=1
+G208R1=$(echo "$G208BL" | grep '^OPTPERSP|value=' | sed -n '1p')
+G208R2=$(echo "$G208BL" | grep '^OPTPERSP|value=' | sed -n '2p')
+echo "$G208R1" | grep -q 'value=1|disabled=0|fx_persp=1|yaw=-30.0|enhanced=1|pitch=60.0|fov=70.0|dist=1.50' || G208OK=0
+echo "$G208R2" | grep -q 'value=0|disabled=0|fx_persp=0|yaw=0.0|enhanced=1|pitch=48.1|fov=50.0|dist=1.10' || G208OK=0
+echo "$G208BL" | grep '^PERSP|' | tail -1 | grep -q '^PERSP|0|yaw=0.0|.*|pitch=48.1|fov=50.0|dist=1.10|cells=11.72' || G208OK=0
+if [ "$G208OK" = "1" ] && [ "$G208N" = "7" ] && [ "$G208SAME" = "1" ] && [ "${G208PX:-0}" -ge 100000 ] \
+   && [ "$G208PKN" = "3" ] && [ "$G208PK" = "1" ] && [ "$G208OFF" = "0" ] && [ "$G208FAR" = "1" ]; then
+  ok "G208 the isometric dials: yaw, tilt, fov and distance each read back the same instant (17.58 cells at 1.5x), tilt 0 hands the lerp back (48.1), a pick off centre before the frame equals the pick after it and lands $G208MOVE cells from where the same pixel picked before the dials moved, Classic is byte-identical with every dial parked, and Reset puts all four back"
+else
+  bad "G208 the isometric dials: lines=$G208OK(n=$G208N want 7) classic-identical=$G208SAME iso-differs=$G208PX(want >=100000) picks=$G208PKN(want 3) pick-before-frame-equals-after=$G208PK(want 1; 0 means the dials reached the camera only at the next frame) moved=$G208MOVE cells(want >=1; near 0 means the pick does not follow the dials) offmap=$G208OFF(want 0). control: $G208PC after: $G208P1 next-frame: $G208P2. persp: $(echo "$G208P" | tr '\n' ' ' | cut -c1-500) reset: $G208R1 $G208R2"
+fi
+
+# =====================================================================================
+# G209 THE GROUND IS LIT CONTINUOUSLY. The light pass had no terrain normal
+# and rebuilt a flat one from depth, so every sun term flipped at a cell edge, the ground
+# cast into the shadow map with its two triangles per cell, and the console's baked
+# per-corner shade was darkened a second time by the Enhanced sun: the ground read as
+# facets with straight lines between them. Two arms on the SCB05EA cliff, the old path
+# (flat normal, no normal offset, no penumbra, full ground occlusion, two suns) and the
+# shipped one; the count of hard luminance steps in the ground window must FALL, and the
+# two frames must differ by enough pixels to prove the terms are live. Determinism of the
+# shipped chain is G36c's claim and stays there.
+# =====================================================================================
+cat > /tmp/g209.txt <<'G209EOF'
+tick 20
+gfx terrain_normals 0
+gfx sun_lambert 0
+gfx shadow_noff 0
+gfx shadow_pen 0
+gfx ssao_ground 1
+shot shots/g209_old.png
+gfx terrain_normals 1
+gfx sun_lambert 1
+gfx shadow_noff 1.5
+gfx shadow_pen 0.08
+gfx ssao_ground 0.5
+shot shots/g209_new.png
+quit
+G209EOF
+gbegin shots/g209_old.png shots/g209_new.png shots/g209.log
+grun shots/g209.log --noshroud --scen SCB05EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g209.txt --gfx
+gshots shots/g209_old.png shots/g209_new.png
+G209R="0 0 0"
+if [ "$GRC" = "0" ]; then
+  G209R=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+a = Image.open('shots/g209_old.png').convert('RGB'); b = Image.open('shots/g209_new.png').convert('RGB')
+def edges(im):
+    g = np.asarray(im.convert('L')).astype(int)[120:470, 0:940]
+    return int((np.abs(g[:, 1:] - g[:, :-1]) > 8).sum() + (np.abs(g[1:, :] - g[:-1, :]) > 8).sum())
+x = np.asarray(a).astype(int); y = np.asarray(b).astype(int)
+print(edges(a), edges(b), int(((np.abs(x - y).sum(axis=2)) > 24).sum()))
+PY
+)
+fi
+set -- $G209R
+G209OLD="$1"; G209NEW="$2"; G209PX="$3"
+if [ "$GRC" = "0" ] && [ "${G209PX:-0}" -ge 3000 ] && [ "${G209NEW:-1}" -lt "${G209OLD:-0}" ] \
+   && [ $((G209OLD - G209NEW)) -ge $((G209OLD / 40)) ]; then
+  ok "G209 the ground is lit continuously: hard luminance steps in the ground window fall from $G209OLD to $G209NEW with the smooth ground, the normal offset, the penumbra and one sun, over $G209PX changed pixels"
+else
+  bad "G209 the ground is lit continuously: steps old=$G209OLD new=$G209NEW (want a fall of at least 2.5%) changed=$G209PX(want >=3000) GRC=$GRC"
+fi
+
+# ---------------------------------------------------------------------------
+# G210 A PLAYER LEAVES: EITHER THE COMPUTER TAKES THE HOUSE, OR IT BLOWS UP.
+#
+# THE FEATURE. AI TAKEOVER is a checkbox in the lobby. With it on, a player who quits
+# mid-match leaves a base that the computer carries on playing; with it off, their army
+# and buildings are destroyed and the survivors are told they have been defeated. Both
+# arms have to happen on the SAME TURN on every machine still in the match, because a
+# house that dies on turn 208 here and turn 209 there is two different worlds one tick
+# later, and the next hash comparison is a desync.
+#
+# WHY THIS GATE EXISTS AT ALL. The departure used to be handled in the live loop only,
+# where no script could reach it: the previous release's claim that a departure "blows up
+# that player's units and buildings" was never once executed by the suite -- and it was
+# wrong. Flag_To_Lose raises IsToLose, and HouseClass::AI reads IsToLose only when
+# GameToPlay == GAME_NORMAL, so in a match the flag was raised and nobody looked. The
+# departed player's base simply stood there. Flag_To_Die is the multiplayer one.
+#
+# THE SHAPE. Three peers on loopback; seat 2 (or whichever seat the third process takes)
+# plays for 200 turns and quits. The two survivors run on to turn 1400. Everything is
+# then read off THEIR logs, not the quitter's:
+#
+#   * both survivors report the departure with the same seat and the same arm (ai=1/ai=0),
+#     each in its own log
+#   * with takeover ON  the departed house still owns objects at the end -- it deployed,
+#     it built, it is being played
+#   * with takeover OFF it owns NOTHING, and both survivors print the defeat line
+#   * neither run raises the desync alarm, and every frame after the departure that both
+#     peers hashed has ONE hash, not two
+#
+# The last one is the assertion that does the real work: it is what proves the two arms
+# are applied at the same moment everywhere rather than merely applied.
+# ---------------------------------------------------------------------------
+G210ON_MSG=""; G210OFF_MSG=""; G210ON_OBJ=-1; G210OFF_OBJ=-1; G210DESYNC=0
+G210SPLIT=0; G210FRAMES=0; G210DEFEAT=0; G210ENDS=0; G210SEATS=0; G210ON_FR=0; G210OFF_FR=0; G210DUP=0
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  for G210LEG in on off; do
+    G210FLAG=""
+    [ "$G210LEG" = "on" ] && G210FLAG="--aitakeover"
+    rm -f g210${G210LEG}_h.log g210${G210LEG}_j1.log g210${G210LEG}_j2.log
+    ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+        $G210FLAG --players 3 --host 17481 --script gate_net_leave_stay.txt \
+        > g210${G210LEG}_h.log 2>&1 &
+    G210HP=$!
+    sleep 3
+    ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+        --join 127.0.0.1 17481 --script gate_net_leave_stay.txt \
+        > g210${G210LEG}_j1.log 2>&1 &
+    G210J1=$!
+    ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+        --join 127.0.0.1 17481 --script gate_net_leave_go.txt \
+        > g210${G210LEG}_j2.log 2>&1 &
+    G210J2=$!
+    wait $G210HP; wait $G210J1; wait $G210J2
+    cat g210${G210LEG}_h.log g210${G210LEG}_j1.log >> "$OUT"
+    # WHICH HOUSE WALKED OUT, named by the process that walked out, so the count below is
+    # about that house and not about whoever happens to have the fewest objects.
+    G210H=$(sed -n 's/^PLAYER|house=\([A-Za-z0-9]*\)|.*/\1/p' g210${G210LEG}_j2.log | head -1)
+    # BOTH SURVIVORS, AND THE SAME ANSWER FROM EACH. Two lines that agree, counted as one.
+    # One survivor's line on its own also collapses to one, so each survivor's OWN log has
+    # to hold the line as well.
+    G210M=$(grep -ah '^MATCHMSG|seat=' g210${G210LEG}_h.log g210${G210LEG}_j1.log \
+            | sed 's/|[^|]*$//' | sort -u)
+    G210N=$(printf '%s\n' "$G210M" | grep -c .)
+    G210MH=$(grep -ac '^MATCHMSG|seat=' g210${G210LEG}_h.log)
+    G210MJ=$(grep -ac '^MATCHMSG|seat=' g210${G210LEG}_j1.log)
+    [ "$G210N" = "1" ] && [ "${G210MH:-0}" -ge 1 ] && [ "${G210MJ:-0}" -ge 1 ] \
+        && G210SEATS=$((G210SEATS + 1))
+    G210OBJ=$(grep -ac "^OBJ|.*|$G210H|" g210${G210LEG}_h.log)
+    G210OBJ2=$(grep -ac "^OBJ|.*|$G210H|" g210${G210LEG}_j1.log)
+    [ "$G210OBJ" = "$G210OBJ2" ] || G210OBJ=-1   # the two survivors must see one world
+    G210ENDS=$((G210ENDS + $(grep -ahc 'SCRIPT|end' g210${G210LEG}_h.log g210${G210LEG}_j1.log g210${G210LEG}_j2.log | awk '{n+=$1} END{print n+0}')))
+    G210DESYNC=$((G210DESYNC + $(cat g210${G210LEG}_h.log g210${G210LEG}_j1.log | grep -ac 'NETDESYNC|')))
+    # THE TURN THE DEPARTURE LANDED ON, and every hash both survivors reported after it.
+    G210T=$(sed -n 's/^NET|peer-gone|seat=[0-9]*|turn=\([0-9]*\)/\1/p' g210${G210LEG}_h.log | head -1)
+    # EACH SURVIVOR'S HASHES COME FROM ITS OWN LOG, and only a frame both logs hashed is
+    # counted or compared. Merging the two logs first let one survivor's hashes meet the
+    # floor alone, with nothing to disagree with. One line out: the frames both logs hashed
+    # at or after the departure, then how many of those carry two different hashes.
+    rm -f /tmp/g210${G210LEG}_fh_h.txt /tmp/g210${G210LEG}_fh_j.txt
+    sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' g210${G210LEG}_h.log \
+        | sort -u > /tmp/g210${G210LEG}_fh_h.txt
+    sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' g210${G210LEG}_j1.log \
+        | sort -u > /tmp/g210${G210LEG}_fh_j.txt
+    G210FS=$(awk -v t="${G210T:-0}" 'NR == FNR {h[$1] = $2; next}
+        ($1 in h) && $1 >= t {n++; if (h[$1] != $2) s++} END {print n+0, s+0}' \
+        /tmp/g210${G210LEG}_fh_h.txt /tmp/g210${G210LEG}_fh_j.txt)
+    G210FRAMES=$((G210FRAMES + ${G210FS%% *}))
+    G210SPLIT=$((G210SPLIT + ${G210FS#* }))
+    # ONE FRAME, ONE HASH, IN EACH SURVIVOR'S OWN LOG. The comparison above keeps one host
+    # hash per frame, so a survivor that reported a frame twice with two different hashes
+    # has one of them never compared, and a frame listed twice would be counted twice.
+    G210DUP=$((G210DUP + $(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/g210${G210LEG}_fh_h.txt) \
+                       + $(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/g210${G210LEG}_fh_j.txt)))
+    if [ "$G210LEG" = "on" ]; then
+      G210ON_MSG="$G210M"; G210ON_OBJ="$G210OBJ"; G210ON_FR="${G210FS%% *}"
+    else
+      G210OFF_MSG="$G210M"; G210OFF_OBJ="$G210OBJ"; G210OFF_FR="${G210FS%% *}"
+      G210DEFEAT=$(grep -ahc '^MATCHMSG|defeat|' g210off_h.log g210off_j1.log | awk '{n+=$1} END{print n+0}')
+    fi
+  done
+fi
+G210ONOK=0; G210OFFOK=0
+# The trailing field (the sentence) was cut above so that two survivors' identical
+# reports collapse to one line, which is why these match the end of the line.
+printf '%s' "$G210ON_MSG"  | grep -q '|ai=1$' && G210ONOK=1
+printf '%s' "$G210OFF_MSG" | grep -q '|ai=0$' && G210OFFOK=1
+# The frame floor holds in EACH leg: a total over both legs is met by one leg alone.
+if [ "$G210ONOK" = "1" ] && [ "$G210OFFOK" = "1" ] && [ "${G210SEATS:-0}" = "2" ] \
+   && [ "${G210ON_OBJ:--1}" -ge 2 ] && [ "${G210OFF_OBJ:--1}" = "0" ] \
+   && [ "${G210DEFEAT:-0}" -ge 2 ] && [ "${G210DESYNC:-1}" = "0" ] \
+   && [ "${G210SPLIT:-1}" = "0" ] && [ "${G210ON_FR:-0}" -ge 20 ] && [ "${G210OFF_FR:-0}" -ge 20 ] \
+   && [ "${G210DUP:-1}" = "0" ] && [ "${G210ENDS:-0}" = "6" ]; then
+  ok "G210 a player leaves and the room decides what happens to their house: with AI Takeover ON the departed player's base is still standing and still growing at the end of the match ($G210ON_OBJ objects, the same number in both survivors' worlds); with it OFF the same house owns nothing at all and both survivors print the defeat line. Both survivors named the same seat and the same arm, each in its own log, and across the frames that BOTH survivors' own logs hashed after the departure landed ($G210ON_FR with takeover on, $G210OFF_FR with it off) there was exactly one hash -- so the two endings are applied on one turn everywhere rather than merely applied"
+else
+  bad "G210 a player leaves and the room decides what happens to their house: takeover-on-said-ai=1=$G210ONOK takeover-off-said-ai=0=$G210OFFOK survivors-agreed=$G210SEATS(want 2; one answer, and present in each survivor's own log) objects-left-with-takeover=$G210ON_OBJ(want >=2; -1 means the two survivors disagreed) objects-left-without=$G210OFF_OBJ(want 0) defeat-lines=$G210DEFEAT(want >=2) desyncs=$G210DESYNC(want 0) split-hashes-after-the-departure=$G210SPLIT(want 0) frames-both-survivors-hashed-after-the-departure=on:${G210ON_FR:-0},off:${G210OFF_FR:-0}(want >=20 in each leg) frames-a-survivor's-own-log-hashed-with-two-hashes=${G210DUP:-unmeasured}(want 0; the cross-survivor comparison keeps one host hash per frame, so a second hash for one frame is never compared) clean-script-ends=$G210ENDS(want 6). $(grep -hE '^NET\|error|^NETDESYNC' g210*_*.log 2>/dev/null | head -2 | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# G210b, G210c AND G210d THE SAME DEPARTURE, WITH THE BAD ARRIVAL ORDERS FORCED.
+#
+# G210 above is the natural leg, and on its own it is a weak gate for the fault it guards.
+# A peer that hears the host's goodbye after it has already run the turn before the named
+# one used to apply the departure one tick after a peer that heard it sooner, and on
+# loopback that happened in about one G210 run in thirteen. A gate that fails one run in
+# thirteen passes a broken build most of the time. These legs force the orderings on every
+# run, with three test switches that only the host reads (CNC3D_NETTEST_HOLD_BYE,
+# CNC3D_NETTEST_CUT_RELAY and CNC3D_NETTEST_LATE_BYE, net/netmatch.c). Nothing in play sets
+# any of them.
+#
+#   G210b THE GOODBYE HELD. The host holds every goodbye it sends to seat 1 for 500 ms
+#   while turns go on flowing, so the survivor holds, and runs, every turn the leaver sent
+#   before it learns which turn the departure lands on. With the departure applied after
+#   the turn BEFORE the named one, every leg of this failed: host 208, survivor 209, and a
+#   desync two frames later.
+#
+#   G210c THE LEAVER'S LAST TURNS CUT. The host stops passing seat 2's turn packets on to
+#   seat 1 from turn 198, and the leaver deploys its MCV on turn 197, so that order sits in
+#   turns the survivor never receives from the relay. The survivor has to get them from the
+#   host after the leaver has gone. With a timer that let the turn through without them,
+#   every leg of this failed with gap-skipped on turn 198.
+#
+#   G210d THE HOST HEARS THE GOODBYE LATE. G210b makes a survivor the late peer; this makes
+#   the host the late one, which a jittered link reaches on its own. The host passes seat
+#   2's turn packets on to seat 1 500 ms late from turn 180, so the survivor runs at least
+#   the lookahead behind the host, and reads seat 2's goodbye only once it has run every
+#   turn seat 2 sent. The host then learns the departure turn standing on it, and tells a
+#   survivor that is still turns short of it.
+#
+# Each runs takeover on and off, with the joiners started one second apart so that the
+# survivor is seat 1 and the leaver seat 2, and each leg is graded by G210's own criteria
+# plus two more: host and survivor applied the departure on the SAME turn, and the forced
+# order really happened. The defects are judged first (a gap skipped, the departure on two
+# turns, two hashes for one frame), so a red leg names what went wrong; whether the order
+# was forced is judged after them, so a leg that forced nothing still fails. For the held
+# goodbye the forced order is the switch armed in the host's log and the survivor's quiet
+# line naming the turn it learned as the turn it was already standing on. For the late
+# goodbye it is the switch armed, the host's quiet line naming the turn it was standing on,
+# and the survivor's naming a turn short of it. For the cut it is the switch armed and the
+# host answering for the departed seat WITH turns. The answer line matters: a cut turn at
+# or beyond the departure cuts nothing, and then no build could fail this leg.
+# ---------------------------------------------------------------------------
+# g210x_leg TAG LEG ENV LEAVER-SCRIPT MODE: runs one leg and leaves the first defect in
+# G210XWHY (empty for none), with the departure turn and shared frames in G210XGONE and
+# G210XFR for the verdict line. MODE is hold or cut.
+g210x_leg() {
+  g210x_tag=$1; g210x_leg=$2; g210x_env=$3; g210x_go=$4; g210x_mode=$5
+  G210XWHY=""; G210XGONE=""; G210XFR=0
+  g210x_flag=""
+  [ "$g210x_leg" = "on" ] && g210x_flag="--aitakeover"
+  g210x_h=${g210x_tag}${g210x_leg}_h.log
+  g210x_s=${g210x_tag}${g210x_leg}_j1.log
+  g210x_l=${g210x_tag}${g210x_leg}_j2.log
+  rm -f "$g210x_h" "$g210x_s" "$g210x_l" /tmp/${g210x_tag}_fh_h.txt /tmp/${g210x_tag}_fh_j.txt
+  env "$g210x_env" ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      $g210x_flag --players 3 --host 17481 --script gate_net_leave_stay.txt > "$g210x_h" 2>&1 &
+  g210x_hp=$!
+  sleep 3
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17481 --script gate_net_leave_stay.txt > "$g210x_s" 2>&1 &
+  g210x_sp=$!
+  # One second later, so the room seats this one second and the leaver is seat 2.
+  sleep 1
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17481 --script "$g210x_go" > "$g210x_l" 2>&1 &
+  g210x_lp=$!
+  wait $g210x_hp; wait $g210x_sp; wait $g210x_lp
+  cat "$g210x_h" "$g210x_s" "$g210x_l" >> "$OUT"
+  g210x_sseat=$(sed -n 's/^NET|seated|seat=\([0-9]*\).*/\1/p' "$g210x_s" | head -1)
+  g210x_lseat=$(sed -n 's/^NET|seated|seat=\([0-9]*\).*/\1/p' "$g210x_l" | head -1)
+  g210x_house=$(sed -n 's/^PLAYER|house=\([A-Za-z0-9]*\)|.*/\1/p' "$g210x_l" | head -1)
+  g210x_m=$(grep -ah '^MATCHMSG|seat=' "$g210x_h" "$g210x_s" | sed 's/|[^|]*$//' | sort -u)
+  g210x_n=$(printf '%s\n' "$g210x_m" | grep -c .)
+  g210x_mh=$(grep -ac '^MATCHMSG|seat=' "$g210x_h")
+  g210x_mj=$(grep -ac '^MATCHMSG|seat=' "$g210x_s")
+  g210x_arm='|ai=0$'; [ "$g210x_leg" = "on" ] && g210x_arm='|ai=1$'
+  g210x_o1=$(grep -ac "^OBJ|.*|${g210x_house:-none}|" "$g210x_h")
+  g210x_o2=$(grep -ac "^OBJ|.*|${g210x_house:-none}|" "$g210x_s")
+  g210x_def=$(cat "$g210x_h" "$g210x_s" | grep -ac '^MATCHMSG|defeat|')
+  g210x_ends=$(cat "$g210x_h" "$g210x_s" "$g210x_l" | grep -ac 'SCRIPT|end')
+  g210x_ds=$(cat "$g210x_h" "$g210x_s" | grep -ac 'NETDESYNC|')
+  g210x_gh=$(sed -n 's/^NET|peer-gone|seat=2|turn=\([0-9]*\).*/\1/p' "$g210x_h" | head -1)
+  g210x_gj=$(sed -n 's/^NET|peer-gone|seat=2|turn=\([0-9]*\).*/\1/p' "$g210x_s" | head -1)
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' "$g210x_h" \
+      | sort -u > /tmp/${g210x_tag}_fh_h.txt
+  sed -n 's/^NETSYNC|frame=\([0-9]*\)|hash=\([0-9A-F]*\).*/\1 \2/p' "$g210x_s" \
+      | sort -u > /tmp/${g210x_tag}_fh_j.txt
+  g210x_fs=$(awk -v t="${g210x_gh:-0}" 'NR == FNR {h[$1] = $2; next}
+      ($1 in h) && $1 >= t {n++; if (h[$1] != $2) s++} END {print n+0, s+0}' \
+      /tmp/${g210x_tag}_fh_h.txt /tmp/${g210x_tag}_fh_j.txt)
+  G210XFR=${g210x_fs%% *}; g210x_split=${g210x_fs#* }
+  g210x_dup=$(( $(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/${g210x_tag}_fh_h.txt) \
+              + $(awk '{c[$1]++} END{n=0; for (f in c) if (c[f] > 1) n++; print n+0}' /tmp/${g210x_tag}_fh_j.txt) ))
+  G210XGONE=$g210x_gh
+  g210x_gap=$(cat "$g210x_h" "$g210x_s" | grep -ac '^NET|gap-skipped')
+  g210x_gapat=$(cat "$g210x_h" "$g210x_s" | grep -a '^NET|gap-skipped' | head -1 | cut -d'|' -f3)
+  g210x_qh=$(sed -n 's/^NET|seat-quiet|seat=2|from-turn=\([0-9]*\)|now=\([0-9]*\).*/\1 \2/p' "$g210x_h" | head -1)
+  g210x_qs=$(sed -n 's/^NET|seat-quiet|seat=2|from-turn=\([0-9]*\)|now=\([0-9]*\).*/\1 \2/p' "$g210x_s" | head -1)
+  # WHETHER THE SWITCH FORCED ITS ORDER. Judged after the defects below, so that a leg
+  # that went wrong names what went wrong, and a leg that forced nothing still fails.
+  g210x_forced=0; g210x_order=""
+  case $g210x_mode in
+    hold)
+      g210x_forced=$(grep -ac '^NET|test|hold-goodbye|seat=1|ms=500$' "$g210x_h")
+      if [ -z "$g210x_qs" ] || [ "${g210x_qs% *}" != "${g210x_qs#* }" ]; then
+        g210x_order="the survivor learned the departure turn before it reached it (its quiet line from-turn/now: ${g210x_qs:-none}), so the held goodbye forced nothing"
+      fi ;;
+    late)
+      g210x_forced=$(grep -ac '^NET|test|late-goodbye|from=2|to=1|turn=180|ms=500$' "$g210x_h")
+      if [ -z "$g210x_qh" ] || [ "${g210x_qh% *}" != "${g210x_qh#* }" ] \
+         || [ -z "$g210x_qs" ] || [ "${g210x_qs#* }" -ge "${g210x_qs% *}" ]; then
+        g210x_order="the host was not the late peer (quiet lines from-turn/now: host ${g210x_qh:-none}, survivor ${g210x_qs:-none}; want the host already standing on the turn and the survivor short of it), so the late goodbye forced nothing"
+      fi ;;
+    cut)
+      g210x_forced=$(grep -ac '^NET|test|cut-relay|from=2|to=1|turn=198$' "$g210x_h")
+      if [ "$(grep -ac '^NET|answered-for-departed|seat=2|for=1|turn=[0-9]*|left-turn=[0-9]*|goodbye+turns$' "$g210x_h")" -lt 1 ]; then
+        g210x_order="the host never answered for the departed seat with its turns, so the cut removed nothing the survivor needed"
+      fi ;;
+  esac
+  if [ "$g210x_sseat" != "1" ] || [ "$g210x_lseat" != "2" ]; then
+    G210XWHY="the survivor took seat ${g210x_sseat:-none} and the leaver seat ${g210x_lseat:-none} (want 1 and 2), so the switch aimed at nothing"
+  elif [ "${g210x_forced:-0}" -lt 1 ]; then
+    G210XWHY="the host's log does not say the $g210x_mode switch was armed"
+  elif [ "${g210x_gap:-1}" != "0" ]; then
+    G210XWHY="a peer let a turn through without the departed seat's orders (gap-skipped x$g210x_gap, the first at ${g210x_gapat:-an unknown turn})"
+  elif [ -z "$g210x_gh" ] || [ "$g210x_gh" != "$g210x_gj" ]; then
+    G210XWHY="the departure landed on turn ${g210x_gh:-none} on the host and ${g210x_gj:-none} on the survivor"
+  elif [ "${g210x_ds:-1}" != "0" ] || [ "${g210x_split:-1}" != "0" ] || [ "${g210x_dup:-1}" != "0" ]; then
+    G210XWHY="desync alarms $g210x_ds, frames with two hashes across the two logs $g210x_split, frames one log hashed twice $g210x_dup (want 0 each). $(cat "$g210x_h" "$g210x_s" | grep -a '^NETDESYNC' | head -1)"
+  elif [ -n "$g210x_order" ]; then
+    G210XWHY=$g210x_order
+  elif [ "$g210x_n" != "1" ] || [ "${g210x_mh:-0}" -lt 1 ] || [ "${g210x_mj:-0}" -lt 1 ] \
+       || ! printf '%s' "$g210x_m" | grep -q "$g210x_arm"; then
+    G210XWHY="host and survivor did not both report one departure with the right arm ($(printf '%s' "$g210x_m" | tr '\n' ' '))"
+  elif [ "$g210x_o1" != "$g210x_o2" ]; then
+    G210XWHY="the departed house owns $g210x_o1 objects in the host's world and $g210x_o2 in the survivor's"
+  elif [ "$g210x_leg" = "on" ] && [ "${g210x_o1:-0}" -lt 2 ]; then
+    G210XWHY="with takeover on the departed house owns $g210x_o1 objects at the end (want >= 2)"
+  elif [ "$g210x_leg" = "off" ] && { [ "$g210x_o1" != "0" ] || [ "${g210x_def:-0}" -lt 2 ]; }; then
+    G210XWHY="with takeover off the departed house owns $g210x_o1 objects (want 0) and $g210x_def defeat lines were printed (want >= 2)"
+  elif [ "${G210XFR:-0}" -lt 20 ]; then
+    G210XWHY="only $G210XFR frames were hashed by both after the departure (want >= 20)"
+  elif [ "$g210x_ends" != "3" ]; then
+    G210XWHY="$g210x_ends of 3 scripts ended cleanly"
+  fi
+}
+# g210x_verdict NAME ON-DEFECT OFF-DEFECT PASS-LINE: one verdict line for the two legs,
+# naming every leg that failed.
+g210x_verdict() {
+  if [ -n "$2" ] && [ -n "$3" ]; then
+    bad "$1, both legs. Takeover on: $2. Takeover off: $3"
+  elif [ -n "$2" ]; then
+    bad "$1, takeover on: $2"
+  elif [ -n "$3" ]; then
+    bad "$1, takeover off: $3"
+  else
+    ok "$4"
+  fi
+}
+if [ ! -x ./cnc_eyes ] || [ ! -s "$SKMAP.pack" ] || [ ! -s "missions/$SKMAP.INI" ] \
+   || [ ! -s gate_net_leave_late.txt ]; then
+  bad "G210b the goodbye held: the run folder has no cnc_eyes, no $SKMAP or no gate_net_leave_late.txt"
+  bad "G210c the leaver's last turns cut: the run folder has no cnc_eyes, no $SKMAP or no gate_net_leave_late.txt"
+  bad "G210d the host hears the goodbye late: the run folder has no cnc_eyes, no $SKMAP or no gate_net_leave_late.txt"
+else
+  g210x_leg g210b on  CNC3D_NETTEST_HOLD_BYE=1:500 gate_net_leave_go.txt hold
+  G210BON=$G210XWHY; G210BONT=$G210XGONE; G210BONF=$G210XFR
+  g210x_leg g210b off CNC3D_NETTEST_HOLD_BYE=1:500 gate_net_leave_go.txt hold
+  G210BOFF=$G210XWHY; G210BOFFT=$G210XGONE; G210BOFFF=$G210XFR
+  g210x_verdict "G210b the goodbye held" "$G210BON" "$G210BOFF" \
+    "G210b the goodbye held: with every goodbye to the survivor held back 500 ms, so it ran all of the leaver's turns before it knew the departure turn, host and survivor both applied the departure on turn $G210BONT with takeover on and $G210BOFFT with it off, and the two worlds had one hash on each of the $G210BONF and $G210BOFFF frames both hashed after it"
+  g210x_leg g210c on  CNC3D_NETTEST_CUT_RELAY=2:1:198 gate_net_leave_late.txt cut
+  G210CON=$G210XWHY; G210CONT=$G210XGONE; G210CONF=$G210XFR
+  g210x_leg g210c off CNC3D_NETTEST_CUT_RELAY=2:1:198 gate_net_leave_late.txt cut
+  G210COFF=$G210XWHY; G210COFFT=$G210XGONE; G210COFFF=$G210XFR
+  g210x_verdict "G210c the leaver's last turns cut" "$G210CON" "$G210COFF" \
+    "G210c the leaver's last turns cut: the survivor never received the leaver's turns from 198 on, which carry its MCV deploy, and got them from the host after the leaver had gone instead of letting the turn through; host and survivor both applied the departure on turn $G210CONT with takeover on and $G210COFFT with it off, one hash on each of the $G210CONF and $G210COFFF frames both hashed after it"
+  g210x_leg g210d on  CNC3D_NETTEST_LATE_BYE=2:1:180:500 gate_net_leave_go.txt late
+  G210DON=$G210XWHY; G210DONT=$G210XGONE; G210DONF=$G210XFR
+  g210x_leg g210d off CNC3D_NETTEST_LATE_BYE=2:1:180:500 gate_net_leave_go.txt late
+  G210DOFF=$G210XWHY; G210DOFFT=$G210XGONE; G210DOFFF=$G210XFR
+  g210x_verdict "G210d the host hears the goodbye late" "$G210DON" "$G210DOFF" \
+    "G210d the host hears the goodbye late: with the leaver's turns reaching the survivor 500 ms late and the host reading the goodbye only after it had run all of them, so the host learned the departure turn standing on it and the survivor learned it turns short of it, host and survivor both applied the departure on turn $G210DONT with takeover on and $G210DOFFT with it off, one hash on each of the $G210DONF and $G210DOFFF frames both hashed after it"
+fi
+
+# =====================================================================================
+# G211 A JOINER'S OWN ROW REACHES THE ROOM: a colour and a start, picked on the real screen.
+#
+# The lobby had two kinds of gate and a hole straight between them. G86 and G87 drive the
+# real SCREEN with synthetic clicks and open no socket at all. G205 drives the real lobby
+# STATE MACHINE in two processes and draws no screen. Neither can see the one thing a
+# JOINER does that nobody else does: reach into its OWN row and change it, which is a click
+# on a screen that has to become a packet, be judged by the host, and come back as the
+# room's answer. That combination had no automated test of any kind, and three separate
+# joiner-seat faults reached the director by hand because of it.
+#
+# THE LAST OF THEM IS WHY THIS GATE IS SHAPED THE WAY IT IS. The joiner's frame loop reads
+# input, then every 100 ms polls the room and copies the host's setup over the WHOLE screen
+# including the joiner's own row. The code that noticed "my row changed, tell the host" ran
+# AFTER that copy, so it compared the host's value with the host's value, found no change,
+# and sent nothing. Every time, for ever. The colour square and the start diamond moved
+# under the pointer and were back a tenth of a second later, so it read as a locked control
+# when in fact the wire was simply never asked. A screen-only gate would have watched the
+# square change and been green; a network-only gate would have exchanged the seat messages
+# the state machine sends itself and been green. Only both at once can see it.
+#
+# So this is that combination and nothing else: the REAL lobby screen, as a REAL JOINER,
+# against a REAL host process on 127.0.0.1.
+#
+#   --lobbyhost 12   opens a room on SCM01EA and holds it twelve seconds. It NEVER presses
+#                    START: what is under test is what the ROOM ends up holding, so the
+#                    host's whole job is to apply what arrives under its own rules and
+#                    report its own setup, on every change and once at the end.
+#   --lobbyjoin 10   joins at 127.0.0.1, waits to be seated, and only THEN opens the real
+#                    lobby screen -- the row to click is the seat the host hands out, and
+#                    a script built before the first WELCOME would click the host's row --
+#                    with a script that opens its own drop down and takes colour 5 and the
+#                    fourth start on it.
+#
+# THE ROOM IS FOUR SEATS WIDE, and that is a measurement rather than a preference: netmatch
+# refuses a colour another seat in the room already holds, and a room as wide as SCM01EA's
+# eight starts deals seats 0..7 the colours 0..7, so there would be no free colour left to
+# ask for and this would measure a refusal working instead of a pick arriving.
+#
+# WHAT IS ASSERTED, and it is read off the FAR END every time:
+#
+#   THE HOST'S OWN TABLE HOLDS THE PICK. LOBBYSEAT|hostfinal for the joiner's seat must
+#   read the colour and the start that were asked for. This is the line the bug fails: with
+#   the send back after the copy it reads colour 1 and start -1, the room as it opened.
+#   IT ARRIVED WHILE THE ROOM WAS LIVE. The host prints a line on every CHANGE to its
+#   setup, and one of those must already carry both picks -- so the table at the end is
+#   something that happened rather than something that was always there.
+#   THE ANSWER CAME BACK. The joiner's own copy of the host's setup, read after its screen
+#   has closed, must say the same two numbers: the room agreed, rather than the screen
+#   believing itself.
+#   NEITHER PICK IS A DEFAULT. was-colour and was-start are printed before anything is
+#   clicked and are required to DIFFER from what is asked for. A test whose expected value
+#   is also its starting value cannot fail, and would have been green through the bug.
+#   THE SCRIPT ACTUALLY CLICKED. Three clicks and no LOBBY|skip lines: a step whose control
+#   has no rectangle says so rather than vanishing, and a script that drove nothing agrees
+#   perfectly with a room that was never told anything.
+#
+# 127.0.0.1 on purpose, as in G205: what is under test is the message and the answer, and a
+# real network adds only the things a network adds.
+# =====================================================================================
+gbegin /tmp/g211_h.log /tmp/g211_j.log
+G211JRC=0
+if [ ! -s SCM01EA.pack ] || [ ! -s missions/SCM01EA.INI ]; then
+  bad "G211 a joiner's own row reaches the room: SCM01EA is not in the run folder, so there is no shipped skirmish map to open a room on"
+else
+  ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+       --lobbyhost 12 --w 1024 --h 640 > /tmp/g211_h.log 2>&1 &
+  G211HP=$!
+  sleep 3
+  ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+       --lobbyjoin 10 --w 1024 --h 640 > /tmp/g211_j.log 2>&1
+  G211JRC=$?
+  # The host shuts its own room on its own clock, twelve seconds after it opened. 40 s is
+  # the backstop so a host that wedges cannot hold the suite, not the plan; the verdict is
+  # read off LOBBYSEAT|host|done rather than off an exit status, because "it printed its
+  # final table" is the thing that has to be true and "it exited 0" is not the same claim.
+  g211w=0
+  while [ $g211w -lt 40 ] && kill -0 $G211HP 2>/dev/null; do sleep 1; g211w=$((g211w+1)); done
+  kill -9 $G211HP 2>/dev/null
+  cat /tmp/g211_h.log /tmp/g211_j.log >> "$OUT"
+  G211OPEN=$(grep -ac '^LOBBYSEAT|host|open|' /tmp/g211_h.log)
+  G211HDONE=$(grep -ac '^LOBBYSEAT|host|done' /tmp/g211_h.log)
+  G211JDONE=$(grep -ac '^LOBBYSEAT|join|done' /tmp/g211_j.log)
+  G211SEAT=$(sed -n 's/^LOBBYSEAT|join|seat=\([0-9]*\)|.*/\1/p' /tmp/g211_j.log | head -1)
+  # "none" rather than empty, so the greps below are still a legal pattern and the verdict
+  # chain gets to say what happened instead of the shell saying it first.
+  [ -n "$G211SEAT" ] || G211SEAT=none
+  G211WASC=$(sed -n 's/.*|was-colour=\(-*[0-9]*\)|.*/\1/p' /tmp/g211_j.log | head -1)
+  G211WASS=$(sed -n 's/.*|was-start=\(-*[0-9]*\)|.*/\1/p' /tmp/g211_j.log | head -1)
+  G211WANTC=$(sed -n 's/.*|want-colour=\([0-9]*\)|.*/\1/p' /tmp/g211_j.log | head -1)
+  G211WANTS=$(sed -n 's/.*|want-start=\(-*[0-9]*\)$/\1/p' /tmp/g211_j.log | head -1)
+  G211JC=$(sed -n 's/^LOBBYSEAT|join|left|.*|colour=\([0-9]*\)|start=.*/\1/p' /tmp/g211_j.log | head -1)
+  G211JS=$(sed -n 's/^LOBBYSEAT|join|left|.*|start=\(-*[0-9]*\)|overflow=.*/\1/p' /tmp/g211_j.log | head -1)
+  G211OVER=$(sed -n 's/^LOBBYSEAT|join|left|.*|overflow=\(-*[0-9]*\)$/\1/p' /tmp/g211_j.log | head -1)
+  G211HC=$(sed -n "s/^LOBBYSEAT|hostfinal|seat=$G211SEAT|colour=\([0-9]*\)|.*/\1/p" /tmp/g211_h.log | head -1)
+  G211HS=$(sed -n "s/^LOBBYSEAT|hostfinal|seat=$G211SEAT|colour=[0-9]*|start=\(-*[0-9]*\)|.*/\1/p" /tmp/g211_h.log | head -1)
+  # THE ARRIVAL, not the resting state: a host line that already carries BOTH picks.
+  G211EDGE=$(grep -ac "^LOBBYSEAT|host|seat=$G211SEAT|colour=${G211WANTC:-x}|start=${G211WANTS:-x}|" /tmp/g211_h.log)
+  G211SKIP=$(grep -ac '^LOBBY|skip|' /tmp/g211_j.log)
+  G211CLICK=$(grep -ac '^LOBBY|click|' /tmp/g211_j.log)
+  G211FAIL=$(grep -ah '^LOBBYSEAT|FAIL' /tmp/g211_h.log /tmp/g211_j.log | head -2 | tr '\n' ' ')
+  if [ "${G211OPEN:-0}" -lt 1 ]; then
+    bad "G211 a joiner's own row reaches the room: the host never opened a room, so there was nothing to join. $G211FAIL $(grep -a 'LOBBYSEAT' /tmp/g211_h.log | tail -2 | tr '\n' ' ')"
+  elif [ "$G211SEAT" = "none" ] || [ "$G211SEAT" = "0" ]; then
+    bad "G211 a joiner's own row reaches the room: the joiner was seated as '$G211SEAT' (want a seat above 0; 'none' means it was never seated at all). $G211FAIL"
+  elif [ "${G211CLICK:-0}" -lt 3 ] || [ "${G211SKIP:-1}" != "0" ]; then
+    bad "G211 a joiner's own row reaches the room: the script did not drive the row. clicks=$G211CLICK(want >=3: the row, a colour and a start) skipped-steps=$G211SKIP(want 0; a skip is a control that had no rectangle, which on a joiner's screen usually means the row was refused). $(grep -a '^LOBBY|skip|' /tmp/g211_j.log | head -2 | tr '\n' ' ')"
+  elif [ "${G211WASC:-x}" = "${G211WANTC:-y}" ] || [ "${G211WASS:-x}" = "${G211WANTS:-y}" ]; then
+    bad "G211 a joiner's own row reaches the room: THE RUN PROVED NOTHING. The room already held what the joiner was about to ask for (colour was=$G211WASC want=$G211WANTC, start was=$G211WASS want=$G211WANTS), so this gate could not have failed whatever the wire did. Pick values the seat is not dealt by default"
+  elif [ "${G211JDONE:-0}" -lt 1 ] || [ "${G211HDONE:-0}" -lt 1 ]; then
+    bad "G211 a joiner's own row reaches the room: one of the two never finished. joiner-done=$G211JDONE host-done=$G211HDONE (want 1 each) after ${g211w}s. A side that does not come back is a stall in the lobby loop, and every number below is whatever it managed before it stopped"
+  elif [ "${G211HC:-x}" != "$G211WANTC" ] || [ "${G211HS:-x}" != "$G211WANTS" ]; then
+    bad "G211 a joiner's own row reaches the room: THE PICK NEVER REACHED THE HOST. The joiner clicked colour $G211WANTC and start $G211WANTS on its own row (seat $G211SEAT, which held colour $G211WASC and start $G211WASS before), and the host's own table still says colour ${G211HC:-none} and start ${G211HS:-none}. This is the fault the gate exists for: the send is read after the room has been copied over the click, so it compares the host's value with the host's value and puts nothing on the wire. $(grep -a "^LOBBYSEAT|host.*seat=$G211SEAT|" /tmp/g211_h.log | tail -3 | tr '\n' ' ')"
+  elif [ "${G211EDGE:-0}" -lt 1 ]; then
+    bad "G211 a joiner's own row reaches the room: the host's final table holds colour $G211WANTC and start $G211WANTS but no line records them ARRIVING while the room was live (edge lines carrying both=$G211EDGE, want >=1). The end state is right and the history is missing, which means the table was not built by the message this gate is about"
+  elif [ "${G211JC:-x}" != "$G211WANTC" ] || [ "${G211JS:-x}" != "$G211WANTS" ]; then
+    bad "G211 a joiner's own row reaches the room: the host took the pick and the answer never came back. The host's table says colour $G211HC start $G211HS; the joiner's own copy of that setup says colour ${G211JC:-none} start ${G211JS:-none}. The room and the screen that is a picture of it disagree, so the joiner is looking at a row nobody else has"
+  elif [ "${G211OVER:-1}" != "0" ]; then
+    bad "G211 a joiner's own row reaches the room: the picks travelled but ${G211OVER} of the joiner's strings do not fit their boxes (want 0; -1 means the measurement could not be made)"
+  elif [ "${G211JRC:-1}" != "0" ]; then
+    bad "G211 a joiner's own row reaches the room: every number is right and the joiner exited $G211JRC (want 0), so something after the lobby went wrong on the way out"
+  else
+    ok "G211 a joiner's own row reaches the room: a host opened a four seat room on SCM01EA and held it; a joiner joined at 127.0.0.1, was seated as seat $G211SEAT holding colour $G211WASC and no start, and on the REAL lobby screen opened its own row and took colour $G211WANTC and start $G211WANTS in $G211CLICK clicks with no step skipped. The HOST'S own table then held colour $G211HC and start $G211HS for that seat, one of its change lines carries both picks together so they were seen arriving rather than found at the end, and the joiner's own copy of the room came back saying the same two numbers with $G211OVER strings overflowing"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# G212 THE PLAYERS CAN TALK TO EACH OTHER DURING A MATCH, and the pane obeys its rules.
+#
+# THE FEATURE. Return opens a line under the OPTIONS plate, what you type reaches every
+# other player as "NAME: MESSAGE" in your own colour, and the pane holds TEN rows: an
+# eleventh hides the first, and a line older than thirty game seconds fades out and lets
+# the rest move up.
+#
+# WHY IT NEEDS A GATE AND NOT AN EYE. Three of the four claims are invisible in a
+# screenshot of a two line conversation. The transport is the interesting one: the lobby
+# carried chat and the MATCH silently did not, because both NM_CHAT handlers live in the
+# lobby drains and nm_lobby_poll returns the moment the room has started. A line sent in
+# game fell off nm_pump's magic chain and was discarded with no error anywhere. That is
+# exactly the shape of fault a person cannot see: you type, it appears on your own screen
+# because the sender echoes locally, and nobody else ever hears it.
+#
+# WHAT IS ASSERTED, all of it off the two peers' OWN panes rather than off the wire:
+#   * both peers end up holding BOTH lines, so the host relayed and the joiner received
+#   * the two lines carry DIFFERENT colours, which is the per-seat livery reaching the
+#     pane rather than one colour for everybody
+#   * twelve more lines leave TEN rows, FILL 03 to FILL 12 in order: the four oldest
+#     (both speakers' lines, FILL 01 and FILL 02) are the ones gone
+#   * after 470 further ticks the pane is EMPTY, which is the thirty second expiry
+#
+# 127.0.0.1, like every other network gate: what is under test is the pane and the relay.
+# ---------------------------------------------------------------------------
+G212HROWS1=-1; G212HROWS2=-1; G212HROWS3=-1; G212JROWS=-1
+G212HHAS=0; G212JHAS=0; G212COLOURS=0; G212DROPPED=0; G212KEPT=0; G212ENDS=0
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  rm -f g212_h.log g212_j.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --players 2 --host 17512 --script gate_chat_host.txt > g212_h.log 2>&1 &
+  G212HP=$!
+  sleep 3
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17512 --script gate_chat_join.txt > g212_j.log 2>&1 &
+  G212JP=$!
+  wait $G212HP; wait $G212JP
+  cat g212_h.log g212_j.log >> "$OUT"
+  # The three dumps the host takes, in order: the conversation, the cap, the expiry.
+  G212HROWS1=$(grep -a '^CHAT|rows=' g212_h.log | sed -n '1s/^CHAT|rows=\([0-9]*\).*/\1/p')
+  G212HROWS2=$(grep -a '^CHAT|rows=' g212_h.log | sed -n '2s/^CHAT|rows=\([0-9]*\).*/\1/p')
+  G212HROWS3=$(grep -a '^CHAT|rows=' g212_h.log | sed -n '3s/^CHAT|rows=\([0-9]*\).*/\1/p')
+  G212JROWS=$(grep -a '^CHAT|rows=' g212_j.log | sed -n '1s/^CHAT|rows=\([0-9]*\).*/\1/p')
+  # BOTH LINES ON BOTH PEERS. The host's own line is its echo; the joiner's arrived.
+  grep -aq 'HOST SPEAKING' g212_h.log && grep -aq 'JOINER SPEAKING' g212_h.log && G212HHAS=1
+  grep -aq 'HOST SPEAKING' g212_j.log && grep -aq 'JOINER SPEAKING' g212_j.log && G212JHAS=1
+  # TWO SEATS, TWO COLOURS. Count the distinct rgb= values across the first dump's rows.
+  G212COLOURS=$(sed -n '/^CHAT|rows=/,/^CHAT|rows=/p' g212_h.log | grep -a '^CHAT|[0-9]' \
+                | sed -n 's/.*|rgb=\([0-9A-F]*\)|.*/\1/p' | sort -u | grep -c .)
+  # THE CAP: fourteen lines went in, so the four oldest (both speakers' lines, FILL 01 and
+  # FILL 02) must be gone and FILL 03 to FILL 12 left, in order. The whole second dump is
+  # compared, because a pane that drops the wrong row still loses FILL 01 and keeps FILL 12.
+  G212CAP=$(awk '/^CHAT[|]rows=/{n++; next} n==2 && /^CHAT[|][0-9]/' g212_h.log \
+            | sed 's/.*: //' | tr '\n' ',')
+  G212WANT="FILL 03,FILL 04,FILL 05,FILL 06,FILL 07,FILL 08,FILL 09,FILL 10,FILL 11,FILL 12,"
+  [ "$G212CAP" = "$G212WANT" ] && G212DROPPED=1 && G212KEPT=1
+  G212ENDS=$(grep -ahc 'SCRIPT|end' g212_h.log g212_j.log | awk '{n+=$1} END{print n+0}')
+fi
+if [ "${G212HROWS1:-0}" = "2" ] && [ "${G212JROWS:-0}" = "2" ] \
+   && [ "${G212HHAS:-0}" = "1" ] && [ "${G212JHAS:-0}" = "1" ] \
+   && [ "${G212COLOURS:-0}" = "2" ] && [ "${G212HROWS2:-0}" = "10" ] \
+   && [ "${G212DROPPED:-0}" = "1" ] && [ "${G212KEPT:-0}" = "1" ] \
+   && [ "${G212HROWS3:-1}" = "0" ] && [ "${G212ENDS:-0}" = "2" ]; then
+  ok "G212 the players can talk during a match: a host and a joiner each said one line and BOTH panes ended up holding BOTH of them, in two different colours rather than one, so the line crossed the wire and arrived wearing the speaker's own livery. Twelve more lines left exactly $G212HROWS2 rows, FILL 03 to FILL 12 in order, with the four oldest gone, and 470 ticks later the pane was empty, which is the ten row cap and the thirty second expiry doing what they say"
+else
+  bad "G212 the players can talk during a match: host-rows=$G212HROWS1(want 2) joiner-rows=$G212JROWS(want 2) host-has-both=$G212HHAS(want 1) joiner-has-both=$G212JHAS(want 1) distinct-colours=$G212COLOURS(want 2) after-twelve=$G212HROWS2(want 10) cap-rows=[$G212CAP](want FILL 03 to FILL 12 in order, the four oldest gone) after-expiry=$G212HROWS3(want 0) clean-ends=$G212ENDS(want 2). $(grep -hE '^NET\|error|^NETDESYNC' g212_*.log 2>/dev/null | head -2 | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# G213 A PLAYER SURRENDERS, AND STAYS TO WATCH.
+#
+# THE FEATURE. In a match the pause dialog's ABORT MISSION row becomes SURRENDER. Taking
+# it destroys that player's base and army (or hands it to the computer, if the room has AI
+# Takeover on), and the player REMAINS in the match as a spectator with the map uncovered.
+# The row then becomes LEAVE MATCH, which is the only thing that actually leaves.
+#
+# THE PART THAT NEEDS A GATE AND NOT AN EYE. A surrender is a simulation change, so it has
+# to land on ONE turn on every machine or the peers hold two different worlds a tick
+# later. It deliberately does NOT reuse the goodbye that a departure sends, for three
+# reasons that all bite: the goodbye path skips this peer's own seat, so the machine that
+# resigned would never apply its own surrender; it marks the seat ABSENT, which tells
+# every other peer to stop waiting for turn packets that a live spectator is still
+# sending, and there is no way back from that; and a departure is what a scripted run
+# reads as the match being over, which a surrender is not.
+#
+# WHAT IS ASSERTED:
+#   * both peers name the SAME turn for it, which is the whole agreement
+#   * both peers mark that house defeated, so the simulation agreed as well as the wire
+#   * neither peer raises the desync alarm
+#   * the match RUNS ON for 200 further turns after the surrender, which is what proves
+#     the spectator kept sending turns and was never marked absent: had it been, the host
+#     would have stalled at the barrier or ended the match instead
+#   * the dialog's row really is called SURRENDER, and the confirmation that follows it
+#     answers YES, because both clicks are BY LABEL and the script fails if no item
+#     answers to the name. Those two labels are the feature's whole visible surface, and
+#     a gate that clicked by position would pass with either word on either button.
+# ---------------------------------------------------------------------------
+G213HT=""; G213JT=""; G213HDEF=0; G213JDEF=0; G213DESYNC=0; G213ENDS=0; G213RAN=0
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  rm -f g213_h.log g213_j.log
+  # THREE PEERS, NOT TWO, and that is the point of the gate rather than an accident of
+  # setup: in a one against one match the surrender legitimately ENDS the game, because
+  # the only opponent is gone, so a two peer run could never show a spectator still
+  # playing. With three, the match carries on and the resigned peer has to keep sending
+  # turns for it to do so.
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --players 3 --host 17513 --script gate_surr_host.txt > g213_h.log 2>&1 &
+  G213HP=$!
+  sleep 3
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17513 --script gate_surr_join.txt > g213_j.log 2>&1 &
+  G213JP=$!
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17513 --script gate_surr_stay.txt > g213_s.log 2>&1 &
+  G213SP=$!
+  wait $G213HP; wait $G213JP; wait $G213SP
+  cat g213_h.log g213_j.log g213_s.log >> "$OUT"
+  # THE AGREED TURN, off each peer's own log.
+  # WHICH SEAT RESIGNED is whatever the room gave that process, not a number written
+  # here: with three peers the joiners are seated in the order they arrive.
+  G213SEAT=$(sed -n 's/^NET|surrender|seat=\([0-9]*\)|.*/\1/p' g213_j.log | head -1)
+  G213HT=$(sed -n "s/^NET|surrendered|seat=$G213SEAT|turn=\([0-9]*\)/\1/p" g213_h.log | head -1)
+  G213JT=$(sed -n "s/^NET|surrendered|seat=$G213SEAT|turn=\([0-9]*\)/\1/p" g213_j.log | head -1)
+  # THE SIMULATION AGREED TOO: seat 1's house reads defeated in the LAST roster dump each
+  # peer took. House 4 is the first multi house, which is the seat that resigned here.
+  # THE SIMULATION AGREED TOO. The resigned peer is the one whose OWN last roster shows
+  # a defeated row; both peers must show exactly one such row, and it must be the same
+  # house on both, which is what makes this a comparison rather than two separate facts.
+  G213JHOUSE=$(grep -a '^ROSTER|.*|defeated=1' g213_j.log | tail -1 \
+               | sed -n 's/.*|house=\([0-9]*\)|.*/\1/p')
+  G213JDEF=$(grep -a '^ROSTER|.*|defeated=1' g213_j.log | tail -1 | grep -c 'defeated=1')
+  G213HDEF=$(grep -a "^ROSTER|.*|house=$G213JHOUSE|" g213_h.log | tail -1 | grep -c 'defeated=1')
+  G213DESYNC=$(cat g213_h.log g213_j.log g213_s.log | grep -ac 'NETDESYNC|')
+  # AND THE MATCH RAN ON. The host's leaving line carries the turn it reached.
+  G213RAN=$(sed -n 's/^NET|leaving|turns=\([0-9]*\)|.*/\1/p' g213_h.log | head -1)
+  G213ENDS=$(grep -ahc 'SCRIPT|end' g213_h.log g213_j.log g213_s.log | awk '{n+=$1} END{print n+0}')
+fi
+if [ -n "$G213HT" ] && [ "$G213HT" = "$G213JT" ] && [ "${G213HDEF:-0}" = "1" ] \
+   && [ "${G213JDEF:-0}" = "1" ] && [ "${G213DESYNC:-1}" = "0" ] \
+   && [ "${G213ENDS:-0}" = "3" ] && [ "${G213RAN:-0}" -ge $((G213HT + 150)) ]; then
+  ok "G213 a player surrenders and stays to watch: a joiner took the dialog's SURRENDER row by name, the host named turn $G213HT for it, and BOTH peers applied it on that same turn and marked that house defeated. No desync, and the host ran on to turn $G213RAN afterwards -- the spectator was still sending turns, which is the whole reason a surrender must not travel as a goodbye"
+else
+  bad "G213 a player surrenders and stays to watch: host-turn=$G213HT joiner-turn=$G213JT(want equal and non-empty) host-sees-defeated=$G213HDEF(want 1) joiner-sees-defeated=$G213JDEF(want 1) desyncs=$G213DESYNC(want 0) host-ran-to=$G213RAN(want >= turn+150) clean-ends=$G213ENDS(want 3). $(grep -hE '^SCRIPT\|optclick|^NETDESYNC' g213_*.log 2>/dev/null | head -2 | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# G214 THE SCREEN A MATCH ENDS ON.
+#
+# The campaign's score screen reports one commander against a designer's par. A match has
+# no par, so this one is a table: one row per commander, and every row's SCORE drawn as a
+# bar measured against whoever leads. It borrows the campaign screen's plate, its turning
+# medallion and its music, and keeps exactly one of that screen's numbers, the time.
+#
+# WHY IT NEEDS A GATE. The screen is otherwise reachable only by playing a match to its
+# finish, which nothing automated can do in a second, so without a door into it the whole
+# thing would be verified by eye once and never again. --matchshot is that door: it draws
+# the board from a made-up table of EIGHT commanders, the worst case the lobby can seat,
+# and photographs it.
+#
+# WHAT IS ASSERTED, off the PICTURE and not off the log:
+#   * the leader's bar is nearly the full width, which is what "measured against the
+#     leader" means
+#   * the bars get shorter down the table, every step of the way: that is the sort and the
+#     proportion working together, and it is what a reader takes from this screen first
+#   * a commander who scored nothing has no bar at all rather than a stub
+#   * the rows are drawn in at least five DIFFERENT liveries rather than one ramp for all
+#   * eight rows fit: the last one's bar is still inside the panel
+#   * the CONTINUE button is drawn below the panel, box and label both
+#   * and, off a SECOND photograph taken with the third commander just finished, that the
+#     table is walked down one commander at a time: three bars there against seven at the
+#     end. Without that shot the animation could stop happening and every other assertion
+#     on this screen would still pass.
+#   * and, from a SECOND run made as Nod, that the emblem and the theme follow the faction
+#     the player played rather than the campaign's: one number drives both, so proving the
+#     medallion proves the music with it.
+# ---------------------------------------------------------------------------
+G214RC=""; G214ROWS=""; G214R=""; G214LOG=""; G214M=""
+G214GDI=0; G214NOD=0; G214NODLOGO=0
+if [ -x ./cnc3d ] && [ -s campaign.pack ]; then
+  rm -f flow_matchscore.png flow_matchscore_mid.png
+  G214LOG=$(./cnc3d --matchshot --w 1280 --h 800 --dylib ./TiberianDawn.dylib \
+            --dir ./missions/ 2>&1)
+  printf '%s\n' "$G214LOG" >> "$OUT"
+  G214RC=$(printf '%s' "$G214LOG" | sed -n 's/^MATCHSHOT|rc=\([-0-9]*\)|.*/\1/p' | head -1)
+  G214ROWS=$(printf '%s' "$G214LOG" | sed -n 's/^MATCHSHOT|.*|rows=\([0-9]*\)/\1/p' | head -1)
+  if [ -s flow_matchscore.png ]; then
+    G214R=$(python3 "$GATEDIR/gate_matchscore.py" flow_matchscore.png)
+  fi
+  # AND THE SAME MEASUREMENT PART WAY DOWN THE TABLE. The finished board says nothing
+  # about whether the commanders arrived one at a time or all at once, which is exactly
+  # the thing that can quietly stop happening.
+  if [ -s flow_matchscore_mid.png ]; then
+    G214M=$(python3 "$GATEDIR/gate_matchscore.py" flow_matchscore_mid.png | awk '{print $6}')
+  fi
+  # AND THE EMBLEM FOLLOWS THE PLAYER'S OWN FACTION, not the campaign's. A commander who
+  # played Nod gets the Nod medallion turning in the corner and the Nod score theme; the
+  # same one number drives both, so proving the emblem proves the music with it.
+  G214GDI=$(printf '%s' "$G214LOG" | grep -c 'CAMPAIGN|matchscore|.*|side=GDI|')
+  G214NODLOG=$(./cnc3d --matchshot --flowside nod --w 800 --h 500 \
+               --dylib ./TiberianDawn.dylib --dir ./missions/ 2>&1)
+  printf '%s\n' "$G214NODLOG" >> "$OUT"
+  G214NOD=$(printf '%s' "$G214NODLOG" | grep -c 'CAMPAIGN|matchscore|.*|side=Nod|')
+  G214NODLOGO=$(printf '%s' "$G214NODLOG" | grep -c 'LOGO|flow_matchscore.png|side=1|')
+fi
+set -- $G214R
+G214LEAD="$1"; G214LAST="$2"; G214MONO="$3"; G214COLS="$4"; G214BTN="$5"; G214DRAWN="$6"
+if [ "${G214RC:-1}" = "0" ] && [ "${G214ROWS:-0}" = "8" ] \
+   && [ "${G214LEAD:-0}" -ge 280 ] && [ "${G214LAST:--1}" = "0" ] \
+   && [ "${G214MONO:-0}" = "1" ] && [ "${G214COLS:-0}" -ge 5 ] && [ "${G214BTN:-0}" = "1" ] && [ "${G214DRAWN:-0}" = "7" ] \
+   && [ "${G214M:-0}" = "3" ] && [ "${G214GDI:-0}" = "1" ] \
+   && [ "${G214NOD:-0}" = "1" ] && [ "${G214NODLOGO:-0}" = "1" ]; then
+  ok "G214 the screen a match ends on: eight commanders drawn on the campaign score screen's own plate, the leader's bar $G214LEAD of 295 pixels wide and every bar below it shorter than the one above, all the way down. $G214COLS different liveries on the board, and the commander who scored nothing has no bar rather than a stub. A full room fits inside the panel, and the CONTINUE button is drawn below it. Part way through, with the third commander just finished, only $G214M rows carried a bar against $G214DRAWN at the end, so the standings really are walked down one commander at a time rather than appearing all at once. Run again as Nod, the board reports the Nod side and turns the Nod medallion, so the emblem and the theme follow the faction the player played rather than the campaign's"
+else
+  bad "G214 the screen a match ends on: rc=$G214RC(want 0) rows=$G214ROWS(want 8) leader-bar=$G214LEAD(want >=280) last-bar=$G214LAST(want 0) bars-descend=$G214MONO(want 1) distinct-liveries=$G214COLS(want >=5) continue-button=$G214BTN(want 1) rows-with-bars=$G214DRAWN(want 7) rows-mid-animation=$G214M(want 3) gdi-board-says-gdi=$G214GDI(want 1) nod-board-says-nod=$G214NOD(want 1) nod-medallion=$G214NODLOGO(want 1). $(printf '%s' "$G214LOG" | grep -E 'campaign:|CAMPAIGN.matchscore' | head -2 | tr '\n' ' ')"
+fi
+
+# =====================================================================================
+# G215 A MATCH HAS ONE WINNER, AND EACH MACHINE READS ITS OWN RESULT.
+#
+# The engine ends a match with one row per house, each stamped with the house it is
+# about, and the renderer has to pick the row belonging to THIS machine. It used to take
+# the first row that belonged to a human. The rows arrive in roster order, which is
+# identical on every peer by construction, so that expression named ONE house and every
+# peer reported that house's win flag as its own: both players were told they had won, or
+# both that they had lost, which is the one result a match cannot produce.
+#
+# Two processes, one loopback match, and the joiner's house is destroyed on a turn both
+# machines take together (blowup names the house per machine: the joiner is its own
+# player 0, and seat 1 to the host). The assertion is not "the host won" on its own --
+# that passed while the bug was live -- it is that the two logs DISAGREE, one WIN and one
+# LOSE, which is the only shape a finished match can have.
+#
+# Seen red before it was believed: with the house test removed, the joiner whose base had
+# just been destroyed printed WIN.
+# ---------------------------------------------------------------------------
+G215HV=""; G215JV=""; G215DESYNC=1; G215ENDS=0; G215HS=""; G215JS=""
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  rm -f g215_h.log g215_j.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --host 17482 --script gate_net_verdict_host.txt > g215_h.log 2>&1 &
+  G215HP=$!
+  sleep 3
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17482 --script gate_net_verdict_join.txt > g215_j.log 2>&1 &
+  G215JP=$!
+  wait $G215HP; wait $G215JP
+  cat g215_h.log g215_j.log >> "$OUT"
+  # One verdict per machine. The line is printed on the frame the engine announces and
+  # again on the way out, so identical lines are collapsed rather than counted twice.
+  G215HV=$(grep -a '^GAMEOVER|SKIRMISH|' g215_h.log | cut -d'|' -f3 | sort -u)
+  G215JV=$(grep -a '^GAMEOVER|SKIRMISH|' g215_j.log | cut -d'|' -f3 | sort -u)
+  G215HS=$(sed -n 's/^GAMEOVER|SKIRMISH|.*|seat=\([0-9]*\)$/\1/p' g215_h.log | sort -u)
+  G215JS=$(sed -n 's/^GAMEOVER|SKIRMISH|.*|seat=\([0-9]*\)$/\1/p' g215_j.log | sort -u)
+  G215DESYNC=$(cat g215_h.log g215_j.log | grep -ac 'NETDESYNC|')
+  G215ENDS=$(grep -ahc 'SCRIPT|end' g215_h.log g215_j.log | awk '{n+=$1} END{print n+0}')
+fi
+if [ "$G215HV" = "WIN" ] && [ "$G215JV" = "LOSE" ] \
+   && [ "$G215HS" = "0" ] && [ "$G215JS" = "1" ] \
+   && [ "${G215DESYNC:-1}" = "0" ] && [ "${G215ENDS:-0}" = "2" ]; then
+  ok "G215 a match has one winner and each machine reads its own result: the surviving host printed WIN on seat 0 and the destroyed joiner printed LOSE on seat 1, from one lockstep match with no desync. The two disagreeing is the assertion: matching the result row by position instead of by house gave every peer the same verdict"
+else
+  bad "G215 a match has one winner and each machine reads its own result: host-verdict=[$G215HV](want WIN) joiner-verdict=[$G215JV](want LOSE) host-seat=[$G215HS](want 0) joiner-seat=[$G215JS](want 1) desyncs=$G215DESYNC(want 0) clean-ends=$G215ENDS(want 2). Two WINs or two LOSEs means the game-over row was matched by position rather than by GlyphXPlayerID. $(grep -hE '^NET\|error|^NETDESYNC' g215_*.log 2>/dev/null | head -2 | tr '\n' ' ')"
+fi
+
+# =====================================================================================
+# G216 NOTHING ON ONE MACHINE HOLDS A MATCH.
+#
+# The frame loop skipped its whole tick block while the pause dialog was up, and that
+# block is where this machine TAKES ITS TURN on the network. So opening the dialog in a
+# match did not pause the match: it stopped this peer answering, the others froze on the
+# barrier waiting for a turn that never came, and thirty seconds later they ended the
+# match. From the other side that looks like the game finishing on its own, about a
+# minute after somebody opened a dialog.
+#
+# THIS GATE HAS TO DRIVE THE LIVE LOOP AND NOTHING ELSE WILL DO. The script verbs advance
+# the world through script_tick, which never consults that condition, so a scripted joiner
+# keeps sending turns whether the bug is present or not -- a gate built on --script would
+# have passed before the fix and proved nothing. --autoesc opens the real dialog from the
+# real event handler and --autoabort holds it open, which is the same pair G13 uses to
+# prove the opposite thing about a campaign.
+#
+# G13 AND THIS ARE MIRRORS, and both must hold: a campaign mission's world must NOT
+# advance while the dialog is up, and a match's world MUST. Neither is decoration and
+# neither can be satisfied by breaking the other.
+#
+# Seen red: on a build without the fix both peers stopped dead on the frame the dialog
+# opened, and the host printed "waiting for a turn from seat 1" three seconds later.
+# ---------------------------------------------------------------------------
+G216OPEN=""; G216CLOSE=""; G216ADV=-1; G216WAIT=-1; G216DESYNC=-1
+G216DWELL=-1; G216CLICK=-1; G216RESUME=-1; G216OPENS=-1; g216w=-1
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  rm -f g216_h.log g216_j.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --host 17483 --run 70 > g216_h.log 2>&1 &
+  G216HP=$!
+  sleep 3
+  # The dialog opens five seconds in and is held for forty, which is past the thirty the
+  # others would have ended the match at. The dwell is the whole measurement.
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17483 --run 70 --autoesc 5 --autoabort 40 > g216_j.log 2>&1 &
+  G216JP=$!
+  # THE WATCHDOG IS A LOOP IN THIS SHELL. A background "( sleep 120; kill ... ) &" makes $!
+  # the subshell, so killing it after a normal finish left its sleep running on its own,
+  # holding the suite's output open for the rest of its two minutes, and nothing recorded
+  # whether it had fired. g216w is the seconds waited: 120 means the peers were killed.
+  g216w=0
+  while [ $g216w -lt 120 ] && { kill -0 $G216HP 2>/dev/null || kill -0 $G216JP 2>/dev/null; }; do
+    sleep 1; g216w=$((g216w+1))
+  done
+  # Only a watchdog that ran out has anything left to kill. A peer that already exited has
+  # given up its PID, and that number may belong to something else by now.
+  if [ $g216w -ge 120 ]; then kill -9 $G216HP $G216JP 2>/dev/null; fi
+  wait $G216HP 2>/dev/null; wait $G216JP 2>/dev/null
+  cat g216_h.log g216_j.log >> "$OUT"
+  # THE PAUSE HAS TO BE SHOWN TO HAVE LASTED. The joiner must say it is dwelling, click
+  # Abort Mission once and never resume, and the world must run from the frame the dialog
+  # opened on to the turn that Abort's surrender lands on. The Abort can only be clicked
+  # while the dialog is open, so with no resume that whole stretch is dialog time.
+  # Measuring to the last frame of the whole run instead let a dialog that closed after a
+  # second pass: the match simply went on without it.
+  G216OPEN=$(sed -n 's/^OPTIONS|open|frame=\([0-9]*\).*/\1/p' g216_j.log | head -1)
+  # AND IT MUST HAVE OPENED ONCE. Not every door out of the dialog prints a resume: in a
+  # match Save and Load close it silently. A dialog closed that way and opened again
+  # later still shows one dwell, one Abort and no resume, with the match running on while
+  # it was shut, so a second open line is what tells that apart from one long hold.
+  G216OPENS=$(grep -ac '^OPTIONS|open|' g216_j.log)
+  G216CLOSE=$(sed -n 's/^NET|surrendered|seat=1|turn=\([0-9]*\).*/\1/p' g216_j.log | head -1)
+  if [ -n "$G216OPEN" ] && [ -n "$G216CLOSE" ]; then
+    G216ADV=$((G216CLOSE - G216OPEN))
+  fi
+  G216DWELL=$(grep -ac 'autoleave: dialog open, dwelling' g216_j.log)
+  G216CLICK=$(grep -ac 'autoleave: clicked Abort Mission' g216_j.log)
+  G216RESUME=$(grep -ac '^OPTIONS|resume' g216_j.log)
+  # The host must never have had to wait. The three-second line is the earliest complaint
+  # there is, so requiring NONE of it is stricter than requiring the match not to end.
+  G216WAIT=$(grep -ac 'waiting for a turn from seat' g216_h.log)
+  G216DESYNC=$(cat g216_h.log g216_j.log | grep -ac 'NETDESYNC')
+fi
+# the hold is forty seconds and the floor is 150 frames, which even the slowest setting
+# the slider offers clears four times over; and a match runs the speed that crossed the
+# wire rather than either player's slider, against
+# the forty seconds the dialog is held for, so the threshold does not move with the rate.
+# Well under what a healthy run produces and far above the zero a paused one does, so a
+# loaded machine cannot turn this red the way G13's throughput leg can.
+if [ "$g216w" -ge 0 ] && [ "$g216w" -lt 120 ] && [ "$G216DWELL" = "1" ] \
+   && [ "$G216CLICK" = "1" ] && [ "$G216RESUME" = "0" ] && [ "$G216OPENS" = "1" ] \
+   && [ "${G216ADV:--1}" -ge 150 ] \
+   && [ "${G216WAIT:--1}" = "0" ] && [ "${G216DESYNC:--1}" = "0" ]; then
+  ok "G216 nothing on one machine holds a match: the pause dialog was opened on the joiner once, at frame $G216OPEN, and held for forty seconds with no resume, and the world ran on underneath it to turn $G216CLOSE, where its Abort surrendered -- $G216ADV frames -- while the host never once had to wait for a turn and neither peer desynced. A peer that stops taking its turn freezes every other machine and ends the match at thirty seconds, which is what this dialog used to do"
+else
+  bad "G216 nothing on one machine holds a match: dialog-opened-at=[$G216OPEN] surrendered-at-turn=[$G216CLOSE] frames-advanced=$G216ADV(want >=150; 0 means the dialog paused the match) dwell-lines=$G216DWELL(want 1) abort-clicks=$G216CLICK(want 1; 0 with a resume means the dialog closed before it was held) resumes=$G216RESUME(want 0) dialog-opens=$G216OPENS(want 1; more means it closed by a door that prints no resume and was opened again, so the forty seconds were not one hold) seconds-waited=$g216w(want <120; 120 means the peers had to be killed) host-waited-for-a-turn=$G216WAIT(want 0) desyncs=$G216DESYNC(want 0). $(grep -hE 'waiting for a turn|no turn from a peer' g216_h.log 2>/dev/null | head -2 | tr '\n' ' ')"
+fi
+
+# =====================================================================================
+# G217 THE POINTER TRACKS THE MOUSE, AND DOES NOT SNAP TO WHAT IT CROSSES.
+#
+# This gate was written the other way round, against a playtest report that
+# the bracket drew beside a unit rather than on it: update_cursor was changed to take the
+# picked object's own anchor whenever a pixel resolved to an object, and this gate required
+# that snap to happen (gap <= 0.02 cells). The shipped build showed what that costs. The
+# director: "my mouse cursor in the game now snaps to anything selectable. This is
+# horrible, it makes the game almost unplayable." A pointer that jumps to the centre of
+# every unit it crosses cannot be aimed, and aiming is what a pointer is for.
+#
+# So the rule is reversed and this gate now guards the reversal: g_cursorWX/g_cursorWZ,
+# the two arguments c3d_draw receives one call later, must equal the TERRAIN RAY through
+# the mouse pixel, over an object as well as over bare ground. The old parallax the first
+# note describes is real and is left to whatever the bracket draws; it is not the
+# pointer's business.
+#
+# WHY IT CANNOT GO VACUOUS. The verb reports the bare ray from the same pixel beside the
+# cursor's own position, and this gate requires that ray to differ from the object's
+# anchor by a real distance (raygap): at a camera where the two coincide there is nothing
+# to tell apart and the run would be measuring nothing.
+cat > gate_curgap.txt <<'TXT'
+tick 20
+cam 50 50
+zoom max
+cursorobj NUKE 0
+cursorobj HARV 0
+zoom min
+cursorobj NUKE 0
+cursorobj HARV 0
+quit
+TXT
+gbegin /tmp/g217.log
+grun "/tmp/g217.log" --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud \
+     --script gate_curgap.txt
+# Four aimed lines, none of them missing its object.
+G217N=$(grep -c '^CURSOROBJ|.*|gap=' /tmp/g217.log 2>/dev/null)
+G217MISS=$(grep -c '^CURSOROBJ|.*MISSING' /tmp/g217.log 2>/dev/null)
+# The cursor must sit where the ray sits: gap and raygap are then the same number, so
+# their difference is the snap. Anything above a fiftieth of a cell means it snapped.
+G217BAD=$(awk -F'[|]' '/^CURSOROBJ\|.*\|gap=/ {g=""; r=""; for (i=1;i<=NF;i++) {if ($i ~ /^gap=/) {sub(/^gap=/,"",$i); g=$i+0} if ($i ~ /^raygap=/) {sub(/^raygap=/,"",$i); r=$i+0}} if (g!="" && r!="" && (g-r > 0.02 || r-g > 0.02)) n++} END {print n+0}' /tmp/g217.log 2>/dev/null)
+# And the two must have something to disagree about at this camera.
+G217RAY=$(awk -F'[|]raygap=' '/raygap=/ {split($2,a,"|"); if (a[1]+0 > m) m=a[1]+0} END {printf "%.3f", m+0}' /tmp/g217.log 2>/dev/null)
+# THE TWO ZOOMS MUST LEAVE TWO CAMERAS. A zoom verb that is accepted and changes nothing
+# is not a script failure, so the camera each one reports is compared, and only by the
+# field that governs the mode it reports. The N64 camera zooms by its distance and never
+# reads zoom= (the view's zoom is only consulted outside CAM_N64), so a zoom verb that
+# moved zoom= and left dist= alone under N64 would still print two different lines while
+# every aim came from one camera. Under N64 the distance is compared; otherwise the zoom.
+G217CAM=$(sed -n 's/^CAM|zoom|.*|zoom=\([^|]*\)|mode=\([^|]*\)|dist=\([^|]*\)|.*/\2 \1 \3/p' /tmp/g217.log 2>/dev/null \
+          | awk '{ if ($1 == "N64") print "mode=N64|dist=" $3; else print "mode=" $1 "|zoom=" $2 }')
+G217CAMN=$(printf '%s\n' "$G217CAM" | grep -c .)
+G217CAM1=$(printf '%s\n' "$G217CAM" | sed -n 1p)
+G217CAM2=$(printf '%s\n' "$G217CAM" | sed -n 2p)
+# AND THE AIMS THEMSELVES MUST SHOW IT. Each object is aimed at once per zoom level, at the
+# pixel its anchor projects to, and neither object stands under the camera's centre, so a
+# second camera puts each one on a different pixel. The same at= for an object at both
+# levels means its two aims were taken through one projection, whatever the CAM lines say.
+# Printed as "objects-aimed-twice objects-on-the-same-pixel-both-times".
+G217AT=$(awk -F'|' '/^CURSOROBJ\|.*\|gap=/ { if ($2 in first) { c++; if (first[$2] == $3) s++ } else first[$2] = $3 }
+           END { print c+0, s+0 }' /tmp/g217.log 2>/dev/null)
+G217ATN=${G217AT% *}; G217ATSAME=${G217AT#* }
+# THE RUN'S EXIT STATUS IS GRADED FIRST. An aim off the screen, an object that is not drawn
+# and a verb the runner does not know are each a script failure, and each still leaves
+# pointer lines for the checks below to read: with the zoom verb refused, all four aims
+# come from one camera and "two zoom levels" is one level measured twice.
+if [ "$GRC" != "0" ]; then
+  bad "G217 the pointer tracks the mouse: the script run failed (exit $GRC), so an aim was off the screen, an object was not drawn or a verb was refused, and the pointer lines below it cannot be trusted. $(grep -hE '^SCRIPT\|end|OFFSCREEN|^SCRIPT\|unknown command|MISSING' /tmp/g217.log 2>/dev/null | head -6 | tr '\n' ' ')"
+elif [ "$G217CAMN" != "2" ] || [ "$G217CAM1" = "$G217CAM2" ]; then
+  bad "G217 the pointer tracks the mouse: the two zoom verbs left the camera at [$G217CAM1] and [$G217CAM2] ($G217CAMN camera lines, want 2 that differ), so all four aims were taken at one zoom level, not two"
+elif [ "${G217ATN:-0}" != "2" ] || [ "${G217ATSAME:-1}" != "0" ]; then
+  bad "G217 the pointer tracks the mouse: of the $G217ATN objects aimed at both zoom levels (want 2), $G217ATSAME were aimed at the same pixel both times (want 0), so the two zoom levels projected them through one camera and the four aims are two aims measured twice. $(grep -h '^CURSOROBJ|' /tmp/g217.log 2>/dev/null | cut -d'|' -f2-3 | head -4 | tr '\n' ' ')"
+elif [ "${G217N:-0}" -ge 4 ] && [ "${G217MISS:-1}" = "0" ] && [ "${G217BAD:--1}" = "0" ] \
+   && awk "BEGIN{exit !(${G217RAY:-0} > 0.10)}"; then
+  ok "G217 the pointer tracks the mouse: $G217N aimed pointers over two zoom levels, every one of them standing on the terrain ray through its own pixel rather than jumping to the object's anchor, at a camera where the two differ by up to $G217RAY cells -- the distance the cursor used to teleport"
+else
+  bad "G217 the pointer tracks the mouse: aims=$G217N(want >=4) missed=$G217MISS(want 0) snapped=$G217BAD(want 0) ray-vs-anchor=$G217RAY(want >0.10; 0 means this camera cannot tell the two apart and the gate measured nothing). $(grep -h '^CURSOROBJ|' /tmp/g217.log 2>/dev/null | head -4 | tr '\n' ' ')"
+fi
+
+# =====================================================================================
+# G218 A MATCH THAT BREAKS ENDS ON A SCREEN, NOT ON THE DESKTOP.
+#
+# There are two ways a network match dies that nobody chose: the simulations part
+# (NETDESYNC), and a machine stops answering. Both used to come back as GAME_EXIT_ERROR,
+# which the shell turns into "close the application with a failing exit code". The player
+# had been playing for twenty minutes; the window went away, and the only account of it
+# was a line in a log file they have to be told how to find. It is indistinguishable from
+# a crash because there is nothing to distinguish it from one.
+#
+# GAME_EXIT_NETLOST separates "a match broke" from "the game broke". The match ends the way
+# every other match ends -- the debrief, with the reason printed on it in place of the score
+# formula -- and then the menu. GAME_EXIT_ERROR still means the brain stopped advancing and
+# still fails, because that is the code this suite reads.
+#
+# TWO LEGS, because the two endings arrive by different roads.
+#   A. THE HOST LEAVES CLEANLY. In a star every link is a link to the host, so when it goes
+#      the others are not a match with a gap in it, they are several people sitting alone.
+#      The joiner must say so AT ONCE. Before this it sat in a stopped world for thirty
+#      seconds first, waiting for a turn that had nowhere to come from.
+#   B. A PEER IS KILLED OUTRIGHT, with no goodbye -- a pulled cable, a machine switched
+#      off. Nothing arrives to explain it, so this leg pays the full thirty seconds of
+#      silence to see what the survivor does with it.
+#
+#      THE PLUG HAS TO COME OUT WHILE THE MATCH IS STILL RUNNING, and that is a race this
+#      leg used to lose silently. Both peers run a script of a FIXED NUMBER OF TICKS while
+#      the shell counts eight seconds on the wall clock, so how far through its script the
+#      victim is when the kill lands depends entirely on how fast the simulation happens to
+#      run on the day. At about 300 turns a second the kill landed 60% of the way through a
+#      4000 tick script and the leg worked. The headless turn rate later rose to about 475
+#      a second, 4000 ticks stopped taking eight seconds, and the victim reached the end of
+#      its own script and exited CLEANLY before the plug was ever pulled -- so the survivor
+#      saw an ordinary goodbye, ran its remaining turns, and left with no verdict and a
+#      clean exit code. The leg then reported "killed-peer-declared-gone=0", which reads as
+#      the departure machinery being broken and is nothing of the kind: nothing was killed.
+#      Proved by building the departure machinery OUT (nm_left_due returning at once) and
+#      running this leg in its old form against both binaries: the two produced identical
+#      numbers, so the old form could not tell a working build from a broken one.
+#      So leg B's script is now ten times longer than eight seconds of simulation can
+#      consume, and the leg ASSERTS that the victim was killed rather than finishing: a
+#      peer that printed its own leaving line left under its own power and this leg
+#      measured nothing. That number is in the verdict either way, so the next time the
+#      simulation gets faster this fails by naming the race instead of blaming the code.
+#
+#      WHAT LEG B MEASURES IS NOT WHAT IT WAS WRITTEN TO MEASURE, and the honest thing is
+#      to say so rather than to bend the code until it matches the gate. It was written
+#      expecting the stall timer to end the match with a NETLOST. It does not: netmatch's
+#      own peer-silent/peer-gone timer gets there first, declares that seat departed, and
+#      the departure machinery blows the house up -- so the survivor reaches a REAL
+#      verdict and wins. That is the better outcome and it already worked. The stall arm
+#      is the backstop underneath it, for the cases the departure timer does not resolve
+#      (more than two seats, a peer that is silent but not gone). So this leg asserts the
+#      property that is actually under test -- the survivor gets an ENDING and a clean
+#      exit code, never the desktop -- and does not pretend to reach the arm it does not
+#      reach.
+#
+# THE EXIT CODE IS HALF THE ASSERTION. A survivor that prints the right sentence and still
+# exits non-zero is still a crash as far as everything downstream is concerned.
+# ---------------------------------------------------------------------------
+# THE SCRIPTS ARE WRITTEN HERE, not shipped beside the gate. The run folder is not in
+# git, so a gate that expected a file to be sitting in it already would pass on this
+# machine and fail on every fresh checkout -- green for the one person who cannot be
+# helped by it.
+cat > gate_netlost_host.txt <<'TXT'
+tick 120
+quit
+TXT
+cat > gate_netlost_stay.txt <<'TXT'
+tick 4000
+quit
+TXT
+# LEG B'S SCRIPT IS THE ONE THAT MUST OUTLAST THE WALL CLOCK. Eight seconds of headless
+# simulation is about 4000 turns at the rate measured here, so 40000 leaves the victim a
+# tenth of the way through when the plug comes out and still holds if the game gets five
+# times faster again. It costs nothing in the normal case: the leg ends on the verdict,
+# about forty five seconds in, and never reaches the end of this script.
+cat > gate_netlost_long.txt <<'TXT'
+tick 40000
+quit
+TXT
+G218A=""; G218AR=1; G218BGONE=0; G218BV=""; G218BR=1; G218BKILL=0
+if [ -x ./cnc_eyes ] && [ -s "$SKMAP.pack" ] && [ -s "missions/$SKMAP.INI" ]; then
+  # ---- leg A: the host quits mid-match; the joiner must end at once ----
+  rm -f g218a_h.log g218a_j.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --host 17484 --script gate_netlost_host.txt > g218a_h.log 2>&1 &
+  G218AHP=$!
+  sleep 3
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17484 --script gate_netlost_stay.txt > g218a_j.log 2>&1 &
+  G218AJP=$!
+  wait $G218AHP
+  wait $G218AJP; G218AR=$?
+  cat g218a_h.log g218a_j.log >> "$OUT"
+  G218A=$(sed -n 's/^GAMEOVER|NETLOST|\(.*\)$/\1/p' g218a_j.log | head -1)
+
+  # ---- leg B: the joiner is killed with no goodbye; the host waits out the stall ----
+  rm -f g218b_h.log g218b_j.log
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 0 \
+      --host 17485 --script gate_netlost_long.txt > g218b_h.log 2>&1 &
+  G218BHP=$!
+  sleep 3
+  ./cnc_eyes --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 0 \
+      --join 127.0.0.1 17485 --script gate_netlost_long.txt > g218b_j.log 2>&1 &
+  G218BJP=$!
+  # Long enough to be seated and taking turns together, then the plug comes out. KILL and
+  # not TERM: a goodbye is exactly what this leg must not send.
+  sleep 8
+  kill -9 $G218BJP 2>/dev/null
+  wait $G218BJP 2>/dev/null
+  wait $G218BHP; G218BR=$?
+  cat g218b_h.log >> "$OUT"
+  G218BGONE=$(grep -ac '^NET|peer-gone|seat=1' g218b_h.log)
+  G218BV=$(grep -a '^GAMEOVER|SKIRMISH|' g218b_h.log | cut -d'|' -f3 | sort -u)
+  # DID THE PLUG ACTUALLY COME OUT? The victim has to have been IN the match and to have
+  # died without a word. A peer that ran out of script leaves its own accounting line on
+  # the way out; a peer that was killed leaves nothing after its last frame. Both halves
+  # are needed: a victim that never seated at all also prints no leaving line, and that
+  # is a leg with nothing in it rather than a leg that worked.
+  if [ "$(grep -ac '^NET|match|seat=1' g218b_j.log)" -ge 1 ] \
+     && [ "$(grep -ac '^NET|leaving' g218b_j.log)" = "0" ]; then G218BKILL=1; fi
+fi
+if [ "$G218A" = "THE HOST LEFT THE GAME" ] && [ "${G218AR:-1}" = "0" ] \
+   && [ "${G218BKILL:-0}" = "1" ] \
+   && [ "${G218BGONE:-0}" -ge 1 ] && [ "$G218BV" = "WIN" ] && [ "${G218BR:-1}" = "0" ]; then
+  ok "G218 a match that breaks ends on a screen: the host quit mid-match and the joiner ended AT ONCE saying \"$G218A\" instead of sitting in a stopped world for thirty seconds; a peer in a running match was killed outright with no goodbye and the survivor declared it gone and finished on a real verdict ($G218BV); and both survivors exited 0. A match broke, not a game -- which used to close the application with a failing code and the only account of it in a log file"
+else
+  bad "G218 a match that breaks ends on a screen: host-left-reason=[$G218A](want THE HOST LEFT THE GAME) joiner-exit=$G218AR(want 0) peer-killed-mid-match=$G218BKILL(want 1) killed-peer-declared-gone=$G218BGONE(want >=1) survivor-verdict=[$G218BV](want WIN) survivor-exit=$G218BR(want 0). A non-zero exit is the shell still treating a broken match as a broken game; an empty host-left reason with a clean exit usually means the check went into the live loop again, which --script never reaches. peer-killed-mid-match=0 means leg B measured nothing at all: the victim reached the end of its own script and left under its own power before the plug was pulled, so the three numbers after it describe an ordinary goodbye and say nothing about the departure machinery -- lengthen gate_netlost_long.txt rather than reading them. $(grep -ahE '^GAMEOVER\||^NETDESYNC' g218a_j.log g218b_h.log 2>/dev/null | head -3 | tr '\n' ' ')"
+fi
+
+# =====================================================================================
+# G219 A GAME YOU CANNOT DISCOVER CAN STILL BE REACHED: the typed address.
+#
+# A broadcast does not leave the building, so the browser can only ever list games on the
+# same network. There is no internet game list and no service to ask, but that was never
+# the same thing as having no way to REACH a game across the internet: somebody who knows
+# where the game is can say so. The INTERNET sub-tab used to be a page that apologised
+# and did nothing; it now carries an address field, and JOIN on that page means that
+# address rather than a row.
+#
+# WHAT THIS DRIVES, and why it is a call and not a screenshot. Everything the field
+# touches is a pure function of the screen's state -- which control is live, which field
+# has the caret, what a string parses to -- and those are answered exactly by asking and
+# badly by looking. --mpaddr asks, with no window, no network and no second process.
+#
+# IT IS NOT VACUOUS, and this is checkable rather than asserted: three of its cases fail
+# on the code as it stood this morning. Backspace did not reach the YOUR NAME prompt at
+# all (the typing and the deleting were two separate lists of fields and had drifted);
+# TAB gave up on the join tab; and choosing INTERNET left the LAN selection standing, so
+# JOIN stayed live and joined a game that was no longer on screen.
+#
+# THE GRAMMAR REFUSES RATHER THAN GUESSES. "host:" and "host:0" are mistakes, and turning
+# a mistake into the default port sends a player to knock on a door they did not name and
+# then tells them nobody answered.
+G219FAIL=""; G219N=0; G219BAD=1
+if [ -x ./cnc3d ]; then
+  ./cnc3d $BASE --mpaddr > /tmp/g219.log 2>&1
+  G219RC=$?
+  cat /tmp/g219.log >> "$OUT"
+  G219N=$(sed -n 's/^MPADDR|done|checks=\([0-9]*\)|.*/\1/p' /tmp/g219.log | head -1)
+  G219BAD=$(sed -n 's/^MPADDR|done|checks=[0-9]*|fails=\([0-9]*\)$/\1/p' /tmp/g219.log | head -1)
+  G219FAIL=$(grep -a '^MPADDR|FAIL|' /tmp/g219.log | head -3 | tr '\n' ' ')
+fi
+# The count is asserted as well as the failures: a case that stops RUNNING stops being
+# asserted, and a suite that cannot tell those two apart is one edit from going quiet.
+# IT ALSO HAS TO BE MAINTAINED, and was not: the rule that ticking INTERNET GAME forces
+# PRIVATE GAME on was reversed, the check that asserted it went with it, and the count fell
+# to one under this floor. The gate went red on main and stayed there, unnoticed among the
+# parked reds, still printing a success sentence describing the rule that had gone. Raise
+# this number in the same edit that adds a case, and re-read the sentence when you do.
+if [ "${G219BAD:-1}" = "0" ] && [ "${G219N:-0}" -ge 52 ] && [ "${G219RC:-1}" = "0" ]; then
+  ok "G219 a game you cannot discover can still be reached: $G219N checks over the typed-address path -- the field is on the INTERNET sub-tab and nowhere else, JOIN is refused until something is typed and live the moment it is, the passcode is offered to a joiner who cannot be shown a padlock, TAB walks the two fields, backspace reaches every field the typing does, choosing INTERNET drops the stale LAN row, the host:port grammar refuses an empty host, a half-typed port, port 0, port 65536, trailing rubbish and an IPv6 literal rather than guessing at any of them, and the two grammars never cross -- a leading '#' is a ROOM CODE and yields an id and no hostname, while the same six letters without one are a hostname and never reach the decoder. Ticking INTERNET GAME does NOT force PRIVATE GAME on, because a game meant to be found by strangers is the ordinary case for a public list and the passcode is for the other one, and it DOES drop any tick left in LIST PUBLICLY, so a choice made about one kind of room cannot put a home address on a public list for a kind the player can no longer see"
+else
+  bad "G219 a game you cannot discover can still be reached: checks=$G219N(want >=52) fails=$G219BAD(want 0) exit=$G219RC(want 0). $G219FAIL"
+fi
+
+# ---------------------------------------------------------------------------
+# G220 THE SEA KNOWS WHERE ITS COAST IS. Under ENHANCED the water is no
+# longer the cartridge's two tiles slid as one sheet: game/water_mod.h builds a signed
+# distance field to the coast out of the terrain art's own alpha holes, pushes the tiles
+# along a flow that turns shoreward, and breaks foam along the coast and around every rock
+# standing in the sea. Three claims, one run on the first GDI mission's beach:
+#   (1) the field was built from the ART, not from cells: the loader line reports at
+#       least 500 shore texels (a cell-resolution coast on this frame would give ~130);
+#   (2) the pass draws SOMETHING, and only on the sea: the sea window differs between
+#       water_fx 0 and 1 by thousands of pixels while the grass window above the beach,
+#       which the opaque terrain pass draws last, is untouched;
+#   (3) it is deterministic: a second run of the water_fx 1 shot has the same digest.
+# The water_fx 0 arm is the cartridge's pass through the same binary, which is the trap:
+# every other gate that shoots a sea does so with the chain OFF and never sees this.
+# =====================================================================================
+cat > /tmp/g217.txt <<'G220EOF'
+tick 20
+gfx water_fx 0
+shot shots/g217_off.png
+gfx water_fx 1
+shot shots/g217_on.png
+quit
+G220EOF
+cat > /tmp/g217b.txt <<'G220EOF'
+tick 20
+shot shots/g217_on2.png
+quit
+G220EOF
+gbegin shots/g217_off.png shots/g217_on.png shots/g217_on2.png shots/g217.log shots/g217b.log
+grun shots/g217.log  --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g217.txt --gfx
+grun shots/g217b.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g217b.txt --gfx
+gshots shots/g217_off.png shots/g217_on.png shots/g217_on2.png
+G220SHORE=$(sed -n 's/^WATER|field|.*|shore_texels=\([0-9]*\)|.*/\1/p' shots/g217.log | head -1)
+G220R="0 0"
+if [ "$GRC" = "0" ]; then
+  G220R=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+a = np.asarray(Image.open('shots/g217_off.png').convert('RGB')).astype(int)
+b = np.asarray(Image.open('shots/g217_on.png').convert('RGB')).astype(int)
+d = np.abs(a - b).sum(axis=2) > 24
+print(int(d[300:620, 0:940].sum()), int(d[40:220, 0:940].sum()))
+PY
+)
+fi
+set -- $G220R
+G220SEA="$1"; G220LAND="$2"
+G220SAME=0
+if [ -s shots/g217_on.png ] && [ -s shots/g217_on2.png ] && cmp -s shots/g217_on.png shots/g217_on2.png; then
+  G220SAME=1
+fi
+if [ "$GRC" = "0" ] && [ "${G220SHORE:-0}" -ge 500 ] && [ "${G220SEA:-0}" -ge 20000 ] \
+   && [ "${G220LAND:-1}" -le 50 ] && [ "$G220SAME" = "1" ]; then
+  ok "G220 the sea knows where its coast is: $G220SHORE shore texels off the art, $G220SEA sea pixels change with the pass and $G220LAND on the grass, two runs one digest"
+else
+  bad "G220 the sea knows where its coast is: shore_texels=${G220SHORE:-none}(want >=500) sea=${G220SEA}(want >=20000) land=${G220LAND}(want <=50) same=$G220SAME GRC=$GRC"
+fi
+
+# ---------------------------------------------------------------------------
+# G221 THE MAP'S EDGE RING IS SHROUD THAT NOTHING LIFTS. The outermost
+# ring of cells OUTSIDE the file's [MAP] rectangle (the off-map border the engine itself refuses), and everything beyond it, is HIDDEN before any
+# switch is asked: not the shroud switch, not --noshroud, not a revealed map. Shot from
+# the rectangle's own corner with --noshroud, so the shroud proper is OUT of play: the
+# corner cell reports HIDDEN and the cell inside it CLEAR, and the black in the world
+# window must FALL by a large amount when the rim is switched off in the same run
+# (rim 0, the trap), because everything the rim covered is drawn terrain underneath.
+# =====================================================================================
+cat > /tmp/g218.txt <<'G221EOF'
+cam 0 0
+tick 20
+shroudat 35 38
+shroudat 36 39
+shot shots/g218_on.png
+rim 0
+shot shots/g218_off.png
+quit
+G221EOF
+gbegin shots/g218_on.png shots/g218_off.png shots/g218.log
+grun shots/g218.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g218.txt
+gshots shots/g218_on.png shots/g218_off.png
+G221CORNER=$(sed -n 's/^SHROUDAT|35,38|\(.*\)$/\1/p' shots/g218.log | head -1)
+G221INNER=$(sed -n 's/^SHROUDAT|36,39|\(.*\)$/\1/p' shots/g218.log | head -1)
+G221R="0 0"
+if [ "$GRC" = "0" ]; then
+  G221R=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+a = np.asarray(Image.open('shots/g218_on.png').convert('RGB')).astype(int)
+b = np.asarray(Image.open('shots/g218_off.png').convert('RGB')).astype(int)
+blk = lambda x: int((x[40:780, 0:940].max(axis=2) < 10).sum())
+print(blk(a), blk(b))
+PY
+)
+fi
+set -- $G221R
+G221ON="$1"; G221OFF="$2"
+if [ "$GRC" = "0" ] && [ "$G221CORNER" = "HIDDEN" ] && [ "$G221INNER" = "CLEAR" ] \
+   && [ $((G221ON - G221OFF)) -ge 100000 ]; then
+  ok "G221 the map's edge ring is shroud that nothing lifts: with --noshroud the corner cell is HIDDEN and its inner neighbour CLEAR, and the black in the world window falls from $G221ON to $G221OFF px when the rim is switched off"
+else
+  bad "G221 the map's edge ring is shroud that nothing lifts: corner=[$G221CORNER](want HIDDEN) inner=[$G221INNER](want CLEAR) black on=$G221ON off=$G221OFF (want a fall >= 100000) GRC=$GRC"
+fi
+
+# =====================================================================================
+# G222 THE WAVE STEP LEAVES THE WORLD'S STATE ALONE. water_wave_sim runs in
+# the MIDDLE of the world pass and reaches fx_fullscreen_quad, which disables the depth
+# test, blend, the alpha test and culling and restores NONE of them. It steps only on
+# the frames the engine ticked, so at sixty drawn frames against a fifteen-hertz brain
+# one frame in four was drawn with no depth test at all, and every soft shadow strobed.
+# Nothing else in the suite renders two phases of ONE tick, which is why it went unseen.
+#
+# TWO CAMERAS, AND THE SECOND ONE IS THE TRAP. At the scenario start the sea is in
+# frame, so the stepped and un-stepped phases MUST differ there -- a run where they do
+# not is a run where the sim never stepped and the whole gate would be vacuous. Inland
+# at 32,32 there is no sea in frame at all, so the same two phases must be the SAME
+# picture: anything that moves there is the sim reaching past its own target.
+# =====================================================================================
+cat > /tmp/g222.txt <<'G222EOF'
+tick 60
+smoothmove 1
+tick 1
+tickalpha 0
+shot shots/g222_warm.png
+tick 1
+tickalpha 0
+shot shots/g222_sea_tick.png
+tickalpha 0.5
+shot shots/g222_sea_sub.png
+cam 32 32
+tick 1
+tickalpha 0
+shot shots/g222_warm2.png
+tick 1
+tickalpha 0
+shot shots/g222_land_tick.png
+tickalpha 0.5
+shot shots/g222_land_sub.png
+quit
+G222EOF
+gbegin shots/g222_sea_tick.png shots/g222_sea_sub.png shots/g222_land_tick.png \
+       shots/g222_land_sub.png shots/g222.log
+grun shots/g222.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g222.txt --gfx
+gshots shots/g222_sea_tick.png shots/g222_sea_sub.png shots/g222_land_tick.png \
+       shots/g222_land_sub.png
+G222FIELD=$(sed -n 's/^WATER|field|.*|wet_texels=\([0-9]*\)|.*/\1/p' shots/g222.log | head -1)
+G222R="-1 -1"
+if [ "$GRC" = "0" ]; then
+  G222R=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def diff(x, y):
+    a = np.asarray(Image.open(x).convert('RGB')).astype(int)
+    b = np.asarray(Image.open(y).convert('RGB')).astype(int)
+    return int((np.abs(a - b).sum(axis=2) > 24).sum())
+print(diff('shots/g222_land_tick.png', 'shots/g222_land_sub.png'),
+      diff('shots/g222_sea_tick.png',  'shots/g222_sea_sub.png'))
+PY
+)
+fi
+set -- $G222R
+G222LAND="$1"; G222SEA="$2"
+if [ "$GRC" = "0" ] && [ "${G222LAND:-99999}" -le 50 ] && [ "${G222SEA:-0}" -ge 1000 ] \
+   && [ "${G222FIELD:-0}" -ge 1000 ]; then
+  ok "G222 the wave step leaves the world's state alone: inland the stepped and un-stepped phases of one tick differ by $G222LAND px, over a sea that moved $G222SEA px in the same run and a field of $G222FIELD wet texels"
+else
+  bad "G222 the wave step leaves the world's state alone: inland=${G222LAND}(want <=50) sea=${G222SEA}(want >=1000, else vacuous) wet_texels=${G222FIELD}(want >=1000) GRC=$GRC"
+fi
+
+# =====================================================================================
+# G223 THE LEAFY TREES PLAY THE RIG THEY WERE MADE WITH, AND THE CACTI ARE STILL CACTI
+#. Two things this gate holds down, and both of them have already gone
+# wrong once.
+#
+# THE RIG. Every one of the pack's sixteen models ships an armature and a hundred keys of
+# authored sway, and the pack now carries twenty of those keys per model plus a bone pair
+# and a weight per vertex. The shader skins the vertex against a palette uploaded per
+# tree. If the palette upload, the client array on texture unit one, or the uniform array
+# quietly fails, NOTHING SAYS SO: the skinning falls back to the bind pose and the tree
+# still draws, correctly lit, perfectly still. glTexCoordPointer already refuses
+# GL_UNSIGNED_BYTE this way, with GL_INVALID_ENUM and no visible effect. So the gate
+# toggles tree3d_anim at ONE tick and requires the picture to change: same frame, same
+# clock, only the rig different.
+#
+# AND IT MUST NOT CHANGE WHEN NOTHING CHANGED. The third shot puts the dial back to nought
+# and must reproduce the first EXACTLY. That is what stops the first test passing on a
+# frame that merely moved on its own, and it is the same determinism the shot digests
+# depend on.
+#
+# THE CACTI. tree3d_is_tree matches T01..T18 on the name, and T04 and T09 are CACTI on
+# desert maps, kept deliberately as the cartridge's own model, so neither is in the
+# pack's name map. The first build claimed them anyway and fell through to a hash: a
+# random one of sixteen temperate species grew in the sand, on 61 cells across eight
+# campaign scenarios, and nothing in the picture said it was a fallback. So the gate
+# stands at a T04 and requires tree3d on and tree3d off to be the SAME PICTURE.
+#
+# A SAME PICTURE IS ALSO WHAT AN EMPTY FRAME GIVES, so the T04 is proven to be in it:
+# drawpos must report the map's one T04 on cell 18,45, and probecell must project that
+# cell onto the frame the cactus shots were taken with. The T08 half is shot from a
+# DIFFERENT camera and cannot prove that; what it does prove is that the tree setting
+# changes a leafy tree, so a pack that failed to load cannot pass as a cactus left alone.
+# Not covered: a cactus that stands in the frame and draws in neither shot.
+# =====================================================================================
+cat > /tmp/g223.txt <<'G223EOF'
+cam 18 45
+zoom max
+tick 12
+gfx tree3d 1
+shot shots/g223_cac_on.png
+gfx tree3d 0
+shot shots/g223_cac_off.png
+drawpos T04 0
+probecell 18 45
+gfx tree3d 1
+cam 23 16
+shot shots/g223_tree_on.png
+gfx tree3d 0
+shot shots/g223_tree_off.png
+gfx tree3d 1
+gfx tree3d_anim 0
+shot shots/g223_rig_off.png
+gfx tree3d_anim 2.5
+shot shots/g223_rig_on.png
+gfx tree3d_anim 0
+shot shots/g223_rig_off2.png
+quit
+G223EOF
+gbegin shots/g223_cac_on.png shots/g223_cac_off.png shots/g223_tree_on.png \
+       shots/g223_tree_off.png shots/g223_rig_off.png shots/g223_rig_on.png \
+       shots/g223_rig_off2.png shots/g223.log
+grun shots/g223.log --noshroud --scen SCB22EB --pack SCB22EB.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g223.txt --enhanced
+gshots shots/g223_cac_on.png shots/g223_cac_off.png shots/g223_tree_on.png \
+       shots/g223_tree_off.png shots/g223_rig_off.png shots/g223_rig_on.png \
+       shots/g223_rig_off2.png
+G223RIGGED=$(sed -n 's/^trees: tree3d.pack v4 -- \([0-9]*\) model.*/\1/p' shots/g223.log | head -1)
+# THE CACTUS IS PROVEN TO BE IN ITS OWN FRAME, not assumed. drawpos says where the map's
+# one T04 stands, and it must stand on cell 18,45; probecell projects that cell's centre
+# through the camera of the cactus shots, and the point must land on the 1280x800 frame.
+# Without both, "the pack changes 0 px at a T04" is also what bare ground reports.
+G223T04=$(sed -n 's/^DRAWPOS|T04|[0-9]*|ex=\([-0-9.]*\)|ez=\([-0-9.]*\)|.*/\1 \2/p' shots/g223.log | head -1)
+G223AT=$(sed -n 's/^PROBE|at=\([-0-9.]*\),\([-0-9.]*\)|.*/\1 \2/p' shots/g223.log | head -1)
+G223INFRAME=$(echo "$G223T04 $G223AT" | awk 'NF == 4 { print (int($1) == 18 && int($2) == 45 && $3 >= 0 && $3 < 1280 && $4 >= 0 && $4 < 800) ? 1 : 0; next } { print 0 }')
+G223R="-1 -1 -1 -1"
+if [ "$GRC" = "0" ]; then
+  G223R=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def diff(x, y):
+    a = np.asarray(Image.open(x).convert('RGB')).astype(int)
+    b = np.asarray(Image.open(y).convert('RGB')).astype(int)
+    return int((np.abs(a - b).sum(axis=2) > 24).sum())
+print(diff('shots/g223_cac_on.png',  'shots/g223_cac_off.png'),
+      diff('shots/g223_tree_on.png', 'shots/g223_tree_off.png'),
+      diff('shots/g223_rig_off.png', 'shots/g223_rig_on.png'),
+      diff('shots/g223_rig_off.png', 'shots/g223_rig_off2.png'))
+PY
+)
+fi
+set -- $G223R
+G223CAC="$1"; G223TREE="$2"; G223RIG="$3"; G223SAME="$4"
+if [ -z "$G223T04" ]; then
+  bad "G223 the leafy trees play their rig and the cacti are still cacti: the run printed no DRAWPOS line for a T04 ($(grep -a -m1 '^DRAWPOS|MISSING' shots/g223.log 2>/dev/null) exit $GRC), so no cactus was shown to stand where the cactus frame is shot, and a 0 px change there is what bare ground reports"
+elif [ "$G223INFRAME" != "1" ]; then
+  bad "G223 the leafy trees play their rig and the cacti are still cacti: the T04 stands at ${G223T04} (want cell 18,45) and cell 18,45 projects to ${G223AT:-nothing} through the cactus shots' camera (want inside 1280x800), so the cactus is not in its own frame and a 0 px change there proves nothing about it"
+elif [ "$GRC" = "0" ] && [ "${G223CAC:--1}" = "0" ] && [ "${G223TREE:-0}" -ge 5000 ] \
+   && [ "${G223RIG:-0}" -ge 3000 ] && [ "${G223SAME:--1}" = "0" ]; then
+  ok "G223 the leafy trees play their rig and the cacti are still cacti: at a T04 standing on cell 18,45 inside its frame (projected to $G223AT) the pack changes $G223CAC px, at a T08 on the same map it changes $G223TREE, the authored sway moves $G223RIG px of one frame at one tick, and putting the dial back reproduces that frame to $G223SAME px, over ${G223RIGGED:-?} models"
+else
+  bad "G223 the leafy trees play their rig and the cacti are still cacti: cactus=${G223CAC}(want 0, else an unmapped name is drawing a hash-picked species) mapped=${G223TREE}(want >=5000, else the first number is vacuous) rig=${G223RIG}(want >=3000, else the skin never reached the shader) reproduce=${G223SAME}(want 0) GRC=$GRC"
+fi
+
+# ---------------------------------------------------------------------------
+# G224 THE GRASS STANDS, THE CLEARANCE CLEARS, AND NEITHER REACHES THE UI.
+#
+# Under ENHANCED the ground grows real blades: game/grass_bake.h reads WHERE from the
+# CARTRIDGE atlas per texel and puts every blade in the map into one static vertex buffer
+# built at load and never rewritten; game/grass_field.h keeps what the battle has done to
+# the ground; game/grass_draw.h draws it, alpha blended, DEPTH WRITES OFF.
+#
+# WHAT THIS GATE ASSERTS, AND WHAT IT DELIBERATELY DOES NOT.
+#
+# The design's stated reason for the clearance is that a blade overlapping an object
+# silhouette lands on a pixel whose ground-normal alpha is 0, where the ground's one-sun
+# lambert is skipped and the occlusion weight doubles, ringing every building and every
+# hull with a dark halo one blade tall. AN EARLIER FORM OF THIS GATE ASSERTED THAT HALO
+# AS A TWENTYFOLD DIFFERENTIAL AND IT IS NOT THERE. Measured on this map and camera at
+# 1280x800, holding the blade at the top of its range (0.30 cells) and moving ONLY the
+# clearance: pixels more than 60 luma darker than the grass-off frame are 679 with the
+# clearance off and 619 with it on. That is a ratio of 1.10, not 20. Nearly all of that
+# darkening is the blade's own root shading over ground, not a halo. At the shipped blade
+# height of 0.20 the frame sits 275 px darker than bare ground, which is what arm 3 has a
+# ceiling on.
+#
+# So the halo is real in principle and negligible at this scale, and a gate that demanded
+# a large one would have to be given a threshold no build can reach. What IS asserted is
+# the thing that can actually break, and the thing that DID break: the clearance must
+# CHANGE THE PICTURE. A cover channel that is never stamped changes nothing, and that is
+# not hypothetical. The per-tick observer was written guarded on a flag that is only ever
+# true inside the world pass, so it recorded nothing on every tick of every mission, the
+# queue was empty on every drawn frame, and tread marks, building cover, regrowth and the
+# shroud channel all silently did not exist while the grass drew perfectly. This arm is
+# what notices that. Measured: the clearance moves 596 px at the shipped blade height and
+# 3122 at 0.30.
+#
+# SIX CLAIMS:
+#   (1) it draws, and it stops at the sidebar;
+#   (2) the clearance changes the picture, which is the cover channel proving it is alive;
+#   (3) the shipped configuration's darkening against bare ground stays small, which is
+#       the halo claim stated as what it actually is;
+#   (4) a --texset flip repaints the grass and NEVER rebuilds the mask. At zero tolerance
+#       the 1995 DOS sheet's CLEAR1 palette already matches 73.4% of its own ROAD texels,
+#       so a mask rebuilt from it carpets every road in grass. One mask line, one vbo
+#       line, two or more colour lines;
+#   (5) two runs of ONE script give one digest, which is the determinism the rest of the
+#       suite rests on;
+#   (6) switching the grass on mid-run and giving it ONE engine tick reproduces, byte for
+#       byte, the frame of a run that had it on all along.
+#
+# (5) AND (6) USED TO BE ONE COMPARISON AND IT WAS NOT EITHER OF THEM. The determinism arm
+# ran the main script once and a SECOND, DIFFERENT script once, then asked for one digest
+# off the two. The scripts differ in the thing this gate is most about: the main one holds
+# the grass OFF across the ticks and switches it on in the tick it photographs, so the
+# per-tick observer recorded nothing and the cover channel is empty in that frame; the
+# other had the grass on for all forty ticks, so the blades are cleared from under the
+# hulls. Both frames are correct. They are not the same frame, and the difference is 2798
+# px at 1280x800 on this map and camera, in two patches, every one of them a blade standing
+# through one of the three vehicles in shot.
+#
+# The old arm therefore reported a determinism failure that did not exist, and it could
+# not do the job either way: measured against a build with a wall-clock term deliberately
+# added to the grass wind, it reported exactly what it reported against the good build.
+# Red on both is not a test. The arm is now the claim it always said it was, two runs of
+# ONE script, which is IDENTICAL on the good build and DIFFERENT on that broken one; and
+# the thing the old pairing was accidentally asking, which is worth asking, is asked
+# properly by (6), with the extra tick the field's own contract requires.
+#
+# THE FIELD IS CORRECT FROM THE TICK AFTER, NEVER IN THE TICK ITSELF. A switched-off field
+# is a cleared one (game/grass_field.h says so at the observer's guard), so the frame drawn
+# in the same tick the feature is switched on has no cover in it at all. One tick later it
+# is indistinguishable from a run that never had it off. That is what (6) measures, and it
+# is why (5) may not be built out of two scripts that switch the feature on at different
+# points in the run.
+#
+# THE MAP IS TEMPERATE AND HAS A BASE ON IT, and both halves matter. Grass is refused on
+# DESERT outright, that theatre's CLEAR1 bank measuring 0.0182 BELOW neutral in green
+# fraction against a gate of 0.08, and desert is 31 of the 60 shipped missions, so a
+# desert map here would measure nothing at all. And the clearance has nothing to clear
+# without structures and hulls in frame.
+#
+# THE CLEARANCE DIAL IS SET BEFORE THE TICKS, NEVER AFTER. The cover channel is written
+# by the per-tick observer and replayed on a drawn frame, so a script that moves the dial
+# and shoots immediately photographs the previous value and reports no difference.
+# =====================================================================================
+cat > /tmp/g224.txt <<'G224EOF'
+gfx grass 0
+cam 15 12
+tick 40
+shot shots/g224_off.png
+gfx grass 1
+shot shots/g224_on.png
+quit
+G224EOF
+# THE SECOND RUN IS THE SAME SCRIPT, line for line, and only the file names differ. That
+# is what makes the digest comparison a statement about the binary rather than about two
+# scripts. The settle shot on the end is claim (6)'s half of the pair: one engine tick
+# after the switch, which is when the field is defined.
+cat > /tmp/g224b.txt <<'G224EOF'
+gfx grass 0
+cam 15 12
+tick 40
+shot shots/g224_off2.png
+gfx grass 1
+shot shots/g224_on2.png
+tick 1
+shot shots/g224_settle.png
+quit
+G224EOF
+# and claim (6)'s other half: the grass on from the first tick, one tick further on, so
+# the two frames stand at the same engine frame with the same forty-one ticks behind them.
+cat > /tmp/g224c.txt <<'G224EOF'
+gfx grass 1
+cam 15 12
+tick 41
+shot shots/g224_along.png
+quit
+G224EOF
+# The two clearance legs, at the TOP of the height range so the effect is well above the
+# noise, and each with the dial set before the ticks that stamp the field.
+cat > /tmp/g224sk0.txt <<'G224EOF'
+gfx grass 1
+gfx grass_height 0.30
+gfx crush_skirt 0
+cam 15 12
+tick 40
+shot shots/g224_noskirt.png
+quit
+G224EOF
+cat > /tmp/g224sk1.txt <<'G224EOF'
+gfx grass 1
+gfx grass_height 0.30
+gfx crush_skirt 1
+cam 15 12
+tick 40
+shot shots/g224_skirt.png
+quit
+G224EOF
+# THE TEXSET LEG IS ITS OWN RUN, because it has to see the bake's first line and then a
+# flip, and the mask line is printed once per BAKE rather than once per frame.
+# THE TEXSET LEG PUTS THE GRASS BACK BY HAND after each flip to the cartridge sheet,
+# because choosing that sheet switches the feature off: it is tuned against the 1995 bank
+# and says so. Turning it on again over the cartridge art is a deliberate override and the
+# code allows it, which is exactly what this leg needs in order to make the bake read a
+# SECOND atlas and prove the mask did not move with it.
+cat > /tmp/g224t.txt <<'G224EOF'
+cam 15 12
+tick 10
+gfx grass 1
+shot shots/g224_tex0.png
+gfx texset 0
+gfx grass 1
+shot shots/g224_tex1.png
+gfx texset 1
+shot shots/g224_tex2.png
+quit
+G224EOF
+gbegin shots/g224_off.png shots/g224_on.png shots/g224_noskirt.png shots/g224_skirt.png \
+       shots/g224_off2.png shots/g224_on2.png shots/g224_settle.png shots/g224_along.png \
+       shots/g224_tex0.png shots/g224_tex1.png shots/g224_tex2.png \
+       shots/g224.log shots/g224b.log shots/g224c.log shots/g224t.log \
+       shots/g224sk0.log shots/g224sk1.log
+grun shots/g224.log    --noshroud --scen SCG07EA --pack SCG07EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g224.txt --enhanced
+grun shots/g224b.log   --noshroud --scen SCG07EA --pack SCG07EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g224b.txt --enhanced
+grun shots/g224c.log   --noshroud --scen SCG07EA --pack SCG07EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g224c.txt --enhanced
+grun shots/g224sk0.log --noshroud --scen SCG07EA --pack SCG07EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g224sk0.txt --enhanced
+grun shots/g224sk1.log --noshroud --scen SCG07EA --pack SCG07EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g224sk1.txt --enhanced
+grun shots/g224t.log   --noshroud --scen SCG07EA --pack SCG07EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g224t.txt --enhanced
+gshots shots/g224_off.png shots/g224_on.png shots/g224_noskirt.png shots/g224_skirt.png \
+       shots/g224_off2.png shots/g224_on2.png shots/g224_settle.png shots/g224_along.png
+
+# The bake's own report. skirt= is the band the LOAD measured, in cells; the draw's live
+# band is height*(1+vary)*1.35/tan(pitch) and must fit inside it. A number below that
+# means somebody widened a dial range without moving the bake's ceiling, and the draw
+# then clamps and says so on stderr.
+G224MASK=$(grep -c '^GRASS|mask|'   shots/g224t.log)
+G224COL=$(grep -c  '^GRASS|colour|' shots/g224t.log)
+G224VBO=$(grep -c  '^GRASS|vbo|'    shots/g224t.log)
+G224BLADES=$(sed -n 's/^GRASS|vbo|.*|blades=\([0-9]*\)|.*/\1/p' shots/g224.log | head -1)
+G224SKIRT=$(sed -n 's/^GRASS|mask|.*|skirt=\([0-9.]*\) cells.*/\1/p' shots/g224.log | head -1)
+G224DREW=$(grep -c '^GRASS|draw|' shots/g224.log)
+G224R="0 0 0 0 0"
+if [ "$GRC" = "0" ]; then
+  G224R=$(python3 - <<'G224PY'
+import numpy as np
+from PIL import Image
+def luma(p):
+    a = np.asarray(Image.open(p).convert('RGB')).astype(int)
+    return (a[:,:,0]*299 + a[:,:,1]*587 + a[:,:,2]*114) // 1000, a
+loff, aoff = luma('shots/g224_off.png')
+lon,  aon  = luma('shots/g224_on.png')
+lns,  ans  = luma('shots/g224_noskirt.png')
+lsk,  ask  = luma('shots/g224_skirt.png')
+changed  = int((np.abs(aon - aoff).sum(axis=2) > 24).sum())
+sidebar  = int((np.abs(aon - aoff)[:, -150:].sum(axis=2) > 24).sum())
+# (2) the clearance must MOVE the picture. Zero is a cover channel that never got stamped.
+clear_px = int((np.abs(ask - ans).sum(axis=2) > 8).sum())
+# (3) and the shipped configuration must stay a long way from ringing the frame in black.
+dark0 = int(((loff - lns) > 60).sum())
+dark1 = int(((loff - lon) > 60).sum())
+print(changed, sidebar, clear_px, dark0, dark1)
+G224PY
+)
+fi
+set -- $G224R
+G224CHG="$1"; G224SB="$2"; G224CLR="$3"; G224D0="$4"; G224D1="$5"
+# (5) THE SAME SCRIPT, TWICE, AND BOTH OF ITS PICTURES. The off frames are compared too
+# and they cost nothing, but they cannot carry this arm on their own: a fault in the grass
+# pass leaves a grass-off frame byte identical, which is exactly what a build with a
+# wall-clock term in the grass wind does.
+G224SAME=0
+if [ -s shots/g224_on.png ] && [ -s shots/g224_on2.png ] \
+   && [ -s shots/g224_off.png ] && [ -s shots/g224_off2.png ] \
+   && cmp -s shots/g224_on.png shots/g224_on2.png \
+   && cmp -s shots/g224_off.png shots/g224_off2.png; then G224SAME=1; fi
+# (6) AND THE FIELD IS RIGHT ONE TICK AFTER THE SWITCH, not in the tick of it.
+G224SETTLE=0
+if [ -s shots/g224_settle.png ] && [ -s shots/g224_along.png ] \
+   && cmp -s shots/g224_settle.png shots/g224_along.png; then G224SETTLE=1; fi
+
+if [ "$GRC" = "0" ] && [ "${G224CHG:-0}" -ge 8000 ] && [ "${G224SB:-1}" -eq 0 ] \
+   && [ "${G224CLR:-0}" -ge 200 ] && [ "${G224D1:-999999}" -le 500 ] \
+   && [ "${G224MASK:-0}" -eq 1 ] && [ "${G224VBO:-0}" -eq 1 ] && [ "${G224COL:-0}" -ge 2 ] \
+   && [ "${G224SAME}" = "1" ] && [ "${G224SETTLE}" = "1" ] && [ "${G224DREW:-0}" -ge 1 ]; then
+  ok "G224 the grass stands and the clearance clears: ${G224BLADES:-?} blades from one static buffer change $G224CHG px and $G224SB of the sidebar; moving the clearance at a 0.30 blade moves $G224CLR px, which is the cover channel proving it is stamped at all; the shipped frame sits $G224D1 px darker than bare ground against $G224D0 with the clearance off; a texset flip gives $G224MASK mask, $G224VBO vbo and $G224COL colour builds; two runs of one script give one digest for both its frames; a tick after the switch the field matches a run that never had it off; baked skirt ${G224SKIRT:-?} cells"
+else
+  bad "G224 the grass stands and the clearance clears: changed=${G224CHG}(want >=8000; measured 38016 at the shipped 0.20 blade) sidebar=${G224SB}(want 0, else the pass is reaching the UI) clearance-moves=${G224CLR}(want >=200; measured 3122 at a 0.30 blade. ZERO IS THE STATE THIS ARM EXISTS FOR: it means the cover channel was never stamped, which is what a per-tick observer guarded on a draw-time flag does, and the grass will still look perfect) shipped-darkening=${G224D1}(want <=500; measured 275 at the shipped 0.20 blade, against ${G224D0} with the clearance off. This is NOT a twentyfold halo test and must not be turned back into one: the halo the clearance exists to prevent measures 679 against 619 at a 0.30 blade, a ratio of 1.10) mask-builds=${G224MASK}(want exactly 1; 2 means a texset flip rebuilt the mask off the DOS sheet and every road is now grass) vbo-builds=${G224VBO}(want 1) colour-builds=${G224COL}(want >=2) drew=${G224DREW}(want >=1) same=${G224SAME}(want 1: ONE script run twice, both frames. It may never be built from two scripts that switch the grass on at different points, which is what it was and what made it report a failure that was not there) settle=${G224SETTLE}(want 1: switched on late plus one tick must equal on all along) skirt=${G224SKIRT:-none} GRC=$GRC"
+fi
+
+# =====================================================================================
+# G225 THE RAIN FALLS ON THE WORLD AND NOWHERE ELSE. Under ENHANCED game/rain_mod.h draws
+# streaks in the air, wets every surface the light pass shades and drops rain into the
+# wave field; rain_fx 0 sets every one of its uniforms to zero and draws not one quad,
+# which is the trap. Four claims, one beach, the sea in frame so the water is exercised:
+#   (1) the pass is LIVE: the renderer logs a RAIN|on line when it first draws;
+#   (2) it draws SOMETHING, and only in the world: the world window differs between
+#       rain_fx 0 and 1 by thousands of pixels while the sidebar is untouched -- and
+#       "untouched" means EXACTLY ZERO pixels, not a small allowance. The world's own
+#       viewport ends at x=960 in this frame and the change measures zero from there
+#       rightward, so the allowance an earlier draft carried was hiding twenty columns
+#       of WORLD inside the window it called the sidebar;
+#   (3) it MOVES, AND THE MOVEMENT IS THE RAIN'S. Two sub-tick phases of one tick are
+#       shot with the rain off and again with it on, and the ON pair must move MORE.
+#       The difference is what the streaks add. Taking the on pair alone does not
+#       work and the first draft of this gate did exactly that: the sea in the same
+#       window pans on the engine clock whatever the rain is doing, and G222 requires
+#       that same rain-off pair to move at least 1000 px as its own vacuity guard, so
+#       twice G225's threshold was already met before a single streak was drawn. It
+#       was proven rather than argued: with the streak count dialled to nothing the
+#       old check still read 7070 moving pixels and scored green;
+#   (4) it is deterministic: a second run of the rain_fx 1 shot has the same digest.
+# The compiled default is rain_fx 0, so no other gate ever sees this; the `gfx` verb
+# turns it on here the way G220 turns the sea on.
+# =====================================================================================
+cat > /tmp/g225.txt <<'G223EOF'
+tick 20
+smoothmove 1
+tick 1
+tickalpha 0
+gfx rain_fx 0
+shot shots/g225_off.png
+tickalpha 0.5
+shot shots/g225_off_sub.png
+tickalpha 0
+gfx rain_fx 1
+shot shots/g225_on.png
+tickalpha 0.5
+shot shots/g225_sub.png
+quit
+G223EOF
+cat > /tmp/g223b.txt <<'G223EOF'
+tick 20
+smoothmove 1
+tick 1
+tickalpha 0
+gfx rain_fx 1
+shot shots/g225_on2.png
+quit
+G223EOF
+gbegin shots/g225_off.png shots/g225_off_sub.png shots/g225_on.png shots/g225_sub.png \
+       shots/g225_on2.png shots/g225.log shots/g223b.log
+grun shots/g225.log  --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g225.txt --gfx
+grun shots/g223b.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g223b.txt --gfx
+gshots shots/g225_off.png shots/g225_off_sub.png shots/g225_on.png shots/g225_sub.png \
+       shots/g225_on2.png
+G223LIVE=$(grep -c '^RAIN|on|' shots/g225.log)
+G223R="0 0 0"
+if [ "$GRC" = "0" ]; then
+  G223R=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def load(x): return np.asarray(Image.open(x).convert('RGB')).astype(int)
+off, on, sub = load('shots/g225_off.png'), load('shots/g225_on.png'), load('shots/g225_sub.png')
+offsub = load('shots/g225_off_sub.png')
+d = np.abs(off - on).sum(axis=2) > 24
+m = np.abs(on - sub).sum(axis=2) > 24
+mo = np.abs(off - offsub).sum(axis=2) > 24
+print(int(d[40:780, 0:940].sum()), int(d[0:800, 960:1280].sum()),
+      int(m[40:780, 0:940].sum()) - int(mo[40:780, 0:940].sum()))
+PY
+)
+fi
+set -- $G223R
+G223WORLD="$1"; G223BAR="$2"; G223MOVE="$3"   # MOVE is what the rain ADDS, sea subtracted
+G223SAME=0
+if [ -s shots/g225_on.png ] && [ -s shots/g225_on2.png ] && cmp -s shots/g225_on.png shots/g225_on2.png; then
+  G223SAME=1
+fi
+if [ "$GRC" = "0" ] && [ "${G223LIVE:-0}" -ge 1 ] && [ "${G223WORLD:-0}" -ge 20000 ] \
+   && [ "${G223BAR:-1}" = "0" ] && [ "${G223MOVE:-0}" -ge 500 ] && [ "$G223SAME" = "1" ]; then
+  ok "G225 the rain falls on the world and nowhere else: $G223WORLD world pixels change with the rain and $G223BAR beyond the world's own edge, $G223MOVE more pixels move between two phases of one tick than move with the rain off, two runs one digest"
+else
+  bad "G225 the rain falls on the world and nowhere else: live=${G223LIVE}(want >=1) world=${G223WORLD}(want >=20000) sidebar=${G223BAR}(want 0) move_added=${G223MOVE}(want >=500) same=$G223SAME GRC=$GRC"
+fi
+
+# =====================================================================================
+# G226 EVERY PART OF THE RAIN IS ALIVE, ONE TERM AT A TIME. G225 proves the rain draws
+# and that the streaks move. It proves nothing else, and that was measured rather than
+# assumed: with the rain on, each of its visual terms was switched off in turn
+# and G225 was re-scored. It stayed GREEN for thirteen of them. Its world arm wants
+# 20000 changed pixels and a real frame gives 432983, so the overcast alone clears it
+# and every other term can be dead behind that margin; its movement arm only ever
+# watched the streaks. Switching off the wave-field drops changed the G225 frame by
+# ZERO pixels, because that script never ticks between shots and the field only steps
+# on a drawn frame that follows a tick, so the drops had never rung by the time it shot.
+#
+# So this gate asks each term for itself. One run sets a MEASURING preset -- every rain
+# intensity turned up, deliberately NOT the shipped look, because what is being proved
+# is that each term is wired and paints when asked, not that its shipped value is right;
+# the look is not a gate -- then switches ONE term off, shoots, switches it back on, and
+# moves to the next. Each frame is compared against the same reference. A term that is
+# dead in the shader, or whose uniform never reaches it, moves nothing and its arm goes
+# red. That is the negative control built into the gate rather than run beside it.
+#
+# ONE AT A TIME, not cumulatively, and that is not a style choice. A cumulative ladder
+# cannot measure two terms that only exist through each other: the derived relief bends
+# only the WET normal, which is read by the glint, the sheen and the ring shading, so
+# whichever of them is switched off first takes the other's measurement with it. Killed
+# after them, the relief moved exactly 0 pixels, and that arm would have been the
+# self-flattering kind this branch has already shipped once.
+#
+# THE ORDER OF THE FRAMES CANNOT MATTER, and that was checked rather than assumed: with
+# no tick between them, consecutive shots are byte identical even with the sea alive, so
+# the reference and every term frame stand at the same instant. The restores are checked
+# too, by shooting the reference a second time after all fourteen and requiring the two
+# files to be the same.
+#
+# THE FLOORS are a quarter of what each term actually measures here, so a term that has
+# gone quiet trips it long before a driver difference could. Measured, world window,
+# pixels differing by more than 24: screen-space puddle reflection 34804, puddle mirror
+# 58476, puddles 221268, glint 249460, sheen 135713, impact rings 112930, derived relief
+# 61383, wet darkening 46927, haze 182832, overcast 365888, ground fog 341106, streaks
+# 9780, rings on the water 12837, the sea's own grey 219502, splash crowns 12079,
+# the wet master 249115,
+# drops in the wave field 52348.
+#
+# THE DROPS NEED THEIR OWN PAIR OF RUNS. The wave field steps on a drawn frame that
+# follows a tick, so the arm interleaves tick and shot six times and reads the last; the
+# two runs are the same script bar the one dial, so the world sim stands in the same
+# place in both and only the drops differ.
+#
+# AND THE DIAL SET IS COMPLETE: with all fourteen intensities at zero the frame is byte
+# identical to the rain_fx 0 frame. Nothing in the rain paints outside the dials this
+# gate names, so a term added later without an arm here cannot hide behind one.
+# =====================================================================================
+cat > /tmp/g226.txt <<'G224EOF'
+tick 20
+smoothmove 1
+tick 1
+gfx rain_fx 1
+gfx rain_amount 1.0
+gfx rain_streaks 1.0
+gfx rain_wet 1.0
+gfx rain_dark 1.0
+gfx rain_spec 2.0
+gfx rain_gloss 4.0
+gfx rain_ripple 1.5
+gfx rain_ripple_density 0.5
+gfx rain_ripple_shade 1.5
+gfx rain_puddle 0.8
+gfx rain_puddle_mirror 1.0
+gfx rain_puddle_ssr 1.0
+gfx rain_relief 0.4
+gfx rain_relief_body 0.4
+gfx rain_sheen 1.5
+gfx rain_haze 0.8
+gfx rain_overcast 0.8
+gfx rain_fog 0.8
+gfx rain_water_ripple 1.5
+gfx rain_sea 1.0
+gfx rain_splash 1.0
+gfx rain_splash_size 0.45
+gfx rain_drops 1.0
+gfx rain_drop_force 0.25
+tickalpha 0
+shot shots/g226_ref.png
+gfx rain_puddle_ssr 0
+shot shots/g226_t00_pudssr.png
+gfx rain_puddle_ssr 1.0
+gfx rain_puddle_mirror 0
+shot shots/g226_t01_pudmir.png
+gfx rain_puddle_mirror 1.0
+gfx rain_puddle 0
+shot shots/g226_t02_puddle.png
+gfx rain_puddle 0.8
+gfx rain_spec 0
+shot shots/g226_t03_spec.png
+gfx rain_spec 2.0
+gfx rain_sheen 0
+shot shots/g226_t04_sheen.png
+gfx rain_sheen 1.5
+gfx rain_ripple 0
+shot shots/g226_t05_ripple.png
+gfx rain_ripple 1.5
+gfx rain_relief 0
+gfx rain_relief_body 0
+shot shots/g226_t06_relief.png
+gfx rain_relief 0.4
+gfx rain_relief_body 0.4
+gfx rain_dark 0
+shot shots/g226_t07_dark.png
+gfx rain_dark 1.0
+gfx rain_haze 0
+shot shots/g226_t08_haze.png
+gfx rain_haze 0.8
+gfx rain_overcast 0
+shot shots/g226_t09_overcast.png
+gfx rain_overcast 0.8
+gfx rain_fog 0
+shot shots/g226_t10_fog.png
+gfx rain_fog 0.8
+gfx rain_streaks 0
+shot shots/g226_t11_streaks.png
+gfx rain_streaks 1.0
+gfx rain_water_ripple 0
+shot shots/g226_t12_watring.png
+gfx rain_water_ripple 1.5
+gfx rain_sea 0
+shot shots/g226_t13_sea.png
+gfx rain_sea 1.0
+gfx rain_splash 0
+shot shots/g226_t14_splash.png
+gfx rain_splash 1.0
+gfx rain_wet 0
+shot shots/g226_t15_wet.png
+gfx rain_wet 1.0
+shot shots/g226_ref2.png
+gfx rain_puddle_ssr 0
+gfx rain_puddle_mirror 0
+gfx rain_puddle 0
+gfx rain_spec 0
+gfx rain_sheen 0
+gfx rain_ripple 0
+gfx rain_relief 0
+gfx rain_relief_body 0
+gfx rain_dark 0
+gfx rain_haze 0
+gfx rain_overcast 0
+gfx rain_fog 0
+gfx rain_streaks 0
+gfx rain_water_ripple 0
+gfx rain_sea 0
+gfx rain_splash 0
+gfx rain_wet 0
+shot shots/g226_alldead.png
+gfx rain_fx 0
+shot shots/g226_rainoff.png
+quit
+G224EOF
+cat > /tmp/g226d.txt <<'G224EOF'
+tick 20
+smoothmove 1
+tick 1
+gfx rain_fx 1
+gfx rain_amount 1.0
+gfx rain_drops 1.0
+gfx rain_drop_force 0.25
+gfx rain_water_ripple 1.5
+tick 5
+shot shots/g226_don1.png
+tick 5
+shot shots/g226_don2.png
+tick 5
+shot shots/g226_don3.png
+tick 5
+shot shots/g226_don4.png
+tick 5
+shot shots/g226_don5.png
+tick 5
+shot shots/g226_don6.png
+quit
+G224EOF
+sed -e 's#^gfx rain_drops 1.0$#gfx rain_drops 0#' -e 's#g226_don#g226_dof#' \
+    /tmp/g226d.txt > /tmp/g226e.txt
+G224T="pudssr pudmir puddle spec sheen ripple relief dark haze overcast fog streaks watring sea splash wet"
+gbegin shots/g226_ref.png shots/g226_ref2.png shots/g226_alldead.png shots/g226_rainoff.png \
+       shots/g226_don6.png shots/g226_dof6.png shots/g226.log shots/g226d.log shots/g226e.log
+rm -f shots/g226_t[0-9][0-9]_*.png
+grun shots/g226.log  --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g226.txt  --gfx
+grun shots/g226d.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g226d.txt --gfx
+grun shots/g226e.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --script /tmp/g226e.txt --gfx
+gshots shots/g226_ref.png shots/g226_ref2.png shots/g226_alldead.png shots/g226_rainoff.png \
+       shots/g226_don6.png shots/g226_dof6.png
+for g226_f in $G224T; do gshots shots/g226_t[0-9][0-9]_$g226_f.png; done
+G224N=0; G224DROPS=0; G224DEAD=-1; G224BAR=-1; G224SAME=0; G224BAD="not-run"
+if [ "$GRC" = "0" ]; then
+  G224R=$(python3 - <<'PY'
+import glob, os
+import numpy as np
+from PIL import Image
+def L(x): return np.asarray(Image.open(x).convert('RGB')).astype(int)
+# A QUARTER of what the term measures on a working build. See the header for the numbers.
+FLOOR = {'pudssr':8000,'pudmir':14000,'puddle':50000,'spec':60000,'sheen':30000,
+         'ripple':25000,'relief':15000,'dark':10000,'haze':45000,'overcast':90000,
+         'fog':85000,'streaks':2000,'watring':3000,'sea':50000,'splash':3000,'wet':60000}
+ref = L('shots/g226_ref.png')
+bad = []; good = 0; bar = 0
+for p in sorted(glob.glob('shots/g226_t[0-9][0-9]_*.png')):
+    name = os.path.basename(p)[9:-4]
+    d = np.abs(ref - L(p)).sum(axis=2)
+    n = int((d[40:780, 0:940] > 24).sum())
+    bar += int((d[0:800, 960:1280] > 0).sum())
+    if name not in FLOOR: bad.append('%s=NO-FLOOR' % name); continue
+    if n >= FLOOR[name]: good += 1
+    else: bad.append('%s=%d/%d' % (name, n, FLOOR[name]))
+dead = int((np.abs(L('shots/g226_alldead.png') - L('shots/g226_rainoff.png')).sum(axis=2) > 0).sum())
+dd = np.abs(L('shots/g226_don6.png') - L('shots/g226_dof6.png')).sum(axis=2)
+drops = int((dd[40:780, 0:940] > 24).sum())
+same = 1 if open('shots/g226_ref.png','rb').read() == open('shots/g226_ref2.png','rb').read() else 0
+print(good, drops, dead, bar, same, (','.join(bad) if bad else 'none'))
+PY
+)
+  set -- $G224R
+  G224N="$1"; G224DROPS="$2"; G224DEAD="$3"; G224BAR="$4"; G224SAME="$5"; G224BAD="$6"
+fi
+if [ "$GRC" = "0" ] && [ "${G224N:-0}" = "16" ] && [ "${G224DROPS:-0}" -ge 12000 ] \
+   && [ "${G224DEAD:-1}" = "0" ] && [ "${G224BAR:-1}" = "0" ] && [ "${G224SAME:-0}" = "1" ]; then
+  ok "G226 every part of the rain is alive: all 16 terms move the world when switched off one at a time and not one of them touches the sidebar, the drops ring the wave field by $G224DROPS px, every intensity at zero is byte identical to rain_fx 0, and the reference frame survives all 16 restores"
+else
+  bad "G226 every part of the rain is alive: terms_alive=${G224N}(want 16, quiet: ${G224BAD}) drops=${G224DROPS}(want >=12000) alldead_vs_rainoff=${G224DEAD}(want 0) sidebar=${G224BAR}(want 0) ref_restored=${G224SAME}(want 1) GRC=$GRC"
+fi
+
+# =====================================================================================
+# G227 THE SPLASH CROWNS STAND IN THE PUDDLES. G226 proves a crown is drawn. It cannot
+# say WHERE, and where is the whole requirement: rain on dry ground throws a ring and no
+# crown, rain into standing water throws both. A crown on dry sand is a failure no pixel
+# count can see, because a crown in the wrong place is exactly as many pixels as a crown
+# in the right one.
+#
+# So this gate asks the picture. Three frames of one run on three maps of different
+# ground: rain with puddles and no crowns, the same with crowns, and the same with the
+# puddles switched off. The second minus the first is where the crowns are. The first
+# minus the third is where the puddles are, which is the light pass's own answer rather
+# than a second opinion about it. Then it asks what share of the crown pixels stand on a
+# puddle pixel, and wants three quarters.
+#
+# THE COVERAGE IS SET TO 0.30 AND THAT IS THE GATE'S WHOLE DISCRIMINATION. At the 0.55
+# this was first written with, more than half of all flat ground is puddle, and crowns
+# are only ever placed on flat ground, so a build with the puddle test CUT OUT OF THE
+# SHADER put 82% of its crowns on a puddle against a working build's 85%, and the gate
+# could not tell them apart. Two baselines were tried to rescue that and both are wrong:
+# the puddle share of the whole window flatters any build, because crowns and puddles
+# are concentrated in the same flat half of the picture, and it scored the cut build at
+# 2.2, 4.2 and 1.8 times chance, passing two maps of three; the puddle share of a
+# crown's own neighbourhood flatters neither, because a correctly placed crown sits in
+# the middle of a puddle broader than the neighbourhood, and it scored a working build
+# at 1.07, 1.20 and 1.09 against the cut one's 1.12, 1.18 and 1.11. At a coverage of
+# 0.30 no baseline is needed and no arithmetic hides anything. Proved both ways at that
+# coverage: a working build puts 99%, 86% and 100% of its crown pixels on a puddle on
+# the three maps, and the cut build 47%, 23% and 32%. The bar is three quarters, which
+# clears the worst working number by eleven points and the best cut one by twenty-eight.
+#
+# WHAT IT STILL CANNOT PROVE. A crown RISES OUT of the water, so its upper pixels project
+# onto whatever is behind and above it, and its edges are blended, so the changed-pixel
+# mask is wider than the crown. Both push the share DOWN, never up, which is the safe
+# direction to be wrong in; the crown is shot at its smallest setting for the same reason.
+# =====================================================================================
+cat > /tmp/g227.txt <<'G225EOF'
+tick 25
+smoothmove 1
+tick 1
+tickalpha 0
+gfx rain_fx 1
+gfx rain_amount 1.0
+gfx rain_wet 1.0
+gfx rain_puddle 0.30
+gfx rain_puddle_mirror 1.0
+gfx rain_splash_size 0.08
+gfx rain_splash 0
+shot shots/g227_SCEN_a.png
+gfx rain_splash 1.0
+shot shots/g227_SCEN_b.png
+gfx rain_splash 0
+gfx rain_puddle 0
+shot shots/g227_SCEN_c.png
+quit
+G225EOF
+G225MAPS="SCB01EA SCG01EA SCG05EA"
+gbegin shots/g227.log
+for g227_m in $G225MAPS; do
+  sed "s/SCEN/$g227_m/g" /tmp/g227.txt > /tmp/g227_$g227_m.txt
+  rm -f shots/g227_${g227_m}_a.png shots/g227_${g227_m}_b.png shots/g227_${g227_m}_c.png
+  grun shots/g227_$g227_m.log --noshroud --scen $g227_m --pack $g227_m.pack $BASE \
+       --w 1280 --h 800 --enhanced --texset 1 --gfx --script /tmp/g227_$g227_m.txt
+  gshots shots/g227_${g227_m}_a.png shots/g227_${g227_m}_b.png shots/g227_${g227_m}_c.png
+done
+G225N=0; G225NOTE="not-run"
+if [ "$GRC" = "0" ]; then
+  G225R=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def L(x): return np.asarray(Image.open(x).convert('RGB')).astype(int)
+g227_good, g227_note = 0, []
+for g227_map in ('SCB01EA', 'SCG01EA', 'SCG05EA'):
+    a, b, c = (L('shots/g227_%s_%s.png' % (g227_map, k)) for k in 'abc')
+    crown = np.abs(a - b).sum(axis=2) > 30; crown[:, 940:] = False
+    pud   = np.abs(a - c).sum(axis=2) > 24; pud[:, 940:] = False
+    n = int(crown.sum())
+    share = float((crown & pud).sum()) / max(n, 1)
+    # a map that drew no crowns at all has proved nothing, so it fails rather than passes
+    if n >= 60 and share >= 0.75: g227_good += 1
+    g227_note.append('%s=%d:%.0f%%' % (g227_map, n, 100.0 * share))
+print(g227_good, ','.join(g227_note))
+PY
+)
+  set -- $G225R
+  G225N="$1"; G225NOTE="$2"
+fi
+if [ "$GRC" = "0" ] && [ "${G225N:-0}" = "3" ]; then
+  ok "G227 the splash crowns stand in the puddles: on the desert, the beach and a river map at least three quarters of every crown pixel stands on a puddle the light pass drew ($G225NOTE)"
+else
+  bad "G227 the splash crowns stand in the puddles: maps_passing=${G225N}(want 3, measured $G225NOTE, each wants >=60 crown px and >=75% of them on a puddle) GRC=$GRC"
+fi
+
+# =====================================================================================
+# G228 THE RAIN IS AUDIBLE, AND IT IS THE ONLY SOUND HERE THAT IS NOT OFF A DISC.
+# Every other clip in this game comes out of the 1995 archives or the cartridge, and that
+# rule is the reason the audio is worth anything. It is set aside for WEATHER, once and
+# deliberately, because neither game has any: there is no rain clip to decode. So the bed
+# is synthesised at boot from a fixed generator, and a synthesised sound needs holding
+# down harder than a decoded one, because nothing on a disc can be quietly compared
+# against it.
+#
+# FOUR CLAIMS.
+#   (1) The loop is BUILT and reports itself: one RAIN|sound|loop line naming the length,
+#       the rate and the drop count.
+#   (2) The join is not a click. The build prints the sample step across the wrap next to
+#       the number of steps INSIDE the loop that are at least as big. For a noise bed the
+#       mean is the wrong comparison, since adjacent samples are near enough independent
+#       and any one step runs several times the mean; what would be heard is an OUTLIER.
+#       Measured on a working build the join is 19433 against a mean of 4747, with 493
+#       other steps as big or bigger, so it sits at the 99.4th percentile and 493 places
+#       nobody hears are worse.
+#
+#       WHAT THIS ARM DOES AND DOES NOT CATCH, because the obvious claim turned out to be
+#       false. Every filter in the bed is run round the buffer once as a warm-up before
+#       the lap that counts, so that the state at sample 0 is the state arriving from
+#       sample N-1. That is correct and it stays. But it was ASSUMED that dropping it
+#       would make the join the largest step in the loop, and it does not: with the
+#       warm-up removed the join measures 25038 with 91 steps still as big, which this
+#       arm passes. The reason is that the loop is broadband noise, where the filters
+#       with short memory settle in two samples and the only long-memory one is a slow
+#       envelope that multiplies by 0.8 to 1.0. So the honest statement is that the loop
+#       is seamless mostly because of WHAT IT IS, and this arm guards against a gross
+#       discontinuity, a join that is the biggest step there is, rather than against a
+#       subtle one. A subtler guard would need a spectral comparison across the join and
+#       is not written.
+#   (3) IT IS ACTUALLY AUDIBLE, and that is measured by SUBTRACTION rather than by a
+#       level. Two runs of the same script, one with the rain on and one with it off,
+#       recorded with --audiowav. The score is playing in both and is far louder than the
+#       bed, so an RMS of the whole recording moves by 2% and proves nothing; the two
+#       runs are deterministic and identical bar the rain, so what is left when one is
+#       taken from the other IS the rain. Measured: RMS 2172 against a recording that is
+#       otherwise the same to the sample.
+#   (4) The rain-off run has no bed in it at all, which the same subtraction shows: the
+#       difference before the dial is set is silence.
+# =====================================================================================
+cat > /tmp/g228on.txt <<'G226EOF'
+tick 20
+smoothmove 1
+gfx rain_fx 1
+tick 15
+shot shots/g228_on.png
+tick 15
+shot shots/g228_on.png
+tick 15
+shot shots/g228_on.png
+tick 15
+shot shots/g228_on.png
+tick 15
+shot shots/g228_on.png
+tick 15
+shot shots/g228_on.png
+tick 15
+shot shots/g228_on.png
+tick 15
+shot shots/g228_on.png
+quit
+G226EOF
+sed 's#^gfx rain_fx 1$#gfx rain_fx 0#; s#g228_on#g228_off#' /tmp/g228on.txt > /tmp/g228off.txt
+gbegin shots/g228_on.wav shots/g228_off.wav shots/g228on.log shots/g228off.log
+grun shots/g228on.log  --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 640 --h 400 \
+     --enhanced --texset 1 --gfx --audiowav "$RUNDIR/shots/g228_on.wav"  --script /tmp/g228on.txt
+grun shots/g228off.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 640 --h 400 \
+     --enhanced --texset 1 --gfx --audiowav "$RUNDIR/shots/g228_off.wav" --script /tmp/g228off.txt
+gshots shots/g228_on.wav shots/g228_off.wav
+G226LOOP=$(grep -c '^RAIN|sound|loop|' shots/g228on.log)
+G226OVER=$(sed -n 's/^RAIN|sound|loop|.*|over=\([0-9]*\).*/\1/p' shots/g228on.log | head -1)
+G226QUIET=$(grep -c '^RAIN|sound|loop|' shots/g228off.log)
+G226RMS=0
+if [ "$GRC" = "0" ]; then
+  G226RMS=$(python3 - <<'PY'
+import wave
+import numpy as np
+def rd(p):
+    w = wave.open(p, 'rb'); n = w.getnframes()
+    d = np.frombuffer(w.readframes(n), dtype='<i2').astype(np.float64)
+    return d.reshape(-1, w.getnchannels()).mean(axis=1)
+a, b = rd('shots/g228_off.wav'), rd('shots/g228_on.wav')
+n = min(len(a), len(b))
+d = b[:n] - a[:n]
+print(int(np.sqrt((d * d).mean())))
+PY
+)
+fi
+if [ "$GRC" = "0" ] && [ "${G226LOOP:-0}" -ge 1 ] && [ "${G226OVER:-0}" -ge 50 ] \
+   && [ "${G226QUIET:-1}" = "0" ] && [ "${G226RMS:-0}" -ge 500 ]; then
+  ok "G228 the rain is audible and its loop has no click: the bed measures RMS $G226RMS against a recording of the same script that is otherwise identical, $G226OVER steps inside the loop are as big as the one across its join, and a run with the rain off never builds it"
+else
+  bad "G228 the rain is audible and its loop has no click: loop_built=${G226LOOP}(want >=1) join_rank=${G226OVER}(want >=50 steps inside as big) built_when_off=${G226QUIET}(want 0) bed_rms=${G226RMS}(want >=500) GRC=$GRC"
+fi
+
+# =====================================================================================
+# G229 A MISSION LOOKS THE SAME WHATEVER RAN BEFORE IT. The one invariant that covers a
+# whole family of faults nothing else here can see: every cache in this renderer that is
+# shaped like a MAP has to be keyed on which map it is for, and a process plays many
+# missions. G4 runs the binary twice and compares, which proves the engine repeats; it
+# cannot see a cache filled by mission one and read by mission two, because it never
+# plays two.
+#
+# THIS IS NOT HYPOTHETICAL. It was reported from play as "the second map broke
+# completely" and it was the soft-coast terrain sheet, a full RGBA copy of the drawn
+# atlas with the coast tiles' alpha turned into a ramp. Its cache was keyed on the atlas
+# INDEX, the source texture's GL NAME and the bilinear dial, and not one of those can
+# tell two missions apart: the bakery puts the atlas in the same bank slot in every pack,
+# and the GL name repeats because pack_free returns the old pack's names before load_pack
+# takes new ones and the atlas is the first texture in the bank, so the new atlas is
+# handed the name the old one had. The guard matched, the sheet was not rebuilt, and the
+# whole ground of the second map was drawn through the first map's tile packing: every
+# cell addressing the right rectangle of the wrong sheet, with black wherever the new
+# map's rectangle fell past the old sheet's used region onto cleared padding. Measured on
+# the build that had it: 429373 of about 700000 world pixels wrong.
+#
+# TWO ARMS, and the structural one is the sharper.
+#   (1) THE SHEET IS REBUILT PER MISSION. water_soft_atlas_sync prints one
+#       WATER|softcoast line every time it builds. Two missions that both have a coast
+#       must print two. The broken build printed one. This is a binary, not a threshold.
+#   (2) THE PICTURE AGREES. The same map, booted fresh and reached by remission from a
+#       map of a DIFFERENT THEATER, must render the same. The floor is 50000 changed
+#       pixels: the fault measures 429373 and a working build measures 3477, so there is
+#       room of about eight times either way.
+#
+# WHY 3477 AND NOT 0, stated rather than rounded away. What is left is the burning
+# wreck's flame and its smoke plume sitting at a different animation frame: 86% of the
+# residual falls inside that one object's box and 471 pixels lie outside it. The combat
+# effects carry an animation phase across a mission boundary. That is a real carry-over
+# of the same family and it is written up in the known gaps; it is small, it is not the
+# terrain, and it is why this arm is a floor rather than an equality. If someone fixes
+# the effects phase, tighten this number rather than leaving the slack.
+# =====================================================================================
+cat > /tmp/g229a.txt <<'G229EOF'
+tick 6
+tickalpha 0
+shot shots/g229_first.png
+remission SCG01EA SCG01EA.pack
+tick 6
+tickalpha 0
+shot shots/g229_second.png
+quit
+G229EOF
+cat > /tmp/g229b.txt <<'G229EOF'
+tick 6
+tickalpha 0
+shot shots/g229_fresh.png
+quit
+G229EOF
+gbegin shots/g229_first.png shots/g229_second.png shots/g229_fresh.png \
+       shots/g229a.log shots/g229b.log
+# leg one starts on a DESERT map so the second mission's atlas packs its tiles differently
+grun shots/g229a.log --noshroud --scen SCB01EA --pack SCB01EA.pack $BASE --w 1280 --h 800 \
+     --enhanced --texset 1 --gfx --script /tmp/g229a.txt
+grun shots/g229b.log --noshroud --scen SCG01EA --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+     --enhanced --texset 1 --gfx --script /tmp/g229b.txt
+gshots shots/g229_first.png shots/g229_second.png shots/g229_fresh.png
+G229BUILDS=$(grep -c '^WATER|softcoast|' shots/g229a.log)
+G229PX=-1
+if [ "$GRC" = "0" ]; then
+  G229PX=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def L(x): return np.asarray(Image.open(x).convert('RGB')).astype(int)
+d = np.abs(L('shots/g229_fresh.png') - L('shots/g229_second.png')).sum(axis=2)
+print(int((d[40:780, 0:940] > 24).sum()))
+PY
+)
+fi
+if [ "$GRC" = "0" ] && [ "${G229BUILDS:-0}" -ge 2 ] && [ "${G229PX:-999999}" -le 50000 ]; then
+  ok "G229 a mission looks the same whatever ran before it: the soft-coast sheet was rebuilt $G229BUILDS times for two missions, and the second mission's picture differs from the same map booted fresh by $G229PX px (the burning wreck's animation phase), against 429373 when the sheet was reused"
+else
+  bad "G229 a mission looks the same whatever ran before it: softcoast_builds=${G229BUILDS}(want >=2, one per mission; 1 means the sheet was reused and the second map is drawn through the first map's tile packing) second_vs_fresh=${G229PX}(want <=50000) GRC=$GRC"
+fi
+
+# =====================================================================================
+# G232 RESET TO DEFAULTS PUTS THE WHOLE ENHANCED PICTURE BACK, AND LEAVES THE INPUT ALONE.
+#
+# The Advanced page's Reset row restored a NAMED LIST of twenty-six fields, and a named
+# list is exactly the thing that goes stale. Every dial added after it was written stayed
+# where the player had left it: the grass switch and all of its dials, the water tuning,
+# the tree shading, the rain, the sun and shadow numbers, the colour grade, the bloom and
+# the tube. So the button gave back a picture that was still not the shipped one, and
+# nothing in this suite measured it. Measured on the build before the fix, against the
+# storm below: 38 dials survived the press that should not have, and the frame stood
+# 486069 px away from a fresh Enhanced frame.
+#
+# THE MEASUREMENT IS THE PRESET FILE, because that file is a complete readback of the
+# state: every one of the 249 fields has an FX_PARAMS row, and fx_save marks any row
+# standing off its default with a trailing comment. So "nothing is left moved" is one grep
+# over every dial the program has, and not over a list written out here that would go stale
+# the same way the reset's own list did.
+#
+# WHAT THIS GATE DOES NOT COVER, said plainly because the suite's rule is that a gate which
+# cannot fail on a defect is not coverage of it: the assertion reads the rows left MOVED,
+# and a row is only moved if the storm below moved it. The storm is a hand-written list, so
+# a dial added tomorrow is NOT inside this assertion until somebody adds a line for it. What
+# covers a new dial is the reset copying the whole struct rather than naming fields; this
+# gate covers the promise that the copy is reached and that the exemptions are exactly the
+# ones intended.
+#
+# THE ROWS THAT MUST STILL READ MOVED AFTER THE PRESS:
+#   swap_buttons, right_drag_scroll  INPUT, which lives on the Gameplay page. This is the
+#       half a careless fix breaks, and it would not merely change the session: the
+#       Visuals screen writes the preset on the way out, so a reset that cleared these
+#       would erase a customised mouse from the file on disc.
+#   cash_tick  THE CREDIT TICK'S SWITCH, a sound on the same page. Same argument: a reset
+#       that cleared it would write a player's OFF back to ON on disc.
+#   enabled  the master switch, which is not a row on this page. It is in the list as a
+#       FACT OF THE RUN rather than as a promise this gate can fail on: the whole run is
+#       Enhanced and the compiled default is off, so the apply that follows the press
+#       leaves it standing off its default whatever the reset did with it.
+# Every other dial, debug included, is a picture and must come back. debug draws a
+# comparison pack's meshes in place of the mission's, so it changes what is on the screen.
+#
+# WHY THE GRASS IS TURNED ON OVER THE CARTRIDGE ART IN THE MIDDLE OF THE STORM. The grass
+# follows the terrain sheet: switching the ground to the cartridge bank takes the tick away
+# and REMEMBERS it, so that coming back to the 1995 bank gives it back. The reset puts the
+# 1995 bank back, so unless that memory is forgotten the grass is handed straight back over
+# the top of the reset that has just cleared it. Measured with the forget removed and
+# everything else fixed: exactly one dial survived, grass, and the frame stood 22209 px
+# out, which is the blades. That leg is the reason this sequence is three lines and not
+# one.
+#
+# THE PICTURE IS COMPARED AGAINST A RUN THAT NEVER MOVED A DIAL rather than against a
+# stored reference: the same scenario, the same camera, the same tick count, ENHANCED
+# chosen through the same dialog, and the two frames must be byte identical. A bare --gfx
+# run is NOT that picture -- it switches the chain on and does nothing else, so it keeps
+# the cartridge tile art and the DOS bar -- which is why the reference goes through the
+# dialog too, and why this is also the proof that the reset reaches the six things applied
+# by a function rather than by a dial: the filter, the terrain and infantry art, the
+# sidebar, the UI scale, the decal edge and the camera.
+#
+# WHY THE DISPLAY MODE IS CHANGED THROUGH THE ROW AND NOT THROUGH A DIAL. The display rows
+# are live: clicking one switches the window there and then. A reset that wrote the shipped
+# mode straight into the dial left the apply nothing to compare against, so the page, the
+# dial and the preset written on the way out all said borderless while the window stayed
+# wherever the player had put it -- the one row on a page of live rows that did not do what
+# it said. So the storm clicks Windowed, which really moves it, and the press afterwards
+# must ask for the window back. In an automated run the requirement is a printed deferral rather
+# than a switch, for the reason the apply gives: a hidden window is never given the
+# display's size, so the gates read the line instead of the window.
+#
+# WHY THE SUPERSAMPLE BOX IS TICKED AGAIN IN A RUN OF ITS OWN. The box is a float wearing a
+# checkbox: the scale it switches off is remembered so that switching it on returns to what
+# was tuned. That memory is a static BESIDE the state struct, so the reset's copy cannot
+# reach it and neither can the readback above -- one press, one click, and a player who had
+# been at 3x was handed 3x back by a button that had just cleared it. The leg needs its own
+# run because the memory is only written when the dialog seeds itself, so the scale has to
+# be standing before the dialog opens, and because the extra readbacks would move the last
+# OPTVIS| line the legs above read.
+#
+# --gfx is load-bearing for the reason G139 states: without it `optclick Advanced...`
+# leaves the page on Visuals and the run measures the wrong page while reporting nothing.
+# =====================================================================================
+cat > /tmp/g232_ref.txt <<'G232EOF'
+tick 30
+options
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optvis
+optclick OK
+optclick OK
+optclick Resume Mission
+tick 10
+shot shots/g232_ref.png
+quit
+G232EOF
+# The storm. A spread across every group on the page and every group that has NO row on
+# it, each dial well away from its default, set through the gfx verb because the point is
+# a picture a player arrived at through the tuning panel or a loaded preset and not one
+# the dialog can express. Four of them are set through a ROW instead, because what they
+# move is not only the dial: the input pair and the credit tick go through their own page,
+# so the page and the dial agree and the survival leg below is reading a real setting
+# rather than a dial the dialog never saw; and the display mode goes through the Windowed row, which really
+# switches the window, so the press afterwards has a window to put back and not just a
+# number. The render scale is set BEFORE the dialog opens, because the memory behind its
+# tick box is only written when the dialog seeds itself.
+cat > /tmp/g232_reset.txt <<'G232EOF'
+tick 30
+gfx ss_scale 3
+options
+optclick Gameplay
+optclick Swap mouse buttons
+optclick Right button scrolls
+optclick Credit tick sound
+optclick OK
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optclick Windowed
+gfx grass 1
+gfx texset 0
+gfx grass 1
+gfx grass_height 0.30
+gfx grass_tip 0.80
+gfx grass_wind 0.60
+gfx grass_density 32
+gfx grass_density_max 64
+gfx water_flow 0.90
+gfx water_natural 0.90
+gfx water_dark 0.50
+gfx water_spec 2.5
+gfx tree3d_gain 2.0
+gfx tree3d_ao 0.10
+gfx rain_fx 1
+gfx rain_amount 0.20
+gfx rain_wet 0.10
+gfx sun_az 200
+gfx sun_el 80
+gfx shadow_strength 0.25
+gfx shadow_res 1024
+gfx cloud_strength 0.95
+gfx exposure -1.5
+gfx contrast 1.9
+gfx saturation 0.2
+gfx bloom_intensity 1.8
+gfx bloom_threshold 0.05
+gfx ssao_intensity 0.1
+gfx light_radius 12
+gfx crt_on 1
+gfx crt_scanline 0.90
+gfx shatter_force 2.8
+gfx tib3d_size 0.60
+gfx tib3d_glow 1.4
+gfx crush_band 0.5
+gfx crush_skirt 0.0
+gfx hb_mode 2
+gfx veh_slope 0.0
+gfx spr_shadow_scale 2.5
+gfx cursor_scale 1.5
+gfx inf_scale 1.5
+gfx decal_soft 0.0
+gfx new_hud 0
+gfx ui_scale 0
+gfx smooth_anim 0
+gfx bilinear 0
+gfx gamma_on 1
+gfx water_fx 0
+gfx tree3d 0
+gfx perspective 1
+gfx iso_yaw -40
+gfx res_w 800
+gfx res_h 600
+gfx debug 1
+gfxsave /tmp/g232_before.cfg
+optclick Reset to defaults
+optvis
+optgp
+gfxsave /tmp/g232_after.cfg
+optclick OK
+optclick OK
+optclick Resume Mission
+tick 10
+shot shots/g232_after.png
+quit
+G232EOF
+# The supersample memory, in a run of its own. 3x is standing before the dialog opens, so
+# the seed records it; the press must clear the memory as well as the scale, and the box
+# ticked afterwards must give the shipped 2x rather than handing the 3x back.
+cat > /tmp/g232_ss.txt <<'G232EOF'
+tick 5
+gfx ss_scale 3
+options
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optclick Reset to defaults
+optvis
+optclick Supersampling
+optvis
+quit
+G232EOF
+# The two cfg files go through gbegin and gshots for the same reason the pictures do: a
+# stale file from a previous suite run is exactly as convincing as a stale PNG.
+gbegin shots/g232_ref.png shots/g232_after.png /tmp/g232_before.cfg /tmp/g232_after.cfg \
+       shots/g232_ref.log shots/g232_reset.log shots/g232_ss.log
+G232BASE="--noshroud --nosound --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 --gfx"
+grun shots/g232_ref.log   $G232BASE --script /tmp/g232_ref.txt
+grun shots/g232_reset.log $G232BASE --script /tmp/g232_reset.txt
+grun shots/g232_ss.log    $G232BASE --script /tmp/g232_ss.txt
+gshots shots/g232_ref.png shots/g232_after.png /tmp/g232_before.cfg /tmp/g232_after.cfg
+# How far the storm actually moved things, so a gate that measures nothing cannot pass.
+G232BEFORE=0; G232AFTER=99; G232KEEP=""; G232PX=-1; G232SAME=0
+if [ "$GRC" = "0" ]; then
+  G232BEFORE=$(grep -c '# was\|# moved' /tmp/g232_before.cfg)
+  G232AFTER=$(grep -c '# was\|# moved' /tmp/g232_after.cfg)
+  G232KEEP=$(grep '# was\|# moved' /tmp/g232_after.cfg | awk '{print $1}' | sort | tr '\n' ' ')
+  cmp -s shots/g232_ref.png shots/g232_after.png && G232SAME=1
+  G232PX=$(python3 - <<'PY'
+import numpy as np
+from PIL import Image
+def L(x): return np.asarray(Image.open(x).convert('RGB')).astype(int)
+d = np.abs(L('shots/g232_ref.png') - L('shots/g232_after.png')).sum(axis=2)
+print(int((d > 24).sum()))
+PY
+)
+fi
+# The dialog's own account of itself after the press. Two claims per row throughout: what
+# the page says, and what the dial behind it says.
+G232V=$(grep '^OPTVIS|' shots/g232_reset.log | tail -1)
+G232D=$(grep '^OPTDISP|' shots/g232_reset.log | tail -1)
+G232P=$(grep '^OPTPERSP|value=' shots/g232_reset.log | tail -1)
+G232G=$(grep '^OPTGP|' shots/g232_reset.log | tail -1)
+G232OK=1
+# the post chain's own switches, the page and the dials together
+echo "$G232V" | grep -q 'enhanced=1|advdisabled=0|bilinear=1|gamma=0|ss=0|shadows=1|ao=1|light=1|bloom=1|grade=1|crt=0' || G232OK=0
+echo "$G232V" | grep -q 'fx_enabled=1|fx_bilinear=1|fx_gamma=0|fx_ss=1.00|fx_shadow=1|fx_ao=1|fx_light=1|fx_bloom=1|fx_grade=1|fx_crt=0' || G232OK=0
+# THE SIDEBAR IS THE FUNCTION-APPLIED HALF: the tick, the dial, and the bar being drawn
+echo "$G232V" | grep -q 'hud=1|fx_hud=1|sb_hud=1' || G232OK=0
+# the display rows back to borderless at the desktop's size, and sb_div is the proof that
+# the UI scale reached the sidebar rather than only the dial
+echo "$G232D" | grep -q 'fx_mode=1|fx_res=0x0|fx_ui=1|sb_div=2' || G232OK=0
+# the camera turned back with the row, not a frame later
+echo "$G232P" | grep -q 'value=0|disabled=0|fx_persp=0|yaw=0.0' || G232OK=0
+# AND THE INPUT SURVIVED, both switches, the page and the dial agreeing
+echo "$G232G" | grep -q 'swap=1|fx_swap=1|push=0|fx_push=0|cash=0|fx_cash=0' || G232OK=0
+# THE WINDOW IS ASKED FOR BACK, and not only its dial. The storm moved the mode through the
+# live Windowed row, so the press must ask for borderless again. In an automated run the
+# ask is printed rather than performed, for the reason the apply gives (a hidden window is
+# never given the display's size), so the line IS the measurement: two of them, the row on
+# the way in and the press on the way out, and the last one must be the press.
+G232DISP=$(grep -c 'DISPLAY|' shots/g232_reset.log)
+G232DISPLAST=$(grep 'DISPLAY|' shots/g232_reset.log | tail -1)
+# THE SUPERSAMPLE MEMORY, from the run of its own: the press clears the scale AND what the
+# tick box remembers, so ticking it again gives the shipped 2x. This cannot be read from the
+# preset file at all, because the memory is a static outside the state struct.
+G232SSN=$(grep -c '^OPTVIS|' shots/g232_ss.log)
+G232SSOFF=$(grep '^OPTVIS|' shots/g232_ss.log | head -1)
+G232SSON=$(grep '^OPTVIS|' shots/g232_ss.log | tail -1)
+G232SSOK=1
+[ "${G232SSN:-0}" = "2" ] || G232SSOK=0
+echo "$G232SSOFF" | grep -q '|ss=0|' || G232SSOK=0
+echo "$G232SSOFF" | grep -q '|fx_ss=1.00|' || G232SSOK=0
+echo "$G232SSON"  | grep -q '|ss=1|' || G232SSOK=0
+echo "$G232SSON"  | grep -q '|fx_ss=2.00|' || G232SSOK=0
+if [ "$GRC" != "0" ]; then
+  bad "G232 Reset to defaults: a run failed (GRC=$GRC). Nothing below was measured"
+elif [ "${G232BEFORE:-0}" -lt 40 ]; then
+  bad "G232 Reset to defaults: the storm only moved $G232BEFORE dials off their defaults (want >=40). The gate cannot go red on a reset that does nothing, so this is the gate failing and not the button"
+elif [ "$G232KEEP" != "cash_tick enabled right_drag_scroll swap_buttons " ]; then
+  bad "G232 Reset to defaults: $G232AFTER dials still stand off their defaults after the press and they are [$G232KEEP], want exactly [cash_tick enabled right_drag_scroll swap_buttons ]. More than those means the reset does not cover the whole picture; FEWER means it has reached something that is not a picture at all -- the two input switches are the player's mouse and the credit tick is a sound, and the Visuals screen writes the preset on the way out, so clearing them rewrites the player's choice on disc"
+elif [ "${G232DISP:-0}" != "2" ] || ! echo "$G232DISPLAST" | grep -q 'DISPLAY|deferred|mode=1|'; then
+  bad "G232 Reset to defaults: the press did not ask for the window back ($G232DISP DISPLAY| lines, last [$G232DISPLAST], want 2 with the last reading mode=1). The storm switched the window to Windowed through the row that does it live, so a press that restores only the dial leaves the page, the dial and the preset on disc all saying borderless with the window still windowed"
+elif [ "$G232OK" != "1" ]; then
+  bad "G232 Reset to defaults: the page and the dials disagree after the press. [$G232V] [$G232D] [$G232P] [$G232G]. The things applied through a FUNCTION are what fail here first: sb_hud is the sidebar actually being drawn, sb_div the UI scale that reached it, and yaw the camera"
+elif [ "$G232SSOK" != "1" ]; then
+  bad "G232 Reset to defaults: the supersample memory survived the press. After the reset [$G232SSOFF] and after ticking the box again [$G232SSON] ($G232SSN readbacks, want 2): want ss=0 fx_ss=1.00 then ss=1 fx_ss=2.00. The scale the box remembers is a static outside the state struct, so the whole-struct copy cannot reach it and one click hands the player back the picture the press just cleared"
+elif [ "$G232SAME" != "1" ]; then
+  bad "G232 Reset to defaults: the frame after the press stands $G232PX px away from a fresh Enhanced frame of the same scenario, camera and tick. The dials read right and the picture does not, so something the dials reach only through a function was not applied"
+else
+  ok "G232 Reset to defaults puts the whole Enhanced picture back: $G232BEFORE dials moved off their defaults, and after one press the only four still standing off them are the two input switches, the credit tick and the master switch; the page and the dials agree row for row, the sidebar, the UI scale and the camera followed, the window was asked back to borderless and not only its dial, ticking the render scale again gives the shipped 2x rather than the 3x the press cleared, and the frame is byte identical to a fresh Enhanced frame"
+fi
+
+# =====================================================================================
+# G233 WHAT A NEW PLAYER IS HANDED, in a folder with no settings files in it at all.
+#
+# The five Game Controls values and the whole Enhanced picture are SHIPPED DEFAULTS: they
+# are what somebody gets on the first launch, before any cnc3d-controls.cfg or
+# cnc3d-fx.cfg exists to be read. Nothing in this suite measured that. Every other gate
+# runs in the build folder, which HAS both files, and the renderer is automated, so it
+# skips the restore and never reads them either. A default could therefore be changed to
+# anything at all and the suite would stay green, which is precisely how the one number
+# this gate was written for went unnoticed.
+#
+# IT RUNS IN A FOLDER OF ITS OWN, not in the run folder with the two files moved aside.
+# The run folder's cnc3d-fx.cfg is a real tuning session and its cnc3d-controls.cfg is
+# somebody's remembered sliders; a gate that renames them is one interrupted run away
+# from destroying both. So the gate builds a sandbox of symlinks back into the run folder
+# and simply does not link the settings files. Everything the game opens is relative, so
+# the links are enough.
+#
+# IT LINKS FILES AND MAKES DIRECTORIES, and the distinction is the whole point of the
+# sandbox. A symlinked DIRECTORY is the real directory: a run that writes shots/x.png
+# below one writes it into the run folder, which is the folder this gate exists to stay
+# out of, and the two files it is protecting sit one level up from exactly such a write.
+# So every directory in the tree is recreated for real and only leaves are linked, and a
+# write anywhere in it lands on a real file inside the sandbox. The sandbox is then
+# REMOVED once every number has been read off it: a gate that leaves 2800 dangling links
+# behind pointing at a folder the next build replaces is a trap for whoever finds it.
+#
+# LEG 1, THE FIVE VALUES, AND THE TICK RATE BESIDE THEM. optctl prints the block without
+# touching it, before the pause dialog is opened and again after. Before, the block is
+# still zero and the tick rate comes from the shipped defaults; after, both come from the
+# seed. THE TWO TICK FIGURES MUST BE EQUAL, and that is the half most easily broken: the
+# speed used to be written out twice, once as the Game Controls default and once as a
+# literal in the renderer's pre-dialog fallback, and moving one without the other gives a
+# player a first mission at one rate that JUMPS to another the first time ESC is pressed.
+# The fallback now asks dopt_settings_init instead, so there is one number.
+#
+# WHAT IS ASSERTED AND WHAT IS ONLY REPORTED, said here because a gate that cannot fail
+# on something must not look like it covers it. The SHIPPED BLOCK is asserted, all five
+# values of it, off optctl's ship_ fields: those come straight out of dopt_settings_init
+# and move the instant it does, which is the defect this gate exists for.
+#
+# The five values on the SLIDERS are a second and weaker thing, and only two of them are
+# asserted against the shipped block. Opening the dialog seeds speed and scroll out of
+# dopt_settings_init, so those two must equal their ship_ figures and are checked against
+# them. It then overwrites all three VOLUMES with what the mixer is playing at, so music,
+# sound and speech on the sliders are an answer about this launch's volume switches and
+# not about the defaults: they are printed, and held at the top of the travel so a change
+# to the seed's own scaling still shows, but changing the shipped volumes could not move
+# them and they are not offered as cover for that.
+#
+# WHY THE RUN NAMES THE VOLUMES, which is the same fact from the other side. --script
+# silences the score unless a volume is named, so a bare scripted run would read a music
+# slider seeded off a mixer at zero. 255 is not a tuning choice: it is the level the
+# game's own parser boots at, so naming it is what makes the slider figures the ones a
+# player with a sound card is handed rather than an artefact of the harness.
+#
+# LEG 2, THE PICTURE. The chain's own preset writer is a complete readback of all 249
+# dials and marks every row standing off its compiled default, so "the shipped picture is
+# the tuned one, untouched" is one count and not a list that would go stale. A handful of
+# named rows are read as well, chosen as the ones a careless copy would get wrong.
+#
+# THE READBACK HAPPENS BEFORE THE DIALOG OPENS, and that ordering is load bearing rather
+# than tidy: opening the pause dialog applies the Visuals page, a bare renderer run is not
+# Enhanced, and the CLASSIC arm turns smooth animation off on its way past. Dumped after
+# the dialog, this leg reads smooth_anim 0 and blames the defaults for it.
+#
+# THE TWO ROWS THAT ARE ASSERTED HARDEST ARE THE TWO THE TUNED FILE DISAGREES WITH, and
+# they are in here as a standing refusal rather than as coverage of anything that moved.
+# smooth_anim ships ON although the tuned file carries 0, because that row is a preference
+# about how animation reads and belongs in a player's own file. enabled ships OFF although
+# the tuned file carries 1, because fx_defaults is what every measuring instrument in this
+# project renders from. A future session copying that file wholesale would move both, and
+# this is what stops it.
+#
+# SAID PLAINLY, because a gate that cannot fail on a defect is not coverage of it: no
+# compiled picture default moved in the change this gate was written with. Every dial in
+# the tuned session already equalled fx_defaults apart from those two. Leg 2 went green
+# before that change and after it, and it is here to hold the picture still, not to prove
+# a move.
+#
+# LEG 3, THE PLAYER'S OWN DOOR. The renderer never reads either settings file whatever is
+# beside it, so legs 1 and 2 prove the values and not the reading. The shell is what a
+# player launches and it is the half that reads both, and only on a run that is NOT
+# automated, so this leg starts the real thing with a real window and kills it. It asserts
+# the two lines the game prints when it looks for the files and finds neither, and that
+# the run wrote neither of them on its way past.
+# =====================================================================================
+G233SB=/tmp/g233_clean
+rm -rf "$G233SB"; mkdir -p "$G233SB"
+# THE TREE, DIRECTORY BY DIRECTORY AND LEAF BY LEAF. find prints paths relative to the run
+# folder; every directory is made for real and every file is linked, so nothing the run
+# writes can reach back into the run folder through a linked directory. The two settings
+# files are the only things skipped, and only at the top level, which is where the game
+# looks for them.
+( cd "$RUNDIR" && find . -mindepth 1 -type d -print ) | while IFS= read -r g233d; do
+  mkdir -p "$G233SB/${g233d#./}"
+done
+( cd "$RUNDIR" && find . -mindepth 1 \( -type f -o -type l \) -print ) | while IFS= read -r g233f; do
+  case "${g233f#./}" in cnc3d-controls.cfg|cnc3d-fx.cfg) continue ;; esac
+  ln -s "$RUNDIR/${g233f#./}" "$G233SB/${g233f#./}" 2>/dev/null
+done
+G233LINKS=$(find "$G233SB" -type l | wc -l | tr -d ' ')
+G233SRCDIRS=$( ( cd "$RUNDIR" && find . -mindepth 1 -type d -print ) | wc -l | tr -d ' ')
+G233DIRS=$(find "$G233SB" -mindepth 1 -type d | wc -l | tr -d ' ')
+# A DIRECTORY LEFT AS A LINK IS THE FAULT THIS GUARDS, so ask the question of the run
+# folder rather than trusting the loop above: every folder that is a real folder there
+# must be a real folder here, because a link in its place is a door back into the run
+# folder for everything written below it. Asked this way round, a run folder entry that
+# is ITSELF a link (the game data is reached through one) is a leaf like any other file
+# and is not mistaken for the fault.
+G233DIRLINKS=$( ( cd "$RUNDIR" && find . -mindepth 1 -type d -print ) | while IFS= read -r g233d; do
+  [ -L "$G233SB/${g233d#./}" ] && echo x
+done | wc -l | tr -d ' ')
+G233STRAY=0
+[ -e "$G233SB/cnc3d-controls.cfg" ] && G233STRAY=$((G233STRAY+1))
+[ -e "$G233SB/cnc3d-fx.cfg" ] && G233STRAY=$((G233STRAY+1))
+cat > "$G233SB/g233.txt" <<'G233EOF'
+gfxsave /tmp/g233_fresh.cfg
+optctl
+options
+optctl
+quit
+G233EOF
+rm -f /tmp/g233_fresh.cfg /tmp/g233_eyes.log /tmp/g233_shell.log
+( cd "$G233SB" && ./cnc_eyes --scen SCG90EA --pack SCG01EA.pack $BASE \
+    --nosound --musicvol 255 --soundvol 255 --script g233.txt > /tmp/g233_eyes.log 2>&1 )
+G233ERC=$?
+cat /tmp/g233_eyes.log >> "$OUT"
+# The real thing, with a window, because the shell only reads the two files when nothing
+# is driving it. Bounded and killed; it is at the main menu long before the timer.
+# EXEC, AND THE PID IS THE GAME'S OWN. Backgrounding `cd X && ./cnc3d` puts the & on the
+# whole AND-list, so the shell forks a WRAPPER and $! names that wrapper; killing it leaves
+# the game orphaned and running, one leaked process per suite run, while the gate prints
+# PASS. exec replaces the subshell with the game itself, so the pid is the thing that has
+# to die. Asserted below rather than trusted.
+( cd "$G233SB" && exec ./cnc3d --nosound $BASE --menupack dosmenu.pack \
+    > /tmp/g233_shell.log 2>&1 ) & G233P=$!
+sleep 14
+# WHAT THE PID IS gets asked BEFORE the kill, while there is still a process to ask. After
+# `wait` the question has no answer: wait only returns once that pid has exited and been
+# reaped, so a check made there reads "gone" whether the pid was the game or a wrapper
+# whose game is still running. The name has to be the game's; anything else, including no
+# name at all because the game had already died, fails below. A wrapper's children are
+# stopped with it, so the orphaned game is not left running, and nothing is killed by name
+# because a pattern would also match a game somebody else started.
+G233COMM=$(ps -o comm= -p $G233P 2>/dev/null)
+G233KIDS=$(pgrep -P $G233P 2>/dev/null)
+kill $G233P 2>/dev/null
+wait $G233P 2>/dev/null
+case "$G233COMM" in
+  *cnc3d) G233NOTGAME=0 ;;
+  *) G233NOTGAME=1; [ -n "$G233KIDS" ] && kill $G233KIDS 2>/dev/null ;;
+esac
+cat /tmp/g233_shell.log >> "$OUT"
+G233WROTE=0
+[ -e "$G233SB/cnc3d-controls.cfg" ] && G233WROTE=$((G233WROTE+1))
+[ -e "$G233SB/cnc3d-fx.cfg" ] && G233WROTE=$((G233WROTE+1))
+
+G233PRE=$(grep '^OPTCTL|seeded=0|' /tmp/g233_eyes.log | head -1)
+G233POST=$(grep '^OPTCTL|seeded=1|' /tmp/g233_eyes.log | head -1)
+g233f() { printf '%s' "$1" | sed -n "s/.*|$2=\([-0-9]*\).*/\1/p"; }
+G233TPRE=$(g233f "$G233PRE" tick)
+G233TPOST=$(g233f "$G233POST" tick)
+G233SPEED=$(g233f "$G233POST" speed)
+G233SCROLL=$(g233f "$G233POST" scroll)
+G233MUSIC=$(g233f "$G233POST" music)
+G233SOUND=$(g233f "$G233POST" sound)
+G233SPEECH=$(g233f "$G233POST" speech)
+# THE SHIPPED BLOCK ITSELF, straight out of dopt_settings_init and untouched by the
+# mixer. This is the half that can go red on a changed default; the five above are what
+# the sliders ended up showing, which for the three volumes is the mixer's answer.
+G233SHSPEED=$(g233f "$G233POST" ship_speed)
+G233SHSCROLL=$(g233f "$G233POST" ship_scroll)
+G233SHMUSIC=$(g233f "$G233POST" ship_music)
+G233SHSOUND=$(g233f "$G233POST" ship_sound)
+G233SHSPEECH=$(g233f "$G233POST" ship_speech)
+G233END=$(grep -c '^SCRIPT|end g233.txt: 5 lines, 0 failures' /tmp/g233_eyes.log)
+# The picture: how many of the 249 rows stand off their compiled default, and the handful
+# read by name. A fresh run must move none of them.
+G233MOVED=$(grep -c '# was\|# moved' /tmp/g233_fresh.cfg 2>/dev/null)
+G233ROWS=$(grep -cE '^[a-z_][a-z_0-9]* ' /tmp/g233_fresh.cfg 2>/dev/null)
+g233dial() { sed -n "s/^$1  *\([-0-9.]*\).*/\1/p" /tmp/g233_fresh.cfg | head -1; }
+G233PIC=1
+[ "$(g233dial smooth_anim)" = "1" ] || G233PIC=0
+[ "$(g233dial enabled)" = "0" ] || G233PIC=0
+[ "$(g233dial bilinear)" = "1" ] || G233PIC=0
+[ "$(g233dial new_hud)" = "1" ] || G233PIC=0
+[ "$(g233dial texset)" = "1.00000" ] || G233PIC=0
+[ "$(g233dial ss_scale)" = "1.00000" ] || G233PIC=0
+[ "$(g233dial sun_az)" = "67.50000" ] || G233PIC=0
+[ "$(g233dial sun_el)" = "28.71428" ] || G233PIC=0
+[ "$(g233dial inf_scale)" = "0.75000" ] || G233PIC=0
+[ "$(g233dial decal_soft)" = "0.60000" ] || G233PIC=0
+[ "$(g233dial grass)" = "0" ] || G233PIC=0
+[ "$(g233dial rain_fx)" = "0" ] || G233PIC=0
+G233PICSAW="smooth_anim=$(g233dial smooth_anim) enabled=$(g233dial enabled) bilinear=$(g233dial bilinear) new_hud=$(g233dial new_hud) texset=$(g233dial texset) ss_scale=$(g233dial ss_scale) sun_az=$(g233dial sun_az) sun_el=$(g233dial sun_el) inf_scale=$(g233dial inf_scale) decal_soft=$(g233dial decal_soft) grass=$(g233dial grass) rain_fx=$(g233dial rain_fx)"
+G233CTLLINE=$(grep -c '^controls: no cnc3d-controls.cfg yet' /tmp/g233_shell.log)
+G233FXLINE=$(grep -c '^FX|no preset at cnc3d-fx.cfg' /tmp/g233_shell.log)
+# EVERY NUMBER IS READ BY NOW, so the sandbox goes. It is thousands of links into a folder
+# the next build replaces, and left lying around it is a trap rather than evidence; the
+# three logs above are the evidence and they are kept.
+rm -rf "$G233SB"
+
+if [ "$G233NOTGAME" != "0" ]; then
+  bad "G233 shipped defaults: the pid this gate started and killed was not the game: ps named it [$G233COMM], want cnc3d. A wrapper there means killing it leaves the game orphaned and running, one leaked process per suite run holding a deleted sandbox open, with every number below read while it ran (its children [$(echo $G233KIDS)] were stopped); an empty name means the game had died before the kill"
+elif [ "$G233LINKS" -lt 100 ] || [ "$G233STRAY" != "0" ] || \
+   [ "$G233DIRS" != "$G233SRCDIRS" ] || [ "$G233DIRLINKS" != "0" ]; then
+  bad "G233 shipped defaults: the sandbox is not one. $G233LINKS files linked (want >=100), $G233STRAY settings file(s) present (want 0), $G233DIRS directories made against $G233SRCDIRS in the run folder, and $G233DIRLINKS of them left as links (want 0, because a linked directory is the run folder and anything written below it lands there). Nothing below was measured in a fresh folder"
+elif [ "$G233ERC" != "0" ] || [ "$G233END" != "1" ]; then
+  bad "G233 shipped defaults: the renderer run failed (exit $G233ERC, end-line matches $G233END). Nothing below was measured"
+elif [ -z "$G233PRE" ] || [ -z "$G233POST" ]; then
+  bad "G233 shipped defaults: no OPTCTL readback. before=[$G233PRE] after=[$G233POST]"
+elif [ "$G233TPRE" != "$G233TPOST" ]; then
+  bad "G233 shipped defaults: the tick rate CHANGES when the pause dialog is first opened, $G233TPRE before and $G233TPOST after. A player's first mission runs at one speed and jumps to another the first time ESC is pressed. The pre-dialog fallback in the renderer and the Game Controls default have stopped being the same number"
+elif [ "$G233SHSPEED" != "4" ] || [ "$G233SHSCROLL" != "3" ] || [ "$G233SHMUSIC" != "239" ] || \
+     [ "$G233SHSOUND" != "239" ] || [ "$G233SHSPEECH" != "239" ] || [ "$G233TPOST" != "4" ]; then
+  bad "G233 shipped defaults: the block a new player is handed is speed=$G233SHSPEED scroll=$G233SHSCROLL music=$G233SHMUSIC sound=$G233SHSOUND speech=$G233SHSPEECH, want 4 / 3 / 239 / 239 / 239, and the tick rate is $G233TPOST, want 4. 239 is the top of the slider's travel, not 255"
+elif [ "$G233SPEED" != "$G233SHSPEED" ] || [ "$G233SCROLL" != "$G233SHSCROLL" ]; then
+  bad "G233 shipped defaults: opening the pause dialog put speed=$G233SPEED scroll=$G233SCROLL on the sliders where the shipped block says $G233SHSPEED / $G233SHSCROLL. These two are seeded straight out of that block, so a player is being shown something other than what the game is running"
+elif [ "$G233MUSIC" != "239" ] || [ "$G233SOUND" != "239" ] || [ "$G233SPEECH" != "239" ]; then
+  bad "G233 shipped defaults: the volume sliders read music=$G233MUSIC sound=$G233SOUND speech=$G233SPEECH on first open, want 239 each. The seed scales the LIVE MIXER onto the slider's travel and this run boots it at full, so these three say the scaling is right; they cannot say anything about the shipped volume defaults, which the line above covers"
+elif [ "${G233ROWS:-0}" -lt 240 ]; then
+  bad "G233 shipped defaults: the picture readback holds $G233ROWS rows (want >=240), so it is not a readback of the whole chain and the count below proves nothing"
+elif [ "${G233MOVED:-99}" != "0" ]; then
+  bad "G233 shipped defaults: $G233MOVED of the $G233ROWS picture rows stand off their compiled default on a FRESH run, which means something is moving the shipped picture before anything has asked it to: [$(grep '# was\|# moved' /tmp/g233_fresh.cfg | tr '\n' ' ')]"
+elif [ "$G233PIC" != "1" ]; then
+  bad "G233 shipped defaults: the named picture rows read [$G233PICSAW]. smooth_anim must be 1 and enabled 0 however the tuned file has them; the rest are the tuned numbers"
+elif [ "$G233CTLLINE" != "1" ] || [ "$G233FXLINE" != "1" ]; then
+  bad "G233 shipped defaults: the shell did not report an empty folder (controls line $G233CTLLINE, preset line $G233FXLINE, want 1 each). It either found a settings file that should not be there or it has stopped looking, and a launch that stops looking is a player whose remembered settings never come back"
+elif [ "$G233WROTE" != "0" ]; then
+  bad "G233 shipped defaults: starting the game in an empty folder MINTED $G233WROTE settings file(s) nobody asked for. From that moment the player is pinned to a snapshot of the defaults and no future change to them can reach that install"
+else
+  ok "G233 shipped defaults, in a folder holding neither settings file ($G233LINKS files linked into $G233DIRS real directories, none of them a link back): the shipped block a new player gets is speed $G233SHSPEED, scroll $G233SHSCROLL, and music, sound and speech all at $G233SHMUSIC, the top of the travel and not 255; the tick rate is $G233TPRE before the pause dialog is opened and $G233TPOST after, so the first mission does not change pace the first time ESC is pressed; the two sliders seeded from that block agree with it, and the three volume sliders read 239 as the mixer's own level scaled onto the travel, REPORTED rather than asserted as a default; all $G233ROWS picture rows stand on their compiled defaults with smooth animation ON and the chain's master switch OFF whatever the tuned file says; and the shell reports both files absent and mints neither; the process killed at the end was the game itself ($G233COMM) and not a wrapper"
+fi
+
+# G237 RESTATE. "Implement Restate in the Options menu." goptions.cpp:373 hands the
+# player the mission objective as text with a Video button beside it; this build drew the
+# button disabled because nothing had read the mission briefing. Four legs, and the last one is
+# the one that could rot silently:
+#
+#   a  SCG02EA has no [Briefing] of its own, so the text must come from MISSION.INI inside
+#      GENERAL.MIX, and the box's lines JOINED must equal that block's entries joined
+#      (read here with the same MIX arithmetic the game uses: the entry table, then the
+#      block). A box that opened with the wrong mission's text would pass a line count.
+#   b  SCG22EA carries its own block, and the joined lines must equal it.
+#   c  in the standalone renderer there is no player, so the box is the single-OK form
+#      (video=0) and OK puts the pause page back (page=0).
+#   d  through the SHELL, which lends its movie player: Restate on Blackout opens the
+#      two-button form (video=1), Video plays OBEL (its Action= movie, since Brief=x),
+#      the engine frame is the SAME before and after the movie (the world stayed paused),
+#      the dialog reopens over a drawn game frame (the PNG has ink), and the departure
+#      then goes out through Abort with 0 harness failures. This is the leg that proves
+#      the movie left the game's GL state alone.
+rm -rf shots/rs; mkdir -p shots/rs
+G237A=$(./cnc_eyes --scen SCG02EA --pack SCG02EA.pack $BASE --noshroud --w 640 --h 400 \
+        --script gate_restate.txt 2>&1)
+echo "$G237A" >> "$OUT"
+G237B=$(./cnc_eyes --scen SCG22EA --pack SCG22EA.pack $BASE --noshroud --w 640 --h 400 \
+        --script gate_restate.txt 2>&1)
+echo "$G237B" >> "$OUT"
+g237_joined() { printf '%s\n' "$1" | sed -n 's/^RESTATE|line|//p' | paste -sd' ' - | sed 's/  */ /g'; }
+G237AJ=$(g237_joined "$G237A")
+G237BJ=$(g237_joined "$G237B")
+# the two reference texts, out of the files the game reads
+G237WANTA=$(python3 - <<'PY'
+import struct,re
+d=open('dosdata/GENERAL.MIX','rb').read()
+n=struct.unpack('<H',d[:2])[0]
+def mixid(name):
+    b=name.upper().encode(); b+=b'\0'*((-len(b))%4); h=0
+    for i in range(0,len(b),4):
+        h=(((h<<1)|(h>>31))+struct.unpack('<I',b[i:i+4])[0])&0xffffffff
+    return h
+want=mixid('MISSION.INI'); hdr=6+n*12
+for i in range(n):
+    id_,o,sz=struct.unpack('<III',d[6+i*12:18+i*12])
+    if id_==want:
+        t=d[hdr+o:hdr+o+sz].decode('latin1'); break
+m=re.search(r'\[SCG02EA\](.*?)(?=\n\[|\Z)',t,re.S)
+print(' '.join(' '.join(l.split('=',1)[1].strip() for l in m.group(1).splitlines() if '=' in l).split()))
+PY
+)
+G237WANTB=$(python3 - <<'PY'
+import re
+t=open('missions/SCG22EA.INI','rb').read().decode('latin1')
+m=re.search(r'\[BRIEFING\](.*?)(?=\n\[|\Z)',t,re.S|re.I)
+print(' '.join(' '.join(l.split('=',1)[1].strip() for l in m.group(1).splitlines() if '=' in l).split()))
+PY
+)
+G237AFROM=$(echo "$G237A" | grep -c '^BRIEF|SCG02EA|from=MISSION.INI|')
+G237BFROM=$(echo "$G237B" | grep -c '^BRIEF|SCG22EA|from=INI|')
+G237AOPEN=$(echo "$G237A" | grep -c '^RESTATE|open|lines=[1-9][0-9]*|video=0|')
+G237ABACK=$(echo "$G237A" | grep -c '^OPTIONS|script|click|OK|.*|page=0$')
+G237AEND=$(echo "$G237A" | grep -c '^SCRIPT|end .* 0 failures$')
+G237BEND=$(echo "$G237B" | grep -c '^SCRIPT|end .* 0 failures$')
+G237PNG=0; [ -s shots/rs/restate.png ] && G237PNG=1
+# leg d, the shell
+rm -rf shots/hrs; mkdir -p shots/hrs
+G237D=$(./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+        --harness 400 --rounds 1 --shotdir shots/hrs --harnessscen SCG22EA \
+        --autoesc 2 --autorestate --autoabort 1 --autorestateshot shots/hrs/after_video.png 2>&1)
+echo "$G237D" >> "$OUT"
+G237DOPEN=$(echo "$G237D" | grep -c '^RESTATE|open|lines=6|video=1|')
+G237DPLAY=$(echo "$G237D" | sed -n 's/^OPTIONS|restate|video|OBEL|played|frame=\([0-9]*\)$/\1/p' | head -1)
+G237DFRAMES=$(echo "$G237D" | sed -n 's/^OPTIONS|open|frame=\([0-9]*\)$/\1/p' | paste -sd' ' -)
+G237DSHOT=$(echo "$G237D" | grep -c '^RESTATE|shot|shots/hrs/after_video.png|written$')
+G237DABORT=$(echo "$G237D" | grep -c '^OPTIONS|abort|frame=')
+G237DEND=$(echo "$G237D" | grep -c '^HARNESS|end|1 round(s), 0 failure(s)')
+G237DINK=$(python3 - <<'PY'
+import zlib,struct
+try:
+    d=open('shots/hrs/after_video.png','rb').read()
+    # count non-black pixels through a plain PNG walk: IHDR then IDAT
+    p=8; w=h=0; idat=b''
+    while p<len(d):
+        n=struct.unpack('>I',d[p:p+4])[0]; t=d[p+4:p+8]; c=d[p+8:p+8+n]
+        if t==b'IHDR': w,h,bd,ct=struct.unpack('>IIBB',c[:10])
+        if t==b'IDAT': idat+=c
+        p+=12+n
+    raw=zlib.decompress(idat); bpp=3 if ct==2 else 4; stride=w*bpp+1
+    ink=0; tot=0
+    for y in range(0,h,4):
+        row=raw[y*stride+1:y*stride+1+w*bpp]
+        for x in range(0,w*bpp,bpp*4):
+            tot+=1
+            if row[x]>24 or row[x+1]>24 or row[x+2]>24: ink+=1
+    print('%.3f'%(ink/float(tot) if tot else 0))
+except Exception as e:
+    print('0')
+PY
+)
+if [ "$G237AFROM" = "1" ] && [ "$G237BFROM" = "1" ] && [ "$G237AOPEN" = "1" ] \
+   && [ "$G237ABACK" = "1" ] && [ "$G237AEND" = "1" ] && [ "$G237BEND" = "1" ] \
+   && [ -n "$G237AJ" ] && [ "$G237AJ" = "$G237WANTA" ] && [ -n "$G237BJ" ] && [ "$G237BJ" = "$G237WANTB" ] \
+   && [ "$G237PNG" = "1" ] && [ "$G237DOPEN" = "1" ] && [ -n "$G237DPLAY" ] \
+   && [ "$G237DFRAMES" = "$G237DPLAY $G237DPLAY" ] && [ "$G237DSHOT" = "1" ] \
+   && [ "$G237DABORT" = "1" ] && [ "$G237DEND" = "1" ] \
+   && [ "$(echo "$G237DINK >= 0.15" | bc -l 2>/dev/null)" = "1" ]; then
+  ok "G237 Restate: SCG02EA's objective comes out of MISSION.INI in GENERAL.MIX and SCG22EA's out of its own [Briefing], both joined texts equal the files' ($(echo "$G237AJ" | wc -c | tr -d ' ') and $(echo "$G237BJ" | wc -c | tr -d ' ') chars), the single-OK box closes back to the pause page; through the shell the two-button box offers Video, OBEL plays with the frame held at $G237DPLAY on both sides of it, the game redraws under the reopened dialog (ink $G237DINK) and the mission then leaves through Abort"
+else
+  bad "G237 Restate: from-mission-ini=$G237AFROM from-ini=$G237BFROM(want 1 each) opened-single-ok=$G237AOPEN back-to-page0=$G237ABACK script-ends=$G237AEND/$G237BEND png=$G237PNG text-a-matches=$([ "$G237AJ" = "$G237WANTA" ] && echo 1 || echo 0) text-b-matches=$([ "$G237BJ" = "$G237WANTB" ] && echo 1 || echo 0) | shell: two-button=$G237DOPEN played-at=[$G237DPLAY] dialog-frames=[$G237DFRAMES](want the same frame twice) shot=$G237DSHOT abort=$G237DABORT end=$G237DEND ink=$G237DINK(want >=0.15). Got a=[$G237AJ] want a=[$G237WANTA]"
+fi
+
+# G238 THE SAVE SYSTEM, FINISHED. Slots were writable since the save layer landed, but
+# only through the script verbs: the pause dialog's Save took the next free slot with a
+# made-up name, Load took the newest slot of the running mission, Delete was greyed, the
+# main menu's Load Mission was greyed, and no slot ever recorded the campaign position.
+# 1995's slot dialog (loaddlg.cpp) is now behind all three pause buttons and the menu
+# button, and this gate walks every door through the real dialog:
+#
+#   a  the renderer, scripted (gate_slots.txt) on SCG01EA into a scratch save folder:
+#      Save opens on [EMPTY SLOT] with the field prefilled and Save live; clearing the
+#      field greys Save and typing brings it back; the save lands in slot 0 UNDER THE
+#      TYPED NAME; a second Save dialog lists the empty slot first (now number 1) and
+#      "(GDI) Alpha base 1" second; choosing that row copies its description into the
+#      field, and saving over it renames it; Load lists the slot and restores frame 300
+#      after 200 more ticks, with the object dump back to the pre-save one line for line;
+#      Delete asks "Delete this file?", Yes removes the slot and the emptied dialog closes.
+#   b  the shell, --flowtest with --autosave: a save made inside the campaign records the
+#      campaign position, read back off the index record as active/side/scenario 1/0/1
+#      for SCG01EA and 1/0/2 for SCG02EA.
+#   c  the shell, --harnessload: the main menu's Load Mission dialog lists both, RETURN
+#      loads the newest, the shell boots SCG02EA with the slot and the campaign position
+#      comes back as 1/0/2, and the mission reports the load at frame 18.
+#   d  the shell, Test Map with --autoesc --autoload: a pause-dialog load of ANOTHER
+#      mission's slot leaves through GAME_EXIT_LOADSLOT (reason 7), the shell boots
+#      SCG02EA and loads it there.
+rm -rf shots/sl; mkdir -p shots/sl/saves
+G238A=$(./cnc_eyes --scen SCG01EA --pack SCG01EA.pack $BASE --savedir shots/sl/saves \
+        --w 640 --h 400 --script gate_slots.txt 2>&1)
+echo "$G238A" >> "$OUT"
+G238OPEN1=$(echo "$G238A" | grep -c '^SLOTS|open|mode=1|rows=1|sel=0|top=0|descr=SCG01EA 0 min|ok-disabled=0$')
+G238EMPTY=$(echo "$G238A" | grep -c '^OPTIONS|script|type|descr=|ok-disabled=1$')
+G238TYPED=$(echo "$G238A" | grep -c '^OPTIONS|script|type|descr=Alpha base 1|ok-disabled=0$')
+G238SAVE1=$(echo "$G238A" | grep -c '^SAVE|slot=0|Alpha base 1|bytes=[0-9]*|frame=300|scen=SCG01EA|')
+G238ROWS2=$(echo "$G238A" | grep -c '^SLOTS|row|0|slot=1|\[EMPTY SLOT\]$')
+G238ROWS2B=$(echo "$G238A" | grep -c '^SLOTS|row|1|slot=0|(GDI) Alpha base 1$')
+G238PICK=$(echo "$G238A" | grep -c '^OPTIONS|script|row|1|sel=1|descr=Alpha base 1$')
+G238SAVE2=$(echo "$G238A" | grep -c '^SAVE|slot=0|Second save|bytes=[0-9]*|frame=300|scen=SCG01EA|')
+G238LOADROW=$(echo "$G238A" | grep -c '^SLOTS|row|0|slot=0|(GDI) Second save$')
+G238LOAD=$(echo "$G238A" | grep -c '^LOAD|slot=0|frame=300|scen=SCG01EA|objects=')
+G238DELQ=$(echo "$G238A" | grep -c '^OPTIONS|script|click|Delete|.*|page=6$')
+G238DEL=$(echo "$G238A" | grep -c '^DELETE|slot=0|removed$')
+G238LEFT=$(echo "$G238A" | grep -c '^SLOTS|0 occupied of 16$')
+G238CLOSED=$(echo "$G238A" | grep -c '^OPTIONS|script|click|Resume Mission|.*|page=0$')
+G238END=$(echo "$G238A" | grep -c '^SCRIPT|end .* 0 failures$')
+echo "$G238A" | awk '/^OBJDUMP-BEGIN/{n++} n==1&&/^(OBJ\||TIB\||WALL\|)/{print}' > /tmp/g238_a.txt
+echo "$G238A" | awk '/^OBJDUMP-BEGIN/{n++} n==3&&/^(OBJ\||TIB\||WALL\|)/{print}' > /tmp/g238_c.txt
+G238LINES=$(wc -l < /tmp/g238_a.txt | tr -d ' ')
+G238SAME=0; cmp -s /tmp/g238_a.txt /tmp/g238_c.txt && G238SAME=1
+G238PNGS=0; for f in save_open save_typed load_open delete_ask; do [ -s shots/sl/$f.png ] && G238PNGS=$((G238PNGS+1)); done
+# leg b: a save from inside the campaign. Watchdogged like G14's flow.
+rm -rf shots/sl/camp; mkdir -p shots/sl/camp
+./cnc3d --flowtest 60 --dylib ./TiberianDawn.dylib --dir ./missions/ \
+      --content ./content/ --cameos cameos.pack --dospack dossidebar.pack \
+      --dosinf dosinfantry.pack --savedir shots/sl/camp --autoesc 1 --autosave \
+      > shots/sl/flow.log 2>>"$OUT" &
+G238FP=$!; G238FW=0
+while kill -0 $G238FP 2>/dev/null && [ $G238FW -lt 300 ]; do sleep 1; G238FW=$((G238FW+1)); done
+if kill -0 $G238FP 2>/dev/null; then kill $G238FP 2>/dev/null; sleep 5; kill -9 $G238FP 2>/dev/null; fi
+wait $G238FP 2>/dev/null
+cat shots/sl/flow.log >> "$OUT"
+G238FSAVE1=$(grep -c '^SAVE|slot=0|SCG01EA 0 min|.*|scen=SCG01EA|' shots/sl/flow.log)
+G238FSAVE2=$(grep -c '^SAVE|slot=1|SCG02EA 0 min|.*|scen=SCG02EA|' shots/sl/flow.log)
+G238FDONE=$(grep -c '^FLOWTEST|complete|2 missions' shots/sl/flow.log)
+G238CAMP=$(python3 - <<'PY'
+import struct
+try:
+    d=open('shots/sl/camp/CNC3DSAV.IDX','rb').read()
+    out=[]
+    for i in range(16):
+        r=d[i*128:(i+1)*128]
+        if len(r)<128 or struct.unpack('<I',r[:4])[0]!=0x53443343: continue
+        out.append('%s=%d/%d/%d'%(r[60:72].split(b'\0')[0].decode(),r[96],r[97],r[98]))
+    print(' '.join(out))
+except Exception:
+    print('unreadable')
+PY
+)
+# leg c: the main menu's Load Mission on that folder
+rm -rf shots/sl/menu; mkdir -p shots/sl/menu
+G238C=$(./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+        --harness 40 --rounds 1 --shotdir shots/sl/menu --harnessload --savedir shots/sl/camp 2>&1)
+echo "$G238C" >> "$OUT"
+G238CROWS=$(echo "$G238C" | grep -c '^LOADMENU|open|rows=2$')
+G238CPICK=$(echo "$G238C" | grep -c '^LOADMENU|close|slot=1$')
+G238CBOOT=$(echo "$G238C" | grep -c '^APP|load|slot=1|scen=SCG02EA|pack=SCG02EA.pack|dir=missions/|campaign=1/0/2$')
+G238CLOAD=$(echo "$G238C" | grep -c '^LOAD|slot=1|frame=18|scen=SCG02EA|objects=')
+G238CEND=$(echo "$G238C" | grep -c '^HARNESS|end|1 round(s), 0 failure(s)')
+# leg d: a pause-dialog load of another mission's slot, from the Test Map
+rm -rf shots/sl/game; mkdir -p shots/sl/game
+G238D=$(./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+        --harness 40 --rounds 1 --shotdir shots/sl/game --savedir shots/sl/camp \
+        --autoesc 2 --autoload 2>&1)
+echo "$G238D" >> "$OUT"
+G238DHAND=$(echo "$G238D" | grep -c '^LOAD|slot=1|saved in SCG02EA, running SCG90EA: handing over to the shell$')
+G238DREASON=$(echo "$G238D" | grep -c '^APP|game|round=1|reason=7$')
+G238DBOOT=$(echo "$G238D" | grep -c '^APP|load|slot=1|scen=SCG02EA|pack=SCG02EA.pack|dir=missions/|campaign=1/0/2$')
+# at least one: the boot's own load, and --autoload loads it again in place next round
+G238DLOAD=$(echo "$G238D" | grep -c '^LOAD|slot=1|frame=18|scen=SCG02EA|objects=')
+G238DEND=$(echo "$G238D" | grep -c '^HARNESS|end|2 round(s), 0 failure(s)')
+if [ "$G238OPEN1" = "1" ] && [ "$G238EMPTY" -ge 1 ] && [ "$G238TYPED" = "1" ] && [ "$G238SAVE1" = "1" ] \
+   && [ "$G238ROWS2" -ge 1 ] && [ "$G238ROWS2B" -ge 1 ] && [ "$G238PICK" = "1" ] && [ "$G238SAVE2" = "1" ] \
+   && [ "$G238LOADROW" -ge 1 ] && [ "$G238LOAD" = "1" ] && [ "$G238DELQ" = "1" ] && [ "$G238DEL" = "1" ] \
+   && [ "$G238LEFT" -ge 1 ] && [ "$G238CLOSED" = "1" ] && [ "$G238END" = "1" ] \
+   && [ "${G238LINES:-0}" -ge 50 ] && [ "$G238SAME" = "1" ] && [ "$G238PNGS" = "4" ] \
+   && [ "$G238FSAVE1" = "1" ] && [ "$G238FSAVE2" = "1" ] && [ "$G238FDONE" = "1" ] \
+   && [ "$G238CAMP" = "SCG01EA=1/0/1 SCG02EA=1/0/2" ] \
+   && [ "$G238CROWS" = "1" ] && [ "$G238CPICK" = "1" ] && [ "$G238CBOOT" = "1" ] && [ "$G238CLOAD" = "1" ] && [ "$G238CEND" = "1" ] \
+   && [ "$G238DHAND" = "1" ] && [ "$G238DREASON" = "1" ] && [ "$G238DBOOT" = "1" ] && [ "$G238DLOAD" -ge 1 ] && [ "$G238DEND" = "1" ]; then
+  ok "G238 the save system: the slot dialog saves under the typed name (empty field greys Save), lists the empty slot first and existing saves newest first, copies a chosen row's description, loads a slot back to frame 300 with $G238LINES dump lines identical, and deletes after asking; a campaign save records its position ($G238CAMP); the main menu's Load Mission boots the slot's own mission and restores the position; and a pause-dialog load of another mission's slot hands over to the shell (reason 7) and lands in it"
+else
+  bad "G238 the save system: open=$G238OPEN1 empty-greys=$G238EMPTY typed=$G238TYPED save1=$G238SAVE1 rows2=$G238ROWS2/$G238ROWS2B pick=$G238PICK save2=$G238SAVE2 loadrow=$G238LOADROW load=$G238LOAD delq=$G238DELQ del=$G238DEL left=$G238LEFT closed=$G238CLOSED end=$G238END lines=$G238LINES same=$G238SAME pngs=$G238PNGS(want 4) | flow: save1=$G238FSAVE1 save2=$G238FSAVE2 done=$G238FDONE camp=[$G238CAMP](want [SCG01EA=1/0/1 SCG02EA=1/0/2]) | menu: rows=$G238CROWS pick=$G238CPICK boot=$G238CBOOT load=$G238CLOAD end=$G238CEND | in-game: handover=$G238DHAND reason7=$G238DREASON boot=$G238DBOOT load=$G238DLOAD end=$G238DEND (want 1 each)"
+fi
+
+# =====================================================================================
+# G239 THE PAD NEVER BURIES A BUILDING, and a building placed beside a taller neighbour
+# rises to its level.
+#
+# THE REPORT. A Barracks ended up sunk into the ground. The building pad levels every
+# footprint to its highest corner, and where two footprints shared a corner the taller
+# pad won it. A building is one flat model drawn at one height, the one under its own
+# anchor, so along a shared edge the lower building stood below its own corners and the
+# ground cut through it. It was retroactive (a standing Barracks sank the moment a Power
+# Plant went up beside it) and it needed no slope (SCB07EC's Barracks stands on raw 64
+# under every corner). Footprints that touch are now levelled together, and an apron row
+# never overrides a corner a footprint owns.
+#
+# THREE LEGS, and why each one is there. (1) The shipped SCB07EC base, which carried the
+# defect as it ships: padcheck must count zero buried and every footprint flat, the
+# Barracks' own south corners must read the same height as the column it shares with the
+# plant, and that height must be the plant's 87 and NOT the yard's 90 or the refinery's
+# 101. The yard's apron row lies on the Barracks' north edge, so a rule that let aprons
+# join groups would fuse the whole base into one platform, and this number would say so.
+# (2) The player's own path on SCG01EC: build a Barracks and place it at 56,52 beside the
+# Construction Yard. Its own east column, which the yard never reaches, must read the
+# yard's 125: the whole Barracks rose, rather than the shared column being given away.
+# (3) The control: the same SCB07EC run with --noflatpads must report buried > 0. A
+# readout that cannot go red proves nothing, and the raw cartridge terrain sinks 15 of
+# that base's 38 pre-placed buildings, so the verb has something to say. On a binary
+# without the verb every leg fails, because an unknown script command is a script failure.
+# =====================================================================================
+gbegin shots/padcheck_scb07ec.png shots/padlive_scg01ec.png \
+       shots/g239_base.log shots/g239_live.log shots/g239_raw.log
+grun shots/g239_base.log --scen SCB07EC --pack SCB07EC.pack $BASE --noshroud --nominimap \
+    --nosidebar --w 1280 --h 720 --script gate_padcheck.txt
+grun shots/g239_live.log --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_padlive.txt
+grun shots/g239_raw.log --scen SCB07EC --pack SCB07EC.pack $BASE --noshroud --noflatpads \
+    --nominimap --nosidebar --w 320 --h 200 --script gate_padcheck.txt
+gshots shots/padcheck_scb07ec.png shots/padlive_scg01ec.png
+# The summary line, split into its numbers. A missing line leaves every field empty, and
+# every test below treats empty as a failure rather than as zero.
+g239_field() { sed -n "s/^PADCHECK|summary|\(.*|\)*$2=\([0-9]*\).*/\2/p" "$1" | tail -1; }
+G239_BLD=$(g239_field shots/g239_base.log buildings)
+G239_BUR=$(g239_field shots/g239_base.log buried)
+G239_FLAT=$(g239_field shots/g239_base.log flat)
+G239_PYLE=$(sed -n 's/^PADCHECK|PYLE|.*|cell=45,52|.*|pad=\([0-9]*\)|low=\([0-9]*\)|anchor=\([0-9.]*\)|.*/\1 \2 \3/p' shots/g239_base.log | tail -1)
+G239_S1=$(sed -n 's/^SBRRAW|45,54|.*|seen=\([0-9]*\).*/\1/p' shots/g239_base.log | tail -1)
+G239_S2=$(sed -n 's/^SBRRAW|46,54|.*|seen=\([0-9]*\).*/\1/p' shots/g239_base.log | tail -1)
+G239_S3=$(sed -n 's/^SBRRAW|47,53|.*|seen=\([0-9]*\).*/\1/p' shots/g239_base.log | tail -1)
+G239_LBUR=$(g239_field shots/g239_live.log buried)
+G239_LBLD=$(g239_field shots/g239_live.log buildings)
+G239_LPYLE=$(sed -n 's/^PADCHECK|PYLE|.*|cell=56,52|.*|raw=\([0-9]*\)|pad=\([0-9]*\)|low=\([0-9]*\)|anchor=\([0-9.]*\)|.*/\1 \2 \3 \4/p' shots/g239_live.log | tail -1)
+G239_L1=$(sed -n 's/^SBRRAW|56,53|.*|seen=\([0-9]*\).*/\1/p' shots/g239_live.log | tail -1)
+G239_L2=$(sed -n 's/^SBRRAW|58,52|.*|seen=\([0-9]*\).*/\1/p' shots/g239_live.log | tail -1)
+G239_L3=$(sed -n 's/^SBRRAW|58,54|.*|seen=\([0-9]*\).*/\1/p' shots/g239_live.log | tail -1)
+G239_RBUR=$(g239_field shots/g239_raw.log buried)
+G239_PLACED=$(grep -ac '^SCRIPT|place|placementmode now 0' shots/g239_live.log)
+if [ "$GRC" != "0" ]; then
+  bad "G239 the pad never buries a building: a run failed (exit $GRC); a binary without padcheck fails here, because an unknown script verb is a script failure"
+elif [ -z "$G239_BLD" ] || [ "$G239_BLD" -lt 30 ]; then
+  bad "G239 the pad never buries a building: SCB07EC padcheck saw ${G239_BLD:-no} buildings (want >= 30), so the readout measured nothing"
+elif [ "$G239_BUR" != "0" ] || [ "$G239_FLAT" != "$G239_BLD" ]; then
+  bad "G239 the pad never buries a building: SCB07EC buried=${G239_BUR:-none} (want 0) flat=${G239_FLAT:-none} of $G239_BLD (want all); a building whose footprint corner is above its own anchor is drawn with the ground through it"
+elif [ "$G239_PYLE" != "87 87 87.00" ]; then
+  bad "G239 the pad never buries a building: the SCB07EC Barracks at 45,52 reads pad/low/anchor [$G239_PYLE] (want 87 87 87.00): it must stand level with the Power Plant it touches, and not at the yard's 90 or the refinery's 101, which would mean an apron row fused the base"
+elif [ "$G239_S1" != "87" ] || [ "$G239_S2" != "87" ] || [ "$G239_S3" != "87" ]; then
+  bad "G239 the pad never buries a building: the Barracks' own south corners read $G239_S1/$G239_S2 and its shared east column $G239_S3 (want 87 87 87): a building is one flat model and stands at one height"
+elif [ "${G239_PLACED:-0}" -lt 1 ] || [ -z "$G239_LBLD" ]; then
+  bad "G239 the pad never buries a building: the SCG01EC Barracks was never placed (placements=$G239_PLACED, padcheck buildings=${G239_LBLD:-none}), so the live leg measured nothing"
+elif [ "$G239_LBUR" != "0" ] || [ "$G239_LPYLE" != "113 125 125 125.00" ]; then
+  bad "G239 the pad never buries a building: after placing a Barracks at 56,52 beside the Construction Yard, buried=${G239_LBUR:-none} (want 0) and the Barracks reads raw/pad/low/anchor [$G239_LPYLE] (want 113 125 125 125.00): its own ground is 113, the yard's 125, and the two must become one platform"
+elif [ "$G239_L1" != "125" ] || [ "$G239_L2" != "125" ] || [ "$G239_L3" != "125" ]; then
+  bad "G239 the pad never buries a building: the placed Barracks' shared west column reads $G239_L1 and its own east column $G239_L2/$G239_L3 (want 125 125 125): the whole building must rise to the yard's level, not have its west edge given to the yard"
+elif [ -z "$G239_RBUR" ] || [ "$G239_RBUR" -lt 5 ]; then
+  bad "G239 the pad never buries a building: with --noflatpads the same base reports buried=${G239_RBUR:-none} (want >= 5); the raw cartridge terrain sinks 15 of its 38 buildings, and a padcheck that cannot see them cannot see anything"
+else
+  ok "G239 the pad never buries a building: SCB07EC $G239_BLD buildings, 0 buried, all flat, the Barracks level with its Power Plant at 87; a Barracks placed beside SCG01EC's Construction Yard rises 113 to 125 on both its columns; without the pad the verb counts $G239_RBUR buried"
+fi
+
+# =====================================================================================
+# G241 THE WRECK KEEPS ITS LIVERY: a destroyed vehicle comes apart in the texture the
+# standing vehicle drew through, not in its faction's default.
+#
+# The vehicle shatter snapshots every live unit once a tick and hands the snapshot's house
+# byte to the pieces when the unit leaves the dump. That byte used to be the SIDE, which
+# is the two-livery answer: with team colours on, a seat whose colour is not its faction's
+# default watched its wreck snap back to that default on the death tick, whole, before a
+# single piece had launched, and then fly apart in the wrong colour. Buildings never had
+# the fault (their spawn site passes the livery slot), and a campaign vehicle cannot show
+# it (every campaign house's slot IS its side), so G91 and G92 are blind to it by design.
+#
+# THE MEASUREMENT IS AN A/B AGAINST --noteamcolours, the way G123 proves the standing
+# army, because only a different texture reaching the card proves anything: the SHATTER
+# lines list the same pieces either way. Three seats, the human on Nod, and seat 2 is
+# blown up (Flag_To_Die, the departure path), which kills its harvester with a
+# free-standing FBALL1 that the sweep accepts as the witness. Seat 2 wears colour 2, RED,
+# a livery that has to be BUILT and whose slot (2) is neither side's default (0 or 1), so
+# on and off differ on the standing unit and MUST still differ on its pieces. The probe
+# run reads out which vehicle of that seat died, where and on which frame; the on/off pair
+# parks the camera on that spot before the blowup, shoots the frame before the death
+# (standing), the death frame (pieces hanging in place) and the two after it (in flight),
+# and the box is the standing vehicle's own silhouette read back from the on run, widened
+# by 60 points so the launch stays inside it.
+#
+# WHY IT CANNOT PASS ON A BROKEN BUILD. Measured on the build this catches: the on/off box
+# differs by 149 sampled pixels while the harvester stands and by 0 on every frame from
+# the death on, because the pieces bind slot 1 in both runs. A build whose SHATTERUNIT
+# line carries no house, or a house other than the seat's own slot, fails the readout leg;
+# a build that prints the right slot and binds the wrong texture fails the pixel leg. The
+# standing-frame floor is the anti-vacuity: a box that does not differ while the unit
+# stands is a box on nothing team-coloured, and the piece counts after it would be about
+# nothing. The off run's house must be 0 or 1, the side alone, or --noteamcolours did not
+# put the two-livery answer back and the pair measures nothing.
+gbegin shots/g241_on_*.png shots/g241_off_*.png
+printf 'tick 5\nlclickobj MCV:@me\nactclickobj MCV:@me\ntick 1500\nblowup 2\ntick 30\nquit\n' > /tmp/g241_probe.txt
+grun /tmp/g241.log --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 2 \
+     --noshroud --w 1280 --h 720 --script /tmp/g241_probe.txt
+# Seat 2's house and colour, and the slot that colour draws through: colour 0 (GOLD) is
+# the GDI variant, slot 1; colour 1 (LTBLUE) is the base texture, slot 0; 2..7 are built
+# and numbered by colour. Anything but a built slot makes the pair indecisive.
+WKHOUSE=$(sed -n 's/^TEAMCOLOUR|seat=2|house=\([^|]*\)|.*/\1/p' /tmp/g241.log | head -1)
+WKCOL=$(sed -n 's/^TEAMCOLOUR|seat=2|house=[^|]*|colour=\([0-9]*\)|.*/\1/p' /tmp/g241.log | head -1)
+case "${WKCOL:-x}" in 0) WKSLOT=1 ;; 1) WKSLOT=0 ;; [2-7]) WKSLOT=$WKCOL ;; *) WKSLOT=-1 ;; esac
+# The first vehicle the sweep shattered after the blowup: its type, heap id, position and
+# death frame. The on/off scripts name it by TYPE:HOUSE#ID, so a vehicle of any other
+# house comes back MISSING from clickobj and the gate goes red instead of measuring it.
+WKLINE=$(awk '/^BLOWUP\|pid=2\|ok=1/ { armed = 1 } armed && /^SHATTERUNIT\|[A-Z0-9]*\|id=[0-9]*\|kind=1\|/ { print; exit }' /tmp/g241.log)
+WKTYPE=$(echo "$WKLINE" | sed -n 's/^SHATTERUNIT|\([^|]*\)|.*/\1/p')
+WKID=$(echo "$WKLINE" | sed -n 's/^SHATTERUNIT|[^|]*|id=\([0-9]*\)|.*/\1/p')
+WKX=$(echo "$WKLINE" | sed -n 's/.*|at=\([-0-9.]*\),\([-0-9.]*\)|.*/\1/p')
+WKZ=$(echo "$WKLINE" | sed -n 's/.*|at=\([-0-9.]*\),\([-0-9.]*\)|.*/\2/p')
+WKF=$(echo "$WKLINE" | sed -n 's/.*|frame=\([0-9]*\).*/\1/p')
+# tick 5 + tick 1500 puts the blowup on frame 1505; the standing shot is the frame before
+# the death, so the tick count to it is WKF - 1 - 1505.
+WKSTAND=$(( ${WKF:-0} - 1506 ))
+wk_script() {
+    printf 'tick 5\nlclickobj MCV:@me\nactclickobj MCV:@me\ntick 1500\ncam %s %s\nzoom max\nblowup 2\ntick %d\nshot shots/g241_%s_stand.png\nclickobj %s:%s#%s\ntick 1\nshot shots/g241_%s_dead.png\ntick 1\nshot shots/g241_%s_fly1.png\ntick 1\nshot shots/g241_%s_fly2.png\nquit\n' \
+        "$WKX" "$WKZ" "$WKSTAND" "$1" "$WKTYPE" "$WKHOUSE" "$WKID" "$1" "$1" "$1" > "/tmp/g241_$1.txt"
+}
+wk_script on; wk_script off
+grun /tmp/g241_on.log --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 2 \
+     --noshroud --w 1280 --h 720 --script /tmp/g241_on.txt
+grun /tmp/g241_off.log --scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side nod --ai 2 \
+     --noshroud --noteamcolours --w 1280 --h 720 --script /tmp/g241_off.txt
+gshots shots/g241_on_stand.png shots/g241_on_dead.png shots/g241_on_fly1.png shots/g241_on_fly2.png \
+       shots/g241_off_stand.png shots/g241_off_dead.png shots/g241_off_fly1.png shots/g241_off_fly2.png
+# The readout leg: the same vehicle died on the same frame in both runs, the on run's
+# pieces carry the seat's slot and the off run's carry the side.
+WKONH=$(sed -n "s/^SHATTERUNIT|$WKTYPE|id=$WKID|.*|frame=$WKF|house=\([0-9-]*\)$/\1/p" /tmp/g241_on.log | head -1)
+WKOFFH=$(sed -n "s/^SHATTERUNIT|$WKTYPE|id=$WKID|.*|frame=$WKF|house=\([0-9-]*\)$/\1/p" /tmp/g241_off.log | head -1)
+case "${WKOFFH:-x}" in 0|1) WKOFFSIDE=1 ;; *) WKOFFSIDE=0 ;; esac
+WKONPASS=$(grep -c '^CLICKOBJ|PASS$' /tmp/g241_on.log)
+WKOFFPASS=$(grep -c '^CLICKOBJ|PASS$' /tmp/g241_off.log)
+# The pixel leg: the standing vehicle's own silhouette from the on run, widened to hold
+# the launch, compared on/off at all four frames.
+WKSIL=$(sed -n 's/^CLICKOBJ|want=.*|silhouette=\([0-9]*\),\([0-9]*\)\.\.\([0-9]*\),\([0-9]*\)|.*/\1 \2 \3 \4/p' /tmp/g241_on.log | head -1)
+WKBOX=$(echo "$WKSIL" | awk 'NF == 4 { printf "%d,%d,%d,%d", $1 - 60, $2 - 60, $3 + 60, $4 + 60 }')
+WKD0=-1; WKD1=-1; WKD2=-1; WKD3=-1
+if [ "$GRC" = "0" ] && [ -n "$WKBOX" ]; then
+    WKD0=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_stand.png shots/g241_off_stand.png "$WKBOX")
+    WKD1=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_dead.png  shots/g241_off_dead.png  "$WKBOX")
+    WKD2=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_fly1.png  shots/g241_off_fly1.png  "$WKBOX")
+    WKD3=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_fly2.png  shots/g241_off_fly2.png  "$WKBOX")
+fi
+if [ "$GRC" != "0" ]; then
+  bad "G241 the wreck keeps its livery: a run failed (exit $GRC) or wrote no shot, so nothing below means anything"
+elif [ "${WKSLOT:--1}" -ge 2 ] && [ -n "$WKHOUSE" ] && [ -n "$WKTYPE" ] && [ -n "$WKID" ] \
+     && [ "${WKF:-0}" -gt 1506 ] && [ "${WKONPASS:-0}" -ge 1 ] && [ "${WKOFFPASS:-0}" -ge 1 ] \
+     && [ "${WKONH:-x}" = "$WKSLOT" ] && [ "${WKOFFSIDE:-0}" = "1" ] \
+     && [ "${WKD0:--1}" -ge 50 ] && [ "${WKD1:--1}" -ge 50 ] && [ "${WKD2:--1}" -ge 50 ] && [ "${WKD3:--1}" -ge 50 ]; then
+  ok "G241 the wreck keeps its livery: seat 2 is $WKHOUSE on colour $WKCOL (slot $WKSLOT), its $WKTYPE#$WKID dies at $WKX,$WKZ on frame $WKF and its pieces print house=$WKONH with team colours on and house=$WKOFFH without; inside the silhouette box $WKBOX the on/off pair differs by $WKD0 sampled pixels standing, then $WKD1 on the death frame, $WKD2 and $WKD3 in flight"
+else
+  bad "G241 the wreck keeps its livery: seat2-house=$WKHOUSE colour=$WKCOL slot=$WKSLOT(want >=2; a default colour on seat 2 means the lobby's colour order changed and the pair is indecisive) victim=$WKTYPE#$WKID at=$WKX,$WKZ frame=$WKF(want >1506; empty means no vehicle of the blown-up seat shattered) clickobj-pass on=$WKONPASS off=$WKOFFPASS(want >=1 each; 0 means the victim was not standing in frame on the frame before its death, so the box and the shots are about nothing) pieces-house on=$WKONH(want $WKSLOT; EMPTY IS THE READOUT MISSING, 1 or 0 is the side alone: the snapshot still carries obj_is_gdi) off=$WKOFFH(want 0 or 1) box=$WKBOX on/off-differs standing=$WKD0 death=$WKD1 fly=$WKD2,$WKD3(want >=50 each, measured 149/150/182/188; ZERO FROM THE DEATH ON IS THE BUG: the pieces bind the faction's default texture)"
+fi
+
+# =====================================================================================
+# G242 A HIDDEN CELL'S TIBERIUM CLUMPS ARE NOT DRAWN, AND THE MAP'S EDGE RING PROVES IT.
+# The edge ring is the one-cell border OUTSIDE the file's [MAP] rect: the ring the engine
+# itself treats as off-map (no harvester is ever sent there and a locked unit may not
+# enter it), and the ring the renderer keeps hidden whatever the shroud is set to. The
+# engine still holds tiberium there: SCG15EC's file places TI at (1,53),(1,54),(1,56) and
+# (1,57) in its west ring. The flat decal under a clump lies beneath the shroud blanket
+# and fades with the ground; a solid clump stands ABOVE the depth-tested blanket, so
+# dimming it to the cell's corner average still left lit crystals standing on the black.
+# The rule now is the walls': a hidden cell's clumps are not drawn at all. Enhanced only,
+# because the Classic flat decal has nothing standing above the lid.
+#
+# THREE RUNS, one shot each, and none is enough alone.
+#   (1) --noshroud, so the ring is the only shroud in play. The four ring boxes must hold
+#       NO green while the harvestable column beside them (2,55),(2,56) and the interior
+#       (3,55) keep theirs.
+#   (2) The same with --norim. The ring's green must be BACK (>= 500 a box), which proves
+#       the cells are still fed and the gate is the rim and not a lost TIB| line; and the
+#       solid clump count run (1) printed must be BELOW this run's, because a build that
+#       dims instead of culls prints the same number both ways.
+#   (3) The shroud proper, on a copy of SCG15EC with one GoodGuy jeep at (3,55) so the
+#       ring borders explored ground the way it does in play. The ring must report
+#       HIDDEN and (2,55) CLEAR, the ring boxes hold no green, the column beside them
+#       stay lit, and this frame's clump count must be under half of run (2)'s, because
+#       every clump in a hidden cell is skipped now rather than drawn black under the
+#       blanket.
+#
+# Boxes are 80x56 px about each CURSORCELL centre at zoom max, where a cell is about 86
+# px wide and 50..68 px tall, so a box lies inside its own cell. Green is g>25, g>r+15,
+# g>b+15. The count line is the first "solid clumps drawn" line of each log: the script
+# runner draws nothing before its first shot, so that line IS the shot frame. Measured
+# before the fix: ring boxes 23/1/0/0 (run 1) and 16/1/0/0 (run 3), run 2 706/896/1308/
+# 1010, and 1088 clumps drawn in every run. After: 0/0/0/0 in runs 1 and 3, the same
+# run-2 boxes, and 1066 / 1088 / 294 clumps. The scratch map goes first, not last: a
+# leftover from an interrupted run would be played instead of made.
+# =====================================================================================
+rm -f missions/user_maps/USEREDGE.INI missions/user_maps/USEREDGE.BIN missions/user_maps/USEREDGE.HGT
+awk 'BEGIN{d=0} {print} /^\[UNITS\]/ && !d {printf "021=GoodGuy,JEEP,256,3523,0,Guard,None\r\n"; d=1}' \
+    missions/SCG15EC.INI > missions/user_maps/USEREDGE.INI
+cp missions/SCG15EC.BIN missions/user_maps/USEREDGE.BIN
+cat > /tmp/g242_rim.txt <<'G242EOF'
+tick 2
+cam 4 55
+zoom max
+tick 1
+cursorcell 1 53
+cursorcell 1 54
+cursorcell 1 56
+cursorcell 1 57
+cursorcell 2 55
+cursorcell 2 56
+cursorcell 3 55
+shot shots/g242_x.png
+quit
+G242EOF
+sed 's#shots/g242_x.png#shots/g242_rim_on.png#'  /tmp/g242_rim.txt > /tmp/g242_on.txt
+sed 's#shots/g242_x.png#shots/g242_rim_off.png#' /tmp/g242_rim.txt > /tmp/g242_off.txt
+cat > /tmp/g242_fog.txt <<'G242EOF'
+tick 5
+expectshroud 2000 1
+shroudat 1 53
+shroudat 2 55
+cam 4 55
+zoom max
+tick 1
+cursorcell 1 53
+cursorcell 1 54
+cursorcell 1 56
+cursorcell 1 57
+cursorcell 2 55
+cursorcell 2 56
+shot shots/g242_fog_on.png
+quit
+G242EOF
+gbegin shots/g242_rim_on.png shots/g242_rim_off.png shots/g242_fog_on.png \
+       shots/g242_on.log shots/g242_off.log shots/g242_fog.log
+grun shots/g242_on.log  --noshroud --enhanced --nosound --scen SCG15EC --pack SCG15EC.pack $BASE \
+     --w 1280 --h 720 --script /tmp/g242_on.txt
+grun shots/g242_off.log --noshroud --norim --enhanced --nosound --scen SCG15EC --pack SCG15EC.pack $BASE \
+     --w 1280 --h 720 --script /tmp/g242_off.txt
+grun shots/g242_fog.log --enhanced --nosound --scen USEREDGE --pack SCG15EC.pack $BASE \
+     --dir missions/user_maps/ --w 1280 --h 720 --script /tmp/g242_fog.txt
+gshots shots/g242_rim_on.png shots/g242_rim_off.png shots/g242_fog_on.png
+G242C1=$(sed -n 's/^tiberium: \([0-9]*\) solid clumps drawn.*/\1/p' shots/g242_on.log  | head -1)
+G242C0=$(sed -n 's/^tiberium: \([0-9]*\) solid clumps drawn.*/\1/p' shots/g242_off.log | head -1)
+G242CF=$(sed -n 's/^tiberium: \([0-9]*\) solid clumps drawn.*/\1/p' shots/g242_fog.log | head -1)
+G242FOG=$(grep -c '^EXPECTSHROUD|.*|PASS$' shots/g242_fog.log)
+G242RING=$(sed -n 's/^SHROUDAT|1,53|\(.*\)$/\1/p' shots/g242_fog.log | head -1)
+G242BESIDE=$(sed -n 's/^SHROUDAT|2,55|\(.*\)$/\1/p' shots/g242_fog.log | head -1)
+G242R="- - - - - -"
+if [ "$GRC" = "0" ]; then
+  G242R=$(python3 - <<'PY'
+import re
+import numpy as np
+from PIL import Image
+def boxes(log, png):
+    at = {}
+    for line in open(log, errors='replace'):
+        m = re.match(r'CURSORCELL\|cell=(\d+),(\d+)\|at=([\d.]+),([\d.]+)\|', line)
+        if m: at[(int(m.group(1)), int(m.group(2)))] = (float(m.group(3)), float(m.group(4)))
+    a = np.asarray(Image.open(png).convert('RGB')).astype(int)
+    out = {}
+    for c, (x, y) in at.items():
+        b = a[int(y) - 28:int(y) + 28, int(x) - 40:int(x) + 40]
+        r, g, bl = b[..., 0], b[..., 1], b[..., 2]
+        out[c] = int(((g > 25) & (g > r + 15) & (g > bl + 15)).sum())
+    return out
+ring = [(1, 53), (1, 54), (1, 56), (1, 57)]
+on  = boxes('shots/g242_on.log',  'shots/g242_rim_on.png')
+off = boxes('shots/g242_off.log', 'shots/g242_rim_off.png')
+fog = boxes('shots/g242_fog.log', 'shots/g242_fog_on.png')
+# ring green with the rim on; the least ring box with it off; the least harvestable
+# column box and the interior box with it on; ring green and least column box under fog
+print(sum(on.get(c, 9999) for c in ring), min(off.get(c, 0) for c in ring),
+      min(on.get((2, 55), 0), on.get((2, 56), 0)), on.get((3, 55), 0),
+      sum(fog.get(c, 9999) for c in ring), min(fog.get((2, 55), 0), fog.get((2, 56), 0)))
+PY
+)
+fi
+set -- $G242R
+G242ON="$1"; G242OFF="$2"; G242COL="$3"; G242IN="$4"; G242FON="$5"; G242FCOL="$6"
+rm -f missions/user_maps/USEREDGE.INI missions/user_maps/USEREDGE.BIN
+if [ "$GRC" = "0" ] && [ "${G242ON:-1}" = "0" ] && [ "${G242OFF:-0}" -ge 500 ] \
+   && [ "${G242COL:-0}" -ge 900 ] && [ "${G242IN:-0}" -ge 2000 ] \
+   && [ "${G242C1:-9999}" -lt "${G242C0:-0}" ] \
+   && [ "$G242FOG" = "1" ] && [ "$G242RING" = "HIDDEN" ] && [ "$G242BESIDE" = "CLEAR" ] \
+   && [ "${G242FON:-1}" = "0" ] && [ "${G242FCOL:-0}" -ge 900 ] \
+   && [ $(( ${G242CF:-9999} * 2 )) -le "${G242C0:-0}" ]; then
+  ok "G242 a hidden cell's tiberium clumps are not drawn: the edge ring holds $G242ON green px with the rim on and at least $G242OFF a box with it off, the column beside it keeps $G242COL and the interior $G242IN; $G242C1 clumps drawn against $G242C0 with the rim off; under the shroud proper the ring is $G242RING beside a $G242BESIDE cell and holds $G242FON green px with the column at $G242FCOL, $G242CF clumps drawn"
+else
+  bad "G242 a hidden cell's tiberium clumps are not drawn: ring on=$G242ON(want 0) ring off min=$G242OFF(want >=500) column=$G242COL(want >=900) interior=$G242IN(want >=2000) clumps rim on=$G242C1 off=$G242C0 (want on<off); fog: expectshroud=$G242FOG(want 1) ring=[$G242RING](want HIDDEN) beside=[$G242BESIDE](want CLEAR) ring on=$G242FON(want 0) column=$G242FCOL(want >=900) clumps=$G242CF(want <= half of $G242C0) GRC=$GRC"
+fi
+
+# =====================================================================================
+# G243 A REMASTERED INFANTRYMAN IS WHOLE WHEN HE FIRES: THE ROWS OF HIS CELL BELOW HIS
+# FEET LIE ON THE GROUND IN FRONT OF HIM INSTEAD OF SINKING UNDER IT.
+#
+# THE REPORTS (BUG-20260905-74C49E, -7E9F32, -17BAEE, -EE24BD): a Remastered flamethrower's
+# legs vanish when he fires standing, he vanishes entirely when he fires prone, and part of
+# a prone minigunner, commando or bazooka man goes with him.
+#
+# THE CAUSE was the placement that G202 measures. A Remastered attack strip carries rows
+# BELOW the man's ground line (the flame jet, the muzzle flash, the rocket exhaust are drawn
+# into the frame), and the draw lowered the whole card by that many rows so his feet met the
+# terrain. Those rows were then under the terrain surface, and because the card leans back
+# at the camera pitch the ground plane cut it drop/cos(pitch) rows up, not drop: 66 to 78 of
+# E4 FIRE's 166 rows, which is boots to knees, and all 56 body rows of E4 FPRONE at far zoom.
+# The depth test did the hiding; nothing about the strip was wrong.
+#
+# THE FIX folds the card at the ground line: the rows above it stand on the terrain, the rows
+# below it lie flat on the ground toward the camera, stretched by 1/sin(pitch) so they land
+# on screen at the same pixels per row as the rows above the crease. A cell with no rows
+# below the line, which is every strip the 1995 pack bakes, draws the single card it always
+# has; the DOS shots of this gate are byte-identical to the shipped binary's.
+#
+# THE FIXTURE is TSTFOLD, a purpose-built map on the SCG01EA pack's level grass: the player
+# is Nod and invulnerable, so a GDI flamethrower flaming a power plant fires standing for as
+# long as the run lasts, and three men against three gun turrets that cannot be hurt are
+# shot at until they lie down and fire prone. Everything is on Hunt; the script orders
+# nothing. Every sampled shot is taken with `look` on the man, which puts his ground point
+# at the screen centre, and is paired with a shot of the same tick with the infantry not
+# drawn (infdraw 0), so the man's silhouette is the set of pixels that differ and no colour
+# rule has to know a flamethrower from his flame. The sun casters and the cartridge blobs
+# are off so the difference is the card alone.
+#
+# FOUR LEGS.
+#   A. THE POSE, from the engine: stagepos at every sampled tick must say bstate=4
+#      (DO_FIRE_WEAPON) for the standing flamethrower and 8 (DO_FIRE_PRONE) for the prone
+#      men, or the pictures below are of the wrong thing and the gate says so.
+#   B. THE PLACEMENT READOUT: every RMINF|place line must fold at the ground line, up + flat
+#      == fh with flat == max(drop, 0) and lift == max(-drop, 0), and a strip with rows
+#      below the line must sit its base ON the ground, dy == 0. The shipped binary prints
+#      dy = -drop/tpu and no fold fields, and fails here first.
+#   C. THE SILHOUETTE reaches the ground line: over the sampled ticks of E4 FIRE, E4 FPRONE
+#      and E1 FPRONE the lowest row of the Remastered man's silhouette must be no more than
+#      4 px above the screen centre (his ground point), and its largest silhouette must be
+#      at least half the DOS man's at the same ticks. Measured on the shipped binary: E4
+#      FIRE lowest -13 px with 132 of the DOS 344 px, E4 FPRONE -18 px with 16 of 175, E1
+#      FPRONE -13 px with 59 of 154. Fixed: 3 px / 237, 15 px / 154, 3 px / 143.
+#   D. THE PITCH SWEEP, the assertion that the mechanism is gone: the prone flamethrower at
+#      one engine frame at near zoom, far zoom, and the Isometric row at 75 and 30 degrees
+#      of tilt must be present (at least 40 px) and reach his ground line in all four.
+#      Shipped: 16, 0, 0 and 71 px, absent at far zoom and at 75 degrees.
+#
+# NO INSTALL, NO GATE, AND IT SAYS SO, the same way G202 does: the art is the player's own.
+# =====================================================================================
+GFOLD_SCRIPT() {   # $1 infset  $2 tag
+  echo "gfx infset $1"; echo "cheatset invuln 1"; echo "zoom max"
+  gf_t=0
+  gf_upto() { if [ "$1" -gt "$gf_t" ]; then echo "tick $(($1 - gf_t))"; gf_t=$1; fi; }
+  gf_snap() { gf_upto "$1"; echo "look $2 $3"; echo "stagepos $2 $3"
+              echo "shot shots/gfold_$4_${5}_t$1_on.png"; echo "infdraw 0"
+              echo "shot shots/gfold_$4_${5}_t$1_off.png"; echo "infdraw 1"; }
+  for T in 110 112 114 116 118; do gf_snap $T E4 0 "$2" e4fire; gf_snap $T E4 1 "$2" e4prone; done
+  for T in 128 130 132; do gf_snap $T E1 0 "$2" e1prone; done
+  gf_upto 216
+  gf_sweep() { echo "look E4 1"; echo "stagepos E4 1"
+               echo "shot shots/gfold_$1_sweep_$2_on.png"; echo "infdraw 0"
+               echo "shot shots/gfold_$1_sweep_$2_off.png"; echo "infdraw 1"; }
+  echo "zoom max"; gf_sweep "$2" near
+  echo "zoom min"; gf_sweep "$2" far
+  echo "gfx perspective 1"; echo "gfx iso_pitch 75"; echo "zoom max"; gf_sweep "$2" p75
+  echo "gfx iso_pitch 30"; gf_sweep "$2" p30
+  echo "gfx perspective 0"; echo "gfx iso_pitch 0"; echo quit
+}
+GFOLD_SCRIPT 2 rm  > /tmp/gfold_rm.script
+GFOLD_SCRIPT 1 dos > /tmp/gfold_dos.script
+gbegin shots/gfold_rm_e4fire_t110_on.png shots/gfold_rm_e4prone_t118_off.png \
+       shots/gfold_rm_e1prone_t132_on.png shots/gfold_rm_sweep_p30_off.png \
+       shots/gfold_dos_e4fire_t110_on.png shots/gfold_dos_sweep_p30_off.png
+rm -f shots/gfold_*.png
+grun /tmp/gfold_rm.log  --scen TSTFOLD --pack SCG01EA.pack $BASE --nosound --enhanced \
+     --nospriteshadow --nosprshadow --noshroud --w 1280 --h 720 --dumpanim --script /tmp/gfold_rm.script
+grun /tmp/gfold_dos.log --scen TSTFOLD --pack SCG01EA.pack $BASE --nosound --enhanced \
+     --nospriteshadow --nosprshadow --noshroud --w 1280 --h 720 --dumpanim --script /tmp/gfold_dos.script
+gshots shots/gfold_rm_e4fire_t110_on.png shots/gfold_rm_e4prone_t118_off.png \
+       shots/gfold_rm_e1prone_t132_on.png shots/gfold_rm_sweep_p30_off.png \
+       shots/gfold_dos_e4fire_t110_on.png shots/gfold_dos_sweep_p30_off.png
+GFNOINST=$(grep -ac 'remaster: no Remastered Collection found' /tmp/gfold_rm.log)
+GFDRAW=$(grep -ac '^FX|infset|Remastered infantry art' /tmp/gfold_rm.log)
+GFUNK=$(grep -ac "SCRIPT|unknown command 'infdraw'" /tmp/gfold_rm.log)
+# LEG A: the poses, in order. 5 standing E4 (4), 5 prone E4 (8), 3 prone E1 (8), 4 sweep E4 (8).
+GFPOSE=$(grep -a '^STAGEPOS|' /tmp/gfold_rm.log | sed -n 's/^STAGEPOS|\([A-Z0-9]*\)|[0-9]*|bstate=\([0-9]*\)|.*/\1:\2/p' | tr '\n' ' ')
+GFPOSEWANT="E4:4 E4:8 E4:4 E4:8 E4:4 E4:8 E4:4 E4:8 E4:4 E4:8 E1:8 E1:8 E1:8 E4:8 E4:8 E4:8 E4:8 "
+GFPOSEDOS=$(grep -a '^STAGEPOS|' /tmp/gfold_dos.log | sed -n 's/^STAGEPOS|\([A-Z0-9]*\)|[0-9]*|bstate=\([0-9]*\)|.*/\1:\2/p' | tr '\n' ' ')
+# LEG B: the readout. Every RMINF|place line folds at the ground line.
+GFPLACEN=$(grep -a '^RMINF|place|' /tmp/gfold_rm.log | sort -u | wc -l | tr -d ' ')
+GFFOLDED=$(grep -a '^RMINF|place|' /tmp/gfold_rm.log | sort -u | grep -c '|flat=[1-9]')
+GFPLACEBAD=$(grep -a '^RMINF|place|' /tmp/gfold_rm.log | sort -u | awk -F'|' '
+  { d=0; y=0; fh=-1; up=-1; fl=-1; li=-1
+    for (i=1;i<=NF;i++) {
+      if ($i ~ /^drop=/) { sub(/^drop=/,"",$i); d=$i+0 }
+      if ($i ~ /^dy=/)   { sub(/^dy=/,"",$i);   y=$i+0 }
+      if ($i ~ /^fh=/)   { sub(/^fh=/,"",$i);   fh=$i+0 }
+      if ($i ~ /^up=/)   { sub(/^up=/,"",$i);   up=$i+0 }
+      if ($i ~ /^flat=/) { sub(/^flat=/,"",$i); fl=$i+0 }
+      if ($i ~ /^lift=/) { sub(/^lift=/,"",$i); li=$i+0 } }
+    if (fh < 0 || up < 0 || fl < 0 || li < 0) { n++; next }      # no fold fields at all
+    wf = d > 0 ? d : 0; wl = d < 0 ? -d : 0
+    if (up + fl != fh || fl != wf || li != wl) { n++; next }
+    if (d >= 0 && (y > 0.00005 || y < -0.00005)) { n++; next }
+    if (d < 0 && y <= 0) { n++; next } }
+  END { print n+0 }')
+# LEGS C and D: the silhouettes. One number per pose: the Remastered man's largest
+# silhouette over its ticks, the DOS man's, and the lowest silhouette row relative to
+# the centre (positive = below his ground point).
+GFPIX=$(python3 - <<'PY'
+from PIL import Image
+import numpy as np, glob, re, collections
+box = (640 - 60, 360 - 90, 640 + 60, 360 + 60)
+def load(p): return np.asarray(Image.open(p).convert('RGB').crop(box)).astype(int)
+best = collections.defaultdict(lambda: [0, -999, 0])   # (tag,pose) -> [max body, max lowest, shots]
+for on in sorted(glob.glob('shots/gfold_*_on.png')):
+    m = re.match(r'shots/gfold_(rm|dos)_([a-z0-9]+)_([a-z0-9]+)_on\.png$', on)
+    if not m: continue
+    tag, pose, tick = m.groups()
+    try:
+        a, b = load(on), load(on[:-7] + '_off.png')
+    except Exception:
+        continue
+    d = np.abs(a - b).max(axis=2) > 12
+    n = int(d.sum())
+    ys = np.where(d.any(axis=1))[0]
+    lo = int(ys.max()) - 90 if len(ys) else -999
+    key = (tag, pose if pose != 'sweep' else 'sweep_' + tick)
+    e = best[key]
+    e[0] = max(e[0], n); e[1] = max(e[1], lo); e[2] += 1
+for k in sorted(best):
+    print("%s_%s body=%d lowest=%d shots=%d" % (k[0], k[1], best[k][0], best[k][1], best[k][2]))
+PY
+)
+gfv() { printf '%s\n' "$GFPIX" | awk -v k="$1" -v f="$2" '$1 == k { split($(f + 1), a, "="); print a[2] }'; }
+GFOK=1; GFWHY=""
+for pose in e4fire e4prone e1prone; do
+  rb=$(gfv "rm_$pose" 1); rl=$(gfv "rm_$pose" 2); db=$(gfv "dos_$pose" 1)
+  [ -n "$rb" ] && [ -n "$db" ] || { GFOK=0; GFWHY="$GFWHY $pose:unmeasured"; continue; }
+  if [ "$rl" -lt -4 ]; then GFOK=0; GFWHY="$GFWHY $pose:lowest=${rl}px"; fi
+  if [ $((rb * 2)) -lt "$db" ]; then GFOK=0; GFWHY="$GFWHY $pose:body=$rb/dos=$db"; fi
+done
+for cam in near far p75 p30; do
+  rb=$(gfv "rm_sweep_$cam" 1); rl=$(gfv "rm_sweep_$cam" 2)
+  [ -n "$rb" ] || { GFOK=0; GFWHY="$GFWHY sweep_$cam:unmeasured"; continue; }
+  if [ "$rb" -lt 40 ] || [ "$rl" -lt -4 ]; then GFOK=0; GFWHY="$GFWHY sweep_$cam:body=$rb,lowest=${rl}px"; fi
+done
+GFSUM=$(printf '%s' "$GFPIX" | grep '^rm_' | sed 's/^rm_//; s/ shots=[0-9]*//' | tr '\n' ' ')
+if [ "$GRC" != "0" ]; then
+  bad "G243 a remastered infantryman is whole when he fires: the run failed or wrote no shot (GRC=$GRC; $GFUNK lines refused the infdraw verb, which a binary without the control leg does), so nothing below means anything"
+elif [ "${GFNOINST:-0}" -ge 1 ] || [ "${GFDRAW:-0}" -lt 1 ]; then
+  skip "G243 a remastered infantryman is whole when he fires: no Remastered Collection on this machine, so there is no art to measure. THE FOLD IS NOT COVERED BY THIS RUN."
+elif [ "${GFUNK:-0}" -ge 1 ]; then
+  bad "G243 a remastered infantryman is whole when he fires: this binary has no infdraw verb, so no silhouette can be measured"
+elif [ "$GFPOSE" != "$GFPOSEWANT" ] || [ "$GFPOSEDOS" != "$GFPOSEWANT" ]; then
+  bad "G243 a remastered infantryman is whole when he fires: the men were not in the poses the fixture is built to reach, so the pictures are of the wrong thing. Remastered run [$GFPOSE] DOS run [$GFPOSEDOS] wanted [$GFPOSEWANT]"
+elif [ "${GFFOLDED:-0}" -lt 3 ]; then
+  bad "G243 a remastered infantryman is whole when he fires: only $GFFOLDED of $GFPLACEN placements carry rows below the ground line, so the fold was never exercised. $(grep -a '^RMINF|place|' /tmp/gfold_rm.log | sort -u | head -2 | tr '\n' ' ')"
+elif [ "${GFPLACEBAD:-99}" != "0" ]; then
+  bad "G243 a remastered infantryman is whole when he fires: $GFPLACEBAD of $GFPLACEN placements do not fold at the ground line (up + flat == fh, flat == max(drop,0), lift == max(-drop,0), base on the ground). $(grep -a '^RMINF|place|' /tmp/gfold_rm.log | sort -u | grep 'drop=[1-9]' | head -2 | tr '\n' ' ')"
+elif [ "$GFOK" != "1" ]; then
+  bad "G243 a remastered infantryman is whole when he fires: the silhouette does not reach his ground line or is under half the DOS man's:$GFWHY. All: $GFSUM"
+else
+  ok "G243 a remastered infantryman is whole when he fires: $GFPLACEN Remastered placements all fold at the ground line ($GFFOLDED with rows below it, E4 FIRE 47, E4 FPRONE 68, E1 FPRONE 39), and against the same ticks drawn without infantry the man's silhouette reaches his ground point and is over half the DOS man's in every reported pose, at near and far zoom and at 75 and 30 degrees of tilt: $GFSUM"
+fi
+
+# =====================================================================================
+# G244 THE REPAIR WRENCH FLOATS OVER THE ROOF, AND THE ENHANCED PICTURE LIGHTS IT AS ITSELF.
+#
+# TWO SYMPTOMS, ONE REPORT: a wrench over a repairing building read as passing BEHIND the
+# building. In Classic that was placement: the lift was half the building's footprint,
+# unrelated to its model, so on a building tall for its footprint the slab stood inside
+# the structure with its edge on the roofline. In Enhanced it was lighting: the wrench
+# left no depth, so the light pass reconstructed the ROOF under every wrench pixel and
+# painted the roof's shading, shadow and outline onto the slab; wherever a jaw crossed a
+# tower the tower's silhouette cut across the jaw.
+#
+# LEG A, THE LIFT, on SCG90EA's Refinery. The Ion Cannon (cheat-enabled, recharged by the
+# gate-only `superrecharge`) damages the Refinery so the engine's own repair can start.
+# wrenchdump prints top= (the building's roof read off its model by mesh_roof_y) and
+# base= (the height of the slab's underside above the wrench's own anchor) beside the
+# lift the draw took. Asserted from those numbers, not recomputed: the roof must be the
+# Refinery's TOWER (1.0..1.2 cell; the three wrong answers a broken rule gives are the
+# smokestack tip at 1.35 from a highest-vertex rule, the 0.90 a percentile fallback
+# gives, and the 0.58 lower deck), the lift must be at least top + base + 0.10 clearance
+# (the roof rule), and it must exceed the footprint rule (dimw/48 = 1.2083 for dimw 58),
+# which is the proof the roof rule was the one that won. A build that does not print
+# top= at all parses to the sentinel and fails. The anchor-equals-quad leg is G180's and
+# is repeated here on this building because both the model's anchor and the sprite quad
+# must move together when the lift moves.
+#
+# LEG B, THE LIGHT, on G180's own SCG02EA barracks (its lift is unchanged by the roof
+# rule, so this leg isolates the depth write). Four runs at the same tick: repairing and
+# not, Classic and Enhanced. The wrench's pixels are the Classic pair's difference inside
+# a window around the barracks; inside that silhouette the Enhanced frame's luminance is
+# compared with the Classic frame's in three horizontal bands. A wrench lit as itself has
+# ONE tone curve, so the three ratios agree; a wrench lit as the roof carries the roof's
+# shading and the ratios spread. Measured: the old draw spread 0.32 and 0.54 at two yaws
+# on this building and 0.51 on the Refinery; the depth-writing draw spreads under 0.08.
+# The threshold is 0.15. The Enhanced pair must also change at least nine tenths of the
+# silhouette (the wrench is drawn in Enhanced at all), and two Enhanced repairing runs
+# must be byte-identical, or "the picture changed" means nothing.
+cat > gate_wrenchlift.txt <<'EOS'
+cheatset super 1
+tick 20
+cam 52 47
+superrecharge
+tick 5
+sbclickitem SW_Ion
+actclick 590 386
+tick 90
+repairmode 1
+lclickobj PROC 0
+tick 25
+deselect
+cursor -1 -1
+shot shots/g244_proc.png
+wrenchdump
+quit
+EOS
+cat > gate_wrenchlit.txt <<'EOS'
+tick 20
+cam 55 51
+repairmode 1
+lclickobj PYLE 0
+tick 11
+deselect
+cursor -1 -1
+shot shots/g244_SHOT.png
+wrenchdump
+quit
+EOS
+sed 's/g244_SHOT/g244_cla_rep/' gate_wrenchlit.txt > gate_wrenchlit_cla_rep.txt
+sed 's/g244_SHOT/g244_enh_rep/' gate_wrenchlit.txt > gate_wrenchlit_enh_rep.txt
+sed 's/g244_SHOT/g244_enh_rep2/' gate_wrenchlit.txt > gate_wrenchlit_enh_rep2.txt
+sed -e 's/^repairmode 1$/repairmode 0/' -e 's/g244_SHOT/g244_cla_ctrl/' gate_wrenchlit.txt > gate_wrenchlit_cla_ctrl.txt
+sed -e 's/^repairmode 1$/repairmode 0/' -e 's/g244_SHOT/g244_enh_ctrl/' gate_wrenchlit.txt > gate_wrenchlit_enh_ctrl.txt
+WLB="$BASE --noshroud --nosound --w 1280 --h 720"
+gbegin shots/g244_proc.png shots/g244_cla_rep.png shots/g244_cla_ctrl.png shots/g244_enh_rep.png \
+       shots/g244_enh_rep2.png shots/g244_enh_ctrl.png shots/g244_proc.log shots/g244_lit.log
+grun shots/g244_proc.log --scen SCG90EA --pack SCG01EA.pack $WLB --script gate_wrenchlift.txt
+grun shots/g244_lit.log  --scen SCG02EA --pack SCG02EA.pack $WLB --script gate_wrenchlit_cla_rep.txt
+grun -                  --scen SCG02EA --pack SCG02EA.pack $WLB --script gate_wrenchlit_cla_ctrl.txt
+grun -                  --scen SCG02EA --pack SCG02EA.pack $WLB --enhanced --script gate_wrenchlit_enh_rep.txt
+grun -                  --scen SCG02EA --pack SCG02EA.pack $WLB --enhanced --script gate_wrenchlit_enh_rep2.txt
+grun -                  --scen SCG02EA --pack SCG02EA.pack $WLB --enhanced --script gate_wrenchlit_enh_ctrl.txt
+gshots shots/g244_proc.png shots/g244_cla_rep.png shots/g244_cla_ctrl.png shots/g244_enh_rep.png \
+       shots/g244_enh_rep2.png shots/g244_enh_ctrl.png
+# Ten fields, every one a value that FAILS its own leg, so a run that could not be
+# measured cannot report a pass: top base ay foot anchorbad | sil covered spread same lit
+WL="0 0 0 9 1 0 0 9 0 0"
+if [ "$GRC" = "0" ]; then
+WL=$(python3 - <<'PY'
+import re
+import numpy as np
+from PIL import Image
+
+# ---- leg A: the numbers the lift was chosen from, off the last wrenchdump ----
+log = open('shots/g244_proc.log').read()
+blocks = log.split('WRENCHDUMP-BEGIN')[1:]
+top = base = ay = 0.0
+foot = 9.0
+anchorbad = 1
+if blocks:
+    b = blocks[-1].split('WRENCHDUMP-END')[0]
+    q = re.search(r'WRENCHQUAD\|PROC\|id=\d+\|dimw=(\d+)\|x0=([-0-9.]+)\|x1=([-0-9.]+)'
+                  r'\|y0=([-0-9.]+)\|y1=([-0-9.]+)\|z=[-0-9.]+\|top=([-0-9.]+)\|base=([-0-9.]+)', b)
+    d = re.search(r'WRENCH3D\|PROC\|id=\d+\|mesh=\d+\|face=-?\d+\|yawdeg=[-0-9.]+'
+                  r'\|ax=([-0-9.]+)\|az=([-0-9.]+)\|ay=([-0-9.]+)', b)
+    if q and d:
+        top, base = float(q.group(6)), float(q.group(7))
+        foot = int(q.group(1)) / 24.0 * 0.5
+        ay = float(d.group(3))
+        # the quad is centred on the lift; the 3D anchor must stand on the same point
+        qx = (float(q.group(2)) + float(q.group(3))) * 0.5
+        qy = (float(q.group(4)) + float(q.group(5))) * 0.5
+        anchorbad = 0 if (abs(float(d.group(1)) - qx) < 0.001 and abs(ay - qy) < 0.001) else 1
+
+# ---- leg B: the wrench's own pixels, Classic against Enhanced ----
+def load(p):
+    return np.asarray(Image.open('shots/' + p).convert('RGB')).astype(int)
+cr, cc, er, ec, er2 = [load(p) for p in ('g244_cla_rep.png', 'g244_cla_ctrl.png',
+                                          'g244_enh_rep.png', 'g244_enh_ctrl.png',
+                                          'g244_enh_rep2.png')]
+same = 1 if np.array_equal(er, er2) else 0
+win = np.zeros(cr.shape[:2], bool)
+win[320:420, 660:780] = True                    # the barracks, cam 55 51 at 1280x720
+sil = (np.abs(cr - cc).sum(axis=2) > 24) & win  # the slab: depth-free, so exactly its pixels
+esil = (np.abs(er - ec).sum(axis=2) > 24) & win
+nsil = int(sil.sum())
+covered = int((esil & sil).sum()) / float(nsil) if nsil else 0.0
+lum = lambda im: 0.299 * im[..., 0] + 0.587 * im[..., 1] + 0.114 * im[..., 2]
+lc, le = lum(cr), lum(er)
+spread = 9.0
+ratios = []
+if nsil >= 100:
+    ys = np.nonzero(sil)[0]
+    y0, y1 = ys.min(), ys.max()
+    h = (y1 - y0 + 1) / 3.0
+    for k in range(3):
+        a, b = int(y0 + k * h), int(y0 + (k + 1) * h)
+        m = sil.copy(); m[:a, :] = False; m[b:, :] = False
+        if m.sum() and lc[m].mean() > 0:
+            ratios.append(le[m].mean() / lc[m].mean())
+    if len(ratios) == 3:
+        spread = max(ratios) - min(ratios)
+print('%.4f %.4f %.4f %.4f %d %d %.3f %.3f %d %s' % (
+    top, base, ay, foot, anchorbad, nsil, covered, spread, same,
+    ','.join('%.3f' % r for r in ratios) or 'unmeasured'))
+PY
+)
+fi
+set -- $WL
+WL_TOP=$1; WL_BASE=$2; WL_AY=$3; WL_FOOT=$4; WL_ANCHORBAD=$5
+WL_SIL=$6; WL_COVERED=$7; WL_SPREAD=$8; WL_SAME=$9; shift 9; WL_RATIOS=${1:-unmeasured}
+WL_ROOF=$(python3 -c "print('%.4f' % ($WL_TOP + $WL_BASE + 0.10 - 0.001))")
+WL_TOPOK=$(python3 -c "print(1 if 1.0 <= $WL_TOP <= 1.2 else 0)")
+WL_BASEOK=$(python3 -c "print(1 if 0.09 <= $WL_BASE <= 0.11 else 0)")
+WL_LIFTOK=$(python3 -c "print(1 if $WL_AY >= $WL_ROOF else 0)")
+WL_WONOK=$(python3 -c "print(1 if $WL_AY > $WL_FOOT + 0.001 else 0)")
+WL_SPREADOK=$(python3 -c "print(1 if $WL_SPREAD < 0.15 else 0)")
+WL_COVOK=$(python3 -c "print(1 if $WL_COVERED >= 0.9 else 0)")
+if [ "$GRC" != "0" ]; then
+  bad "G244 the repair wrench floats over the roof and is lit as itself: a run failed (exit $GRC), so nothing below was measured"
+elif [ "$WL_TOPOK" != "1" ]; then
+  bad "G244 the repair wrench floats over the roof: wrenchdump read the Refinery's roof as top=$WL_TOP cell, wanted 1.0..1.2 (the tower). 1.35 is the smokestack tip (a highest-vertex rule), 0.90 the percentile fallback, 0.58 the lower deck, 0 a build that prints no top= at all"
+elif [ "$WL_BASEOK" != "1" ]; then
+  bad "G244 the repair wrench floats over the roof: the slab's underside is base=$WL_BASE cell above its anchor, wanted 0.09..0.11 (mesh y 101 of CUR05). The lift rule adds this number, so a wrong reading puts the slab in the wrong place"
+elif [ "$WL_LIFTOK" != "1" ]; then
+  bad "G244 the repair wrench floats over the roof: the draw lifted the wrench to ay=$WL_AY, below the roof rule's $WL_ROOF (top $WL_TOP + base $WL_BASE + 0.10 clearance). The slab is inside the Refinery's tower again"
+elif [ "$WL_WONOK" != "1" ]; then
+  bad "G244 the repair wrench floats over the roof: ay=$WL_AY does not exceed the footprint rule's $WL_FOOT, so the roof rule did not win on the one building this gate chose because it must"
+elif [ "$WL_ANCHORBAD" != "0" ]; then
+  bad "G244 the repair wrench floats over the roof: the 3D anchor draw_mesh reported and the collector's quad centre disagree on the Refinery. The lift moved one and not the other"
+elif [ "${WL_SIL:-0}" -lt 500 ]; then
+  bad "G244 the repair wrench is lit as itself: only $WL_SIL pixels changed between the repairing and non-repairing Classic frames inside the barracks window, wanted at least 500. The wrench is not on screen where this gate looks"
+elif [ "$WL_SAME" != "1" ]; then
+  bad "G244 the repair wrench is lit as itself: two Enhanced runs of the same repairing tick differ. Nondeterministic pixels make the luminance leg below meaningless"
+elif [ "$WL_COVOK" != "1" ]; then
+  bad "G244 the repair wrench is lit as itself: the Enhanced repairing frame changed only $WL_COVERED of the wrench's silhouette against its own control, wanted 0.9. The wrench is not drawn under the Enhanced chain"
+elif [ "$WL_SPREADOK" != "1" ]; then
+  bad "G244 the repair wrench is lit as itself: across the three bands of the wrench the Enhanced/Classic luminance ratios are $WL_RATIOS, a spread of $WL_SPREAD (want < 0.15). The Enhanced chain is shading the wrench with the roof behind it, which is the wrench drawn without its own depth"
+else
+  ok "G244 the repair wrench floats over the roof and is lit as itself: Refinery roof read as $WL_TOP, slab base $WL_BASE, wrench lifted to $WL_AY (roof rule $WL_ROOF, footprint rule $WL_FOOT), anchor on the quad; barracks wrench $WL_SIL px, Enhanced/Classic band ratios $WL_RATIOS spread $WL_SPREAD, $WL_COVERED of the silhouette changed in Enhanced, two Enhanced runs identical"
+fi
+
+# G245 THE TANK SHELL LIES ALONG ITS FLIGHT UNDER ENHANCED AND STANDS ON END IN CLASSIC.
+# The 120MM bullet mesh is authored as an upright 24 x 77 x 20 box, and the cartridge's
+# bullet draw (RAM 0x801D6418) only ever yaws it, so on the console the tank shell is a
+# vertical pillar in every flight direction; the grenade is the same pillar (model-table
+# slots 92 and 96 share one scene node). Classic keeps that. Under the Enhanced picture
+# the shell is laid along its direction of travel, a deliberate departure, and the
+# grenade stays upright on both. Three runs on SCG90EA, a Medium Tank force-firing due
+# west (face=194) and due north (face=0), the shell caught two to three cells out with
+# nothing between it and the camera:
+#   (a) the READOUT: EFXDUMP|BULLET carries flat=0 in Classic and flat=1 under Enhanced
+#       for the 120mm round, and EFXDUMP|BULLETSCR projects the middle of the drawn box.
+#   (b) the PICTURE, west: the bright box on the flight line (gate_shell.py, threshold
+#       150 in a 29 px window about the projected centre) is TALLER than wide in Classic
+#       (3 x 6 measured at 1280x720) and WIDER than tall under Enhanced (7 x 3).
+#   (c) the PICTURE, north: laid along the view direction the box foreshortens to no
+#       more than 8 px tall and 4 px wide (2 x 5 measured), which is what a shell pointing
+#       along its travel looks like from behind.
+#   (d) CENTRING AND LIFT: in all three frames the bright box's centre lands within 2.5 px
+#       of the projected centre (0.4..0.6 px measured), so the laid shell neither trails
+#       nor leads its lepton coordinate and sits on its lift rather than in the ground.
+# Why a broken build cannot pass: a shell drawn upright under Enhanced fails (b) and the
+# flat=1 readout (the shipped binary before this measured 2 x 6 there); a lay-flat matrix
+# with the wrong centring fails (d); a build without the readout fails (a) and has no
+# centre to measure from; a build that draws no shell prints a zero box and fails every
+# comparison.
+sed 's#shots/shell_x.png#shots/g_shell_wc.png#' "$GATEDIR/gate_shell_w.txt" > /tmp/gshell_wc.txt
+sed 's#shots/shell_x.png#shots/g_shell_we.png#' "$GATEDIR/gate_shell_w.txt" > /tmp/gshell_we.txt
+sed 's#shots/shell_x.png#shots/g_shell_ne.png#' "$GATEDIR/gate_shell_n.txt" > /tmp/gshell_ne.txt
+gbegin shots/g_shell_wc.png shots/g_shell_we.png shots/g_shell_ne.png \
+       shots/g_shell_wc.log shots/g_shell_we.log shots/g_shell_ne.log
+grun shots/g_shell_wc.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --w 1280 --h 720 --script /tmp/gshell_wc.txt
+grun shots/g_shell_we.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --w 1280 --h 720 --enhanced --script /tmp/gshell_we.txt
+grun shots/g_shell_ne.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --w 1280 --h 720 --enhanced --script /tmp/gshell_ne.txt
+gshots shots/g_shell_wc.png shots/g_shell_we.png shots/g_shell_ne.png
+# The readouts: one BULLET line and one BULLETSCR line per run, the rule and the pixel.
+SHWC=$(grep -c '^EFXDUMP|BULLET|120mm|id=0|cell=55.8,52.2|face=194|alt=0|invis=0|flat=0$' shots/g_shell_wc.log)
+SHWE=$(grep -c '^EFXDUMP|BULLET|120mm|id=0|cell=55.8,52.2|face=194|alt=0|invis=0|flat=1$' shots/g_shell_we.log)
+SHNE=$(grep -c '^EFXDUMP|BULLET|120mm|id=0|cell=58.5,50.0|face=0|alt=0|invis=0|flat=1$' shots/g_shell_ne.log)
+SHWCS=$(sed -n 's/^EFXDUMP|BULLETSCR|120mm|id=0|scr=\([0-9.]*\),\([0-9.]*\)|flat=0$/\1 \2/p' shots/g_shell_wc.log | head -1)
+SHWES=$(sed -n 's/^EFXDUMP|BULLETSCR|120mm|id=0|scr=\([0-9.]*\),\([0-9.]*\)|flat=1$/\1 \2/p' shots/g_shell_we.log | head -1)
+SHNES=$(sed -n 's/^EFXDUMP|BULLETSCR|120mm|id=0|scr=\([0-9.]*\),\([0-9.]*\)|flat=1$/\1 \2/p' shots/g_shell_ne.log | head -1)
+# The pictures, measured about the projected centre. A run without the readout has no
+# centre to measure about, and its box is reported as 0 x 0 rather than measured at some
+# corner of the frame where the sidebar would be counted instead.
+if [ -n "$SHWCS" ]; then set -- $(python3 "$GATEDIR/gate_shell.py" shots/g_shell_wc.png $SHWCS); else set -- 0 0 0 0 0; fi
+SHWCW=$1; SHWCH=$2; SHWCX=$3; SHWCY=$4
+if [ -n "$SHWES" ]; then set -- $(python3 "$GATEDIR/gate_shell.py" shots/g_shell_we.png $SHWES); else set -- 0 0 0 0 0; fi
+SHWEW=$1; SHWEH=$2; SHWEX=$3; SHWEY=$4
+if [ -n "$SHNES" ]; then set -- $(python3 "$GATEDIR/gate_shell.py" shots/g_shell_ne.png $SHNES); else set -- 0 0 0 0 0; fi
+SHNEW=$1; SHNEH=$2; SHNEX=$3; SHNEY=$4
+# centre error, worst axis, over the three frames; 99 when a readout or a box is missing
+SHERR=$(python3 -c "
+w=[('$SHWCS','$SHWCX','$SHWCY'),('$SHWES','$SHWEX','$SHWEY'),('$SHNES','$SHNEX','$SHNEY')]
+e=0.0
+for s,x,y in w:
+    if not s or (x in ('','0') and y in ('','0')): e=99.0; continue
+    px,py=(float(v) for v in s.split())
+    e=max(e,abs(px-float(x)),abs(py-float(y)))
+print('%.1f'%e)")
+SHOK=$(python3 -c "print(1 if float('$SHERR') <= 2.5 else 0)")
+if [ "$GRC" != "0" ]; then
+  bad "G245 tank shell: a run failed or wrote no shot (GRC=$GRC)"
+elif [ "$SHWC" = "1" ] && [ "$SHWE" = "1" ] && [ "$SHNE" = "1" ] \
+   && [ "${SHWCW:-0}" -ge 2 ] && [ "${SHWCH:-0}" -ge 4 ] && [ "$SHWCW" -lt "$SHWCH" ] \
+   && [ "${SHWEW:-0}" -ge 5 ] && [ "$SHWEW" -gt "$SHWEH" ] \
+   && [ "${SHNEH:-0}" -ge 3 ] && [ "$SHNEH" -le 8 ] && [ "${SHNEW:-0}" -le 4 ] \
+   && [ "$SHOK" = "1" ]; then
+  ok "G245 tank shell: Classic draws the console's upright box (${SHWCW}x${SHWCH} px, flat=0) and Enhanced lays it along its flight (west ${SHWEW}x${SHWEH} px, north ${SHNEW}x${SHNEH} px, flat=1), face=194 west and 0 north, every box centred within $SHERR px of its projected centre"
+else
+  bad "G245 tank shell: readouts classic-west=$SHWC enhanced-west=$SHWE enhanced-north=$SHNE (want 1 each), boxes classic-west=${SHWCW}x${SHWCH}(want taller than wide) enhanced-west=${SHWEW}x${SHWEH}(want wider than tall, >=5 wide) enhanced-north=${SHNEW}x${SHNEH}(want <=4 x <=8), worst centre error ${SHERR}px(want <=2.5)"
+fi
+
+# G246 THE ROCKET LAUNCHER POINTS WHERE ITS ROCKETS GO UNDER ENHANCED, AND CLASSIC KEEPS
+# THE CONSOLE'S PICTURE. The GDI rocket launcher (INI MSAM) is turret equipped in the
+# engine but its cartridge model is one rigid node, and the console draws the whole model
+# at PrimaryFacing while the homing DRAGON round leaves along SecondaryFacing from the
+# unit's centre. The body is turned only in TarComClass::AI's FIRE_FACING arm, which is
+# unreachable while the launcher is rearming, so a retarget inside the 83-tick reload
+# swings the turret alone and the next volley leaves out of the flank of a body that
+# never moved. Under Enhanced draw_facing hands the launcher its turret facing instead;
+# Classic keeps PrimaryFacing. Same scenario, same script, two looks, and the SIM must be
+# identical in both: this is a renderer-only change and the readouts prove it.
+#
+# THE REPRO is the reload gate. SCG90EA with unit 003 swapped for a launcher at 57,50
+# facing north. Force-fire east at 61,50: the body turns 0->63 (FIRE_FACING, the turret
+# was 64 off), both rockets leave east (tick 33, 42). At tick 60, inside the reload,
+# force-fire north at 57,46: the turret swings 63->0 at 6/tick over 13 ticks while the
+# body stays at 63, and the next pair leaves at tick 125 and 134, due north (face=0) from
+# 57.5,50.3, the unit's own centre. Both runs must print the same engine state at every
+# sample or the gate is measuring two different games.
+#
+# Assertions, all four needed:
+#   (a) ENGINE, both looks: face=63 tface=63 before the retarget; face=63 tface=0 after
+#       the swing and at the launch; the launch line EFXDUMP|BULLET|DRAGON|id=0|
+#       cell=57.5,50.3|face=0. The body did NOT turn and the rocket is going north.
+#   (b) YAW, Classic: every sampled yaw is 191 ((63+128)&255): the body's facing, as the
+#       console draws it.
+#   (c) YAW, Enhanced: 191 before the swing, 128 ((0+128)&255) at the launch, and the
+#       13-tick swing is CONTINUOUS: 14 samples, no |jump| above 6 (the turret's own
+#       ROT+1 step), so the swap cannot snap the hull the way the old stillness latch
+#       snapped the harvester.
+#   (d) PIXELS: the launcher's own sand pixels in a box around it (cam 57 50 at zoom max
+#       puts it at about 685,386; the box keeps the medium tank to its west and the smoke
+#       column out). Their spread is wider than tall when the hull lies east-west and
+#       taller than wide when it points north. Measured: Classic w=64 h=35, Enhanced
+#       w=32 h=54. The shipped build measures w=64 h=35 in BOTH looks.
+GML=$(mktemp -d "${TMPDIR:-/tmp}/gate_mlrs.XXXXXX")
+cp missions/*.INI missions/*.BIN "$GML"/
+sed -i.bak 's/^003=GoodGuy,MTNK,256,3257,0,Guard,None/003=GoodGuy,MSAM,256,3257,0,Guard,None/' "$GML/SCG90EA.INI"
+GMLSWAP=$(grep -c '^003=GoodGuy,MSAM,256,3257,0,Guard,None' "$GML/SCG90EA.INI")
+for look in classic enh; do
+cat > "/tmp/g246_$look.txt" <<EOS
+tick 5
+cam 57 50
+zoom max
+lclickobj MSAM 0
+tick 1
+order 61 50 c
+tick 60
+aimwatch MSAM 0 0
+efxdump
+order 57 46 c
+aimwatch MSAM 0 13
+tick 52
+aimwatch MSAM 0 0
+efxdump
+deselect
+tick 3
+aimwatch MSAM 0 0
+efxdump
+shot shots/g246_$look.png
+quit
+EOS
+done
+gbegin shots/g246_classic.png shots/g246_enh.png shots/g246_classic.log shots/g246_enh.log
+grun shots/g246_classic.log --scen SCG90EA --pack SCG01EA.pack $BASE --dir "$GML/" --noshroud \
+     --w 1280 --h 720 --script /tmp/g246_classic.txt
+grun shots/g246_enh.log --scen SCG90EA --pack SCG01EA.pack $BASE --dir "$GML/" --noshroud \
+     --w 1280 --h 720 --enhanced --script /tmp/g246_enh.txt
+gshots shots/g246_classic.png shots/g246_enh.png
+rm -rf "$GML"
+# (a) the engine, read out of each log and required to agree between the looks
+gml_engine() {
+  grep -E '^AIMWATCH\|MSAM#0\|t=[0-9]+\|' "$1" | sed 's/|still=[0-9]*|isstill=[0-9]|yaw=[0-9]*|jump=[-+0-9]*|/|/' | tr '\n' ' '
+}
+GMLEC=$(gml_engine shots/g246_classic.log)
+GMLEE=$(gml_engine shots/g246_enh.log)
+GMLSAME=0; [ -n "$GMLEC" ] && [ "$GMLEC" = "$GMLEE" ] && GMLSAME=1
+GMLPRE=$(grep -c '^AIMWATCH|MSAM#0|t=0|lx=14720|ly=12928|face=63|tface=63|' shots/g246_classic.log)
+GMLPOST=$(grep -c '^AIMWATCH|MSAM#0|t=0|lx=14720|ly=12928|face=63|tface=0|' shots/g246_classic.log)
+GMLLAUNCH=$(grep -c '^EFXDUMP|BULLET|DRAGON|id=0|cell=57.5,50.3|face=0|' shots/g246_classic.log)
+GMLLAUNCHE=$(grep -c '^EFXDUMP|BULLET|DRAGON|id=0|cell=57.5,50.3|face=0|' shots/g246_enh.log)
+# (b) Classic: every yaw is the body's
+GMLCYAW=$(grep -E '^AIMWATCH\|MSAM#0\|t=[0-9]+\|' shots/g246_classic.log | grep -c '|yaw=191|')
+GMLCN=$(grep -cE '^AIMWATCH\|MSAM#0\|t=[0-9]+\|' shots/g246_classic.log)
+# (c) Enhanced: the yaw follows the turret, continuously
+GMLEPRE=$(grep -c '^AIMWATCH|MSAM#0|t=0|lx=14720|ly=12928|face=63|tface=63|still=70|isstill=1|yaw=191|' shots/g246_enh.log)
+GMLEAT=$(grep -c '^AIMWATCH|MSAM#0|t=0|lx=14720|ly=12928|face=63|tface=0|still=13[58]|isstill=1|yaw=128|' shots/g246_enh.log)
+GMLEJUMP=$(grep -E '^AIMWATCH\|MSAM#0\|t=[0-9]+\|' shots/g246_enh.log | sed -n 's/.*|jump=\([-+0-9]*\)|.*/\1/p' | tr -d '+' | sort -n | awk 'NR==1{lo=$1} {hi=$1} END{m=-lo; if (hi>m) m=hi; print m+0}')
+GMLESW=$(grep -c '^AIMWATCH|MSAM#0|t=1[0-3]|' shots/g246_enh.log)
+# (d) the pixels
+GMLPIX=$(python3 - <<'PY'
+from PIL import Image
+import numpy as np
+out = []
+for p in ('shots/g246_classic.png', 'shots/g246_enh.png'):
+    a = np.asarray(Image.open(p).convert('RGB')).astype(int)
+    box = a[320:450, 632:770]
+    r, g, b = box[:, :, 0], box[:, :, 1], box[:, :, 2]
+    sand = (r > g) & (g > b) & (r >= 110) & (r - b >= 45)
+    ys, xs = np.nonzero(sand)
+    if len(xs) < 400:
+        out += [len(xs), 0, 0]
+        continue
+    w = int(np.percentile(xs, 97) - np.percentile(xs, 3))
+    h = int(np.percentile(ys, 97) - np.percentile(ys, 3))
+    out += [len(xs), w, h]
+print(' '.join(str(v) for v in out))
+PY
+)
+set -- $GMLPIX
+GMLCS="${1:-0}"; GMLCW="${2:-0}"; GMLCH="${3:-0}"; GMLES="${4:-0}"; GMLEW="${5:-0}"; GMLEH="${6:-0}"
+if [ "$GRC" != "0" ]; then
+  bad "G246 rocket launcher: the run itself failed or wrote no shot (GRC=$GRC)"
+elif [ "$GMLSWAP" != "1" ] || [ "$GMLSAME" != "1" ] || [ "$GMLPRE" -lt 2 ] || [ "$GMLPOST" -lt 2 ] \
+   || [ "$GMLLAUNCH" != "1" ] || [ "$GMLLAUNCHE" != "1" ]; then
+  bad "G246 rocket launcher, the engine half: launcher-in-scenario=$GMLSWAP(want 1) same-sim-both-looks=$GMLSAME(want 1) face63-tface63-samples=$GMLPRE(want >=2) face63-tface0-samples=$GMLPOST(want >=2) north-launch-from-centre classic=$GMLLAUNCH enh=$GMLLAUNCHE(want 1 each)"
+elif [ "$GMLCN" -lt 17 ] || [ "$GMLCYAW" != "$GMLCN" ]; then
+  bad "G246 rocket launcher, Classic: $GMLCYAW of $GMLCN sampled yaws are the body's 191 (want all of >=17)"
+elif [ "$GMLEPRE" -lt 1 ] || [ "$GMLEAT" -lt 2 ] || [ "$GMLESW" != "4" ] || [ "${GMLEJUMP:-99}" -gt 6 ]; then
+  bad "G246 rocket launcher, Enhanced: yaw191-before=$GMLEPRE(want >=1) yaw128-at-launch=$GMLEAT(want >=2) swing-samples=$GMLESW(want 4) largest-jump=$GMLEJUMP(want <=6)"
+elif [ "$GMLCS" -lt 400 ] || [ "$GMLES" -lt 400 ] || [ "$GMLCW" -le "$GMLCH" ] || [ "$GMLEH" -le "$GMLEW" ]; then
+  bad "G246 rocket launcher, the pixels: classic sand=$GMLCS w=$GMLCW h=$GMLCH (want w>h, east-west) enhanced sand=$GMLES w=$GMLEW h=$GMLEH (want h>w, pointing north)"
+else
+  ok "G246 rocket launcher: same sim both looks (face 63, turret 63->0 in 13 ticks, volley north from 57.5,50.3); Classic draws the body at 191 in all $GMLCN samples; Enhanced follows the turret 191->128 with no jump over $GMLEJUMP and lands at 128 at the launch; launcher ${GMLCW}x${GMLCH} px east-west in Classic, ${GMLEW}x${GMLEH} px north in Enhanced"
+fi
+
+# G247 THE TEXTURE BOOKS SIT ON THEIR BUILDINGS. G68 reads the slot the silo picks; this
+# gate reads the PICTURE, and it exists because G68 stayed green for a whole release over a
+# fill dome nobody could see. bake_struct_flipbooks baked every book variant from the
+# payload list's raw vertices, without the book node's mount transform, while the base
+# mesh carried the same geometry posed (through the walker's node+0x04 fallback). Two of
+# the six books hang off a posed node: the silo's dome variant sat 10.93 units inside the
+# building's own dome, so a full silo looked exactly like an empty one, and the refinery's
+# storage strip stood 0.28 cells east of the strip on the building, so the refinery wore
+# two columns and only the loose one filled. Three legs:
+#   a  texbookdump: every book variant's triangles are on the base mesh (onbase == tris)
+#      in whatever pack is loaded, so a pack baked by the older baker is named here;
+#   b  the Nod silo on SCG32EA (id=88, box 575,320..705,400 at 1280x720): zero
+#      bright-green pixels at fill 0, and a measured 904 at fill 40, threshold 400;
+#   c  the Test Map refinery while its harvester unloads (stage 21): switching the books
+#      off changes pixels inside the corner column 500,260..545,360 (measured 203,
+#      threshold 100) and NONE in the box the second column used to fill,
+#      540,260..554,350 (was 315).
+# PROVEN TO FAIL on the build before the fix: no TEXBOOK readout, 0 green at fill 40, 315
+# pixels in the old column's box.
+gbegin shots/silofill_0.png shots/silofill_40.png shots/procstrip_on.png shots/procstrip_off.png
+grun shots/gtexbook.log --scen SCG32EA --pack SCG32EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_silofill.txt
+gshots shots/silofill_0.png shots/silofill_40.png
+TBK_N=$(grep -c '^TEXBOOK|' shots/gtexbook.log)
+TBK_OFF=$(awk -F'|' '/^TEXBOOK\|/ { t=$6; b=$7; sub("tris=","",t); sub("onbase=","",b); if (t+0 != b+0) print $2 }' shots/gtexbook.log | tr '\n' ' ')
+TBK_S0=$(sed -n 's/^SILOBOOK|id=88|.*|state=\([0-9-]*\)|.*/\1/p' shots/gtexbook.log | head -1)
+TBK_S40=$(sed -n 's/^SILOBOOK|id=88|.*|state=\([0-9-]*\)|.*/\1/p' shots/gtexbook.log | tail -1)
+TBK_G=$(python3 - shots/silofill_0.png shots/silofill_40.png <<'PY'
+import sys
+from PIL import Image
+out = []
+for p in sys.argv[1:3]:
+    im = Image.open(p).convert("RGB"); px = im.load()
+    n = sum(1 for y in range(320, 400) for x in range(575, 705)
+            if px[x, y][1] > 150 and px[x, y][0] < 80 and px[x, y][2] < 80)
+    out.append(str(n))
+print(" ".join(out))
+PY
+)
+set -- $TBK_G
+TBK_G0="${1:-x}"; TBK_G40="${2:-x}"
+grun shots/gtexbook.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_procstrip.txt
+[ -s shots/procstrip.png ] && mv shots/procstrip.png shots/procstrip_on.png
+TBK_ST=$(sed -n 's/^ANIM|PROC|.*|stage=\([0-9]*\)|.*/\1/p' shots/gtexbook.log | head -1)
+grun shots/gtexbook.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound \
+    --notexbook --w 1280 --h 720 --script gate_procstrip.txt
+[ -s shots/procstrip.png ] && mv shots/procstrip.png shots/procstrip_off.png
+gshots shots/procstrip_on.png shots/procstrip_off.png
+TBK_D=$(python3 - shots/procstrip_on.png shots/procstrip_off.png <<'PY'
+import sys
+from PIL import Image
+a = Image.open(sys.argv[1]).convert("RGB").load(); b = Image.open(sys.argv[2]).convert("RGB").load()
+def box(x0, y0, x1, y1):
+    return sum(1 for y in range(y0, y1) for x in range(x0, x1) if a[x, y] != b[x, y])
+print("%d %d" % (box(500, 260, 545, 360), box(540, 260, 554, 350)))
+PY
+)
+set -- $TBK_D
+TBK_DCOL="${1:-x}"; TBK_DOLD="${2:-x}"
+if [ "$GRC" != "0" ]; then
+  bad "G247 texture books on their buildings: a run failed or a shot is missing (GRC=$GRC)"
+elif [ "${TBK_N:-0}" -lt 6 ] || [ -n "$TBK_OFF" ]; then
+  bad "G247 texture books on their buildings: texbookdump lines=$TBK_N(want >=6) books off their base=[$TBK_OFF](want none): the loaded pack was baked without the book node's pose"
+elif [ "$TBK_S0" != "0" ] || [ "$TBK_S40" != "40" ] || [ "$TBK_ST" != "21" ]; then
+  bad "G247 texture books on their buildings: the scene did not reach the states this gate measures (silo states $TBK_S0/$TBK_S40 want 0/40, refinery stage $TBK_ST want 21)"
+elif [ "$TBK_G0" = "0" ] && [ "${TBK_G40:-0}" -ge 400 ] && [ "${TBK_DCOL:-0}" -ge 100 ] && [ "$TBK_DOLD" = "0" ]; then
+  ok "G247 texture books on their buildings: all $TBK_N book variants sit on their base meshes, the silo dome shows $TBK_G0 green pixels empty and $TBK_G40 full, and the refinery strip fills $TBK_DCOL pixels of the corner column with $TBK_DOLD in the box its stray copy used to fill"
+else
+  bad "G247 texture books on their buildings: silo green empty=$TBK_G0(want 0) full=$TBK_G40(want >=400); refinery strip column=$TBK_DCOL(want >=100) old-stray-box=$TBK_DOLD(want 0)"
+fi
+
+# G248 THE STRUCTURE ANIMATION CURVES ARE THE CONSOLE'S. Two legs. First the extractor's
+# BEEFED02 evaluator is run against the cartridge's own: tools/anim/anim_console_check.py
+# loads the resident segment and both model segments into the MIPS interpreter, calls the
+# cartridge's curve init and apply for every animated node, and compares the matrix the
+# console builds with the one rebuilt from the committed slot JSON at every baked frame
+# (tolerance 2e-3; measured worst 6.5e-6). The evaluator before it blended key values with
+# slerp and ignored the two control points, which was 178 degrees wrong on the
+# Communications Centre's dish and turned its 412-degree pan into a 308-degree pan the
+# other way; the check fails on those JSONs by 159 degrees at frame 24. Second, the PACK in
+# the run folder: armdump reads the dish's drawn bearing at cartridge frames 24, 48, 72
+# and 96 (ticks 48..192), which the console's evaluator puts at -93.6, -176.0, +94.3 and
+# +14.1 degrees, with the dish upright (roll < 2) there and at ticks 576 and 768, where the
+# authored clip would have it pointing at the sky and upside down; the idle window keeps
+# the drawn frame inside 2..102.
+# PROVEN TO FAIL: the pre-fix JSONs fail the console check, and the pre-fix renderer has no
+# armdump verb and pans the other way (+65 at frame 24).
+ACC_LINE=$(python3 "$GATEDIR/../tools/anim/anim_console_check.py" 2>&1 | tee -a "$OUT" | grep '^CONSOLECHECK|nodes=' | tail -1)
+ACC_N=$(echo "$ACC_LINE" | sed -n 's/^CONSOLECHECK|nodes=\([0-9]*\)|bad=\([0-9]*\)|.*/\1/p')
+ACC_B=$(echo "$ACC_LINE" | sed -n 's/^CONSOLECHECK|nodes=\([0-9]*\)|bad=\([0-9]*\)|.*/\2/p')
+gbegin shots/eyedish_f096.png shots/eyedish_f288.png shots/eyedish_f384.png
+grun shots/geyedish.log --scen SCB13EA --pack SCB13EA.pack $BASE --noshroud --nosound \
+    --nominimap --nosidebar --w 1280 --h 720 --script gate_eyedish.txt
+gshots shots/eyedish_f096.png shots/eyedish_f288.png shots/eyedish_f384.png
+EYE_RES=$(python3 - shots/geyedish.log <<'PY'
+import re, sys
+az, roll, fr = [], [], []
+for ln in open(sys.argv[1]):
+    m = re.match(r"ARMMAT\|EYE\|id=\d+\|frame=([0-9.]+)\|part=1\|az=(-?[0-9.]+)\|el=(-?[0-9.]+)\|roll=(-?[0-9.]+)", ln)
+    if m:
+        fr.append(float(m.group(1))); az.append(float(m.group(2))); roll.append(float(m.group(4)))
+want = [-93.6, -176.0, 94.3, 14.1]
+if len(az) < 6:
+    print("0 samples=%d" % len(az)); raise SystemExit
+def dang(a, b):
+    d = (a - b + 180.0) % 360.0 - 180.0
+    return abs(d)
+okaz = all(dang(a, w) <= 3.0 for a, w in zip(az[:4], want))
+okroll = max(roll) < 2.0
+okfr = all(2.0 <= f <= 102.0 for f in fr)
+print("%d az=%s roll_max=%.1f frames=%s" % (1 if (okaz and okroll and okfr) else 0,
+      [round(a, 1) for a in az], max(roll), [round(f, 1) for f in fr]))
+PY
+)
+set -- $EYE_RES
+EYE_OK="$1"
+if [ "$ACC_N" != "15" ] || [ "$ACC_B" != "0" ]; then
+  bad "G248 animation curves: the console check did not pass ($ACC_LINE): the committed slot JSONs are not what the cartridge's evaluator produces"
+elif [ "$GRC" != "0" ]; then
+  bad "G248 animation curves: the dish run failed or wrote no shot (GRC=$GRC)"
+elif [ "$EYE_OK" = "1" ]; then
+  ok "G248 animation curves: $ACC_N BEEFED02 nodes match the console's evaluator at every baked frame, and the Communications Centre's dish pans upright on the console's bearings ($EYE_RES)"
+else
+  bad "G248 animation curves: the dish is not on the console's pan (want az -93.6/-176.0/94.3/14.1 within 3, roll < 2, frames in 2..102) [$EYE_RES]"
+fi
+
+# G249. THE EXIT COMES BEFORE THE RALLY, AND THE AIRSTRIP HONOURS IT. Six legs and two
+# controls, all on the rally point a factory stores in its ArchiveTarget (G96).
+#   A  SCG90EA barracks, rally north at 58,50: the soldier enters the exit cell 58,55
+#      before any cell above the pad row, and ends at 58,50. On a build that hands the
+#      rally to the soldier at the door point it walks 58,54 then 59,54, through the
+#      side of the hut, and never enters 58,55.
+#   B  SCB70EA Hand of Nod, rally north at 15,44: the exit cell 16,50 before any cell
+#      above row 50 (the spawn cell 15,49 excepted), ending at 15,44.
+#   C  SCG90EA barracks, rally behind and left at 55,50: the exit cell first, then along
+#      the front of the pad, ending at 55,50. Without the door the line to the rally runs
+#      through the occupied corner 57,53.
+#   D  SCB70EA airstrip, rally at 9,58: the buggy is in limbo before the drop, then under
+#      MISSION_MOVE, and ends at 9,58.
+#   E  the same strip and rally, a harvester: never MISSION_MOVE, never at 9,58, ends
+#      under MISSION_HARVEST. The strip is Nod's only harvester source.
+#   F  SCB70EA helipad: the rally is refused (accepted=0) and the dump names none.
+#   A' and B' are A and B with the rally lines taken out: the vanilla exit walk, 58,54
+#      58,55 and 15,49 15,50 16,50, and no rally stored anywhere.
+# PROVEN TO FAIL on the build before the fix, 3 of 8: A walks 58,54 59,54 59,53 and never
+# enters 58,55, B walks 15,49 16,49 17,48, C walks 58,54 57,54 57,53 through the occupied
+# corner, D's buggy is scattered to 13,54 and ends there in guard, F stores the helipad
+# rally at 20,50; only E and the two controls pass.
+gbegin shots/exitpath_a_door.png shots/exitpath_a_end.png shots/exitpath_b_door.png \
+       shots/exitpath_c_front.png shots/exitpath_d_drop.png shots/exitpath_d_end.png
+grun shots/gexitpath_a.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_exitpath.txt
+# The controls drop the shot lines as well as the rally lines: they run AFTER the rally
+# arm and would otherwise overwrite its pictures with their own, and a control soldier
+# standing at the exit cell looks exactly like a fixed one at the same tick.
+sed '/^[[:space:]]*rally /d; /^[[:space:]]*shot /d' gate_exitpath.txt > /tmp/g249_actl.txt
+grun shots/gexitpath_actl.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script /tmp/g249_actl.txt
+grun shots/gexitpath_c.log --scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_exitpath_nw.txt
+grun shots/gexitpath_b.log --scen SCB70EA --pack SCB01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_exitpath_hand.txt
+sed '/^[[:space:]]*rally /d; /^[[:space:]]*shot /d' gate_exitpath_hand.txt > /tmp/g249_bctl.txt
+grun shots/gexitpath_bctl.log --scen SCB70EA --pack SCB01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script /tmp/g249_bctl.txt
+grun shots/gexitpath_d.log --scen SCB70EA --pack SCB01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_exitpath_afld.txt
+grun shots/gexitpath_e.log --scen SCB70EA --pack SCB01EA.pack $BASE --noshroud --nosound \
+    --w 1280 --h 720 --script gate_exitpath_harv.txt
+gshots shots/exitpath_a_door.png shots/exitpath_a_end.png shots/exitpath_b_door.png \
+       shots/exitpath_c_front.png shots/exitpath_d_drop.png shots/exitpath_d_end.png
+EXP_RES=$(python3 - shots/gexitpath_a.log shots/gexitpath_actl.log shots/gexitpath_c.log \
+                    shots/gexitpath_b.log shots/gexitpath_bctl.log shots/gexitpath_d.log \
+                    shots/gexitpath_e.log <<'PY'
+import re, sys
+LIMBO = (127, 127)
+def read(path, label):
+    text = open(path, errors="replace").read()
+    cells, missions = [], []
+    # A watch prints the cell it starts in, so the second watch of a script repeats the
+    # last cell of the first: consecutive repeats are one cell, not a step.
+    for m in re.finditer(r"^WATCH\|%s\|f=\d+\|cell=(\d+),(\d+)\|mission=(\w+)" % re.escape(label), text, re.M):
+        cell = (int(m.group(1)), int(m.group(2)))
+        if not cells or cells[-1] != cell:
+            cells.append(cell)
+        missions.append(m.group(3))
+    o = re.search(r"^OBJ\|%s\|[A-Z]+\|\w+\|cell=(\d+),(\d+)\|[^|]*\|mission=(\w+)" % re.escape(label), text, re.M)
+    obj = ((int(o.group(1)), int(o.group(2))), o.group(3)) if o else (None, None)
+    return text, cells, missions, obj
+def fmt(cells):
+    return ">".join("%d,%d" % c for c in cells) if cells else "none"
+def exit_first(cells, exitcell, behind, skip=0):
+    walk = [c for c in cells if c != LIMBO]
+    if exitcell not in walk:
+        return False
+    past = [i for i, c in enumerate(walk) if i >= skip and behind(c)]
+    return not past or walk.index(exitcell) < past[0]
+res, notes = {}, []
+# A: barracks north rally.
+t, c, m, o = read(sys.argv[1], "E1:GoodGuy#4")
+res["A"] = exit_first(c, (58, 55), lambda p: p[1] <= 53) and o[0] == (58, 50)
+notes.append("A %s end=%s" % (fmt([x for x in c if x != LIMBO]), o[0]))
+# A': the control walks the vanilla exit and stores no rally.
+t, c, m, o = read(sys.argv[2], "E1:GoodGuy#4")
+res["A'"] = [x for x in c if x != LIMBO] == [(58, 54), (58, 55)] and o[0] == (58, 55) \
+            and not re.search(r"^RALLY\|", t, re.M)
+notes.append("A' %s" % fmt([x for x in c if x != LIMBO]))
+# C: behind-left rally.
+t, c, m, o = read(sys.argv[3], "E1:GoodGuy#4")
+res["C"] = exit_first(c, (58, 55), lambda p: p[1] <= 53) and o[0] == (55, 50)
+notes.append("C %s end=%s" % (fmt([x for x in c if x != LIMBO]), o[0]))
+# B: the Hand of Nod. The spawn cell 15,49 is above row 50 and is skipped. F, the
+# helipad refusal, is in the same log: the set line says accepted=0 and no dump line
+# names a helipad.
+t, c, m, o = read(sys.argv[4], "E1:BadGuy#17")
+res["B"] = exit_first(c, (16, 50), lambda p: p[1] <= 49, skip=1) and o[0] == (15, 44)
+res["F"] = bool(re.search(r"^RALLY\|set\|HPAD\|id=\d+\|cell=20,50\|accepted=0$", t, re.M)) \
+           and not re.search(r"^RALLY\|HPAD\|", t, re.M)
+notes.append("F %s" % ("refused" if res["F"] else "STORED"))
+notes.append("B %s end=%s" % (fmt([x for x in c if x != LIMBO]), o[0]))
+t, c, m, o = read(sys.argv[5], "E1:BadGuy#17")
+res["B'"] = [x for x in c if x != LIMBO] == [(15, 49), (15, 50), (16, 50)] and o[0] == (16, 50) \
+            and not re.search(r"^RALLY\|", t, re.M)
+notes.append("B' %s" % fmt([x for x in c if x != LIMBO]))
+# D: the airstrip drop, then MISSION_MOVE, then the rally cell.
+t, c, m, o = read(sys.argv[6], "BGGY:BadGuy#3")
+res["D"] = len(c) >= 2 and c[0] == LIMBO and m[0] == "None" and "Move" in m and o[0] == (9, 58)
+notes.append("D %s end=%s/%s" % (fmt(c[:3] + [c[-1]] if len(c) > 4 else c), o[0], o[1]))
+# E: the harvester is left to harvest.
+t, c, m, o = read(sys.argv[7], "HARV:BadGuy#1")
+res["E"] = len(c) >= 2 and c[0] == LIMBO and "Move" not in m and (9, 58) not in c and o[1] == "Harvest"
+notes.append("E cells=%d missions=%s end=%s/%s" % (len(c), ",".join(sorted(set(m))), o[0], o[1]))
+order = ["A", "A'", "B", "B'", "C", "D", "E", "F"]
+print("%d %s | %s" % (sum(1 for k in order if res[k]),
+      " ".join("%s=%d" % (k, 1 if res[k] else 0) for k in order), "; ".join(notes)))
+PY
+)
+EXP_N="${EXP_RES%% *}"
+if [ "$GRC" != "0" ]; then
+  bad "G249 exit before rally: a run failed or a shot is missing (GRC=$GRC)"
+elif [ "${EXP_N:-0}" = "8" ]; then
+  ok "G249 exit before rally: all eight legs hold [$EXP_RES]"
+else
+  bad "G249 exit before rally: ${EXP_N:-0} of 8 legs hold (want A B C D E F and the two controls all 1) [$EXP_RES]"
+fi
+
+# G253 A MISSION THAT CANNOT START SAYS WHY. A report that every mission start closed the
+# game after the mission briefing movie could not be worked, because a refused or crashed start
+# left nothing behind: the window vanished, or the menu came back untouched with one line
+# on stderr. Two shapes reproduce on the build before this gate and both are closed here.
+#
+#   a  THE THEATER ARCHIVE. DisplayClass::Init_Theater copied the theater palette out of
+#      MFCD::Retrieve with no check on the answer, so a missing, zero-length or damaged
+#      content/<THEATER>.MIX was a NULL dereference inside CNC_Start_Custom_Instance, and
+#      the same crash met any play folder assembled without its content/ archives. Three runs
+#      against a scratch content folder (empty; a zero-length TEMPERAT.MIX; 400 bytes of
+#      junk whose header reads as a negative entry count, which faulted in the archive
+#      reader once the palette copy no longer did). Each must exit 0 with no FATAL line,
+#      print the engine's own CNC3D|theater| line, and stand a world up (COUNT|E1|have>0).
+#      PROVEN TO FAIL: the build before this exits 139 on all three with
+#      "FATAL: signal 11 while: CNC_Start_Custom_Instance" and never reaches the count.
+#   b  THE REFUSAL READOUT. A library that cannot be loaded (what an antivirus quarantine
+#      or Smart App Control does to TiberianDawn.dll) made game_boot return 0 and the shell
+#      go back to the menu. The shell now prints BOOTFAIL|<scen>|<reason> naming the file,
+#      HARNESS|end still counts exactly one failure, and the menu's digest after the refusal
+#      equals the one before it (the menu stands, nothing leaked onto it).
+#      PROVEN TO FAIL: the build before this prints zero BOOTFAIL lines.
+#   c  THE PLAYER IS TOLD. --bootfailshot attempts the same refused start, draws the
+#      "Unable to start mission" box once and writes it. NOTICE|open| exactly once with the
+#      box's framebuffer rectangle; the PNG exists; the ink inside that rectangle against a
+#      black frame is in the thousands (measured 15399 sampled pixels at 1280x720) while a
+#      120-row strip below the box has none, so the box is drawn where it says it is.
+#      PROVEN TO FAIL: the build before this has no --bootfailshot and no notice page.
+#   d  A MISSING MISSION FILE is refused before the engine is asked, with a sentence that
+#      names the file, and no crash. PROVEN TO FAIL: the build before this reports only
+#      "CNC_Start_Custom_Instance FAILED" and nothing a player could read.
+rm -rf shots/bf; mkdir -p shots/bf/empty shots/bf/zero shots/bf/junk
+: > shots/bf/zero/TEMPERAT.MIX
+python3 -c 'import random; random.seed(253); open("shots/bf/junk/TEMPERAT.MIX", "wb").write(bytes(random.randrange(256) for _ in range(400)))'
+G253BASE="--cameos cameos.pack --dospack dossidebar.pack --dosinf dosinfantry.pack --dylib TiberianDawn.dylib --dir missions/"
+gbegin shots/bf/a_empty.log shots/bf/a_zero.log shots/bf/a_junk.log
+grun shots/bf/a_empty.log --scen SCG90EA --pack SCG01EA.pack $G253BASE --content shots/bf/empty/ \
+     --noshroud --w 640 --h 400 --script gate_bootfail.txt
+grun shots/bf/a_zero.log  --scen SCG90EA --pack SCG01EA.pack $G253BASE --content shots/bf/zero/ \
+     --noshroud --w 640 --h 400 --script gate_bootfail.txt
+grun shots/bf/a_junk.log  --scen SCG90EA --pack SCG01EA.pack $G253BASE --content shots/bf/junk/ \
+     --noshroud --w 640 --h 400 --script gate_bootfail.txt
+G253ARC=$GRC
+G253AFATAL=$(cat shots/bf/a_empty.log shots/bf/a_zero.log shots/bf/a_junk.log | grep -c '^FATAL: signal')
+G253ALINE=$(cat shots/bf/a_empty.log shots/bf/a_zero.log shots/bf/a_junk.log | grep -c '^CNC3D|theater|TEMPERAT.PAL is in no loaded archive: TEMPERAT.MIX is missing, empty or damaged')
+G253AE1=$(cat shots/bf/a_empty.log shots/bf/a_zero.log shots/bf/a_junk.log | sed -n 's/^COUNT|E1|have=\([0-9]*\).*/\1/p' | paste -sd' ' -)
+G253AE1OK=1
+for g253n in $G253AE1 x; do
+  [ "$g253n" = "x" ] && continue
+  [ "$g253n" -gt 0 ] 2>/dev/null || G253AE1OK=0
+done
+[ "$(echo "$G253AE1" | wc -w | tr -d ' ')" = "3" ] || G253AE1OK=0
+# leg b: the shell, a library that cannot be loaded
+G253B=$(./cnc3d --dylib ./nonexistent.dylib --harness 60 --rounds 1 2>&1)
+echo "$G253B" >> "$OUT"
+G253BFAIL=$(echo "$G253B" | grep -c '^BOOTFAIL|SCG90EA|.*nonexistent\.dylib')
+G253BEND=$(echo "$G253B" | grep -c '^HARNESS|end|1 round(s), 1 failure(s)')
+G253BM1=$(echo "$G253B" | sed -n 's/^HARNESS|menu1|ink=[0-9.]*|digest=\([0-9a-f]*\).*/\1/p' | head -1)
+G253BM2=$(echo "$G253B" | sed -n 's/^HARNESS|menu2|ink=[0-9.]*|digest=\([0-9a-f]*\).*/\1/p' | head -1)
+# leg c: the box, photographed
+rm -f shots/bf/bootfail.png
+G253C=$(./cnc3d --scen SCG90EA --pack SCG01EA.pack $G253BASE --content content/ --menupack dosmenu.pack \
+        --dylib ./nonexistent.dylib --bootfailshot shots/bf/bootfail.png 2>&1)
+echo "$G253C" >> "$OUT"
+G253COPEN=$(echo "$G253C" | grep -c '^NOTICE|open|caption=Unable to start mission|')
+G253CRECT=$(echo "$G253C" | sed -n 's/^NOTICE|open|caption=[^|]*|lines=[0-9]*|rect=\([0-9,]*\)|.*/\1/p' | head -1)
+G253CPNG=0; [ -s shots/bf/bootfail.png ] && G253CPNG=1
+G253CINK=0; G253CBELOW=0
+if [ "$G253CPNG" = "1" ] && [ -n "$G253CRECT" ]; then
+  python3 -c 'from PIL import Image; im = Image.open("shots/bf/bootfail.png"); Image.new("RGB", im.size, (0, 0, 0)).save("shots/bf/black.png")'
+  G253CINK=$(python3 "$GATEDIR/gate_pixdiff.py" shots/bf/bootfail.png shots/bf/black.png "$G253CRECT" 2>/dev/null)
+  G253CY1=$(echo "$G253CRECT" | cut -d, -f4)
+  G253CBELOW=$(python3 "$GATEDIR/gate_pixdiff.py" shots/bf/bootfail.png shots/bf/black.png "0,$((G253CY1 + 8)),1279,$((G253CY1 + 127))" 2>/dev/null)
+fi
+# leg d: a mission file that is not there
+G253D=$(./cnc_eyes --scen NOSUCH --pack SCG01EA.pack $G253BASE --content content/ --noshroud \
+        --w 640 --h 400 --script gate_bootfail.txt 2>&1); G253DRC=$?
+echo "$G253D" >> "$OUT"
+G253DLINE=$(echo "$G253D" | grep -c '^BOOTFAIL|The mission file missions/NOSUCH.INI is missing')
+G253DFATAL=$(echo "$G253D" | grep -c '^FATAL: signal')
+if [ "$G253ARC" != "0" ] || [ "$G253AFATAL" != "0" ]; then
+  bad "G253 a mission that cannot start says why: a missing, empty or junk theater archive still ends the mission start (exit=$G253ARC fatal-lines=$G253AFATAL theater-lines=$G253ALINE E1=[$G253AE1])"
+elif [ "$G253ALINE" != "3" ] || [ "$G253AE1OK" != "1" ]; then
+  bad "G253 a mission that cannot start says why: the runs survived but the engine did not say so or stood no world up (theater-lines=$G253ALINE want 3, E1=[$G253AE1] want three counts above 0)"
+elif [ "$G253BFAIL" != "1" ] || [ "$G253BEND" != "1" ] || [ -z "$G253BM1" ] || [ "$G253BM1" != "$G253BM2" ]; then
+  bad "G253 a mission that cannot start says why: the shell did not report the refused library (BOOTFAIL-lines=$G253BFAIL want 1, end=$G253BEND want 1, menu1=$G253BM1 menu2=$G253BM2 want equal)"
+elif [ "$G253COPEN" != "1" ] || [ "$G253CPNG" != "1" ] || [ -z "$G253CRECT" ] \
+     || [ "${G253CINK:-0}" -lt 3000 ] || [ "${G253CBELOW:-1}" != "0" ]; then
+  bad "G253 a mission that cannot start says why: the notice box is not on the glass (open=$G253COPEN png=$G253CPNG rect=[$G253CRECT] ink-in-box=$G253CINK want >=3000, ink-below=$G253CBELOW want 0)"
+elif [ "$G253DRC" = "0" ] || [ "$G253DLINE" != "1" ] || [ "$G253DFATAL" != "0" ]; then
+  bad "G253 a mission that cannot start says why: a missing mission file is not refused by name (exit=$G253DRC line=$G253DLINE fatal=$G253DFATAL)"
+else
+  ok "G253 a mission that cannot start says why: an empty content folder, a zero-length and a junk TEMPERAT.MIX all boot SCG90EA (exit 0, $G253ALINE theater lines, E1 counts $G253AE1); a library that cannot be loaded is reported as BOOTFAIL|SCG90EA|... naming it, HARNESS|end counts 1 failure and the menu digest $G253BM1 stands; the Unable to start mission box is drawn at $G253CRECT with $G253CINK sampled pixels of ink and $G253CBELOW below it; a missing mission file is refused by name (exit $G253DRC)"
+fi
+
+# =====================================================================================
+# G250 THE SCREEN EDGES SCROLL OVER THE UNIT CARD.
+#
+# The unit card is pinned to the bottom-left corner of the Enhanced HUD, and
+# edge_scroll_allowed used to refuse wherever uc_over said the pointer was on it. uc_hit
+# answers for every point in the card's rectangle while the card is up, so with anything
+# selected the bottom strip was dead across the card's width, the left strip across its
+# height, and the corner between them: measured as exactly the card's rectangle at every
+# window size tried. The card's own presses never pass through that guard (uc_click sits
+# at the head of the press ladders), so the veto bought nothing the card needed. The fix
+# takes the clause out, and this gate is its keeper: the strips answer the SCREEN edge,
+# the rule G79 and G141 already hold the east and top strips to.
+#
+# HARNESS FACT THIS GATE RESTS ON. The veto this gate guards against read g_ucShownNow
+# through uc_over, a latch set only by a drawn frame (shot) or by the unitcard and
+# cardclick verbs; a script tick does not refresh it. Every selection change is therefore followed by unitcard BEFORE its
+# probes, and the UNITCARD|rect line that verb prints is asserted to the pixel, so the
+# probes are proven to lie on the card rather than assumed to. Without that, a card that
+# was never latched would let every probe pass for the wrong reason.
+#
+# THREE GEOMETRIES, because the card's size follows the sidebar zoom and the fault would
+# survive at any one of them:
+#   A  1280x960, zoom 2, card 480x332 at y=628. Probes 2,958 (the corner: both strips),
+#      200,958 (the bottom strip over the tab row), 2,700 (the left strip over the card's
+#      bezel). Controls 600,958 and 2,300, bare map on the same strips.
+#   B  1280x720, zoom 1, card 240x166 at y=554. Probes 2,718 / 100,718 / 2,600, control
+#      300,718 and 2,300.
+#   C  1280x960 with gfx ui_scale 1, card 240x166 at y=794. Probes 2,958 / 100,958 /
+#      2,800, controls 600,958 and 2,300.
+# Each moving arm is measured against its control arm on the same strip and, for leg A,
+# against a Classic run of the identical script (no card exists there, UNITCARD says
+# unavailable) to 0.002, the way G141 measures against the DOS bar. The corner arm must
+# move on both axes (x < 44 and z > 46 from 45,45); a pure west pan drifts z by 0.02, so
+# the left arm is held to x alone and to its control.
+#
+# THE CLICK LEG, on A and B: lclick at 5,H-6 sits inside both strips over tab 1 and must
+# still print GROUP|recall|key=1|slot=0|selection=N with the card's count unchanged after
+# it, proving the strips scrolling did not take the card's press away from it. And the
+# cursor over the card while it pans stays the plain arrow, as it does over the east
+# strip on the sidebar.
+#
+# PROVEN TO FAIL on the build before the fix: leg A printed
+#   EDGEAT|frames=20|mouse=2,958|tacright=960|guard=blocked|busy=0
+#   CAM|edgeat|x=45.000|z=45.000
+# for all three card probes, and the same at 1280x720 (2,718 / 100,718 / 2,600) and at
+# ui_scale 1 (2,958 / 100,958 / 2,800), while the controls moved to z=49.028 and
+# x=41.965 (z=50.351 / x=40.940 at 720). The fixed build moves the corner to
+# x=42.871 z=47.796 at 960 and x=42.164 z=48.480 at 720.
+# =====================================================================================
+gbegin /tmp/g250a.log /tmp/g250cl.log /tmp/g250b.log /tmp/g250c.log shots/g250_card.png
+printf 'enabled 1\n' > gfx_g250.cfg
+# The Classic control runs the SAME script as leg A, shot line included, so it goes
+# first: the picture left behind is then the Enhanced one with the card in it, not the
+# plain HUD without.
+grun /tmp/g250cl.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 960 \
+     --script gate_edgecard.txt
+export CNC3D_HUD=new
+grun /tmp/g250a.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 960 \
+     --gfx gfx_g250.cfg --script gate_edgecard.txt
+grun /tmp/g250b.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 720 \
+     --gfx gfx_g250.cfg --script gate_edgecard_720.txt
+grun /tmp/g250c.log --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 960 \
+     --gfx gfx_g250.cfg --script gate_edgecard_ui1.txt
+unset CNC3D_HUD
+gshots shots/g250_card.png
+# The nth EDGEAT guard word and the nth CAM|edgeat x and z of a log.
+g250g() { grep -a '^EDGEAT|' "$1" | sed -n "$2p" | sed 's/.*|mouse=\([0-9,]*\)|.*|guard=\([a-z]*\)|.*/\1 \2/'; }
+g250x() { grep -a '^CAM|edgeat|' "$1" | sed -n "$2p" | sed 's/.*|x=\([0-9.-]*\)|.*/\1/'; }
+g250z() { grep -a '^CAM|edgeat|' "$1" | sed -n "$2p" | sed 's/.*|z=\([0-9.-]*\)|.*/\1/'; }
+# Geometry, asserted: the card where the probes expect it, and a selection on it.
+G250RA=$(grep -ac '^UNITCARD|rect|x=0|y=628|w=480|h=332|scale=2.00$' /tmp/g250a.log)
+G250RB=$(grep -ac '^UNITCARD|rect|x=0|y=554|w=240|h=166|scale=1.00$' /tmp/g250b.log)
+G250RC=$(grep -ac '^UNITCARD|rect|x=0|y=794|w=240|h=166|scale=1.00$' /tmp/g250c.log)
+G250UI=$(grep -ac '^GFX|ui_scale=1$' /tmp/g250c.log)
+G250NA=$(grep -a '^UNITCARD|shown=1|count=' /tmp/g250a.log | head -1 | sed 's/.*|count=\([0-9]*\)|.*/\1/')
+G250NB=$(grep -a '^UNITCARD|shown=1|count=' /tmp/g250b.log | head -1 | sed 's/.*|count=\([0-9]*\)|.*/\1/')
+G250NC=$(grep -a '^UNITCARD|shown=1|count=' /tmp/g250c.log | head -1 | sed 's/.*|count=\([0-9]*\)|.*/\1/')
+G250CL=$(grep -ac '^UNITCARD|unavailable|' /tmp/g250cl.log)
+# The guards, as "mouse guard" pairs, all five arms of each leg.
+G250GA="$(g250g /tmp/g250a.log 1)/$(g250g /tmp/g250a.log 2)/$(g250g /tmp/g250a.log 3)/$(g250g /tmp/g250a.log 4)/$(g250g /tmp/g250a.log 5)"
+G250GB="$(g250g /tmp/g250b.log 1)/$(g250g /tmp/g250b.log 2)/$(g250g /tmp/g250b.log 3)/$(g250g /tmp/g250b.log 4)/$(g250g /tmp/g250b.log 5)"
+G250GC="$(g250g /tmp/g250c.log 1)/$(g250g /tmp/g250c.log 2)/$(g250g /tmp/g250c.log 3)/$(g250g /tmp/g250c.log 4)/$(g250g /tmp/g250c.log 5)"
+G250GL="$(g250g /tmp/g250cl.log 1)/$(g250g /tmp/g250cl.log 2)/$(g250g /tmp/g250cl.log 3)/$(g250g /tmp/g250cl.log 4)/$(g250g /tmp/g250cl.log 5)"
+G250WA="2,958 pass/200,958 pass/2,700 pass/600,958 pass/2,300 pass"
+G250WB="2,718 pass/100,718 pass/2,600 pass/300,718 pass/2,300 pass"
+G250WC="2,958 pass/100,958 pass/2,800 pass/600,958 pass/2,300 pass"
+# The camera after each arm: corner, bottom, left, bottom control, left control.
+g250leg() {
+  awk -v cx="$(g250x "$1" 1)" -v cz="$(g250z "$1" 1)" \
+      -v bx="$(g250x "$1" 2)" -v bz="$(g250z "$1" 2)" \
+      -v lx="$(g250x "$1" 3)" -v lz="$(g250z "$1" 3)" \
+      -v kx="$(g250x "$1" 4)" -v kz="$(g250z "$1" 4)" \
+      -v mx="$(g250x "$1" 5)" -v mz="$(g250z "$1" 5)" '
+  function ab(v) { return v < 0 ? -v : v }
+  BEGIN { eps = 0.002;
+    print (cx < 44.0 && cz > 46.0 \
+        && bz > 46.0 && ab(bx - kx) < eps && ab(bz - kz) < eps \
+        && lx < 44.0 && ab(lx - mx) < eps && ab(lz - mz) < eps \
+        && kz > 46.0 && mx < 44.0) ? 1 : 0 }'
+}
+G250VA=$(g250leg /tmp/g250a.log); G250VB=$(g250leg /tmp/g250b.log); G250VC=$(g250leg /tmp/g250c.log)
+# Leg A against the Classic run of the same script, arm by arm, to 0.002.
+G250VL=$(awk -v a1x="$(g250x /tmp/g250a.log 1)" -v a1z="$(g250z /tmp/g250a.log 1)" \
+             -v a2x="$(g250x /tmp/g250a.log 2)" -v a2z="$(g250z /tmp/g250a.log 2)" \
+             -v a3x="$(g250x /tmp/g250a.log 3)" -v a3z="$(g250z /tmp/g250a.log 3)" \
+             -v c1x="$(g250x /tmp/g250cl.log 1)" -v c1z="$(g250z /tmp/g250cl.log 1)" \
+             -v c2x="$(g250x /tmp/g250cl.log 2)" -v c2z="$(g250z /tmp/g250cl.log 2)" \
+             -v c3x="$(g250x /tmp/g250cl.log 3)" -v c3z="$(g250z /tmp/g250cl.log 3)" '
+  function ab(v) { return v < 0 ? -v : v }
+  BEGIN { eps = 0.002;
+    print (ab(a1x - c1x) < eps && ab(a1z - c1z) < eps && ab(a2x - c2x) < eps \
+        && ab(a2z - c2z) < eps && ab(a3x - c3x) < eps && ab(a3z - c3z) < eps) ? 1 : 0 }')
+# The click leg: the press over tab 1 is still the card's, and the count after it holds.
+G250KA=$(grep -ac "^GROUP|recall|key=1|slot=0|selection=${G250NA:-x}\$" /tmp/g250a.log)
+G250KB=$(grep -ac "^GROUP|recall|key=1|slot=0|selection=${G250NB:-x}\$" /tmp/g250b.log)
+G250HA=$(grep -a '^UNITCARD|shown=1|count=' /tmp/g250a.log | sed -n 2p | sed 's/.*|count=\([0-9]*\)|.*/\1/')
+G250HB=$(grep -a '^UNITCARD|shown=1|count=' /tmp/g250b.log | sed -n 2p | sed 's/.*|count=\([0-9]*\)|.*/\1/')
+# The cursor over the card and over the east strip: the plain arrow at both.
+G250CU=$(grep -a '^CURSOR|at=2.0,958.0|' /tmp/g250a.log | sed 's/.*|shape=\([a-z_]*\)|.*/\1/')
+G250CE=$(grep -a '^CURSOR|at=1275.0,500.0|' /tmp/g250a.log | sed 's/.*|shape=\([a-z_]*\)|.*/\1/')
+if [ "$GRC" != "0" ]; then
+  bad "G250 edges over the unit card: a run failed or wrote no shot (GRC=$GRC)"
+elif [ "${G250RA:-0}" -lt 1 ] || [ "${G250RB:-0}" -lt 1 ] || [ "${G250RC:-0}" -lt 1 ] || [ "${G250UI:-0}" -lt 1 ]; then
+  bad "G250 edges over the unit card: the card is not where the probes expect it (rect lines 960=$G250RA 720=$G250RB ui1=$G250RC ui_scale=$G250UI, want 1 each): $(grep -a '^UNITCARD|rect' /tmp/g250a.log /tmp/g250b.log /tmp/g250c.log | head -3 | tr '\n' ' ')"
+elif [ "${G250NA:-0}" -lt 1 ] || [ "${G250NB:-0}" -lt 1 ] || [ "${G250NC:-0}" -lt 1 ]; then
+  bad "G250 edges over the unit card: the band left nothing on the card (counts $G250NA/$G250NB/$G250NC, want >0), so the probes were not over a card"
+elif [ "${G250CL:-0}" -lt 1 ]; then
+  bad "G250 edges over the unit card: the Classic control run had a card (want UNITCARD|unavailable)"
+elif [ "$G250GL" != "$G250WA" ]; then
+  bad "G250 edges over the unit card: the Classic control refused a strip it has nothing on: [$G250GL] want [$G250WA]"
+elif [ "$G250GA" != "$G250WA" ] || [ "$G250GB" != "$G250WB" ] || [ "$G250GC" != "$G250WC" ]; then
+  bad "G250 edges over the unit card: a strip over the card is vetoed. 1280x960 [$G250GA] want [$G250WA]; 1280x720 [$G250GB] want [$G250WB]; ui_scale 1 [$G250GC] want [$G250WC]"
+elif [ "$G250VA" != "1" ] || [ "$G250VB" != "1" ] || [ "$G250VC" != "1" ]; then
+  bad "G250 edges over the unit card: the guard passed but the camera did not move as its control did (legs ok=$G250VA$G250VB$G250VC want 111). 960: corner $(g250x /tmp/g250a.log 1),$(g250z /tmp/g250a.log 1) bottom z=$(g250z /tmp/g250a.log 2) ctl z=$(g250z /tmp/g250a.log 4) left x=$(g250x /tmp/g250a.log 3) ctl x=$(g250x /tmp/g250a.log 5); 720: corner $(g250x /tmp/g250b.log 1),$(g250z /tmp/g250b.log 1) bottom z=$(g250z /tmp/g250b.log 2) ctl z=$(g250z /tmp/g250b.log 4) left x=$(g250x /tmp/g250b.log 3) ctl x=$(g250x /tmp/g250b.log 5); ui1: corner $(g250x /tmp/g250c.log 1),$(g250z /tmp/g250c.log 1) bottom z=$(g250z /tmp/g250c.log 2) ctl z=$(g250z /tmp/g250c.log 4) left x=$(g250x /tmp/g250c.log 3) ctl x=$(g250x /tmp/g250c.log 5) (start 45,45; corner wants x<44 and z>46, each arm equals its control to 0.002)"
+elif [ "$G250VL" != "1" ]; then
+  bad "G250 edges over the unit card: the three card arms at 1280x960 do not match the Classic run of the same script to 0.002: card $(g250x /tmp/g250a.log 1),$(g250z /tmp/g250a.log 1) / $(g250x /tmp/g250a.log 2),$(g250z /tmp/g250a.log 2) / $(g250x /tmp/g250a.log 3),$(g250z /tmp/g250a.log 3) vs classic $(g250x /tmp/g250cl.log 1),$(g250z /tmp/g250cl.log 1) / $(g250x /tmp/g250cl.log 2),$(g250z /tmp/g250cl.log 2) / $(g250x /tmp/g250cl.log 3),$(g250z /tmp/g250cl.log 3)"
+elif [ "${G250KA:-0}" -lt 1 ] || [ "${G250KB:-0}" -lt 1 ] || [ "$G250HA" != "$G250NA" ] || [ "$G250HB" != "$G250NB" ]; then
+  bad "G250 edges over the unit card: the press on tab 1 inside both strips is no longer the card's (recall lines 960=$G250KA 720=$G250KB want 1 each; count after the press $G250HA/$G250HB want $G250NA/$G250NB)"
+elif [ "$G250CU" != "normal" ] || [ "$G250CE" != "normal" ]; then
+  bad "G250 edges over the unit card: the cursor over the card while it pans is [$G250CU] and over the east strip [$G250CE] (want normal, the plain arrow, at both)"
+else
+  ok "G250 edges over the unit card: with $G250NA units selected and the card at y=628 (480x332), the corner at 2,958 pans to $(g250x /tmp/g250a.log 1),$(g250z /tmp/g250a.log 1), the bottom strip over the tab row to z=$(g250z /tmp/g250a.log 2) and the left strip over the bezel to x=$(g250x /tmp/g250a.log 3), each the same as its bare-map control and as the Classic run with no card; the same at 1280x720 (corner $(g250x /tmp/g250b.log 1),$(g250z /tmp/g250b.log 1)) and at ui_scale 1 (corner $(g250x /tmp/g250c.log 1),$(g250z /tmp/g250c.log 1)); a press on tab 1 inside both strips still recalls group 1 with $G250NA selected, and the cursor over the card is the plain arrow"
+fi
+
+# G252 THE CREDITS TICK. The credits readout is CreditClass::Current, walked toward the
+# bank one step per tick by the engine (credits.cpp CreditClass::AI: the difference >> 5,
+# bounded 1..143) and exported as CreditsCounter. In 1995 every step also sounded VOC_UP
+# (TONE15) or VOC_DOWN (TONE16) at VOL_1, but from the tab's draw routine, which the DLL
+# build never calls: the count crossed into the port and the sound did not. The renderer
+# now raises the tone from the poll delta, once per engine tick, on the effects bus.
+#
+# See gate_cashtick.txt for the sequence. Two legs, both with --dumpsound AND --audiowav,
+# for the reason G109 gives: with a sink the voice pool retires honestly, and the recording
+# proves something audible was mixed, so a gain of zero cannot pass on the log alone.
+#
+#   ON   the second creditsdump must read credits=30000 counter=7860 up=20 EXACTLY
+#        (5000 + 20 steps of 143: the readout steps, it does not jump), with exactly 20
+#        TONE15 played lines before it; the third must read counter=30000; the fourth,
+#        forty ticks into a power plant's drip payment, must read down >= 30 with at
+#        least 30 TONE16 played lines after the third. No cash line may say SILENT.
+#        The recording over the 20 count-up ticks (105..125, nothing else sounds there)
+#        must read RMS > 300.
+#   OFF  the same run under `gfx cash_tick 0`: no cash lines at all, the count-up window
+#        silent to the sample. The two runs are tick-locked and otherwise identical, so
+#        the down window (525..565), where the plant's construction noise also sounds,
+#        is measured as the DIFFERENCE between the two recordings: that is the tick's
+#        own energy, and it must read RMS > 150.
+# The tick windows below are the script's own numbers (5 + 100 ticks before the money
+# switch, 20 after it, 400 more, then 40 into the build) and move with it.
+#
+# PROVEN TO FAIL on the build before the fix: `creditsdump` is an unknown verb (exit 1),
+# 0 TONE15 and 0 TONE16 lines, and the count-up window reads RMS 0.
+# Measured on the fixed build: up=20, 349 TONE15 and 40 TONE16 played, count-up RMS 730,
+# down-window difference RMS 358, OFF leg 0 cash lines and peak 0.
+printf 'gfx cash_tick 0\n' > /tmp/g252_off.txt
+cat "$GATEDIR/gate_cashtick.txt" >> /tmp/g252_off.txt
+gbegin shots/g252_on.log shots/g252_on.wav shots/g252_off.log shots/g252_off.wav
+G252BASE="--scen $SKMAP --pack $SKMAP.pack $SKBASE --skirmish --side gdi --ai 2 --noshroud --w 1280 --h 720 --dumpsound --musicvol 0"
+grun shots/g252_on.log  $G252BASE --audiowav shots/g252_on.wav  --script "$GATEDIR/gate_cashtick.txt"
+grun shots/g252_off.log $G252BASE --audiowav shots/g252_off.wav --script /tmp/g252_off.txt
+gshots shots/g252_on.wav shots/g252_off.wav
+CT_N=$(grep -c '^CREDITS|' shots/g252_on.log)
+CT_L2=$(grep '^CREDITS|' shots/g252_on.log | sed -n '2p')
+CT_L3=$(grep '^CREDITS|' shots/g252_on.log | sed -n '3p')
+CT_L4=$(grep '^CREDITS|' shots/g252_on.log | sed -n '4p')
+CT_L2OK=$(echo "$CT_L2" | grep -c '^CREDITS|credits=30000|counter=7860|.*|up=20|down=0|')
+CT_L3OK=$(echo "$CT_L3" | grep -c '^CREDITS|credits=30000|counter=30000|')
+CT_DOWN=$(echo "$CT_L4" | sed -n 's/.*|down=\([0-9]*\)|.*/\1/p')
+# The tones in ORDER: TONE15 played lines before the second dump, TONE16 after the third.
+CT_UP20=$(awk '/^CREDITS\|/{n++} n==1 && /^SOUND\|cash\|TONE15\|.*\|played$/{c++} END{print c+0}' shots/g252_on.log)
+CT_DN=$(awk '/^CREDITS\|/{n++} n==3 && /^SOUND\|cash\|TONE16\|.*\|played$/{c++} END{print c+0}' shots/g252_on.log)
+CT_UPALL=$(grep -c '^SOUND|cash|TONE15|.*|played$' shots/g252_on.log)
+CT_DNALL=$(grep -c '^SOUND|cash|TONE16|.*|played$' shots/g252_on.log)
+CT_SIL=$(grep -c '^SOUND|cash|.*|SILENT$' shots/g252_on.log)
+CT_OFFN=$(grep -c '^SOUND|cash' shots/g252_off.log)
+CT_OFFRC=$(grep -c '^CREDITS|credits=30000|counter=7860|' shots/g252_off.log)
+CT_W=$(python3 - <<'PY'
+import os, wave
+import numpy as np
+def load(p):
+    if not os.path.exists(p) or os.path.getsize(p) == 0:
+        return None, 0
+    w = wave.open(p)
+    a = np.frombuffer(w.readframes(w.getnframes()), dtype='<i2').astype(float)
+    return a, w.getframerate() * w.getnchannels() * 66 // 1000   # samples per engine tick
+on, pt = load("shots/g252_on.wav")
+off, pt2 = load("shots/g252_off.wav")
+if on is None or off is None or pt != pt2 or len(on) != len(off):
+    print("-1 -1 -1 -1")
+else:
+    def rms(a): return int(round((a ** 2).mean() ** 0.5)) if len(a) else -1
+    def peak(a): return int(np.abs(a).max()) if len(a) else -1
+    up = slice(105 * pt, 125 * pt); dn = slice(525 * pt, 565 * pt)
+    print(rms(on[up]), rms(on[dn] - off[dn]), rms(off[up]), peak(off[up]))
+PY
+)
+CT_UPRMS=$(echo "$CT_W" | cut -d' ' -f1)
+CT_DNRMS=$(echo "$CT_W" | cut -d' ' -f2)
+CT_OFFRMS=$(echo "$CT_W" | cut -d' ' -f3)
+CT_OFFPK=$(echo "$CT_W" | cut -d' ' -f4)
+if [ "$GRC" != "0" ]; then
+  bad "G252 the credits tick: a run failed or wrote no recording (GRC=$GRC). On the build before the fix creditsdump is an unknown verb and the run exits 1"
+elif [ "${CT_N:-0}" != "4" ]; then
+  bad "G252 the credits tick: $CT_N CREDITS| lines (want 4): the creditsdump verb is missing or the script did not run through"
+elif [ "${CT_L2OK:-0}" != "1" ] || [ "${CT_UP20:-0}" != "20" ]; then
+  bad "G252 the credits tick: twenty ticks after the money switch the readout must stand at exactly 5000 + 20 x 143 = 7860 with up=20 and twenty TONE15 played lines before it; got [$CT_L2] with $CT_UP20 TONE15 lines. The count must STEP, one tone per step, not jump"
+elif [ "${CT_L3OK:-0}" != "1" ]; then
+  bad "G252 the credits tick: 400 ticks later the readout has not arrived at the bank [$CT_L3]"
+elif [ "${CT_DOWN:--1}" -lt 30 ] || [ "${CT_DN:-0}" -lt 30 ]; then
+  bad "G252 the credits tick: forty ticks into a power plant's drip payment the readout reports down=$CT_DOWN with $CT_DN TONE16 played lines after the third dump (want >= 30 of each) [$CT_L4]. The count-down is silent"
+elif [ "${CT_SIL:-1}" != "0" ]; then
+  bad "G252 the credits tick: $CT_SIL cash lines came back SILENT. TONE15.JUV/TONE16.JUV fall back to the .AUD; SILENT means neither is on the disc"
+elif [ "${CT_UPRMS:--1}" -le 300 ]; then
+  bad "G252 the credits tick: the log says the tones played but the recording over the 20 count-up ticks reads RMS $CT_UPRMS (want > 300, measured 730). A tick at gain 0, or one routed to a bus the recording does not carry, reads like this"
+elif [ "${CT_DNRMS:--1}" -le 150 ]; then
+  bad "G252 the credits tick: the down window's difference against the OFF recording reads RMS $CT_DNRMS (want > 150, measured 358); the TONE16 lines are printed but nothing of them reaches the mix"
+elif [ "${CT_OFFN:-1}" != "0" ] || [ "${CT_OFFRC:-0}" != "1" ] || [ "${CT_OFFPK:--1}" != "0" ]; then
+  bad "G252 the credits tick: with cash_tick 0 the run printed $CT_OFFN cash lines (want 0), reached 7860 on schedule=$CT_OFFRC (want 1) and the count-up window peaks at $CT_OFFPK (want 0). The switch must silence the tone and leave the count alone"
+else
+  ok "G252 the credits tick: the readout steps 5000 to 7860 in twenty ticks of 143 with twenty TONE15 tones and arrives at 30000 ($CT_UPALL up-ticks in all), a power plant's drip payment sounds $CT_DN TONE16 tones in forty ticks ($CT_DNALL in all), none SILENT; the recording reads RMS $CT_UPRMS over the count-up and $CT_DNRMS of tick over the count-down, and with the Gameplay switch off the same run prints no cash line and the count-up window is silent (peak $CT_OFFPK, RMS $CT_OFFRMS) while the readout still reaches 7860 on schedule"
+fi
+
+# =====================================================================================
+# G251 THE RESOLUTION LIST FITS THE DISPLAY. The Advanced page's Resolution row used to
+# keep the first seven distinct sizes in the driver's largest-first order, with no desktop
+# lookup and no bounds test, so on any display whose driver advertises sizes above the
+# panel (a 4K mode on a 1080p display, a Retina display's full pixel count) the native size
+# and everything under it fell off the end: a 1080p display offered 3840x2160 down to
+# 2048x1536 and nothing that fit. Five things are proved here, the way G206 proves the
+# display rows: through the dialog's own functions, with the dial read beside the page.
+#
+#   THE LIST (inject leg). `optres inject` builds the list for a display this machine does
+#   not have: a 1080p panel whose driver lists eighteen modes, eight above it. Entry 0 reads
+#   Desktop, every size is kept (nres 18, nothing dropped for being oversized), and under
+#   Windowed the nine that cannot fit the usable room are greyed with a reason and refuse
+#   the click; the count is nine and not eight because the room is 1920x1040 (a task bar)
+#   and 1680x1050 is 10 rows too tall for it. Under True fullscreen the same entries are
+#   pickable, and picking 3840x2160 writes the dial.
+#   THE DESKTOP ENTRY. Picking it under Windowed resolves to the usable room (a real
+#   window), not the 0x0 that used to leave the window untouched.
+#   SCROLLING. The list shows seven rows; the wheel, the slider well's lower half and
+#   `pick` on an entry past the window all move restop, and a pick of entry 12 lands.
+#   THE QUANTISER. res_w and res_h used to be quantised to a step of 8 on the way in from
+#   the preset and the gfx verb, so 2103x1183 came back 2104x1184 and matched no entry.
+#   THE CLAMP. A preset asking Windowed at 6015x3383 is shrunk to the usable room before
+#   the window is born, and says so; this is the shell's birth path in a hidden harness
+#   run, the one path that applies a mode in an automated run.
+#
+# A live leg (no inject) reads THIS machine's display through the same verb: entry 0 is
+# the desktop, every unfit entry is exactly the set marked DISABLED under Windowed, and
+# the list holds every distinct size the driver offered plus the desktop when unlisted.
+# A pixel leg diffs two shots of the open list at the same scroll position, Windowed
+# against True fullscreen: the Desktop row is byte-identical and each of the six greyed
+# rows below it differs, which is the DISABLED ink and nothing else (G206's neighbours
+# use gate_pixdiff.py the same way).
+#
+# PROVEN TO FAIL on the build before the fix: `optres` is an unknown command (SCRIPT
+# failure, 1 in the run), OPTDISP reads nres=7 with the desktop unmarked, gfx res_w 3008
+# and res_h 1692 read back as fx_res=3008x1696, and the shell's birth prints no
+# DISPLAY|clamped line at all.
+# =====================================================================================
+cat > /tmp/g251_inject.txt <<'G251EOF'
+tick 30
+options
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optclick Windowed
+optres inject 1920 1080 1920 1040 3840x2160,3325x1871,2880x1620,2715x1527,2560x1440,2351x1323,2103x1183,2048x1536,1920x1080,1680x1050,1600x900,1440x900,1366x768,1280x1024,1280x720,1024x768,800x600,640x480
+gfx res_w 2103
+gfx res_h 1183
+optvis
+optclick OK
+optclick OK
+optclick Resume Mission
+options
+optclick Visuals
+optclick Advanced...
+optres
+optvis
+optres open
+optres hover 1
+optres pick 1
+optres pick 0
+optvis
+optres open
+optres scroll 6
+optres pick 12
+optvis
+optres open
+optres bar lower
+optres scroll -12
+shot shots/g251_windowed.png
+optclick True fullscreen
+optres open
+optres scroll -12
+shot shots/g251_fullscreen.png
+optres pick 17
+optvis
+optres open
+optres pick 1
+optvis
+quit
+G251EOF
+cat > /tmp/g251_live.txt <<'G251EOF'
+tick 30
+options
+optclick Visuals
+optclick Enhanced
+optclick Advanced...
+optclick Windowed
+optres open
+optres
+quit
+G251EOF
+gbegin shots/g251_windowed.png shots/g251_fullscreen.png shots/g251_inject.log shots/g251_live.log
+G251BASE="--noshroud --nosound --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 --gfx"
+grun shots/g251_inject.log $G251BASE --script /tmp/g251_inject.txt
+grun shots/g251_live.log   $G251BASE --script /tmp/g251_live.txt
+gshots shots/g251_windowed.png shots/g251_fullscreen.png
+G251R=$(grep '^OPTRES|page=' shots/g251_inject.log)
+G251D=$(grep '^OPTDISP|' shots/g251_inject.log)
+g251r() { echo "$G251R" | sed -n "$1p"; }
+g251d() { echo "$G251D" | sed -n "$1p"; }
+G251OK=1; G251WHY=""
+g251bad() { G251OK=0; G251WHY="$G251WHY [$1]"; }
+# EVERY optres VERB PRINTS THE READOUT, so the lines are, in order: 1 the inject, 2 the
+# dialog reopened on the saved size (shut), 3 open, 4 hover 1, 5 the refused pick, 6 pick
+# 0 (shut), 7 open, 8 scroll 6, 9 pick 12 (shut), 10 open, 11 the bar press, 12 scroll
+# -12, 13 open under fullscreen, 14 scroll -12 there, 15 pick 17 (the last entry, out of
+# view, so the pick scrolls first), 16 open, 17 pick 1 (out of view the other way).
+# OPTDISP lines: 1 after the gfx verb, 2 on the reopen, 3 after pick 0, 4 after pick 12,
+# 5 and 6 after the two fullscreen picks.
+G251RN=$(echo "$G251R" | grep -c .)
+[ "$G251RN" = "17" ] || g251bad "optres lines=$G251RN want 17"
+# THE QUANTISER: the gfx verb wrote 2103x1183 and it stayed 2103x1183 (was 2104x1184);
+# then the dialog, closed and opened again, found the entry (7) from the dial alone.
+echo "$(g251d 1)" | grep -q '|fx_res=2103x1183|' || g251bad "quantiser: $(g251d 1 | cut -c1-120)"
+echo "$(g251r 2)" | grep -q '|open=0|value=7|.*|fx_res=2103x1183|' || g251bad "saved size not found on reopen: $(g251r 2 | sed 's/|0=.*|fx_res/|fx_res/' | cut -c1-200)"
+echo "$(g251d 2)" | grep -q 'mode=0|res=7|nres=18|.*|fx_res=2103x1183|' || g251bad "optdisp res=7: $(g251d 2 | cut -c1-120)"
+# THE LIST: 18 entries, the desktop first and named, all nine oversized sizes kept, the
+# desktop's own pair folded into entry 0 (desktop_listed=1, nmodes_distinct=17+1).
+echo "$(g251r 2)" | grep -q '|nres=18|0=Desktop|1=3840 x 2160|' || g251bad "entry 0 is not Desktop"
+echo "$(g251r 2)" | grep -q '|17=640 x 480|' || g251bad "640x480 missing"
+echo "$(g251r 2)" | grep -q '|desktop=1920x1080|usable=1920x1040|bounds=1|nmodes=18|nmodes_distinct=18|desktop_listed=1|desktop_entry=0|over_desktop=9|nfit=9|' || g251bad "counts: $(g251r 2 | sed 's/.*|fx_res=/|fx_res=/' | cut -c1-220)"
+# OPEN UNDER WINDOWED: entries 1..9 carry (DISABLED), entry 0 and 10.. do not, seven rows
+# shown with a slider well beside them, scrolled so the current entry (7) is the last row
+# in view (restop 1).
+echo "$(g251r 3)" | grep -q '|open=1|.*|0=Desktop|1=3840 x 2160 (DISABLED)|.*|9=1680 x 1050 (DISABLED)|10=1600 x 900|' || g251bad "greying under Windowed: $(g251r 3 | cut -c1-260)"
+[ "$(echo "$(g251r 3)" | grep -o '(DISABLED)' | wc -l | tr -d ' ')" = "9" ] || g251bad "DISABLED count"
+echo "$(g251r 3)" | grep -q '|restop=1|shown=7|list=[0-9]*,[0-9]*,[0-9]*x63|rowh=9|bar=[0-9]*,[0-9]*,5x63|' || g251bad "window/bar: $(g251r 3 | sed 's/.*|restop=/|restop=/')"
+# THE REFUSED PICK: hover 1 raises the tip, the pick leaves the list open on value 0.
+grep -q '^OPTRES|tooltip|Larger than the desktop. A window this size cannot fit. Pick it under True fullscreen.' shots/g251_inject.log || g251bad "no tip on hover 1"
+echo "$(g251r 4)" | grep -q '|open=1|value=7|hot=1|' || g251bad "hover 1: $(g251r 4 | cut -c1-80)"
+echo "$(g251r 5)" | grep -q '|open=1|value=7|hot=1|' || g251bad "pick 1 was not refused: $(g251r 5 | cut -c1-80)"
+# THE DESKTOP ENTRY UNDER WINDOWED resolves to the usable room, on the dial and the page.
+echo "$(g251r 6)" | grep -q '|open=0|value=0|.*|fx_res=1920x1040|fx_mode=0|' || g251bad "pick 0 under Windowed: $(g251r 6 | sed 's/|0=.*|fx_res/|fx_res/' | cut -c1-160)"
+echo "$(g251d 3)" | grep -q 'mode=0|res=0|nres=18|.*|fx_mode=0|fx_res=1920x1040|' || g251bad "optdisp after pick 0: $(g251d 3 | cut -c1-120)"
+echo "$(g251d 3)" | grep -q '|desktop=1920x1080|usable=1920x1040|nfit=9$' || g251bad "optdisp tail: $(g251d 3 | sed 's/.*|sb_div/|sb_div/')"
+# SCROLLING: the wheel moves restop to 6, the pick of 12 lands (page and dial), the
+# list reopens with 12 in view (restop 6), the bar's lower half pages to the end (11),
+# and the wheel back up clamps at 0.
+echo "$(g251r 7)" | grep -q '|open=1|value=0|.*|restop=0|shown=7|' || g251bad "open on 0: $(g251r 7 | sed 's/.*|restop=/|restop=/')"
+echo "$(g251r 8)" | grep -q '|open=1|value=0|.*|restop=6|shown=7|' || g251bad "scroll 6: $(g251r 8 | sed 's/.*|restop=/|restop=/')"
+echo "$(g251d 4)" | grep -q 'mode=0|res=12|nres=18|.*|fx_mode=0|fx_res=1366x768|' || g251bad "pick 12: $(g251d 4 | cut -c1-120)"
+echo "$(g251r 10)" | grep -q '|open=1|value=12|.*|restop=6|shown=7|' || g251bad "reopen on 12: $(g251r 10 | sed 's/.*|restop=/|restop=/')"
+echo "$(g251r 11)" | grep -q '|open=1|value=12|.*|restop=11|shown=7|' || g251bad "bar lower: $(g251r 11 | sed 's/.*|restop=/|restop=/')"
+echo "$(g251r 12)" | grep -q '|open=1|value=12|.*|restop=0|shown=7|' || g251bad "scroll -12: $(g251r 12 | sed 's/.*|restop=/|restop=/')"
+# TRUE FULLSCREEN: nothing greyed; a pick past the window scrolls to it first (17 at the
+# bottom, then 1 at the top), and the oversized 3840x2160 is picked and written.
+echo "$(g251r 14)" | grep -q '|open=1|value=12|.*|1=3840 x 2160|2=3325 x 1871|.*|fx_mode=2|.*|restop=0|' || g251bad "fullscreen open: $(g251r 14 | cut -c1-200)"
+echo "$(g251r 14)" | grep -q '(DISABLED)' && g251bad "greyed under fullscreen"
+echo "$(g251d 5)" | grep -q 'mode=2|res=17|nres=18|.*|fx_mode=2|fx_res=640x480|' || g251bad "fullscreen pick 17: $(g251d 5 | cut -c1-120)"
+grep -q 'scrolled|restop=11|for=optres pick 17' shots/g251_inject.log || g251bad "pick 17 did not scroll into view"
+echo "$(g251d 6)" | grep -q 'mode=2|res=1|nres=18|.*|fx_mode=2|fx_res=3840x2160|' || g251bad "fullscreen pick 1: $(g251d 6 | cut -c1-120)"
+grep -q 'scrolled|restop=1|for=optres pick 1' shots/g251_inject.log || g251bad "pick 1 did not scroll into view"
+# NO SCRIPT FAILURE, and the window was only ever asked for (a hidden automated run).
+grep -q '^SCRIPT|end .* 0 failures' shots/g251_inject.log || g251bad "script failures: $(grep '^SCRIPT|end' shots/g251_inject.log)"
+[ "$(grep -c '^DISPLAY|' shots/g251_inject.log)" = "$(grep -c '^DISPLAY|deferred|' shots/g251_inject.log)" ] || g251bad "a DISPLAY line was not deferred"
+# THE LIVE LEG: this machine's display, whatever it is.
+G251L=$(grep '^OPTRES|page=' shots/g251_live.log | tail -1)
+g251f() { printf '%s' "$1" | sed -n "s/.*|$2=\([-0-9]*\).*/\1/p"; }
+G251LN=$(g251f "$G251L" nres); G251LDIST=$(g251f "$G251L" nmodes_distinct)
+G251LLISTED=$(g251f "$G251L" desktop_listed); G251LOVER=$(g251f "$G251L" over_desktop)
+G251LDIS=$(printf '%s' "$G251L" | grep -o '(DISABLED)' | wc -l | tr -d ' ')
+echo "$G251L" | grep -q '|open=1|.*|0=Desktop|' || g251bad "live: entry 0 not Desktop"
+echo "$G251L" | grep -q '|0=Desktop (DISABLED)' && g251bad "live: Desktop greyed"
+echo "$G251L" | grep -q '|bounds=1|.*|desktop_entry=0|.*|injected=0' || g251bad "live: $(echo "$G251L" | sed 's/.*|fx_res=/|fx_res=/')"
+[ "${G251LOVER:-x}" = "$G251LDIS" ] || g251bad "live: over_desktop=$G251LOVER but $G251LDIS DISABLED"
+if [ "${G251LLISTED:-0}" = "1" ]; then G251LWANT=$G251LDIST; else G251LWANT=$((G251LDIST + 1)); fi
+[ "${G251LN:-0}" = "$G251LWANT" ] || g251bad "live: nres=$G251LN want $G251LWANT (distinct=$G251LDIST listed=$G251LLISTED)"
+[ "${G251LN:-0}" -ge 2 ] || g251bad "live: only $G251LN entries"
+# THE PIXEL LEG: the open list's window from the readout (DOS pixels, x4 at 1280x800:
+# the plate is 320x200 scaled 4 and sits at 0,0), row by row.
+G251LIST=$(g251r 12 | sed -n 's/.*|list=\([0-9]*\),\([0-9]*\),\([0-9]*\)x\([0-9]*\)|rowh=\([0-9]*\)|.*/\1 \2 \3 \4 \5/p')
+set -- $G251LIST 0 0 0 0 0
+G251LX=$1; G251LY=$2; G251LW=$3; G251LH=$4; G251RH=$5
+G251ROWS=""
+if [ "${G251RH:-0}" -gt 0 ]; then
+  G251I=0
+  while [ $G251I -lt 7 ]; do
+    G251Y0=$(( (G251LY + G251I * G251RH) * 4 )); G251Y1=$(( (G251LY + (G251I + 1) * G251RH) * 4 - 1 ))
+    G251PX=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g251_windowed.png shots/g251_fullscreen.png \
+             "$((G251LX * 4)),$G251Y0,$(( (G251LX + G251LW) * 4 - 1 )),$G251Y1" 2>/dev/null)
+    G251ROWS="$G251ROWS ${G251PX:-x}"
+    if [ $G251I = 0 ]; then
+      [ "${G251PX:-x}" = "0" ] || g251bad "pixel row 0 (Desktop) differs by $G251PX"
+    else
+      [ "${G251PX:-0}" -ge 20 ] || g251bad "pixel row $G251I differs by only $G251PX (want >= 20, the DISABLED ink)"
+    fi
+    G251I=$((G251I + 1))
+  done
+else
+  g251bad "no list rectangle in the readout"
+fi
+# THE CLAMP, through the shell's birth: a preset asking for a window larger than the
+# desktop, in a scratch folder of links (G233's arrangement) so the run folder's own
+# preset is never touched. 6015x3383 is not a multiple of 8, so the asked= half also
+# proves the preset is read unquantised.
+G251SB=/tmp/g251_clamp
+rm -rf "$G251SB"; mkdir -p "$G251SB/shots"
+( cd "$RUNDIR" && find . -mindepth 1 -type d -print ) | while IFS= read -r g251d; do
+  mkdir -p "$G251SB/${g251d#./}"
+done
+( cd "$RUNDIR" && find . -mindepth 1 \( -type f -o -type l \) -print ) | while IFS= read -r g251f; do
+  case "${g251f#./}" in cnc3d-controls.cfg|cnc3d-fx.cfg|shots/*) continue ;; esac
+  ln -s "$RUNDIR/${g251f#./}" "$G251SB/${g251f#./}" 2>/dev/null
+done
+printf 'display_mode 0\nres_w 6015\nres_h 3383\n' > "$G251SB/cnc3d-fx.cfg"
+( cd "$G251SB" && ./cnc3d --scen SCG01EC --pack SCG01EA.pack $BASE --menupack dosmenu.pack \
+    --nosound --harness 1 --rounds 1 --shotdir shots > /tmp/g251_shell.log 2>&1 )
+G251SRC=$?
+cat /tmp/g251_shell.log >> "$OUT"
+G251CL=$(grep '^DISPLAY|clamped|' /tmp/g251_shell.log | head -1)
+G251UW=$(g251f "$G251L" usable | sed 's/x.*//'); G251UH=$(printf '%s' "$G251L" | sed -n 's/.*|usable=[0-9]*x\([0-9]*\)|.*/\1/p')
+G251GW=$(printf '%s' "$G251CL" | sed -n 's/.*|got=\([0-9]*\)x\([0-9]*\).*/\1/p')
+G251GH=$(printf '%s' "$G251CL" | sed -n 's/.*|got=\([0-9]*\)x\([0-9]*\).*/\2/p')
+[ "$G251SRC" = "0" ] || g251bad "clamp: the shell run failed (exit $G251SRC)"
+echo "$G251CL" | grep -q '^DISPLAY|clamped|asked=6015x3383|got=[0-9]*x[0-9]*$' || g251bad "clamp: no clamped line [$G251CL]"
+[ -n "$G251GW" ] && [ "$G251GW" -le "${G251UW:-0}" ] && [ "$G251GH" -le "${G251UH:-0}" ] || g251bad "clamp: got ${G251GW}x${G251GH} is not within the usable ${G251UW}x${G251UH}"
+if [ "$GRC" != "0" ]; then
+  bad "G251 the Resolution list fits the display: a run failed or a shot was not written (GRC=$GRC)"
+elif [ "$G251OK" = "1" ]; then
+  ok "G251 the Resolution list fits the display: for a 1080p panel listing 18 sizes the list holds all 18 with Desktop first, the 9 that cannot fit its 1920x1040 room are greyed and refused under Windowed with a reason and pickable under True fullscreen (3840x2160 written), Desktop under Windowed resolves to 1920x1040, the wheel/bar/pick scroll the seven-row window (restop 6, 11, 0), 2103x1183 survives the quantiser and lands on entry 7; this display lists $G251LN sizes ($G251LDIST distinct, desktop listed=$G251LLISTED) with $G251LOVER greyed; the Desktop row is pixel-identical across modes and the six greyed rows differ by$G251ROWS; the shell clamped a 6015x3383 window to ${G251GW}x${G251GH}"
+else
+  bad "G251 the Resolution list fits the display:$G251WHY"
+fi
+
+# THE SKIP COUNT IS PART OF THE SUMMARY, never left off it. A run that quietly dropped a
+# gate and printed the same shape of line as a run that did not is how a suite starts
+# lying about its own coverage, and release.sh reads this line.
+if [ "${SKIPPED:-0}" != "0" ]; then
+  echo "----- $LABEL: $PASS pass, $FAIL fail, $SKIPPED skipped (CNC3D_GATES_INTERACTIVE=1 runs them) -----" | tee -a "$OUT"
+else
+  echo "----- $LABEL: $PASS pass, $FAIL fail -----" | tee -a "$OUT"
+fi
 exit $FAIL

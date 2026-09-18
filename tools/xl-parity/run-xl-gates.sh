@@ -38,7 +38,7 @@
 # play folder's shipped dylib and game/ are never touched. Run it from
 # anywhere; it works out of playable/.
 #
-# NOTE (26 Aug 2026): the parity oracle is a BRING-UP instrument for classic
+# NOTE: the parity oracle is a BRING-UP instrument for classic
 # content on the XL brain. It retires when the XL pathfinder lands (route
 # choice legitimately diverges) and is archived here per the contract.
 set -uo pipefail
@@ -334,7 +334,7 @@ if [ -x "$XLBOOT" ]; then
     # ---- THE NEGATIVE CONTROL ---------------------------------------------------
     #
     # Every leg above asserts that something GOOD happened. None of them could tell you
-    # whether the assertion is capable of failing, and on 27 Aug 2026 one of them was
+    # whether the assertion is capable of failing, and one of them was
     # not: a .BIN with a corrupted magic passed all four, because the engine refuses the
     # file, loads the scenario from its INI anyway, and the dump has no terrain in it to
     # notice by. The dump hash was byte-identical between the good map and the corrupt

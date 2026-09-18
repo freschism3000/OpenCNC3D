@@ -1,0 +1,18 @@
+# THE SILO FILL STRIP ON THE DOME, in pixels. G68's readout half proved the slot the
+# renderer picks; this half proves the picture, because the readout alone passed for a
+# whole release over a fill dome that was baked 10.93 units inside the building's own
+# dome and never showed. SCG32EA: the Nod silo (id=88) is empty until its harvester
+# unloads, and reads 2600/2600 by tick 2630. The two shots are the same silo at fill 0
+# and at fill 40; texbookdump reads back, for every book in the loaded pack, how many
+# variant triangles sit exactly on the base mesh's copy of that geometry.
+tick 30
+look SILO 1
+zoom max
+texbookdump
+tick 1800
+silodump
+shot shots/silofill_0.png
+tick 800
+silodump
+shot shots/silofill_40.png
+quit

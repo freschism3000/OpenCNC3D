@@ -34,7 +34,7 @@
 #ifndef C3D_CEILING_H
 #define C3D_CEILING_H
 
-/* 256 as of 27 Aug 2026, from 128. The cost is bytes of BSS: everything sized from it is
+/* 256, from 128. The cost is bytes of BSS: everything sized from it is
  * static at the ceiling, so the whole renderer-plus-editor grid set grows about fourfold,
  * from roughly one megabyte to roughly four. Nothing here is per-frame work: the loops all
  * run over the live grid, not the ceiling.

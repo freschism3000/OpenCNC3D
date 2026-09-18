@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// Two changes in AnimClass. The constructor's drop-zone smoke reveal, which
+// reads PlayerPtr, is withheld in a lockstep network match, where one
+// machine's viewpoint must not decide another machine's missions. AI's kill
+// time compares a beacon's deadline against the frame counter rather than
+// the Windows wall clock, so a beacon expires on every platform.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\anim.cpv   2.18   16 Oct 1995 16:48:48   JOE_BOSTIC  $ */
 /***********************************************************************************************
@@ -645,9 +656,35 @@ AnimClass::AnimClass(AnimType animnum, COORDINATE coord, unsigned char timedelay
     **	Drop zone smoke always reveals the map around itself.
     */
     if (*this == ANIM_LZ_SMOKE) {
-        // Added PlayerPtr here as Sight_From now needs to know who to perform the action for. This should be OK as it's
-        // not used in MP. ST - 3/28/2019 2:43PM
-        Map.Sight_From(PlayerPtr, Coord_Cell(coord), 4, false);
+        /*
+        **	CNC3D lockstep: the 2019 comment that stood here said "This should be OK as
+        **	it's not used in MP", and that assumption is what this gate replaces.
+        **
+        **	PlayerPtr is the house of whoever is sitting at THIS machine, and Sight_From
+        **	is not presentation: it reaches DisplayClass::Map_Cell, which sets bits in
+        **	CellClass::IsMappedByPlayerMask and IsVisibleByPlayerMask, and those are read
+        **	by TechnoClass::Per_Cell_Process (which can spring EVENT_DISCOVERED and switch
+        **	an ambusher to MISSION_HUNT) and by MapClass::Cell_Threat, which scores AI
+        **	targets. So one machine's viewpoint would decide another machine's missions.
+        **
+        **	Same shape and same reason as DisplayClass::Calculated_Cell's SOURCE_VISIBLE
+        **	arm, which refuses a local-camera-derived cell in a match and says so.
+        **
+        **	WHAT THE GATE COSTS, and it is written down rather than discovered later: a
+        **	lockstep match gets no drop-zone reveal from an ACTION_DZ trigger. Nothing
+        **	shipped reaches it (no shipped multiplayer map carries a DZ trigger), but a
+        **	user map can, and the faithful answer for the day one does is to reveal for
+        **	the TRIGGER'S OWN house, which is shared, rather than for this machine's.
+        */
+        if (CNC3D_Lockstep) {
+            GlyphX_Debug_Print("AnimClass: drop-zone smoke reveals the map for PlayerPtr, the LOCAL "
+                               "seat's house, which is not shared between peers. It reveals nothing "
+                               "in a network match.");
+        } else {
+            // Added PlayerPtr here as Sight_From now needs to know who to perform the action for.
+            // ST - 3/28/2019 2:43PM
+            Map.Sight_From(PlayerPtr, Coord_Cell(coord), 4, false);
+        }
     }
 
     /*

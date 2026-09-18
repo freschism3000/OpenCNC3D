@@ -111,6 +111,19 @@ done
 # editor sources dropped still produces a file of that name. The string below is an
 # editor-only diagnostic, and it discriminates -- measured on the cross compiled .exe,
 # it appears in cnc_eyes.exe and not at all in the launcher.
+# A COOKED PACKAGE CARRIES NO F5 PANEL, and this is what stops the fail-open case: the
+# packager asked for a cook (CNC3D_COOKED set, as tools/release.sh does) but the binaries
+# were built without the define. The cooked fxp_toggle prints one sentence and nothing
+# else; a binary that does not carry it was not cooked. Checked on both programs.
+if [ -n "$CNC3D_COOKED" ]; then
+  for b in cnc_eyes.exe cnc3d.exe; do
+    strings -a "$OUT/$b" 2>/dev/null | grep -q 'unavailable in a cooked build' || {
+      echo "$b was packaged as a cooked build but carries the F5 panel: it was compiled" >&2
+      echo "without CNC3D_COOKED. Rebuild with the packager, not by hand." >&2
+      exit 1; }
+  done
+  echo "cooked: cnc_eyes.exe and cnc3d.exe carry no F5 panel"
+fi
 strings -a "$OUT/cnc_eyes.exe" 2>/dev/null | grep -q 'edit: world grid' || {
     echo "cnc_eyes.exe carries no editor: the editor-only diagnostic string is not in" >&2
     echo "it. The launcher's EDITOR button runs this binary with --edit, so a package" >&2
@@ -133,7 +146,7 @@ for f in cnc_eyes --edit; do
 done
 echo "   editor: cnc_eyes.exe carries it, C&C3D.exe knows how to open it"
 
-# THE THING A PLAYER DOUBLE-CLICKS IS THE LAUNCHER. (the project owner, 24 Aug 2026: "Make sure
+# THE THING A PLAYER DOUBLE-CLICKS IS THE LAUNCHER. (Reported: "Make sure
 # its the default executeable / app for Windows / Mac, from release v0.6.3 and
 # going forward.") Three checks rather than one, because the interesting failure
 # is not a missing file, it is the RIGHT NAME CARRYING THE WRONG BINARY:
@@ -293,6 +306,11 @@ IF SOMETHING IS WRONG
     * GL_MULTITEX = NO     the terrain pass needs two texture units
     * GL_GOT depth 0       with no depth buffer the depth test discards the world
     * LoadLibrary / 126    the brain DLL, or something it depends on, is missing
+    * BOOTFAIL|            a mission that would not start says why on this line,
+                           and the same sentence was shown on screen; send the
+                           line as it is, it names the file or the step
+    * FATAL: signal        the game died inside the step named after "while:";
+                           that line is the whole point of sending the log
 TXT
 
     # THE LICENCE AND THE NOTICE, and they are not optional. This program is a single
@@ -312,10 +330,27 @@ TXT
     for f in "$SRC"/*.pack "$SRC"/CONQUER.MIX; do
         [ -f "$f" ] && cp "$f" "$OUT/"
     done
+    # user_maps is excluded for the reason the mac packager gives at need_dir: it is a
+    # personal folder the editor and the gates both write into, not content. The worked
+    # examples are put back by name below.
     for d in content missions movies; do
-        [ -d "$SRC/$d" ] && rsync -aL "$SRC/$d" "$OUT/"
+        [ -d "$SRC/$d" ] && rsync -aL --exclude 'user_maps/' "$SRC/$d" "$OUT/"
     done
     [ -e "$SRC/dosdata" ] && rsync -aL "$SRC/dosdata" "$OUT/"
+
+    # THE WORKED EXAMPLES GO BACK IN, BY NAME. need_dir excludes user_maps wholesale because
+    # it is a personal folder, and these two are the exception: game/examples/ tracks them,
+    # game/build.sh stages them, and the editor's own documentation walks a reader through
+    # them. Named one at a time rather than by a pattern, so the day somebody's map is called
+    # USER92 it does NOT quietly rejoin the package.
+    _ex="$OUT/missions/user_maps"
+    mkdir -p "$_ex"
+    for _m in USER90 USER91; do
+        for _e in INI BIN HGT; do
+            [ -f "$SRC/missions/user_maps/$_m.$_e" ] &&
+                cp "$SRC/missions/user_maps/$_m.$_e" "$_ex/"
+        done
+    done
 
     # THE SAME PAIR CHECK THE MAC PACKAGER MAKES, on the files that actually landed here.
     # The two copies above are a glob and an rsync and neither can fail loudly, so a
@@ -405,7 +440,72 @@ if [ $DO_ZIP -eq 1 ]; then
     ZIP="$DIST_ZIP/CNC3D-windows-$GITDESC$SUF.zip"
     echo "== zipping to $ZIP"
     rm -f "$ZIP"
-    (cd "$STAGE" && zip -rqX "$ZIP" "$NAME" -x '*.DS_Store')
+    # THE LAST ENTRIES ARE MADE, NOT HOPED FOR, because the launcher that unpacks this
+    # zip is the one already installed. Launchers up to v0.6.11 write entries in zip
+    # order with a plain fopen, write the install record wherever the zip lists it, and
+    # stop at the first refusal; SDL2.dll is the one file they always have loaded, so
+    # Windows always refuses it. zip -r lists files in whatever order the file system
+    # hands them out, which put the record at entry 412 of 460, so an old launcher that
+    # stopped at any of the 47 files after it (a pack it could not write, the window
+    # closed part way) left a folder claiming a version it did not hold. So the full
+    # package ends
+    #
+    #     CHANGELOG.txt  cnc3d-install.txt  BUILD-ID.txt  SDL2.dll
+    #
+    # An old launcher stopped anywhere before the record has not claimed the new
+    # version, and the update is offered again. One that reaches SDL2.dll has written
+    # everything else, its own replacement included, and the next start runs the new
+    # launcher, which replaces files by renaming.
+    #
+    # THE BINARY-ONLY ZIP IS FLAT, ending BUILD-ID.txt, SDL2.dll, and carries no record.
+    # Those launchers unpack it without stripping a folder, so a zip wrapped in
+    # CNC3D-windows-<id>/ lands in a subfolder of the install, leaves every binary at
+    # the top untouched, and records the new version; launchers from v0.6.12 on read
+    # the shape off the archive either way.
+    #
+    # Both only make SDL2.dll harmless while it is byte identical to the installed copy,
+    # which tools/release.sh holds it to (the note at SDL2_VER in setup-toolchain.sh).
+    if [ $BINS_ONLY -eq 1 ]; then
+        ZDIR="$OUT"
+        ZPRE=""
+    else
+        ZDIR="$STAGE"
+        ZPRE="$NAME/"
+    fi
+    ZTAIL=""
+    for f in CHANGELOG.txt cnc3d-install.txt BUILD-ID.txt SDL2.dll; do
+        [ -f "$OUT/$f" ] && ZTAIL="$ZTAIL $f"
+    done
+    (
+        cd "$ZDIR"
+        set --
+        for f in $ZTAIL; do set -- "$@" -x "$ZPRE$f"; done
+        if [ -n "$ZPRE" ]; then
+            zip -rqX "$ZIP" "$NAME" -x '*.DS_Store' "$@"
+        else
+            zip -rqX "$ZIP" . -x '*.DS_Store' "$@"
+        fi
+        for f in $ZTAIL; do zip -qX -g "$ZIP" "$ZPRE$f"; done
+    )
+    ZWANT=$(for f in $ZTAIL; do printf '%s%s\n' "$ZPRE" "$f"; done)
+    ZGOT=$(unzip -Z1 "$ZIP" | tail -n "$(echo $ZTAIL | wc -w | tr -d ' ')")
+    ZBAD=""
+    [ "$ZGOT" = "$ZWANT" ] || ZBAD="its last entries are not$ZTAIL"
+    case " $ZTAIL " in *" SDL2.dll "*) ;; *) ZBAD="it carries no SDL2.dll" ;; esac
+    if [ $BINS_ONLY -eq 1 ]; then
+        ! unzip -Z1 "$ZIP" | grep -q / || ZBAD="the binary-only zip is not flat"
+    else
+        case " $ZTAIL " in *" cnc3d-install.txt "*) ;; *) ZBAD="it carries no cnc3d-install.txt" ;; esac
+    fi
+    [ -z "$ZBAD" ] || {
+        rm -f "$ZIP"
+        echo "the Windows zip is refused: $ZBAD. Every installed launcher up to v0.6.11" >&2
+        echo "writes the install record where the zip lists it and stops at SDL2.dll," >&2
+        echo "so the order above is what keeps those players' folders honest. The zip" >&2
+        echo "has been removed." >&2
+        exit 1
+    }
+    echo "   last entries:$ZTAIL$([ $BINS_ONLY -eq 1 ] && echo ', flat')"
     echo
     echo "ready: $ZIP  ($(du -h "$ZIP" | cut -f1))"
 else

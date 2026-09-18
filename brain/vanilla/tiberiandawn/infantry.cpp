@@ -12,6 +12,19 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// Three changes. In Per_Cell_Process the sabotage arm records the saboteur's
+// own house rather than this machine's in a lockstep match, and the tether
+// cut reads a factory rally point (a CNC3D addition, carried in the
+// soldier's own ArchiveTarget by BuildingClass::Exit_Object) and sends the
+// soldier on from the exit cell. Overlap_List drops the selection term in a
+// lockstep match, so cell occupancy does not depend on which peer has the
+// soldier selected.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\infantry.cpv   2.19   16 Oct 1995 16:50:30   JOE_BOSTIC  $ */
 /***********************************************************************************************
@@ -719,7 +732,15 @@ void InfantryClass::Per_Cell_Process(bool center)
             int temp = Special.IsScatter;
 
             building->IsGoingToBlow = true;
-            building->Clicked_As_Target(PlayerPtr->Class->House,
+            /*
+            **	CNC3D: the saboteur's own house rather than this machine's, for the reason
+            **	written out in BuildingClass::Sell_Back. This site never showed in a dump
+            **	because the line after it immediately overwrites FlashCount with the same
+            **	20 on every peer -- but FlashCountPerPlayer[] keeps whichever index it was
+            **	handed, so each peer recorded a different house as having clicked, and
+            **	nothing exports that array for a gate to notice.
+            */
+            building->Clicked_As_Target(CNC3D_Lockstep ? Owner() : PlayerPtr->Class->House,
                                         20); // 2019/09/20 JAS - Added record of who clicked on the object
             building->Clicked_As_Target(building->Owner(), 20);
             building->CountDown.Set(20);
@@ -740,7 +761,46 @@ void InfantryClass::Per_Cell_Process(bool center)
     **	unit might actually be a building.
     */
     if (center && IsTethered) {
+        /*
+        **	CNC3D: a factory's rally point. BuildingClass::Exit_Object parks it in this
+        **	soldier's own ArchiveTarget (always a CELL target) and leaves the destination
+        **	as the exit cell, so the soldier walks out through the door first. This is
+        **	that cell: the tether is cut here and the walk to the rally begins from here,
+        **	the way a vehicle finishes its door track before it turns for the rally.
+        **
+        **	The contact is read BEFORE the transmit, which is what breaks it. The last
+        **	term is the one that keeps a player's own order: an order given between the
+        **	spawn and the door is honoured by the engine with the tether still on, and
+        **	only when this cell is still the soldier's destination is the exit walk the
+        **	one that is ending here. Without it a move order given at the door would be
+        **	overridden at the first cell centre.
+        **
+        **	The tests keep it inert in a vanilla run: a fresh soldier's ArchiveTarget is
+        **	TARGET_NONE, the computer's units (which the AI shuffle gives an archive cell
+        **	at Unlimbo) are excluded by IsHuman, a transport order writes an OBJECT
+        **	target under MISSION_ENTER, and a guard-area order changes the mission.
+        **	Nothing else reaches a MISSION_MOVE soldier tethered to a factory with a
+        **	legal cell archive.
+        **
+        **	And when a human soldier leaves a factory WITHOUT the walk to the rally,
+        **	because the player gave it an order at the door, the carried CELL is dropped
+        **	rather than left behind, since a later guard-area order would otherwise
+        **	centre on it. A guard-area order given in that window has just written its
+        **	own centre there and is left alone, and so is an OBJECT archive (a transport
+        **	order's), which this hook never wrote.
+        */
+        TechnoClass const* cnc3d_from = Contact_With_Whom();
+        const bool cnc3d_factory = cnc3d_from != NULL && cnc3d_from->What_Am_I() == RTTI_BUILDING
+                                   && ((BuildingClass const*)cnc3d_from)->Class->IsFactory && House->IsHuman;
+        const bool cnc3d_rally = cnc3d_factory && Mission == MISSION_MOVE && Target_Legal(ArchiveTarget)
+                                 && Is_Target_Cell(ArchiveTarget) && Coord_Cell(Coord) == As_Cell(NavCom);
         Transmit_Message(RADIO_UNLOADED);
+        if (cnc3d_rally) {
+            Assign_Destination(ArchiveTarget);
+            ArchiveTarget = TARGET_NONE;
+        } else if (cnc3d_factory && Mission != MISSION_GUARD_AREA && Is_Target_Cell(ArchiveTarget)) {
+            ArchiveTarget = TARGET_NONE;
+        }
         if (House->Class->House == HOUSE_GOOD) {
             Do_Action(DO_GESTURE1);
         } else {

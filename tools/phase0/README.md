@@ -30,7 +30,7 @@ It ignores carriage returns, because Windows writes a redirected stdout as CRLF.
 ignores everything the HOST prints, because the host's state readout after the first and
 last tick carries the platform's pointer width in a buffer size, and its `[event]` lines
 land wherever the host's stdout buffer happens to flush on Windows, which is not where they
-land on the Mac. Both were found the expensive way on 3 Sep 2026: the first comparison had
+land on the Mac. Both were found the expensive way: the first comparison had
 all 20,000 ticks differing, and the engine was identical underneath.
 
 ## The result, 3 Sep 2026: PHASE 0 PASSES

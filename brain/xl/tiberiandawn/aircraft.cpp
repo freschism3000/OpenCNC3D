@@ -1149,6 +1149,37 @@ int AircraftClass::Mission_Unload(void)
                                 unit->IsALoaner = false;
                                 unit->IsLocked = true;
                                 unit->Scatter(0, true);
+
+                                /*
+                                **	CNC3D: and THEN the airstrip's rally point, the same field
+                                **	the barracks and the war factory read. The building this
+                                **	plane is in radio contact with is the airstrip that ordered
+                                **	the delivery (PICK_AIRSTRIP hailed it, and vanilla has just
+                                **	dereferenced it for the exit cell), and the Assign_Target
+                                **	below clears TarCom, not the contact. Scatter must still
+                                **	run above: it is what moves the vehicle off the drop cell
+                                **	when no rally is set. A legal rally replaces the cell it
+                                **	chose, and a rally set, moved or cleared while the plane
+                                **	was inbound is what the drop honours.
+                                **
+                                **	A HARVESTER is left to Scatter. Its Unlimbo gave it
+                                **	MISSION_HARVEST through Enter_Idle_Mode, the airstrip is
+                                **	the only place a Nod harvester comes from, and a move
+                                **	order would park it at the rally in guard instead of
+                                **	sending it to the field; the war factory's exit likewise
+                                **	re-assigns MISSION_HARVEST at the door.
+                                **
+                                **	Target_Legal(ArchiveTarget) on a building is provably
+                                **	false in a vanilla run (see the note in
+                                **	BuildingClass::What_Action), so this is inert there.
+                                */
+                                TechnoClass* strip = Contact_With_Whom();
+                                if (strip != NULL && strip->What_Am_I() == RTTI_BUILDING
+                                    && Target_Legal(strip->ArchiveTarget) && unit->What_Am_I() == RTTI_UNIT
+                                    && *((UnitClass*)unit) != UNIT_HARVESTER) {
+                                    unit->Assign_Mission(MISSION_MOVE);
+                                    unit->Assign_Destination(strip->ArchiveTarget);
+                                }
                             }
                             ScenarioInit--;
 

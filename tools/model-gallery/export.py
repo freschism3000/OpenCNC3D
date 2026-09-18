@@ -41,6 +41,7 @@ sys.path.insert(0, HERE)
 
 import packinspect as PI                                     # noqa: E402
 import catalog as CAT                                        # noqa: E402
+import anim_rates as ANIM                                    # noqa: E402
 
 DEFAULT_PACK = os.path.join(ROOT, "tools", "bakery", "game", "SCB01EA.pack")
 OUT = os.path.join(HERE, "public", "data")
@@ -77,10 +78,26 @@ def read_tris(mesh):
     return out
 
 
-def pack_geometry(tris, tex):
+def part_index(parts, ntris):
+    """Which scene-graph node each triangle belongs to.
+
+    A part is a CONTIGUOUS RUN of the mesh's triangles (tri0, ntris), which is how the
+    renderer walks them: one monotone cursor over the whole list. The viewer regroups
+    triangles by pass and texture, so the run is gone by the time it draws and the node
+    has to travel with the triangle instead. A mesh with no part table is one node.
+    """
+    out = bytearray(ntris)
+    for i, (tri0, nt, _role, _pivot) in enumerate(parts or []):
+        for t in range(tri0, min(tri0 + nt, ntris)):
+            out[t] = i
+    return out
+
+
+def pack_geometry(tris, tex, parts=None):
     """One asset's geometry, in the layout the viewer's loader expects.
 
     pos f32[9n] | uv f32[6n] | col u8[12n] | tex i16[n] | mode u8[n] | wrap u8[n]
+    | part u8[n]
 
     The UV scale is the renderer's own (cnc_eyes.cpp:5510): the pack's u,v run 0..1
     over the texture's USED region and the PNG is padded to a power of two, so every
@@ -114,12 +131,93 @@ def pack_geometry(tris, tex):
         tix += struct.pack("<h", t["tex"])
         mod += bytes((t["mode"],))
         wrp += bytes((t["wrap"],))
-    blob = bytes(pos) + bytes(uv) + bytes(col) + bytes(tix) + bytes(mod) + bytes(wrp)
+    blob = (bytes(pos) + bytes(uv) + bytes(col) + bytes(tix) + bytes(mod) + bytes(wrp)
+            + bytes(part_index(parts, n)))
     while len(blob) % 4:
         blob += b"\0"
     if n == 0:
         lo = hi = [0.0, 0.0, 0.0]
     return blob, n, lo, hi
+
+
+def anim_bbox(mesh, tris):
+    """The box the mesh occupies over its WHOLE clip, not just at rest.
+
+    A camera framed on the rest pose loses a model that moves: the MCV deploy rig ends
+    the clip about 2.2x the size it starts it, so the construction yard it unfolds into
+    walks off the edge of the view halfway through. Each node's own corners are carried
+    through every frame's delta, which gives a conservative box (a transformed AABB's
+    corners always contain the transformed contents) and costs one pass over the clip
+    at build time rather than a bounds recompute every frame in the browser.
+    """
+    a = mesh["anim"]
+    nf, np_ = (a or {}).get("frames", 0), len(mesh["parts"])
+    if not a or not nf or not np_ or len(a["mat"]) != nf * np_ * 12 * 4:
+        return None
+    mat = struct.unpack("<%df" % (nf * np_ * 12), a["mat"])
+    vis = a["vis"] or bytes([1]) * (nf * np_)
+    corners = []
+    for (tri0, nt, _role, _pivot) in mesh["parts"]:
+        lo, hi = [1e30] * 3, [-1e30] * 3
+        for t in tris[tri0:tri0 + nt]:
+            for v in t["v"]:
+                for k in range(3):
+                    lo[k] = min(lo[k], v[k])
+                    hi[k] = max(hi[k], v[k])
+        corners.append([] if lo[0] > hi[0] else
+                       [(x, y, z) for x in (lo[0], hi[0])
+                        for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
+    LO, HI = [1e30] * 3, [-1e30] * 3
+    for f in range(nf):
+        for pi in range(np_):
+            if not vis[f * np_ + pi] or not corners[pi]:
+                continue
+            m = mat[(f * np_ + pi) * 12:(f * np_ + pi) * 12 + 12]
+            for (x, y, z) in corners[pi]:
+                for k in range(3):
+                    c = m[k * 4] * x + m[k * 4 + 1] * y + m[k * 4 + 2] * z + m[k * 4 + 3]
+                    LO[k] = min(LO[k], c)
+                    HI[k] = max(HI[k], c)
+    return [LO, HI] if HI[0] > -1e29 else None
+
+
+def anim_block(mesh, code, blob, tris):
+    """The mesh's baked clip, plus its bytes appended to `blob` (data/anim.bin).
+
+    THE VIEWER NEEDS THE MATRICES, not just the frame count. The pack stores, per baked
+    frame and per node, a 3x4 DELTA from the rest pose (row major, applied as
+    v' = M * v + t in mesh units) and a visibility byte saying whether that node is drawn
+    on that frame at all. Both go out verbatim, in the pack's own layout, so the page
+    plays exactly what the renderer draws rather than a re-interpretation of it:
+
+        mat  nf * nparts * 12  float32, frame major
+        vis  nf * nparts       uint8, 0 = the node is absent on that frame
+
+    The blob is padded to four bytes per asset because the browser reads `mat` as a
+    Float32Array view over the fetched buffer, and an unaligned view throws.
+
+    `driver` is how the GAME walks this clip, from tools/art/anim_rates.py, which is the
+    same table the FBX exporter declares its frame rate from. The viewer prints it and
+    plays it; nothing about the rate is decided here.
+    """
+    a = mesh["anim"]
+    if not a:
+        return None
+    nf, nparts = a["frames"], len(mesh["parts"])
+    out = dict(frames=nf, ticks_per_frame=a["ticks_per_frame"], parts=nparts,
+               clips=[dict(t0=c["t0"], t1=c["t1"], loop=bool(c["loop"]))
+                      for c in a["clips"]],
+               driver=ANIM.driver(code, nf, a["ticks_per_frame"] or 1))
+    box = anim_bbox(mesh, tris)
+    if box:
+        out["bbox"] = box
+    if nf and nparts and len(a["mat"]) == nf * nparts * 12 * 4:
+        out["off"] = len(blob)
+        blob += a["mat"]
+        blob += a["vis"]
+        while len(blob) % 4:
+            blob += b"\0"
+    return out
 
 
 # --------------------------------------------------------------------- textures
@@ -292,6 +390,7 @@ def main():
           % (len(texmeta), sum(1 for t in texmeta if t["gdi"])))
 
     geo = bytearray()
+    anim_blob = bytearray()
     assets = []
     unnamed = []
     for mi in sorted(k for k in m2c if k >= 0):
@@ -315,7 +414,7 @@ def main():
         shadow = bool(tris) and all(t["mode"] in (2, 3) for t in tris)
         name, cat, why = CAT.resolve(code, txt, gpl, km, shadow=shadow)
 
-        blob, n, lo, hi = pack_geometry(tris, pack["tex"])
+        blob, n, lo, hi = pack_geometry(tris, pack["tex"], mesh["parts"])
         off = len(geo)
         geo += blob
 
@@ -343,14 +442,14 @@ def main():
                 continue
             vm = pack["meshes"][vi]
             vtris = read_tris(vm)
-            vblob, vn, vlo, vhi = pack_geometry(vtris, pack["tex"])
+            vblob, vn, vlo, vhi = pack_geometry(vtris, pack["tex"], vm["parts"])
             voff = len(geo)
             geo += vblob
             variants.append(dict(
                 code=sorted(m2c[vi])[0], mesh=vm["name"], codes=sorted(m2c[vi]),
                 off=voff, tris=vn, bbox=[vlo, vhi],
                 tex=[t for t in dict.fromkeys(t["tex"] for t in vtris) if t >= 0]))
-        anim = mesh["anim"]
+        anim = anim_block(mesh, code, anim_blob, tris)
         assets.append(dict(
             id=code, code=code, name=name, category=cat, provenance=why,
             codes=codes, aliases=aliases, mesh=mesh["name"], off=off, tris=n,
@@ -358,9 +457,7 @@ def main():
             parts=[dict(tri0=p[0], tris=p[1], role=ROLE.get(p[2], str(p[2])),
                         pivot=list(p[3])) for p in mesh["parts"]],
             sections=len(mesh["sections"]),
-            anim=(dict(frames=anim["frames"],
-                       clips=[dict(t0=c["t0"], t1=c["t1"], loop=bool(c["loop"]))
-                              for c in anim["clips"]]) if anim else None),
+            anim=anim,
             variants=variants,
             gdi=any(texmeta[t]["gdi"] for t in used),
             source="pack"))
@@ -404,6 +501,7 @@ def main():
             print("briefing meshes SKIPPED: %s" % e)
 
     open(os.path.join(OUT, "geo.bin"), "wb").write(bytes(geo))
+    open(os.path.join(OUT, "anim.bin"), "wb").write(bytes(anim_blob))
     cats = [c for c in CATEGORY_ORDER if any(x["category"] == c for x in assets)]
     manifest = dict(
         pack=os.path.basename(a.pack), pack_version=pack["version"],
@@ -411,8 +509,9 @@ def main():
         assets=sorted(assets, key=lambda x: (CATEGORY_ORDER.index(x["category"]),
                                              x["name"], x["code"])))
     json.dump(manifest, open(os.path.join(OUT, "assets.json"), "w"))
-    print("geo.bin %.1f KB, %d assets, %d categories"
-          % (len(geo) / 1024.0, len(assets), len(cats)))
+    print("geo.bin %.1f KB, anim.bin %.1f KB (%d clips), %d assets, %d categories"
+          % (len(geo) / 1024.0, len(anim_blob) / 1024.0,
+             sum(1 for x in assets if x["anim"]), len(assets), len(cats)))
     if unnamed:
         print("NO NAME IN ANY SOURCE (%d, shown by cartridge code): %s"
               % (len(unnamed), " ".join(unnamed)))
@@ -558,6 +657,11 @@ def bake_exports(pack, manifest, brief, rom):
                                 os.path.join(dirs["tex"], fn))
                 texnames.append(fn)
         ent["fbx"] = dict(model=code + ".fbx", extra=[])
+        if asset["source"] == "pack" and asset["anim"]:
+            tl = FX.timeline(code, mesh)
+            ent["fbx"]["timeline"] = dict(fps=tl["fps"], spacing=tl["spacing"],
+                                          exact=round(tl["exact"], 6),
+                                          error_pct=round(tl["error_pct"], 4))
         write_obj(os.path.join(dirs["obj"], code + ".obj"), code, tris, texlist, texnames)
         ent["obj"] = dict(model=code + ".obj", extra=[code + ".mtl"])
         write_gltf(os.path.join(dirs["gltf"], code + ".gltf"), code, tris, texlist, texnames)

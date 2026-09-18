@@ -94,6 +94,43 @@ The models are dark, which is right: a vehicle's baked shading averages about RG
 The gallery lifts the *backdrop* rather than the model, so what is on screen is still
 the game's own colour.
 
+## Animation
+
+24 of the 238 assets carry a baked clip and the viewer plays it. The transport under the
+model has play/pause, a frame scrubber, and two rules to play by:
+
+**game driver** is what the renderer does, at the rate the game does it. Which frame a
+model is on is a per-StructType decision on the cartridge, and every number behind it
+comes from `tools/art/anim_rates.py`, a transcription of `structure_anim_frame` in
+`game/cnc_eyes.cpp` with the ROM addresses kept in place. In baked frames per second:
+
+| | fps | one cycle | |
+|---|---|---|---|
+| Construction Yard | 10 | 5.0 s idle | and a second segment that plays only while it is building something |
+| Comm Centre, Adv. Comm Centre | 7.5 | 128 s | the last 40 frames are a collapse with no trigger, never played |
+| Barracks, Hand of Nod | 100 | 3.0 s | the flag |
+| Airstrip | 20 | 2.05 s | |
+| Oil Pump | 18.75 | 7.5 s | |
+| Power Plant, Advanced Power | 2 | 20 s | a ping-pong, up the clip and back down it |
+| War Factory | 49.17 | 1.2 s | the door, frames 0..59; 60..100 are never reached |
+| SAM Site | 93.75 | 2.0 s rising | plus a tracking band that is a facing, not a clock |
+| MCV deploy rig | 20.2 | 5.0 s | the whole clip once, across the engine's buildup |
+| Refinery rig | 37.5 | 1.87 s | driven by the refinery's own unload stage |
+| Advanced Guard Tower, Hand of Nod globe | -- | -- | **held**: the game never advances these |
+| everything else | 15 | | one frame per engine tick, the pack's own baked grid |
+
+**whole clip** ignores all of that and runs the clip end to end at the baked grid's
+15 Hz. It is the mode for looking at art the game declines to play: the guard tower's
+whole idle, the war factory's frames 60 to 100, the two collapse tails.
+
+The data is `data/anim.bin`, the pack's own PKB bytes unchanged: per baked frame and per
+node a 3x4 delta from the rest pose, applied as `v' = M * v + t`, plus one visibility
+byte saying whether that node is drawn on that frame at all. `geo.bin` carries one extra
+byte per triangle naming its node, because the viewer regroups triangles by texture and
+that destroys the contiguous run the renderer walks. The camera frames the box the clip
+needs rather than the box the rest pose needs, which is why a deploying MCV stays in
+view.
+
 ## Export
 
 Every asset is pre-baked into three formats at build time, so the page stays a static
@@ -101,7 +138,7 @@ site and needs no server that can run Python:
 
 | Format | Written by | Carries |
 |---|---|---|
-| **FBX 7.4 binary** (default) | `tools/art/fbxout.py`, and `tools/romdump/fbx_export.py` for the ROM meshes | node hierarchy, the cartridge's own pivots, PKB animation as real FBX curves, per-face materials |
+| **FBX 7.4 binary** (default) | `tools/art/fbxout.py`, and `tools/romdump/fbx_export.py` for the ROM meshes | node hierarchy, the cartridge's own pivots, PKB animation as real FBX curves on whole frames, per-face materials |
 | **OBJ + MTL** | here | geometry, UVs, materials. No pivots: OBJ has no node transforms, and the file says so in its own header |
 | **glTF 2.0** | here | geometry, UVs, baked vertex colours as `COLOR_0`, `KHR_materials_unlit` |
 
@@ -123,19 +160,36 @@ python3 tools/model-gallery/verify.py      # check every export against the asse
 python3 -m http.server 8110 --directory tools/model-gallery/public
 ```
 
-`verify.py` is not a spot check: it walks all 202 assets and asserts, per format, that
-the file exists, carries the right magic, and declares the same triangle count the
-viewer draws. A silent disagreement between the three writers is exactly the failure
-it catches.
+**Every FBX animation key sits on a whole frame.** An FBX stores absolute times, and the
+frame numbers an artist sees are those times times whatever rate the file declares, so
+the two have to be derived from one number or the clip arrives on fractions. The file
+declares a whole frame rate, preferring one of the values the FBX SDK's own enum and
+Blender's importer table agree on, and one baked frame occupies a whole number of
+timeline frames chosen so the clip plays at the speed the game plays it: the Barracks is
+100 fps with one frame each, a vehicle is 30 fps with two, the power plant 24 fps with
+twelve. Two rates cannot be expressed by any whole number, the war factory's 295/6 and
+the SAM's 375/4; those files declare 49 and 94 and say in their sidecar JSON that they
+are 0.34% and 0.27% fast.
 
-The page must be **served**, not opened from the filesystem: it fetches `geo.bin` and
-`assets.json`, which `file://` refuses.
+`verify.py` is not a spot check: it walks every asset and asserts, per format, that the
+file exists, carries the right magic, and declares the same triangle count the viewer
+draws. It also reads every FBX's key times back with a parser written inside it and
+fails if any key lands off a whole frame of the rate its own file declares. A silent
+disagreement between the three writers is exactly the failure it catches.
+
+The page must be **served**, not opened from the filesystem: it fetches `geo.bin`,
+`assets.json` and `anim.bin`, which `file://` refuses. `anim.bin` is fetched only when
+a model that carries a clip is opened, so the gallery's first load is unchanged.
 
 ## Known gaps
 
-* **The viewer does not animate.** 22 meshes carry a clip and the gallery draws their
-  rest pose; the detail panel says so on those models rather than letting a still
-  stand in for a clip. The clip does go out with the FBX.
+* **Three clips are swept rather than driven.** The war factory's clip is indexed by
+  its door position, the SAM's by its launcher facing, the refinery rig's by the
+  refinery's own unload stage. None of the three is walked by a clock, so the viewer
+  runs them forward and back at the rate the game moves them and pauses at each end.
+  The sweep is decoded; the pause is this tool's, and the panel says so on those three.
+  The SAM's tracking band is swept as though the launcher turned at a constant rate,
+  which it does not.
 * **The briefing meshes' light is ours**, not the cartridge's own briefing light. It
   is the console's resident directional light, applied because those lists run with
   `G_LIGHTING` on and carry no baked colour to modulate. Which light the mission briefing

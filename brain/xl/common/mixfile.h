@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// Both MixFileClass constructors now refuse a file whose header carries a
+// negative entry count or data size, or whose entry table cannot be read in
+// full. Such a file is left off the mixfile list, so lookups in it answer
+// "not found" instead of searching an unallocated or half-read table. A file
+// with a sound header is read exactly as before.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/MIXFILE.H 1     3/03/97 10:25a Joe_bostic $ */
 
@@ -321,10 +332,30 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename)
     /*
     **	Load up the offset control array. If RAM is exhausted, then the mixfile is invalid.
     */
+    /*
+    **	C&C 3D: a header that cannot be believed is an archive that holds nothing. The
+    **	count is a signed 16-bit field, so a damaged file can carry a negative one, which
+    **	is a negative allocation and then a search over a NULL table; a positive count on
+    **	a file too short to hold its table leaves the table uninitialised and searched as
+    **	if it were sorted. Either ends in a fault inside mission start. The file is
+    **	refused here instead: it is never attached to the list, so every lookup answers
+    **	"not here" and the caller decides what to do without the entry.
+    */
+    if (Count < 0 || DataSize < 0) {
+        Count = 0;
+        DataSize = 0;
+        return;
+    }
     HeaderBuffer = new SubBlock[Count];
     if (HeaderBuffer == NULL)
         return;
-    straw->Get(HeaderBuffer, Count * sizeof(SubBlock));
+    if (straw->Get(HeaderBuffer, Count * sizeof(SubBlock)) != (int)(Count * sizeof(SubBlock))) {
+        delete[] HeaderBuffer;
+        HeaderBuffer = NULL;
+        Count = 0;
+        DataSize = 0;
+        return;
+    }
 
     for (int i = 0; i < Count; i++) {
         HeaderBuffer[i].CRC = le32toh(HeaderBuffer[i].CRC);
@@ -453,10 +484,30 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename, PKey const* key)
     /*
     **	Load up the offset control array. If RAM is exhausted, then the mixfile is invalid.
     */
+    /*
+    **	C&C 3D: a header that cannot be believed is an archive that holds nothing. The
+    **	count is a signed 16-bit field, so a damaged file can carry a negative one, which
+    **	is a negative allocation and then a search over a NULL table; a positive count on
+    **	a file too short to hold its table leaves the table uninitialised and searched as
+    **	if it were sorted. Either ends in a fault inside mission start. The file is
+    **	refused here instead: it is never attached to the list, so every lookup answers
+    **	"not here" and the caller decides what to do without the entry.
+    */
+    if (Count < 0 || DataSize < 0) {
+        Count = 0;
+        DataSize = 0;
+        return;
+    }
     HeaderBuffer = new SubBlock[Count];
     if (HeaderBuffer == NULL)
         return;
-    straw->Get(HeaderBuffer, Count * sizeof(SubBlock));
+    if (straw->Get(HeaderBuffer, Count * sizeof(SubBlock)) != (int)(Count * sizeof(SubBlock))) {
+        delete[] HeaderBuffer;
+        HeaderBuffer = NULL;
+        Count = 0;
+        DataSize = 0;
+        return;
+    }
 
     for (int i = 0; i < Count; i++) {
         HeaderBuffer[i].CRC = le32toh(HeaderBuffer[i].CRC);

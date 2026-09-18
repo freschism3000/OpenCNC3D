@@ -1,5 +1,356 @@
 # Changelog
 
+## C&C 3D v0.7.1 "On The Level" (2026-09-18)
+
+### New features
+
+- Save Mission, Load Mission and Delete Mission use the 1995 slot dialog: sixteen named slots, newest first, a typed description, and a Delete that asks first
+- Load Mission on the main menu loads any slot, booting the mission it was saved in; a load from the pause dialog can do the same
+- An empty Load Mission dialog says there are no saved games
+- A save made during the campaign remembers where the campaign had got to
+- Restate in the pause dialog shows the mission objective, with a Video button that replays the mission briefing movie
+- The credits readout ticks as it counts, up and down, with a Gameplay switch to silence it
+
+### Improvements
+
+- The Special Ops list is filed by faction and then by source: GDI and Nod each have a Covert Operations section and a Special Ops section, with the test scenarios last
+- The Test Map is the last row of the Special Ops list instead of a main menu button of its own
+- HOME and END jump to the first and last mission of the Special Ops list
+- Under Enhanced the tank shell flies laid along its direction of travel; Classic keeps the console's upright shell, and the grenade stays upright in both
+- Under Enhanced the Rocket Launcher turns to face where its rockets go; under Classic it keeps the console's fixed pod
+- The repair wrench floats above a building's own roof rather than at half its footprint, so on the Refinery, Weapons Factory, Hand of Nod and Temple it no longer sits inside the structure
+- Structure idle animations (the Barracks flag, the Communications Center dishes, the SAM site, the Airstrip's scanner, the nuclear dome) follow the cartridge's own curve evaluator between keyframes
+- A helipad no longer takes a rally point, since its aircraft never followed one
+- A mission that cannot start says why on screen instead of returning to the menu in silence
+
+### Platforms and builds
+
+- Nineteen more tests in the build's gate suite that could pass on a broken build now fail on one
+- The suite's two-run reproducibility test no longer fails on a freshly built test folder
+- A room opened from the command line without a name takes the game's own default room name
+- Nine new tests in the build's gate suite cover the pad, wreck colours, edge tiberium, Remastered attack poses, the wrench, the tank shell, the Rocket Launcher, the texture books and the animation curves
+- Five more cover the factory exit and the airstrip rally point, the screen edges over the unit card, the Resolution list, the credits tick and a refused mission start
+- Both Windows executables are linked large-address-aware and declare the UTF-8 code page
+- The Windows READ-ME names the BOOTFAIL and FATAL lines to look for in the log
+
+### Bugs fixed
+
+- A building placed beside a taller neighbour no longer sinks into the ground; buildings whose footprints touch stand on one platform, and a neighbour's apron row no longer lifts or cuts a building
+- A transport helicopter docked on a helipad directly below a taller building no longer loses its nose in the slope
+- A destroyed vehicle or aircraft comes apart in its seat's team colour instead of snapping back to its faction's default
+- Tiberium crystals no longer show in the map's always-shrouded edge ring or in any unexplored cell (Enhanced)
+- Remastered infantry are drawn whole when they fire: a standing flamethrower keeps his legs, and a prone flamethrower, minigunner, bazooka man or commando is no longer cut off at the ground
+- In the Enhanced picture the repair wrench is lit as a wrench instead of taking the shading and outline of the roof behind it
+- Tiberium silos show their fill level; the fill dome is drawn on the silo instead of hidden inside it
+- The Tiberium Refinery's storage strip stands on the building and fills there; the second strip beside it is gone
+- The Advanced Communications Center's dish pans in a level circle in the direction the cartridge authored, instead of tumbling
+- A soldier leaving a Barracks or Hand of Nod with a rally point set walks out through the door before turning for the rally, instead of through the side of the hut
+- A vehicle delivered by the cargo plane drives to the Airstrip's rally point; a harvester still goes to the tiberium field
+- The bottom-left corner and the screen edges over the unit card scroll the map with units selected
+- The Resolution list carries every size the display offers, the desktop first as Desktop, and scrolls; sizes larger than the desktop are greyed under Windowed and pickable under True fullscreen, and a windowed size is clamped to the desktop
+- A saved resolution is read back exactly instead of rounded to a multiple of 8
+- A mission whose theater archive is missing or damaged no longer closes the game
+- A damaged data archive whose header cannot be read is refused instead of searched
+
+---
+
+---
+
+## C&C 3D v0.6.12 "Step Aside" (2026-09-14)
+
+### New features
+
+- The game list is ten rows tall, sorts by any column header, scrolls with a bar and can hide locked or greyed games
+- A PING column shows each internet game's round trip; a direct game is measured only once it is selected
+- The game list's sort, HIDE boxes and the player's name are remembered between launches
+
+### Platforms and builds
+
+- The Windows full package lists CHANGELOG.txt, cnc3d-install.txt, BUILD-ID.txt and SDL2.dll last
+- The Windows binary-only zip no longer wraps its files in a folder
+- A release stops when the Windows SDL2.dll is not the pinned one
+- The Windows launcher declares UTF-8 as its code page
+- Online play needs every player on v0.6.12: an older build is refused by version when it tries to join
+- Fifteen tests in the build's gate suite that could pass on a broken build now fail on one
+
+### Bugs fixed
+
+- Updating on Windows replaces a file the launcher has loaded, such as SDL2.dll, by renaming instead of writing over it
+- An update that fails or is interrupted part way is undone from a journal in the game folder
+- An update stops and names the file when a file cannot be moved aside
+- Every file an update writes is checked against the zip's own CRC-32 and size
+- A launcher locks the game folder while it recovers or updates it
+- The launcher reads whether an update zip is wrapped in a folder instead of assuming it
+- A changed file is written beside itself and renamed into place once checked
+- The launcher finishes an interrupted update before it reads the installed version
+- The Windows installer sets aside an interrupted update's journal before it installs
+- On macOS the app starts the launcher, not the game, while an update is unfinished
+- The launcher changes files only in a folder holding cnc3d-install.txt, and never removes a file there by pattern
+- A player leaving an online match no longer desyncs it when one machine hears the goodbye a turn later than another
+- A machine that missed a departed player's last orders gets them from the host instead of playing on without them
+- A building that would cover a cell off the edge of the map is refused with CANNOT DEPLOY HERE instead of vanishing into its factory
+
+---
+
+---
+
+## C&C 3D v0.6.11 "Out Of The Box" (2026-09-13)
+
+### Improvements
+
+- A new player starts at game speed 4 instead of 3, in campaign, skirmish and online alike
+
+### Bugs fixed
+
+- Reset to defaults on Visuals > Advanced puts every setting back, not the twenty six rows it knew about
+
+---
+
+---
+
+## C&C 3D v0.6.10 "Bring Your Own Tank" (2026-09-09)
+
+### New features
+
+- An artist's FBX model can replace a cartridge vehicle, tracks and all
+- Water Shader: the Enhanced sea knows its coastline, flows, reflects and takes a boat's wake
+- Solid tiberium: crystals stand on the field under Enhanced instead of a flat decal
+- Rain under Enhanced: streaks in the air, wet ground, hulls and men, drops on the water; tuning panel only for now, off by default
+- The outermost ring of cells on every map stays shrouded, whatever the shroud is set to
+- A 3D Trees row on Visuals > Advanced, on under Enhanced, beside the Water Shader
+- An MCV that cannot deploy where it stands says CANNOT DEPLOY HERE under OPTIONS
+- Sixteen of the eighteen tree names draw their own species under Enhanced, from an imported game-ready pack, with a shader, baked canopy occlusion, wind and burning
+- Desert maps get desert trees: the four tree names used only on desert maps are mapped to acacias
+- Real grass grows on temperate and winter ground under Enhanced, in the trees' own wind; tuning panel only for now, off by default
+- Grass takes its colour from the ground it grows out of, thins with distance, and is cleared from under buildings and hulls
+- A Grass section in the F5 panel, thirty four dials, saved and reloaded with the rest of the preset
+- Grass switches itself off with the cartridge terrain art, which it is not tuned against, and comes back with the 1995 art
+- Grass bends away from the mouse pointer as it moves over the field
+- The ground takes a small jolt when a building is put down
+- A Debug row at the bottom of the F5 panel draws updated meshes from a debug pack
+- Type a host's address on the INTERNET tab and join a game across the internet
+- The host is shown the address to read out, and the port to forward
+- `netcheck relay <host>` says whether a CnCNet tunnel is reachable from here
+- Tick INTERNET GAME to host through a relay: others join with a room code, nobody forwards a port
+- The waiting room shows the host the room code to read out
+
+### Improvements
+
+- Trees sway on the rig their artist authored, instead of leaning together as one
+- Trees are lit from their real surface direction rather than a guessed one
+- The F5 panel's rows stop drawing over its own title and buttons when the list is scrolled
+
+### Performance
+
+- Trees are only drawn where the camera can see them, in the lit pass and in the water reflection
+
+### Fixes
+
+- Ambient occlusion does something: its depth test compared against a threshold no scene could cross, so the feature changed nothing at any setting
+- Grass covers the men standing in it instead of being drawn behind them
+- A vehicle driving over grass leaves wheel tracks instead of clearing a strip its own width
+- Windows and Mac players can join each other's games again
+- A game built against a different engine is refused by name, not by accident
+- Two builds that could not read their own engine no longer match each other
+- A joiner without the host's map is told so, instead of playing a different one
+- A joiner whose copy of the map differs is refused before the match starts
+- Changing the map no longer leaves the room refusing against the old one
+- Changing the map or the rules unlights every READY, so nobody is committed unseen
+- A refused joiner leaves its seat instead of a phantom the host waits on
+- A READY the network loses is said again, instead of leaving a room that can never start
+- One order given to a large group no longer stops the match dead
+- A player who leaves goes quiet on the same turn in every world, so the armies do not part
+- A room stops advertising itself the moment START is pressed, not the moment the match begins
+- A game that has started comes off the internet list at once instead of after forty five seconds
+- A build too old for the room is refused by name instead of joining and hanging
+- One peer can no longer make the host repeat a kilobyte to everyone else on demand
+- Only the seat itself can surrender it or leave it
+- A match that breaks ends on the debrief with the reason on it, not on the desktop
+- A host that quits ends the match at once instead of after thirty seconds of silence
+- The browser can finally grey a game you would be refused from
+- Health bars only while a unit is selected, which is the engine's own default
+- The 3D pointer tracks the mouse instead of snapping to whatever it crosses
+- Refused and move markers sit on the ground instead of floating over hills
+- Backspace works in the YOUR NAME prompt
+- Switching to the INTERNET tab no longer leaves JOIN pointing at a hidden LAN game
+- A field stops hiding what you just typed once it passes 32 characters
+- One refused send no longer condemns every later join with a local-network message
+- Shadows no longer strobe when you zoom in: one frame in four was drawn with no depth test
+- Cut-out objects drawn after a tree keep their alpha test, instead of turning solid
+- Desert maps grow cacti again instead of random temperate trees
+- The menu music keeps playing when the multiplayer screen is opened
+- Leaving a mission gives back the sidebar and decal art it loaded, instead of two megabytes a mission
+- A click near an enemy standing in unexplored shroud is no longer re-aimed onto it
+
+---
+
+---
+
+## C&C 3D v0.6.9 "Ask First" (2026-09-07)
+
+### New features
+
+- A match ends on its own screen, one commander at a time, with a Continue button
+- The debrief shows the emblem and plays the theme of the side you played
+- Surrender and stay to watch the rest of the match
+- AI Takeover: a player who leaves is played by the computer, or their base is destroyed
+- Players can talk to each other during a match, and EVA talks only to your side
+- Players have names, and a private room asks for a passcode
+- A joiner picks its own side, colour, team and start position
+- The room gains AI Takeover and Short Game, and the browser lists maps by name
+- Windows Desktop shortcuts for the newest build from main and for the source tree
+- The outermost ring of every map is always shrouded, whatever the shroud setting
+- The water reflects the world, bends the sea floor beneath it and catches the sun (Enhanced)
+- Boats push the water and leave a wake in it, on a wave simulation that bounces off the shore (Enhanced)
+- The water is a greyer, more natural blue (Enhanced)
+- Water Shader, a switch on the Visuals page under Enhanced: the sea knows where its coast is: the beach fades under the water, a pale band of water marks every shore and riverbank, the water line creeps up the sand, the sea pans on its current and rivers run downstream, shallows and deep water (Enhanced)
+
+### Improvements
+
+- The room measures its slowest link and stamps orders far enough ahead for it
+- Surrendering asks Yes or No instead of offering a Restart a match cannot do
+- A surrendered commander loses the cameos, Repair and Sell, and keeps the radar
+- A surrendered commander reads as SPECTATOR in the player list
+- The map is revealed to a commander who is out of the match
+- A joiner's rows read EMPTY until the host's room arrives
+- A failed network send is written to the log
+- The model gallery plays its animations at the speed the game plays them
+- The unit card's frame, cameo and group tabs are cut to the sidebar's chamfered corners
+- Each control group tab on the unit card is its own framed button
+- The unit card's health bar is a row of raised blocks
+
+### Platforms and builds
+
+- The macOS build asks for the Local Network permission where the player can see it
+- Peers can talk through a CnCNet relay, which nothing uses yet
+
+### Bugs fixed
+
+- Both players were told they had won when a match ended
+- A joiner could not change faction, and the side buttons showed the host's side
+- Opening the pause dialog in a match ended the match for everyone a minute later
+- Double-clicking the MCV selected every unit of its type instead of deploying it
+- A match where every player had resigned never ended
+- One player leaving ended the match for everybody
+- A match froze on its fourth tick when the room was not settled at START
+- A Mac started from the Finder never reached a LAN host
+- The launcher quit on the first mouse movement, and carried no SDL of its own
+- The engine patch no longer matched the engine, so no build would start
+- A failed join did not give its socket back, and the sixth attempt was refused
+- The question when leaving a match ran outside its box
+- Choosing CLASSIC destroyed the New HUD setting instead of overriding it
+- A filled build slot showed a square frame with a dark triangle in each corner
+
+---
+
+---
+
+## C&C 3D v0.6.8 "Another Angle" (2026-09-06)
+
+### New features
+
+- Perspective row on the Advanced page: Classic, or Isometric at 45 degrees
+- Picking, edge push, drag band, infantry facings and paint order all follow the camera
+- Four isometric dials under F5: yaw, tilt, field of view and distance
+- The ground is lit from its own normal, with a soft penumbra and a single sun
+- Six dials for the new ground lighting, each with an off that draws the old picture
+
+### Improvements
+
+- Infantry are a quarter smaller under Enhanced, all three art sets
+- The 3D cursors keep their Classic heading under any yaw, and draw at 0.7 size
+- Cliffs and slopes no longer show cell-shaped shadow blocks
+- A joiner that gets no answer for ten seconds is told so, with the address it tried
+- The room is not drawn until the host's copy of it arrives
+- The host's log names what it refused and what it did not understand
+- A joiner accepts the host's answer from any of the host's addresses, and says which
+- The Mac writes the same log Windows does when started from Finder
+
+### Bugs fixed
+
+- Resolution, UI scaling and Perspective drew their labels under their drop lists
+- The lobby refused two installs whose first map differed, rather than the hosted one
+
+---
+
+---
+
+## C&C 3D v0.6.7 "One World" (2026-09-05)
+
+### New features
+
+- HOST opens the room and goes straight to the multiplayer game screen
+- A hosted game is as big as its map: one seat per start, re-sized when the map changes
+- Every seat is a menu: BOT, EMPTY or BLOCK, and a BOT seat is how a computer joins
+- Chat in the lobby, each player's lines in their own colour
+- The room reports its own events in the chat pane: who joined, left, readied or is waited on
+- Start positions are numbered on the map preview and picked from each player's drop down
+- A player who picks no start is dealt one by the engine, the same on every machine
+- The map list is a window with OFFICIAL and USER MAPS tabs, opened by CHANGE MAP
+- True fullscreen, Windowed and Windowed borderless on the Advanced page
+- Resolution picks from the sizes the display offers
+- UI scaling, with -2x as the new default
+- Reset to defaults on the Advanced page
+
+### Improvements
+
+- The lobby was redrawn: rule boxes, sliders in one row, and a six line chat pane
+- The AI Players slider is gone; a skirmish seats one computer per start
+- The lobby's wording is shorter, with no explanatory sentences under the controls
+- F5, the tuning panel, is compiled out of published builds
+- Cheats will not open in a network game, and any switched on beforehand are cleared
+- The colour grade is brighter and punchier, and cloud shadows are stronger and softer
+
+### Bugs fixed
+
+- A LAN match was two separate games: the lobby never switched the engine into network mode
+- A joiner played the host's faction whatever seat it was in
+- The tech level did not travel, so the two sides had different build lists
+- A player whose connection died froze everyone else silently and for ever
+- Clicking MULTIPLAYER left the menu on screen while the browser ran behind it
+- Both installers shipped one person's personal map folder
+- Double-clicking a map in the list threw the host back to the Host/Join screen
+
+---
+
+---
+
+## C&C 3D v0.6.6 "In Step" (2026-09-05)
+
+### New features
+
+- MULTIPLAYER is live on the main menu: host a game or join one on your own network
+- Up to eight people in one match, with only the host's machine needing to be reachable
+- Games announce themselves on the network and are listed with name, map and player count
+- The lobby is the Skirmish screen: the host sets the rules, each player picks side, team and colour
+- Nobody starts until everyone has pressed READY
+- Games can be given a name and a four digit passcode
+- The host can remove a player who never readies, and that player is told so
+- The host prints the address to join it at
+
+### Improvements
+
+- A player whose map differs from the host's is refused by name before the match starts
+- A desync report names the order wire, the agreed map, and which player disagreed
+- Tests no longer open windows or play music
+
+### Bugs fixed
+
+- Switching the ground to the 1995 tiles did nothing, because no pack carried the tiles
+- The camera readout covered the OPTIONS and DATABASE tabs
+- Remastered soldiers hopped into the air when they attacked
+- The chemical warrior sprayed a rifle flash instead of a spray
+- Selling a building put the players in a network match out of step
+- Repairing a building, and a commando planting explosives, did the same
+- Two players were dealt different armies depending on what each had played before
+- Players disagreed about what was discovered once a computer's harvester delivered
+- Build Anywhere did nothing in the Enhanced engine
+- One player leaving a match ended it for everyone else
+
+---
+
+---
+
 ## C&C 3D v0.6.5 "Second Look" (2026-09-01)
 
 A pass back over the player board: every open report was read against the code again, and
@@ -26,7 +377,7 @@ this is the half that was cheap, unblocked and needed nobody's permission.
 
 - Hold the right button and push: the view follows your hand, faster the further out you hold it, with a small still spot in the middle of the screen. It is on out of the box, and the pointer becomes four arrows while it travels. A right click is still a right click: the push only starts once the pointer has moved further than a click ever does, so cancelling, ordering, the radar and the build column all behave exactly as before.
 - Mouse settings moved to their own page, Options then Gameplay: swapped buttons, and the new push scroll.
-- **Classic mode no longer changes your mouse.** Classic is about the picture, and how you drive the game is yours. Until now, choosing Classic silently turned Swapped Mouse Buttons off and wrote that over your saved settings, so the setting could not survive being looked at. That is fixed in both directions and for both routes: the in-game Classic button leaves your mouse alone, and starting the game with --classic reads your saved settings too. It used to read none of them, and then wrote the shipped defaults back over your tuned file on the way out.
+- Classic mode no longer turns Swapped Mouse Buttons off, by either route, and no longer writes the shipped defaults over your saved settings
 - The tuning panel keeps its own file. A dial you move with the panel open and never SAVE no longer reaches disc because you changed something else in the pause menu afterwards. Press SAVE and it does, and it survives whatever you change next.
 - A preset named on the command line stays the file the game writes.
 - A mouse setting changed from the in-game pause menu is remembered. Only the main menu's Visuals screen and the tuning panel ever wrote your settings to disc, so anything set while paused was lost when you quit.
@@ -54,6 +405,14 @@ this is the half that was cheap, unblocked and needed nobody's permission.
 - WEATHER: soft cloud shadows drift across the ground, the buildings and the units, cast by the same sun as everything else and moving at a speed measured in cells per second. Off by default, because nothing in the cartridge has weather. Eight dials on the F5 panel.
 - The cloud mask is generated rather than shipped: tiling noise, warped so the shapes have a wind in them.
 - Answering a long-standing question: the cartridge's terrain is NOT lower resolution than the PC game's. Both draw 24 x 24 texels a cell. It is colour depth and smoothing, and 91% of the first GDI mission is drawn from a 16-colour bank.
+
+### The unit card
+
+- A card in the bottom-left corner of the Enhanced HUD shows what you have selected: the unit's cameo, its name, health as a segmented bar with the numbers beside it, and its weapon's damage.
+- The rest of a multiple selection appears as a row of smaller cameos under it. Click one and that unit becomes your whole selection.
+- Ten tabs under the card are the control groups, keyed 1 to 9 then 0 as on the keyboard, each showing how many units the group holds. Click a tab to select that group; the tab lights amber while the selection is that group.
+- Clicking the big cameo centres the view on the unit.
+- The card is cut from the sidebar's own chrome and lettered in its own font, so it is the same panel wearing another shape. Enhanced mode with the new HUD only; Classic is untouched.
 
 ### The codex
 

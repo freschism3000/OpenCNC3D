@@ -1,0 +1,117 @@
+# G31c, the engaging half. THE SAM SITE MUST RISE, TRACK AND LOWER ON THE CARTRIDGE'S
+# FORMULA, and this run exists so that it has to.
+#
+# gate_structanim_sam.txt holds a SAM underground on a map with nothing to shoot at, so
+# every sample it yields takes the underground branch of the arm and the tracking branch
+# (status 2, 3 or 6, frames 200..400 from the facing) is never evaluated. A build whose
+# tracking frame is wrong passes that run untouched. Here the SAMs are given aircraft.
+#
+# The opening is gate_samsound.txt's, and its load-bearing points apply unchanged:
+#  1. SCG13EA carries SAM sites and no aircraft, so the air strike has to be summoned;
+#     that is what the super weapon cheat and the recharge are for.
+#  2. 738,437 is a SAM's own silhouette with the camera at 38,33 in a 1280x800 frame, so
+#     the gate runs this at --w 1280 --h 800. A loose click sends the strike elsewhere.
+#  3. The A-10s take roughly 250 ticks to reach the SAMs. The sampling runs 450 ticks past
+#     the click so that the launchers are seen rising, turning and lowering again.
+# One sample every 10 ticks is what catches the launcher part way up, at more than one
+# facing while it follows the aircraft, and part way down.
+tick 60
+cheatset super 1
+tick 10
+superrecharge
+tick 10
+cam 38 33
+tick 5
+sbclickitem SW_AirStrike
+actclick 738 437
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+tick 10
+anims
+quit

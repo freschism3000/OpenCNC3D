@@ -25,6 +25,16 @@
 # requires the two pictures to differ. Without that this passes on a renderer that
 # computes a perfect strip and draws none of it.
 
+# THE SHOW RULE IS SET EXPLICITLY HERE, and it has to be. This gate's subject is an
+# ENEMY harvester -- SCG03EA gives the player none -- so under the shipped default of
+# hb_mode 1 (selected only, which is vanilla's own: special.h:76 HB_SELECTED) it can
+# never carry a strip, because the player cannot select it. The row used to appear
+# because the old default was 2, selected-or-damaged, and that harvester is damaged.
+# What this gate is about is the strip's GEOMETRY and whether it reaches the glass; the
+# show rule itself belongs to G112, which drives all three positions. So the dial is
+# named rather than inherited, and BOTH runs of the A/B name it, or the pixel arm would
+# be comparing two different rules instead of pips against no pips.
+gfx hb_mode 2
 tick 60
 cam 26 32
 zoom max

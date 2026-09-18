@@ -32,8 +32,9 @@ tick 3
 rallydump
 
 echo G96-2 and RIGHT-click does NOT -- it still cancels, which is its one meaning here
-# the project owner asked for right-click first, got it, and changed his mind on 25 Aug once he had
-# tried it: "Should only be left click". This leg is the regression guard for that. Every
+# The rally point was set by the right button in an earlier build; playing it showed the
+# right button has one meaning, cancel, and the rally moved to the left button. This leg
+# is the regression guard for that. Every
 # other arm of the right button's ladder is a MODE BEING LEFT, and putting a rally point
 # there cost right-click its ability to deselect a factory -- for a gesture that was
 # already available on the left button. The rally set above must SURVIVE this click
@@ -44,9 +45,14 @@ expectsel 0
 rallydump
 
 echo G96-3 the unit it builds walks there
-count E1
+# Counted and read BY HOUSE. An unscoped E1 index runs over every house's Minigunners in
+# heap order, and a Nod one dies on this map around tick 170, which moves every later
+# index by one. Scoped to GoodGuy the new soldier is index 4 whatever Nod loses.
+# Tick 170, not 140: the soldier leaves through the door first, salutes at the exit
+# cell 58,55, and reaches the rally at 57,55 at about tick 151 after the build.
+count E1:GoodGuy
 build E1
-tick 140
-count E1
-obj E1 10
+tick 170
+count E1:GoodGuy
+obj E1:GoodGuy 4
 quit

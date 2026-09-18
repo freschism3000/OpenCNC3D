@@ -1,0 +1,14 @@
+tick 5
+lclickobj MCV:@me
+actclickobj MCV:@me
+tick 250
+build NUKE
+ready NUKE 1500
+startplace NUKE
+hover 35 58
+place 35 58
+tick 30
+place auto
+tick 150
+objdump
+quit

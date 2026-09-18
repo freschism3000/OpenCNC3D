@@ -56,6 +56,37 @@ typedef struct CampScore {
     char movie[16];         /* the win/lose movie the event named (no extension) */
 } CampScore;
 
+/* ---- the screen a MATCH ends on ----------------------------------------------------
+ *
+ * The campaign's score screen reports one commander against a designer's par. A match has
+ * no par: it has other people, and the only question worth answering is how you did
+ * against THEM. So this is a table rather than a tally, one row per commander, drawn as
+ * one shared grid with a bar per row measured against whoever leads.
+ *
+ * It borrows the campaign screen's plate, its medallion and its music, and keeps exactly
+ * one of its numbers: the time the match took. */
+typedef struct CampMatchRow {
+    char name[16];
+    int colour;                  /* seat livery 0..7, which picks the row's ramp */
+    int killed, razed, lost, harvested, score;
+    int defeated, is_local;
+} CampMatchRow;
+
+typedef struct CampMatch {
+    CampMatchRow row[8];
+    int nrows;
+    int win;                     /* from the local commander's point of view */
+    int seconds;
+    int net;                     /* a network match rather than a Skirmish */
+    int side;                    /* the local commander's faction: 0 GDI, 1 Nod */
+    char map[24];
+    /* WHY IT ENDED, when it did not end by somebody winning. Printed on the header in
+       place of the score formula, because on the one screen a player gets after a match
+       that broke, why it broke outranks how the points were added up. At most 32
+       characters reach the plate; see MS_HEAD_X. "" for an ordinary finish. */
+    char ended[96];
+} CampMatch;
+
 /* One campaign.pack entry (format CNC3DCPN v2, game/bake_campaign.py).
    kind 0 anims carry the disc's own LCW'd XOR-delta chunks and an accumulator
    that camp code advances frame by frame; kinds 1/2 carry raw indexed frames;
@@ -131,6 +162,11 @@ typedef struct Camp {
        shot gates stay byte-comparable. */
     Logo3D       logo;
     int          logo_ok;
+    /* WHERE THE MEDALLION SITS, in plate pixels. The campaign's score screen has always
+       used one fixed box; the match debrief needs its own, because its table occupies the
+       space that box was chosen for. Defaulted by camp_open, so a screen that says
+       nothing gets the behaviour it always had. */
+    int          logo_x, logo_y, logo_w, logo_h;
     int          logo_side;
     Uint32       logo_t0;
 } Camp;
@@ -162,6 +198,10 @@ int camp_side_select(Camp *c);
 /* ScoreClass::Presentation: the side's full score tally with the engine's numbers.
    Returns 0 on click/key at the end, -1 window closed. */
 int camp_score(Camp *c, const CampScore *s, int side, int scenario);
+
+/* The same plate, medallion and music, with a match's table on it instead of a mission's
+   tally. Returns 0 on click/key at the end, -1 if the window closed. */
+int camp_match_score(Camp *c, const CampMatch *m, int side);
 
 /* Map_Selection: globe spin-in, EARTH_E, EUROPE advances, territory blink, click.
    scenario is the one JUST WON (its CountryArray row names the choices for the

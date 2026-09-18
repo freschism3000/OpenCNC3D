@@ -16,8 +16,7 @@ normal and therefore reads green; that is the data, not a bug in this file.
 One world cell is 1024 mesh units, so the printed extent doubles as a size check.
 That number is the RENDERER's, not a guess: game/cnc_eyes.cpp sets
 MODEL_SCALE = 1.0f / 1024.0f, and the independent confirmation is a wall straight,
-authored x[-500,+501], i.e. 1001 units for the one cell it occupies. This file said 256
-until 2 Sep 2026 and every extent it printed was therefore four times too large; the
+authored x[-500,+501], i.e. 1001 units for the one cell it occupies. This file said 256 and every extent it printed was therefore four times too large; the
 tell was that it made the flying Orca four cells long.
 """
 import argparse

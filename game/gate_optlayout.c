@@ -92,15 +92,36 @@
  * so what it answers with is those rows plus OK plus the scroll bar. Summing
  * DOPT_A_COUNT here would demand a rectangle for every element at once, which is exactly
  * what scrolling means it must not give. */
+/* THE RESTATE BOX IS MEASURED TWICE: with a movie on offer it answers DOPT_R_COUNT
+ * rectangles (Video and Options), and without one it answers ONE, the lone OK, because
+ * the second button then does not exist (scenario.cpp:797-803). Both forms are drawn
+ * for real, so both are counted. */
+/* THE SLOT DIALOG IS MEASURED TWICE TOO: in LOAD mode the description field does not
+ * exist, so the page answers DOPT_SL_COUNT - 1 rectangles; in SAVE mode all of them. */
+/* THE NOTICE BOX answers ONE rectangle, its lone OK, on the Restate geometry. */
 #define OPTLAYOUT_EXPECT                                                                 \
     (DOPT_ITEM_COUNT + DOPT_C_COUNT + DOPT_V_COUNT + (DOPT_A_VIEW_ROWS + 2)              \
-     + DOPT_S_COUNT + DOPT_G_COUNT)
+     + DOPT_S_COUNT + DOPT_G_COUNT + DOPT_R_COUNT + 1 + (DOPT_SL_COUNT - 1) + DOPT_SL_COUNT \
+     + 1)
 
 /* goptions.cpp:130 walks the stack in steps of OButtonHeight + 2. The 2 is the gap. */
 #define OPT_MIN_SEP 2
 
+/* A row supplier with every slot taken, newest first, for the slot dialog legs. */
+static int layout_slots(void *user, DOPT_SlotRow *out, int max)
+{
+    int i;
+    (void)user;
+    for (i = 0; i < 16 && i < max; i++) {
+        out[i].slot = 15 - i;
+        sprintf(out[i].text, "(GDI) slot %d", 15 - i);
+    }
+    return i;
+}
+
 static int fails = 0;
 static int checked = 0;
+static int dropseen = 0;   /* leg (g): which drop rows were measured */
 
 static void page(DOPT_State *st, const DB_Pack *p, int pg, const char *name, int bx,
                  int by, int bw, int bh)
@@ -138,6 +159,15 @@ static void page(DOPT_State *st, const DB_Pack *p, int pg, const char *name, int
                is what stops this swallowing a page that has stopped answering. */
             if (pg == DOPT_PAGE_ADVANCED && i < DOPT_VE_COUNT
                 && (i < st->advTop || i >= st->advTop + DOPT_A_VIEW_ROWS))
+                continue;
+            /* And the Restate box's second button, which is not there without a movie:
+               the lone OK form has one rectangle by design, and the total leg counts it
+               as one. */
+            if ((pg == DOPT_PAGE_RESTATE || pg == DOPT_PAGE_NOTICE) && i == DOPT_R_RIGHT
+                && !st->rvideo)
+                continue;
+            /* And the slot dialog's field, which exists only in SAVE mode. */
+            if (pg == DOPT_PAGE_SLOTS && i == DOPT_SL_EDIT && st->sl.mode != DOPT_SL_SAVE)
                 continue;
             printf("  FAIL no rectangle: item %d (%s)\n", i, dopt_item_label(st, i));
             fails++;
@@ -187,6 +217,39 @@ static void page(DOPT_State *st, const DB_Pack *p, int pg, const char *name, int
                        "%d..%d\n",
                        dopt_item_label(st, i), tx, tx + sw - 1, bx + 1, bx + bw - 2);
                 fails++;
+            }
+        }
+
+        /* (g) A DROP ROW'S VALUE BOX: clear of the row's own printed label by the 2 that
+           legs (d)/(e) demand between any two controls, wide enough for its widest entry
+           plus the arrow, and inside its row. Legs (a)-(e) never saw this: the box is
+           not an item, and the label is printed to the RIGHT of an h=7 row, which leg
+           (b) names as exempt. Measured: RESOLUTION, UI SCALING and
+           PERSPECTIVE ran 6, 4 and 12 columns under one right-aligned box while every
+           leg above was green. */
+        if (pg == DOPT_PAGE_ADVANCED) {
+            int dx, dy, dw, dh, need, labend;
+            if (dopt_texset_box_rect_pub(st, i, &dx, &dy, &dw, &dh)) {
+                dropseen |= 1 << i;
+                labend = DOPT_A_LABEL_X
+                       + db_string_width(fnt, dopt_item_label(st, i), DB_FONT6_XSPACING);
+                need = dopt_drop_need_pub(st, p, i);
+                if (labend + OPT_MIN_SEP > dx) {
+                    printf("  FAIL label under the drop box: %-16s label ends %d, box starts "
+                           "%d (want >= %d)\n", dopt_item_label(st, i), labend - 1, dx,
+                           labend + OPT_MIN_SEP);
+                    fails++;
+                }
+                if (dw < need) {
+                    printf("  FAIL drop box too narrow: %-16s box %d wide, widest entry + "
+                           "arrow needs %d\n", dopt_item_label(st, i), dw, need);
+                    fails++;
+                }
+                if (dx < x || dx + dw > x + w) {
+                    printf("  FAIL drop box outside its row: %-16s box x=%d..%d row %d..%d\n",
+                           dopt_item_label(st, i), dx, dx + dw - 1, x, x + w - 1);
+                    fails++;
+                }
             }
         }
 
@@ -273,6 +336,124 @@ int main(int argc, char **argv)
     page(&st, p, DOPT_PAGE_GAMEPLAY, "GAMEPLAY", DOPT_V_X, DOPT_V_Y, DOPT_V_W,
          DOPT_V_H);
 
+    /* THE RESTATE BOX, sized from a briefing of the longest shape the discs carry (the
+     * widest one is 280 characters; this is longer, so the box measured here is at
+     * least as big as any real one) and measured in both of its forms. The box's own
+     * rectangle comes out of the layout the way the confirmation's does, so the leg
+     * that checks it fits the plate is the one that matters: a briefing that wrapped
+     * to too many lines would walk the box off the bottom. */
+    {
+        static const char* const LONG =
+            "Nod is experimenting on civilians using Tiberium. Use the Commando to take "
+            "out the SAM sites surrounding the dropoff area. With the SAMs gone you will "
+            "then be given an airstrike. Take out the Obelisk and an MCV will be delivered "
+            "to help you to locate and destroy the BioResearch Facility. Nod forces are "
+            "scattered throughout the area so it is only a matter of time before you are "
+            "detected, and the longest shipped briefing is two hundred and eighty long.";
+        dopt_set_briefing(&st, LONG, 1);
+        dopt_layout(&st, p);
+        if (st.brlines < 6 || st.brlines > DOPT_R_MAX_LINES) {
+            printf("  FAIL the Restate wrap produced %d lines for a %d character briefing "
+                   "at %d px; a wrap that stopped working would draw one line off the "
+                   "plate\n", st.brlines, (int)strlen(LONG), DOPT_R_WRAP_W);
+            fails++;
+        }
+        {
+            int li, x0 = st.rx + DOPT_CF_TEXT_X;
+            for (li = 0; li < st.brlines; li++) {
+                const int lw = db_string_width(p ? db_font(p, "GRAD6FNT") : NULL,
+                                               st.brwrap + st.brline[li], DB_FONT6_XSPACING);
+                if (lw >= DOPT_R_WRAP_W) {
+                    printf("  FAIL Restate line %d is %d px wide, past the %d px wrap: [%s]\n",
+                           li, lw, DOPT_R_WRAP_W, st.brwrap + st.brline[li]);
+                    fails++;
+                }
+                if (x0 + lw > st.rx + st.rw - 2) {
+                    printf("  FAIL Restate line %d runs out of its box: text to %d, box "
+                           "inner edge %d\n", li, x0 + lw - 1, st.rx + st.rw - 2);
+                    fails++;
+                }
+            }
+        }
+        page(&st, p, DOPT_PAGE_RESTATE, "RESTATE-VIDEO", st.rx, st.ry, st.rw, st.rh);
+        dopt_set_briefing(&st, LONG, 0);
+        dopt_layout(&st, p);
+        page(&st, p, DOPT_PAGE_RESTATE, "RESTATE-OK", st.rx, st.ry, st.rw, st.rh);
+    }
+
+    /* THE NOTICE BOX, the Restate geometry lent to a refused mission start. Opened the
+     * way the shell opens it, with a caption and the longest sentence the boot path can
+     * produce (a loader's own error text runs long: this one is the shape of a missing
+     * engine library on Windows), and measured as the single-OK form. The leg that
+     * matters is the same as Restate's: the wrapped text and the lone button inside the
+     * box, and the box on the plate. */
+    {
+        static const char* const NOTICE =
+            "The engine library C:\\Users\\Player\\Desktop\\CNC3D-windows-v0.7.1\\"
+            "TiberianDawn.dll could not be loaded: LoadLibrary(TiberianDawn.dll) failed, "
+            "GetLastError=126 (ERROR_MOD_NOT_FOUND: the file itself, or a DLL it depends "
+            "on, is not where the loader looked)";
+        dopt_open_notice(&st, p, "Unable to start mission", NOTICE);
+        if (st.page != DOPT_PAGE_NOTICE || st.brlines < 3 || st.rw <= 0) {
+            printf("  FAIL dopt_open_notice opened page %d with %d lines in a %d wide box; "
+                   "want the notice page, several lines and a measured box\n",
+                   st.page, st.brlines, st.rw);
+            fails++;
+        }
+        page(&st, p, DOPT_PAGE_NOTICE, "NOTICE", st.rx, st.ry, st.rw, st.rh);
+        /* OK, Enter and Escape all close it and nothing else does: the one answer. */
+        if (dopt_key(&st, DOPT_KEY_ESC) != DOPT_ACT_RESUME) {
+            printf("  FAIL Escape on the notice did not answer DOPT_ACT_RESUME\n");
+            fails++;
+        }
+    }
+
+    /* THE SLOT DIALOG, in LOAD and in SAVE mode, with the row supplier answering a full
+     * sixteen so the well is fuller than it can show. The list and the field print no
+     * centred label and are taller than any button, so leg (b) measures their names
+     * against their own width, which they pass by a mile; what this is here for is legs
+     * (a), (d) and (e): every rectangle inside the 250x156 box, and no two of them
+     * touching. loaddlg.cpp's numbers are derived in dosopt.h and this is where they are
+     * read back. */
+    {
+        int li;
+        dopt_bind_slots(&st, layout_slots);
+        dopt_open_slots(&st, p, DOPT_SL_LOAD);
+        if (st.sl.nrows != 16) {
+            printf("  FAIL the LOAD dialog lists %d rows from a supplier that gave 16\n",
+                   st.sl.nrows);
+            fails++;
+        }
+        page(&st, p, DOPT_PAGE_SLOTS, "SLOTS-LOAD", DOPT_SL_X, DOPT_SL_Y, DOPT_SL_W,
+             DOPT_SL_H);
+        dopt_open_slots(&st, p, DOPT_SL_SAVE);
+        /* SAVE puts the empty slot first, and with sixteen taken there is none: the
+           rows are the sixteen, and the field opens on the row's own description. */
+        if (st.sl.nrows != 16 || strcmp(dopt_slot_row_text(&st, 0), "(GDI) slot 15") != 0) {
+            printf("  FAIL the SAVE dialog's first row is [%s] of %d; with sixteen slots "
+                   "taken there is no empty row and the newest comes first\n",
+                   dopt_slot_row_text(&st, 0) ? dopt_slot_row_text(&st, 0) : "(none)",
+                   st.sl.nrows);
+            fails++;
+        }
+        if (strcmp(dopt_slot_descr(&st), "slot 15") != 0) {
+            printf("  FAIL the SAVE field opened on [%s], want the first row's own "
+                   "description with the (GDI) stripped\n", dopt_slot_descr(&st));
+            fails++;
+        }
+        /* the rows the well shows must end above the field's label */
+        for (li = 0; li < DOPT_SL_LIST_H_SAVE / DOPT_SL_ROW_H; li++) {
+            const int ry = DOPT_SL_LIST_Y + 1 + li * DOPT_SL_ROW_H;
+            if (ry + DOPT_SL_ROW_H > DOPT_SL_LABEL_Y) {
+                printf("  FAIL SAVE row %d ends at %d, through the label at %d\n", li,
+                       ry + DOPT_SL_ROW_H - 1, DOPT_SL_LABEL_Y);
+                fails++;
+            }
+        }
+        page(&st, p, DOPT_PAGE_SLOTS, "SLOTS-SAVE", DOPT_SL_X, DOPT_SL_Y, DOPT_SL_W,
+             DOPT_SL_H);
+    }
+
     /* THE ADVANCED PAGE AGAIN, AT THE BOTTOM OF TRAVEL.
      *
      * Every leg above measures the page as it opens, which is the one scroll offset
@@ -311,8 +492,21 @@ int main(int argc, char **argv)
         checked = before;
     }
 
+    /* Leg (g) is only worth having if it measured every drop row on one of the two
+       passes (the top of travel shows the display rows, the bottom the art rows). */
+    {
+        const int want = (1 << DOPT_VE_RESOLUTION) | (1 << DOPT_VE_UISCALE)
+                       | (1 << DOPT_VE_PERSPECTIVE) | (1 << DOPT_VE_TEXSET)
+                       | (1 << DOPT_VE_INFSET);
+        if (dropseen != want) {
+            printf("  FAIL not every drop row was measured by leg (g): mask %#x, want %#x\n",
+                   dropseen, want);
+            fails++;
+        }
+    }
+
     if (checked != OPTLAYOUT_EXPECT) {
-        printf("  FAIL checked %d rectangles, the five pages declare %d\n", checked,
+        printf("  FAIL checked %d rectangles, the pages declare %d\n", checked,
                (int)OPTLAYOUT_EXPECT);
         fails++;
     }

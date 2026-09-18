@@ -175,8 +175,13 @@ jobs:
             # adding a genuine system DLL to it does not soften what the check is for:
             # the case it exists to catch, a link quietly pulling in something that has
             # to be shipped like libwinpthread-1.dll, is refused exactly as before.
+            #
+            # WININET.dll joins the list on the same terms. It is a Windows system DLL, in
+            # System32 on every Windows since 98, and it is what the internet game list is
+            # fetched and published through: using the one the OS already trusts is why
+            # there is no second SSL stack to ship and nothing for a player to install.
             extra=$(x86_64-w64-mingw32-objdump -p $exe | grep "DLL Name" \
-                    | grep -viE "api-ms-win-crt|msvcrt|KERNEL32|USER32|SHELL32|OPENGL32|WINMM|OLEAUT32|ADVAPI32|GDI32|WS2_32|SDL2" || true)
+                    | grep -viE "api-ms-win-crt|msvcrt|KERNEL32|USER32|SHELL32|OPENGL32|WINMM|OLEAUT32|ADVAPI32|GDI32|WS2_32|WININET|SDL2" || true)
             [ -z "$extra" ] || { echo "$exe needs a DLL that Windows 11 does not ship:"; echo "$extra"; exit 1; }
           done
           echo "PE32 i686, brain exports present, SDL2.dll is the only extra dependency"

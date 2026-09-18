@@ -1,0 +1,13 @@
+# RESTATE. The pause dialog's Restate button raises the Mission Objective box with the
+# briefing text, the way scenario.cpp:780 Restate_Mission does. Two missions, because the
+# text comes from two places: SCG02EA carries no [Briefing] and reads MISSION.INI out of
+# GENERAL.MIX; SCG22EA carries its own block. The RESTATE|line rows are what the box
+# draws, and the gate compares them, joined, against the mission file itself. The
+# standalone renderer has no movie player, so the box here is the single-OK form.
+tick 20
+options
+optclick Restate
+shot shots/rs/restate.png
+optclick OK
+optclick Resume Mission
+quit

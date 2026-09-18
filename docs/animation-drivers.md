@@ -8,6 +8,13 @@ Mappings used (given, not re-derived):
 Every claim below is tagged **DECODED** (I disassembled it and quote the
 instructions), **INFERRED** (consistent reading, not proven), or **NOT FOUND**.
 
+**Where the numbers live now.** The per-type rates this document derives are held once,
+in `tools/art/anim_rates.py`, and read from there by the FBX exporter and by the model
+gallery, so a rate cannot be right in one and wrong in the other. That file is a
+transcription of `structure_anim_frame` in `game/cnc_eyes.cpp`, which is the renderer's
+own reading of the arms below; if an arm here changes, it changes in three places and
+`tools/model-gallery/verify.py` is what notices when they stop agreeing.
+
 ---
 
 ## 0. Executive answer

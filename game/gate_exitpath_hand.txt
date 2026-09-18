@@ -1,0 +1,32 @@
+# G249, legs B and F. THE HAND OF NOD on SCB70EA, rally NORTH at 15,44, and the helipad.
+#
+# The helipad first. It is a factory too, and the craft it builds never leave it, so a
+# rally on it would be stored, drawn and honoured by nothing. It is refused at the door:
+# accepted=0, and the dump that follows names no helipad. SCB70EA has two Nod helipads;
+# the spec is house-scoped so the first NOD one answers, not GDI's.
+#
+# The Hand stands at 14,47: occupied 14,48 15,48 15,49, overlap 14,47 15,47 14,49, the
+# door point in 15,49 and the exit cell at 16,50, one row down and one to the right.
+# A soldier that honours the rally from the door point walks 15,49 then 16,49 and
+# north from there, through the building's right-hand side, and never enters 16,50.
+# The soldier that leaves through the door walks 15,49 then 15,50 then 16,50, salutes,
+# and turns north from the front of the building.
+#
+# The control is this script with the rally line taken out: 15,49 15,50 16,50 and stop.
+tick 30
+cam 15 48
+zoom max
+rally HPAD:BadGuy 0 20 50
+tick 2
+rallydump
+rally HAND 0 15 44
+tick 2
+rallydump
+count E1:BadGuy
+build E1
+watch E1:BadGuy 17 140
+shot shots/exitpath_b_door.png
+watch E1:BadGuy 17 360
+count E1:BadGuy
+obj E1:BadGuy 17
+quit

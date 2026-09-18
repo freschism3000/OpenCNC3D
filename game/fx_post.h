@@ -60,6 +60,7 @@
 #include "fx_gl.h"
 #include "fx_state.h"
 #include "fx_cloud.h"
+#include "rain_glsl.h"   /* the drop-impact ripple, shared with the water surface */
 
 /* ---- What the host hands us ------------------------------------------------------ */
 
@@ -80,6 +81,30 @@ static int     g_fxNLight = 0;
    frame, into a depth-only target, with colour writes already off. */
 typedef void (*FxCasterFn)(void);
 static FxCasterFn g_fxCasters = 0;
+/* The host's ground-normal draw (fx_draw_terrain_normals), rendered by fx_world_end
+   into g_fxGNorm and read by the light pass for ground pixels. */
+static FxCasterFn g_fxGroundNormals = 0;
+static FxRT g_fxGNorm;
+static float g_fxSunR = 1.0f;           /* the sun box's half-width, in cells */
+/* THE SUN BOX AS NUMBERS, not just as a matrix. fx_sun_matrix already builds an eye, an
+   orthonormal basis and a near/far pair on its way to the matrix; keeping them means the
+   HOST can ask whether a given caster is inside the box before it submits one, which is
+   the only cull a shadow pass may use. The camera's own frustum is the wrong question
+   here: a wood standing behind the player still casts into the frame in front of them. */
+static float g_fxSunEye[3] = { 0.0f, 0.0f, 0.0f };
+static float g_fxSunS[3]   = { 1.0f, 0.0f, 0.0f };
+static float g_fxSunU[3]   = { 0.0f, 1.0f, 0.0f };
+static float g_fxSunNear = 0.0f, g_fxSunFar = 0.0f;
+
+/* WHICH PASS IS ASKING FOR THE CASTERS. g_fxCasters is called from two places with two
+   entirely different matrices loaded -- the sun's orthographic box, and the camera's own
+   projection with the modelview mirrored about the sea -- and until the host is told
+   which, it cannot cull either one. Set immediately before the call and left alone
+   otherwise; the sun is the default because it is the one that existed first. */
+#define FXCAST_SUN     0
+#define FXCAST_REFLECT 1
+static int   g_fxCasterPass   = FXCAST_SUN;
+static float g_fxCasterPlaneY = 0.0f;    /* the sea's plane, for FXCAST_REFLECT */
 
 /* The ground rectangle the camera can currently see, in cells, set by the host from
    its own view_ground_bounds. The sun's box is fitted to this, which is what keeps the
@@ -173,6 +198,11 @@ static const char* FX_FS_LIGHT =
     "uniform int   uShadowOn;\n"
     "uniform float uSStrength, uSSoft, uSBias, uSTexel;\n"
     "uniform vec3  uSTint;\n"
+    "uniform sampler2D uGNorm;\n"
+    "uniform float uAoFoliage;\n"
+    "uniform int   uGNormOn;\n"
+    "uniform float uSNormOff, uSPen, uAoGround, uSunFloor;\n"
+    "uniform int   uSunLambert;\n"
     "uniform sampler2D uCloudTex;\n"
     "uniform int   uCloudOn;\n"
     "uniform float uCStrength, uCEdge, uCWidth, uCInvScale, uCDrift, uCHeight;\n"
@@ -182,7 +212,20 @@ static const char* FX_FS_LIGHT =
     "uniform int   uNLights;\n"
     "uniform vec4  uLightPos[24];\n"
     "uniform vec4  uLightCol[24];\n"
-    "uniform float uLightFalloff;\n";
+    "uniform float uLightFalloff;\n"
+    /* THE RAIN (rain_mod.h sets these; all zero when it is off, so every rain branch
+       below is a uniform branch that costs nothing). uRainWater is the sea's own field,
+       its alpha 1 over water: the surface draws its own rain and must not be wetted
+       again as if it were ground. */
+    "uniform float uRainWet, uRainDark, uRainGloss, uRainSpec, uRainRipple;\n"
+    "uniform float uRainRippleScale, uRainRippleRate, uRainPuddle, uRainHaze, uRainHazeNear, uRainOvercast, uRainTime;\n"
+    "uniform vec3  uRainSky;\n"
+    "uniform sampler2D uRainWater; uniform int uRainWaterOn; uniform vec2 uRainWaterScale;\n"
+    "uniform float uRainRippleDensity, uRainRippleShade, uRainSheen, uRainPuddleInv;\n"
+    "uniform float uRainRelief, uRainReliefBody, uRainPuddleMirror;\n"
+    "uniform float uRainPuddleEdge, uRainPuddleFlat, uRainPuddleSSR;\n"
+    "uniform float uRainFog, uRainFogHeight, uRainFogBase, uRainFogInvScale, uRainFogDetail, uRainFogDrift1, uRainFogDrift2;\n"
+    "uniform vec2  uRainFogDir;\n";
 
 static const char* FX_FS_LIGHT_BODY =
     "\n"
@@ -201,31 +244,156 @@ static const char* FX_FS_LIGHT_BODY =
        d is clamped for the reconstruction so a sky fragment cannot divide by a zero w
        and hand its neighbours a NaN, which would be the same bug wearing a hat. */
     "    vec3 P = fx_world(uv, min(d, 0.999989));\n"
-    "    vec3 n = normalize(cross(dFdx(P), dFdy(P)));\n"
+    "    vec3 dPx = dFdx(P), dPy = dFdy(P);\n"
+    "    vec3 n = normalize(cross(dPx, dPy));\n"
     "    if (dot(n, uCamPos - P) < 0.0) n = -n;\n"
+    /* ---- SURFACE RELIEF FOR EVERYTHING, AND WHERE IT COMES FROM -------------------
+       Nothing in this game carries a normal map. The terrain writes one normal per
+       cell corner off the heightfield, a mesh vertex carries a position, a texture
+       coordinate and a baked colour and nothing else, and a sprite is a flat card.
+       So a per-texel normal has to be DERIVED, and the only per-texel surface signal
+       every one of those has in common is the art itself: the tile, the hull texture
+       and the sprite were all painted with their own relief already shaded into them.
+
+       This reads that painting back. The scene's luminance is treated as a height
+       field and its gradient across the surface tilts the normal, which is the
+       oldest bump-map trick there is. It is a derivation and not a measurement, and
+       it is honest about what it can be wrong about: a painted stripe with no relief
+       under it tilts the normal as a real groove would. At the strength a wet sheen
+       wants, that reads as surface texture rather than as error, and the dial goes
+       to zero.
+
+       The screen-space gradient becomes a surface gradient through the same two
+       derivatives that built the normal: dPx and dPy span the tangent plane, so
+       dividing each by its own squared length turns "per pixel across" into "per
+       cell across". Clamped, because at a silhouette the two taps straddle a depth
+       cliff and the luminance step there is a cliff too. */
+    "    float relL = dot(col, vec3(0.299, 0.587, 0.114));\n"
+    "    float relX = dFdx(relL), relY = dFdy(relL);\n"
+    "    float lx2 = max(dot(dPx, dPx), 1e-6), ly2 = max(dot(dPy, dPy), 1e-6);\n"
+    "    vec3  relG = dPx * (relX / lx2) + dPy * (relY / ly2);\n"
+    "    relG -= n * dot(n, relG);\n"
+    "    float relLen = length(relG);\n"
+    "    if (relLen > 6.0) relG *= 6.0 / relLen;\n"
+    /* THE SURFACE'S OWN NORMAL, when the host drew one, and the alpha says WHOSE.
+       This channel used to answer one question, "is this ground", and it now answers
+       two, because they turned out to be different questions:
+
+         0.00  nothing drew here. Units, walls and water keep the flat reconstruction.
+         0.50  FOLIAGE. Use this normal, but it is not ground.
+         1.00  ground. Use this normal AND the ground's own one-sun slope term below.
+
+       The split exists because a canopy needs the first without the second. The
+       reconstruction above is cross(dFdx(P), dFdy(P)), which is right on a hull because
+       a hull is a few large connected faces, and noise on a tree because a canopy is
+       hundreds of independently angled alpha-cut cards: it gave every card its own plane
+       and fired the sun's terminator per card at random. Marking foliage as ground
+       instead would have fixed the normal and then lit the tree twice, once by its own
+       shader and once by the ground's lambert. */
+    "    vec4 gn = texture2D(uGNorm, uv);\n"
+    "    float haveN  = (uGNormOn == 1 && gn.a > 0.25) ? 1.0 : 0.0;\n"
+    "    float ground = (uGNormOn == 1 && gn.a > 0.75) ? 1.0 : 0.0;\n"
+    "    float foliage = haveN * (1.0 - ground);\n"
+    "    if (haveN > 0.5) { vec3 g = gn.xyz * 2.0 - 1.0; if (dot(g, g) > 0.01) n = normalize(g); }\n"
+    /* THE RAIN'S TWO MASKS, read here for the same derivative reason as P and n: the
+       puddle mask is the cloud deck's own tiling noise at a finer scale (it is
+       histogram equalised, so a threshold on it is a coverage), and the water bit is
+       the sea's shore field. Both are sampled by every fragment, and only the rain
+       block below decides whether they mean anything. */
+    /* THE PUDDLE'S OUTLINE, two octaves of the deck's own tiling noise. One octave is
+       a blob and a blob is what a stain looks like; the second breaks the outline into
+       the thin, branching shape water makes when it lies in the dips of a surface. */
+    "    float rainPm = rn_puddle_mask(texture2D(uCloudTex, rn_puddle_uv1(P.xz, uRainPuddleInv)).r,\n"
+    "                                  texture2D(uCloudTex, rn_puddle_uv2(P.xz, uRainPuddleInv)).r);\n"
+    "    float rainWater = texture2D(uRainWater, P.xz * uRainWaterScale).a * float(uRainWaterOn);\n"
     "\n"
     /* The far plane is the sky and the shroud's black: nothing there has a surface. */
     "    if (d >= 0.99999) { gl_FragColor = vec4(col, 1.0); return; }\n"
     "\n"
+    /* ---- the rain, part one: a wet surface is darker, and its top rings ------------
+       Before the sun, so a cast shadow on wet ground is a shadow on the darker colour.
+       The darkening is a power curve, which is what wetting does to a diffuse surface
+       (the water film traps light, so dark pigment gets darker and saturation rises),
+       plus a plain dimming. Flat ground (ground class, normal near vertical) gathers
+       puddles where the noise is above the coverage; a puddle is darker still and is
+       mirrored below. Drops landing on anything that faces up bend its normal with
+       the impact rings, into nw; the shadow lookup keeps the smooth n. The sea keeps
+       none of this: its own shader rains on it. */
+    "    float wet = uRainWet * (1.0 - rainWater);\n"
+    "    float rainLum = smoothstep(0.015, 0.150, max(col.r, max(col.g, col.b)));\n"
+    "    float pud = 0.0;\n"
+    "    vec3 nw = n;\n"
+    /* THE RELIEF GOES ON THE WET NORMAL ONLY, never on the one the sun and the
+       shadow map use: the ground's own lambert and the shadow lookup are geometry
+       questions and this is a surface-detail answer. Ground and foliage get one
+       strength, everything the target does not claim -- hulls, walls, sprites -- gets
+       its own, because a rolled steel plate is smoother than a field. */
+    "    if (uRainWet > 0.0) {\n"
+    "        float rel = mix(uRainReliefBody, uRainRelief, haveN);\n"
+    "        nw = normalize(n - relG * rel);\n"
+    "    }\n"
+    "    if (uRainWet > 0.0) {\n"
+    "        float up = clamp(n.y, 0.0, 1.0);\n"
+    /* WATER LIES WHERE THE GROUND IS FLAT, and on a desert map the whole board is
+       flat, which is how a tenth of the noise field became a rash of grey patches
+       across every dune. The flatness test is a dial now and it is asked of the
+       GEOMETRY normal, never of the relief-bent one, or the derived detail would
+       carve puddles out of the art's own grain. */
+    "        pud = rn_puddle_cover(rainPm, uRainPuddle, uRainPuddleEdge)\n"
+    "              * ground * smoothstep(uRainPuddleFlat, uRainPuddleFlat + 0.02, n.y) * wet;\n"
+    "        vec3 wetc = pow(col, vec3(1.0 + 0.5 * uRainDark)) * (1.0 - 0.30 * uRainDark);\n"
+    "        col = mix(col, wetc, wet * (0.55 + 0.45 * up));\n"
+    "        col = mix(col, col * 0.55, pud);\n"
+    "        if (uRainRipple > 0.0 && up > 0.3) {\n"
+    /* A RING IS SHARPEST ON STANDING WATER and is a faint dimple on wet ground, which
+       is what the eye expects: the rings a downpour draws are the ones in the puddles. */
+    "            vec2 g = rn_ripple(P.xz, uRainTime, uRainRippleScale, uRainRippleRate, uRainRippleDensity);\n"
+    "            nw = normalize(nw + vec3(g.x, 0.0, g.y) * (uRainRipple * 0.06 * up * wet * (1.0 + 24.0 * pud)));\n"
+    /* A RING HAS TO SHADE OR IT IS NOT THERE. From this rig the sun sits too low
+       and the eye too high for a wet ring's glint to fire on level ground, and the
+       sheen barely moves with a tilt, so the rings were computed and never seen.
+       This is the ring's own diffuse shading: the ratio of the bent normal's
+       lambert to the flat one's, so the side of a ring turned to the sun is
+       lighter and the far side darker, the way a bump map reads at any exposure.
+       Bounded, and scaled by the wetness, so a dry surface keeps its own light. */
+    "            float lf = max(dot(n,  -uSunDir), 0.08);\n"
+    "            float lb = max(dot(nw, -uSunDir), 0.0);\n"
+    "            float rs = 0.45 * uRainRippleShade;\n"
+    "            col *= mix(1.0, clamp(lb / lf, 1.0 - rs, 1.0 + rs), wet);\n"
+    "        }\n"
+    "    }\n"
+    "\n"
     /* ---- the sun ---- */
     "    float sh = 0.0;\n"
     "    if (uShadowOn == 1) {\n"
-    "        vec4 sc = uSunVP * vec4(P, 1.0);\n"
+    /* NORMAL OFFSET: the receiver is looked up a little way out along its normal, so a
+       surface never tests against the shadow texel it is itself standing in. */
+    "        vec4 sc = uSunVP * vec4(P + n * uSNormOff, 1.0);\n"
     "        vec3 s  = (sc.xyz / sc.w) * 0.5 + 0.5;\n"
     "        if (s.x > 0.001 && s.x < 0.999 && s.y > 0.001 && s.y < 0.999 && s.z < 1.0) {\n"
     "            float ndl  = dot(n, -uSunDir);\n"
     /* Slope-scaled bias: a face nearly edge-on to the sun spans many depth units
        across one shadow texel and needs more room than a face square to it. */
     "            float bias = uSBias * (1.0 + 3.0 * (1.0 - clamp(ndl, 0.0, 1.0)));\n"
+    /* THE PENUMBRA: twelve Poisson taps on a disc whose radius is the larger of the
+       texel softness and the penumbra dial converted from world cells, turned per pixel
+       by the same deterministic hash the occlusion uses (never a clock: two --shot runs
+       must agree byte for byte). The 3x3 grid it replaces reached 0.01 of a cell at
+       4096 texels and drew every cliff's shadow as a polygon. */
+    "            float rad = max(uSSoft, uSPen) * uSTexel;\n"
+    "            float ang = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898,78.233))) * 43758.5453) * 6.2831853;\n"
+    "            float ca = cos(ang), sa = sin(ang);\n"
+    "            vec2 pd[12];\n"
+    "            pd[0]=vec2(-0.326,-0.406); pd[1]=vec2(-0.840,-0.074); pd[2]=vec2(-0.696, 0.457); pd[3]=vec2(-0.203, 0.621);\n"
+    "            pd[4]=vec2( 0.962,-0.195); pd[5]=vec2( 0.473,-0.480); pd[6]=vec2( 0.519, 0.767); pd[7]=vec2( 0.185,-0.893);\n"
+    "            pd[8]=vec2( 0.507, 0.064); pd[9]=vec2( 0.896, 0.412); pd[10]=vec2(-0.322,-0.933); pd[11]=vec2(-0.792,-0.598);\n"
     "            float sum  = 0.0;\n"
-    "            for (int j = -1; j <= 1; j++) {\n"
-    "                for (int i = -1; i <= 1; i++) {\n"
-    "                    vec2 o = vec2(float(i), float(j)) * uSSoft * uSTexel;\n"
-    "                    float dz = texture2D(uShadow, s.xy + o).r;\n"
-    "                    sum += (s.z - bias > dz) ? 1.0 : 0.0;\n"
-    "                }\n"
+    "            for (int i = 0; i < 12; i++) {\n"
+    "                vec2 o = vec2(pd[i].x * ca - pd[i].y * sa, pd[i].x * sa + pd[i].y * ca) * rad;\n"
+    "                float dz = texture2D(uShadow, s.xy + o).r;\n"
+    "                sum += (s.z - bias > dz) ? 1.0 : 0.0;\n"
     "            }\n"
-    "            sh = sum / 9.0;\n"
+    "            sh = sum / 12.0;\n"
     /* A surface turned away from the sun is unlit whether or not anything stands
        between them. Without this the dark side of a building is as bright as the lit
        one and only the cast shadow reads, which looks like a decal rather than light. */
@@ -277,6 +445,22 @@ static const char* FX_FS_LIGHT_BODY =
        take away, and taking it twice is what makes stacked shadow terms read as dirt.
        One tint for both, for the same reason: they are the same sun. */
     "    col *= mix(vec3(1.0), uSTint, max(sh * uSStrength, cl * uCStrength));\n"
+    /* ONE SUN: the ground's slope shading, once, per pixel, from the smooth normal, and
+       normalised to level ground so a flat field keeps exactly the brightness it had
+       (the host drew it at the flat baked shade). Capped at 1.35 so a slope turned
+       into the sun brightens a little and never blows out; the far side falls to the
+       sun_floor dial, and the shadow tint does the rest.
+
+       THAT FLOOR WAS 0.25 AND READ AS BLACK. A slope facing away is shaded twice for one
+       geometric fact -- the shadow pass tints it as well, with nothing casting -- and the
+       product landed near a tenth of level brightness before occlusion and the grade's
+       black point finished it off. Nothing else in the chain has an ambient floor, so
+       this literal was the whole of it, and it is a dial now. */
+    "    if (uSunLambert == 1 && ground > 0.5) {\n"
+    "        float flatL = max(-uSunDir.y, 0.05);\n"
+    "        float lam = clamp(dot(n, -uSunDir), 0.0, 1.0) / flatL;\n"
+    "        col *= clamp(lam, uSunFloor, 1.35);\n"
+    "    }\n"
     "\n"
     /* ---- occlusion ---- */
     "    float ao = 1.0;\n"
@@ -302,22 +486,147 @@ static const char* FX_FS_LIGHT_BODY =
     "            vec2 st  = (cp.xy / cp.w) * 0.5 + 0.5;\n"
     "            if (st.x < 0.0 || st.x > 1.0 || st.y < 0.0 || st.y > 1.0) continue;\n"
     "            float sd = texture2D(uDepth, st).r;\n"
-    "            float sz = (cp.z / cp.w) * 0.5 + 0.5;\n"
     "            cnt += 1.0;\n"
-    "            if (sd < sz - uAoBias) {\n"
+    /* THE OCCLUSION TEST IS IN WORLD CELLS, AND IT USED TO BE IN WINDOW DEPTH. That is
+       the whole of why this pass did nothing. Window depth is what the depth buffer
+       stores and it is not linear in distance: perspective crushes the far half of the
+       scene into the last sliver of the range, so one fixed epsilon there is a hair's
+       breadth near the eye and an enormous gap further out. Compared that way the shipped
+       bias of 0.02 was larger than any depth difference this camera produces, and nothing
+       ever counted as occluding anything.
+
+       MEASURED BEFORE THE CHANGE, on a 1280x800 frame with a base in shot: toggling the
+       feature at the shipped dials moved ZERO pixels. It only began to move the picture
+       at all at a bias of 0.001, the very bottom of the slider, and the ladder in between
+       was 9,051 pixels at 0.001, 4,567 at 0.002, 741 at 0.005, 36 at 0.010 and nothing
+       from 0.020 up. A dial whose only useful setting is its own minimum is a dial that
+       does not work.
+
+       Both points are now reconstructed to world space and compared as distances from the
+       eye, so the bias is a length in CELLS and means the same thing everywhere in the
+       frame. The cost is one reconstruction per SAMPLE rather than one per hit: a matrix
+       multiply and a divide, inside a loop that already fetches a texture each time
+       round. */
+    "            vec3 sw = fx_world(st, sd);\n"
+    "            if (length(sw - uCamPos) < length(sp - uCamPos) - uAoBias) {\n"
     /* The range check stops a distant wall behind a unit from occluding it: only a
        surface within the sample radius counts as contact. */
-    "                vec3 sw = fx_world(st, sd);\n"
     "                float dist = length(sw - P);\n"
     "                occ += clamp(uAoRadius / max(dist, 1e-4), 0.0, 1.0);\n"
     "            }\n"
     "        }\n"
     "        if (cnt > 0.0) {\n"
-    "            float f = pow(clamp(occ / cnt, 0.0, 1.0), uAoPower) * uAoIntensity;\n"
+    "            float f = pow(clamp(occ / cnt, 0.0, 1.0), uAoPower) * uAoIntensity\n"
+    "                      * mix(mix(1.0, uAoFoliage, foliage), uAoGround, ground);\n"
     "            ao = clamp(1.0 - f, 0.0, 1.0);\n"
     "        }\n"
     "    }\n"
     "    col *= ao;\n"
+    "\n"
+    /* ---- the rain, part two: what shines off a wet surface --------------------------
+       A Fresnel sheen of the overcast sky at grazing angles, a Blinn glint of the sun
+       where the sun reaches (the shadow and cloud terms already computed), and the
+       puddles mirroring the sky. A camera-facing card is a sprite, not a surface: its
+       reconstructed normal looks straight at the eye, which would glint everywhere, so
+       the mirror terms fade out on it and it keeps the darkening alone. Every additive
+       term is gated on the scene's own luminance the way the cloud term is, so nothing
+       shines under the shroud's black. */
+    "    if (uRainWet > 0.0) {\n"
+    "        vec3 V = normalize(uCamPos - P);\n"
+    "        float ndv = max(dot(nw, V), 0.0);\n"
+    "        float fres = pow(1.0 - ndv, 4.0);\n"
+    "        float bill = 1.0 - smoothstep(0.985, 0.999, max(dot(n, V), 0.0));\n"
+    "        vec3 H = normalize(V - uSunDir);\n"
+    "        float sunlit = 1.0 - max(sh * uSStrength, cl * uCStrength);\n"
+    "        float glint = pow(max(dot(nw, H), 0.0), uRainGloss) * uRainSpec * wet * sunlit\n"
+    "                      * (0.5 + 0.5 * clamp(nw.y, 0.0, 1.0)) * (1.0 + 6.0 * pud) * bill;\n"
+    /* THE SHEEN IS THE WET LOOK. A film of water is a glossy layer over whatever is
+       under it: it mirrors the sky, more at a glancing angle (the Fresnel term) but
+       never nothing, because a wet surface's reflectance floor is well above a dry
+       one's, and games lift that floor further than physics does so the eye reads
+       it. The sky it mirrors is a hemisphere, brighter overhead, read along the
+       reflected view ray off the ring-bent normal, so a hull's roof and a road both
+       take a grey gloss and a wall takes it where it turns away from the eye. */
+    "        vec3 Rv = reflect(-V, nw);\n"
+    "        vec3 skyR = uRainSky * (0.75 + 0.35 * clamp(Rv.y, 0.0, 1.0));\n"
+    "        float fresW = 0.12 + 0.88 * pow(1.0 - ndv, 5.0);\n"
+    "        float sheen = wet * bill * uRainSheen * fresW;\n"
+    /* STANDING WATER IS A MIRROR, and the thing that makes one read is CONTRAST: a
+       bright sky held inside a dark wet outline, with the rings breaking it up. A
+       broad soft blend of a mid grey is a stain, which is what the first one was.
+       So the puddle takes the sky almost entirely, brightened where the ring-bent
+       normal turns it up, and the ground it sits in is already the darkest thing
+       around it. */
+    /* AND IT MUST STAY INSIDE THE PICTURE. At the sky's own value and a lift on top
+       the puddles came out blown to white and read as snow rather than water: the
+       sky this camera sees is already bright against ground the rain has just
+       darkened, so the mirror only has to be brighter than what surrounds it. */
+    /* WHAT MAKES A PUDDLE READ IS WHAT IS IN IT, and a flat fill has nothing in it.
+       The reflected ray is marched against the depth buffer this pass already has
+       bound, exactly as the occlusion marches its hemisphere: where it runs into
+       something, that pixel's colour is what the water shows; where it runs out into
+       nothing, the water shows the sky. From a camera looking down at this angle the
+       ray leaves almost vertically, so most of it finds sky and the rest finds the
+       tall things standing beside the water -- a tree, a cliff, a hull -- as dark
+       shapes against it. That contrast is the whole of the effect.
+
+       The step grows geometrically so twelve taps cover a useful distance without
+       crawling; the hit test wants the sample to be BEHIND the stored depth by more
+       than the bias and not by a mile, because a ray passing far in front of a distant
+       cliff has not hit it. Note the taps are inside a branch that is not uniform
+       across a quad: that is legal here for the same reason the occlusion's is, the
+       two targets carry no mipmaps at all, so the implicit derivative selects a level
+       that does not exist and level zero is sampled either way. */
+    /* A PUDDLE SEEN FROM ABOVE IS MOSTLY SKY, and that is geometry rather than a
+       shortcoming: the reflected ray leaves a level surface at the angle the view
+       arrived on, which from this rig is steeply upward, so it finds open air within
+       a cell or two and only rarely a tree or a cliff. A photograph taken standing on
+       a road shows a puddle full of trees because THAT ray runs nearly flat.
+
+       So what makes this one read as water is not the content of the reflection, it
+       is the RIPPLES breaking it. The sky is given a steep gradient between a bright
+       zenith and a dark horizon, and the ring-bent normal then swings the sample
+       across that gradient: a millimetre of tilt becomes a visible light or dark
+       band, which is exactly how still water announces that it is not a painted
+       patch. On damp ground the same term is a whisper, because the bend there is a
+       twenty-fourth of the one a puddle gets. */
+    "        float pupR = clamp(Rv.y, 0.0, 1.0);\n"
+    "        vec3 pudC = mix(uRainSky * 0.30, uRainSky * 1.25, pupR * pupR);\n"
+    "        if (uRainPuddleSSR > 0.0 && pud > 0.002) {\n"
+    "            float rt = 0.12, rstep = 0.12;\n"
+    "            for (int i = 0; i < 12; i++) {\n"
+    "                vec3 sp = P + Rv * rt;\n"
+    "                vec4 cp = uVP * vec4(sp, 1.0);\n"
+    "                if (cp.w <= 0.0) break;\n"
+    "                vec2 st = (cp.xy / cp.w) * 0.5 + 0.5;\n"
+    "                if (st.x < 0.0 || st.x > 1.0 || st.y < 0.0 || st.y > 1.0) break;\n"
+    "                float sd = texture2D(uDepth, st).r;\n"
+    "                float sz = (cp.z / cp.w) * 0.5 + 0.5;\n"
+    "                if (sz > sd + 0.00002 && sz < sd + 0.004) {\n"
+    "                    vec3 hitc = texture2D(uColor, st).rgb;\n"
+    "                    pudC = mix(pudC, hitc * 0.75, uRainPuddleSSR);\n"
+    "                    break;\n"
+    "                }\n"
+    "                rstep *= 1.45;\n"
+    "                rt += rstep;\n"
+    "            }\n"
+    "        }\n"
+    /* THE OUTLINE FADES, THE MIRROR DOES NOT. A puddle with a hard cut round it reads
+       as a decal laid on the ground, so the coverage now ramps over a real band and the
+       darkening follows it all the way out. The MIRROR cannot follow it: a broad soft
+       wash of pale sky is the grey stain this went round twice already, and it is what
+       an ungated soft mask always turns into. So the sky is held to the CORE, a
+       smoothstep of the same coverage with no second noise fetch, and what reaches the
+       rim is the darkening and the wetting alone. Water is dark at its edge and bright
+       in its middle, which is the right way round anyway.
+
+       the mirror is gated on luminance like the additive terms: ground the shroud has
+       darkened (the rim ring, the dark band) is drawn black and carries the ground
+       class, and an ungated puddle painted pale sky over it */
+    "        float pudCore = smoothstep(0.35, 1.0, pud);\n"
+    "        col = mix(col, pudC, pudCore * uRainPuddleMirror * rainLum);\n"
+    "        col += (skyR * sheen + vec3(1.0, 0.97, 0.90) * glint) * rainLum;\n"
+    "    }\n"
     "\n"
     /* ---- the things that are actually burning ---- */
     "    vec3 add = vec3(0.0);\n"
@@ -335,6 +644,49 @@ static const char* FX_FS_LIGHT_BODY =
     "        add += uLightCol[i].rgb * uLightCol[i].w * att * (0.35 + 0.65 * ndl);\n"
     "    }\n"
     "    col += add;\n"
+    "\n"
+    /* ---- the rain, part three: the air -----------------------------------------------
+       THE GROUND FOG is a short march along the view ray from where it enters the
+       fog's ceiling down to the surface, through the cloud deck's own tiling noise
+       read as two octaves drifting on the wind: eight steps, jittered per pixel by
+       the same deterministic hash the occlusion uses, so the banding an eight-step
+       march would otherwise draw becomes grain that never moves between runs. The
+       density thins upward from the mainland level, so hills stand out of it and
+       the sea sits deeper in it. It is a uniform branch and the taps take implicit
+       derivatives, which is the rule the note above P and n is about. Gated on
+       luminance so the shroud stays black. Then the distance haze toward the
+       overcast, and a cool grey over everything, gated the same way. */
+    "    if (uRainFog > 0.0) {\n"
+    "        vec3 rd = P - uCamPos;\n"
+    "        float len = length(rd);\n"
+    "        rd /= max(len, 1e-4);\n"
+    "        float top = uRainFogBase + 4.0 * uRainFogHeight;\n"
+    "        float t0 = 0.0;\n"
+    "        if (uCamPos.y > top && rd.y < -1e-4) t0 = (top - uCamPos.y) / rd.y;\n"
+    "        t0 = clamp(t0, 0.0, len);\n"
+    "        float dt = (len - t0) / 8.0;\n"
+    "        float jit = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898,78.233))) * 43758.5453);\n"
+    "        vec2 fdx = uRainFogDir, fdy = vec2(-uRainFogDir.y, uRainFogDir.x);\n"
+    "        float trans = 1.0;\n"
+    "        for (int i = 0; i < 8; i++) {\n"
+    "            vec3 sp = uCamPos + rd * (t0 + (float(i) + jit) * dt);\n"
+    "            vec2 q = vec2(dot(sp.xz, fdx), dot(sp.xz, fdy)) * uRainFogInvScale;\n"
+    "            float n1 = texture2D(uCloudTex, q - vec2(uRainFogDrift1, 0.0)).r;\n"
+    "            float n2 = texture2D(uCloudTex, q * 2.7 - vec2(uRainFogDrift2, -0.37)).r;\n"
+    "            float nz = n1 * 0.65 + n2 * 0.35;\n"
+    "            float dens = mix(1.0, nz * nz * 2.2, uRainFogDetail);\n"
+    "            float hgt = exp(-max(sp.y - uRainFogBase, 0.0) / uRainFogHeight);\n"
+    "            trans *= exp(-uRainFog * 0.30 * dens * hgt * dt);\n"
+    "        }\n"
+    "        trans = mix(1.0, trans, rainLum);\n"
+    "        col = mix(uRainSky * 0.92, col, trans);\n"
+    "    }\n"
+    "    if (uRainHaze > 0.0 || uRainOvercast > 0.0) {\n"
+    "        float dist = length(P - uCamPos);\n"
+    "        float fog = (1.0 - exp(-max(dist - uRainHazeNear, 0.0) * uRainHaze * 0.12)) * rainLum;\n"
+    "        col = mix(col, uRainSky * 0.85, fog);\n"
+    "        col *= mix(vec3(1.0), vec3(0.80, 0.82, 0.86), uRainOvercast);\n"
+    "    }\n"
     "\n"
     "    gl_FragColor = vec4(col, 1.0);\n"
     "}\n";
@@ -538,10 +890,13 @@ static int fx_boot(void)
     /* The lighting program is three strings: its uniforms, the shared reconstruction,
        then its body. Concatenated here because GLSL 1.20 has no #include and a
        three-source glShaderSource call is harder to read than one buffer. */
-    size_t n = strlen(FX_FS_LIGHT) + strlen(FX_COMMON) + strlen(FX_FS_LIGHT_BODY) + 1;
+    size_t n = strlen(FX_FS_LIGHT) + strlen(FX_COMMON) + strlen(RAIN_GLSL_RIPPLE)
+             + strlen(RAIN_GLSL_PUDDLE) + strlen(FX_FS_LIGHT_BODY) + 1;
     char* lit = (char*)malloc(n);
     if (!lit) return 0;
-    strcpy(lit, FX_FS_LIGHT); strcat(lit, FX_COMMON); strcat(lit, FX_FS_LIGHT_BODY);
+    strcpy(lit, FX_FS_LIGHT); strcat(lit, FX_COMMON); strcat(lit, RAIN_GLSL_RIPPLE);
+    strcat(lit, RAIN_GLSL_PUDDLE);
+    strcat(lit, FX_FS_LIGHT_BODY);
 
     g_fxPLight   = fx_program(lit, "light");
     free(lit);
@@ -611,12 +966,14 @@ static void fx_capture_camera(void)
    rather than composed from glOrtho and gluLookAt because the sun's matrix has to
    exist as NUMBERS for the shader uniform as well as on the matrix stack, and reading
    it back off the stack to get it would be the same arithmetic twice. */
-static void fx_sun_matrix(float* out)
+/* The direction light TRAVELS: down from the sky, on the given bearing. Its own
+   function because the ground's one-sun term wants it whether or not the
+   shadow pass runs this frame; with it computed only inside the shadow matrix, a
+   chain with shadows off lit every field against no direction at all. */
+static void fx_sun_dir(void)
 {
     const float DEG = 3.14159265358979f / 180.0f;
     const float az = g_fx.sun_az * DEG, el = g_fx.sun_el * DEG;
-
-    /* The direction light TRAVELS: down from the sky, on the given bearing. */
     float d[3];
     d[0] =  sinf(az) * cosf(el);
     d[1] = -sinf(el);
@@ -624,6 +981,13 @@ static void fx_sun_matrix(float* out)
     float dl = sqrtf(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
     d[0] /= dl; d[1] /= dl; d[2] /= dl;
     g_fxSunDir[0] = d[0]; g_fxSunDir[1] = d[1]; g_fxSunDir[2] = d[2];
+}
+
+static void fx_sun_matrix(float* out)
+{
+    fx_sun_dir();
+    float d[3];
+    d[0] = g_fxSunDir[0]; d[1] = g_fxSunDir[1]; d[2] = g_fxSunDir[2];
 
     /* The box is fitted to what the camera can see, so the texel density follows the
        zoom instead of being a constant that is too coarse close in and wasted far out. */
@@ -661,6 +1025,12 @@ static void fx_sun_matrix(float* out)
        and costs depth precision, which is the whole currency of a shadow map. */
     const float nearp = R * 0.5f, farp = R * 5.5f;
     g_fxSunSpan = farp - nearp;
+    g_fxSunR = R;
+    /* the same box, kept as numbers for the host's caster cull */
+    g_fxSunEye[0] = eye[0]; g_fxSunEye[1] = eye[1]; g_fxSunEye[2] = eye[2];
+    g_fxSunS[0] = s[0]; g_fxSunS[1] = s[1]; g_fxSunS[2] = s[2];
+    g_fxSunU[0] = u[0]; g_fxSunU[1] = u[1]; g_fxSunU[2] = u[2];
+    g_fxSunNear = nearp; g_fxSunFar = farp;
     float P[16];
     memset(P, 0, sizeof P);
     P[0]  =  1.0f / R;
@@ -711,6 +1081,7 @@ static void fx_render_shadow_map(void)
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
 
+    g_fxCasterPass = FXCAST_SUN;
     g_fxCasters();
 
     glDisable(GL_POLYGON_OFFSET_FILL);
@@ -818,11 +1189,55 @@ static void fx_draw_with(GLuint prog, const FxRT* dst)
 }
 
 /* Everything between the last world draw and the first sidebar draw. */
+/* THE RAIN'S SIDE OF THE LIGHT PASS, defined in rain_mod.h (included by the host after
+   the sea, whose field it binds). Forward-declared here the way the terrain declares
+   the coast's hooks: the light program is this file's, the rain's numbers are not. */
+static void rain_light_uniforms(GLuint prog);
+static void rain_light_bind(GLuint prog);
+static void rain_light_unbind(void);
+
 static void fx_world_end(void)
 {
     if (!g_fxActive) return;
 
     const int rw = g_fxScene.w, rh = g_fxScene.h;
+
+    fx_sun_dir();      /* the sun exists whether or not it casts this frame */
+
+    /* ---- 0. the ground's normal ----
+       The host draws the terrain once more, untextured, with the console's per-corner
+       normal as the colour, depth-tested (writes off) against the scene it just
+       finished through the scene's own depth texture attached here for the duration.
+       The camera is the captured VP loaded as one matrix, the way the sun's is; a hair
+       of polygon offset toward the viewer covers the last-bit difference between that
+       and the fixed pipe's frustum+modelview, or half the ground would fail its own
+       depth by a rounding. */
+    int gnOn = 0;
+    if (g_fx.terrain_normals && g_fxGroundNormals && g_fxScene.depth
+        && fx_rt_init(&g_fxGNorm, rw, rh, 1, GL_LINEAR)) {
+        float clearc[4];
+        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearc);
+        fx_rt_bind(&g_fxGNorm);
+        fx_glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+                                  g_fxScene.depth, 0);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+        glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadMatrixf(g_fxVP);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_FALSE);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1.0f, -2.0f);
+        g_fxGroundNormals();
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        glDepthMask(GL_TRUE);
+        glMatrixMode(GL_PROJECTION); glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+        fx_glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
+        glClearColor(clearc[0], clearc[1], clearc[2], clearc[3]);
+        gnOn = 1;
+    }
 
     /* ---- 1. shadow, occlusion and light ---- */
     const FxRT* litSrc = &g_fxScene;
@@ -845,6 +1260,26 @@ static void fx_world_end(void)
                  g_fx.shadow_bias / (g_fxSunSpan > 0.001f ? g_fxSunSpan : 1.0f));
         fx_set1f(g_fxPLight, "uSTexel", g_fxShadow.w ? 1.0f / (float)g_fxShadow.w : 0.0f);
         fx_set3f(g_fxPLight, "uSTint", g_fx.shadow_r, g_fx.shadow_g, g_fx.shadow_b);
+        /* The smooth ground, the normal offset (texels on the panel, world cells in the
+           shader: one shadow texel is 2R/res cells) and the penumbra (cells on the
+           panel, texels in the shader, the same ratio the other way). */
+        {
+            const float res = g_fxShadow.w > 0 ? (float)g_fxShadow.w : 1.0f;
+            const float cellsPerTexel = 2.0f * g_fxSunR / res;
+            fx_set1i(g_fxPLight, "uGNorm", 4);
+            fx_set1i(g_fxPLight, "uGNormOn", gnOn);
+            /* SCREEN-SPACE OCCLUSION MEANS LESS ON A CANOPY THAN ON A CREASE. Its
+               hemisphere is built from the same reconstructed normal, and with the
+               radius against cards packed a cell across nearly every tap lands on
+               another leaf. The trees carry occlusion baked from the model that still
+               had a million leaves in it, so this one only has to stay out of the way. */
+            fx_set1f(g_fxPLight, "uAoFoliage", g_fx.ssao_foliage);
+            fx_set1f(g_fxPLight, "uSNormOff", g_fx.shadow_noff * cellsPerTexel);
+            fx_set1f(g_fxPLight, "uSunFloor", g_fx.sun_floor);
+            fx_set1f(g_fxPLight, "uSPen", cellsPerTexel > 0.0f ? g_fx.shadow_pen / cellsPerTexel : 0.0f);
+            fx_set1f(g_fxPLight, "uAoGround", g_fx.ssao_ground);
+            fx_set1i(g_fxPLight, "uSunLambert", (g_fx.sun_lambert && gnOn) ? 1 : 0);
+        }
 
         /* ---- the weather ----
            Every one of these is a panel dial turned into the form the shader wants,
@@ -901,7 +1336,12 @@ static void fx_world_end(void)
             fx_set4fv(g_fxPLight, "uLightCol", nl, lc);
         }
         fx_set1f(g_fxPLight, "uLightFalloff", g_fx.light_falloff);
+        rain_light_uniforms(g_fxPLight);
+        rain_light_bind(g_fxPLight);          /* unit 5: the sea's field, or nothing */
 
+        glActiveTexture(GL_TEXTURE4);
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, gnOn ? g_fxGNorm.tex : 0);
         glActiveTexture(GL_TEXTURE3);
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, g_fxCloudTex);
@@ -921,6 +1361,8 @@ static void fx_world_end(void)
 
         /* The unbind is not optional: the HUD is drawn with fixed-function state right
            after this and a live unit 3 would modulate it. */
+        rain_light_unbind();
+        glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, 0); glDisable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, 0); glDisable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, 0); glDisable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0); glDisable(GL_TEXTURE_2D);
@@ -969,7 +1411,7 @@ static void fx_world_end(void)
        tests. With colour only there is no depth buffer to test against, so per the GL
        spec the test always passes, the model's six batches paint in array order, and
        its LAST batch -- an untextured, flat, full-radius disc -- covers the emblem.
-       That is the flat grey ellipse the project owner recorded on 26 Aug 2026.
+       That is the flat grey ellipse the project owner recorded.
 
        It hid from every gate because the app turns this chain on unconditionally
        (game_visuals_default_enhanced sets g_fx.enabled = 1, called on every non-classic

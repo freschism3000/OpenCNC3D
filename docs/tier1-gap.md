@@ -75,7 +75,7 @@ because nothing in the mixer touches a platform API.
 | Music streaming | `cnc_audio_update()` decodes on the GAME thread and pushes into a ring the device only reads | unchanged, and it is the whole reason a Win98 backend does not have to make stdio interrupt safe |
 | Decoded clip cache | 8 MB LRU cap | unchanged. The cap exists precisely for this target: decoding all 249 sounds at once is about 12 MB, which is fine on a modern machine and is not fine on Win98 |
 
-**`audio/audio_win98.c` IS WRITTEN NOW (19 Aug 2026), and it is a new file, not a
+**`audio/audio_win98.c` IS WRITTEN NOW, and it is a new file, not a
 rewrite.** It implements the same six functions `audio_sdl.c` does and touches nothing
 else, over `waveOut` rather than DirectSound: winmm.dll is on every Windows 98 install
 as shipped, where DirectSound would add a DirectX runtime to require, detect and fall
@@ -115,7 +115,7 @@ reasoning as the infantry loader), and the draw is one alpha-tested quad per bui
 under construction. The only Tier 1 cost is one texture bind per constructing
 building per frame, on a 5-second one-shot animation.
 
-## Wave 4: water, per-object shroud, health bars (15 Aug 2026)
+## Wave 4: water, per-object shroud, health bars
 
 Everything in this round is fixed-function and lands inside the Tier 1 contract. The one
 item that adds a hardware requirement is the water, and the Voodoo 2 is the machine it was
@@ -135,7 +135,7 @@ designed for.
 Nothing in this round introduced a shader, a render target, a new GL token or a texture
 larger than 256x256.
 
-## Wave 5: the MCV deploy rig (15 Aug 2026)
+## Wave 5: the MCV deploy rig
 
 Nothing here introduces a shader, a render target, a new GL token or a texture larger than
 256x256. The rig rides the PKB node-animation path that already existed for the idle
@@ -147,7 +147,7 @@ clips, so its Tier 1 answer is that path's answer.
 | **Baked clip storage** | 102 frames x 21 parts x 12 floats = 103 KB of `float` per pack, resident | **Watch item, not a blocker.** A Win98 target machine has this, but it is the largest single animation block in the pack and a 16 MB build should measure the pack's total resident size before adding more one-shot rigs. Halving it to `short` fixed-point is available and was NOT done, because nothing needs it yet. |
 | **The rig REPLACES the yard's mesh** | One `draw_mesh` instead of another, same three passes | Unchanged: strictly fewer triangles than the finished Construction Yard it stands in for. |
 
-## Wave 5: the cursor animations (15 Aug 2026)
+## Wave 5: the cursor animations
 
 Nothing here introduces a shader, a render target, a new GL token or a texture larger than
 256x256. The ten animated cursor states reach the screen through two paths that already
@@ -161,7 +161,7 @@ had Tier 1 answers, so this section is mostly a statement that nothing new was s
 | **`cursor3dstate` / `cursor3danim` script verbs** | Test-only, no draw cost | Not shipped behaviour: they change which of the cartridge's own 20 state rows is used, and both default to the engine's answer. No Tier 1 surface at all. |
 
 
-## Wave 5: the terrain CM tint layer (15 Aug 2026)
+## Wave 5: the terrain CM tint layer
 
 **This is the one place so far where the Voodoo 2 is BETTER than desktop GL fixed
 function, and the answer is that it can express the console's combiner exactly, in one
@@ -283,7 +283,7 @@ triangles, and it stayed flat as the count went 50 -> 200 -> 800 while FPS scale
 confirming the card is fill bound and not setup bound at this geometry.
 
 
-## Wave 7: what the SECOND Win98 pass added to Tier 1 (20 Aug 2026)
+## Wave 7: what the SECOND Win98 pass added to Tier 1
 
 Nothing in this round is a Tier 2 debt. Three of the four are places where Tier 1 needed a
 mechanism the desktop build gets for free from GL, and the fourth is a straight Tier 1 WIN.
@@ -309,7 +309,13 @@ fixed point is still available and still not needed.
 | **A skirmish seat's colour on its FOOT SOLDIERS** | up to six extra copies of the 1995 infantry sheets, the uniform band (palette 176..191) substituted per `PlayerColorType`. Measured on the shipping pack: 102 of its 397 strips qualify, 1.43 M texels, so **5.5 MB on the card per colour and 33 MB with all six in play** | **none by default, and that is a deliberate cut rather than an oversight.** It is thirty times what the mesh liveries cost (0.18 MB per colour) and a Voodoo 2 has 4 MB of texture memory in total, so Tier 1 keeps the pack's own two colourways on infantry and puts the seat's colour on vehicles, buildings, selection boxes, radar blips and rally flags only. **A much cheaper Glide answer exists and is not written:** these sheets are 8-bit and Glide is natively palettised, so `GR_TEXFMT_P_8` plus one `grTexDownloadTable` per colour makes a livery cost a 768 byte palette instead of a second copy of the art. On that route Tier 1 could carry all six for less than one costs on Tier 2 |
 
 
-## The primary-factory label (1 Sep 2026)
+## The unit card
+
+| Piece | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **The selection card in the bottom-left corner of the Enhanced HUD** (cameo, name, health, damage, the rest of the selection as smaller cameos, ten control-group tabs) | composed on the CPU in `game/hud640.c` (`hud640_draw_card`, plain C89) out of assets in `hud640.pack`, uploaded through the bar's own `h6_upload` and drawn as ONE 240x166 textured quad per frame, alpha blended | **SHIPS WHEN THE 640x480 HUD SHIPS, with no new mechanism.** It is the same rasteriser and the same blit the bar already is on this tier; the one texture is 240x166 RGBA in a 256x256 page, 256 KB once. The alpha blend is only for the bezel's rounded corners and can be a chroma key on Glide. The Enhanced-only gate is the codex's gate (`codex_available`), and Tier 1 never enters Enhanced, so on Win98 the card is simply absent, exactly like the DATABASE plate. What Tier 1 does not have is the `group=` field in its own brain reader (`tier1/w98_brain.c`), which is the same three-line shape as the `alt=` gap recorded above. |
+
+## The primary-factory label
 
 | Piece | Tier 2 | Tier 1 answer |
 |---|---|---|
@@ -335,3 +341,58 @@ One placement difference to declare rather than discover: Tier 2 anchors the lab
 bottom of the object's projected MESH silhouette, and Tier 1 has no mesh-silhouette bound, so
 it anchors to the object's ground point plus a fixed offset in HUD pixels. Identical on a squat
 building, a little high on a tall one.
+
+## Solid tiberium
+
+| Feature | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **Crystal clumps standing on a tiberium cell** (`game/tib3d_mod.h`, `draw_tiberium_ground`, `draw_tiberium_solid`) | three passes out of `tib3d.pack`: the ground cracks (one additive quad per CRYSTAL of a generated 128x128 tile, `GL_ONE, GL_ONE` over a premultiplied sheet), the clumps themselves (four indexed meshes on one 256x256 sheet, opaque, from a per-cell instance list rebuilt only when the field changes and drawn through client vertex arrays with `glDrawElements`), and a glow (the same batch added over itself with `GL_SRC_ALPHA, GL_ONE` through the emissive mask baked into that sheet's alpha) | **SHIPS ON TIER 1 as far as the API goes, and is NOT WIRED THERE.** Nothing in the three passes needs anything above GL 1.1: no shader, no render target, no multitexture, no buffer object, and the element type is `GL_UNSIGNED_SHORT` because the batch flushes before 65535 vertices rather than reaching for `GL_UNSIGNED_INT`. Two textures in the whole feature, 256x256 and 128x128, both powers of two at or under the Voodoo 2's per-side limit; at 16-bit that is 160 KB of a 4 MB TMU. The clump pass is opaque with depth writes on, so there is nothing to sort and no alpha test. **The emissive glow is the one part that costs the Voodoo a second look:** it is `GL_SRC_ALPHA, GL_ONE` over the same geometry, which Glide does natively, but it doubles the fill for a field and the Voodoo 2 is fill limited before it is triangle limited. Its dial is `tib3d_glow` and 0 removes the pass entirely, so the Tier 1 answer if it turns out too expensive is a number rather than a rewrite. The crack decals are additive too and there is one per crystal rather than per cell, so they are the other half of that fill; `tib3d_ground` is their own dial and 0 removes them. They bind with `GL_CLAMP`, chosen over `GL_CLAMP_TO_EDGE` for this tier, and rely on the tile's black border making a rotated sample outside 0..1 add nothing. What is missing is the same thing missing for the shatter and the overlay family: **Tier 1 is a separate program** (`tools/win98/build.sh` builds `w98glide.exe` out of `tier1/*.c` and never compiles `game/cnc_eyes.cpp`), so the pack reader, the instance list and the draw would have to be written a second time. Until they are, Win98 draws the flat cartridge overlay alone, which is the console's own picture and therefore not a fidelity loss. |
+
+**The cost to watch when it is ported is triangle COUNT, not the API.** A field on screen
+is a few hundred clumps of 84 to 252 triangles each: measured on the largest field in
+SCG05EA, 450 clumps drawn of 618 placed over 140 cells. The `tib3d_density` dial exists
+partly for this -- at 0.25 the same field is a quarter of the geometry -- and the view-bounds
+cull is already in the pass rather than left to the card.
+
+## Real grass on the ground
+
+| Feature | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **Blades standing on every grass cell** (`game/grass_bake.h`, `game/grass_field.h`, `game/grass_draw.h`, `grass_draw()`) | one static vertex buffer built at load holding every blade in the map as two triangles, drawn alpha blended with depth writes OFF through a GLSL 1.20 program that makes TWO VERTEX-STAGE texture fetches; a map-wide RGBA16F render target carrying tread, cover and shroud, updated with `GL_MAX` and a reverse-subtract blend equation; and the blade's colour read back off the GPU from whichever terrain atlas is drawn | **ABSENT ON TIER 1, and this is a deeper gap than the tiberium one.** Four separate things in it are above the Voodoo 2's line, and three of them have no fallback that keeps the feature recognisable. The **vertex texture fetch** is the hard one: the blade reads the ground colour and the crush field in the VERTEX stage so a whole card fades, presses and takes its colour as one thing, and a fixed-function pipeline cannot sample a texture per vertex at all. The **half-float render target** is the second: `GL_RGBA16F` needs a float-format framebuffer, and the field's exactness argument rests on one fp16 unit in the last place being the decay step, which an 8-bit target cannot express. The **buffer object** is the third, and it is the only one with a clean answer: without `GL_ARB_vertex_buffer_object` the geometry can be submitted as client arrays, which the measured numbers say costs 5 to 39 ms a frame against 0.07 to 0.30 from a buffer, so on a Voodoo 2 that answer is "do not draw grass" rather than "draw it slowly". The fourth is **fill**: a blade is a blended card two to eight screen pixels tall with no alpha test, and there are tens of thousands of them; the Voodoo 2 is fill limited before it is triangle limited and this is the worst kind of fill there is. **So Win98 draws the cartridge's own ground with no grass, which is the picture this project has always shipped there and is not a fidelity loss.** The whole feature is behind one dial, `grass`, and every entry point is gated on `g_fxActive`, so nothing here reaches the Voodoo path even if `tier1/*.c` later grows a reader. |
+
+**What a Tier 1 grass would have to be, if it is ever wanted.** Not this feature with parts
+removed. The blade would have to become a texture: the mask that says where grass grows is
+already read per terrain texel at load, so a second ground layer drawn as a tiling alpha sheet
+modulated by that mask is the shape a Voodoo 2 could carry, at one extra pass over the ground
+rather than one card per blade. It would move in the wind only as a scrolling texture matrix,
+it could not be pressed flat by a vehicle without a second sheet to modulate it, and it would
+have no silhouette at all at a grazing camera. That is a different feature wearing the same
+name, which is why it is written here as a rewrite and not as a fallback.
+## The Remastered infantry sprites, and the fold at the ground line
+
+| Piece | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **The player's own Remastered Collection infantry art under Enhanced** (`game/remaster_inf.h`, the `infset` row of Visuals/Advanced) | strips built at run time out of the install's TGA frames, one per (type, action), on RGBA power-of-two sheets sized to the frame count (a 128-frame attack strip lands on a 2048-a-side sheet) at about five times the DOS texel density; drawn by the same `dosinf_draw_sprite` as the 1995 sprites | **NONE. TIER 2 ONLY, and it was never listed before.** The art is not in the tree and Win98 has no reader for it; the sheets are far past the Voodoo 2's 256x256 limit and would have to be cut down to fit 4 MB. Win98 draws the 1995 sprites, which is the picture this project has always shipped, and nothing is lost that was ever there. |
+| **The fold: a cell's rows below the man's ground line lie flat on the ground in front of him** (`dosinf_draw_sprite`, the `dn > 0` branch) | two fixed-function `GL_QUADS` in place of one, sharing the crease's two vertices, same texture, alpha test and modulate colour; the flat quad's far corners take their own `terrain_y` and the same +0.012 z-fight lift the vehicle shadows use | **NOTHING ABOVE GL 1.1 IN IT, and Tier 1 never reaches it anyway:** every strip the 1995 pack bakes has `drop` 0, so the branch is only entered for the Remastered set above. If Tier 1 ever carries a strip with rows below the line, the fold is two textured quads and a division, which Glide draws as it is. |
+
+## Rain
+
+| Feature | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **Rain under Enhanced** (`game/rain_mod.h`, `game/rain_glsl.h`; hooks in the light pass, the sea's wave field and surface, and one call in the frame after the effects) | three things on one switch: a lattice of 6000 thin quads placed by a GLSL 1.20 vertex shader from the engine clock alone (one client-array draw, no per-frame upload); a wet block inside the existing light program (darkening, a Fresnel sheen, a sun glint, drop-impact rings bending the reconstructed normal, puddles from the cloud deck's noise, distance haze, an overcast tint), which needs the offscreen scene, its depth texture and the ground-normal target; and drops pressed into the sea's RGBA16F wave field each step plus the same rings on its surface. Cost measured at 0.11 ms a frame over the chain at 1280x800, taking the minimum frame of 120 in alternating passes, because the mean drifts upward on a machine that is doing anything else | **NONE. TIER 2 ONLY, by the same row the whole chain has: on Win98 the chain does not run and the master switch is never on.** Stated piece by piece so the port is a list and not a surprise. The wet look cannot exist on Tier 1 at all: it is a screen-space term over a depth texture and a normal target, and the Voodoo 2 has neither a render target nor a shader. The drops on the water ride the wave field, which is itself a half-float render target with no Tier 1 form. The streaks are the one part a Glide build could draw, as fixed-function alpha-blended quads placed on the CPU from the same lattice and clock, and the number is 2545 of them at the shipped dials, not a few hundred: the count is 6000 times the square of the amount times the streak dial, which at 0.768 and 0.848 is 0.424 of the lattice. No shader is essential to them; the vertex shader is only what makes them free. A Glide build should be budgeted from that figure at 640x480, or from a lower streak dial chosen for this tier. None of it is written: with no wet ground under them they would be rain that leaves nothing wet, and the decision is to ship no rain on Win98 rather than half of it. There is no Visuals row at all: the rain is reached only through the F5 panel, which is compiled out of every release build, so on both tiers a player cannot turn it on and Tier 1 has nothing to answer for yet. |
+| **The splash crowns** (`rain_splash_draw`) | a few hundred camera-facing quads a frame, placed on the CPU from the terrain heightfield and its corner normals, culled in a GLSL 1.20 vertex shader that samples the cloud noise and the sea's shore field with `texture2DLod`. Needs VERTEX TEXTURE FETCH, asked for once with `GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS`; a GL reporting none draws no crowns and says so | **NONE, and it would be the easiest part of the rain to give one.** The placing is already CPU work and the geometry is a few hundred blended quads, which a Voodoo 2 draws without complaint. What has no Tier 1 form is the CULL: the puddle rule reads a texture from a vertex shader, and the field that says where the sea is is a texture too. Both are readable on the CPU at the cost of keeping the baked cloud mask's level 0 in memory, 256 KB, and sampling the shore field there instead. It is not written, and it would not be worth writing before the wet ground the crowns stand in has a Tier 1 answer, which it does not. |
+| **The rain's own sound** (`game/rain_audio.h`) | four seconds of mono 22050 synthesised at boot from a fixed generator and looped through `mixer_play_loop`. No shader, no GPU, no asset: plain C, integers and a noise generator | **IT ALREADY WORKS ON TIER 1 AND IS ABSENT ONLY BECAUSE THE RAIN IS.** This is the one part of the rain with no Tier 1 obstacle at all. `mixer_play_loop` is plain C whose wrap lives in `mixer_render`, so a Win98 DirectSound backend inherits it unchanged, and the synthesis is a few hundred lines of arithmetic over a 176 KB buffer. If Win98 ever gets rain of any kind, it can have the sound on the same day. |
+
+## The texture-book second draw
+
+| Feature | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **A structure's texture-book variant drawn over its base mesh** (`texbook_overdraws`, the book loop in `draw_object_mesh`) | the building is drawn, then the book's variant mesh is drawn again at the same place. For PROC's first book, HPAD and FIX the variant's triangles head the base list and the second draw is pulled toward the camera with `glPolygonOffset(-1,-1)`; for FACT, SILO and PROC's second book the variant is bit-identical to the copy the base mesh already carries (posed with the book node's own transform, this round) and the second draw simply wins the `GL_LEQUAL` tie with no bias | **Half native, half a registered gap that predates this round and was never written down.** The bias-free half is Glide's home ground: `GR_CMP_LEQUAL` on identical vertices is exactly what the Voodoo 2 does with the water, and the silo's fill dome and the refinery's storage strip take that path on purpose. The biased half has no Glide form: `glPolygonOffset` does not exist there (see the water row above). The Tier 1 answer for those three books is the same bias-free path, which needs nothing more than drawing the variant after the base with depth `LEQUAL`; on a 16-bit Z buffer at 640x480 that tie may sparkle, and if it does the answer is a depth-range tweak, not an offset. None of this is wired: Tier 1 is a separate program that draws no texture books at all yet. |
+
+## A mission start that is refused says why
+
+| Feature | Tier 2 | Tier 1 answer |
+|---|---|---|
+| **The engine survives a missing or damaged theater archive** (`DisplayClass::Init_Theater` in both brains; the header guard in `common/mixfile.h`) | a `content/<THEATER>.MIX` that is absent, zero length or junk no longer faults inside `CNC_Start_Custom_Instance`: the palette is zeroed, one `CNC3D\|theater\|` line goes to the log, and the mission plays | **ALREADY COVERED, and by the same object.** `tier1/w98_brain.c` loads the same DLL through `LoadLibraryA` and calls the same `CNC_Start_Custom_Instance` (`wb_start`), so the guard is in the engine it runs and nothing in the Tier 1 program has to change. |
+| **The "Unable to start mission" box** (`game_notice_open` in the renderer, `DOPT_PAGE_NOTICE` in `dosopt.c`, drawn by the shell after `game_boot` refuses) | the pause dialog's rasteriser lends its objective box: a caption, the refusal wrapped at 255 px and a lone OK, over black, until dismissed. One GL 1.1 textured quad, nothing above the Voodoo 2's line in the drawing itself | **TIER 2 ONLY, by decision rather than by capability.** The Win98 program has no dialog module and no shell menu to put a box in front of: a refused start there already comes back through `wb_open`/`wb_start`'s `err` string (`LoadLibraryA(...) failed, GetLastError()=...`, `missing CNC_* exports ...`), printed by the caller. That line is the Tier 1 answer, and it carries the same facts the box does. The box is not mirrored because there is nothing there to mirror it onto yet; if the Tier 1 program ever grows a menu, `dosopt.c` is plain C89 with no GL in it and the page comes with it. |
+| **`BOOTFAIL\|` in the log** (`boot_refuse` in the renderer, printed by the shell as `BOOTFAIL\|<scen>\|<reason>`) | every refusal on the boot path writes one sentence naming the file or the step | **Equivalent exists.** The Win98 program's `err` string is the same sentence in a different prefix; it is not spelled `BOOTFAIL\|` and no gate reads it, which is written here so nobody greps a Win98 log for a line it will not carry. |

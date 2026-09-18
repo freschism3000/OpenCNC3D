@@ -97,6 +97,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cstdarg>
 #include <cstdint>
 #include <cmath>
 #include <dlfcn.h>
@@ -108,6 +109,7 @@
 #include <set>
 #include <algorithm>
 #include <zlib.h>
+#include "brain_path.h"
 
 #include <SDL.h>
 #include <signal.h>   /* the crash-stage handler below */
@@ -166,13 +168,20 @@ static void cnc_screen_viewport(int w, int h)
 #ifdef _WIN32
 #include <process.h>   /* _getpid, for the per-process scratch file in capture_brain_call */
 #endif
-static int g_netSpeed = 3;                 /* the match's speed slider index, host's choice */
+/* THE MATCH'S SPEED SLIDER INDEX, the host's choice, overwritten by net_arm_lockstep
+   with whatever crossed the wire. The initialiser is only ever read in the sliver
+   between a match going live and being armed, so it is the room's opening speed rather
+   than a number of its own: NM_DEFAULT_SPEED, the same one every other builder of an
+   NmSetup starts from. */
+static int g_netSpeed = NM_DEFAULT_SPEED;
 static void net_hash_world(int frame);     /* defined beside brain_advance */
 
 /* Combat presentation: engine anims (muzzle flashes, impacts, explosions) and bullets,
    parsed from the brain dump's EFX| lines and drawn as billboards. Self-contained. */
 #include "effects_mod.h"
 #include "dostib_mod.h"
+#include "tib3d_mod.h"
+#include "tree3d_mod.h"
 #include "doscrate_mod.h"
 #include "smudge_mod.h"
 #include "verdict_mod.h"
@@ -243,6 +252,28 @@ typedef bool (*CNC_Advance_t)(uint64);
 typedef int  (*CNC3D_Dump_t)(void);
 
 static const char* volatile g_bootStage = "not started";
+
+/* WHY A MISSION START WAS REFUSED, in words a player can act on.
+ *
+ * A refused start used to be one line on stderr from whichever step refused, and then a
+ * return to the menu that looked exactly like the menu had never been left. A player
+ * whose engine library was quarantined by an antivirus, or whose package had lost a
+ * file, saw "the mission does not start" and nothing else, and the report that reached
+ * this project said the same. Every refusal now writes ONE sentence here, prints it as a
+ * BOOTFAIL| line for the log and the harness, and the shell shows the same sentence in a
+ * box before it puts the menu back. The sentence names the file or the step, never the
+ * internal function, because it is the player who reads it. */
+static char g_bootRefusal[512] = "";
+static void boot_refuse(const char* fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(g_bootRefusal, sizeof g_bootRefusal, fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "BOOTFAIL|%s\n", g_bootRefusal);
+    fflush(stderr);
+}
+const char* game_boot_refusal(void) { return g_bootRefusal; }
 
 static CNC_Init_t         BrainInit;
 static CNC_Config_t       BrainConfig;
@@ -320,6 +351,30 @@ static CNC3D_SetBuildAnywhere_t BrainSetBuildAnywhere;
 typedef bool (*CNC3D_ForceVerdict_t)(uint64, bool);
 static CNC3D_ForceVerdict_t BrainForceVerdict;
 
+/* AI TAKEOVER. Hand one house to the computer, which is the other half of what
+   happens when somebody walks out of a network match: with the lobby's AI TAKEOVER
+   ticked their base carries on being played rather than blowing up. The engine
+   already had this code -- it is the arm the Remastered build takes when a
+   disconnect is not fatal -- and the export only names the house rather than
+   assuming the one this machine is looking through. Every peer calls it on the same
+   agreed turn, so the takeover happens on one frame everywhere. */
+typedef bool (*CNC3D_PlayerToAI_t)(uint64);
+static CNC3D_PlayerToAI_t BrainPlayerToAI;
+
+/* And the read that makes it checkable: 1 computer, 0 person, -1 nobody. The engine's
+   own player info carries an IsAI field it never fills on the way out, so this is the
+   only way to ask afterwards whether the takeover took. */
+typedef int (*CNC3D_PlayerIsAI_t)(uint64);
+static CNC3D_PlayerIsAI_t BrainPlayerIsAI;
+
+/* AND THE OTHER ENDING. Flag_To_Die rather than Flag_To_Lose, because HouseClass::AI
+   reads IsToLose only in a single player game: in a match the losing flag was raised and
+   nothing ever looked at it, so a departed player's base simply stood there. This one
+   blows the house up and then reports it defeated, which is what the message on the
+   other players' screens is. */
+typedef bool (*CNC3D_PlayerBlowup_t)(uint64);
+static CNC3D_PlayerBlowup_t BrainPlayerBlowup;
+
 /* Would this building type pass the proximity check on this cell? A pure query, and the
    only way to measure Build Anywhere without first constructing a building: the flag the
    placement cursor reads is filled in per cell only during a live placement. */
@@ -377,6 +432,8 @@ static CNC_SaveLoad_t        BrainSaveLoad;
    see the note there about why they must be the same code. */
 static bool opt_do_save(void);
 static bool opt_do_load(void);
+static bool opt_do_delete(void);
+static void opt_sync_textinput(void);
 static CNC_Select_Object_t   BrainSelect;
 static CNC_Clear_Sel_t       BrainClearSel;
 /* CONTROL GROUPS ARE THE ENGINE'S, NOT OURS, and the door was already open.
@@ -412,6 +469,25 @@ static CNC3D_Probe_t         BrainProbe;
 extern "C" {
 #include "dossave.h"   /* the save-slot index; see game/dossave.h */
 }
+/* WHAT MISSION IS RUNNING, kept from the boot options so a save can record it and a load
+   can refuse a slot written in a different one. The engine's payload carries the scenario
+   number, but not which .pack the renderer needs for the terrain, models and tiberium. */
+static char g_bootScen[12] = "";
+static char g_bootPack[24] = "";
+static int  g_bootBuild = 0;
+/* The mission briefing, for the pause dialog's Restate: the text the way the engine
+   reads it and the two movie names. Plain C over the MIX reader; see the header. */
+#include <stdlib.h>
+#include "brief_mod.h"
+
+/* THE MOVIE PLAYER IS THE SHELL'S. The renderer has no VQA decoder and no reason to
+   grow one: the shell plays every campaign movie in the same window, so it lends the
+   renderer that ability for the one in-mission use, Restate's Video button. The
+   standalone renderer never registers one, and with no player Restate's box offers no
+   Video button, which is exactly what 1995 does when the movie file is absent. The
+   callback returns 0 only when the window was closed during the movie. */
+static int (*g_moviePlay)(void* user, const char* name) = NULL;
+static void* g_movieUser = NULL;
 
 /* The 1995 MS-DOS infantry sprites (dosinfantry.pack). Loader, facing tables and
    anim-slot mapping; the draw itself is dosinf_draw_sprite below, next to
@@ -453,7 +529,18 @@ static bool g_fxPresetNamed = false;
  * ---------------------------------------------------------------------------------- */
 static CncAudio* g_au = NULL;
 
-void game_set_audio(struct CncAudio* au) { g_au = (CncAudio*)au; }
+/* Defined with the rain, far below, and wanted here: this file is one translation unit
+   and the shell's hand-back of the mixer happens near the top of it. */
+static void rain_audio_stop(void);
+
+/* THE SHELL TAKES THE MIXER AWAY BETWEEN MISSIONS, and anything still holding a voice
+   has to let go BEFORE it does, while there is still a mixer to tell. The rain's bed is
+   the only looping voice here; a looping voice is never retired by the mixer itself. */
+void game_set_audio(struct CncAudio* au)
+{
+    if (!au) rain_audio_stop();
+    g_au = (CncAudio*)au;
+}
 
 /* What the brain asked for while this mission ran. Counted rather than narrated, so a
    headless run can assert on it: "combat asked for 210 sounds and 208 of them were on
@@ -488,6 +575,16 @@ const GameOverInfo* game_over_info(void) { return &g_gameOver; }
    arrives from inside the DLL, where the loop's own tick_count is out of reach, and
    the score screen's TIME field has no other source. Reset in game_boot. */
 static int g_simTicks = 0;
+
+/* "<NAME> HAS BEEN DEFEATED", off the engine's own message rather than a guess made
+   here. Defined further down, next to the seat colours it draws with. */
+static void match_defeat_message(const char* text, unsigned long long pid);
+
+/* A MATCH SHOWS THE MAP BEFORE IT SHOWS THE WORD. Armed here, in the callback, because
+   that is the one place every path in this program hears a verdict: the live loop, a
+   scripted run and a `shot` all come through ev_cb, and arming it in the loop alone left
+   the whole sequence unreachable by any gate. Defined beside the latch it sets. */
+static void verdict_begin_reveal(void);
 
 static void ev_cb(const EventCallbackStruct& e)
 {
@@ -555,19 +652,32 @@ static void ev_cb(const EventCallbackStruct& e)
                fields carry whatever the union last held. What there is instead is one row
                per house.
 
-               MATCH THE ROW BY HOUSE, NOT BY PLAYER ID. Zero is both the local player's id
-               and the value the engine leaves in a row it never filled, so an id test
-               matches every empty row as well as the right one. The event's own
-               GlyphXPlayerID names the house the result is about, and the local player is
-               always the first entry of the lobby. */
+               THE ROW IS MINE OR IT IS NOBODY'S, AND TAKING THE FIRST HUMAN ONE HANDED
+               EVERY MACHINE THE SAME VERDICT. The rows arrive in roster order, which is
+               identical on every peer by construction, so "the first row that is human"
+               names ONE house and every machine read that house's win flag as its own.
+               A two player match therefore ended with both players told they had won, or
+               both told they had lost, which is the one result a match cannot produce.
+
+               Each row carries the house it is about. This machine's own house is id 0
+               on every peer -- that is what arm_skirmish gives the local seat, whichever
+               seat it sits in -- so the local row is the one carrying zero.
+
+               THE HUMAN TEST STAYS, AND IT IS WHAT MAKES THE ID TEST SAFE. Zero is also
+               what the engine leaves in a row it never filled, so an id test alone would
+               match every empty row; an unfilled row is neither IsHuman nor WasHuman and
+               is already gone by the time the id is read. */
             g_gameOver.valid = 1;
             g_gameOver.win = 0;
             g_gameOver.movie[0] = 0;
+            verdict_begin_reveal();
             for (int i = 0; i < e.GameOver.MultiPlayerTotalPlayers
                             && i < GAME_OVER_MULTIPLAYER_MAX_PLAYERS_TRACKED; i++) {
                 const GameOverMultiPlayerStatsStruct& row = e.GameOver.MultiPlayerPlayersData[i];
                 if (!row.IsHuman && !row.WasHuman)
                     continue;
+                if (row.GlyphXPlayerID != 0)
+                    continue;                    /* somebody else's result, not ours */
                 g_gameOver.win = row.IsWinner ? 1 : 0;
                 g_gameOver.credits = row.ResourcesGathered;
                 g_gameOver.score = row.Score;
@@ -575,9 +685,13 @@ static void ev_cb(const EventCallbackStruct& e)
                 break;
             }
             g_gameOver.minutes = g_simTicks / 900 + 1;
-            printf("GAMEOVER|SKIRMISH|%s|players=%d|minutes=%d\n",
+            /* THE SEAT IS ON THE LINE so that two peers' logs can be read against each
+               other. A match has one winner: if both ends of a two player game print
+               WIN, the row was matched by position instead of by house. */
+            printf("GAMEOVER|SKIRMISH|%s|players=%d|minutes=%d|seat=%d\n",
                    g_gameOver.win ? "WIN" : "LOSE",
-                   e.GameOver.MultiPlayerTotalPlayers, g_gameOver.minutes);
+                   e.GameOver.MultiPlayerTotalPlayers, g_gameOver.minutes,
+                   nm_active() ? nm_seat() : 0);
             fflush(stdout);
             if (g_au)
                 cnc_audio_play_named(g_au, g_gameOver.win ? "ACCOM1.AUD" : "FAIL1.AUD",
@@ -585,9 +699,37 @@ static void ev_cb(const EventCallbackStruct& e)
         }
         return;
     }
+    case CALLBACK_EVENT_MESSAGE: {
+        /* THE ENGINE'S OWN DEFEAT LINE. HouseClass::MPlayer_Defeated builds the text --
+           "<name> has been defeated." -- and posts it here, and until now nothing in this
+           renderer listened, so a player being knocked out of a match was announced
+           nowhere. It reaches the message feed with the rest of the match's news.
+
+           Only the defeat type: DIRECT is chat, which has its own path, and the computer
+           taunt is a single player flourish this game does not run. */
+        if (e.Message.MessageType == MESSAGE_TYPE_PLAYER_DEFEATED)
+            match_defeat_message(e.Message.Message, e.GlyphXPlayerID);
+        return;
+    }
     case CALLBACK_EVENT_SPEECH: {
+        /* EVA TALKS TO ONE HOUSE, and until now she talked to the room. In a match every
+           player heard every other player's announcements: an opponent finishing a
+           barracks said "construction complete" on all eight machines.
+
+           The engine was never at fault. On_Message stamps the event with the house the
+           line belongs to, and this case threw that field away. The reason another
+           house's line is raised in OUR context at all is that the engine walks every
+           seat's sidebar once per tick with PlayerPtr moved to that seat, so the line is
+           raised while this machine is briefly looking through somebody else's eyes; it
+           is correctly labelled, and nobody read the label.
+
+           Id 0 is this machine's own human, by construction: every peer names its own
+           player 0 and every other seat index+1, which is also why this can never travel
+           on the wire and never needs to. A campaign mission gets 0 for its only house,
+           so single player is untouched. */
+        const int mine = (e.GlyphXPlayerID == 0);
         g_voxAsked++;
-        const int h = cnc_audio_on_speech(g_au, e.Speech.SpeechIndex);
+        const int h = mine ? cnc_audio_on_speech(g_au, e.Speech.SpeechIndex) : -1;
         if (h >= 0) g_voxPlayed++;
         if (g_dumpsound)
             /* "queued" not "SILENT": a refusal here is the 1995 rule working, not a
@@ -596,7 +738,7 @@ static void ev_cb(const EventCallbackStruct& e)
                instead of twenty three times. Genuinely absent files are reported
                separately by the bank's miss log. */
             printf("SOUND|eva|%d|%s|%s\n", e.Speech.SpeechIndex, e.Speech.SpeechName,
-                   h >= 0 ? "played" : "dropped-duplicate");
+                   !mine ? "not-mine" : (h >= 0 ? "played" : "dropped-duplicate"));
         return;
     }
     default:
@@ -716,7 +858,7 @@ static float g_faceBias = 128.0f;
 static const struct { const char* type; int forward; } g_meshForward[] = {
     { "BOAT", 192 },                  /* bow west; everything else is nose south (128) */
     /* The Nod gun turret's BARREL is authored pointing NORTH, unlike the unit hulls.
-       Measured live (14 Aug 2026): a GUN at engine facing 109 (SSE) rendered its
+       Measured live: a GUN at engine facing 109 (SSE) rendered its
        barrel at ~DirType 237 (NNW) under the authored-south default -- exactly the
        (face - 128) delta applied to a north-authored barrel. With forward = 0 the
        same delta lands the barrel on the engine's facing. GUN is a BUILDING, so this
@@ -763,7 +905,7 @@ static bool g_measure = false;
    honest, and the gates read it -- but it is a debug instrument, so it is off by default
    and --ordermarks turns it back on. The console's own order acknowledgement is
    unreproduced; see known-gap notes. */
-/* ON by default since 18 Aug 2026, when the marker stopped being a diamond we drew and
+/* ON by default, when the marker stopped being a diamond we drew and
    became the cartridge's own model. It was opt-in while it was ours; there is no reason
    to hide the console's own art behind a flag. --noordermarks turns it off. */
 static bool g_orderMarksOn = true;
@@ -782,8 +924,8 @@ static bool g_sprShadow = true;
 static bool g_vehShadow = true;
 
 /* ---- THE GLOBAL SHADOW NUDGE -------------------------------------------------------
-   OURS, NOT THE CARTRIDGE'S, and deliberate: the project owner asked for every shadow in the game to
-   sit slightly further north-east than the cartridge places it (15 Aug 2026), having
+   OURS, NOT THE CARTRIDGE'S, and deliberate: the requirement asked for every shadow in the game to
+   sit slightly further north-east than the cartridge places it, having
    compared our build against console capture. Do not "fix" this back to zero because the
    ROM says zero -- the ROM's own offsets are still applied underneath it, and this rides
    on top of them.
@@ -824,7 +966,7 @@ static const float SPRSHADOW_HALF = 40.0f / 256.0f;
 static const float SPRSHADOW_ALPHA = 80.0f / 255.0f;
 
 /* MODE_XLU is the cartridge's own G_RM_AA_ZB_XLU_SURF: blended, depth TESTED, depth
-   NOT written. It arrived late (19 Aug 2026) because the baker used to pick a triangle's
+   NOT written. It arrived late because the baker used to pick a triangle's
    mode from its TEXTURE FORMAT, and a texture format cannot tell a canopy from a solid
    panel. Sixty nine faces over sixteen models were drawing solid as a result: the Jeep's
    and Recon Bike's windscreens, the Apache's canopy, the rocket launcher's, the Weapons
@@ -938,6 +1080,9 @@ struct PackInf { char set[5]; int strip[SPRH_COUNT][SPR_ANIM_COUNT]; };
 
 struct Pack {
     char scen[17], theater[17];
+    /* The pack's own magic, kept because the version letter in it is the actionable
+       half of "this pack cannot draw that": it says which baker made the file. */
+    char magic[9];
     /* PKF: the pack's own cell dimensions (two u32 directly after the version).
        Everything grid-shaped in this file sizes its STORAGE from C3D_MAP_MAX and
        STRIDES by these -- a pre-PKF pack is defined to be 64x64, which is why the
@@ -997,6 +1142,33 @@ struct Pack {
 
 static Pack g_pack;
 
+/* THE DEBUG PACK: updated meshes, drawn instead of the mission's when the F5 panel's
+   DEBUG row is on.
+
+   The point of it is a turnaround. A model that has been remade lands in a pack through
+   the FBX import tool, and without this there is no way to see the new one beside the old
+   one except by keeping two copies of the run folder and restarting between them. So a
+   second pack named debug.pack, sitting beside the mission's own, is loaded at boot when
+   it exists and every type whose mesh DIFFERS between the two is remembered. With the
+   dial on those types draw from the debug pack, textures and all; with it off the
+   mission's own art draws, and the two can be compared in one session.
+
+   Matched BY TYPE CODE and not by mesh index, because mesh order is a property of the
+   pack a model was baked into: the same tank is a different index in two missions, and
+   an index match would draw a harvester where the tank should be. Only meshes that
+   actually differ are listed, so a debug pack that is a copy of one mission's pack
+   overrides nothing in another.
+
+   Costs nothing when the file is absent, which is the normal case and every gate's. */
+static Pack g_packDebug;
+static bool g_packDebugOk = false;
+static std::map<int, int> g_debugMeshOf;   /* mission mesh index -> debug mesh index */
+
+static bool debug_meshes_on(void)
+{
+    return g_packDebugOk && g_fx.debug != 0.0f;
+}
+
 /* The console's terrain is a HEIGHTFIELD (PK9 corner bytes, unit 1/64 cell).
    g_terrainBase re-zeroes the world on the map's most common corner height --
    the mainland level -- so the camera maths, which pivot about y = 0, keep
@@ -1009,6 +1181,11 @@ static float g_terrainHTop = 0.0f, g_terrainHBot = 0.0f;   /* world-y bracket, l
 /* The engine's map rect, known before the pack loads (the MAP line prints first).
    Declared here because the PK9 base level is computed over exactly this rect. */
 static int g_mapX = 0, g_mapY = 0, g_mapW = 64, g_mapH = 64, g_theater = 0;
+/* The scenario's own playable rectangle. The one above is a cell wider on each side,
+   because GAME_STATE_STATIC_MAP widens it and keeps this one in OriginalMapCell*. A
+   building may cover only cells inside this one, so the placement overlay needs it.
+   Zero width until a map has been read. */
+static int g_playX = 0, g_playY = 0, g_playW = 0, g_playH = 0;
 
 /* ---- THE 128-MAP SEAM ----------------------------------------------------------
    The world grid is not "64" any more, it is THE LOADED PACK'S dims. Storage stays
@@ -1024,7 +1201,7 @@ static int g_mapX = 0, g_mapY = 0, g_mapW = 64, g_mapH = 64, g_theater = 0;
    size from the engine's own map constant, which is a third number again. */
 static int g_gridW = 64, g_gridH = 64;   /* the LOADED pack's cell dims        */
 /* THE HOST'S STORAGE MUST BE AT LEAST AS BIG AS ANYTHING AN ENGINE CAN HAND BACK, and
-   that is the whole of the requirement. This asserted EQUALITY until 27 Aug 2026, on the
+   that is the whole of the requirement. This asserted EQUALITY, on the
    reasoning that "a pack larger than that ceiling could never be walked by the engine" --
    true while there was one engine walking a 128 grid, and false now: the XL engine walks
    1024. Equality would have pinned the renderer to the smaller of the two engines it can
@@ -1035,7 +1212,7 @@ static_assert(C3D_MAP_MAX >= MAP_MAX_CELL_WIDTH && C3D_MAP_MAX >= MAP_MAX_CELL_H
 
 /* THE BUILDING PAD.
    A building is a FLAT model standing at ONE ground height, so on sloping ground its
-   uphill edge sinks under the terrain and its downhill edge floats. the project owner found this on
+   uphill edge sinks under the terrain and its downhill edge floats. It showed first on
    the Construction Yard: the test map stands the GDI base on the beach ramp (corner
    heights 125/113/101/90 across its three cells), which buried the whole north-west
    quarter of its concrete apron -- the fan deck then read as a box floating on grass
@@ -1051,13 +1228,30 @@ static_assert(C3D_MAP_MAX >= MAP_MAX_CELL_WIDTH && C3D_MAP_MAX >= MAP_MAX_CELL_H
    So the renderer generalises the artists' own choice: every building levels the corners
    of its own footprint to the HIGHEST ground it stands on. Highest, not mean, because a
    pad that is level with the high side can never bury anything; the low side steps down
-   at the pad's edge, which is what a cut-and-fill building platform looks like. Where
-   two adjacent buildings share a corner the taller pad wins, which is the same rule
-   applied twice and keeps the result independent of object order.
+   at the pad's edge, which is what a cut-and-fill building platform looks like.
+
+   TWO BUILDINGS THAT TOUCH SHARE ONE PLATFORM. A corner on the edge between two
+   footprints can only hold one height, and a building is drawn at one height, the one
+   under its own anchor. "The taller pad wins" at that corner therefore buried the lower
+   building along the whole shared edge: a Barracks placed beside a Power Plant on
+   dead-flat ground had its plate sliced by the terrain the moment the plant went up,
+   and a player who did nothing to the Barracks watched it sink. So footprints that
+   share any corner, directly or through a chain of neighbours, are levelled together
+   to the highest ground any of them stands on: the same raise-never-bury rule, applied
+   to the group instead of to the building. A base on a slope becomes one platform
+   with one step at its downhill edge, which is what a real base cut into a hill is.
+
+   AN APRON ONLY BORROWS GROUND NOBODY STANDS ON. A bibbed building also levels the one
+   corner row under its apron's second row, so the apron does not fold across its own
+   middle. That row is outside the footprint, and the building that owns it is the one
+   whose footprint it is, so an apron claim never overrides a footprint claim: a
+   neighbour's apron row could otherwise lift a 2x2 building's anchor corner and float
+   the model over its own pad. Among claims of the same class the taller wins; an apron
+   claim never digs. The result is independent of object order.
 
    It is an addition, not a substitution: the ROM's heights are untouched, the pad is an
-   overlay, and --noflatpads renders without it for the A/B. Registered in
-   known-gap notes as ours.
+   overlay, and --noflatpads renders without it for the A/B. Registered as ours, not a
+   decode.
 
    WHAT IT DELIBERATELY DOES NOT REACH: terrain_shade_calc, and therefore the CM tint.
    Those two are the cartridge's own baked lighting of the cartridge's own terrain, and
@@ -1065,6 +1259,7 @@ static_assert(C3D_MAP_MAX >= MAP_MAX_CELL_WIDTH && C3D_MAP_MAX >= MAP_MAX_CELL_H
    note in terrain_shade_calc for the measurement. */
 static unsigned char g_padH[C3D_CORN_MAX * C3D_CORN_MAX];
 static unsigned char g_padOn[C3D_CORN_MAX * C3D_CORN_MAX];
+static unsigned char g_padFoot[C3D_CORN_MAX * C3D_CORN_MAX];   /* 1: a footprint owns it */
 static bool g_flatPads = true;                  /* --noflatpads turns the pad off */
 
 static inline unsigned char corner_raw(int cx, int cz)
@@ -1135,6 +1330,11 @@ static bool g_terrainShade = true;      /* --noshade turns the console's light o
 /* Precomputed once per pack, exactly as the console precomputes it into the vertex
    at load: 65x65 bytes, no per-frame square roots. */
 static unsigned char g_shadeGrid[C3D_CORN_MAX * C3D_CORN_MAX];
+/* THE SAME NORMAL, KEPT. The console reduces it to the shade byte and
+   drops it; the Enhanced light pass wants it back, because its own normal is rebuilt
+   from depth and is flat per triangle. Stored as three bytes, n * 0.5 + 0.5, drawn into
+   a normal target by fx_draw_terrain_normals with the same Gouraud the shade gets. */
+static unsigned char g_normGrid[C3D_CORN_MAX * C3D_CORN_MAX][3];
 /* THE CM TINT, the other half of the console's terrain colour (PKC block).
    Same 65x65 corner grid, three bytes per corner, precomputed with the shade for
    exactly the same reason. Each is the value the cartridge stores into the F3D
@@ -1145,10 +1345,14 @@ static bool g_tintAny = false;          /* false => the plain modulate path is e
 static bool g_cmTint = true;            /* --nocmtint turns the layer off for A/B */
 static bool g_shadeReady = false;
 
-static float terrain_shade_calc(int cx, int cz)
+/* The corner's normal, |n| = 127 exactly as the ROM normalises it, or zero where the
+   ROM's normalise leaves a zero alone. terrain_shade_calc dots it with the console's
+   light; the Enhanced ground normal target draws it. One arithmetic, two readers. */
+static void terrain_corner_normal(int cx, int cz, float n[3])
 {
+    n[0] = n[1] = n[2] = 0.0f;
     if (g_pack.corner.empty())
-        return 1.0f;
+        return;
     if (cx < 0) cx = 0; else if (cx > g_gridW) cx = g_gridW;
     if (cz < 0) cz = 0; else if (cz > g_gridH) cz = g_gridH;
     /* RAW corners, NOT corner_raw: the building pad is deliberately kept out of this
@@ -1192,6 +1396,16 @@ static float terrain_shade_calc(int cx, int cz)
         const float s = 127.0f / ln;
         nx *= s; ny *= s; nz *= s;
     }
+    n[0] = nx; n[1] = ny; n[2] = nz;
+}
+
+static float terrain_shade_calc(int cx, int cz)
+{
+    if (g_pack.corner.empty())
+        return 1.0f;
+    float n[3];
+    terrain_corner_normal(cx, cz, n);
+    const float nx = n[0], ny = n[1], nz = n[2];
     const float dot = -64.0f * nx + 64.0f * ny + 64.0f * nz;
     const float llen = 110.851257f;      /* |(-64,64,64)| = 64*sqrt(3) */
     int v = (int)(16.0f + 250.0f * dot / (llen * 127.0f));   /* trunc, as the ROM */
@@ -1263,6 +1477,16 @@ static void terrain_shade_build(void)
             const unsigned char lit =
                 (unsigned char)(terrain_shade_calc(x, z) * 255.0f + 0.5f);
             g_shadeGrid[z * cw + x] = lit;
+            {
+                float n[3];
+                terrain_corner_normal(x, z, n);
+                if (n[0] == 0.0f && n[1] == 0.0f && n[2] == 0.0f) n[1] = 127.0f;
+                for (int k = 0; k < 3; k++) {
+                    int b = (int)((n[k] / 127.0f * 0.5f + 0.5f) * 255.0f + 0.5f);
+                    if (b < 0) b = 0; else if (b > 255) b = 255;
+                    g_normGrid[z * cw + x][k] = (unsigned char)b;
+                }
+            }
             /* The tint is a function of the LIGHT as well as of the CM map, so it is
                built here and not separately: the console multiplies the two before it
                ever reaches a vertex. */
@@ -1401,6 +1625,8 @@ static bool load_pack(const char* path, Pack& p)
         fclose(f);
         return false;
     }
+    memcpy(p.magic, magic, 8);
+    p.magic[8] = 0;
     const bool pk6 = magic[7] >= '6';   /* per-texture GDI house variants        */
     const bool pk7 = magic[7] >= '7';   /* per-mesh construction section tables  */
     /* PK8 appends two int32 water-texture bank indices at the very END of the file
@@ -2011,6 +2237,62 @@ static bool load_pack(const char* path, Pack& p)
     return true;
 }
 
+/* Load debug.pack from the directory the mission's pack came from, and list the types
+   whose mesh it redefines. See g_packDebug. Called once, after the mission's own pack is
+   up, so the comparison has something to compare against; silent and harmless when the
+   file is not there. */
+static void load_debug_pack(const char* packpath)
+{
+    std::string dir(packpath ? packpath : "");
+    const size_t cut = dir.find_last_of("/\\");
+    dir = (cut == std::string::npos) ? std::string("") : dir.substr(0, cut + 1);
+    const std::string path = dir + "debug.pack";
+    FILE* probe = fopen(path.c_str(), "rb");
+    if (!probe) return;                       /* the normal case: nothing to do */
+    fclose(probe);
+    if (!load_pack(path.c_str(), g_packDebug)) {
+        fprintf(stderr, "debug: %s would not load; the mission's own art stands\n",
+                path.c_str());
+        return;
+    }
+    g_packDebugOk = true;
+    g_debugMeshOf.clear();
+    int same = 0;
+    for (std::map<std::string, PackType>::const_iterator it = g_pack.type.begin();
+         it != g_pack.type.end(); ++it) {
+        std::map<std::string, PackType>::const_iterator jt =
+            g_packDebug.type.find(it->first);
+        if (jt == g_packDebug.type.end()) continue;
+        const int a = it->second.mesh, b = jt->second.mesh;
+        if (a < 0 || a >= (int)g_pack.mesh.size()) continue;
+        if (b < 0 || b >= (int)g_packDebug.mesh.size()) continue;
+        const PackMesh& ma = g_pack.mesh[a];
+        const PackMesh& mb = g_packDebug.mesh[b];
+        /* Triangle count first because it settles almost every case for free, then the
+           triangles themselves: a remodelled mesh that happens to keep its count still
+           has to be caught, or the one thing this exists for goes unnoticed. */
+        bool differs = ma.tris.size() != mb.tris.size();
+        if (!differs && !ma.tris.empty())
+            differs = memcmp(&ma.tris[0], &mb.tris[0],
+                             ma.tris.size() * sizeof(PackTri)) != 0;
+        if (differs) g_debugMeshOf[a] = b;
+        else         same++;
+    }
+    fprintf(stderr, "debug: %s loaded, %d type%s redefined (%d identical). "
+                    "F5 group 13 draws them\n",
+            path.c_str(), (int)g_debugMeshOf.size(),
+            g_debugMeshOf.size() == 1 ? "" : "s", same);
+    for (std::map<int, int>::const_iterator it = g_debugMeshOf.begin();
+         it != g_debugMeshOf.end(); ++it) {
+        for (std::map<std::string, PackType>::const_iterator t = g_pack.type.begin();
+             t != g_pack.type.end(); ++t)
+            if (t->second.mesh == it->first)
+                fprintf(stderr, "debug:   %s  %d -> %d triangles\n", t->first.c_str(),
+                        (int)g_pack.mesh[it->first].tris.size(),
+                        (int)g_packDebug.mesh[it->second].tris.size());
+    }
+}
+
 /* Undo load_pack. One texture per pack texture went up; one comes back down. The
    vectors and maps are ordinary C++ containers, so clearing them is enough, but they
    have to be cleared rather than left: load_pack RESIZES tex/mesh/cell, so a second
@@ -2165,8 +2447,9 @@ struct SimObject {
        writes -1 for a unit, which the old comment here claimed. For a unit whose type is
        NOT IsTurretEquipped the engine writes this field exactly once, at Unlimbo, and
        never again -- so on a harvester, an MCV, an APC or a transport it is the spawn
-       heading forever and means nothing. Only turret_delta may read it, and only for a
-       mesh that carries a real turret part. See draw_facing. */
+       heading forever and means nothing. Only turret_delta may read it, for a mesh that
+       carries a real turret part, and launcher_follows_turret, for the two rocket
+       launcher stems that are turret equipped without one. See draw_facing. */
     int     tface;
     int     id;                  /* slot in the object's own heap: stable for its lifetime */
     int     lx, ly;              /* exact position in leptons, 256 per cell */
@@ -2274,6 +2557,11 @@ struct SimObject {
        nav < 0 && tar < 0 is the only honest reading of "this unit has finished what it
        was last told to do". Default -1, which reads as idle. */
     int     nav, tar;
+    /* WHICH CONTROL GROUP IT IS IN: FootClass::Group, 0..9 for a member, -1 for none,
+       for a building or terrain object, and for a brain that predates the export. The
+       unit card counts the groups off this field rather than keeping its own list, so
+       a unit that dies or is reassigned leaves the count changed by itself. */
+    int     group;
 };
 
 /* WHICH SIDE AN OBJECT FIGHTS FOR: 0 GDI, 1 Nod, 2 neutral, 3 special, -1 unknown.
@@ -2318,6 +2606,8 @@ static void amq_service(int frame);
 static bool g_feedOn = false;      /* armed by playing out of the editor */
 static bool g_feedShow = true;
 static void feed_service(int frame);
+static void chat_expire(int frame);   /* the player's pane ages on the same tick */
+static void say_cannot_deploy(void);  /* and a refused deploy is said in it */
 static void feed_reset(void);
 
 /* THE CARTRIDGE'S PER-BUILDING PARTICLE EMITTERS, on the same once-per-engine-tick
@@ -2356,6 +2646,11 @@ static std::vector<SimObject> g_riders;
    diffing. It suppresses only the DRAW -- the deck is still resolved and cargodump
    still reports it. */
 static bool g_ridersDraw = true;
+/* infdraw 0|1: the infantry billboards, drawn or not, in both the sun caster pass and
+   the scene. A gate's control leg: a shot with the men and one without, at the same
+   tick, differ in exactly the men's pixels, which is how a card's silhouette is
+   measured without a colour rule that has to know a flamethrower from his flame. */
+static bool g_infantryDraw = true;
 
 /* The raw link, parsed before the objects it names are necessarily all in hand (the
    passenger's own OBJ| line may follow the transport's). Resolved after the dump. */
@@ -2424,7 +2719,7 @@ static std::vector<WallCell> g_walls;
    16-frame art does too. (icon 0/1/2/4/8 are the five such cases; none occurs in any
    shipped mission, so this row of the table is unexercised by real content.) */
 struct WallVariant { unsigned char variant, face; };
-/* THE CARTRIDGE'S OWN 16-WAY WALL TABLE, transcribed (18 Aug 2026), replacing one that
+/* THE CARTRIDGE'S OWN 16-WAY WALL TABLE, transcribed, replacing one that
    had been derived by eye.
 
    Found by following the overlay draw dispatcher at RAM 0x801F54D8 into its 3-D arm at
@@ -2525,7 +2820,7 @@ static float g_camFreeYaw = 0, g_camFreePitch = 45, g_camFreeY = 20;
 static float g_tickAlpha = 0.0f;
 
 /* ---------------------------------------------------------------------------------- *
- *  MOVEMENT SMOOTHING. the project owner, 20 Aug 2026: "Vehicles visually moving cell by cell ... the
+ *  MOVEMENT SMOOTHING. Reported: "Vehicles visually moving cell by cell ... the
  *  movement of this needs to be interpolated, so its smooth."
  *
  *  The same disease as the animation staircase, in a different organ. The brain reports
@@ -2591,6 +2886,55 @@ static const float SMOOTH_JUMP_CELLS = 1.0f;
 struct SmoothPos { float x[SMOOTH_MAX], z[SMOOTH_MAX]; int n; int frame; };
 static std::map<int, SmoothPos> g_smoothPos;
 
+/* RUNNING TRACK. A vehicle whose model carries track faces scrolls them under itself as
+   it drives. The pack marks those triangles in the top nibble of the per-triangle wrap
+   byte, which the RDP's own clamp/mirror fields never used: 0 is not track, 1 is a strip
+   scrolled continuously, and 2..15 step a flipbook of that many frames stacked down the
+   image. The scroll is a texture-coordinate offset and nothing else, so it costs the
+   fixed-function pipeline nothing and needs no shader.
+
+   The phase is DISTANCE TRAVELLED, not wall clock, so a stationary tank's track is still
+   and two vehicles at different speeds do not run in step. It is accumulated in the
+   per-tick object parse rather than in the draw, for the same reason the dead-building
+   clock is: a draw does not happen on every tick under a script, and a phase that
+   advanced per drawn frame would make two --shot runs of the same script disagree. */
+struct TreadPhase { float x, z, phase; };
+static std::map<int, TreadPhase> g_treadPhase;
+static float g_treadNow = 0.0f;      /* the object being drawn, in strip repeats */
+static int   g_treadTest = -1;       /* --treadtest N: force phase N/16, for a still */
+
+/* Model units the strip repeats over, matching the importer's own default pitch. One
+   map cell is 1024 units, so this is a little under a sixth of a cell per repeat. */
+static const float TREAD_PITCH = 160.0f;
+
+static void tread_advance(int id, float wx, float wz)
+{
+    if (id < 0) return;
+    std::map<int, TreadPhase>::iterator it = g_treadPhase.find(id);
+    if (it == g_treadPhase.end()) {
+        TreadPhase tp; tp.x = wx; tp.z = wz; tp.phase = 0.0f;
+        g_treadPhase[id] = tp;
+        return;
+    }
+    const float dx = wx - it->second.x, dz = wz - it->second.z;
+    float d = sqrtf(dx * dx + dz * dz);
+    /* A teleport is not a drive: recycled ids and reinforcement drops would otherwise
+       spin the track by the width of the map in one tick. One cell is the same
+       threshold the movement filter uses to decide a journey has been broken. */
+    if (d > SMOOTH_JUMP_CELLS) d = 0.0f;
+    it->second.phase += d * 1024.0f / TREAD_PITCH;   /* cells -> model units -> repeats */
+    if (it->second.phase > 4096.0f) it->second.phase -= 4096.0f;   /* keep it small */
+    it->second.x = wx;
+    it->second.z = wz;
+}
+
+static float tread_phase_of(int id)
+{
+    if (g_treadTest >= 0) return (float)g_treadTest / 16.0f;
+    std::map<int, TreadPhase>::const_iterator it = g_treadPhase.find(id);
+    return (it == g_treadPhase.end()) ? 0.0f : it->second.phase;
+}
+
 /* Where the filter says the object is at sub-tick phase `a`.
    Two box means of K samples, offset by one tick, lerped between. A box of length K
    cancels EXACTLY any periodic ripple whose period divides K, and the ripple here is the
@@ -2634,7 +2978,7 @@ static void smooth_at(const SmoothPos& s, float a, float* ox, float* oz)
 static int smooth_key(const SimObject& o) { return (int)o.kind * 1000000 + o.id; }
 
 /* ---------------------------------------------------------------------------------- *
- *  THE ENGINE'S STAGE COUNTER, SMOOTHED. the project owner, 21 Aug 2026: "do the same interpolation
+ *  THE ENGINE'S STAGE COUNTER, SMOOTHED. Reported: "do the same interpolation
  *  for Structure animations (When being build, action is happening (like Construction Yard
  *  crane is moving around or the Harvester is emptying itself into the refinery), and Idle
  *  animations)."
@@ -2772,31 +3116,29 @@ struct AnimState {
 static std::map<int, AnimState> g_anim;   /* infantry heap id -> state */
 
 /* ---------------------------------------------------------------------------------- *
- *  Turret aim for vehicles
+ *  Vehicle stillness, a diagnostic
  *
- *  The engine reports a separate turret facing (tface) for turreted units, but the N64
- *  vehicle meshes are single rigid bodies: measured straight from the pack, MTNK's
- *  above-deck triangles span the full hull length (z -440..347 of a -440..404 hull) and
- *  there is no barrel geometry at all, so a separate turret CANNOT be drawn -- there is
- *  nothing to rotate. What CAN be drawn honestly: when a turreted unit is standing
- *  still, turn the whole model to tface, so a tank shooting sideways visibly points at
- *  what it is shooting instead of firing out of its flank. While the unit is actually
- *  driving, the hull facing keeps the art on the movement vector (the facing audit's
- *  invariant: drawn art matches motion). A drive-by shot therefore still leaves the
- *  flank; that residue is unfixable without turret geometry and is a listed known
- *  issue. Stillness is decided exactly like the infantry walk gate above: did the
- *  lepton position change between engine ticks. When the turret is centred
- *  (tface == face, the engine recentres it at rest) this changes nothing.             */
+ *  The engine reports a separate turret facing (tface) for turreted units. Where the
+ *  mesh carries a real turret part that part alone is turned to it (turret_delta), and
+ *  the hull keeps PrimaryFacing. This latch used to decide something else: a standing
+ *  unit whose mesh has NO turret part was once turned whole to tface, and the latch
+ *  said when it was standing. That swap is gone (tface is a frozen spawn value for
+ *  every type that is not turret equipped, so it snapped the harvester and the MCV by
+ *  up to 45 degrees; see draw_facing), and the one whole-body swap that remains, the
+ *  rocket launcher under Enhanced, deliberately does NOT consult it (see
+ *  launcher_follows_turret). What is left is the measurement: the aimwatch verb prints
+ *  the counter beside the engine facings and the drawn yaw every tick, so a drawn flip
+ *  that FACEWATCH's moved-only filter would hide is caught in the act. Stillness is
+ *  decided exactly like the infantry walk gate above: did the lepton position change
+ *  between engine ticks.                                                             */
 struct UnitAim { int lx, ly, still; bool seen; };
 static std::map<int, UnitAim> g_unitAim;   /* unit heap id -> stillness */
-/* Ticks without motion before tface drives the model. NOT 1: a DRIVING unit's speed
+/* Ticks without motion before a unit reads as standing. NOT 1: a DRIVING unit's speed
    accumulator emits isolated zero-progress ticks (measured on the gunboat at cruise:
-   one tick in five, AIMWATCH log), and a single such tick must not read as "standing"
-   or the whole mesh snaps to the turret facing for that one tick and back: the boat
-   spin bug. Four consecutive still ticks never occur while actually driving, and a
-   genuinely stopped tank still turns to aim within ~0.27 s at the engine's 15 Hz.
-   (Since the turret step this swap only reaches meshes WITHOUT a real turret part;
-   the window still matters for those.) */
+   one tick in five, AIMWATCH log), and a single such tick must not read as "standing",
+   which is how the whole gunboat once snapped to its turret facing for one tick and
+   back: the boat spin bug. Four consecutive still ticks never occur while actually
+   driving. */
 static const int AIM_STILL_TICKS = 4;
 
 static bool unit_is_still(int id)
@@ -2889,7 +3231,7 @@ static FILE* capture_brain_call(int (*fn)(void))
         char* pref = SDL_GetPrefPath("Slipgate Ironworks", "CNC3D");
         if (pref) {
             char p[1024];
-            /* ONE SCRATCH FILE PER PROCESS, found the hard way on 3 Sep 2026: two copies
+            /* ONE SCRATCH FILE PER PROCESS, found the hard way: two copies
                of the game on one machine, a host and a joiner over loopback, both wrote
                and read THIS file, and each saw a world torn between its own and the
                other's, frames arriving out of order, buildings flipping from 17 to 0 and
@@ -3031,6 +3373,14 @@ static int  draw_facing(const SimObject& o);   /* observed here and nowhere else
 static float alt_lift(const SimObject& o);     /* an aircraft's height above the ground */
 static void aircraft_stand_resolve(void);      /* and the step it is parked against     */
 static void shake_note(float amp);             /* the camera jolt, defined by set_camera */
+
+/* THE GRASS'S PER-TICK OBSERVER, defined in grass_field.h far below. It records what the
+   tick did (the building footprint runs, and one entry per vehicle with its previous
+   position and its beam), touches no GL, and is replayed into the crush field by
+   grass_crush_sim() in the draw path. The split is the same ruling the tread phase
+   already made at :2806-2810: a draw does not happen on every tick under a script, and a
+   permanent mark advanced per DRAWN frame makes two --shot runs disagree. */
+static void grass_crush_note_tick(void);
 static void shake_tap(float amp);              /* the smaller one, same place            */
 /* A VEHICLE DEATH'S JOLT, one number for every vehicle. Measured against the building
    scale beside it (0.028 per footprint cell): this is 0.357 of a Guard Tower, 0.179 of
@@ -3151,18 +3501,26 @@ static void terrain_pads_rebuild(void)
     memcpy(prevOn, g_padOn, sizeof prevOn);
     memset(g_padH, 0, sizeof g_padH);
     memset(g_padOn, 0, sizeof g_padOn);
+    memset(g_padFoot, 0, sizeof g_padFoot);
     int nbld = 0, worst = 0;
     if (g_flatPads) {
+        /* ONE PAD PER STANDING BUILDING, measured first and painted last, because the
+           height a building is painted at is not decided until every building has been
+           measured: two footprints that touch are levelled together (below). */
+        struct Pad { int x0, z0, fw, fh, rows, root; unsigned char top; };
+        static std::vector<Pad> pads;
+        pads.clear();
         for (size_t i = 0; i < g_objects.size(); i++) {
             const SimObject& o = g_objects[i];
             if (o.kind != K_BUILDING || o.limbo)
                 continue;
-            const int fw = o.fw > 0 ? o.fw : 1, fh = o.fh > 0 ? o.fh : 1;
-            const int x0 = o.cx, z0 = o.cy;
+            Pad p;
+            p.fw = o.fw > 0 ? o.fw : 1; p.fh = o.fh > 0 ? o.fh : 1;
+            p.x0 = o.cx; p.z0 = o.cy;
             unsigned char top = 0, bot = 255;
-            for (int dz = 0; dz <= fh; dz++)
-                for (int dx = 0; dx <= fw; dx++) {
-                    const int cx = x0 + dx, cz = z0 + dz;
+            for (int dz = 0; dz <= p.fh; dz++)
+                for (int dx = 0; dx <= p.fw; dx++) {
+                    const int cx = p.x0 + dx, cz = p.z0 + dz;
                     if (cx < 0 || cx > g_gridW || cz < 0 || cz > g_gridH) continue;
                     const unsigned char h = g_pack.corner[cz * (g_gridW + 1) + cx];
                     if (h > top) top = h;
@@ -3180,22 +3538,65 @@ static void terrain_pads_rebuild(void)
                THE MEASURE LOOP ABOVE IS DELIBERATELY NOT EXTENDED. top and worst still
                describe the footprint alone, so a tall cell below a building cannot lift
                the building itself, and the PAD| line keeps the meaning its gate reads. */
-            const int padRows = bib_row_below(x0, z0, fw, fh) ? fh + 1 : fh;
-            for (int dz = 0; dz <= padRows; dz++)
-                for (int dx = 0; dx <= fw; dx++) {
-                    const int cx = x0 + dx, cz = z0 + dz;
+            p.rows = bib_row_below(p.x0, p.z0, p.fw, p.fh) ? p.fh + 1 : p.fh;
+            p.top = top;
+            p.root = (int)pads.size();
+            pads.push_back(p);
+        }
+        /* FOOTPRINTS THAT TOUCH ARE LEVELLED TOGETHER. Two footprint boxes that share a
+           corner, along an edge or at a single point, are one connected group, and so is
+           any chain of them; every member takes the group's highest top. The anchor a
+           building is drawn at lies inside its own footprint, so once every footprint
+           corner of the group reads the same height no member can be below its own pad
+           along a shared edge, which is the burial the old taller-wins corner rule
+           produced. Apron rows do not join a group: an apron touching a footprint is
+           settled per corner below, and a base does not fuse into one platform through
+           its aprons. Union-find rather than iteration, so the closure is exact in one
+           pass and the result is independent of object order. */
+        for (size_t i = 0; i < pads.size(); i++)
+            for (size_t j = i + 1; j < pads.size(); j++) {
+                const Pad& a = pads[i];
+                const Pad& b = pads[j];
+                if (a.x0 > b.x0 + b.fw || b.x0 > a.x0 + a.fw ||
+                    a.z0 > b.z0 + b.fh || b.z0 > a.z0 + a.fh)
+                    continue;
+                int ra = (int)i, rb = (int)j;
+                while (pads[ra].root != ra) ra = pads[ra].root;
+                while (pads[rb].root != rb) rb = pads[rb].root;
+                if (ra != rb) pads[ra].root = rb;
+            }
+        for (size_t i = 0; i < pads.size(); i++) {
+            int r = (int)i;
+            while (pads[r].root != r) r = pads[r].root;
+            pads[i].root = r;
+            if (pads[i].top > pads[r].top) pads[r].top = pads[i].top;
+        }
+        for (size_t i = 0; i < pads.size(); i++)
+            pads[i].top = pads[pads[i].root].top;
+        for (size_t i = 0; i < pads.size(); i++) {
+            const Pad& p = pads[i];
+            for (int dz = 0; dz <= p.rows; dz++)
+                for (int dx = 0; dx <= p.fw; dx++) {
+                    const int cx = p.x0 + dx, cz = p.z0 + dz;
                     if (cx < 0 || cx > g_gridW || cz < 0 || cz > g_gridH) continue;
                     const int k = cz * (g_gridW + 1) + cx;
+                    const bool foot = dz <= p.fh;
                     /* THE PAD RAISES; IT NEVER DIGS. Inside the footprint that costs
                        nothing, because top is the maximum of those very corners. The bib
                        row is ground the measure never looked at and it can stand HIGHER
                        than the building; cutting it down to the pad would gouge a notch
                        out of whatever stands behind, so that case is left alone. */
-                    if (dz > fh && top <= g_pack.corner[k])
+                    if (!foot && p.top <= g_pack.corner[k])
                         continue;
-                    if (!g_padOn[k] || top > g_padH[k]) {   /* the taller pad wins */
-                        g_padH[k] = top;
+                    /* A FOOTPRINT CLAIM ALWAYS BEATS AN APRON CLAIM, whatever the
+                       heights; among claims of one class the taller wins. Two
+                       footprints that meet here were levelled together above, so the
+                       taller-wins case between footprints can only be a tie. */
+                    if (!g_padOn[k] || (foot && !g_padFoot[k]) ||
+                        (foot == (g_padFoot[k] != 0) && p.top > g_padH[k])) {
+                        g_padH[k] = p.top;
                         g_padOn[k] = 1;
+                        g_padFoot[k] = foot ? 1 : 0;
                     }
                 }
         }
@@ -3247,11 +3648,147 @@ static float mesh_deck_y(int mi)
     return bestY * MODEL_SCALE;
 }
 
+/* THE ROOF OF A BUILDING, in cells above its anchor, read off the model the same way the
+   deck is: the HIGHEST horizontal face (opaque or cutout, so neither a shadow plate nor a
+   translucent surface) whose doubled footprint area exceeds MESH_ROOF_MIN_AREA2. This is
+   what the repair wrench floats over.
+
+   WHY AN AREA THRESHOLD AND NOT THE HIGHEST VERTEX. The highest vertex of most of these
+   models is not a roof: the Refinery's is the tip of its two smokestacks (1.35 cells,
+   drawn as sliver triangles of zero footprint) while its tallest bulk, the tower with the
+   arch, tops out at 1.05; the Comm Center's is a mast, the Temple's a spire, the Guard
+   Tower's a mast tip. A wrench lifted to those would hang in the air over a building it
+   is meant to sit on. A face with a real footprint is a surface something could stand on.
+
+   THE FALLBACK. A model with no horizontal face that large at all (the Temple, the Hand
+   of Nod, the Obelisk, the Advanced Guard Tower: every one of them a sloped or faceted
+   body) answers with the 90th percentile of its vertex heights, which is the level a
+   tenth of the model rises above: the top of the bulk rather than the tip of the spire.
+
+   IT CAN UNDER-READ, AND THAT COSTS NOTHING. A model with a pitched roof over a flat
+   base plate answers with the base plate, because the pitched faces fail the horizontal
+   test and the plate does not. The one caller takes the LARGER of this and the building's
+   footprint rule, so an answer that is too low simply changes nothing, and the numbers
+   printed by wrenchdump say which rule won. The tolerance is mesh_deck_y's, so the two
+   readings of "horizontal" cannot disagree. Measured on the shipped pack: Refinery 1.052,
+   Weapons Factory 1.104, Barracks 0.067 (base plate; its footprint rule wins), Temple
+   1.745 and Hand of Nod 1.727 by the fallback. */
+static const float MESH_ROOF_MIN_AREA2 = 50000.0f;   /* 0.048 square cells, doubled */
+static float mesh_roof_y(int mi)
+{
+    if (mi < 0 || mi >= (int)g_pack.mesh.size())
+        return 0.0f;
+    const std::vector<PackTri>& tris = g_pack.mesh[mi].tris;
+    float bestY = 0.0f;
+    bool  found = false;
+    std::vector<float> ys;
+    ys.reserve(tris.size() * 3);
+    for (size_t i = 0; i < tris.size(); i++) {
+        const PackTri& t = tris[i];
+        if (t.mode == MODE_SHADOW || t.mode == MODE_XLU)
+            continue;
+        for (int v = 0; v < 3; v++) ys.push_back(t.v[v].y);
+        const float y = t.v[0].y;
+        if (fabsf(t.v[1].y - y) > 0.01f || fabsf(t.v[2].y - y) > 0.01f)
+            continue;                                   /* not a horizontal face */
+        const float area = fabsf((t.v[1].x - t.v[0].x) * (t.v[2].z - t.v[0].z)
+                               - (t.v[2].x - t.v[0].x) * (t.v[1].z - t.v[0].z));
+        if (area <= MESH_ROOF_MIN_AREA2)
+            continue;
+        if (!found || y > bestY) { bestY = y; found = true; }
+    }
+    if (!found && !ys.empty()) {
+        std::sort(ys.begin(), ys.end());
+        size_t k = (size_t)((float)ys.size() * 0.9f);
+        if (k >= ys.size()) k = ys.size() - 1;
+        bestY = ys[k];
+    }
+    return bestY * MODEL_SCALE;
+}
+
+/* WHERE A MODEL'S SOLID BODY STARTS, in cells above its anchor: the lowest vertex among
+   its opaque faces. The repair wrench's slab is modelled floating 0.099 cell above its
+   own anchor (mesh y 101 of a 168 tall box; the only thing at y=0 is its cutout ground
+   marker), so a lift that wants the slab's UNDERSIDE a known distance above a roof has
+   to know this number, and it is read off the mesh rather than written down. */
+static float mesh_body_base_y(int mi)
+{
+    if (mi < 0 || mi >= (int)g_pack.mesh.size())
+        return 0.0f;
+    const std::vector<PackTri>& tris = g_pack.mesh[mi].tris;
+    float low = 0.0f;
+    bool  found = false;
+    for (size_t i = 0; i < tris.size(); i++) {
+        const PackTri& t = tris[i];
+        if (t.mode != MODE_OPAQUE)
+            continue;
+        for (int v = 0; v < 3; v++)
+            if (!found || t.v[v].y < low) { low = t.v[v].y; found = true; }
+    }
+    return found ? low * MODEL_SCALE : 0.0f;
+}
+
+/* THE CREDIT TICK. The credits readout is not the bank: it is CreditClass::Current,
+   which the engine walks toward the real total one step per tick (credits.cpp
+   CreditClass::AI: the difference >> 5, bounded 1..143), and it reaches this side as
+   CNCSidebarStruct::CreditsCounter. In 1995 each step also sounded VOC_UP (TONE15) or
+   VOC_DOWN (TONE16) at VOL_1, but from CreditClass::Graphic_Logic, the tab's draw
+   routine, which the DLL build never calls: the count survived the port and the sound did
+   not. The cartridge sounds one tone for both directions from its own CreditClass::AI, at
+   a fifth of an ordinary effect's volume; the 1995 pair at 1995's VOL_1 is used here.
+
+   THE CADENCE IS ONCE PER ENGINE TICK, from the delta between two polls, which is the
+   console's cadence. 1995 sounded from the draw, once per frame, so a catch-up burst
+   there made one tone for several steps and here makes one per step; the difference is
+   only audible when the frame rate falls below the tick rate.
+
+   VOL_1 is 25 of 255. It goes to the effects bus so the effects slider scales it, where
+   1995 handed VOL_1 straight to the sample player past its own slider. The priority is
+   the table's, 0, the lowest there is: in a full firefight it is the first thing the
+   mixer refuses a voice, and that refusal is reported as its own outcome below rather
+   than as a missing clip. */
+#define CASH_TICK_GAIN     (25 * MIX_UNITY / 255)
+#define CASH_TICK_VOC_UP   69   /* VOC_UP,   TONE15, sfx_voc[69] */
+#define CASH_TICK_VOC_DOWN 70   /* VOC_DOWN, TONE16, sfx_voc[70] */
+static int g_cashPrev = -1;     /* the counter at the last poll; -1 = no baseline yet */
+static int g_cashLastStep = 0;  /* the last change seen, signed */
+static int g_cashUp = 0, g_cashDown = 0, g_cashNoVoice = 0, g_cashSilent = 0;  /* tallies */
+static void cash_tick(void)
+{
+    if (!g_sbState.valid) { g_cashPrev = -1; return; }
+    const int cur = g_sbState.creditsCounter;
+    if (g_cashPrev >= 0 && cur != g_cashPrev && g_fx.cash_tick) {
+        const bool up = cur > g_cashPrev;
+        g_cashLastStep = cur - g_cashPrev;
+        const int h = cnc_audio_on_ui_effect(g_au, up ? CASH_TICK_VOC_UP : CASH_TICK_VOC_DOWN,
+                                             CASH_TICK_GAIN);
+        if (h >= 0) { if (up) g_cashUp++; else g_cashDown++; }
+        else if (h == CNC_SFX_NOVOICE) g_cashNoVoice++;
+        else if (h != CNC_SFX_DUPLICATE) g_cashSilent++;
+        /* FOUR OUTCOMES. "dropped-novoice" is the mixer refusing a voice to the lowest
+           priority in the table; a headless run with nothing draining the mixer shows it
+           after the pool fills, a run with a device or a WAV sink almost never does.
+           SILENT stays reserved for a clip the disc does not have, which is what the
+           sound gates count. */
+        if (g_dumpsound)
+            printf("SOUND|cash|%s|from=%d|to=%d|step=%+d|gain=%d|%s\n",
+                   up ? "TONE15" : "TONE16", g_cashPrev, cur, cur - g_cashPrev,
+                   CASH_TICK_GAIN,
+                   h == CNC_SFX_DUPLICATE ? "dropped-duplicate"
+                   : h == CNC_SFX_NOVOICE ? "dropped-novoice"
+                                          : (h >= 0 ? "played" : "SILENT"));
+    }
+    g_cashPrev = cur;
+}
+
 static void refresh_objects(void)
 {
     /* The sidebar mirror is refreshed on the same heartbeat as the object list, so a
        frame never shows a build queue from one tick and a map from another. */
     sb_poll();
+    /* The credit tick reads the poll just taken. Here and not in the tick loops, because
+       every path that advances the engine ends in this function once per tick. */
+    cash_tick();
     /* The shroud snapshot rides the same heartbeat, for the same reason. */
     if (g_shroudOn)
         shroud_fetch(BrainGetState);
@@ -3525,6 +4062,9 @@ static void refresh_objects(void)
            rather than one standing over an arbitrary building. */
         o.primary   = field(f, nf, "primary", 0);
         o.flash = field(f, nf, "flash", 0);
+        /* -1, not 0: 0 is control group 1, and a brain without the export must read as
+           "in no group" rather than putting every unit in the first one. */
+        o.group = field(f, nf, "group", -1);
         o.ylift = 0.0f;
         o.deck = 0.0f;                 /* resolved below, once the building cells exist */
         o.stand = 0.0f;                /* resolved below, once the pads have been built  */
@@ -3544,6 +4084,7 @@ static void refresh_objects(void)
            whatever the footprint, and ignore the facing. The ground truth ex/ez stays put
            so the same instrument measures both. */
         if (g_legacy) { o.wx = (float)o.cx + 0.5f; o.wz = (float)o.cy + 0.5f; o.face = -1; }
+        tread_advance(o.id, o.ex, o.ez);
         if (o.dying && o.id >= 0)
             efx_note_dying(o.id, o.wx, o.wz, o.dostage, obj_is_gdi(o));
         /* A DEAD BUILDING'S CLOCK STARTS HERE, in the per-tick parse, and NOT in the draw.
@@ -3582,7 +4123,7 @@ static void refresh_objects(void)
                about a third of a Guard Tower: a firefight kills them several a second, so
                they get the strictly-largest-wins rule that stops a screen of them from
                re-arming the shake forever. The shake block carries it.
-               0.028 rather than the 0.020 this shipped with, at the project owner's ask on 24 Aug 2026.
+               0.028 rather than the 0.020 this shipped with, at the project owner's ask.
                At the default shake_amount of 1.0 that is about 3.7 screen pixels of peak
                throw for a 2x2 building at the standard zoom, against 2.6 before. The F5
                dial still scales it from 0 to 3. */
@@ -3594,6 +4135,39 @@ static void refresh_objects(void)
         if (o.kind == K_BUILDING && !o.limbo) {
             /* Stamp this building's cells with its own origin key. */
             const int key = o.cy * g_gridW + o.cx;
+            /* AND THE GROUND TAKES THE WEIGHT OF A NEW ONE. A building whose origin cell
+               did not carry its key last tick has just arrived, and one that is arriving
+               in BSTATE_CONSTRUCTION is one a player has just put down: the mission's own
+               pre-placed structures arrive complete, so they are not this, and a building
+               revealed by scouting was already in the map because the footprint map is
+               built from the dump rather than from what can be seen. Selling shares that
+               build state and is excluded by the same test, because a building being sold
+               is not new.
+
+               A THIRD OF A DEMOLITION, scaled by the footprint the same way, so a
+               Construction Yard is felt three times a Guard Tower and none of them is
+               felt as hard as something dying. Through shake_tap rather than shake_note:
+               a base going up puts several of these down in a few seconds and the tap's
+               strictly-largest-wins rule is what stops them re-arming the shake forever,
+               which is the same reason a vehicle death uses it.
+
+               ENHANCED ONLY, and that gate is the reason this is not simply next to the
+               death jolt. The shake itself is not behind the post chain and never has
+               been: the camera moves on this tier and on Classic alike, which is right
+               for a building coming apart because that has jolted the ground since the
+               beginning. A jolt when one goes UP is new, and Classic is the tier that has
+               to keep drawing the picture this project has always drawn. Without this
+               test the first structure a player puts down makes a Classic frame differ
+               from the frame it drew yesterday, which is the one thing that tier may not
+               do. A run that places nothing is unaffected either way, which is why the
+               screenshot gates never saw it. */
+            if (g_fx.enabled && o.doing == DOSMAKE_BSTATE_CONSTRUCTION
+                && o.cx >= 0 && o.cy >= 0
+                && o.cx < g_gridW && o.cy < g_gridH
+                && g_bldCellPrev[o.cy * g_gridW + o.cx] != key) {
+                const int fw = o.fw > 0 ? o.fw : 1, fh = o.fh > 0 ? o.fh : 1;
+                shake_tap(0.009f * (float)(fw > fh ? fw : fh));
+            }
             for (int dy = 0; dy < (o.fh > 0 ? o.fh : 1); dy++)
                 for (int dx = 0; dx < (o.fw > 0 ? o.fw : 1); dx++) {
                     const int px = o.cx + dx, py = o.cy + dy;
@@ -3764,6 +4338,7 @@ static void refresh_objects(void)
            describes -- the houses' credits and counts, and where every object stands. */
         enh_service(frameno);
         feed_service(frameno);
+        chat_expire(frameno);
         /* THE ORDER QUEUE STEPS HERE AND NOWHERE ELSE. It reads the nav/tar this dump has
            just parsed, so it judges the tick it is standing in, and the heartbeat guard
            is what stops one engine tick advancing a queue twice. */
@@ -3782,6 +4357,9 @@ static void refresh_objects(void)
         g_efxLoopCX = g_camX;
         g_efxLoopCZ = g_camZ;
         bld_footprints_age();
+        /* AND THE GRASS'S RECORD OF THE SAME TICK, immediately after the footprints are
+           aged so it reads a stable map. No GL here: this only records. */
+        grass_crush_note_tick();
         /* THE VANISH SWEEP. Any unit that was in the previous dump and is not in this
            one just died (or boarded a transport). Detected by heap identity, not by
            proximity, and BEFORE efx_step so this tick's death anims can already ask
@@ -3853,7 +4431,14 @@ static void refresh_objects(void)
                     u.cx = o.cx; u.cy = o.cy;
                     u.lift = alt_lift(o);
                     u.kind = (signed char)o.kind;
-                    u.house = (signed char)obj_is_gdi(o);
+                    /* THE LIVERY SLOT THE STANDING UNIT DREW THROUGH, kept in the
+                       snapshot so its pieces bind the same texture. This byte used to
+                       carry the side alone, which was the two-livery answer: with team
+                       colours on, every seat whose colour is not its faction's default
+                       watched its wreck snap back to that default on the death tick,
+                       before the pieces had even launched. The building shatter already
+                       passes mesh_house; this is the vehicle and aircraft half of it. */
+                    u.house = (signed char)mesh_house(o);
                     u.limbo = (unsigned char)(o.limbo ? 1 : 0);
                     snprintf(u.type, sizeof u.type, "%s", o.type);
                     /* The victim's own motion, read while g_smoothPos still holds LAST
@@ -3914,9 +4499,12 @@ static void refresh_objects(void)
                            g_engineFrame, verdict);
                     if (witness < 0) continue;
                     claimed[witness] = 1;
-                    printf("SHATTERUNIT|%s|id=%d|kind=%d|at=%.3f,%.3f|lift=%.3f|v=%.4f,%.4f|by=%s|frame=%d\n",
+                    /* house= is the livery slot the pieces will bind, once per death
+                       rather than on every piece line, so a gate can hold it against
+                       the seat colour the standing unit wore. */
+                    printf("SHATTERUNIT|%s|id=%d|kind=%d|at=%.3f,%.3f|lift=%.3f|v=%.4f,%.4f|by=%s|frame=%d|house=%d\n",
                            u.type, u.id, (int)u.kind, u.ex, u.ez, u.lift, u.vx, u.vz,
-                           g_efxAnims[witness].name, g_engineFrame);
+                           g_efxAnims[witness].name, g_engineFrame, (int)u.house);
                     shatter_note_death(u.id + (u.kind == K_AIRCRAFT ? 100000 : 0),
                                        u.mi, u.face, u.house,
                                        u.ex, u.ez, 1, 1, g_engineFrame, u.type,
@@ -4366,19 +4954,39 @@ static float structure_anim_frame(const SimObject& o, int frames)
        never plays -- which is the point. It was playing at random before, because a
        three-stage idle counter was being mapped across the whole clip and landing inside
        the tail. Declining to play an animation we cannot yet trigger is honest; collapsing
-       a building that nothing has destroyed is not. The driver it would need is registered
-       in known-gap notes. */
-    struct Arm { const char* type; float perStage; int rate; bool folded; int seg1; };
+       a building that nothing has destroyed is not. The driver it would need is a
+       registered gap.
+
+       THE IDLE WINDOW, idle0..idle1, is a second fence inside the idle segment, and only
+       EYE carries one. Its authored idle is 963 frames and only the first 113 of them are
+       a dish turning: cartridge frames 0..113 are one clean sweep of 412 degrees about the
+       vertical (a full turn at frame 100, 0.46 degrees from rest), and everything after
+       that is the dish tumbling through its remaining key poses, boresight to the sky at
+       frame 288, upside down at 384, at the ground at 480, over again at 744..936. Read
+       off the console's own curve evaluator, not off ours, so it is the authored motion
+       and not an extraction error; it was reported as the dish turning on the wrong axis
+       and in on itself. The console itself never plays any of it: its counter stays at
+       frame 0 and the dish stands still. Holding it still would be the faithful answer;
+       the choice made here is to loop the one segment that reads as a radar dish,
+       cartridge frames 0..100, bake indices 2..102 (the extractor's f0 is -2), which at
+       3.6 degrees a frame joins back onto itself with no visible seam because frame 100
+       is within half a degree of frame 0. The loop lerps INTO idle1 and wraps to idle0,
+       so idle1 is the last frame the eye sees and not a frame it holds. A deliberate
+       deviation from the console, registered as such. */
+    struct Arm {
+        const char* type; float perStage; int rate; bool folded; int seg1;
+        int idle0, idle1;   /* bake indices; both 0 = the whole idle segment */
+    };
     static const Arm ARMS[] = {
-        { "FACT", 1.0f,     3,  false, 50 },  /* RAM 0x8003DFC0  frame = stage       */
-        { "EYE",  1.0f,     4,  false, 963},  /* RAM 0x8003DDE8  frame = stage       */
-        { "HQ",   1.0f,     4,  false, 0  },  /* RAM 0x8003DDD0  frame = stage       */
-        { "PYLE", 10.0f,    3,  false, 0  },  /* RAM 0x8003E1A4  frame = stage * 10  */
-        { "AFLD", 2.0f,     3,  false, 0  },  /* RAM 0x8003DF48  frame = stage * 2   */
-        { "HAND", 10.0f,    3,  false, 0  },  /* RAM 0x8003DE00  frame = stage * 10  */
-        { "V19",  2.5f,     4,  false, 0  },  /* RAM 0x8003E1C8  frame = stage * 2.5 */
-        { "NUKE", 1.0f,     15, true,  0  },  /* RAM 0x8003DF64  stage<20 ? stage : 39-stage */
-        { "NUK2", 1.0f,     15, true,  0  },
+        { "FACT", 1.0f,     3,  false, 50,  0, 0   },  /* RAM 0x8003DFC0  frame = stage       */
+        { "EYE",  1.0f,     4,  false, 963, 2, 102 },  /* RAM 0x8003DDE8  frame = stage       */
+        { "HQ",   1.0f,     4,  false, 0,   0, 0   },  /* RAM 0x8003DDD0  frame = stage       */
+        { "PYLE", 10.0f,    3,  false, 0,   0, 0   },  /* RAM 0x8003E1A4  frame = stage * 10  */
+        { "AFLD", 2.0f,     3,  false, 0,   0, 0   },  /* RAM 0x8003DF48  frame = stage * 2   */
+        { "HAND", 10.0f,    3,  false, 0,   0, 0   },  /* RAM 0x8003DE00  frame = stage * 10  */
+        { "V19",  2.5f,     4,  false, 0,   0, 0   },  /* RAM 0x8003E1C8  frame = stage * 2.5 */
+        { "NUKE", 1.0f,     15, true,  0,   0, 0   },  /* RAM 0x8003DF64  stage<20 ? stage : 39-stage */
+        { "NUK2", 1.0f,     15, true,  0,   0, 0   },
         /* ATWR HOLDS ITS REST POSE, and the 0 below is the reason rather than an omission.
            Every other arm here borrows a real BSTATE_IDLE row out of bdata.cpp's _anims[]:
            FACT from STRUCT_CONST, EYE from STRUCT_EYE, HQ from STRUCT_RADAR, PYLE and HAND
@@ -4405,7 +5013,7 @@ static float structure_anim_frame(const SimObject& o, int frames)
 
            perStage stays the cartridge's own arm constant and seg1 stays where it is, so
            the tail is still fenced off precisely where it always was. */
-        { "ATWR", 1.0f,     0,  false, 963},  /* RAM 0x8003DDB8  frame = stage       */
+        { "ATWR", 1.0f,     0,  false, 963, 0, 0   },  /* RAM 0x8003DDB8  frame = stage       */
     };
     const Arm* arm = NULL;
     for (size_t i = 0; i < sizeof(ARMS) / sizeof(ARMS[0]); i++)
@@ -4419,6 +5027,13 @@ static float structure_anim_frame(const SimObject& o, int frames)
     if (arm->seg1 > 0 && arm->seg1 < frames) {
         if (o.doing == BS_ACTIVE) { f0 = arm->seg1; f1 = frames; }
         else                      { f0 = 0;         f1 = arm->seg1; }
+    }
+    /* ...and the idle window inside that, when the row carries one (see the table). The
+       window's end is a lerp target, not a held frame, so the clamp below lets the frame
+       run up to it rather than stopping one short. */
+    bool window = false;
+    if (o.doing != BS_ACTIVE && arm->idle1 > arm->idle0 && arm->idle1 < f1) {
+        f0 = arm->idle0; f1 = arm->idle1; window = true;
     }
     const int segFrames = f1 - f0;
     if (segFrames <= 1)
@@ -4474,7 +5089,8 @@ static float structure_anim_frame(const SimObject& o, int frames)
        the arm's own constant rather than a frame count picked by eye: if a single stage
        advances further than the whole segment, the arm and the clip do not belong to each
        other. Checked against every armed type, only HAND trips it. FACT, EYE, HQ and ATWR
-       step 1 frame per stage over 50, 963, 49 and 963; AFLD steps 2 over 41; V19 steps 2.5
+       step 1 frame per stage over 50, 100 (its idle window), 49 and 963; AFLD steps 2 over
+       41; V19 steps 2.5
        over 141; NUKE and NUK2 step 1 over 40; PYLE, which is this same building on the other
        side and whose flag speed is confirmed correct, steps 10 over 301.
 
@@ -4502,13 +5118,16 @@ static float structure_anim_frame(const SimObject& o, int frames)
        (2) The console's own counter cannot settle it either, because on the cartridge it
            does not move at all (Anims flat, rate 0 -- see the header note).
 
-       So the counter is ours, and it is justified by the arms being unclamped: PYLE's
-       writes frame = stage*10 with no modulo, and its clip is evaluated by BEEFED02, whose
-       cycle controller (RAM 0x8007F264, `base += n*period` at 0x8007F31C, read instruction
-       by instruction) wraps any t back into the period. So on the cartridge the counter
-       simply counts and the evaluator folds it. Reproducing that gives a rate with no free
-       parameter: perStage frames per stage, rate engine ticks per stage, wrapped by the
-       segment length.
+       So the counter is ours, and so is the WRAP. The arms are unclamped (PYLE's writes
+       frame = stage*10 with no modulo), and the BEEFED02 curves the clips come from are
+       authored as one cycle each, but their evaluator does not fold time into that
+       cycle: every descriptor in the cartridge selects the CONSTANT end mode of the cycle
+       controller at RAM 0x8007F264, which holds the last key once the period is over (an
+       earlier reading of its `base += n*period` arithmetic as a wrap was the CYCLE mode,
+       which nothing selects). Looping the authored cycle is this renderer's convention,
+       chosen because a flag that ripples once and freezes would be worse than one that
+       keeps rippling. The rate has no free parameter: perStage frames per stage, rate
+       engine ticks per stage, wrapped by the segment length.
 
        THE 2x, AND WHY IT IS PROBABLY A CORRECTION RATHER THAN A FUDGE. the project owner watched the
        Barracks flag at the rate above and asked for double, then confirmed the result as
@@ -4537,8 +5156,9 @@ static float structure_anim_frame(const SimObject& o, int frames)
     float frame = t;
     if (arm->folded && t >= (float)segFrames)   /* ...and back down again */
         frame = (float)((segFrames - 1) * 2) - t;
+    const float last = window ? (float)segFrames : (float)(segFrames - 1);
     if (frame < 0.0f) frame = 0.0f;
-    if (frame > (float)(segFrames - 1)) frame = (float)(segFrames - 1);
+    if (frame > last) frame = last;
     return (float)f0 + frame;
 }
 
@@ -4748,6 +5368,44 @@ static int livery_ramp_k(int r, int g, int b)
    renderer reads the world through that pointer, so the walk runs BACKWARDS and finishes
    on seat 0, leaving the context exactly where it found it. Once per mission: a house's
    RemapColor is written in Init_Data and never again. */
+/* WHAT arm_skirmish ACTUALLY SEATED, and the id it gave each row.
+ *
+ * Everything in this renderer that asks the engine about a player has to ask by the id
+ * the roster was BUILT with, and in a match those ids are not 0..n-1. The local human is
+ * always 0, whichever seat it sits in, and every other seat is its seat number plus one
+ * (see arm_skirmish). So a two player match hosted from seat 0 uses the ids {0, 2}, and
+ * anything walking 0..n-1 asks about id 1, which belongs to nobody: Set_Player_Context
+ * refuses it and the row is dropped.
+ *
+ * That is exactly what the MAP button's player list and the team colour walk were doing.
+ * The host saw one row and the joiner saw two, from the same code, because the joiner's
+ * own mapping happens to make {1, 0} contiguous. Both were also sized off the COMPUTER
+ * count, which is zero in an all human room, so the list was two rows long in an eight
+ * player match.
+ *
+ * Written once, where the roster is built, and read everywhere else. */
+static int g_matchRows = 0;
+static unsigned long long g_matchId[8];
+/* THE WIRE SEAT EACH ROSTER ROW PLAYS, and whether a person is in it. The engine names
+   ROWS and the lockstep names SEATS, and rows[] already maps one to the other while the
+   roster is being built -- but nothing kept the answer, so anything asking "has the
+   player in row 3 surrendered" had no way to reach the seat the wire talks about. A
+   BLOCKed seat is skipped entirely when the roster is built, which is exactly when the
+   two numbering schemes part company. */
+static int g_matchSeat[8];
+static int g_matchHuman[8];
+/* WHICH SEATS HAVE RESIGNED, by wire seat. The engine cannot answer this: with AI
+   Takeover on, a surrendered house is not defeated, it belongs to the computer -- so
+   IsDefeated stays false and the roster showed a live commander with a frozen kill
+   count. Kept here because the surrender is already agreed on one turn everywhere. */
+static unsigned g_surrSeats = 0;
+/* AND WHICH FACTION EACH ROW PLAYS, 0 GDI and 1 Nod, kept for the same reason and at the
+   same moment. The engine hands multiplayer houses out as MULTI1..8 and the player info
+   it gives back names one of those, so the FACTION cannot be read back out afterwards:
+   it is only knowable here, where the roster is built from what the room agreed. The
+   debrief needs it for the medallion it turns and the music it plays. */
+static int g_matchFaction[8];
+
 static void livery_resolve(int players)
 {
     g_liveryOf.clear();
@@ -4756,8 +5414,12 @@ static void livery_resolve(int players)
     if (players > 8) players = 8;
     static unsigned char buf[sizeof(CNCPlayerInfoStruct) + 64];
     for (int s = players - 1; s >= 0; s--) {
+        /* BY THE ID THE ROW WAS GIVEN, not by its position: in a match those are not the
+           same number and the difference is a house with no livery, wearing the fallback
+           colour for the whole game. See g_matchId. */
+        const unsigned long long pid = (s < g_matchRows) ? g_matchId[s] : (unsigned long long)s;
         memset(buf, 0, sizeof(buf));
-        if (!BrainGetState(GAME_STATE_PLAYER_INFO, (uint64)s, buf,
+        if (!BrainGetState(GAME_STATE_PLAYER_INFO, pid, buf,
                            (unsigned int)sizeof(buf)))
             continue;
         const CNCPlayerInfoStruct& pi = *(const CNCPlayerInfoStruct*)buf;
@@ -4825,8 +5487,14 @@ static int sb_roster_fetch(SbRosterRow* out, int max)
         int n = 0, i, j;
         g_rosterFrame = g_engineFrame;
         for (int s = seats - 1; s >= 0; s--) {
+            /* THE ID THIS ROW WAS BUILT WITH. Walking 0..n-1 asked about a player who
+               does not exist on this machine, so in a match the list quietly lost a row
+               (and, before the names were carried through at all, showed PLAYER for the
+               one that survived). See g_matchId. */
+            const unsigned long long pid =
+                (s < g_matchRows) ? g_matchId[s] : (unsigned long long)s;
             memset(pbuf, 0, sizeof pbuf);
-            if (!BrainGetState(GAME_STATE_PLAYER_INFO, (uint64)s, pbuf,
+            if (!BrainGetState(GAME_STATE_PLAYER_INFO, pid, pbuf,
                                (unsigned int)sizeof pbuf))
                 continue;
             {
@@ -4836,10 +5504,19 @@ static int sb_roster_fetch(SbRosterRow* out, int max)
                 snprintf(r.name, sizeof r.name, "%s", pi.Name);
                 r.colour   = (int)pi.ColorIndex;
                 r.house    = (int)pi.House;
-                r.defeated = pi.IsDefeated ? 1 : 0;
+                /* DEFEATED OR RESIGNED READ THE SAME HERE, because to everyone else
+                   they are the same thing: that commander is watching. The engine only
+                   knows the first, and under AI Takeover it does not even know that --
+                   the house is alive and belongs to the computer. */
+                {
+                    const int wseat = (s < 8) ? g_matchSeat[s] : s;
+                    r.defeated = (pi.IsDefeated
+                                  || (wseat >= 0 && wseat < 8
+                                      && (g_surrSeats & (1u << wseat)))) ? 1 : 0;
+                }
             }
             memset(sbuf, 0, sizeof(CNCSidebarStruct));
-            if (BrainGetState(GAME_STATE_SIDEBAR, (uint64)s, sbuf,
+            if (BrainGetState(GAME_STATE_SIDEBAR, pid, sbuf,
                               (unsigned int)sizeof sbuf)) {
                 const CNCSidebarStruct& sd = *(const CNCSidebarStruct*)sbuf;
                 tmp[n - 1].kills = (int)sd.UnitsKilled + (int)sd.BuildingsKilled;
@@ -5120,6 +5797,21 @@ static const float N64_DIST_STEP = 100.0f;    /* per frame while the button is h
    measures what it measured. Registered as a deliberate deviation and a known gap.
    To get the cartridge back exactly, set DIST_MAX_EXTRA to zero. */
 static const float DIST_MAX_EXTRA = 4.0f * N64_DIST_STEP;          /* OURS: 400        */
+
+/* THE ISOMETRIC EXPERIMENT (v0.6.8). The cartridge's camera has yaw zero: north straight
+   up the screen, as on DOS. The Advanced page's Perspective row turns the whole world
+   by the iso_yaw dial (F5 group 0; 16 degrees, the director's choice, by default)
+   under the tilt, field of view and distance the same group sets (iso_pitch, iso_fov,
+   iso_dist), so the view reads like an isometric RTS. Everything that
+   mattered to picking already carried g_camYaw (the map
+   editor's free camera put it there); what did NOT was the sprite side, which assumed
+   yaw zero in five places -- the billboard basis, the facing bias, the painter's key,
+   the drag band and the push arrows -- and each of those now keeps its yaw-zero branch
+   verbatim, so Classic is bit for bit the frame it was. The Windows 98 / Voodoo tier
+   has no yaw at all (t1_cam.h), so there the row is read and ignored: a recorded gap.
+   THE SIGN of the yaw: negative puts the eye to the player's RIGHT (south-east of the
+   target, so north runs up-and-right on the screen), positive to the LEFT. The first
+   picture was -45; the shipped 16 was chosen by eye. Nothing else cares which. */
 static const float DIST_MAX_OURS  = N64_DIST_MAX + DIST_MAX_EXTRA; /* 4200 leptons     */
 /* pitch = 0.78 .. 0.92 radians (44.691 .. 52.712 deg), lerped from the distance by
    SetZoom. It is NOT a free parameter: zooming out also tilts the camera over. */
@@ -5169,9 +5861,40 @@ static float g_zoom = 0.0f;          /* CAM_ORTHO only. 0 = auto-fit the tactica
 static float g_camYaw   = 0.0f;      /* radians, 0 = the console's own heading      */
 static float g_camPitchFree = -1.0f; /* radians, < 0 = derive it from the distance  */
 
+/* THE PERSPECTIVE ROW IS ON: Isometric under an Enhanced chain. Every reader of the
+   iso_* dials sits behind this one predicate, which is what keeps Classic bit for bit:
+   with it false the accessors below hand back the cartridge's own constants, the very
+   float objects, never a recomputation of them. */
+static bool cam_option_active(void)
+{
+    return g_fx.enabled && (int)(g_fx.perspective + 0.5f) == FX_PERSP_ISO;
+}
+static float cam_fovy_deg(void)
+{
+    return cam_option_active() ? g_fx.iso_fov : N64_FOVY_DEG;
+}
+/* 1/tan(fovy/2), as the DOUBLE the projection and its inverse divide by. Hands back the
+   float constant N64_F itself whenever the dial sits at the cartridge's 50: a recomputed
+   1/tan(25 deg) differs from it in the eighth digit and would move every pixel gate. */
+static double cam_f(void)
+{
+    if (!cam_option_active() || g_fx.iso_fov == N64_FOVY_DEG) return (double)N64_F;
+    return 1.0 / tan((double)g_fx.iso_fov * 0.5 * M_PI / 180.0);
+}
+
 static float n64_pitch(void)         /* radians, positive = looking down */
 {
     if (g_camPitchFree >= 0.0f) return g_camPitchFree;
+    /* THE ISOMETRIC TILT: a fixed angle from the dial, floored just above half the field
+       of view so the horizon never crosses the screen (a frame with sky in it has no
+       ground under its top corners: the terrain cull gives up and every cell draws, and
+       the camera cage collapses to the map's centre). 0 keeps the console's own lerp. */
+    if (cam_option_active() && g_fx.iso_pitch > 0.0f) {
+        float deg = g_fx.iso_pitch;
+        const float floorDeg = cam_fovy_deg() * 0.5f + 2.0f;
+        if (deg < floorDeg) deg = floorDeg;
+        return deg * (float)M_PI / 180.0f;
+    }
     /* NORMALISED ON THE CARTRIDGE'S RANGE AND CLAMPED TO IT. The two pitches are the
        ROM's endpoints, so out in OUR extra range the lerp would be extrapolating a tilt
        the console never had. It holds at N64_PITCH_AT_FAR instead, which makes the extra
@@ -5181,7 +5904,14 @@ static float n64_pitch(void)         /* radians, positive = looking down */
     if (t > 1.0f) t = 1.0f;
     return N64_PITCH_AT_NEAR + (N64_PITCH_AT_FAR - N64_PITCH_AT_NEAR) * t;
 }
-static float n64_dist_cells(void) { return g_dist / LEPTONS_PER_CELL; }
+static float n64_dist_cells(void)
+{
+    /* iso_dist scales the RIG's distance only. g_dist stays the console's leptons: the
+       pitch key, the zoom clamps, the save slot and every CAM|/ZOOM| print read it
+       unscaled, so the dial cannot reach them. At 1.0 the product is g_dist exactly. */
+    const float d = cam_option_active() ? g_dist * g_fx.iso_dist : g_dist;
+    return d / LEPTONS_PER_CELL;
+}
 
 /* The projection aspect.
 
@@ -5207,6 +5937,28 @@ static double g_autoesc = 0.0;
    prove the world actually pauses; the pause gate needs the dwell. */
 static double g_autoabort = 0.0;
 static bool   g_autoplay = false;
+/* --autorestate: on the dialog --autoesc opens, click Restate, then click the box's
+   left button (Video when a movie is offered, OK when not), and only then let the
+   departure carry on to Abort. It is the one way the movie callback can be exercised
+   with nobody at the keyboard, because the script verbs run in the standalone
+   renderer, which has no player. Steps: 0 pending, 1 Restate clicked, 2 the box's
+   button clicked, 3 done. */
+static bool g_autorestate = false;
+static int  g_autorestateStep = 0;
+/* --autorestateshot PATH: the first frame drawn after the movie, as a PNG. The one
+   picture that shows whether the movie left the game's GL state alone. */
+static const char* g_autorestateShot = NULL;
+static bool g_grabNextFrame = false;
+/* --autoload: on the dialog --autoesc opens, click Load Mission and answer the slot
+   dialog with RETURN, which loads its first row, the newest save. A slot of THIS
+   mission loads in place; another mission's leaves through GAME_EXIT_LOADSLOT for the
+   shell to boot. Steps as --autorestate's: 0 pending, 1 clicked, 2 answered, 3 done. */
+static bool g_autoload = false;
+static int  g_autoloadStep = 0;
+/* --autosave: the same through Save Mission, answered with RETURN, which saves into the
+   empty slot under the field's default description. */
+static bool g_autosave = false;
+static int  g_autosaveStep = 0;
 /* --camflip SECONDS: flip the camera on a timer, hands free, so the difference between
    the two can be watched as an A/B without anyone holding the key down. */
 static double g_camflip = 0.0;
@@ -5226,6 +5978,13 @@ static int g_confinePointer = 0;
 /* --confinetest: walk that decision table and exit, the way --uitest walks the editor
    panel's layout. No window, no display and no pointer are needed to answer it. */
 static int g_confineTest = 0;
+/* --audiodevicetest: the one automated run that ASKS for a sound device. Every automated
+   run is silent (see the audio_boot call in main), which is right for a test run and also
+   means no test can reach the path where a device is requested and refused. This lifts the
+   silence for that one run so the refusal can be tested, and main refuses it outright
+   unless SDL_AUDIODRIVER names a driver, so a test run cannot end up playing through a
+   real sound card. */
+static int g_audioDeviceTest = 0;
 
 /* --autoplay is a TEST, not a demo: each act is followed by an assertion about the
    simulation, and a failed assertion makes the process exit non-zero. It is the only
@@ -5315,18 +6074,35 @@ static bool g_clamp_camera = true;
    sprite be sized in world units and still land on screen at a predictable size.
 
    CAM_ORTHO: the inverse of Ry(45)*Rx(26.565) applied to screen X / Y.
-   CAM_N64:   yaw is zero, so right is exactly world +X and up is (0, cos p, -sin p) --
-              the lookAt yaxis, cross(zaxis, xaxis), with zaxis = (0, sin p, cos p).
+   CAM_N64:   yaw is zero in Classic, so right is exactly world +X and up is
+              (0, cos p, -sin p) -- the lookAt yaxis, cross(zaxis, xaxis), with
+              zaxis = (0, sin p, cos p). Under a yaw (the Perspective row, or the
+              editor's free camera) both are turned about world Y by it.
    It depends on the pitch, and in CAM_N64 the pitch moves with the zoom, so anything
    that changes the distance or the mode calls this again. */
 static float g_bbRight[3], g_bbUp[3];
+static float g_bbBuiltYaw = 0.0f, g_bbBuiltPitch = -1.0f;   /* the pair it was built from */
 
 static void compute_billboard_basis(void)
 {
     if (g_camMode == CAM_N64) {
         const float p = n64_pitch();
-        g_bbRight[0] = 1.0f;  g_bbRight[1] = 0.0f;     g_bbRight[2] = 0.0f;
-        g_bbUp[0]    = 0.0f;  g_bbUp[1]    = cosf(p);  g_bbUp[2]    = -sinf(p);
+        g_bbBuiltYaw = g_camYaw; g_bbBuiltPitch = p;
+        if (g_camYaw == 0.0f) {
+            g_bbRight[0] = 1.0f;  g_bbRight[1] = 0.0f;     g_bbRight[2] = 0.0f;
+            g_bbUp[0]    = 0.0f;  g_bbUp[1]    = cosf(p);  g_bbUp[2]    = -sinf(p);
+            return;
+        }
+        /* YAWED: the same two vectors turned about the world's vertical. set_camera
+           applies Ry(yaw) to the world before the pitch, so the camera's right in world
+           terms is Ry(-yaw) of +X and its up is Ry(-yaw) of (0, cos p, -sin p); the
+           CAM_ORTHO form below is this same algebra with its fixed yaw. The zero branch
+           above is kept verbatim so Classic never moves by a bit. */
+        const float y = g_camYaw;
+        g_bbRight[0] = cosf(y);  g_bbRight[1] = 0.0f;    g_bbRight[2] = sinf(y);
+        g_bbUp[0] = sinf(p) * sinf(y);
+        g_bbUp[1] = cosf(p);
+        g_bbUp[2] = -sinf(p) * cosf(y);
         return;
     }
     const float p = PITCH_DEG * (float)M_PI / 180.0f;
@@ -5335,6 +6111,35 @@ static void compute_billboard_basis(void)
     g_bbUp[0] = sinf(p) * sinf(y);
     g_bbUp[1] = cosf(p);
     g_bbUp[2] = -sinf(p) * cosf(y);
+}
+
+/* THE PERSPECTIVE ROW'S YAW, in radians: the iso_yaw dial under Isometric, zero under
+   Classic. Enhanced only, the way the terrain art and the new HUD are: CLASSIC visuals
+   are the picture this project has always shipped, north straight up, and the dial's
+   tick is left standing so choosing ENHANCED again gives the angle back. */
+static float cam_option_yaw(void)
+{
+    return cam_option_active() ? g_fx.iso_yaw * (float)M_PI / 180.0f : 0.0f;
+}
+
+/* Writes the row's yaw into the camera. Called every frame ahead of the clamp, so a
+   picktest sweep or an editor release that zeroed g_camYaw cannot leave Isometric
+   looking Classic, and called from the dialog, the panel and the gfx verb so a turn or
+   a tilt is instant, before any pick. The editor's free camera owns the yaw while it is
+   engaged (edit_cam_begin sets g_camAtYFree) and CAM_ORTHO has its own fixed yaw and
+   ignores this one, so both are left alone. The billboard basis is the one cache of the
+   pitch and the yaw (the field of view and the distance are read live by set_camera
+   and the inverse), so it is rebuilt whenever the pair it was built from moved and not
+   otherwise: under Classic this runs every frame and touches nothing. A stale basis
+   puts the infantry cards and their pick silhouettes at odds with the drawn quads. */
+static void cam_apply_option(void)
+{
+    if (g_camMode != CAM_N64) return;
+    if (g_camAtYFree > -1.0e8f) return;
+    const float want = cam_option_yaw();
+    if (g_camYaw != want) g_camYaw = want;
+    const float p = n64_pitch();
+    if (g_camYaw != g_bbBuiltYaw || p != g_bbBuiltPitch) compute_billboard_basis();
 }
 
 /* The GL matrix pair. Fixed function only: glFrustum, glRotatef, glTranslatef. No GLU
@@ -5439,7 +6244,7 @@ static void set_camera(int fbw, int fbh)
         double zf          = 2.0 * Dc + 2096.0 / LEPTONS_PER_CELL;      /* ROM: 2*dist+2096 */
         if (g_camFarBoost > 0.0f && zf < Dc + (double)g_camFarBoost)
             zf = Dc + (double)g_camFarBoost;
-        const double top   = zn * tan(N64_FOVY_DEG * 0.5 * M_PI / 180.0);
+        const double top   = zn * tan(cam_fovy_deg() * 0.5 * M_PI / 180.0);
         const double right = top * cam_aspect(fbw, fbh);
         glFrustum(-right, right, -top, top, zn, zf);
         glMatrixMode(GL_MODELVIEW);
@@ -5567,8 +6372,9 @@ static bool project_point(float wx, float wy, float wz, int fbw, int fbh,
     const bool front = depth > 1.0e-3;
     if (!front) depth = 1.0e-3;
     const double asp = cam_aspect(fbw, fbh);
-    *col = (float)((double)fbw * 0.5 * (1.0 + xe * N64_F / (asp * depth)));
-    *row = (float)((double)fbh * 0.5 * (1.0 - ye * N64_F / depth));
+    const double f   = cam_f();
+    *col = (float)((double)fbw * 0.5 * (1.0 + xe * f / (asp * depth)));
+    *row = (float)((double)fbh * 0.5 * (1.0 - ye * f / depth));
     return front;
 }
 
@@ -5603,8 +6409,9 @@ static bool screen_to_plane(float col, float row, float h, int fbw, int fbh,
     const double sp = sin(p), cp = cos(p);
     const double Dc = n64_dist_cells();
     const double asp = cam_aspect(fbw, fbh);
-    const double dvx = (2.0 * col / (double)fbw - 1.0) * asp / N64_F;
-    const double dvy = (1.0 - 2.0 * row / (double)fbh) / N64_F;
+    const double f   = cam_f();
+    const double dvx = (2.0 * col / (double)fbw - 1.0) * asp / f;
+    const double dvy = (1.0 - 2.0 * row / (double)fbh) / f;
     /* The ray, in the YAW-ROTATED frame -- the same frame n64_eye works in. */
     const double rdx = dvx;
     const double diry = dvy * cp - sp;
@@ -5685,7 +6492,7 @@ static float px_per_cell_at(float wx, float wz, int fbw, int fbh)
     double xe, ye, depth;
     n64_eye(wx, 0.0, wz, &xe, &ye, &depth);
     if (depth < 1.0e-3) depth = 1.0e-3;
-    return (float)((double)fbh * 0.5 * N64_F / depth);
+    return (float)((double)fbh * 0.5 * cam_f() / depth);
 }
 
 /* Same, snapped to a map cell. Returns false when the point lands off the world grid. */
@@ -6025,36 +6832,148 @@ static float g_cullX0 = 0.0f, g_cullX1 = 0.0f, g_cullZ0 = 0.0f, g_cullZ1 = 0.0f;
 static bool  g_cullValid = false;
 static bool  g_cullOn = true;    /* the sun's shadow pass sees ground the player cannot */
 
-static void terrain_cull_bounds(int fbw, int fbh)
+/* THE GROUND-XZ BOX THE CAMERA CAN SEE BETWEEN TWO HORIZONTAL PLANES, which is the
+   arithmetic the cull box above is one use of. It is a function rather than the body of
+   terrain_cull_bounds because a second pass wants the same rays at a DIFFERENT pair of
+   heights: the water reflection draws the world mirrored about the sea plane, so what it
+   shows is the camera's view of the slab BELOW that plane, and asking the terrain box
+   about it would be asking the wrong question with the right numbers. Returns false, and
+   leaves the box untouched, when a screen-corner ray never descends. */
+static bool view_plane_box(int fbw, int fbh, float hlo, float hhi,
+                           float* x0, float* x1, float* z0, float* z1)
 {
     const float sc[4] = { 0.0f, (float)fbw, (float)fbw, 0.0f };
     const float sr[4] = { 0.0f, 0.0f, (float)fbh, (float)fbh };
-    const float hp[2] = { g_terrainHTop + 0.02f, g_terrainHBot - 0.02f };
-    g_cullX0 = g_cullZ0 = 1e30f;
-    g_cullX1 = g_cullZ1 = -1e30f;
-    g_cullValid = true;
-    for (int i = 0; i < 4 && g_cullValid; i++)
+    const float hp[2] = { hhi, hlo };
+    float bx0 = 1e30f, bz0 = 1e30f, bx1 = -1e30f, bz1 = -1e30f;
+    for (int i = 0; i < 4; i++)
         for (int k = 0; k < 2; k++) {
             float wx, wz;
-            if (!screen_to_plane(sc[i], sr[i], hp[k], fbw, fbh, &wx, &wz)) {
-                g_cullValid = false;         /* sky ray: no finite box this frame */
-                break;
-            }
-            if (wx < g_cullX0) g_cullX0 = wx;
-            if (wx > g_cullX1) g_cullX1 = wx;
-            if (wz < g_cullZ0) g_cullZ0 = wz;
-            if (wz > g_cullZ1) g_cullZ1 = wz;
+            if (!screen_to_plane(sc[i], sr[i], hp[k], fbw, fbh, &wx, &wz))
+                return false;                /* sky ray: no finite box this frame */
+            if (wx < bx0) bx0 = wx;
+            if (wx > bx1) bx1 = wx;
+            if (wz < bz0) bz0 = wz;
+            if (wz > bz1) bz1 = wz;
         }
+    *x0 = bx0; *x1 = bx1; *z0 = bz0; *z1 = bz1;
+    return true;
 }
 
-/* Cell (x,y) spans [x,x+1) x [y,y+1) on the ground. Margin 2 world cells. */
+static void terrain_cull_bounds(int fbw, int fbh)
+{
+    g_cullValid = view_plane_box(fbw, fbh, g_terrainHBot - 0.02f, g_terrainHTop + 0.02f,
+                                 &g_cullX0, &g_cullX1, &g_cullZ0, &g_cullZ1);
+    if (!g_cullValid) {
+        g_cullX0 = g_cullZ0 = 1e30f;
+        g_cullX1 = g_cullZ1 = -1e30f;
+    }
+}
+
+/* Cell (x,y) spans [x,x+1) x [y,y+1) on the ground. */
+static inline bool cell_in_box(int x, int y, float m,
+                               float bx0, float bx1, float bz0, float bz1)
+{
+    return !((float)(x + 1) < bx0 - m || (float)x > bx1 + m ||
+             (float)(y + 1) < bz0 - m || (float)y > bz1 + m);
+}
+
+/* Margin 2 world cells. */
 static inline bool cell_in_view(int x, int y)
 {
     if (!g_cullOn || !g_cullValid || !g_clip_to_map)
         return true;
-    const float m = 2.0f;
-    return !((float)(x + 1) < g_cullX0 - m || (float)x > g_cullX1 + m ||
-             (float)(y + 1) < g_cullZ0 - m || (float)y > g_cullZ1 + m);
+    return cell_in_box(x, y, 2.0f, g_cullX0, g_cullX1, g_cullZ0, g_cullZ1);
+}
+
+/* THE TREES' OWN VIEW BOX, and why the terrain's will not do.
+ *
+ * A rebuilt tree is submitted FOUR times a frame -- the ground-normal pass, the lit
+ * cutout pass, the sun map and, whenever water is in the frame, the reflection -- and
+ * until now only the first of those tested whether the tree was on screen at all. The
+ * other three reach trees through visible(), which asks about the editor's toggles,
+ * cloak, limbo, shroud and the map rectangle and contains no frustum term, so a wood in
+ * the far corner of the map went down the pipe in full no matter where the camera was
+ * pointed. On the heaviest shipped map that is 444,201 vertices and 148,067 triangles
+ * per pass, from client memory, every frame.
+ *
+ * A TREE IS NOT A GROUND CELL, so it cannot simply borrow g_cullX0..g_cullZ1. That box
+ * is a proven superset of the visible GROUND, computed from the screen-corner rays at
+ * the two planes that bracket the heightfield; a tree stands metres above the top of
+ * that bracket, and a canopy whose trunk is outside the box can still be on screen. The
+ * answer is the same arithmetic asked at the right height: the box is recomputed with
+ * its upper plane raised by the tallest a tree can be drawn, and then widened by how far
+ * a crown reaches from its own trunk. Both terms come from the pack's own per-model
+ * height and radius and from the live dials, so moving a slider moves the box with it.
+ *
+ * The margin is deliberately generous. Growing the box costs a handful of trees that
+ * would have been culled; shrinking it below the truth pops a wood in and out at the
+ * frame edge, which is the one failure this must not be able to produce.
+ */
+static float g_treeCullX0 = 0.0f, g_treeCullX1 = 0.0f;
+static float g_treeCullZ0 = 0.0f, g_treeCullZ1 = 0.0f;
+static bool  g_treeCullValid = false;
+static float g_treeCullPad = 0.0f;
+
+/* WHAT THE FOUR TREE PASSES SUBMITTED LAST FRAME, and what their boxes turned away.
+   A cull that is silent is a cull nobody can tell from a cull that never fires: two
+   frames drawn identically prove the box changes no pixel and prove nothing at all
+   about whether it ever said no. These are the numbers that separate the two, and
+   report_coverage prints them beside the mesh counts. The caster pair accumulates
+   because that pass runs once for the sun map and again, when water is in the frame,
+   for the reflection. */
+static int g_nTreeLit = 0, g_nTreeLitCut = 0;
+static int g_nTreeNrm = 0, g_nTreeNrmCut = 0;
+static int g_nTreeSun = 0, g_nTreeSunCut = 0;
+static int g_nTreeRefl = 0, g_nTreeReflCut = 0;
+/* The last box each caster pass measured, reported beside the counts. Without it a pass
+   that submits everything cannot be told apart from a cull that is not running. */
+static float g_castBoxSun[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+static float g_castBoxRefl[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+static int   g_castBoxSunOn = 0, g_castBoxReflOn = 0;
+
+/* How far a drawn tree reaches from the cell its trunk stands in: sideways in *outXZ,
+   upwards in *outY, both in cells. Model positions are in tree heights standing on the
+   model's own origin, so height and radius are multiplied by the same scale the draw
+   applies, at the TOP of the variation rather than the mean. */
+static void tree3d_reach(float* outXZ, float* outY)
+{
+    float r = 0.0f, h = 0.0f;
+    for (size_t i = 0; i < g_tree3dModel.size(); i++) {
+        if (g_tree3dModel[i].radius > r) r = g_tree3dModel[i].radius;
+        if (g_tree3dModel[i].height > h) h = g_tree3dModel[i].height;
+    }
+    const float sc = g_fx.tree3d_size * (1.0f + g_fx.tree3d_vary);
+    /* the wind, the resting lean and the leaf flutter all move the crown as fractions
+       of the tree's own height, and they are summed rather than combined because a
+       bound that is too large costs nothing and a bound that is too small pops */
+    const float sway = g_fx.tree3d_wind + g_fx.tree3d_lean
+                     + g_fx.tree3d_flutter * g_fx.tree3d_wind;
+    *outXZ = sc * (r + h * sway) * 1.25f + 0.5f;
+    *outY  = sc * h * (1.0f + sway) * 1.25f + 0.5f;
+}
+
+static void tree3d_cull_bounds(int fbw, int fbh)
+{
+    float xz = 0.0f, y = 0.0f;
+    tree3d_reach(&xz, &y);
+    g_treeCullPad = xz + 2.0f;      /* the ground box's own float-slop margin, kept */
+    g_treeCullValid = view_plane_box(fbw, fbh, g_terrainHBot - 0.02f,
+                                     g_terrainHTop + y,
+                                     &g_treeCullX0, &g_treeCullX1,
+                                     &g_treeCullZ0, &g_treeCullZ1);
+}
+
+/* Can a tree whose trunk is in cell (x,y) put anything on the screen this frame?
+   Answers yes whenever it cannot prove no, which is what makes this free of picture
+   changes: --noclip, a camera pitched at the sky and a pack with no trees in it all
+   fall through to the same yes the four passes had before this existed. */
+static inline bool tree3d_cell_in_view(int x, int y)
+{
+    if (!g_cullOn || !g_treeCullValid || !g_clip_to_map)
+        return true;
+    return cell_in_box(x, y, g_treeCullPad,
+                       g_treeCullX0, g_treeCullX1, g_treeCullZ0, g_treeCullZ1);
 }
 
 static bool cell_shown(int x, int y)
@@ -6241,6 +7160,11 @@ static int terrain_atlas_index(void)
     return 0;
 }
 
+/* ENHANCED (water_mod.h, included further down): the coast tiles drawn from a copy of
+   the atlas whose alpha is a ramp about the cut, and blended, so the sand fades into
+   the sea. Both hand back the ordinary answer whenever that is not in play. */
+static GLuint water_terrain_gl(GLuint def);
+static bool water_terrain_soft(void);
 static void draw_terrain(void)
 {
     if (fx_texset_get() == FX_TEX_REMASTER) terrain_remaster_ensure();
@@ -6284,12 +7208,13 @@ static void draw_terrain(void)
        a tint that floors to zero everywhere are both exactly the plain modulate. */
     const bool tinted = terrain_tint_live();
 
+    const GLuint atGL = water_terrain_gl(at.gl);
     glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, at.gl);
+    glBindTexture(GL_TEXTURE_2D, atGL);
     if (tinted) {
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, at.gl);
+        glBindTexture(GL_TEXTURE_2D, atGL);
         glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
         glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_SUBTRACT);
         glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_TEXTURE);
@@ -6321,7 +7246,16 @@ static void draw_terrain(void)
     /* Alpha 0 in the atlas is a WATER HOLE, not black. Without the alpha test the
        river and the shoreline paint as solid black slabs. */
     glEnable(GL_ALPHA_TEST);
-    glAlphaFunc(GL_GREATER, 0.5f);
+    const bool softCoast = water_terrain_soft();
+    if (softCoast) {
+        /* ENHANCED: the coast tiles' alpha is a ramp about the cut (water_mod.h) and it
+           is BLENDED, so the sand fades into the sea over a few texels instead of
+           stopping at a one-texel step. Interior texels are alpha 1, a no-op blend. */
+        glAlphaFunc(GL_GREATER, 0.02f);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    } else
+        glAlphaFunc(GL_GREATER, 0.5f);
     glColor3f(1.0f, 1.0f, 1.0f);
     /* The console's own tessellation, read off the cartridge's display list (the
        gterrain.c DL emitter at ROM 0x196FFC..0x197028): G_VTX loads the cell's four
@@ -6366,10 +7300,20 @@ static void draw_terrain(void)
         const float k10 = shroud_corner_vis(c.x + 1, c.y);
         const float k11 = shroud_corner_vis(c.x + 1, c.y + 1);
         const float k01 = shroud_corner_vis(c.x,     c.y + 1);
-        const float s00 = terrain_shade(c.x,     c.y)     * k00;
-        const float s10 = terrain_shade(c.x + 1, c.y)     * k10;
-        const float s11 = terrain_shade(c.x + 1, c.y + 1) * k11;
-        const float s01 = terrain_shade(c.x,     c.y + 1) * k01;
+        /* ONE SUN (sun_lambert, Enhanced only): the console's baked slope shade is
+           replaced by the flat value it gives level ground, and the light pass shades
+           the slope once, per pixel, from the smooth normal. Level ground is untouched
+           either way: 160/255 is exactly what terrain_shade returns for it. */
+        /* The sun's direction is computed every frame by the chain whether or not the
+           shadow pass runs (fx_sun_dir), so this does not depend on shadow_on: with the
+           term tied to the shadow pass, a chain with shadows off lit every field
+           against no direction (G36d and G52 caught it on their shadow-off arms). */
+        const bool oneSun = g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals;
+        const float flat = 160.0f / 255.0f;
+        const float s00 = (oneSun ? flat : terrain_shade(c.x,     c.y))     * k00;
+        const float s10 = (oneSun ? flat : terrain_shade(c.x + 1, c.y))     * k10;
+        const float s11 = (oneSun ? flat : terrain_shade(c.x + 1, c.y + 1)) * k11;
+        const float s01 = (oneSun ? flat : terrain_shade(c.x,     c.y + 1)) * k01;
         if (tinted) {
             /* The cartridge's own vertex: RGB = the CM tint, ALPHA = the light. Both
                Gouraud, both shared with the neighbouring cells for the same reason
@@ -6402,6 +7346,7 @@ static void draw_terrain(void)
     }
     glEnd();
     glDisable(GL_ALPHA_TEST);
+    if (softCoast) glDisable(GL_BLEND);
     if (tinted) {
         /* Put the fixed pipe back exactly as every other pass expects to find it:
            unit 1 off, unit 0 back on MODULATE. Leaving GL_COMBINE bound here would
@@ -6530,6 +7475,24 @@ static void draw_water_quads(float du, float dv, float phase, bool warp, float u
     glEnd();
 }
 
+/* THE ENHANCED SEA: shore field, flow and foam, in its own file. Included here, after
+   the console's UV constants and the corner helpers it re-uses, so draw_water can hand
+   the frame to it. */
+#include "water_mod.h"
+#include "rain_mod.h"    /* the rain: after the sea, whose field and clock it shares */
+#include "rain_audio.h"  /* and the only sound in this game that is not off a disc   */
+
+/* ENHANCED: real grass. Three files, and the order is enforced by #error guards in the
+   third: the bake owns the vertex format and the static buffer, the field owns the
+   crush/cover/shroud target the blade reads, and the draw owns the program. Included
+   here for the same reason water_mod.h is: by this point the pack, the play rectangle,
+   the terrain helpers, the cull box and the shroud are all in scope, and nothing below
+   needs a forward declaration. Every one of the three is gated on g_fxActive and draws
+   nothing under CLASSIC. */
+#include "grass_bake.h"
+#include "grass_field.h"
+#include "grass_draw.h"
+
 /* The sea floor. Opaque, depth write ON, exactly one BOTTOM tile per world cell (the
    console's ground ST of 1536 units per cell at tile shift 0 with the shared G_TEXTURE
    scale of 2/3 works out to precisely 1.0 repeat). Seabed pass: ROM 0x19B488..0x19B88C. */
@@ -6548,6 +7511,10 @@ static void draw_seabed(void)
 
 static void draw_water(void)
 {
+    /* ENHANCED: the shore-aware surface in water_mod.h draws instead, when it can. The
+       return is the whole hook; everything below stays the cartridge's pass. */
+    if (water_fx_draw()) return;
+
     if (g_pack.waterTex1 >= 0 && g_pack.waterTex2 >= 0) {
         /* The cartridge's counter ticks once per rendered frame and its rates are per
            tick. Ours is the ENGINE frame, so --shot stays byte-reproducible. The fmodf
@@ -6664,6 +7631,16 @@ static void draw_tiberium(void)
     if (g_tib.empty())
         return;
 
+    /* THE FLAT OVERLAY IS OFF UNDER SOLID CRYSTALS, and it is a dial rather than a
+       consequence so it can be put back. It is a whole tiberium field in its own
+       right, and drawing it under another one leaves two fields at different heights
+       to read apart -- the decal's clusters sit between the crystals and look like
+       more crystals lying down. This early-out is guarded on the crystals actually
+       drawing: with them off the decal is the entire picture and the dial must not
+       reach it. */
+    if (g_fx.enabled && g_fx.tib3d && !g_fx.tib3d_decal && g_tib3dHave)
+        return;
+
     /* THE REAL ART: the cartridge's ANY_TI filmstrips out of dostib.pack. One flat
        quad per cell, frame = the engine's OverlayData verbatim (cell.cpp:1041 uses
        it as the SHP frame index with no arithmetic). Alpha-tested cutout, depth
@@ -6774,6 +7751,1104 @@ static void draw_tiberium(void)
         }
     }
     glEnd();
+}
+
+
+/* ---- SOLID TIBERIUM ----------------------------------------------------------------
+   Crystal clumps standing on the cells the decal above just painted. Enhanced only,
+   and every number in it is ours: the console has no tiberium model, so there is no
+   original picture this can be measured against. tib3d_mod.h carries where the art
+   came from and what the fill table means.
+
+   ONE INSTANCE LIST, REBUILT ONLY WHEN THE FIELD CHANGES. Placement is a hash of the
+   cell, so it is stable under the camera and identical on two --shot runs; but a
+   harvester lowers a cell's stage and growth raises it, so the list is keyed on a
+   signature over the whole field and the two dials that shape it. Everything that
+   changes per FRAME -- the shroud, the ground shade, what the camera can see -- is
+   applied at draw time and never baked into the list. */
+struct Tib3dInst {
+    short cx, cy;          /* the cell, for the shroud and the ground shade */
+    float x, z;            /* where the clump stands                        */
+    float sn, cs;          /* its yaw, resolved once                        */
+    float scale;           /* pack units to world, this clump's own         */
+    float lift;            /* how far above the ground it sits: see the pod */
+    unsigned char clump;
+    /* WHAT MAKES ONE INSTANCE THE SAME INSTANCE ACROSS A REBUILD, so a field can grow
+       and be harvested rather than popping. The list is rebuilt whenever the engine's
+       cell table changes, and without an identity every clump in a field would be a
+       new one every time any cell anywhere was touched. */
+    unsigned char k;       /* which of the cell's clumps this is            */
+    unsigned char pod;     /* 1 = the rock half of a pair                   */
+    unsigned char dying;   /* 1 = shrinking out, then dropped               */
+    float t0;              /* simulated seconds when it started; < 0 = always been here */
+};
+
+/* The key those five fields make. Cells are at most 128 on a side and k at most 8, so
+   everything fits with room to spare. */
+static unsigned long long tib3d_key(int cx, int cy, int k, int clump, int pod)
+{
+    return ((unsigned long long)(unsigned short)cx << 32)
+         | ((unsigned long long)(unsigned short)cy << 16)
+         | ((unsigned long long)(k & 15) << 4)
+         | ((unsigned long long)(clump & 7) << 1)
+         | (unsigned long long)(pod & 1);
+}
+static unsigned long long tib3d_key(const Tib3dInst& in)
+{ return tib3d_key(in.cx, in.cy, in.k, in.clump, in.pod); }
+
+/* HOW MUCH OF ITSELF A CLUMP IS SHOWING, 0 to 1. A new one scales up out of nothing and
+   a harvested one scales down into it, which is what makes a field grow and be eaten
+   rather than blink. Off the ENGINE clock like every other motion here, so two --shot
+   runs still agree. t0 below zero means the clump was there when the mission started
+   and has no entrance to play -- otherwise every field on every map would sprout at
+   the moment it first came into view. */
+static float tib3d_growth(const Tib3dInst& in)
+{
+    const float T = g_fx.tib3d_growtime;
+    if (T <= 0.001f)
+        return in.dying ? 0.0f : 1.0f;      /* 0 on the dial is the old instant pop */
+    if (in.t0 < 0.0f)
+        return in.dying ? 0.0f : 1.0f;
+    float u = (engine_time() * (1.0f / 15.0f) - in.t0) / T;
+    if (u < 0.0f) u = 0.0f;
+    if (u > 1.0f) u = 1.0f;
+    u = u * u * (3.0f - 2.0f * u);          /* ease both ends */
+    return in.dying ? 1.0f - u : u;
+}
+static std::vector<Tib3dInst> g_tib3dInst;
+static unsigned g_tib3dSig  = 0;
+static bool     g_tib3dSigOk = false;
+
+static unsigned tib3d_signature(void)
+{
+    unsigned h = 2166136261u;
+    h = (h ^ (unsigned)g_tib.size()) * 16777619u;
+    for (size_t i = 0; i < g_tib.size(); i++) {
+        const TibCell& t = g_tib[i];
+        h = (h ^ (unsigned)(unsigned short)t.x) * 16777619u;
+        h = (h ^ (unsigned)(unsigned short)t.y) * 16777619u;
+        h = (h ^ (unsigned)t.kind)  * 16777619u;
+        h = (h ^ (unsigned)t.stage) * 16777619u;
+    }
+    /* The two dials that move geometry rather than shading. Quantised so a slider
+       being dragged does not rebuild on every pixel of travel. */
+    h = (h ^ (unsigned)(g_fx.tib3d_size    * 1000.0f)) * 16777619u;
+    h = (h ^ (unsigned)(g_fx.tib3d_density * 1000.0f)) * 16777619u;
+    h = (h ^ (unsigned)(g_fx.tib3d_pod     * 1000.0f)) * 16777619u;
+    h = (h ^ (unsigned)(g_fx.tib3d_seat    * 1000.0f)) * 16777619u;
+    return h;
+}
+
+static std::vector<Tib3dInst> g_tib3dWant;   /* scratch, kept to avoid reallocating */
+
+/* THE MERGE: what the field wants, against what is already standing there.
+
+   Three outcomes per clump, and the point of all three is that nothing appears or
+   disappears in one frame:
+     * in both lists            -- it keeps the clock it already had, so a field that is
+                                   only being harvested at its far edge does not restart
+                                   every clump on the map.
+     * wanted, not standing     -- born, and it scales up out of nothing. If it was
+                                   ALREADY dying it is revived instead, from exactly the
+                                   size it had shrunk to, so a cell that regrows while
+                                   its old clump is still going does not jump.
+     * standing, not wanted     -- it starts dying, from exactly the size it had grown
+                                   to, and is dropped once it reaches nothing.
+
+   The very first build has no entrance: t0 below zero means the clump was there when
+   the mission started. Otherwise every field would sprout the moment the pack loaded. */
+static void tib3d_merge(void)
+{
+    const float now = engine_time() * (1.0f / 15.0f);
+    const float T   = g_fx.tib3d_growtime;
+
+    if (!g_tib3dSigOk) {                       /* the first build of this mission */
+        g_tib3dInst = g_tib3dWant;
+        for (size_t i = 0; i < g_tib3dInst.size(); i++) {
+            g_tib3dInst[i].dying = 0;
+            g_tib3dInst[i].t0 = -1.0f;
+        }
+        return;
+    }
+
+    std::map<unsigned long long, size_t> have;
+    for (size_t i = 0; i < g_tib3dInst.size(); i++)
+        have[tib3d_key(g_tib3dInst[i])] = i;
+
+    std::vector<Tib3dInst> out;
+    out.reserve(g_tib3dInst.size() + g_tib3dWant.size());
+    std::vector<bool> used(g_tib3dInst.size(), false);
+
+    for (size_t i = 0; i < g_tib3dWant.size(); i++) {
+        Tib3dInst w = g_tib3dWant[i];
+        std::map<unsigned long long, size_t>::iterator it = have.find(tib3d_key(w));
+        if (it == have.end()) {                /* born */
+            w.dying = 0;
+            w.t0 = now;
+        } else {
+            const Tib3dInst& o = g_tib3dInst[it->second];
+            used[it->second] = true;
+            if (o.dying) {                     /* revived from the size it had left */
+                const float f = tib3d_growth(o);
+                w.dying = 0;
+                w.t0 = (T > 0.001f) ? now - f * T : -1.0f;
+            } else {
+                w.dying = 0;
+                w.t0 = o.t0;                   /* keeps its own clock */
+            }
+        }
+        out.push_back(w);
+    }
+
+    for (size_t i = 0; i < g_tib3dInst.size(); i++) {
+        if (used[i])
+            continue;
+        Tib3dInst o = g_tib3dInst[i];
+        if (!o.dying) {                        /* starts dying from the size it reached */
+            const float f = tib3d_growth(o);
+            o.dying = 1;
+            o.t0 = (T > 0.001f) ? now - (1.0f - f) * T : now;
+        }
+        if (tib3d_growth(o) > 0.001f)
+            out.push_back(o);                  /* still visible; keep it going */
+    }
+    g_tib3dInst.swap(out);
+}
+
+
+static void tib3d_rebuild(void)
+{
+    g_tib3dWant.clear();
+    if (!g_tib3dHave || g_tib3dClump.empty()) {
+        g_tib3dInst.clear();
+        return;
+    }
+    const float size = g_fx.tib3d_size;
+    const float dens = g_fx.tib3d_density;
+    for (size_t i = 0; i < g_tib.size(); i++) {
+        const TibCell& tc = g_tib[i];
+        int stage = tc.stage; if (stage < 0) stage = 0; if (stage > 11) stage = 11;
+        const Tib3dFill& fl = TIB3D_FILL[stage];
+        int n = (int)(fl.count * dens + 0.5f);
+        if (n < 1) n = 1;
+        if (n > 8) n = 8;
+        /* A CRYSTAL AND ITS POD ARE ONE THING. The pod is the brown rock a crystal
+           grows out of, so it is placed AT that crystal, scaled to it rather than to
+           the cell, and pushed in first so the crystal draws over the dip in its
+           middle. One pod per cell placed on its own was tried and is wrong: the
+           crystals then stand on bare ground a third of a cell from the only pod
+           there is. */
+        for (int k = 0; k < n; k++) {
+            /* kind rides in the hash so two neighbouring overlay types scatter
+               differently. It selects nothing: the twelve TI shapes are not
+               reproduced and tib3d_mod.h says so. */
+            const unsigned base = (unsigned)k * 3u + (unsigned)tc.kind * 97u;
+            const unsigned h1 = tib3d_hash(tc.x, tc.y, base);
+            const unsigned h2 = tib3d_hash(tc.x, tc.y, base + 1u);
+            const unsigned h3 = tib3d_hash(tc.x, tc.y, base + 2u);
+            Tib3dInst in;
+            in.clump = fl.pick[h1 % fl.npick];
+            if (in.clump >= g_tib3dClump.size())
+                in.clump = (unsigned char)(g_tib3dClump.size() - 1);
+            const Tib3dClump& c  = g_tib3dClump[in.clump];
+            const Tib3dClump& pc = g_tib3dClump[TIB3D_POD];
+            /* 0.75 to 1.15 of the dial, so a field is not a row of identical props */
+            in.scale = size * (0.75f + 0.40f * (float)((h1 >> 8) & 255) / 255.0f);
+            /* The pod is sized to ITS crystal and a little wider, so what shows around
+               the base is rock rather than a fixed collar the small clumps rattle in. */
+            float podScale = 0.0f;
+            if (pc.radius > 0.0001f)
+                podScale = in.scale * (c.radius / pc.radius) * g_fx.tib3d_pod;
+            /* Keep the pair's footprint inside its own cell, or a field's edge grows a
+               fringe the decal underneath does not have. Capped so a wide clump still
+               has somewhere to move to. */
+            float inset = c.radius * in.scale;
+            const float podInset = pc.radius * podScale;
+            if (podInset > inset) inset = podInset;
+            if (inset > 0.38f) inset = 0.38f;
+            const float span = 1.0f - 2.0f * inset;
+            in.x = (float)tc.x + inset + span * (float)(h2 & 1023) / 1023.0f;
+            in.z = (float)tc.y + inset + span * (float)(h3 & 1023) / 1023.0f;
+            const float yaw = 6.2831853f * (float)((h2 >> 12) & 1023) / 1023.0f;
+            in.sn = sinf(yaw);
+            in.cs = cosf(yaw);
+            in.cx = tc.x;
+            in.cy = tc.y;
+            /* THE CRYSTAL STANDS ON THE POD, NOT IN IT. The pod is a crater with a dip
+               in the middle, so a crystal whose base is at ground level sits in the
+               hole with the rim standing up around it -- which is what a field looked
+               like. tib3d_load measures each clump's surface height at its own middle;
+               lifting the crystal by the pod's, at the pod's scale, seats it on the
+               rock. Zero when there is no pod, and the dial scales it for the case
+               where a clump's own base is meant to bed in a little further. */
+            in.lift = (podScale > 0.0001f)
+                    ? pc.seat * podScale * g_fx.tib3d_seat : 0.0f;
+            /* the pod, on its own bearing so a field is not a row of matching rings */
+            if (podScale > 0.0001f) {
+                Tib3dInst pod = in;
+                pod.clump = (unsigned char)TIB3D_POD;
+                pod.scale = podScale;
+                pod.lift  = 0.0f;      /* the pod is what sits on the ground */
+                const float pyaw = 6.2831853f * (float)((h3 >> 12) & 1023) / 1023.0f;
+                pod.sn = sinf(pyaw);
+                pod.cs = cosf(pyaw);
+                pod.k = (unsigned char)k;
+                pod.pod = 1;
+                g_tib3dWant.push_back(pod);
+            }
+            in.k = (unsigned char)k;
+            in.pod = 0;
+            g_tib3dWant.push_back(in);
+        }
+    }
+    tib3d_merge();
+}
+
+/* The batch. Client vertex arrays rather than immediate mode because a field on
+   screen is tens of thousands of triangles and glVertex3f per corner is three
+   calls a vertex; glDrawElements is GL 1.1 and needs nothing a Voodoo 2 lacks.
+   Indices are 16-bit and the batch flushes before it could overrun them, so no
+   GL_UNSIGNED_INT element type is asked for anywhere. */
+static std::vector<float>          g_tib3dPos, g_tib3dUV;
+static std::vector<unsigned char>  g_tib3dCol;    /* pass 2: sun and ground shade   */
+static std::vector<unsigned char>  g_tib3dGlow;   /* pass 3: how hard it burns       */
+static std::vector<unsigned short> g_tib3dIdx;
+
+/* Both passes over one batch, so the geometry is built once. Pass 2 is the lit surface;
+   pass 3 adds the crystal's own light through the emissive mask in the sheet's alpha,
+   which under MODULATE reaches the blender as src alpha and so scales exactly the texels
+   that are meant to burn. Additive with depth writes off: a glow lights itself and
+   never occludes what is behind it. */
+static void tib3d_flush(bool glowPass)
+{
+    if (g_tib3dIdx.empty())
+        return;
+    glVertexPointer(3, GL_FLOAT, 0, &g_tib3dPos[0]);
+    glTexCoordPointer(2, GL_FLOAT, 0, &g_tib3dUV[0]);
+    glColorPointer(3, GL_UNSIGNED_BYTE, 0, &g_tib3dCol[0]);
+    glDrawElements(GL_TRIANGLES, (GLsizei)g_tib3dIdx.size(),
+                   GL_UNSIGNED_SHORT, &g_tib3dIdx[0]);
+    if (glowPass) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glDepthMask(GL_FALSE);
+        glColorPointer(3, GL_UNSIGNED_BYTE, 0, &g_tib3dGlow[0]);
+        glDrawElements(GL_TRIANGLES, (GLsizei)g_tib3dIdx.size(),
+                       GL_UNSIGNED_SHORT, &g_tib3dIdx[0]);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+    }
+    g_tib3dPos.clear();
+    g_tib3dUV.clear();
+    g_tib3dCol.clear();
+    g_tib3dGlow.clear();
+    g_tib3dIdx.clear();
+}
+
+/* THE CRACKS THE CRYSTALS COME OUT OF, drawn after the terrain and before the clumps.
+   ONE DECAL PER CRYSTAL, under that crystal, so the fracture reads as the ground giving
+   way where the mineral pushed through rather than as a pattern stamped on the cell
+   grid. It walks the same instance list the clumps do and skips the pods, which are not
+   crystals and would double every decal.
+
+   ADDITIVE, AND THAT IS THE WHOLE POINT. It adds light to whatever ground is already
+   there instead of covering it, so grass stays grass and sand stays sand under a field
+   and only goes greener and lit along the cracks. The tile is written premultiplied by
+   bake_tib3d.py, so the blend is GL_ONE, GL_ONE and its alpha is not consulted at all.
+   Depth writes off, depth test on, which is the rule every ground decal here follows. */
+/* HOW HARD A GIVEN CLUMP IS BURNING THIS INSTANT, in 1 - depth .. 1.
+
+   OFF THE ENGINE CLOCK AND NOTHING ELSE. engine_time is the brain's own frame plus the
+   sub-tick phase, so this is simulated seconds: identical on two --shot runs of one
+   script, and no faster on a machine that draws more frames. A wall clock here would
+   cost the determinism gates and gain nothing a player could see.
+
+   The phase is a hash of the clump, so a field shimmers instead of throbbing as one
+   light; the rate is deliberately slow and NOT a dial, because what wants tuning by eye
+   is how deep it swings and a second slider for speed is a knob nobody moves twice. */
+static float tib3d_pulse(unsigned seed)
+{
+    const float depth = g_fx.tib3d_pulse;
+    if (depth <= 0.001f)
+        return 1.0f;
+    const float t = engine_time() * (1.0f / 15.0f);      /* simulated seconds */
+    const float phase = (float)(seed & 1023) / 1024.0f;
+    const float s = sinf(6.2831853f * (0.21f * t + phase));
+    return 1.0f - depth * 0.5f + depth * 0.5f * s;
+}
+
+
+/* The instance list, brought up to date. Both passes need it and either can be the
+   first to run in a frame, so neither owns the rebuild. */
+static void tib3d_ensure(void)
+{
+    const unsigned sig = tib3d_signature();
+    if (!g_tib3dSigOk || sig != g_tib3dSig) {
+        tib3d_rebuild();
+        g_tib3dSig = sig;
+        g_tib3dSigOk = true;
+    }
+    /* Drop the ones that have finished shrinking. Here rather than in the merge because
+       a clump keeps dying between rebuilds, and a field that is not changing gets no
+       rebuild at all. */
+    size_t w = 0;
+    for (size_t i = 0; i < g_tib3dInst.size(); i++) {
+        if (g_tib3dInst[i].dying && tib3d_growth(g_tib3dInst[i]) <= 0.001f)
+            continue;
+        if (w != i) g_tib3dInst[w] = g_tib3dInst[i];
+        w++;
+    }
+    g_tib3dInst.resize(w);
+}
+
+static void draw_tiberium_ground(void)
+{
+    if (!g_fx.enabled || !g_fx.tib3d || g_fx.tib3d_ground <= 0.01f)
+        return;
+    if (!g_tib3dHaveGround || g_tib.empty())
+        return;
+    tib3d_ensure();
+    if (g_tib3dInst.empty())
+        return;
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, g_tib3dGround);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glDepthMask(GL_FALSE);
+    glBegin(GL_TRIANGLES);
+    for (size_t i = 0; i < g_tib3dInst.size(); i++) {
+        const Tib3dInst& in = g_tib3dInst[i];
+        if (in.clump == (unsigned char)TIB3D_POD)
+            continue;                     /* a pod is not a crystal; it cracks nothing */
+        /* Same cull as the crystal this crack belongs to, see draw_tiberium_solid. */
+        if (!cell_shown(in.cx, in.cy) || shroud_cell_hidden(in.cx, in.cy))
+            continue;
+        if (g_viewValid && (in.x < g_viewX0 - 2.0f || in.x > g_viewX1 + 2.0f ||
+                            in.z < g_viewZ0 - 2.0f || in.z > g_viewZ1 + 2.0f))
+            continue;
+        /* The crack arrives with the crystal it belongs to and leaves with it. */
+        const float grow = tib3d_growth(in);
+        if (grow <= 0.001f)
+            continue;
+        /* THE SHROUD, AND NOT THE SUN. This is light the ground gives off, so a slope
+           facing away from the sun does not dim it; but a cell nobody has scouted must
+           not shine through the black. The four corners are averaged so a decal does
+           not jump as the reveal edge crosses its cell. Its own brightness dial rather
+           than the crystals', because these overlap: one per crystal means four deep in
+           the middle of a field where the crystals themselves do not stack at all. */
+        float lit = g_fx.tib3d_ground
+                    * tib3d_pulse(tib3d_hash(in.cx, in.cy, (unsigned)i)) * 0.25f *
+                    (shroud_corner_vis(in.cx,     in.cy) +
+                     shroud_corner_vis(in.cx + 1, in.cy) +
+                     shroud_corner_vis(in.cx,     in.cy + 1) +
+                     shroud_corner_vis(in.cx + 1, in.cy + 1));
+        if (lit <= 0.001f)
+            continue;
+        lit *= grow;
+        if (lit > 1.0f) lit = 1.0f;
+        glColor4f(lit, lit, lit, 1.0f);
+        /* Sized to the crystal it belongs to and to nothing else, so a full bush
+           breaks more ground than a pair of shards and no dial can put a decal
+           somewhere its crystal is not. */
+        const Tib3dClump& c = g_tib3dClump[in.clump];
+        const float half = (0.34f + 2.2f * c.radius * in.scale) * grow;
+        /* The pattern is TURNED, not the quad: the quad stays axis aligned so its four
+           corners are four straight terrain samples, and the turn goes on the texture
+           coordinates instead. Rotating a unit square about its middle throws the
+           corners outside 0..1, which is harmless because the tile is CLAMPed and its
+           border is black -- and black added to the ground is nothing at all. The
+           pattern itself lives in the inscribed disc, which no rotation leaves. */
+        const float ca = in.cs, sa = in.sn;   /* the clump's own bearing */
+        static const float U[4][2] = {{-0.5f,-0.5f},{0.5f,-0.5f},{0.5f,0.5f},{-0.5f,0.5f}};
+        const float px[4] = { in.x - half, in.x + half, in.x + half, in.x - half };
+        const float pz[4] = { in.z - half, in.z - half, in.z + half, in.z + half };
+        float vx[4], vy[4], vz[4], vu[4], vv[4];
+        for (int k = 0; k < 4; k++) {
+            vx[k] = px[k];
+            vz[k] = pz[k];
+            vy[k] = terrain_y(px[k], pz[k]) + 0.012f;   /* just over the flat decal */
+            vu[k] = 0.5f + U[k][0] * ca - U[k][1] * sa;
+            vv[k] = 0.5f + U[k][0] * sa + U[k][1] * ca;
+        }
+        const int tri[6] = { 0, 3, 1, 1, 3, 2 };   /* the ground's own SW-NE split */
+        for (int k = 0; k < 6; k++) {
+            const int v = tri[k];
+            glTexCoord2f(vu[v], vv[v]);
+            glVertex3f(vx[v], vy[v], vz[v]);
+        }
+    }
+    glEnd();
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glDisable(GL_TEXTURE_2D);
+}
+
+
+/* ---- The tree's own GLSL pair, and why the trees needed one -------------------------
+ *
+ *  Every other Enhanced world surface has per-pixel shading. Water builds its own
+ *  programs with a normal-mapped surface, a Blinn half-vector specular, a Fresnel term
+ *  and a reflection; the terrain gets the console's per-corner normal through the ground
+ *  normal buffer and the chain's one-sun lambert. The trees had NOTHING: a per-vertex
+ *  abs(N dot L) mapped into a narrow band, and then the post chain re-lit them from a
+ *  normal it reconstructs out of the depth buffer's derivatives. On a hull that
+ *  reconstruction is fine, because a hull is a few big connected faces. On a canopy of
+ *  seven hundred independently angled cards it gives every card its own plane normal and
+ *  fires the sun's terminator per card at random, which is a large part of why the first
+ *  build read as flat cardboard.
+ *
+ *  So the trees get a program. It carries four things the old path could not:
+ *
+ *    1  A REAL SHADING NORMAL, normal-mapped off the sheet, with the tangent frame built
+ *       from screen-space derivatives rather than from a tangent attribute nobody wants
+ *       to store four more floats a vertex for.
+ *    2  WRAPPED DIFFUSE instead of abs(N dot L). A canopy has no hard terminator, and
+ *       the absolute value made the shadow side exactly as bright as the lit side, which
+ *       took every trace of form out of the tree.
+ *    3  TRANSMISSION. Sun coming THROUGH a leaf is the one term that separates foliage
+ *       from a green solid, and it is gated on the thickness baked into the vertex, so a
+ *       leaf with a metre of canopy behind it does not glow.
+ *    4  THE BAKED OCCLUSION, which is the canopy's self-shadowing. See tree3d_mod.h for
+ *       the measurement showing the sun map cannot resolve it at this scale.
+ *
+ *  The wind moved into the vertex stage with it, so the CPU no longer rebuilds three
+ *  thousand vertices a tree a frame, and the canopy can flutter on its own phase instead
+ *  of the whole tree sliding sideways as one rigid body.
+ * ---------------------------------------------------------------------------------- */
+static const char* TREE_VS =
+    "#version 120\n"
+    "uniform vec3  uOrigin;\n"
+    "uniform float uScale, uYawC, uYawS;\n"
+    "uniform vec3  uWind, uLean;\n"
+    "uniform float uFlutter, uTime, uPhase;\n"
+    /* THE RIG THE ARTIST SHIPPED. Sixty-four bones of three rows each, which is 768 of
+       the 4096 vertex uniform components this card reports, and the widest rig in the
+       pack is fifty-four. uAnim scales the displacement away from the bind pose rather
+       than the pose itself, so nought is the unrigged tree exactly and a value above one
+       exaggerates a sway that is otherwise too small to see: measured on oak_1, the
+       authored motion peaks at 1.6% of the tree's height, which at this camera is about
+       one screen pixel. */
+    "uniform vec4  uBone[192];\n"
+    "uniform float uAnim, uRigWind;\n"
+    "varying vec2  vUV;\n"
+    "varying vec3  vN, vW;\n"
+    "varying float vAO, vTH, vMAT;\n"
+    "void main() {\n"
+    "    vec3 p = gl_Vertex.xyz;\n"
+    "    if (uAnim > 0.0) {\n"
+    "        int i0 = int(gl_MultiTexCoord1.x) * 3;\n"
+    "        int i1 = int(gl_MultiTexCoord1.y) * 3;\n"
+    "        float bw = gl_MultiTexCoord1.z * (1.0 / 32767.0);\n"
+    "        vec4 h = vec4(p, 1.0);\n"
+    "        vec3 a = vec3(dot(uBone[i0],   h), dot(uBone[i0+1], h), dot(uBone[i0+2], h));\n"
+    "        vec3 b = vec3(dot(uBone[i1],   h), dot(uBone[i1+1], h), dot(uBone[i1+2], h));\n"
+    "        p = mix(p, mix(b, a, bw), uAnim);\n"
+    "    }\n"
+    "    vec3 r = vec3(p.x * uYawC - p.z * uYawS, p.y, p.x * uYawS + p.z * uYawC);\n"
+    "    vec3 n = gl_Normal;\n"
+    "    vN = vec3(n.x * uYawC - n.z * uYawS, n.y, n.x * uYawS + n.z * uYawC);\n"
+    "    float sway = gl_Color.r * uRigWind;\n"
+    "    vAO  = gl_Color.g;\n"
+    "    vTH  = gl_Color.b;\n"
+    "    vMAT = gl_Color.a;\n"
+    /* THE CROWN BENDS AS ONE AND EACH CARD FLUTTERS ON ITS OWN. A single shear along one
+       bearing is a tree sliding sideways, which is what the first build did and what the
+       director called out. The second term is high frequency, keyed off the vertex's own
+       position so neighbouring cards disagree, and it is gated on the material so the
+       trunk and the limbs stay still. */
+    "    float f = sin(6.2831853 * uTime * 3.1 + uPhase * 3.0 + r.y * 11.0 + r.x * 7.0);\n"
+    "    float g = sin(6.2831853 * uTime * 2.3 + uPhase * 5.0 + r.z * 9.0);\n"
+    "    vec3 flut = vec3(f, g * 0.35, g) * (uFlutter * vMAT * sway);\n"
+    "    vec3 w = uOrigin + r * uScale + (uWind + uLean) * sway + flut;\n"
+    "    vW = w;\n"
+    "    vUV = gl_MultiTexCoord0.xy;\n"
+    "    gl_Position = gl_ModelViewProjectionMatrix * vec4(w, 1.0);\n"
+    "}\n";
+
+static const char* TREE_FS =
+    "#version 120\n"
+    "uniform sampler2D uAtlas, uAtlasN, uBark, uBarkN;\n"
+    "uniform vec3  uSun, uCam, uSunCol, uSkyCol, uGndCol;\n"
+    "uniform float uCut, uBurn, uAOAmt, uTrans, uSheen, uAmb, uShroud;\n"
+    "uniform float uWrap, uAoFloor, uAoGamma, uAoDirect, uGain;\n"
+    "varying vec2  vUV;\n"
+    "varying vec3  vN, vW;\n"
+    "varying float vAO, vTH, vMAT;\n"
+    "void main() {\n"
+    "    float leaf = step(0.5, vMAT);\n"
+    "    vec4 c  = mix(texture2D(uBark,  vUV), texture2D(uAtlas,  vUV), leaf);\n"
+    "    vec4 nr = mix(texture2D(uBarkN, vUV), texture2D(uAtlasN, vUV), leaf);\n"
+    /* THE CUT RISES AS THE TREE BURNS, which is how the canopy thins. */
+    "    if (leaf > 0.5 && c.a < uCut) discard;\n"
+    "    float rough = clamp(nr.a, 0.06, 1.0);\n"
+    /* A TANGENT FRAME WITHOUT A TANGENT ATTRIBUTE: the cotangent construction off the
+       screen-space derivatives of the position and the UV. Four derivatives, against
+       four more floats on every one of eleven thousand vertices. */
+    "    vec3 N = normalize(vN);\n"
+    "    vec3 dp1 = dFdx(vW), dp2 = dFdy(vW);\n"
+    "    vec2 du1 = dFdx(vUV), du2 = dFdy(vUV);\n"
+    "    vec3 dp2p = cross(dp2, N), dp1p = cross(N, dp1);\n"
+    "    vec3 T = dp2p * du1.x + dp1p * du2.x;\n"
+    "    vec3 B = dp2p * du1.y + dp1p * du2.y;\n"
+    "    float inv = inversesqrt(max(dot(T, T), dot(B, B)) + 1e-8);\n"
+    "    vec3 tn = nr.xyz * 2.0 - 1.0;\n"
+    "    vec3 Nm = normalize(T * inv * tn.x + B * inv * tn.y + N * tn.z);\n"
+    "    vec3 V = normalize(uCam - vW);\n"
+    "    vec3 L = normalize(uSun);\n"
+    /* A LEAF IS LIT THROUGH BOTH FACES AND A CARD'S WINDING IS ARBITRARY, so its normal
+       is turned toward the viewer before it is used. Bark is a solid and keeps its own. */
+    "    if (leaf > 0.5 && dot(Nm, V) < 0.0) Nm = -Nm;\n"
+    /* WRAPPED DIFFUSE, not a clamped lambert and certainly not an absolute value. THE
+       WRAP HAS TO BE WIDE. At 0.55 a leaf turned more than about a right angle from the
+       sun got exactly nothing, and with the ambient as thin as it was that came out as
+       flat black cards sitting beside lit ones: measured on the shipped build, 27.9% of
+       the canopy below luminance 12 out of 255. Switching the occlusion off entirely
+       moved that to 25.8%, which is how it was established that the occlusion was never
+       the cause and the lighting model was. */
+    "    float wr = mix(0.15, uWrap, leaf);\n"
+    "    float nl = max((dot(Nm, L) + wr) / (1.0 + wr), 0.0);\n"
+    /* THE OCCLUSION IS SHAPED, NOT APPLIED RAW. vAO reaches 0.04 deep inside a canopy,
+       and a term that low multiplying a thin ambient is a black card. The floor is what
+       a canopy interior actually looks like -- dark, and not a hole -- and the gamma
+       lifts the bottom of the range where the eye reads the difference. */
+    "    float aoS = uAoFloor + (1.0 - uAoFloor) * pow(vAO, uAoGamma);\n"
+    "    aoS = mix(1.0, aoS, uAOAmt);\n"
+    /* AND IT LEANS ON THE AMBIENT, NOT ON THE SUN. Ambient occlusion is a statement
+       about how much SKY a point can see. Letting it dim the direct sun as hard as it
+       dims the sky is what turned shaded cards into holes, so the sun keeps most of its
+       strength and uAoDirect says how much of it the canopy is allowed to take. */
+    "    float direct = nl * mix(1.0, aoS, uAoDirect);\n"
+    /* AMBIENT FROM A SKY AND A GROUND, which is what gives a canopy its vertical
+       gradient without one light having to do all the work. */
+    "    vec3 amb = mix(uGndCol, uSkyCol, Nm.y * 0.5 + 0.5) * aoS * uAmb;\n"
+    /* TRANSMISSION: the sun coming THROUGH the leaf, gated on how much foliage is behind
+       it. Warm, because a leaf held to the sun is yellow-green and not white. */
+    "    float back = pow(max(dot(-L, V), 0.0), 3.0);\n"
+    "    vec3 trans = uSunCol * (uTrans * back * (1.0 - vTH) * leaf) * vec3(1.0, 0.92, 0.55);\n"
+    "    vec3 H = normalize(L + V);\n"
+    "    float spec = pow(max(dot(Nm, H), 0.0), mix(96.0, 8.0, rough)) * uSheen * (1.0 - rough);\n"
+    "    vec3 albedo = c.rgb * mix(vec3(1.0), vec3(0.42, 0.30, 0.24), uBurn);\n"
+    "    vec3 col = albedo * (uSunCol * direct + amb) + trans * albedo\n"
+    "             + uSunCol * spec * aoS * (1.0 - uBurn);\n"
+    /* ONE EXPOSURE ON THE WHOLE TREE, and it is a dial rather than a constant folded
+       into the ambient. Softening the terminator and lifting the ambient to stop the
+       canopy cutting black holes in itself also lifted the whole tree: measured on the
+       same shot, tree pixels went from 26.0 to 29.8 against the cartridge tree's 25.3
+       and the bare ground's 25.4, so the wood read as brighter than the field it stands
+       in. Correcting that by pulling the ambient back down would have put the holes
+       straight back, so the shape of the light and the level of it are separate
+       controls. */
+    "    gl_FragColor = vec4(col * uShroud * uGain, 1.0);\n"
+    "}\n";
+
+/* THE SAME TREE, WRITTEN AS A NORMAL. The post chain reconstructs a pixel's normal from
+   the depth buffer's derivatives, which is right on a hull and noise on a canopy: hundreds
+   of independently angled cards each get their own plane and the sun's terminator fires
+   per card. The ground already escapes that by drawing its own normal into a buffer the
+   light pass prefers; this is the trees doing the same, with the alpha set to the FOLIAGE
+   state rather than the ground one, so the chain takes the normal without also applying
+   the ground's own lambert on top of the tree's shader. Same vertex stage as the lit
+   pass, so the geometry cannot disagree with itself. */
+static const char* TREE_NRM_FS =
+    "#version 120\n"
+    "uniform sampler2D uAtlas;\n"
+    "uniform float uCut, uNormAlpha;\n"
+    "varying vec2  vUV;\n"
+    "varying vec3  vN, vW;\n"
+    "varying float vAO, vTH, vMAT;\n"
+    "uniform vec3  uCam;\n"
+    "void main() {\n"
+    "    if (vMAT > 0.5 && texture2D(uAtlas, vUV).a < uCut) discard;\n"
+    "    vec3 N = normalize(vN);\n"
+    /* a leaf card's winding is arbitrary and it is lit through both faces, so the normal
+       is turned toward the viewer, exactly as the lit pass does it */
+    "    if (vMAT > 0.5 && dot(N, normalize(uCam - vW)) < 0.0) N = -N;\n"
+    "    gl_FragColor = vec4(N * 0.5 + 0.5, uNormAlpha);\n"
+    "}\n";
+
+static GLuint g_treeNrmProg = 0;
+static int    g_treeNrmTried = 0;
+
+static GLuint g_treeProg = 0;
+static int    g_treeProgTried = 0;
+
+static GLuint tree3d_link(const char* fs_src, const char* label)
+{
+    if (!fx_gl_ready)
+        return 0;
+    GLuint vs = fx_compile(GL_VERTEX_SHADER, TREE_VS, label);
+    if (!vs) return 0;
+    GLuint fs = fx_compile(GL_FRAGMENT_SHADER, fs_src, label);
+    if (!fs) { fx_glDeleteShader(vs); return 0; }
+    GLuint p = fx_glCreateProgram();
+    fx_glAttachShader(p, vs);
+    fx_glAttachShader(p, fs);
+    fx_glLinkProgram(p);
+    GLint ok = 0;
+    fx_glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) {
+        char log[4096]; GLsizei n = 0;
+        if (fx_glGetProgramInfoLog) fx_glGetProgramInfoLog(p, (GLsizei)sizeof log, &n, log);
+        log[n < (GLsizei)sizeof log ? n : (GLsizei)sizeof log - 1] = 0;
+        fprintf(stderr, "FX|program|%s FAILED TO LINK\n%s\n", label, log);
+        fx_glDeleteProgram(p);
+        p = 0;
+    }
+    fx_glDeleteShader(vs);
+    fx_glDeleteShader(fs);
+    return p;
+}
+
+static GLuint tree3d_prog(void)
+{
+    if (!g_treeProg && !g_treeProgTried) {
+        g_treeProgTried = 1;
+        g_treeProg = tree3d_link(TREE_FS, "tree");
+    }
+    return g_treeProg;
+}
+
+static GLuint tree3d_nrm_prog(void)
+{
+    if (!g_treeNrmProg && !g_treeNrmTried) {
+        g_treeNrmTried = 1;
+        g_treeNrmProg = tree3d_link(TREE_NRM_FS, "tree-normals");
+    }
+    return g_treeNrmProg;
+}
+
+static bool tree3d_is_tree(const SimObject& o)
+{
+    /* T01..T18 are the trees. TC01..TC05 are clumps with no model of their own and are
+       left to --clumptrees, and ROCK1..7 and the blossom trees are not trees at all. */
+    return o.kind == K_TERRAIN && o.type[0] == 'T' && o.type[1] >= '0' && o.type[1] <= '9';
+}
+
+static bool tree3d_claims(const SimObject& o)
+{
+    /* AND THE PACK MUST ACTUALLY HAVE A TREE FOR THIS NAME. T04 and T09 are cacti on
+       desert maps and the director kept the cartridge's own model for both, so neither
+       is in the pack's name map. Claiming them anyway suppressed the cactus and drew a
+       hash-picked temperate species in its place: 61 cells across eight campaign
+       scenarios grew a conifer in the sand. An unmapped name now falls through to the
+       cartridge, which is what "not replaced" has to mean. */
+    return g_fxActive && g_fx.tree3d && g_tree3dHave && !g_tree3dModel.empty()
+           && tree3d_is_tree(o) && tree3d_model_for(o.type) >= 0;
+}
+
+/* WHERE THIS TREE STANDS AND HOW IT IS MOVING, set on whichever program is about to
+   draw it. Both passes call this, because a normal written from geometry in one place
+   and shaded from geometry in another is a normal that belongs to nothing. */
+static void tree3d_pose(GLuint prog, const Tree3dModel& m, float t, float phase);
+
+static void tree3d_place(GLuint prog, const SimObject& o, const Tree3dModel& m,
+                         int named, unsigned h)
+{
+    const float r1 = (float)((h >> 4) & 1023) / 1023.0f;
+    const float r2 = (float)((h >> 14) & 1023) / 1023.0f;
+    const float r3 = (float)((h >> 24) & 255) / 255.0f;
+    const float vary = (named >= 0) ? g_fx.tree3d_vary * 0.45f : g_fx.tree3d_vary;
+    const float sc  = g_fx.tree3d_size * (1.0f + vary * (r1 * 2.0f - 1.0f));
+    const float yaw = r2 * 6.2831853f;
+    const float t = engine_time() * (1.0f / 15.0f);
+    const float phase = r3 * 6.2831853f;
+    const float amp = g_fx.tree3d_wind
+                      * sinf(6.2831853f * g_fx.tree3d_wind_speed * t + phase);
+    const float wdir = g_fx.tree3d_wind_dir * 0.01745329f;
+    const float lean = g_fx.tree3d_lean * (r1 - 0.5f) * 2.0f;
+    (void)m;
+    fx_set3f(prog, "uOrigin", o.wx, terrain_y(o.wx, o.wz), o.wz);
+    fx_set1f(prog, "uScale", sc);
+    fx_set1f(prog, "uYawC", cosf(yaw));
+    fx_set1f(prog, "uYawS", sinf(yaw));
+    fx_set3f(prog, "uWind", cosf(wdir) * amp, 0.0f, sinf(wdir) * amp);
+    fx_set3f(prog, "uLean", cosf(phase) * lean, 0.0f, sinf(phase) * lean);
+    fx_set1f(prog, "uFlutter", g_fx.tree3d_flutter * g_fx.tree3d_wind);
+    fx_set1f(prog, "uTime", t);
+    fx_set1f(prog, "uPhase", phase);
+    /* A RIGGED TREE KEEPS SOME OF THE GLOBAL SWAY AND NOT ALL OF IT. The authored rig
+       moves branches against one another, which the shear cannot do; the shear moves the
+       whole tree along one bearing, which the rig cannot do, because the rig knows
+       nothing about wind_dir. Both, at less than full weight each, or the crown travels
+       twice as far as the dial says. */
+    const bool rig = (m.nbones > 0 && m.nframes > 0 && g_fx.tree3d_anim > 0.0f);
+    fx_set1f(prog, "uAnim", rig ? g_fx.tree3d_anim : 0.0f);
+    fx_set1f(prog, "uRigWind", rig ? g_fx.tree3d_anim_wind : 1.0f);
+    /* BOTH PASSES POSE THE SAME TREE, and that is why the palette is uploaded here
+       rather than at the draw. A crown skinned into one shape for the lit pass and left
+       at bind for the ground-normal pass is a normal that belongs to nothing, which is
+       the mistake this function's own comment was written about. */
+    tree3d_pose(prog, m, t, phase);
+}
+
+/* WHERE THIS TREE IS IN ITS OWN LOOP, as a palette of bone matrices.
+
+   The pack holds twenty frames of a 4.1667 second loop and this lerps between two of
+   them. Twenty is measured, not chosen: reconstructing all hundred authored frames from
+   a decimated set lands within 0.093% of the tree's height on oak_1 and 0.050% on
+   pine_3, which is about a twentieth of a screen pixel at this camera, and sampling
+   finer does not improve it because past twenty the grid stops landing on the artist's
+   own keys.
+
+   THE PHASE IS FOLDED BEFORE IT IS USED, in double, and that is not fussiness. The sway
+   term a few lines up feeds engine_time()/15 straight into sin(6.28 * uTime * 3.1) as a
+   raw float: after two hours of run time that argument is 140,000 radians, where one ulp
+   is 0.0156 and a 60 Hz frame steps twenty ulps, and eventually the wind quantises and
+   then stops. A folded phase cannot do that however long the game runs. */
+static std::vector<float> g_tree3dPalette;
+
+static void tree3d_pose(GLuint prog, const Tree3dModel& m, float t, float phase)
+{
+    if (m.nbones <= 0 || m.nframes <= 0 || g_fx.tree3d_anim <= 0.0f)
+        return;
+    const double loop = (double)TREE3D_LOOP_SECONDS;
+    double u = (double)t * (double)g_fx.tree3d_wind_speed / loop
+             + (double)phase * (1.0 / 6.2831853071795864);
+    u -= floor(u);
+    const double fpos = u * (double)m.nframes;
+    const int a = (int)fpos % m.nframes;
+    const int b = (a + 1) % m.nframes;
+    const float w = (float)(fpos - floor(fpos));
+    const int n = m.nbones * 12;
+    if ((int)g_tree3dPalette.size() < n)
+        g_tree3dPalette.resize((size_t)n);
+    const float* A = &m.frames[(size_t)a * (size_t)n];
+    const float* B = &m.frames[(size_t)b * (size_t)n];
+    for (int i = 0; i < n; i++)
+        g_tree3dPalette[i] = A[i] + (B[i] - A[i]) * w;
+    fx_set4fv(prog, "uBone", m.nbones * 3, &g_tree3dPalette[0]);
+}
+
+/* The client arrays both passes read, and the teardown that puts them back. */
+static void tree3d_arrays_on(const Tree3dModel& m)
+{
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_NORMAL_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glVertexPointer(3, GL_FLOAT, 0, &m.pos[0]);
+    glNormalPointer(GL_FLOAT, 0, &m.nrm[0]);
+    glTexCoordPointer(2, GL_FLOAT, 0, &m.uv[0]);
+    glColorPointer(4, GL_UNSIGNED_BYTE, 0, &m.col[0]);
+    /* THE BONE PAIR RIDES ON TEXTURE UNIT ONE, as shorts. glTexCoordPointer rejects
+       GL_UNSIGNED_BYTE with GL_INVALID_ENUM and says nothing about it, so a byte index
+       would have arrived as a tree that never moved. The client unit is put back to
+       zero before this returns: every other array in the program assumes it. */
+    if (!m.skin.empty()) {
+        glClientActiveTexture(GL_TEXTURE1);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+        glTexCoordPointer(3, GL_SHORT, 0, &m.skin[0]);
+        glClientActiveTexture(GL_TEXTURE0);
+    }
+}
+
+static void tree3d_arrays_off(void)
+{
+    glClientActiveTexture(GL_TEXTURE1);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glClientActiveTexture(GL_TEXTURE0);
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDisableClientState(GL_NORMAL_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+/* EVERY TREE'S NORMAL, INTO THE BUFFER THE LIGHT PASS PREFERS. Called from the ground
+   normal pass, which has the scene depth attached, depth writes off and a polygon offset
+   already set, so this only has to draw the same geometry and write the foliage state. */
+static void tree3d_draw_normals(void)
+{
+    if (!g_fx.tree3d || !g_tree3dHave || g_tree3dModel.empty())
+        return;
+    const GLuint prog = tree3d_nrm_prog();
+    if (!prog)
+        return;
+    glEnable(GL_TEXTURE_2D);
+    fx_glUseProgram(prog);
+    fx_set1i(prog, "uAtlas", 0);
+    fx_set3f(prog, "uCam", g_fxCamPos[0], g_fxCamPos[1], g_fxCamPos[2]);
+    /* HALF, WHICH IS THE FOLIAGE STATE. One is ground and would earn the ground's own
+       one-sun lambert on top of the tree's shader; zero is nothing drew here. */
+    fx_set1f(prog, "uNormAlpha", 0.5f);
+    for (size_t i = 0; i < g_objects.size(); i++) {
+        const SimObject& o = g_objects[i];
+        /* the same two tests the lit pass gets through visible(), which is declared
+           further down this file than this pass has to live */
+        if (!tree3d_claims(o))
+            continue;
+        if (!cell_shown(o.cx, o.cy) || !cell_in_view(o.cx, o.cy)) {
+            g_nTreeNrmCut++;
+            continue;
+        }
+        g_nTreeNrm++;
+        const unsigned h = tree3d_hash(o.cx, o.cy);
+        const int named = tree3d_model_for(o.type);
+        const size_t pick = (named >= 0 && (size_t)named < g_tree3dModel.size())
+                            ? (size_t)named : (h % g_tree3dModel.size());
+        const Tree3dModel& m = g_tree3dModel[pick];
+        if (m.pos.empty() || m.idx.empty() || m.set < 0 ||
+            (size_t)m.set >= g_tree3dSet.size())
+            continue;
+        float burn = 0.0f;
+        if (o.maxstr > 0 && o.str >= 0 && o.str < o.maxstr)
+            burn = g_fx.tree3d_burn * (1.0f - (float)o.str / (float)o.maxstr);
+        if (burn > 1.0f) burn = 1.0f;
+        fx_set1f(prog, "uCut", 0.34f + 0.42f * burn);
+        tree3d_place(prog, o, m, named, h);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, g_tree3dSet[m.set].tex[0]);
+        tree3d_arrays_on(m);
+        glDrawElements(GL_TRIANGLES, (GLsizei)m.idx.size(), GL_UNSIGNED_INT, &m.idx[0]);
+        tree3d_arrays_off();
+    }
+    fx_glUseProgram(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_TEXTURE_2D);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+static void tree3d_draw(const SimObject& o, int pass)
+{
+    /* ONE PASS AND ONE ONLY. The first build ignored this argument entirely and drew the
+       whole lit tree again inside the blended cartridge-shadow pass, and twice into the
+       sun map. The tree is alpha-cut and depth-written, so the cutout pass is where it
+       belongs, and both callers reach it there. */
+    if (pass != MODE_CUTOUT || !tree3d_claims(o))
+        return;
+    const GLuint prog = tree3d_prog();
+    if (!prog)
+        return;
+    const unsigned h = tree3d_hash(o.cx, o.cy);
+    /* THE CARTRIDGE'S OWN NAME CHOOSES THE TREE, and the hash only stands in where the
+       pack has nothing to say. Which name gets which species is a decision about the
+       game: T18 is an acacia because every one of its 241 placements is on a desert map,
+       and T05 is a fir because every one of its is temperate. The renderer should not be
+       inventing that, so the pack carries it. */
+    const int named = tree3d_model_for(o.type);
+    /* tree3d_claims has already refused anything the map does not name, so the hash is
+       a guard against a malformed pack rather than a policy. */
+    const size_t pick = (named >= 0 && (size_t)named < g_tree3dModel.size())
+                        ? (size_t)named : (h % g_tree3dModel.size());
+    const Tree3dModel& m = g_tree3dModel[pick];
+    if (m.pos.empty() || m.idx.empty() || m.set < 0 ||
+        (size_t)m.set >= g_tree3dSet.size())
+        return;
+    const Tree3dSet& ts = g_tree3dSet[m.set];
+
+    /* its own settled character, all from the one hash */
+    const float r1 = (float)((h >> 4) & 1023) / 1023.0f;
+    const float r2 = (float)((h >> 14) & 1023) / 1023.0f;
+    const float r3 = (float)((h >> 24) & 255) / 255.0f;
+    /* A NAMED TREE STILL VARIES IN SIZE, but less: the species now carries most of the
+       difference between one tree and the next, so the old spread would read as the same
+       oak drawn at random scales rather than as a wood. */
+    const float vary = (named >= 0) ? g_fx.tree3d_vary * 0.45f : g_fx.tree3d_vary;
+    const float sc  = g_fx.tree3d_size * (1.0f + vary * (r1 * 2.0f - 1.0f));
+    const float yaw = r2 * 6.2831853f;
+
+    const float t = engine_time() * (1.0f / 15.0f);      /* simulated seconds */
+    const float phase = r3 * 6.2831853f;
+    const float amp = g_fx.tree3d_wind
+                      * sinf(6.2831853f * g_fx.tree3d_wind_speed * t + phase);
+    const float wdir = g_fx.tree3d_wind_dir * 0.01745329f;
+    const float lean = g_fx.tree3d_lean * (r1 - 0.5f) * 2.0f;
+
+    float burn = 0.0f;
+    if (o.maxstr > 0 && o.str >= 0 && o.str < o.maxstr)
+        burn = g_fx.tree3d_burn * (1.0f - (float)o.str / (float)o.maxstr);
+    if (burn > 1.0f) burn = 1.0f;
+
+    /* ONE SUN, WHICH IS THE CHAIN'S. The first build multiplied the Tier 2 lambert by
+       terrain_shade, and terrain_shade is the CARTRIDGE's own baked corner shade against
+       a fixed light vector that has nothing to do with sun_az or sun_el. Two suns
+       multiplied together is why a lit crown never got bright. The ground's shade now
+       takes a small ambient share only, which is the same pattern draw_tiberium_solid
+       uses for its own GROUND_MIX. */
+    fx_sun_dir();
+    const float vis = 0.25f * (shroud_corner_vis(o.cx,     o.cy) +
+                               shroud_corner_vis(o.cx + 1, o.cy) +
+                               shroud_corner_vis(o.cx,     o.cy + 1) +
+                               shroud_corner_vis(o.cx + 1, o.cy + 1));
+    const float gshade = 0.70f + 0.30f * terrain_shade(o.cx, o.cy);
+
+    fx_glUseProgram(prog);
+    tree3d_place(prog, o, m, named, h);
+    fx_set1i(prog, "uAtlas", 0);  fx_set1i(prog, "uAtlasN", 1);
+    fx_set1i(prog, "uBark",  2);  fx_set1i(prog, "uBarkN",  3);
+    fx_set3f(prog, "uSun", -g_fxSunDir[0], -g_fxSunDir[1], -g_fxSunDir[2]);
+    fx_set3f(prog, "uCam", g_fxCamPos[0], g_fxCamPos[1], g_fxCamPos[2]);
+    fx_set3f(prog, "uSunCol", 1.00f, 0.97f, 0.90f);
+    fx_set3f(prog, "uSkyCol", 0.52f, 0.62f, 0.78f);
+    fx_set3f(prog, "uGndCol", 0.30f, 0.31f, 0.22f);
+    fx_set1f(prog, "uCut", 0.34f + 0.42f * burn);
+    fx_set1f(prog, "uBurn", burn);
+    fx_set1f(prog, "uAOAmt", g_fx.tree3d_ao);
+    fx_set1f(prog, "uWrap", g_fx.tree3d_wrap);
+    fx_set1f(prog, "uAoFloor", g_fx.tree3d_ao_floor);
+    fx_set1f(prog, "uAoGamma", g_fx.tree3d_ao_gamma);
+    fx_set1f(prog, "uAoDirect", g_fx.tree3d_ao_direct);
+    fx_set1f(prog, "uGain", g_fx.tree3d_gain);
+    fx_set1f(prog, "uTrans", g_fx.tree3d_trans);
+    fx_set1f(prog, "uSheen", g_fx.tree3d_sheen);
+    fx_set1f(prog, "uAmb", g_fx.tree3d_ambient * gshade);
+    fx_set1f(prog, "uShroud", vis);
+
+    for (int u = 3; u >= 0; u--) {
+        glActiveTexture(GL_TEXTURE0 + u);
+        glBindTexture(GL_TEXTURE_2D, ts.tex[u]);
+    }
+
+    /* THE STATE THIS PASS WAS GIVEN IS THE STATE IT GETS BACK. The cutout loop enables
+       the alpha test ONCE before it runs and every draw inside inherits it; the first
+       build disabled it on the way out, which silently turned the cutout off for every
+       object drawn after the first tree. The shader discards on its own and writes alpha
+       1, so the inherited test passes and nothing here needs to touch it. */
+    tree3d_arrays_on(m);
+    glDrawElements(GL_TRIANGLES, (GLsizei)m.idx.size(), GL_UNSIGNED_INT, &m.idx[0]);
+    tree3d_arrays_off();
+
+    fx_glUseProgram(0);
+    for (int u = 3; u >= 1; u--) {
+        glActiveTexture(GL_TEXTURE0 + u);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    glActiveTexture(GL_TEXTURE0);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+static void draw_tiberium_solid(void)
+{
+    if (!g_fx.enabled || !g_fx.tib3d)        /* Enhanced only, and off is the console */
+        return;
+    if (!g_tib3dHave || g_tib.empty())
+        return;
+    tib3d_ensure();
+    if (g_tib3dInst.empty())
+        return;
+
+    /* The sun the rest of the chain uses. Resolved here rather than read, because the
+       only other caller is the post pass, which runs AFTER the world is drawn: reading
+       it would light this pass by the previous frame's bearing for one frame after a
+       dial moves. fx_sun_dir is arithmetic on two dials and touches no GL. */
+    fx_sun_dir();
+    const float lx = -g_fxSunDir[0], ly = -g_fxSunDir[1], lz = -g_fxSunDir[2];
+    /* A floor under the lambert so a face turned away is dark rather than black. OURS,
+       and the same shape as the ramp the model importer bakes for delivered art that
+       arrives with no vertex colour of its own. Generous, because a crystal is not a
+       matte surface and because the sheet under it is already dark: the first render
+       used 0.34/0.66 over the ground shade whole, and a field came out as black
+       clutter rather than as anything green. */
+    const float FLOOR = 0.46f, RANGE = 0.54f;
+    /* AND THE GROUND SHADE ONLY GETS A SHARE. The decal is part of the ground and takes
+       the console's slope shade entire; a crystal stands out of it and catches the sky,
+       so it keeps just over half its own brightness on the darkest slope. */
+    const float GROUND_MIX = 0.45f;
+    const float sink = g_fx.tib3d_sink;
+    const bool  glow = (g_fx.tib3d_glow > 0.01f);
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, g_tib3dTex);
+    /* MODULATE is stated, not inherited: draw_terrain can leave a two-stage COMBINE
+       env bound, and under that a per-vertex colour is not what this pass means. */
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glDepthMask(GL_TRUE);          /* solid geometry, unlike the decal it stands on */
+    /* NO ALPHA TEST. The sheet's alpha is the emissive mask, not a cutout: testing it
+       would punch holes through every texel that does not glow. */
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_BLEND);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+
+    int drawn = 0;
+    for (size_t i = 0; i < g_tib3dInst.size(); i++) {
+        const Tib3dInst& in = g_tib3dInst[i];
+        /* A HIDDEN CELL'S CLUMPS ARE NOT DRAWN AT ALL, the rule the walls take. The flat
+           decal under them lies beneath the shroud blanket and is dimmed by it like the
+           ground; a clump stands ABOVE the depth-tested blanket, so dimming it by the
+           cell's corner average still leaves a lit crystal on the black. The map's edge
+           ring is always hidden, and its cells hold tiberium on many missions (placed by
+           the file or spread there at runtime), so without this test crystals showed in
+           the one ring no harvester can enter. The pod rock rides this list and goes
+           with them. */
+        if (!cell_shown(in.cx, in.cy) || shroud_cell_hidden(in.cx, in.cy))
+            continue;
+        if (g_viewValid && (in.x < g_viewX0 - 1.0f || in.x > g_viewX1 + 1.0f ||
+                            in.z < g_viewZ0 - 1.0f || in.z > g_viewZ1 + 1.0f))
+            continue;
+        const Tib3dClump& c = g_tib3dClump[in.clump];
+        /* HOW MUCH OF ITSELF IT IS SHOWING. A clump growing in or being harvested out
+           scales about its own base, so it rises out of the pod and sinks back into it
+           rather than fading. Nothing to draw at zero. */
+        const float grow = tib3d_growth(in);
+        if (grow <= 0.001f)
+            continue;
+        const float gsc = in.scale * grow;
+        if (g_tib3dPos.size() / 3 + c.vert.size() > 65535)
+            tib3d_flush(glow);
+        /* The cell's own ground shade times its shroud, which is the rule the flat
+           decal under this obeys; the four corners are averaged so a clump does not
+           jump in brightness as the reveal edge crosses the cell. */
+        const float vis = 0.25f * (shroud_corner_vis(in.cx,     in.cy) +
+                                   shroud_corner_vis(in.cx + 1, in.cy) +
+                                   shroud_corner_vis(in.cx,     in.cy + 1) +
+                                   shroud_corner_vis(in.cx + 1, in.cy + 1));
+        const float lit = ((1.0f - GROUND_MIX) +
+                           GROUND_MIX * terrain_shade(in.cx, in.cy)) * vis;
+        float gv = g_fx.tib3d_glow * vis
+                   * tib3d_pulse(tib3d_hash(in.cx, in.cy, (unsigned)i));
+        if (gv > 1.0f) gv = 1.0f;
+        const unsigned char gb = (unsigned char)(gv * 255.0f + 0.5f);
+        const float y0 = terrain_y(in.x, in.z) + in.lift * grow
+                         - c.height * gsc * sink;
+        const unsigned short base = (unsigned short)(g_tib3dPos.size() / 3);
+        for (size_t v = 0; v < c.vert.size(); v++) {
+            const Tib3dVert& s = c.vert[v];
+            const float px = s.x * in.cs - s.z * in.sn;
+            const float pz = s.x * in.sn + s.z * in.cs;
+            g_tib3dPos.push_back(in.x + px * gsc);
+            g_tib3dPos.push_back(y0   + s.y * gsc);
+            g_tib3dPos.push_back(in.z + pz * gsc);
+            g_tib3dUV.push_back(s.u);
+            g_tib3dUV.push_back(s.v);
+            const float nx = s.nx * in.cs - s.nz * in.sn;
+            const float nz = s.nx * in.sn + s.nz * in.cs;
+            float d = nx * lx + s.ny * ly + nz * lz;
+            if (d < 0.0f) d = 0.0f;
+            float sh = lit * (FLOOR + RANGE * d);
+            if (sh > 1.0f) sh = 1.0f;
+            const unsigned char b = (unsigned char)(sh * 255.0f + 0.5f);
+            g_tib3dCol.push_back(b);
+            g_tib3dCol.push_back(b);
+            g_tib3dCol.push_back(b);
+            /* The glow takes the SHROUD but not the sun: a crystal's own light does
+               not go out on the shaded side of a hill, and a crystal nobody has
+               scouted must not shine through the black. */
+            g_tib3dGlow.push_back(gb);
+            g_tib3dGlow.push_back(gb);
+            g_tib3dGlow.push_back(gb);
+        }
+        for (size_t k = 0; k < c.idx.size(); k++)
+            g_tib3dIdx.push_back((unsigned short)(base + c.idx[k]));
+        drawn++;
+    }
+    tib3d_flush(glow);
+
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);   /* the shade was per vertex; leave white */
+    glDisable(GL_TEXTURE_2D);
+
+    static int announced = -1;
+    if (announced != drawn / 64) {       /* only when it has moved by a batch's worth */
+        announced = drawn / 64;
+        fprintf(stderr, "tiberium: %d solid clumps drawn of %zu placed over %zu cells\n",
+                drawn, g_tib3dInst.size(), g_tib.size());
+    }
 }
 
 
@@ -7045,6 +9120,45 @@ static void mesh_wobble(int mode, float cx, float cz, float* ax, float* az)
     if (mode == WOBBLE_VEHICLE) {
         *ax = 0.1f * sinf(6.0f * cz);
         *az = 0.1f * sinf(6.0f * cx);
+        /* AND THE GROUND ITSELF. Everything above is the console's washboard, a fixed
+           field of two sines standing in the world that reads no terrain at all, so a
+           tank on a hill stood upright and cut into the slope. The slope term is summed
+           into the SAME two angles rather than bolted on as a second rotation, so the
+           lean and the washboard ride one chain in the console's own order: scale, yaw
+           about Y, then world X, then world Z, pivoting at the vehicle's own anchor on
+           the ground.
+
+           OURS, NOT THE CARTRIDGE'S, which is why it has an off. The type-1 draw arm's
+           terrain-orienting shear is flag bit 0x400 and a ground vehicle issues 0x180, so
+           the console never orients one.
+
+           A CENTRAL DIFFERENCE OVER A CONTACT PATCH, not the triangle's normal. A tank
+           spans its own hull rather than balancing on a point, and the difference of a
+           continuous function is continuous, so nothing pops as a vehicle crosses a cell
+           edge or the diagonal a per-triangle normal would break on. terrain_y and not
+           the corner normal grid, because terrain_y is planar over the triangle actually
+           drawn and it routes the building pad, so a tank parked on a levelled pad stays
+           level.
+
+           Ships are deliberately left alone: an LST's terrain_y is the seabed. That also
+           keeps a jeep riding an LST's deck level, because a rider on a boat is forced to
+           the ship mode. */
+        if (g_fx.veh_slope > 0.0f) {
+            const float r = (g_fx.veh_slope_span > 0.01f) ? g_fx.veh_slope_span : 0.40f;
+            const float dz = terrain_y(cx, cz + r) - terrain_y(cx, cz - r);
+            const float dx = terrain_y(cx + r, cz) - terrain_y(cx - r, cz);
+            /* +ax drops the SOUTH end and +az raises the EAST end; see the rotating arm
+               in draw_mesh, which is where those signs are defined. */
+            float sx = -atan2f(dz, 2.0f * r);
+            float sz =  atan2f(dx, 2.0f * r);
+            const float cap = g_fx.veh_slope_max * 3.14159265f / 180.0f;
+            if (cap > 0.0f) {
+                if (sx >  cap) sx =  cap; else if (sx < -cap) sx = -cap;
+                if (sz >  cap) sz =  cap; else if (sz < -cap) sz = -cap;
+            }
+            *ax += sx * g_fx.veh_slope;
+            *az += sz * g_fx.veh_slope;
+        }
     } else if (mode == WOBBLE_SHIP) {
         *az = 0.07f * sinf(1.6f * cx);
     }
@@ -7110,7 +9224,7 @@ static int   g_fanTex = -1;      /* the active fan grille texture, -1 = no spin 
 static float g_fanAngle = 0.0f;
 
 /* HOW MANY TRIANGLES OF A BUILDING EXIST YET, from the engine's buildup fraction.
-   Lifted out of draw_mesh on 21 Aug 2026 so the renderer and the `stagepos` probe compute
+   Lifted out of draw_mesh so the renderer and the `stagepos` probe compute
    it from ONE implementation. Measuring this by counting pixels does not work: the
    building shares its screen space with terrain, scaffolding, the yard's own crane and
    whatever infantry walks past, and every one of those moves every frame. */
@@ -7122,7 +9236,7 @@ static size_t build_tri_limit(const PackMesh& mesh, size_t ntris, float frac)
         if (ns > 1 && g_smoothMove) {
             /* SUB-SECTION REVEAL, and it is a DEVIATION, switched by "Smooth animations".
                The cartridge pops whole display-list sections in, which is what the branch
-               below does and what this project shipped until 21 Aug 2026. the project owner reported
+               below does and what this project shipped. the project owner reported
                it twice: "when certain buildings are being placed (like Power plants,
                Barracks etc), the animations are still not smooth but very choppy."
                A power plant has few enough sections that each pop is a visible lurch, and
@@ -7170,6 +9284,18 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
         return;
     if (build_frac <= 0.0f)
         return;   /* a sold building past its last piece: nothing left to draw */
+    /* THE DEBUG PACK'S VERSION OF THIS MESH, when the panel asks for it. The whole draw
+       reads geometry AND textures from `src`, because a mesh's texture indices are
+       indices into its OWN pack's bank and mean nothing in another. The pivots, roles,
+       sections and animation come from the same place for the same reason. */
+    const Pack* src = &g_pack;
+    if (debug_meshes_on()) {
+        std::map<int, int>::const_iterator dm = g_debugMeshOf.find(mi);
+        if (dm != g_debugMeshOf.end() && dm->second < (int)g_packDebug.mesh.size()) {
+            src = &g_packDebug;
+            mi = dm->second;
+        }
+    }
     /* The model stands ON the terrain: its whole local frame lifts by the ground
        height under its anchor (PK9 heightfield; 0 on a flat pack). */
     const float ground = terrain_y(cx, cz);
@@ -7192,7 +9318,7 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
     g_meshFace = face;
     g_meshYawS = rs;
     g_meshYawC = rc;
-    const PackMesh& mesh = g_pack.mesh[mi];
+    const PackMesh& mesh = src->mesh[mi];
     const std::vector<PackTri>& tris = mesh.tris;
     /* per-part extra rotation about the part's own pivot; identity when unused */
     const float tura = -((float)turyaw) * (2.0f * (float)M_PI / 256.0f);
@@ -7273,6 +9399,21 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
         if (g_fanTex >= 0 && t.tex == g_fanTex) {
             fanS = sinf(g_fanAngle); fanC = cosf(g_fanAngle); fanOn = true;
         }
+        /* RUNNING TRACK, from the wrap byte's top nibble (see g_treadPhase). One frame
+           means a strip scrolled continuously; more means a flipbook whose v was
+           squeezed into the first frame's band at import, so stepping frames is adding
+           whole multiples of 1/frames. The offset goes on v, which the importer aimed
+           ALONG the vehicle, and the strip wraps because these triangles carry the
+           repeat wrap mode. A texture-coordinate offset is all it is, so the fixed
+           function pipeline draws it unchanged and no shader is involved. */
+        const int treadFrames = (int)(t.wrap >> 4);
+        float treadV = 0.0f;
+        if (treadFrames == 1) {
+            treadV = g_treadNow;
+        } else if (treadFrames > 1) {
+            const float ph = g_treadNow - floorf(g_treadNow);
+            treadV = floorf(ph * (float)treadFrames) / (float)treadFrames;
+        }
         if (t.tex != curtex || (t.tex >= 0 && (int)t.wrap != curwrap)) {
             if (began) { glEnd(); began = false; }
             curtex = t.tex;
@@ -7285,7 +9426,7 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
             const bool flashThis = g_meshFlash && t.mode != MODE_SHADOW
                                                && t.mode != MODE_XLU;
             if (curtex >= 0 && !flashThis) {
-                const PackTex& tx = g_pack.tex[curtex];
+                const PackTex& tx = src->tex[curtex];
                 glEnable(GL_TEXTURE_2D);
                 glBindTexture(GL_TEXTURE_2D,
                               livery_texture(tx, house));
@@ -7307,13 +9448,14 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
         for (int k = 0; k < 3; k++) {
             const PackVert& v = t.v[k];
             if (curtex >= 0) {
-                const PackTex& tx = g_pack.tex[curtex];
+                const PackTex& tx = src->tex[curtex];
                 float uu = v.u, vv = v.v;
                 if (fanOn) {   /* spin the grille under a fixed triangle: rotate UV about (0.5,0.5) */
                     const float du = uu - 0.5f, dv = vv - 0.5f;
                     uu = 0.5f + du * fanC - dv * fanS;
                     vv = 0.5f + du * fanS + dv * fanC;
                 }
+                if (treadFrames) vv += treadV;
                 glTexCoord2f(uu * (float)tx.uw / (float)tx.w,
                              vv * (float)tx.uh / (float)tx.h);
             }
@@ -7325,7 +9467,7 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                VERTEX, at that vertex's own world position, where the cartridge samples
                once per node. Per-node cannot make a tree whose canopy straddles the
                shroud boundary read half-dark, and that half-lit tree is precisely what
-               the project owner asked for. Per-vertex costs one bilinear lookup per vertex and gives
+               the requirement asked for. Per-vertex costs one bilinear lookup per vertex and gives
                a Gouraud gradient across the object for free.
                The subtraction must come AFTER the whiten_packed substitution, or a
                whitened part would never darken. */
@@ -7919,7 +10061,39 @@ static void efx_chunk_draw_model(int mi, float wx, float wy, float wz,
     glDepthMask(GL_FALSE);
 }
 
-static void efx_bullet_draw_model(int mi, float wx, float ylift, float wz, int face)
+/* THE SHELL LAID ALONG ITS FLIGHT, an Enhanced-only departure from the console.
+   The 120MM/BOMB display list is authored standing on end: 24 x 77 x 20 mesh units
+   with the 77 on the display frame's Y, which draw_mesh treats as height. This 3x4
+   (column-vector form, out = M * v + t, applied before the yaw) takes the authored
+   vertical onto model +z, which the +128 bias below then turns along the direction of
+   travel: (x, y, z) -> (x, -z, y - 38.5). The -38.5 centres the 77-unit length on the
+   bullet's own coordinate so the shell neither leads nor trails it, and the box then
+   spans -10..10 in y, which is why the draw lifts it by ten mesh units: at altitude 0
+   its underside would otherwise sit in the ground.
+   The box is symmetric under a half turn, so which end becomes the nose cannot show;
+   the parts that CAN go wrong are the centring and the lift, and the gate on the flight
+   line measures both (the bright box's centre against the bullet's projected centre). */
+static const float EFX_SHELL_LAY_FLAT[12] = { 1.0f, 0.0f,  0.0f,   0.0f,
+                                              0.0f, 0.0f, -1.0f,   0.0f,
+                                              0.0f, 1.0f,  0.0f, -38.5f };
+
+/* Which bullets fly laid flat, decided BY NAME and only under the Enhanced picture.
+   By name rather than by measuring the mesh, because the bake maps more than one type
+   onto this display list (BOMB, and a ROAD entry in the model table) and a rule keyed on
+   the box's proportions would follow the mesh onto whatever else arrives sharing it
+   after a re-bake. Only the tank round: the grenade keeps the console's upright box on
+   both tiers, and DRAGON/MISSILE/BOMBLET are authored along z already. Case is folded
+   because the engine spells the round "120mm" while the pack key is "120MM".
+   Classic is the cartridge's picture, and there the shell stands on end. */
+static bool efx_bullet_lays_flat(const char* name)
+{
+    if (!g_fx.enabled)
+        return false;
+    return strcasecmp(name, "120MM") == 0;
+}
+
+static void efx_bullet_draw_model(int mi, float wx, float ylift, float wz, int face,
+                                  bool lay_flat)
 {
     /* Solid little model in mid-air: opaque mesh state, then hand the effects pass
        back the state it runs on (blend on, depth writes off).
@@ -7945,21 +10119,52 @@ static void efx_bullet_draw_model(int mi, float wx, float ylift, float wz, int f
          difference between projectile facings, and BulletClass::Draw_It takes shape 0
          for it whatever the facing is.
 
-       So there is no per-bullet forward table to add here, and a shell that looks like
-       it is pointing the wrong way is not this line: that mesh cannot point. What is
-       NOT settled is whether the cartridge yaws a bullet model at all. It would matter
-       only for the 120MM box, which is not symmetric under a QUARTER turn (its two z
-       faces are lighter than its two x faces), and that is exactly the round the engine
-       calls faceless. Deciding it needs the console's bullet draw path read. */
+       THE CARTRIDGE YAWS A BULLET, AND ONLY YAWS IT, and that is read off the console's
+       own draw rather than inferred. Its bullet draw (RAM 0x801D6418, the ObjectClass
+       draw virtual; the vtable word sits at ROM 0x164EE0) reads the bullet-table model
+       id (-1 skips, which is the invis rule), the altitude and PrimaryFacing, and
+       enqueues the model through RAM 0x8004A384 with flags 0, tag 3, a lift of
+       1.5 x altitude and a facing of 0x80 - PrimaryFacing, the same form the unit draw
+       at RAM 0x80013C68 uses. The draw interpreter (RAM 0x8004BF80, type-1 arm at
+       0x8004C108) applies that facing as the Y euler only when tag bit 1 is set
+       (0x8004C5AC..0x8004C5E8, times 2pi/256) and adds the lift when bit 0 is set
+       (0x8004C41C..0x8004C43C); the extra-rotation arm at 0x8004C540 needs tag bit 2,
+       which is clear. No pitch anywhere, and the table's faceless bit is never read by
+       the draw. So on the console the 120MM box stands on end in every flight
+       direction, yawed about the vertical: a 24 x 77 x 20 pillar that never points
+       along its travel, and the grenade is the same pillar because model-table slots
+       92 and 96 point at one scene node (RAM 0x801B5044). This function draws exactly
+       that, and Classic keeps it. At 320x240 the pillar is a two-pixel spark; at
+       1280x720 it is a 3 x 6 px stick with a legible vertical, which is why it reads
+       worse here than on the console.
+
+       lay_flat is the Enhanced-only departure described at EFX_SHELL_LAY_FLAT: the
+       same draw with the authored vertical turned along travel and ten mesh units of
+       extra lift so the laid box clears the ground. */
+    const float* M   = lay_flat ? EFX_SHELL_LAY_FLAT : NULL;
+    const float lift = lay_flat ? ylift + 10.0f * MODEL_SCALE : ylift;
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
     glColor3f(1.0f, 1.0f, 1.0f);
-    draw_mesh(mi, wx, wz, (face + 128) & 255, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, ylift);
+    draw_mesh(mi, wx, wz, (face + 128) & 255, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, lift,
+              false, WOBBLE_NONE, -1.0f, M);
     glEnable(GL_TEXTURE_2D); /* draw_mesh may leave it off after untextured tris */
-    draw_mesh(mi, wx, wz, (face + 128) & 255, MODE_CUTOUT, 0, 0.0f, 0, 1.0f, ylift);
+    draw_mesh(mi, wx, wz, (face + 128) & 255, MODE_CUTOUT, 0, 0.0f, 0, 1.0f, lift,
+              false, WOBBLE_NONE, -1.0f, M);
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
     glDepthMask(GL_FALSE);
+}
+
+/* Where the middle of the 120MM/BOMB box sits above the bullet's ground lift, in cells,
+   for the efxdump readout to project: half the 77-unit length when the box stands on
+   end, and the ten-unit clearance lift when it lies along its travel (the lay-flat
+   matrix already centres the length on the coordinate). A gate compares the bright
+   box in a screenshot against this projection, which is what makes the centring and
+   the lift measurable rather than eyeballed. */
+static float efx_bullet_centre_lift(float ylift, bool lay_flat)
+{
+    return ylift + (lay_flat ? 10.0f : 38.5f) * MODEL_SCALE;
 }
 
 /* ---- THE NUCLEAR STRIKE's mushroom --------------------------------------------------
@@ -8239,14 +10444,38 @@ static float sprite_texels_per_unit(void)
     return (g_camMode == CAM_N64) ? 24.0f : (24.0f / 0.70710678f);
 }
 
+/* THE ENHANCED INFANTRY SIZE DIAL, applied as a DIVISOR ON tpu and not as a multiply on
+   the finished quad. Three reasons it goes here rather than on wid/hgt:
+     - ox and drop are in the strip's own texels and are divided by this same tpu, so
+       scaling tpu scales the card ABOUT THE MAN'S GROUND LINE. A multiply on hgt alone
+       would shrink a Remastered attack pose toward the bottom of its crop box, which is
+       below his boots, and lift him off the ground (the very bug G202 was written for).
+     - the Remastered strips carry their OWN tpu (RI_SIZE), so a change to
+       sprite_texels_per_unit() alone would miss them.
+     - CLASSIC NEVER MULTIPLIES, so it never rounds: the early return hands back the exact
+       float the caller had, and every pixel gate on the Classic path is bit-identical.
+   dosmake_draw_card (the building scaffold) divides by the plain divisor on purpose. */
+static float inf_card_tpu(float base)
+{
+    if (!g_fx.enabled) return base;
+    const float s = g_fx.inf_scale;
+    if (s <= 0.0f) return base;
+    return base / s;
+}
+
 /* The strips were drawn for the classic C&C view, where world north is straight up the
    screen. CAM_ORTHO yaws the camera 45 degrees, so world north appears up-and-LEFT, and
    without this correction every infantryman stands one octant off his true heading.
-   CAM_N64 has yaw 0: north is straight up the screen exactly as the art assumes, so the
-   correction is zero and the bias exists only to undo a rotation we no longer apply. */
+   CAM_N64 has yaw 0 in Classic: north is straight up the screen exactly as the art
+   assumes, so the correction is zero. Under the Perspective row's yaw (Isometric) the
+   same undoing applies to that yaw, in DirType units with the opposite sign: at -45
+   that is +32, a man facing world north drawn from his north-east strip because north
+   runs up-and-right; at the shipped 16 it is -11. */
 static int sprite_facing_bias(void)
 {
-    return (g_camMode == CAM_N64) ? 0 : -(int)(YAW_DEG * 256.0f / 360.0f);   /* 0 or -32 */
+    if (g_camMode != CAM_N64) return -(int)(YAW_DEG * 256.0f / 360.0f);          /* -32 */
+    if (g_camYaw == 0.0f) return 0;                                               /* Classic */
+    return -(int)lroundf(g_camYaw * 256.0f / (2.0f * (float)M_PI));
 }
 
 /* Diagnostics for the animation, printed by --dumpanim. */
@@ -8360,7 +10589,10 @@ static bool inf_use_sprites(void)
 enum { RM_UNBUILT = -2, RM_NOART = -1 };
 
 static std::map<std::string, DosInfType> g_rmInf;   /* key "TYPE#livery" */
-static std::map<std::string, float> g_rmInfTpu;    /* one scale per type; see rm_inf_tpu */
+/* ONE SCALE AND ONE ANCHOR PER TYPE, both read off its STAND action. tpu is why the man
+   is the right size; ax/ay are why he is in the right place whatever he is doing. */
+struct RmInfRef { float tpu; int ax, ay; };
+static std::map<std::string, RmInfRef> g_rmInfRef;
 static RtMeg  g_rmInfMeg, g_rmInfCfg;
 static RiBand g_rmInfBand;
 static bool   g_rmInfOpen = false, g_rmInfTried = false;
@@ -8394,7 +10626,7 @@ static void rm_inf_close(void)
     if (g_rmInfOpen) { rt_meg_close(&g_rmInfMeg); rt_meg_close(&g_rmInfCfg); }
     g_rmInfOpen = g_rmInfTried = false;
     g_rmInf.clear();
-    g_rmInfTpu.clear();
+    g_rmInfRef.clear();
 }
 
 /* THE TYPE'S SCALE, measured once from its STAND action and used for every action of it.
@@ -8403,24 +10635,30 @@ static void rm_inf_close(void)
    and FIRE agree at 4.76 and 4.69 but WALK comes out 3.72, so a walking man drew about a
    fifth larger than a standing one. The 1995 art has one texels-per-unit for every strip
    and lets the art carry the relative sizes; this does the same. */
-static float rm_inf_tpu(const std::string& ty, const RiZip* z, const DosInfType& dosT)
+static RmInfRef rm_inf_ref(const std::string& ty, const RiZip* z, const DosInfType& dosT)
 {
-    std::map<std::string, float>::iterator it = g_rmInfTpu.find(ty);
-    if (it != g_rmInfTpu.end()) return it->second;
+    std::map<std::string, RmInfRef>::iterator it = g_rmInfRef.find(ty);
+    if (it != g_rmInfRef.end()) return it->second;
     {
         const short (*rows)[3] = di_do_rows(ty.c_str());
         char low[32];
-        int uw = 0, uh = 0, dosfw = 0;
-        float tpu = 0.0f;
+        int dosfw = 0, box[4];
+        RmInfRef r;
+        r.tpu = 0.0f; r.ax = 0; r.ay = 0;
         snprintf(low, sizeof low, "%s", ty.c_str());
         for (char* q = low; *q; q++) *q = (char)tolower((unsigned char)*q);
         if (rows && dosT.strip[0][DA_STAND] >= 0
             && dosT.strip[0][DA_STAND] < (int)g_dosStrips.size())
             dosfw = g_dosStrips[dosT.strip[0][DA_STAND]].fw;
-        if (rows && dosfw > 0 && ri_union_box(z, low, rows[DA_STAND], &uw, &uh))
-            tpu = (float)uw * 24.0f / (float)dosfw / RI_SIZE;
-        g_rmInfTpu[ty] = tpu;
-        return tpu;
+        /* ONE READ OF THE STAND BOX serves both answers, so the scale and the anchor can
+           never disagree about which action they were measured from. */
+        if (rows && dosfw > 0 && ri_action_box(z, low, rows[DA_STAND], box)) {
+            r.tpu = (float)(box[2] - box[0]) * 24.0f / (float)dosfw / RI_SIZE;
+            r.ax  = (box[0] + box[2]) / 2;
+            r.ay  = box[3];
+        }
+        g_rmInfRef[ty] = r;
+        return r;
     }
 }
 
@@ -8465,11 +10703,11 @@ static int rm_inf_strip(const std::string& ty, int anim, int lv, const DosInfTyp
         if (!blob) { fprintf(stderr, "remaster-inf: %s not in the archive\n", zn); return RM_NOART; }
         if (!ri_zip_open(&z, blob, len)) { fprintf(stderr, "remaster-inf: %s is not a readable zip\n", zn); free(blob); return RM_NOART; }
         {
-            const float tpu = rm_inf_tpu(ty, &z, dosT);
-            if (tpu <= 0.0f) { ri_zip_close(&z); free(blob); return RM_NOART; }
+            const RmInfRef ref = rm_inf_ref(ty, &z, dosT);
+            if (ref.tpu <= 0.0f) { ri_zip_close(&z); free(blob); return RM_NOART; }
             if (!ri_build_strip(&z, low, rows[anim], dosfw, &g_rmInfBand,
                                 LIVERY_BAND[lv < 0 || lv >= LIVERY_COUNT ? 0 : lv],
-                                tpu, &sh)) {
+                                ref.tpu, ref.ax, ref.ay, &sh)) {
             fprintf(stderr, "remaster-inf: %s slot %d built nothing (row %d,%d,%d)\n",
                     ty.c_str(), anim, rows[anim][0], rows[anim][1], rows[anim][2]);
             ri_zip_close(&z); free(blob); return RM_NOART;
@@ -8485,7 +10723,14 @@ static int rm_inf_strip(const std::string& ty, int anim, int lv, const DosInfTyp
             st.src_stages = sh.stages;      /* nothing is subsampled at desktop sizes */
             st.fw = sh.fw; st.fh = sh.fh; st.cols = sh.cols;
             st.texw = sh.texw; st.texh = sh.texh;
-            st.tpu = sh.tpu;
+            st.tpu = sh.tpu; st.ox = sh.ox; st.drop = sh.drop;
+            /* THE ONE LINE THAT SAYS WHERE THIS STRIP THINKS THE GROUND IS. Printed once
+               per strip built, which is once per (type, action, seat) in a whole run, so
+               it costs nothing and G202 can read the derivation off a real install
+               instead of trusting it. */
+            fprintf(stderr, "RMINF|strip|%s|%s|fw=%d|fh=%d|tpu=%.3f|ox=%.0f|drop=%.0f\n",
+                    ty.c_str(), anim >= 0 && anim < DI_SLOT_COUNT ? DI_SLOT_NAME[anim] : "?",
+                    st.fw, st.fh, st.tpu, st.ox, st.drop);
             glGenTextures(1, &st.gl);
             glBindTexture(GL_TEXTURE_2D, st.gl);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, fx_filter_mode(GL_NEAREST));
@@ -8535,9 +10780,18 @@ static int rm_inf_strip(const std::string& ty, int anim, int lv, const DosInfTyp
        three texels on a 17x12 sprite, and precisely the class of silent mirror bug this
        file has been bitten by before.
 
-   (c) HEIGHT IS hgt * g_bbUp[1], not hgt. The drawn card LEANS toward the camera, so it
-       only reaches that far above the ground; using the full height would cast the shadow
-       of a taller man than the one standing there.
+   (c) HEIGHT IS THE MAN'S OWN, NOT THE CARD'S LEAN. This used to be hgt * g_bbUp[1], on
+       the reasoning that the drawn card leans toward the camera and only reaches that far
+       above the ground. That is true of the CARD and false of the MAN: the lean is a
+       billboard artifact of facing the camera, and the art is a man standing upright. A
+       shadow that shortens because the camera moved is a shadow that is wrong, and since
+       g_bbUp[1] is the cosine of a pitch that is itself a function of zoom distance, that
+       one factor was the ENTIRE camera-distance dependence of an infantry shadow. It is
+       why they all but vanished at full zoom out, which is where the factor is smallest.
+
+       The scale dial multiplies from there, about the man's ground line so his boots stay
+       on it: see spr_shadow_scale, and the note there about the chain's fixed world costs
+       being sized against a cliff rather than a rifleman.
 
    (d) SELF-SHADOW, the part most likely to be got wrong. The lighting pass reads the scene
        depth buffer, where the man's pixels sit on the LEANING card -- displaced away from
@@ -8547,9 +10801,20 @@ static int rm_inf_strip(const std::string& ty, int anim, int lv, const DosInfTyp
        is free. The bottom pair clears the card's half-width and the top pair also clears
        its lean, because one uniform push big enough for the lean would lift the contact
        shadow off his boots. */
+/* (e) THE BASE POINT IS HANDED IN, not derived. The caster stands in for the card that
+       WOULD have been drawn, so it has to start where that card starts -- and a
+       Remastered strip's card is offset from the man's own position by the strip's ox,
+       and raised along its plane when its cell stops short of his ground line
+       (dosinf_mod.h). Deriving the base here would put the shadow where the man is not.
+       The height is the STANDING part of the card only: a strip whose cell carries rows
+       below the ground line has those rows folded flat onto the terrain by the draw, and
+       a thing lying on the ground casts nothing worth drawing. v1 is likewise the crease
+       row, not the cell's bottom. The pack's own strips and the cartridge billboards
+       pass exactly what this used to compute. */
 static void fx_emit_sprite_shadow(const SimObject& o, GLuint tex,
                                   float ua, float ub, float v0, float v1,
-                                  float wid, float hgt)
+                                  float wid, float hgt,
+                                  float bx, float by, float bz)
 {
     const float* S = g_fxSunDir;
     float rx = S[2], rz = -S[0];
@@ -8557,17 +10822,21 @@ static void fx_emit_sprite_shadow(const SimObject& o, GLuint tex,
     if (rl < 1e-4f) { rx = 1.0f; rz = 0.0f; rl = 1.0f; }
     rx /= rl; rz /= rl;
     if (rx * g_bbRight[0] + rz * g_bbRight[2] < 0.0f) { rx = -rx; rz = -rz; }
+    {
+        const float sc = (g_fx.spr_shadow_scale > 0.1f) ? g_fx.spr_shadow_scale : 1.0f;
+        wid *= sc;
+        hgt *= sc;
+    }
     rx *= wid * 0.5f; rz *= wid * 0.5f;
 
-    const float bx = o.wx, bz = o.wz;
-    const float by = terrain_y(bx, bz) + o.ylift;
-    const float h  = hgt * g_bbUp[1];
+    const float h  = hgt;
+    (void)o;
 
     const float side = 0.5f * wid * fabsf(g_bbRight[0] * S[0] + g_bbRight[2] * S[2]);
     float lean = hgt * (g_bbUp[0] * S[0] + g_bbUp[2] * S[2]);
     if (lean < 0.0f) lean = 0.0f;
     /* THE BASE PUSH IS ZERO, and that is the fix to (d) above rather than an exception to
-       it (20 Aug 2026). Pushing along the light does leave the ground silhouette
+       it. Pushing along the light does leave the ground silhouette
        bit-identical, exactly as that note says -- but it also puts the caster that much
        DEEPER in the shadow map, so a receiver has to be dB + bias deeper still before the
        compare fires. On flat ground that is a dead zone measured outward from the man's
@@ -8678,24 +10947,89 @@ static bool dosinf_draw_sprite(const SimObject& o)
 
     /* A strip built from art at another resolution carries its own scale, so the same
        sized man comes off a much bigger cell. The pack's strips leave it zero. */
-    const float tpu = sp.tpu > 0.0f ? sp.tpu : sprite_texels_per_unit();
-    const float hgt = (float)sp.fh / tpu;
+    const float tpu = inf_card_tpu(sp.tpu > 0.0f ? sp.tpu : sprite_texels_per_unit());
     const float wid = (float)sp.fw / tpu;
+    /* THE CARD IS PLACED ON THE MAN, NOT ON THE CELL. sp.drop is how far this strip's
+       bottom row falls below his ground line and sp.ox how far its centre lies right of
+       his anchor column, both in the strip's own texels; dividing by the strip's own tpu
+       turns them into the world units the quad is built in. Every strip the 1995 pack
+       bakes leaves both zero -- its actions already share one feet line -- so this is
+       arithmetic with no effect there and the DOS and cartridge sprites do not move. */
+    const float offw  = sp.ox   / tpu;
+    /* THE ROWS BELOW HIS GROUND LINE ARE FOLDED ONTO THE GROUND, NOT SUNK INTO IT. A
+       positive drop means the cell carries rows under the man's feet: a flame jet, a
+       muzzle flash, a rocket exhaust, the lower half of a prone body. Lowering the whole
+       card by that much so his feet land on the terrain, which is what this used to do,
+       put those rows UNDER the terrain surface, and since the card leans back at the
+       camera pitch the ground plane cuts it drop/cos(pitch) rows up rather than drop:
+       47 rows of flame under a standing flamethrower cost him 66 to 78 rows of a 166-row
+       cell, which is his boots to his knees, and a prone flamethrower (68 rows under the
+       line, 56 rows of body straddling it) vanished at far zoom. The depth test against
+       the terrain hid it; nothing about the strip was wrong.
+
+       So the card is split at the ground line. The rows above it stand on the terrain as
+       one upright quad, exactly today's card with its bottom trimmed; the rows below it
+       lie flat on the ground in front of him, toward the camera, which is what the 2D
+       game's blit means by those rows in the first place. `dn` is the fold, in this
+       strip's texels, clamped so a cell that is all overhang cannot go negative. */
+    float dn = sp.drop;
+    if (dn < 0.0f) dn = 0.0f;
+    if (dn > (float)sp.fh) dn = (float)sp.fh;
+    /* A NEGATIVE DROP RAISES THE CARD ALONG ITS OWN PLANE. The cell ends above the ground
+       line (a walk whose crop stops short of the feet line), so the base goes up the card
+       by that much and the line the art stands on is again exactly at the ground. A
+       vertical raise, which this used to be, left that line low by |drop|(1 - cos pitch),
+       two or three rows. */
+    const float raisew = sp.drop < 0.0f ? -sp.drop / tpu : 0.0f;
     /* + o.ylift: a rider stands on the LST's deck plate, not in the water. Zero for
        every object that came out of g_objects. The lift has to enter here rather
        than through a matrix push because the Glide port has no matrix stack, so
        every billboard is emitted with explicit vertices. */
-    const float bx = o.wx, bz = o.wz, by = terrain_y(o.wx, o.wz) + o.ylift;
+    /* The ground is sampled under the MAN (o.wx, o.wz), never under the shifted card:
+       ox slides the art across him, it does not move him to other ground. */
+    const float gnd = terrain_y(o.wx, o.wz) + o.ylift;
+    const float bx = o.wx + g_bbRight[0] * offw + g_bbUp[0] * raisew;
+    const float bz = o.wz + g_bbRight[2] * offw + g_bbUp[2] * raisew;
+    const float by = gnd + g_bbRight[1] * offw + g_bbUp[1] * raisew;
+    /* The two heights, in world units: what stands and what lies. The pack's own strips
+       and the cartridge's have drop 0, so dn is 0, hUp is the whole cell, and the single
+       quad below is emitted with the vertices it has always had. */
+    const float hUp   = ((float)sp.fh - dn) / tpu;
+    const float hFlat = dn / tpu;
+    /* The texture row of the crease. v runs top to bottom, so the ground line sits
+       (fh - dn) rows down the cell. With no fold it is v1 itself, not v1 recomputed
+       through a multiply that could land an ulp away from it. */
+    const float vG = dn > 0.0f ? v0 + (v1 - v0) * (((float)sp.fh - dn) / (float)sp.fh)
+                               : v1;
+
+    /* ONE LINE PER (type, action) PER RUN, so a gate can read where the card was actually
+       put rather than trusting that the offsets above were applied. dy is the card's base
+       against the ground under him, in cells: 0 for every strip that stands on its ground
+       line, and the along-card raise's vertical part for a negative drop. up and flat are
+       the fold in texels and must sum to fh; lift is the along-card raise in texels. */
+    if (g_dumpanim && !g_spriteShadowPass && sp.tpu > 0.0f) {
+        static std::set<std::string> seen;
+        char k[96];
+        snprintf(k, sizeof k, "%s|%d", sp.name, anim);
+        if (seen.insert(std::string(k)).second)
+            printf("RMINF|place|%s|%s|drop=%.0f|ox=%.0f|tpu=%.3f|dy=%.4f|dx=%.4f"
+                   "|fh=%d|up=%.0f|flat=%.0f|lift=%.0f\n",
+                   sp.name, anim >= 0 && anim < DI_SLOT_COUNT ? DI_SLOT_NAME[anim] : "?",
+                   sp.drop, sp.ox, tpu,
+                   by - gnd, offw,
+                   sp.fh, (float)sp.fh - dn, dn, raisew * tpu);
+    }
 
     const float rx = g_bbRight[0] * wid * 0.5f;
     const float ry = g_bbRight[1] * wid * 0.5f;
     const float rz = g_bbRight[2] * wid * 0.5f;
-    const float ux = g_bbUp[0] * hgt, uy = g_bbUp[1] * hgt, uz = g_bbUp[2] * hgt;
+    const float ux = g_bbUp[0] * hUp, uy = g_bbUp[1] * hUp, uz = g_bbUp[2] * hUp;
 
     /* The shadow caster is a silhouette and reads this sheet for its alpha only, so it
-       stays on the pack's own texture and a player's colour costs nothing here. */
+       stays on the pack's own texture and a player's colour costs nothing here. Only the
+       standing part casts: the folded rows are on the ground already. */
     if (g_spriteShadowPass) {
-        fx_emit_sprite_shadow(o, sp.gl, u0, u1, v0, v1, wid, hgt);
+        fx_emit_sprite_shadow(o, sp.gl, u0, u1, v0, vG, wid, hUp, bx, by, bz);
         return true;
     }
 
@@ -8734,11 +11068,53 @@ static bool dosinf_draw_sprite(const SimObject& o)
         const float k = 1.0f - e;
         glColor3f(k, k, k);
     }
+    if (dn <= 0.0f) {
+        /* No rows below the ground line: the one card, as always. */
+        glBegin(GL_QUADS);
+        glTexCoord2f(u0, v1); glVertex3f(bx - rx,      by - ry,      bz - rz);
+        glTexCoord2f(u1, v1); glVertex3f(bx + rx,      by + ry,      bz + rz);
+        glTexCoord2f(u1, v0); glVertex3f(bx + rx + ux, by + ry + uy, bz + rz + uz);
+        glTexCoord2f(u0, v0); glVertex3f(bx - rx + ux, by - ry + uy, bz - rz + uz);
+        glEnd();
+        return true;
+    }
+
+    /* THE FOLD. The crease is the ground line, lifted off the terrain by the same margin
+       the vehicle shadows use so neither quad z-fights the ground it lies on; the two
+       quads share the crease's two vertices exactly, so the seam is watertight.
+
+       The flat part runs along the ground TOWARD the camera, and it is stretched. The
+       upright card lies in the image plane and projects one to one, but a length on the
+       ground projects onto screen-up by only sin(pitch), the size of g_bbUp's horizontal
+       component. Dividing the flat length by that puts every folded row on screen at the
+       same pixels per texel as the rows above the crease, so on level ground the picture
+       is the 2D game's blit row for row: no step in scale where a prone body or a
+       diagonal flame crosses the line. The clamp guards a camera looking straight down
+       the card, where the horizontal component vanishes. */
+    float fwx = -g_bbUp[0], fwz = -g_bbUp[2];
+    float proj = sqrtf(fwx * fwx + fwz * fwz);
+    if (proj < 1e-4f) { fwx = 0.0f; fwz = 1.0f; proj = 1e-4f; }
+    else              { fwx /= proj; fwz /= proj; }
+    if (proj < 0.1f) proj = 0.1f;
+    const float len = hFlat / proj;
+    const float lift = 0.012f;
+    const float fxl = fwx * len, fzl = fwz * len;
+    const float cy = by + lift;                       /* the crease's height */
+    const float ax = bx - rx + fxl, az = bz - rz + fzl;   /* the far edge's ends */
+    const float ex = bx + rx + fxl, ez = bz + rz + fzl;
+    const float ay = terrain_y(ax, az) + o.ylift + lift;
+    const float ey = terrain_y(ex, ez) + o.ylift + lift;
     glBegin(GL_QUADS);
-    glTexCoord2f(u0, v1); glVertex3f(bx - rx,      by - ry,      bz - rz);
-    glTexCoord2f(u1, v1); glVertex3f(bx + rx,      by + ry,      bz + rz);
-    glTexCoord2f(u1, v0); glVertex3f(bx + rx + ux, by + ry + uy, bz + rz + uz);
-    glTexCoord2f(u0, v0); glVertex3f(bx - rx + ux, by - ry + uy, bz - rz + uz);
+    /* standing: crease to top */
+    glTexCoord2f(u0, vG); glVertex3f(bx - rx,      cy - ry,      bz - rz);
+    glTexCoord2f(u1, vG); glVertex3f(bx + rx,      cy + ry,      bz + rz);
+    glTexCoord2f(u1, v0); glVertex3f(bx + rx + ux, cy + ry + uy, bz + rz + uz);
+    glTexCoord2f(u0, v0); glVertex3f(bx - rx + ux, cy - ry + uy, bz - rz + uz);
+    /* lying: crease to the cell's bottom row, out along the ground */
+    glTexCoord2f(u0, v1); glVertex3f(ax,      ay,      az);
+    glTexCoord2f(u1, v1); glVertex3f(ex,      ey,      ez);
+    glTexCoord2f(u1, vG); glVertex3f(bx + rx, cy + ry, bz + rz);
+    glTexCoord2f(u0, vG); glVertex3f(bx - rx, cy - ry, bz - rz);
     glEnd();
     return true;
 }
@@ -8932,7 +11308,7 @@ static float construction_frac(const SimObject& o)
 /* "This building is going up (or being sold) RIGHT NOW", the console's own test.
 
    NOT the same question as construction_frac(o) >= 1.0f, which three draw sites used as a
-   proxy for it until 20 Aug 2026. construction_frac is 2*stage/count clamped to 1 -- the
+   proxy for it. construction_frac is 2*stage/count clamped to 1 -- the
    cartridge's own 2x reveal rate -- so it SATURATES at stage = count/2 and reports
    "finished" for the whole second half of a buildup. With PROC's makecnt of 20 it reads
    1.00 from stage 10 onward while the engine is still ten stages from done.
@@ -8953,7 +11329,7 @@ static bool building_constructing(const SimObject& o)
  * ANY_UNIT_MCVANIMZ1 -- the cartridge names it itself, in the pointer array at ROM
  * 0x1DE924 whose entries 7, 8, 9 read ANY_STR_CONYARDZ1, ANY_UNIT_MCVANIMZ1,
  * ANY_STR_REFINERYZ1, i.e. exactly the +10 model-index bias the draw-command interpreter
- * at RAM 0x8004C108 applies -- re-read instruction by instruction on 17 Aug 2026 after a
+ * at RAM 0x8004C108 applies -- re-read instruction by instruction after a
  * decode pass claimed that address was something else entirely, and it holds:
  *     8004C11C  lui   v1, 0x800a
  *     8004C120  addiu v1, v1, -0x65c8     ; v1 = 0x80099A38 = modelTable + 10*16
@@ -9412,7 +11788,7 @@ static void draw_sprite(const SimObject& o, size_t idx)
     float ua = 0.0f, ub = fu;
     if (mirror) { ua = fu; ub = 0.0f; }
 
-    const float tpu = sprite_texels_per_unit();
+    const float tpu = inf_card_tpu(sprite_texels_per_unit());
     const float hgt = (float)sp->fh / tpu;
     const float wid = (float)sp->fw / tpu;
 
@@ -9430,7 +11806,7 @@ static void draw_sprite(const SimObject& o, size_t idx)
     const float ux = g_bbUp[0] * hgt, uy = g_bbUp[1] * hgt, uz = g_bbUp[2] * hgt;
 
     if (g_spriteShadowPass) {
-        fx_emit_sprite_shadow(o, tx.gl, ua, ub, v0, v1, wid, hgt);
+        fx_emit_sprite_shadow(o, tx.gl, ua, ub, v0, v1, wid, hgt, bx, by, bz);
         return;
     }
 
@@ -10095,6 +12471,56 @@ static bool mesh_world_centroid(int mi, float cx, float cz, int face, float* ox,
     return true;
 }
 
+/* THE ROCKET LAUNCHER IS DRAWN AT ITS TURRET FACING UNDER ENHANCED, and nowhere else.
+
+   The GDI rocket launcher (INI stem MSAM; the Nod SSM's stem MLRS is listed with it
+   for a pack that ever carries one) is the one turret-equipped unit type whose model
+   has no turret part: the cartridge models it as a single rigid node with no clip
+   (model slot 47), and its vehicle draw places the whole model at PrimaryFacing
+   (Draw3D, RAM 0x80014078-0x80014084) exactly as it does for a tank hull. Its rockets
+   do not leave that way. The DRAGON round is homing, a homing round launches along
+   TurretClass::Fire_Direction, which is SecondaryFacing for a turret-equipped type
+   (turret.cpp:538, RAM 0x80016A00), from Center_Coord (Fire_Coord has no launcher
+   case), and the body is only ever turned in TarComClass::AI's FIRE_FACING arm
+   (tarcom.cpp:130-135, RAM 0x800194E8-0x80019574). Can_Fire quarters the turret-to-
+   target difference for a homing round (turret.cpp:326-333), so a target within 31
+   DirType of the turret never produces FIRE_FACING at all, and while the launcher is
+   rearming (techno.cpp:2196, FIRE_REARM, 83 ticks after a pair) the facing test is not
+   even reached: the turret keeps tracking at ROT+1 per tick (tarcom.cpp:153-157) and
+   a retarget inside that window puts it anywhere up to 180 degrees off the hull before
+   the next volley leaves. Measured: face=63, tface=0, both rockets due north out of an
+   east-lying body. The 1995 DOS picture hides this because the launcher sprite is
+   drawn from the turret facing (unit.cpp:2214, BodyShape[tfacing] + 32); the console's
+   picture shows it, and Classic keeps the console's picture.
+
+   Under Enhanced the whole launcher is turned to tface instead, so the pod points where
+   the rockets go. No stillness latch: the type is IsLockTurret, the turret is locked to
+   the hull whenever it drives (turret.cpp:197-199, drive.cpp:1042), so tface == face on
+   the move and the drawn yaw is continuous through every stop, start and re-aim.
+   Measured on a move order given with the turret 63 off the hull: the two facings close
+   on each other at 5 and 6 per tick, meet after 7 ticks, turn together onto the heading,
+   and the drawn yaw never moves more than 6 in a tick. The old latch would have snapped
+   the hull by up to 24 when a launcher halted in range and its turret started turning.
+   The body turning with the pod is the compromise a one-node model forces; a bake-time
+   split of the pod into a ROLE_TURRET part with its own pivot would turn the pod alone
+   through turret_delta unchanged, and is the better shape if the model is ever split.
+
+   KEYED TO THE TYPE STEM, NOT TO "NO TURRET PART". tface is a frozen spawn value for
+   every type that is not IsTurretEquipped (the harvester, the MCV, the APC, the
+   transports: see draw_facing), and a test on the mesh alone would put the 45-degree
+   snap back on all of them. These two stems are the renderer's copy of the only
+   IsTurretEquipped entries in udata.cpp whose model lacks the part; every other turreted
+   type (LTNK, MTNK, HTNK, JEEP, BGGY, BOAT) carries one and goes through turret_delta. */
+static bool launcher_follows_turret(const SimObject& o)
+{
+    if (o.kind != K_UNIT || !g_fx.enabled || g_legacy || o.face < 0 || o.tface < 0)
+        return false;
+    if (strcmp(o.type, "MSAM") != 0 && strcmp(o.type, "MLRS") != 0)
+        return false;
+    const int mi = mesh_for(o);
+    return mi >= 0 && !mesh_has_role(mi, ROLE_TURRET);
+}
+
 /* Which objects actually turn.
 
    Vehicles do: PrimaryFacing is their heading and the mesh is authored pointing south.
@@ -10133,9 +12559,10 @@ static int draw_facing(const SimObject& o)
         const int abias = g_nofacefix ? (((int)g_faceBias) & 255) : model_face_bias(o.type);
         return (src + abias) & 255;
     }
-    /* THE HULL FOLLOWS PrimaryFacing, ALWAYS. A standing unit whose mesh has no turret
-       part used to be turned to `tface` instead, on the theory that the art should point
-       where the gun points. It cannot: for exactly the units that branch could still
+    /* THE HULL FOLLOWS PrimaryFacing, with one declared exception (the rocket launcher
+       under Enhanced, launcher_follows_turret below). A standing unit whose mesh has no
+       turret part used to be turned to `tface` instead, on the theory that the art should
+       point where the gun points. It cannot: for exactly the units that branch could still
        reach, tface IS A DEAD FIELD. The brain exports it for every RTTI_UNIT as
        SecondaryFacing.Current(), and SecondaryFacing is written ONCE, by
        TurretClass::Unlimbo (turret.cpp:496-503); every later write in TurretClass::AI is
@@ -10146,13 +12573,16 @@ static int draw_facing(const SimObject& o)
        snapped to its real heading in one frame the moment it rolled. Measured with
        aimwatch on the shipped binary: HARV 161 samples, 2 ticks where the engine facing
        moved 0 and the drawn yaw moved 64 and 32; MCV 61 samples, 1 tick of 32 DirType,
-       which is exactly the 45 degrees the project owner reported. A Medium Tank scored 0 only because
+       which is exactly the reported 45-degree snap. A Medium Tank scored 0 only because
        mesh_has_role(ROLE_TURRET) is true for its mesh and the branch never fired.
        Nothing is lost by dropping it: a turretless unit in Tiberian Dawn aims with
        PrimaryFacing (turret.cpp:313), so the hull heading already points at what it
-       shoots. If a genuinely turreted unit ever needs the swap back, the honest input is
-       Class->IsTurretEquipped exported from the brain, not our own mesh role table. */
+       shoots. The honest input for any swap back is the engine's own IsTurretEquipped,
+       never "the mesh has no turret part": the launcher exception below is keyed to the
+       two type stems that ARE turret equipped in udata.cpp, and to nothing wider. */
     const int bias = g_nofacefix ? (((int)g_faceBias) & 255) : model_face_bias(o.type);
+    if (launcher_follows_turret(o))
+        return (o.tface + bias) & 255;
     return (o.face + bias) & 255;
 }
 
@@ -10255,7 +12685,7 @@ static int efx_muzzle_at(int attref, int attkind, float* wx, float* wy, float* w
             *wx = o.wx;
             *wz = o.wz;
             *wy = terrain_y(o.wx, o.wz) + o.ylift
-                  + INF_MUZZLE_TEXELS / sprite_texels_per_unit();
+                  + INF_MUZZLE_TEXELS / inf_card_tpu(sprite_texels_per_unit());
             return 1;
         }
         const int mi = mesh_for(o);
@@ -10608,6 +13038,11 @@ static void report_placement(void)
    multiply-adds, so this stays affordable on the Pentium the Voodoo2 will be bolted to. */
 
 static void begin_overlay(int fbw, int fbh);
+/* Defined in unitcard_mod.h, included far below: is this point on the unit card, and
+   a left press on it. Every ladder that decides what a press or a pointer means asks
+   uc_over before it reaches the map, for the same reason it asks sb_over_panel. */
+static bool uc_over(float col, float row, int fbw, int fbh);
+static bool uc_click(float col, float row, int fbw, int fbh);
 /* Defined in edit_mod.h, included far below: is this point on the editor's own
    chrome? update_cursor needs it, and --edit switches the game's own sidebar off,
    so sb_over_panel cannot answer for the editor. */
@@ -10767,8 +13202,9 @@ static bool infantry_quad_size(const SimObject& o, float* wid, float* hgt)
             const int hs = sprite_house(o);
             if (di->second.strip[hs][DA_STAND] >= 0) {
                 const DosStrip& sp = g_dosStrips[di->second.strip[hs][DA_STAND]];
-                *wid = (float)sp.fw / sprite_texels_per_unit();
-                *hgt = (float)sp.fh / sprite_texels_per_unit();
+                const float tpu = inf_card_tpu(sprite_texels_per_unit());
+                *wid = (float)sp.fw / tpu;
+                *hgt = (float)sp.fh / tpu;
                 return true;
             }
         }
@@ -10780,8 +13216,9 @@ static bool infantry_quad_size(const SimObject& o, float* wid, float* hgt)
     const int hs = sprite_house(o);
     if (ti->second.strip[hs][anim] < 0) return false;
     const PackSprite& sp = g_pack.sprite[ti->second.strip[hs][anim]];
-    *wid = (float)sp.fw / sprite_texels_per_unit();
-    *hgt = (float)sp.fh / sprite_texels_per_unit();
+    const float tpu = inf_card_tpu(sprite_texels_per_unit());
+    *wid = (float)sp.fw / tpu;
+    *hgt = (float)sp.fh / tpu;
     return true;
 }
 
@@ -10867,7 +13304,7 @@ static ScreenPoly object_screen_poly(const SimObject& o, int fbw, int fbh, bool 
 
 /* Painter order: bigger means nearer the viewer, i.e. drawn later and on top.
 
-   CAM_ORTHO looks down the (+x, +z) diagonal, so the key is cx + cy. CAM_N64 has yaw 0
+   CAM_ORTHO looks down the (+x, +z) diagonal, so the key is cx + cy. CAM_N64 in Classic has yaw 0
    and its eye sits at +Z from the target looking toward -Z, so screen depth is z alone
    and cx must not enter the key at all: with the diagonal key, two objects in the same
    row would sort by their x, and the shadows and cutout billboards (which are drawn with
@@ -10875,7 +13312,12 @@ static ScreenPoly object_screen_poly(const SimObject& o, int fbw, int fbh, bool 
    composite in a diagonal sweep across a screen where nothing is diagonal. */
 static float paint_depth(const SimObject& o)
 {
-    return (g_camMode == CAM_N64) ? (float)o.cy : (float)(o.cx + o.cy);
+    if (g_camMode != CAM_N64) return (float)(o.cx + o.cy);
+    if (g_camYaw == 0.0f) return (float)o.cy;
+    /* Isometric: the depth along the turned view axis. set_camera applies Ry(yaw) to
+       the world, whose third row is (-sin yaw, 0, cos yaw), and the eye sits at +Z of
+       the turned frame, so bigger is nearer. At yaw 0 this would be o.cy exactly. */
+    return (float)o.cy * cosf(g_camYaw) - (float)o.cx * sinf(g_camYaw);
 }
 
 static int pick_class(const SimObject& o)
@@ -11302,7 +13744,7 @@ static int curcirc_mesh(void)
  */
 static bool g_rallyMarksOn = true;      /* --norallymark is the A/B */
 
-/* THE BARRACKS' OWN FLAG, lifted out and re-used. the project owner, 25 Aug 2026: "Take the Flag Pole
+/* THE BARRACKS' OWN FLAG, lifted out and re-used. Reported: "Take the Flag Pole
    and Animated flag from the Barracks, seperate it, and use it for the Rally Point for
    all buildings. Show the flag if you have set a rally point, and have the building
    selected. Make the flag the player color."
@@ -11430,10 +13872,37 @@ static void draw_order_marks(void)
            when the pack has no CURCIRC, so an old pack still shows something. */
         if (m.kind == 0 && cc >= 0)
             continue;
+        /* AN ATTACK ORDER PAINTS NOTHING ON THE GROUND, and a guard here rather than a
+           recolour is the point: there is no shape to get right, because neither the
+           cartridge nor 1995 marks the ground where an attack was aimed. The console's
+           one recovered order model is CURSOR_CIRCLES, which is the MOVE marker drawn
+           above; 1995 answers an attack click with the attack CURSOR and the target's own
+           white blush, and this renderer already draws both of those.
+
+           The red diamond was ours, written as a debug instrument and meant to live
+           behind --ordermarks. It became visible when the whole family was defaulted on,
+           on the reasoning that the marker "became the cartridge's own model" -- true of
+           the move marker and of nothing else, so the flip put a debug shape on every
+           attack click.
+
+           The MARK is still recorded. The refused/attack/move taxonomy is what the ORDER
+           line prints and what the gates read; only the paint is gone. */
+        if (m.kind == 1)
+            continue;
         /* shrinks as it ages, exactly like the original's expanding-then-gone cursor,
            only inverted so the final frame is the smallest */
         const float t = 1.0f - order_mark_age(m);
         const float r = 0.20f + 0.45f * t;
+        /* ON THE GROUND THIS MARK IS STANDING ON, not at a fixed world height. These two
+           shapes were the last drawn things left on the hard-coded y = 0.10f that
+           draw_selection was already corrected off: it is only the ground on a map whose
+           heightmap happens to sit at zero, and SCB01EA's runs 0..194. On anything hilly
+           the ring floated clear of the cell it was refusing -- a red shape hanging over
+           empty ground with nothing under it, which is exactly how a stray debug
+           instrument reads. Each vertex takes its own terrain height for the same reason
+           the bracket's corners do: at this radius the two ends of a slashed ring can sit
+           on visibly different ground. */
+        #define OMY(px, pz) (terrain_y((px), (pz)) + 0.10f)
         if (m.kind == 2) {
             /* REFUSED: a no-entry ring with a slash, in red. Painted where the green
                confirm diamond used to be painted dishonestly: the engine is not going
@@ -11442,24 +13911,26 @@ static void draw_order_marks(void)
             glBegin(GL_LINE_LOOP);
             for (int k = 0; k < 16; k++) {
                 const float a = (float)k * (float)M_PI / 8.0f;
-                glVertex3f(m.x + r * cosf(a), 0.10f, m.z + r * sinf(a));
+                const float vx = m.x + r * cosf(a), vz = m.z + r * sinf(a);
+                glVertex3f(vx, OMY(vx, vz), vz);
             }
             glEnd();
             const float d = r * 0.70710678f;
             glBegin(GL_LINES);
-            glVertex3f(m.x - d, 0.10f, m.z - d);
-            glVertex3f(m.x + d, 0.10f, m.z + d);
+            glVertex3f(m.x - d, OMY(m.x - d, m.z - d), m.z - d);
+            glVertex3f(m.x + d, OMY(m.x + d, m.z + d), m.z + d);
             glEnd();
             continue;
         }
         if (m.kind) glColor3f(1.0f, 0.25f, 0.20f);
         else        glColor3f(0.25f, 1.0f, 0.35f);
         glBegin(GL_LINE_LOOP);
-        glVertex3f(m.x - r, 0.10f, m.z);
-        glVertex3f(m.x, 0.10f, m.z - r);
-        glVertex3f(m.x + r, 0.10f, m.z);
-        glVertex3f(m.x, 0.10f, m.z + r);
+        glVertex3f(m.x - r, OMY(m.x - r, m.z), m.z);
+        glVertex3f(m.x, OMY(m.x, m.z - r), m.z - r);
+        glVertex3f(m.x + r, OMY(m.x + r, m.z), m.z);
+        glVertex3f(m.x, OMY(m.x, m.z + r), m.z + r);
         glEnd();
+        #undef OMY
     }
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -11478,6 +13949,8 @@ static void draw_order_marks(void)
    own. The block inside carries the whole account. */
 static int ui_left_click(float col, float row, int fbw, int fbh, bool additive)
 {
+    /* The card sits over the world in its corner; a press there is its, not the map's. */
+    if (uc_click(col, row, fbw, fbh)) return -1;
     const PickInfo p = pick_at(col, row, fbw, fbh);
     const bool hit = p.index >= 0;
     const char* verdict = "empty";
@@ -11663,6 +14136,26 @@ static bool ui_select_same_type(float col, float row, int fbw, int fbh, bool add
     if (seed.kind != K_UNIT && seed.kind != K_INFANTRY && seed.kind != K_AIRCRAFT)
         return false;
     if (!selectable_by_player(seed)) return false;
+    /* A DOUBLE TAP ON SOMETHING THE ENGINE WOULD DEPLOY IS A DEPLOY, AND NOT A SELECTION.
+       Taking every MCV in view is a true answer to the gesture and a useless one: there is
+       normally exactly one, it is already selected, and taking it again ATE the second
+       click of the pair. So the one building a match opens with could not be laid down by
+       the gesture every other unit answers to, and it needed a third, slower click --
+       which reads as a dead double click rather than as a rule.
+
+       Best_Object_Action decides it, which is the same authority ui_click_action's
+       select-or-order split asks, so the two cannot disagree about what a click was for.
+       ACTION_SELF is offered only over the player's own object with exactly one thing
+       selected, so nothing else in view can reach this arm. */
+    if (BrainProbe && g_selCount > 0) {
+        int spx, spy;
+        if (engine_pixels_for_cell(seed.tcx, seed.tcy, &spx, &spy)
+            && BrainProbe(spx, spy) == CUR_ACTION_SELF) {
+            printf("SAMETYPE|%s|at=%.1f,%.1f|declined=deploy\n", seed.type, col, row);
+            fflush(stdout);
+            return false;
+        }
+    }
     const ObjKind kind = seed.kind;
     char want[16];
     snprintf(want, sizeof(want), "%s", seed.type);
@@ -12092,7 +14585,7 @@ static void amq_service(int frame)
    WHICH of the object's cells is the engine's own answer, not ours: SimObject::tcx/tcy is
    Coord_Cell(Target_Coord()), the cell BuildingClass::Target_Coord walks to inside the
    type's Occupy_List. Aiming at the footprint's top-left corner instead -- what this did
-   until 20 Aug 2026 -- put the order on bare ground for the fifteen types whose occupy
+   -- put the order on bare ground for the fifteen types whose occupy
    list has no offset 0, so Best_Object_Action answered ACTION_MOVE, Clicked_As_Target
    never fired and the target never even blushed. Measured on SCG41EA, twelve enemy
    structure types, engine probe per type: HAND 1, OBLI 1, TMPL 2 and nine 5s before;
@@ -12190,6 +14683,7 @@ static void ui_order_at(float col, float row, int fbw, int fbh, bool ctrl, bool 
     const bool attack = ctrl || (vis && (probe == 5 || (probe < 0 && hostile)));
     if (g_orderMarksOn)
         add_order_mark(tx, ty, refused ? 2 : (attack ? 1 : 0));
+    if (refused && probe == 21) say_cannot_deploy();
     printf("ORDER|at=%.1f,%.1f|cell=%d,%d|enginepx=%d,%d|target=%s|probe=%d|%s%s%s%s\n",
            col, row, tx, ty, px, py, target, probe,
            refused ? (probe == 2 ? "REFUSED(nomove)" : "REFUSED(none)")
@@ -12219,7 +14713,7 @@ static bool ui_super_fire(float col, float row, int fbw, int fbh)
 
 /* ---- THE LEFT BUTTON: select AND order, which is what C&C has always been ----------
  *
- *  the project owner, 21 Aug 2026: "Left click should be movement/attack. Not right click." That is
+ *  Reported: "Left click should be movement/attack. Not right click." That is
  *  not a preference, it is the 1995 game's own scheme, and ours had drifted to the
  *  StarCraft one (left selects, right orders) without anybody deciding to.
  *
@@ -12436,7 +14930,11 @@ static void ui_right_press(float mc, float mr, int dw, int dh, bool* lpress, boo
         printf("MINIMAP|jump|by=right|to=%.2f,%.2f\n", rwx, rwz);
         return;
     }
-    if (sb_click(mc, mr, dw, dh, true)) {
+    if (uc_over(mc, mr, dw, dh)) {
+        /* The card takes the right button too, so a miss on a tab does not deselect
+           the very units the card is showing. */
+        printf("UNITCARD|right|consumed\n");
+    } else if (sb_click(mc, mr, dw, dh, true)) {
         /* consumed */
     } else if (sb_placing()) {
         sb_cancel_placement();
@@ -12900,6 +15398,7 @@ static void update_cursor(int fbw, int fbh)
        which is what 1995 shows over a modal dialog. */
     if (sb_over_panel(col, row, fbw, fbh) || sb_placing() || fxp_over_panel(col, fbh)
         || codex_holds_the_world()
+        || uc_over(col, row, fbw, fbh)
         || edit_over_chrome(col, row, fbw, fbh)) {
         g_cursorOnMap = false;
         cur_set(MOUSE_NORMAL);
@@ -12907,14 +15406,27 @@ static void update_cursor(int fbw, int fbh)
     }
 
     const PickInfo p = pick_at(col, row, fbw, fbh);
-    g_cursorWX = p.wx;
-    g_cursorWZ = p.wz;
+    /* WHERE THE 3-D POINTER STANDS: under the mouse, always, and nowhere else.
+       It briefly stood on the picked OBJECT's own anchor instead (o.wx/o.wz), to answer
+       a report that the bracket drew beside the unit rather than on it on a slope. The
+       cure was worse than the complaint: the pointer then JUMPED to the centre of
+       whatever it crossed, so dragging it over a column of units made it hop from one
+       to the next instead of moving with the hand. The director, on the shipped build:
+       "my mouse cursor in the game now snaps to anything selectable. This is horrible,
+       it makes the game almost unplayable."
+       A pointer must track the pointer. The parallax the earlier note describes is real
+       but small, and it belongs to whatever the bracket does, not to where the cursor
+       is. Anything that wants the object's own position still has p.index and can ask
+       for it. */
+    const float curWX = p.wx, curWZ = p.wz;
+    g_cursorWX = curWX;
+    g_cursorWZ = curWZ;
     g_cursorOnMap = p.onMap;
     /* Latch the stand-in's size here and NOWHERE else. Unconditionally: not behind
        c3d_have() and not behind p.onMap, because both of those can be false on the last
        pick before the pointer reaches the panel, and a latch that skipped those frames
        would leave the sprite carrying a size from further back still. */
-    g_cursorScale = cursor_scale_at(p.wx, p.wz, fbw, fbh);
+    g_cursorScale = cursor_scale_at(curWX, curWZ, fbw, fbh);
 
     int tx = p.cellX, ty = p.cellY;
     bool hostile = false;
@@ -13266,10 +15778,34 @@ static void draw_band(int fbw, int fbh)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glColor4ub(cr, cg, cb, ca);
-    band_wall(x0, z0, x1, z0);
-    band_wall(x1, z0, x1, z1);
-    band_wall(x1, z1, x0, z1);
-    band_wall(x0, z1, x0, z0);
+    if (g_camMode == CAM_N64 && g_camYaw != 0.0f) {
+        /* ISOMETRIC: the box is built in the camera's turned frame, so the band the
+           player drags is the screen-aligned rectangle they see and not a world-axis
+           box that would read as a diamond. u runs along screen-right on the ground, v
+           along screen-down. The selection test itself (ui_band_select) is a screen
+           rectangle and never read this box, so what is drawn and what is picked stay
+           the same thing. A registered deviation from the cartridge, on the gaps list. */
+        const float c = cosf(g_camYaw), s = sinf(g_camYaw);
+        const float dx0 = g_bandWX0 - g_camX, dz0 = g_bandWZ0 - g_camZ;
+        const float dx1 = g_bandWX1 - g_camX, dz1 = g_bandWZ1 - g_camZ;
+        const float u0 =  dx0 * c + dz0 * s, v0 = -dx0 * s + dz0 * c;
+        const float u1 =  dx1 * c + dz1 * s, v1 = -dx1 * s + dz1 * c;
+        const float ua = fminf(u0, u1), ub = fmaxf(u0, u1);
+        const float va = fminf(v0, v1), vb = fmaxf(v0, v1);
+        const float U[4] = { ua, ub, ub, ua }, V[4] = { va, va, vb, vb };
+        float px[4], pz[4];
+        for (int i = 0; i < 4; i++) {
+            px[i] = g_camX + U[i] * c - V[i] * s;
+            pz[i] = g_camZ + U[i] * s + V[i] * c;
+        }
+        for (int i = 0; i < 4; i++)
+            band_wall(px[i], pz[i], px[(i + 1) & 3], pz[(i + 1) & 3]);
+    } else {
+        band_wall(x0, z0, x1, z0);
+        band_wall(x1, z0, x1, z1);
+        band_wall(x1, z1, x0, z1);
+        band_wall(x0, z1, x0, z0);
+    }
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
     glEnable(GL_ALPHA_TEST);
@@ -13458,8 +15994,12 @@ static void radar_plot_into(const RadarTarget* t, float z, int ox, int oy)
         const PackCell& c = g_pack.cell[i];
         if (c.x < g_mapX || c.x >= g_mapX + g_mapW) continue;
         if (c.y < g_mapY || c.y >= g_mapY + g_mapH) continue;
-        if (shroud_state_at(c.x, c.y) == SHROUD_HIDDEN)   /* self-degrades: CLEAR when
-                                                             shroud is off or unfetched */
+        /* THROUGH THE REVEAL, not around it. Asking shroud_state_at directly skipped the
+           one switch that turns the fog off, so a commander who had surrendered got an
+           open battlefield and a minimap still holed by everything they had never
+           explored. shroud_cell_hidden is that switch plus the same self-degrading
+           answer, which is what the tactical view has always asked. */
+        if (shroud_cell_hidden(c.x, c.y))
             continue;
         /* The triple belonging to the set the ground is drawing from, so the radar and
            the battlefield cannot disagree about what colour the theatre is. */
@@ -14004,6 +16544,8 @@ static int cm_combine_selftest(int fbw, int fbh)
    glass. It borrows the sidebar's DOS pack and this file's overlay projection, which
    is why it is included down here rather than up with the other modules. */
 #include "dosopt_gl.h"
+/* The slot dialog's row supplier, defined beside game_save_slot with the other three. */
+static int opt_slot_rows(void* user, DOPT_SlotRow* out, int max);
 /* THE DATABASE TAB. After dosopt_gl.h because it reads g_optState.set.music as the
    ceiling its music duck fades back to, and after edit_mod.h because it draws through
    this file's draw_mesh, terrain_y and begin_overlay. */
@@ -14011,15 +16553,32 @@ static int cm_combine_selftest(int fbw, int fbh)
 /* THE GAME SPEED SETTING, defensively.
  *
  * g_optState is a static, so its settings block is ZERO until the pause dialog is first
- * opened and seeds it (dopt_settings_init, further down: speed 3). Zero is a LEGITIMATE
- * speed -- the slowest one -- so a tick loop that reads the raw field runs the whole game
- * at half rate for anyone who has not opened the dialog yet, which is everyone at the
- * start of every mission. That is exactly what happened when the slider was first wired
- * up, and the gate suite caught it by taking twice as long as it should.
+ * opened and seeds it (dopt_settings_init). Zero is a LEGITIMATE speed -- the slowest
+ * one -- so a tick loop that reads the raw field runs the whole game at half rate for
+ * anyone who has not opened the dialog yet, which is everyone at the start of every
+ * mission. That is exactly what happened when the slider was first wired up, and the
+ * gate suite caught it by taking twice as long as it should.
  *
- * So: until the dialog has seeded the block, report the 1995 DEFAULT (3), which is the
- * anchor the renderer's 15 Hz was built and gated against. After that, report what the
- * player chose. */
+ * So: until the dialog has seeded the block, report THE SHIPPED DEFAULT, asked of
+ * dopt_settings_init rather than written out here as a number. That matters more than it
+ * looks. This used to be a literal 3 beside dosopt.c's own literal 3, two copies of one
+ * decision, and when the shipped speed moved to 4 only one of them would have moved: a
+ * new player's first mission would have run at the old rate and JUMPED the first time
+ * ESC was pressed, because opening the dialog is what swaps this branch for the seeded
+ * one. Asking the seeder removes the second copy. After the seed, report what the player
+ * chose. */
+/* ONE PACE IN EVERY MODE, and the two constants that have to agree for that to be true.
+ * A campaign mission and a local skirmish run this machine's Game Controls speed; a
+ * network or hosted match runs the speed that crossed the handshake, which starts at
+ * the room's own default. They are separate numbers on purpose -- the match's belongs
+ * beside the field it fills, and the lobby must not have to include the options page to
+ * open a room -- but the decision is that a player meets ONE tick rate whichever mode
+ * is picked, so the two are checked against each other where both headers happen to be
+ * in scope. This is the only place in the program where they are. */
+static_assert(NM_DEFAULT_SPEED == DOPT_DEFAULT_SPEED,
+              "the speed a match opens at and the speed the Game Controls page ships "
+              "must be the same slider index, or campaign and multiplayer run at "
+              "different tick rates");
 static bool g_optSeeded = false;
 
 static int game_speed_setting(void)
@@ -14030,7 +16589,11 @@ static int game_speed_setting(void)
        everybody up. Phase 1's last item, landed here because this is where the agreed
        value first exists. */
     if (nm_active()) return g_netSpeed;
-    if (!g_optSeeded) return 3;              /* options.cpp:73-79 GameSpeed 3 */
+    if (!g_optSeeded) {
+        DOPT_Settings d;
+        dopt_settings_init(&d);              /* the shipped block, not a second copy */
+        return d.speed;
+    }
     int sp = g_optState.set.speed;
     if (sp < 0) sp = 0;
     if (sp >= DOPT_MAX_SPEED) sp = DOPT_MAX_SPEED - 1;
@@ -14244,6 +16807,7 @@ static void opt_controls_sync(void)
    options block above rather than in a header. It also draws through this file's own
    draw_mesh, terrain_y and begin_overlay, which are further up still. */
 #include "codex_mod.h"
+#include "unitcard_mod.h"
 
 /* ---------------------------------------------------------------------------------- *
  *  THE VISUALS AND INPUT PRESET, REMEMBERED FROM THE PAUSE DIALOG TOO.
@@ -14369,6 +16933,55 @@ static void opt_push_abort_click(float mscaleX, float mscaleY, int item, const c
  *  panel or loaded from their own preset. */
 static float g_visSSRemembered = 2.0f;
 
+/* THE RESOLUTION LIST'S SOURCE. What the display said the last time the list was built,
+   kept so the apply can resolve the Desktop entry and the readout can say what the list
+   was built from. g_resInject is a display a script hands in through `optres inject`, so
+   a gate can build the list for a display this machine does not have; while it is set it
+   stands in for SDL in every place the list or the desktop's size is read. */
+static FS_ModeInfo g_resInfo;
+static struct {
+    int on;
+    int deskw, deskh, usablew, usableh;
+    int n;
+    int mw[DOPT_RES_MAX * 2], mh[DOPT_RES_MAX * 2];
+} g_resInject;
+
+/* THE DESKTOP'S SIZE AND ITS USABLE ROOM, from the last list built (or the injected
+   display), so the apply and the seed agree on what "the desktop's" means. */
+static void res_desktop(int* dw, int* dh, int* uw, int* uh)
+{
+    *dw = g_resInfo.deskw;
+    *dh = g_resInfo.deskh;
+    *uw = g_resInfo.usablew;
+    *uh = g_resInfo.usableh;
+}
+
+/* THE LIST AND THE CHOSEN ENTRY, from the dial. A 0x0 dial (the desktop's) lands on
+   entry 0; so does a dial equal to the desktop's own size or to its usable room, which
+   is what the Windowed apply writes for entry 0; a size found in the list lands on it;
+   a size the display does not offer lands on entry 0 rather than on some other size. */
+static void vis_seed_res(DOPT_Visuals* v)
+{
+    int k, dw, dh, uw, uh;
+    const int fw = (int)g_fx.res_w, fh = (int)g_fx.res_h;
+    if (g_resInject.on) {
+        v->nres = fs_pick_modes(g_resInject.mw, g_resInject.mh, g_resInject.n,
+                                g_resInject.deskw, g_resInject.deskh,
+                                g_resInject.usablew, g_resInject.usableh,
+                                v->res_w, v->res_h, v->res_fit, DOPT_RES_MAX, &g_resInfo);
+        g_resInfo.display = -1;
+    } else {
+        v->nres = fs_enum_modes(SDL_GL_GetCurrentWindow(), v->res_w, v->res_h, v->res_fit,
+                                DOPT_RES_MAX, &g_resInfo);
+    }
+    res_desktop(&dw, &dh, &uw, &uh);
+    v->residx = 0;
+    if ((fw == 0 && fh == 0) || (fw == dw && fh == dh) || (fw == uw && fh == uh))
+        return;
+    for (k = 1; k < v->nres; k++)
+        if (v->res_w[k] == fw && v->res_h[k] == fh) v->residx = k;
+}
+
 static void vis_from_fx(DOPT_Visuals* v)
 {
     memset(v->elem, 0, sizeof v->elem);
@@ -14376,6 +16989,8 @@ static void vis_from_fx(DOPT_Visuals* v)
     v->elem[DOPT_VE_SMOOTH]      = g_fx.smooth_anim ? 1 : 0;
     v->elem[DOPT_VE_NEWHUD]      = g_fx.new_hud ? 1 : 0;
     v->elem[DOPT_VE_BILINEAR]    = g_fx.bilinear ? 1 : 0;
+    v->elem[DOPT_VE_WATER]       = g_fx.water_fx ? 1 : 0;
+    v->elem[DOPT_VE_TREES]       = g_fx.tree3d ? 1 : 0;
     /* The drop list's value and whether its third entry can be chosen. Availability is
        asked FRESH every time the dialog opens rather than cached at boot, so plugging
        in an external drive with the Remastered Collection on it does not need a
@@ -14383,7 +16998,24 @@ static void vis_from_fx(DOPT_Visuals* v)
     v->texset                    = (int)g_fx.texset;
     v->infset                    = (int)g_fx.infset;
     v->remaster_ok               = remaster_available() ? 1 : 0;
+    /* WHETHER THIS MAP'S PACK CAN ACTUALLY SWAP THE GROUND. Two theaters never had a 1995
+       original, and a pack baked before that art existed carries none either; both looked
+       identical from the dialog, which took the click and drew the cartridge anyway. */
+    v->dos_tex_ok                = (g_pack.terrainTexDos >= 0) ? 1 : 0;
 
+    /* THE DISPLAY ROWS AND THE UI SCALE, seeded from the dials, and the
+       display's sizes enumerated FRESH each open for the same reason remaster_ok is. */
+    {
+        v->uiscale  = (int)(g_fx.ui_scale + 0.5f);
+        if (v->uiscale < 0) v->uiscale = 0;
+        if (v->uiscale >= DOPT_UI_COUNT) v->uiscale = DOPT_UI_COUNT - 1;
+        v->perspective = (int)(g_fx.perspective + 0.5f);
+        if (v->perspective < 0) v->perspective = 0;
+        if (v->perspective >= DOPT_PERSP_COUNT) v->perspective = DOPT_PERSP_COUNT - 1;
+        v->dispmode = (int)(g_fx.display_mode + 0.5f);
+        if (v->dispmode < 0 || v->dispmode > DOPT_DISP_FULLSCREEN) v->dispmode = DOPT_DISP_BORDERLESS;
+        vis_seed_res(v);
+    }
     v->elem[DOPT_VE_GAMMA]       = g_fx.gamma_on ? 1 : 0;
     v->elem[DOPT_VE_SUPERSAMPLE] = (g_fx.ss_scale > 1.001f) ? 1 : 0;
     v->elem[DOPT_VE_SHADOWS]     = g_fx.shadow_on ? 1 : 0;
@@ -14404,8 +17036,9 @@ static void vis_from_fx(DOPT_Visuals* v)
    swap_buttons 0. */
 static void gp_from_fx(DOPT_Gameplay* g)
 {
-    g->on[DOPT_G_SWAPBTN] = g_fx.swap_buttons ? 1 : 0;
-    g->on[DOPT_G_RPUSH]   = g_fx.right_drag_scroll ? 1 : 0;
+    g->on[DOPT_G_SWAPBTN]  = g_fx.swap_buttons ? 1 : 0;
+    g->on[DOPT_G_RPUSH]    = g_fx.right_drag_scroll ? 1 : 0;
+    g->on[DOPT_G_CASHTICK] = g_fx.cash_tick ? 1 : 0;
 }
 
 static void opt_apply_gameplay(void* user, const DOPT_Gameplay* g)
@@ -14414,7 +17047,11 @@ static void opt_apply_gameplay(void* user, const DOPT_Gameplay* g)
     if (!g) return;
     g_fx.swap_buttons      = g->on[DOPT_G_SWAPBTN];
     g_fx.right_drag_scroll = g->on[DOPT_G_RPUSH];
+    g_fx.cash_tick         = g->on[DOPT_G_CASHTICK];
 }
+
+/* Defined beside confine_automated, which this is a question to. */
+static bool opt_run_is_automated(void);
 
 static void opt_apply_visuals(void* user, const DOPT_Visuals* v)
 {
@@ -14428,9 +17065,18 @@ static void opt_apply_visuals(void* user, const DOPT_Visuals* v)
         /* CLASSIC means the presentation this project has always shipped, and the
            original stepping is part of that. Same reasoning as the filter above. */
         g_fx.smooth_anim = 0;
-        /* "Classic Mode should have the old DOS hud" -- the project owner, 21 Aug 2026. */
-        g_fx.new_hud = 0;
+        /* CLASSIC DRAWS THE DOS BAR, and that is the whole of the requirement.
+           THE DIAL IS LEFT STANDING, which it was not: this arm wrote the tick itself
+           back to 0 as well as turning the bar on, so one visit to CLASSIC did not
+           override the player's choice of HUD, it DESTROYED it -- and the write is
+           remembered, because the preset is saved on the way out. Choosing ENHANCED
+           again then gave back the old bar, and on the next launch the starting HUD had
+           been silently changed by a setting the player had since turned off.
+           The terrain art four lines below has always had this right and says so in its
+           own comment: the tick stands, so choosing ENHANCED again gives it back. */
         sb_set_hud_new(0);
+        sb_set_ui_scale(1);        /* Classic: the DOS bar, at its largest; no divisor */
+        cam_apply_option();    /* Classic: north straight up; the row's tick stands */
         /* And the terrain goes back to the cartridge's own art. CLASSIC means the
            cartridge, and the tile bank is the most of it: same reasoning as the filter,
            the stepping and the sidebar. The dialog's tick is left standing so choosing
@@ -14457,13 +17103,25 @@ static void opt_apply_visuals(void* user, const DOPT_Visuals* v)
     g_fx.grade_on    = v->elem[DOPT_VE_GRADE];
     g_fx.crt_on      = v->elem[DOPT_VE_CRT];
     g_fx.bilinear    = v->elem[DOPT_VE_BILINEAR];
+    g_fx.water_fx    = v->elem[DOPT_VE_WATER];
+    g_fx.tree3d      = v->elem[DOPT_VE_TREES];
     g_fx.smooth_anim = v->elem[DOPT_VE_SMOOTH];
     g_fx.new_hud     = v->elem[DOPT_VE_NEWHUD];
     /* A preset can carry Remastered from a machine that had it. Falling back to DOS
        rather than drawing nothing is the same rule terrain_atlas_index keeps. */
-    g_fx.texset      = (float)((v->texset == DOPT_TEX_REMASTER && !v->remaster_ok)
-                              ? FX_TEX_DOS : v->texset);
+    /* A preset can carry a set this build cannot supply -- Remastered from a machine
+       that had it, or DOS from a pack that carries the second atlas when this one does
+       not. Fall back rather than draw nothing, and fall back HERE as well as in
+       terrain_atlas_index, so the value that gets saved back is one that can be honoured
+       instead of a request that quietly means something else every time it is read. */
+    {
+        int want = v->texset;
+        if (want == DOPT_TEX_REMASTER && !v->remaster_ok) want = FX_TEX_DOS;
+        if (want == DOPT_TEX_DOS && !v->dos_tex_ok) want = FX_TEX_N64;
+        g_fx.texset = (float)want;
+    }
     fx_texset_set((int)g_fx.texset);
+    fx_grass_follow_texset();   /* the grass is tuned against the 1995 bank */
     g_fx.infset      = (float)((v->infset == DOPT_TEX_REMASTER && !v->remaster_ok)
                               ? FX_INF_DOS : v->infset);
     fx_infset_set((int)g_fx.infset);
@@ -14476,6 +17134,149 @@ static void opt_apply_visuals(void* user, const DOPT_Visuals* v)
         g_fx.ss_scale = 1.0f;
     }
     fx_filter_set(g_fx.bilinear);
+    /* THE UI SCALE AND THE DISPLAY ROWS. The divisor goes to the sidebar
+       here and in the Enhanced boot, and nowhere a gate reaches. The window is switched
+       only when the mode or the size actually changed, so pressing OK does not flicker
+       the display, and it is found through the current GL context because this callback
+       was never handed a window. */
+    g_fx.ui_scale = (float)v->uiscale;
+    sb_set_ui_scale(1 + v->uiscale);
+    /* THE PERSPECTIVE ROW (v0.6.8): the dial is the renderer's and is read every frame;
+       the camera turns the moment the row is picked, like every row here. */
+    g_fx.perspective = (float)v->perspective;
+    cam_apply_option();
+    {
+        const int mode = v->dispmode;
+        /* ENTRY 0 IS THE DESKTOP'S OWN. Under borderless and true fullscreen it is
+           written as 0 x 0, the dial's word for "the desktop's". Under WINDOWED it has
+           to be a real window, so it resolves to the desktop's usable room here, and the
+           birth of the window resolves a 0x0 dial the same way. */
+        int dw, dh, uw, uh;
+        int rw = (v->residx > 0 && v->residx < v->nres) ? v->res_w[v->residx] : 0;
+        int rh = (v->residx > 0 && v->residx < v->nres) ? v->res_h[v->residx] : 0;
+        int oldw = (int)g_fx.res_w, oldh = (int)g_fx.res_h;
+        int changed;
+        res_desktop(&dw, &dh, &uw, &uh);
+        if (rw == 0 && rh == 0 && mode == DOPT_DISP_WINDOWED && uw > 0 && uh > 0) {
+            rw = uw;
+            rh = uh;
+        }
+        /* THE "CHANGED" TEST READS THE DIAL THE WAY THE SEED DOES, so a preset that
+           spells the desktop as its size (or as 0x0 under WINDOWED) is the same
+           choice as entry 0 and does not switch a window that has not changed. */
+        if (oldw == dw && oldh == dh) { oldw = 0; oldh = 0; }
+        if (oldw == uw && oldh == uh) { oldw = 0; oldh = 0; }
+        if (oldw == 0 && oldh == 0 && mode == DOPT_DISP_WINDOWED && uw > 0 && uh > 0) {
+            oldw = uw;
+            oldh = uh;
+        }
+        changed = ((int)(g_fx.display_mode + 0.5f) != mode) || (oldw != rw) || (oldh != rh);
+        g_fx.display_mode = (float)mode;
+        g_fx.res_w = (float)rw;
+        g_fx.res_h = (float)rh;
+        /* NOT IN AN AUTOMATED RUN: a hidden window is never given the display's size and
+           a fullscreen one would measure the wrong thing (the note on the window flags).
+           The dial is still written, which is what a gate reads. */
+        if (changed && !opt_run_is_automated()) fs_apply_mode(SDL_GL_GetCurrentWindow(), mode, rw, rh);
+        else if (changed) { printf("DISPLAY|deferred|mode=%d|automated run\n", mode); fflush(stdout); }
+    }
+}
+
+/* RESET TO DEFAULTS, the Advanced page's button: THE WHOLE ENHANCED PICTURE back to what
+ * fx_defaults says, which is the ONE source and not a copy.
+ *
+ * IT TAKES THE WHOLE STATE AND PUTS BACK THE FEW FIELDS THAT ARE NOT A PICTURE, rather
+ * than naming the fields to restore. A named list is what this was, twenty-six fields
+ * long, and it went stale the way a second copy of a list always does: every dial added
+ * after it was written stayed exactly where the player or a preset had left it -- the
+ * grass switch and all of its dials, the water tuning, the tree shading, the rain, the sun
+ * and shadow numbers, the colour grade, the bloom, the tube -- so the button handed back a
+ * picture that was still not the shipped one. Measured against the gate that now covers
+ * this: 38 dials survived one press. Copying the defaults over the struct means a dial
+ * added tomorrow is covered on the day it is added, by nobody remembering anything.
+ *
+ * THE FOUR FIELDS CARRIED ACROSS, and why none of them is the picture:
+ *
+ *   swap_buttons, right_drag_scroll  INPUT. They sit on the Gameplay page behind their own
+ *       callback for the reason recorded there: CLASSIC and ENHANCED govern the PICTURE,
+ *       and how the game is driven stays the player's. The Visuals screen writes the
+ *       preset on the way out, so a reset that cleared these would not just change the
+ *       session, it would erase a customised mouse from the file on disc.
+ *   cash_tick  A SOUND, the credits readout's step tone, on the same page behind the same
+ *       callback. Same argument: a reset that cleared it would write the player's OFF
+ *       back to ON on disc, from a button that promises the shipped picture.
+ *   enabled  THE MASTER SWITCH, which is not a row on this page and so is not this page's
+ *       to move. The compiled default is OFF, because the measuring instruments need it
+ *       off. This line is ORDERING RATHER THAN THE MECHANISM: what keeps the chain on
+ *       across the press is v->enhanced below and the apply that dosopt runs immediately
+ *       after this callback, whose Enhanced arm sets the switch itself. The line is here
+ *       so that the struct is never momentarily claiming the chain is off while the code
+ *       between the copy and that apply reads it, the camera being one such reader.
+ *
+ * EVERYTHING ELSE IN FxState IS A PICTURE AND IS RESET, debug included: with a comparison
+ * pack beside the mission's it draws every type whose mesh differs from that pack instead,
+ * so it changes what is on the screen and the button's promise covers it.
+ *
+ * NOTHING THAT IS NOT A PICTURE LIVES IN THIS STRUCT AT ALL: the volumes, the game speed
+ * and the scroll rate are a DOPT_Settings block written to its own file, and saved games,
+ * the player's name and the multiplayer settings are nowhere near it. So this reset cannot
+ * reach any of them.
+ *
+ * The dialog is then re-seeded from the dials and applies them the ordinary way, which is
+ * what carries everything a dial alone does not do: the filter, the terrain and infantry
+ * art, the sidebar, the UI scale, the decal edge, the camera and the window itself. */
+static void opt_reset_visuals(void* user, DOPT_Visuals* v)
+{
+    FxState d;
+    float live_mode, live_w, live_h;
+    (void)user;
+    if (!v) return;
+    /* THE DISPLAY THE PLAYER IS ACTUALLY LOOKING AT, remembered before the copy for the
+       three lines at the bottom of this function. */
+    live_mode = g_fx.display_mode;
+    live_w    = g_fx.res_w;
+    live_h    = g_fx.res_h;
+    fx_defaults(&d);
+    d.swap_buttons      = g_fx.swap_buttons;
+    d.right_drag_scroll = g_fx.right_drag_scroll;
+    d.cash_tick         = g_fx.cash_tick;
+    d.enabled           = g_fx.enabled;
+    g_fx = d;
+    /* AND THE TWO MEMORIES THAT LIVE OUTSIDE THE STRUCT, which the copy above cannot
+       reach and which would each hand a pre-reset value straight back.
+
+       THE GRASS LATCH. fx_grass_follow_texset remembers a tick it took away when the
+       ground was switched to the cartridge bank, and gives it back when the 1995 bank
+       returns. The apply below puts the 1995 bank back, so without this a player who had
+       the grass on over the cartridge art would have had it handed straight back over the
+       top of the reset that had just cleared it, and the one dial would survive a button
+       whose whole promise is that none of them does.
+
+       THE SUPERSAMPLE SCALE. The tick box remembers the scale it switched off so that
+       switching it on again returns to what was tuned rather than to a default. After a
+       reset there is nothing to return to: the shipped picture is the one on screen, so
+       the next tick of that box must give the shipped scale and not the one the press
+       just cleared. 2.0 is that scale, the same value this static holds on a boot nobody
+       has touched and the same fallback the box uses when it has nothing remembered. */
+    fx_grass_forget_cart();
+    g_visSSRemembered = 2.0f;
+    cam_apply_option();
+    vis_from_fx(v);
+    v->enhanced = 1;
+    /* AND THE WINDOW IS PUT BACK, NOT JUST ITS DIAL. The apply that runs immediately after
+       this callback switches the window only when the mode or size it is handed differs
+       from the dial, so writing the shipped display row into g_fx above would leave it with
+       nothing to compare against: the page, the dial and the preset written on the way out
+       would all say borderless while the window stayed where the player had put it, and
+       this row alone on a page of live rows would not do what it says. Handing back the
+       live values makes the difference visible to that comparison, which then writes the
+       shipped ones and switches the window exactly as clicking the row does. This is safe
+       only because the apply follows unconditionally; dosopt calls it on the line after
+       this callback, and the two are bound together. */
+    g_fx.display_mode = live_mode;
+    g_fx.res_w        = live_w;
+    g_fx.res_h        = live_h;
+    fprintf(stderr, "FX|advanced reset to defaults\n");
 }
 
 /* ------------------------------------------------------------------------------------ *
@@ -14558,7 +17359,7 @@ static void opt_jukebox(void* user, int verb, int arg)
         cnc_music_set_playlist(g_au, 0);
         cnc_music_stop(g_au);
         break;
-    /* SHUFFLE IS REAL NOW (26 Aug 2026). It used to overload au->playlist, the ADVANCE
+    /* SHUFFLE IS REAL NOW. It used to overload au->playlist, the ADVANCE
        flag, so SHUFFLE OFF stopped the score dead instead of playing the table in order:
        Options.IsScoreShuffle's random pick simply did not exist, and the note here said
        so and left it. cnc_music_next_theme has the branch now (audio/cncaudio.c), seeded
@@ -14772,9 +17573,19 @@ static int net_post_cb(void* user, const void* event)
 
 /* One step of the turn: begin it once, wait for it, run it. Returns 1 when the advance may
    follow, 0 when the loop should come back later (or the match is over: ask nm_). */
+/* WHEN THE MATCH STOPPED WAITING FOR A PEER, in SDL milliseconds, or 0 while turns are
+   flowing. The live loop's stall had no clock at all: a peer that died without a BYE
+   left every other player looking at a world that never moved again, silently, for ever.
+   brain_advance's own wait gives up after 30 s and says so; the live loop never reached
+   that wait, because it polls once per frame and comes back. This is the same 30 s, said
+   once at three seconds so the player knows WHO they are waiting for, and ended at
+   thirty. */
+static double g_netStallSince = 0.0;
+static bool   g_netStallSaid = false;
+
 static int net_pre_advance(void)
 {
-    if (nm_desynced() || nm_peer_left()) return 0;
+    if (nm_desynced()) return 0;
     if (!g_netTurnBegun) {
         if (!nm_begin_turn()) return 0;
         g_netTurnBegun = 1;
@@ -14833,8 +17644,325 @@ static void net_hash_world(int frame)
     if (seen_end) nm_note_hash((unsigned)frame, h);
 }
 
+/* THE SCENARIO'S OWN BYTES, hashed, and it is a different question from every other check
+   in the handshake. The setup the joiner adopts carries the scenario NAME, and two peers
+   can agree on that name to the letter while holding different FILES: an edited map, a
+   user map copied half way, a different mission set, one side's SCM01EA.INI touched by the
+   editor. Nothing in the setup can see it, the handshake succeeds, and the match desyncs
+   on the first tick with the alarm truthfully reporting a mismatch and no cause at all.
+   Hashing what the SIMULATION reads turns that into a refusal by name before a tick runs.
+
+   WHAT IS IN IT, and why only these two. The .INI is the scenario (houses, objects,
+   triggers, teamtypes, waypoints) and the .BIN is the terrain. Those are the brain's
+   inputs. The .pack, the cameos and the sidebar art are the RENDERER'S inputs: two peers
+   with different art draw different pictures of one identical world, which is a cosmetic
+   difference and not a desync, so hashing them here would refuse pairs that would have
+   played perfectly. The extension goes into the hash before each file so a missing .BIN
+   cannot produce the same number as an empty one.
+
+   RETURNS 0 to mean "could not compute one", which nm_host and nm_join read as "skip the
+   check" rather than "disagree": a joiner started with no --scen at all has no scenario to
+   hash yet, and refusing it here would be refusing a fact not in evidence. */
+static unsigned net_scen_hash(const GameOpts* o)
+{
+    static const char* const EXT[2] = {".INI", ".BIN"};
+    unsigned h = 2166136261u;
+    int got = 0;
+    if (!o->scen || !*o->scen) return 0u;
+    for (int i = 0; i < 2; i++) {
+        char path[1024];
+        char buf[8192];
+        size_t n;
+        FILE* f;
+        snprintf(path, sizeof path, "%s%s%s%s", o->dir ? o->dir : "",
+                 (o->dir && *o->dir && o->dir[strlen(o->dir) - 1] != '/') ? "/" : "", o->scen,
+                 EXT[i]);
+        f = fopen(path, "rb");
+        if (!f) continue;
+        h = net_fnv(h, EXT[i], strlen(EXT[i]));
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) h = net_fnv(h, buf, n);
+        fclose(f);
+        got++;
+    }
+    /* Never hand back a real hash that happens to be zero, because zero is the sentinel. */
+    return got ? (h ? h : 1u) : 0u;
+}
+
 /* The handshake, run before the scenario is read so the joiner can arm the host's lobby
    rather than its own. Fills `eff` with the options the match will actually use. */
+/* THROW THE LOCKSTEP SWITCH. Everything a match needs AFTER its handshake, in one place,
+   because it lived only at the bottom of net_match_prepare -- the
+   command-line handshake -- and the lobby path skips that function on purpose, since by
+   the time the lobby says STARTED the match socket is already live and nm_active() is
+   true. So a game started from the MULTIPLAYER screen booted with the brain's lockstep
+   switch never thrown and both order sinks null: nm_begin_turn asks the brain for
+   nothing, and the turns went out empty from the first tick. It played, it desynced
+   nothing, and it was two people watching two separate games. G205 is the gate. */
+static void net_arm_lockstep(int seats, int humans, int speed, int evsize,
+                             unsigned abi, unsigned scen)
+{
+    g_netSpeed = speed;
+    nm_set_engine(net_drain_cb, net_post_cb, NULL, evsize);
+    BrainSetLockstep(true);
+    g_netTurnBegun = 0;
+    g_netArmed = 0;
+    g_netStallSince = 0.0;
+    fprintf(stderr,
+            "net: lockstep ON as seat %d of %d (%d human), speed %d, order wire %d bytes, "
+            "layout %08X, scenario bytes %08X\n",
+            nm_seat(), seats, humans, speed, evsize, abi, scen);
+}
+
+/* THE LOBBY PATH'S HALF OF net_match_prepare: no handshake, because the lobby already did
+   it and the match socket is live, but every switch that function throws AFTER its
+   handshake. The speed and the roster come from the setup the lobby agreed on, which is
+   the same struct the command-line handshake would have exchanged. Returns false only
+   when this brain cannot play a match at all. */
+/* WHAT THE ROOM AGREED, kept apart from what this machine's own options say.
+
+   A departure has to be handled IDENTICALLY on every peer or the worlds part: if one
+   machine blows the house up and another hands it to the computer, the next tick is two
+   different tiberium counts and a desync. The takeover switch is therefore read off the
+   setup that crossed the wire rather than off each peer's GameOpts -- which on the
+   command-line path is that peer's own switches, and the joiner's were never the host's.
+
+   The colours go with it for the same reason and one more: the message naming who left
+   is drawn in that seat's colour, and a joiner started from a command line has the
+   default permutation in its options rather than the room's. */
+static int g_netAiTakeover = 0;
+static unsigned char g_netSeatColour[NM_MAX_SEATS];
+/* HOW MUCH OF THE CHAT RING BELONGS TO THE ROOM RATHER THAN TO THE MATCH. The ring is
+   one ring and the lobby filled part of it before START; without this mark the whole
+   room's conversation would arrive in the match's pane on the first frame. */
+static int g_netChatTaken = 0;
+
+/* THE VICTORY REVEAL. When a MATCH is decided the map is uncovered for this long before
+   the banner drops, so the players see the field they just fought over. Armed once, when
+   the verdict arrives, by the live loop; read by the drawer and by the dwell that ends
+   the mission, so all three agree on when the announcement actually began.
+   A campaign mission never arms it and announces at once, as the cartridge does. */
+/* Set when a skirmish or a match is armed; a campaign mission leaves it false and
+   announces at once, as the cartridge does. Declared up here because the verdict, the
+   options dialog and the end-of-match table all reach it long before the boot code that
+   writes it. */
+static bool g_skirmishRunning;
+
+enum { VERDICT_REVEAL_MS = 4000 };
+static double g_verdictRevealMs = -1.0;
+/* THIS PLAYER HAS RESIGNED and is watching the rest of the match. The options dialog
+   reads it to turn SURRENDER into LEAVE MATCH, and the shroud stays off for them. */
+static int g_surrendered = 0;
+
+/* ---- the table a match ends on ----------------------------------------------------
+ *
+ * The same walk sb_roster_fetch makes, taken once at the end and kept: by the id each row
+ * was actually given (g_matchId), through the two engine states that already carry every
+ * number, and captured BEFORE game_shutdown pulls the engine down, because the screen
+ * that draws it runs afterwards.
+ *
+ * THE SCORE IS A VISIBLE SUM OF WHAT IS ON THE SCREEN, and that is a rule rather than a
+ * detail: a total nobody can reconstruct from the columns beside it is a number the
+ * player has to take on trust. Razing is worth more than killing because a structure is
+ * the thing that keeps making units, and tiberium is divided down to sit in the same
+ * range as the other two rather than swamping them. LOST is shown and deliberately not
+ * scored: it is the context for the other three, not a penalty, and subtracting it would
+ * let a score go negative and make the bars meaningless. */
+static MatchStats g_matchStats;
+/* WHY A NETWORK MATCH ENDED, when it ended by breaking rather than by being won. Set at
+   the two places that used to close the application instead, read by the shell to choose
+   the score screen over an error exit, and copied into the match table so the debrief can
+   print it. Cleared when a mission boots, so it can never describe the previous one. */
+static char g_netFailWhy[96];
+/* THE ONE PLACE A BROKEN MATCH IS NAMED. First reason wins and is said exactly once: the
+   live loop and brain_advance can both notice the same break within a frame of each
+   other, and a debrief that flickered between two explanations would be worse than one
+   that gave neither. Thirty-two characters reach the plate; see MS_HEAD_X in campaign.c. */
+static void net_fail_say(const char* why)
+{
+    if (g_netFailWhy[0]) return;
+    snprintf(g_netFailWhy, sizeof g_netFailWhy, "%s", why ? why : "");
+    printf("GAMEOVER|NETLOST|%s\n", g_netFailWhy);
+    fflush(stdout);
+}
+
+static int match_score_of(const MatchStatRow* r)
+{
+    return r->killed * 2 + r->razed * 5 + r->harvested / 10;
+}
+
+static void match_stats_capture(void)
+{
+    /* The sentence rides with the table because they are read together, one screen, one
+       moment. snprintf rather than strcpy: the field is fixed and the source is not. */
+    snprintf(g_matchStats.ended, sizeof g_matchStats.ended, "%s", g_netFailWhy);
+    static unsigned char pbuf[sizeof(CNCPlayerInfoStruct) + 64];
+    static unsigned char sbuf[1 << 16];
+    int i, n = 0;
+    /* CLEARED FIRST, AND BEFORE THE GUARD. Otherwise a campaign mission played after a
+       match would return here with the MATCH's table still standing, and the shell would
+       put a debrief for a game that finished ten minutes ago on the end of a mission. */
+    memset(&g_matchStats, 0, sizeof g_matchStats);
+    if (!g_skirmishRunning || !BrainGetState) return;
+    for (i = 0; i < g_matchRows && i < 8; i++) {
+        const unsigned long long pid = g_matchId[i];
+        MatchStatRow* r;
+        memset(pbuf, 0, sizeof pbuf);
+        if (!BrainGetState(GAME_STATE_PLAYER_INFO, pid, pbuf, (unsigned int)sizeof pbuf))
+            continue;
+        r = &g_matchStats.row[n];
+        {
+            const CNCPlayerInfoStruct& pi = *(const CNCPlayerInfoStruct*)pbuf;
+            snprintf(r->name, sizeof r->name, "%s", pi.Name[0] ? pi.Name : "PLAYER");
+            r->colour = (int)pi.ColorIndex;
+            r->house = (int)pi.House;
+            r->defeated = pi.IsDefeated ? 1 : 0;
+            r->is_local = (pid == 0) ? 1 : 0;
+            r->faction = (i < 8) ? g_matchFaction[i] : 0;
+            if (r->is_local) g_matchStats.side = r->faction;
+        }
+        memset(sbuf, 0, sizeof(CNCSidebarStruct));
+        if (BrainGetState(GAME_STATE_SIDEBAR, pid, sbuf, (unsigned int)sizeof sbuf)) {
+            const CNCSidebarStruct& sd = *(const CNCSidebarStruct*)sbuf;
+            r->killed = (int)sd.UnitsKilled;
+            r->razed = (int)sd.BuildingsKilled;
+            r->lost = (int)(sd.UnitsLost + sd.BuildingsLost);
+            r->harvested = (int)sd.TotalHarvestedCredits;
+        }
+        r->score = match_score_of(r);
+        n++;
+    }
+    g_matchStats.nrows = n;
+    g_matchStats.valid = n > 0;
+    g_matchStats.net = nm_active() ? 1 : 0;
+    /* THE LOCAL PLAYER'S OWN VERDICT. A player who resigned lost, whatever the engine
+       went on to decide about the houses that were still fighting. */
+    g_matchStats.win = (g_gameOver.valid && g_gameOver.win && !g_surrendered) ? 1 : 0;
+    /* Game seconds at the engine's nominal fifteen ticks: the same clock every other
+       elapsed number in this program is quoted in. */
+    g_matchStats.seconds = g_simTicks / 15;
+    snprintf(g_matchStats.map, sizeof g_matchStats.map, "%s",
+             g_scenLabel ? g_scenLabel : "");
+    printf("MATCHSTATS|rows=%d|win=%d|seconds=%d|net=%d|side=%s\n",
+           g_matchStats.nrows, g_matchStats.win, g_matchStats.seconds, g_matchStats.net,
+           g_matchStats.side ? "Nod" : "GDI");
+    for (i = 0; i < g_matchStats.nrows; i++) {
+        const MatchStatRow* r = &g_matchStats.row[i];
+        printf("MATCHSTATS|%d|name=%s|colour=%d|house=%d|killed=%d|razed=%d|lost=%d|"
+               "harvested=%d|score=%d|defeated=%d|me=%d\n",
+               i, r->name, r->colour, r->house, r->killed, r->razed, r->lost,
+               r->harvested, r->score, r->defeated, r->is_local);
+    }
+    fflush(stdout);
+}
+
+const MatchStats* game_match_stats(void) { return &g_matchStats; }
+const char* game_net_fail(void) { return g_netFailWhy; }
+
+
+static void verdict_begin_reveal(void)
+{
+    if (!g_skirmishRunning || g_verdictRevealMs >= 0.0) return;
+    g_verdictRevealMs = (double)SDL_GetTicks();
+    shroud_reveal(1);
+    sb_set_spectator(1);
+    printf("GAMEOVER|reveal|ms=%d\n", (int)VERDICT_REVEAL_MS);
+    fflush(stdout);
+}
+
+static bool verdict_banner_due(void)
+{
+    if (g_verdictRevealMs < 0.0) return true;     /* not a match: announce at once */
+    return (double)SDL_GetTicks() - g_verdictRevealMs >= (double)VERDICT_REVEAL_MS;
+}
+
+/* The two panes are further down the file; these are their callers above it. The match's
+   own news goes to the PLAYER's pane (chat_say), not to the editor's script instrument. */
+static void feed_add(int tick, unsigned colour, const char* fmt, ...);
+static void chat_say(int tick, unsigned colour, const char* fmt, ...);
+
+/* The colour the room gave that seat, as 0xRRGGBB for the feed. Step 2 of the livery
+   ramp, which is the entry the lobby's own swatch was filled from. */
+static unsigned net_seat_rgb(int seat)
+{
+    if (seat < 0 || seat >= NM_MAX_SEATS) return 0xFFFFFFu;
+    {
+        const int lc = g_netSeatColour[seat];
+        if (lc < 0 || lc >= LIVERY_COUNT) return 0xFFFFFFu;
+        return ((unsigned)LIVERY_BAND[lc][2][0] << 16)
+             | ((unsigned)LIVERY_BAND[lc][2][1] << 8)
+             |  (unsigned)LIVERY_BAND[lc][2][2];
+    }
+}
+
+/* ONE ANNOUNCEMENT PER SEAT. The engine posts this message more than once for a single
+   defeat, and a feed that says a player has been defeated twice reads like it happened
+   twice. Cleared when a mission ends, next to the frame counter. */
+static unsigned g_defeatSaid = 0;
+
+static void match_defeat_message(const char* text, unsigned long long pid)
+{
+    char line[96];
+    int i;
+    if (!text || !text[0]) return;
+    /* The engine's sentence, in this game's voice: it writes the player's name followed
+       by "has been defeated.", and the feed speaks in capitals with no full stop. */
+    snprintf(line, sizeof line, "%s", text);
+    for (i = 0; line[i]; i++) line[i] = (char)toupper((unsigned char)line[i]);
+    while (i > 0 && (line[i - 1] == '.' || line[i - 1] == ' ')) line[--i] = 0;
+    /* WHOSE COLOUR. The ids this game hands the engine are 0 for the player at this
+       machine and seat+1 for everybody else, which is the same mapping the departure
+       block uses; outside a match there are no room colours and the line is white. */
+    {
+        const int seat = nm_active() ? ((pid == 0) ? nm_seat() : (int)pid - 1) : -1;
+        const unsigned bit = (seat >= 0 && seat < NM_MAX_SEATS) ? (1u << seat) : 0u;
+        if (bit && (g_defeatSaid & bit)) return;
+        g_defeatSaid |= bit;
+        /* A NAME EVEN WHEN THE ENGINE HAS NONE. MPlayer_Defeated builds the sentence out
+           of MPlayerNames, which a match started from a command line never filled, and
+           the result was a line beginning with a space. The room knows who sits there. */
+        if (line[0] == ' ' || !strncmp(line, "HAS BEEN", 8)) {
+            const char* nm = (seat >= 0) ? nm_seat_name(seat) : NULL;
+            char named[96];
+            snprintf(named, sizeof named, "%s HAS BEEN DEFEATED",
+                     (nm && nm[0]) ? nm : "A PLAYER");
+            snprintf(line, sizeof line, "%s", named);
+            for (i = 0; line[i]; i++) line[i] = (char)toupper((unsigned char)line[i]);
+        }
+        printf("MATCHMSG|defeat|seat=%d|%s\n", seat, line);
+        fflush(stdout);
+        chat_say(g_engineFrame, net_seat_rgb(seat), "%s", line);
+    }
+}
+
+static void net_adopt_agreed(const NmSetup* s)
+{
+    if (!s) return;
+    /* Both arming paths come through here, so this is the one place that can say where
+       the room's conversation ends and the match's begins. */
+    g_netChatTaken = nm_chat_count();
+    g_netAiTakeover = s->aitake ? 1 : 0;
+    for (int i = 0; i < NM_MAX_SEATS; i++)
+        g_netSeatColour[i] = (unsigned char)((s->colour[i] < LIVERY_COUNT) ? s->colour[i] : (i & 7));
+}
+
+static bool net_arm_from_lobby(const GameOpts* o)
+{
+    if (!BrainSetLockstep || !BrainDrainEvents || !BrainPostEvent || !BrainEventABI) {
+        fprintf(stderr, "net: this brain has no lockstep exports, so it cannot play a match\n");
+        return false;
+    }
+    unsigned slots[32];
+    memset(slots, 0, sizeof slots);
+    const int n = BrainEventABI(slots, 32);
+    const unsigned abi = (n > 10) ? slots[10] : 0u;
+    const int evsize = (n > 1) ? (int)slots[1] : 22;
+    const NmSetup* ls = nm_lobby_setup();
+    net_adopt_agreed(ls);
+    const int speed = (ls && ls->speed > 0) ? ls->speed : game_speed_setting();
+    net_arm_lockstep(nm_seats(), nm_humans(), speed, evsize, abi, net_scen_hash(o));
+    return true;
+}
+
 static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
 {
     *eff = *o;
@@ -14846,6 +17974,7 @@ static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
     memset(slots, 0, sizeof slots);
     const int n = BrainEventABI(slots, 32);
     const unsigned abi = (n > 10) ? slots[10] : 0u;
+    const unsigned scen = net_scen_hash(o);
     const int evsize = (n > 1) ? (int)slots[1] : 22;
     NmSetup s;
     memset(&s, 0, sizeof s);
@@ -14855,23 +17984,46 @@ static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
         s.credits = o->credits;
         s.tiberium = o->tiberium;
         s.crates = o->crates;
+        for (int i = 0; i < 8; i++)
+            snprintf(s.name[i], sizeof s.name[i], "%s", o->player_name[i]);
+        s.aitake = o->ai_takeover;
+        s.shortgame = o->short_game;
         s.superweapons = o->superweapons;
         s.bases = o->bases;
         s.unit_count = o->unit_count;
+        /* THE COMMAND LINE HAS NO LOBBY TO CHOOSE A SPEED ON, so the host offers its own
+           Game Controls setting and the joiners adopt it, which is the same rule the
+           screen follows: one peer decides and the number travels. Untouched, that is
+           the shipped default and therefore the same pace as a campaign mission; a host
+           that has moved its own slider hosts at the speed it is playing at. */
         s.speed = game_speed_setting();
-        const int ai = (o->ai_count < 0) ? 0 : (o->ai_count > 6 ? 6 : o->ai_count);
-        s.humans = 2;
-        s.seats = 2 + ai;
+        /* THE ROSTER IS HUMANS FIRST, THEN COMPUTERS, and the total cannot pass eight.
+           A host that asks for six people and four computers gets six people and two
+           computers rather than a refusal: the people are what somebody is waiting to
+           play, and the computers are the part that can give way. It says so on the
+           way past rather than trimming in silence. */
+        int humans = o->net_players < 2 ? 2 : (o->net_players > NM_MAX_SEATS ? NM_MAX_SEATS : o->net_players);
+        int ai = (o->ai_count < 0) ? 0 : o->ai_count;
+        if (humans + ai > NM_MAX_SEATS) {
+            const int was = ai;
+            ai = NM_MAX_SEATS - humans;
+            fprintf(stderr, "net: %d players and %d computers is %d seats; the engine seats "
+                            "%d, so the match runs with %d computers\n",
+                    humans, was, humans + was, NM_MAX_SEATS, ai);
+        }
+        s.humans = humans;
+        s.seats = humans + ai;
         for (int i = 0; i < s.seats; i++) {
             s.house[i] = o->player_house[i] ? 1 : 0;
             s.colour[i] = (unsigned char)((o->player_colour[i] < 0 || o->player_colour[i] > 7) ? (i & 7) : o->player_colour[i]);
             s.team[i] = (unsigned char)o->player_team[i];
-            s.start[i] = (unsigned char)((o->start_wp[i] >= 0) ? o->start_wp[i] : i);
-            s.is_ai[i] = (i >= 2) ? 1 : 0;
+            s.start[i] = (unsigned char)((o->start_wp[i] >= 0) ? o->start_wp[i] : CNC3D_START_RANDOM);
+            s.is_ai[i] = (i >= humans) ? 1 : 0;
+            s.mode[i] = (i >= humans) ? NM_SEAT_BOT : NM_SEAT_HUMAN;   /* the CLI's prefix roster */
         }
-        if (nm_host(port, &s, abi, 120) < 0) return false;
+        if (nm_host(port, &s, abi, scen, humans, 120) < 0) return false;
     } else {
-        if (!o->net_addr || nm_join(o->net_addr, port, &s, abi, 120) < 0) return false;
+        if (!o->net_addr || nm_join(o->net_addr, port, &s, abi, scen, 120) < 0) return false;
         if (o->scen && strcmp(s.scenario, o->scen) != 0) {
             fprintf(stderr, "net: the host is playing %s and this side was started on %s; "
                             "start it with --scen %s and that map's pack\n",
@@ -14882,26 +18034,273 @@ static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
         eff->credits = s.credits;
         eff->tiberium = s.tiberium;
         eff->crates = s.crates;
+        /* THE ROOM'S OWN NAMES, which is the host's table: every peer draws and
+           prints the same handles. */
+        for (int i = 0; i < 8; i++)
+            snprintf(eff->player_name[i], sizeof eff->player_name[i], "%s", s.name[i]);
+        eff->ai_takeover = s.aitake;
+        eff->short_game = s.shortgame;
         eff->superweapons = s.superweapons;
         eff->bases = s.bases;
         eff->unit_count = s.unit_count;
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < NM_MAX_SEATS; i++) {
             eff->player_house[i] = s.house[i];
             eff->player_colour[i] = s.colour[i];
             eff->player_team[i] = s.team[i];
-            eff->start_wp[i] = s.start[i];
+            eff->start_wp[i] = (s.start[i] == CNC3D_START_RANDOM) ? -1 : s.start[i];
         }
-        eff->side = s.house[1];   /* the joiner is seat 1 */
+        /* THIS MACHINE'S OWN SEAT, which is no longer always 1. */
+        eff->side = s.house[nm_seat() < 0 ? 1 : nm_seat()];
     }
-    eff->ai_count = s.seats - 2;
-    g_netSpeed = s.speed;
-    nm_set_engine(net_drain_cb, net_post_cb, NULL, evsize);
-    BrainSetLockstep(true);
-    g_netTurnBegun = 0;
-    g_netArmed = 0;
-    fprintf(stderr, "net: lockstep ON as seat %d of %d, speed %d, order wire %d bytes, layout %08X\n",
-            nm_seat(), s.seats, s.speed, evsize, abi);
+    net_adopt_agreed(&s);
+    /* THE SEAT MODES TRAVEL INTO THE OPTIONS, host and joiner alike, so arm_skirmish
+       builds the roster seat by seat off the same table every peer holds. A setup with
+       no modes (an older peer's, or a test that never filled them) keeps the prefix
+       arithmetic it always had. */
+    {
+        int bots = 0, any = 0;
+        for (int i = 0; i < NM_MAX_SEATS; i++) {
+            eff->seat_mode[i] = s.mode[i];
+            if (s.mode[i]) any = 1;
+            if (s.mode[i] == NM_SEAT_BOT) bots++;
+        }
+        eff->ai_count = any ? bots : (s.seats - s.humans);
+    }
+    eff->net_players = s.humans;
+    net_arm_lockstep(s.seats, s.humans, s.speed, evsize, abi, scen);
     return true;
+}
+
+/* WHAT THE OTHER PLAYERS HAVE SAID SINCE THE LAST LOOK. Drained at frame rate rather
+   than on the tick, so a line arrives while you are reading it and not one turn later,
+   and so a peer sitting in the options dialog still hears the room.
+
+   NOT AN ORDER, and it never becomes one: it carries no turn, it is not in the world
+   hash, and two peers whose panes differ are still playing the same game. */
+static void net_chat_service(void)
+{
+    const int have = nm_chat_count();
+    while (g_netChatTaken < have) {
+        int seat = -1;
+        const char* t = nm_chat_line(g_netChatTaken, &seat);
+        g_netChatTaken++;
+        if (!t || !t[0]) continue;
+        {
+            const char* nm = (seat >= 0) ? nm_seat_name(seat) : NULL;
+            chat_say(g_engineFrame, net_seat_rgb(seat), "%s: %s",
+                     (nm && nm[0]) ? nm : "PLAYER", t);
+        }
+    }
+}
+
+/* IS THERE ANYBODY LEFT PLAYING? A match is over when the last person in it resigns,
+   and nothing noticed. The engine's own end test (HouseClass::MPlayer_Defeated) counts
+   living humans -- but it only ever RUNS when a house is defeated, and under AI Takeover
+   a house that resigns is not defeated, it is handed to the computer. So with takeover on
+   every player could resign and the computers would fight on for ever with the humans
+   watching, which is a game nobody can end.
+
+   Counted over the roster rows, because that is where the seat a row plays and whether a
+   person was ever in it are both known. A computer seat has never been a person and does
+   not count either way; a seat whose player walked out is gone rather than watching, and
+   the departure path has already dealt with its house.
+
+   THE ANSWER IS THE SAME ON EVERY MACHINE, which is what lets the callers act on it
+   without agreeing anything further: g_surrSeats is fed only by the surrender that has
+   already been agreed on one turn everywhere, and the roster is built in the same order
+   on every peer. */
+static bool no_players_left(void)
+{
+    int rows = g_matchRows > 0 ? g_matchRows : 1;
+    int playing = 0;
+    if (rows > 8) rows = 8;
+    for (int k = 0; k < rows; k++) {
+        const int seat = g_matchSeat[k];
+        if (!g_matchHuman[k]) continue;                       /* never a person */
+        if (seat < 0 || seat >= 8) continue;
+        if (g_surrSeats & (1u << seat)) continue;             /* watching */
+        playing++;
+    }
+    return playing == 0;
+}
+
+/* EVERYBODY HAS GONE, SO THE MATCH IS OVER. Ends it the way losing ends it, because
+   nobody won: every peer flags its own player, on the same turn, and the ordinary
+   game-over path takes it from there and puts the board up. */
+static void end_match_nobody_left(void)
+{
+    if (g_gameOver.valid) return;                 /* already ending */
+    printf("MATCHMSG|allresigned|the last commander has resigned\n");
+
+    /* ENDED WHERE A VERDICT IS ENDED, NOT WHERE A HOUSE IS KILLED, and the difference is
+       the whole reason this is written out rather than handed to the engine.
+
+       Flagging the house to lose does nothing here: that raises IsToLose, which
+       HouseClass::AI reads only in a single player game, so in a match the flag is set
+       and nobody ever looks at it. The multiplayer arm that DOES end a house is the one
+       that blows it up -- and each machine would blow up ITS OWN player, which is a
+       different house on every peer, so two worlds would part on the last turn of the
+       match.
+
+       Nothing here touches the simulation. Each peer draws its own conclusion from state
+       every peer already shares, on the turn they all agreed the last surrender landed,
+       so the worlds stay identical and the board goes up on all of them together. There
+       is no winner to name: everybody walked away. */
+    g_gameOver.valid = 1;
+    g_gameOver.win = 0;
+    g_gameOver.movie[0] = 0;
+    g_gameOver.minutes = g_simTicks / 900 + 1;
+    verdict_begin_reveal();
+    printf("GAMEOVER|SKIRMISH|LOSE|players=%d|minutes=%d|seat=%d|allresigned\n",
+           g_matchRows, g_gameOver.minutes, nm_active() ? nm_seat() : 0);
+    fflush(stdout);
+}
+
+/* I RESIGN. In a NETWORK match this only asks: the host names a turn, it comes back
+   relayed, and net_handle_surrenders does the work on that turn on every machine at once.
+   In a local skirmish there is nobody to agree with, so it happens here and now.
+
+   The takeover flag differs by path on purpose: a match reads what the ROOM agreed
+   (g_netAiTakeover, off the wire), and a skirmish reads this machine's own options,
+   because in a skirmish this machine's options ARE the room. */
+static void surrender_request(const GameOpts* o)
+{
+    if (g_surrendered) return;
+    if (nm_active()) {
+        nm_surrender();
+        return;
+    }
+    {
+        const bool takeover = (o && o->ai_takeover && BrainPlayerToAI && BrainPlayerToAI(0));
+        if (!takeover) {
+            if (BrainPlayerBlowup)      BrainPlayerBlowup(0);
+            else if (BrainForceVerdict) BrainForceVerdict(0, false);
+        }
+        g_surrendered = 1;
+        g_surrSeats |= 1u;                       /* a skirmish is a room of one, seat 0 */
+        shroud_reveal(1);
+        sb_set_spectator(1);
+        printf("MATCHMSG|surrender|seat=%d|ai=%d|YOU have surrendered\n",
+               0, takeover ? 1 : 0);
+        fflush(stdout);
+        chat_say(g_engineFrame, 0xFFFFFFu,
+                 takeover ? "YOU HAVE SURRENDERED (TAKEN OVER BY THE COMPUTER)"
+                          : "YOU HAVE SURRENDERED");
+        /* Only reachable under takeover: without it the blowup above defeats the house
+           and the engine ends the game itself. */
+        if (no_players_left()) end_match_nobody_left();
+    }
+}
+
+/* WHO HAS RESIGNED, ON THE TURN EVERY MACHINE AGREED ON. The same discipline as a
+   departure and for the same reason: one house has to stop existing on ONE frame
+   everywhere or the next tick is two different worlds. What differs is that the player is
+   still here. They keep sending turns, they are not absent, and the map is uncovered for
+   them so they can watch the rest of it out.
+
+   The room's AI TAKEOVER checkbox decides which ending it is, read off the setup that
+   crossed the wire rather than off this machine's own options, exactly as the departure
+   reads it: both peers must take the same arm. */
+static void net_handle_surrenders(void)
+{
+    const int gone = nm_surr_due();
+    if (gone < 0) return;
+    {
+        char who[24];
+        const char *nm = nm_seat_name(gone);
+        const unsigned long long pid = (unsigned long long)
+            ((gone == nm_seat()) ? 0 : gone + 1);
+        const bool takeover = (g_netAiTakeover && BrainPlayerToAI && BrainPlayerToAI(pid));
+        snprintf(who, sizeof who, "%s", (nm && nm[0]) ? nm : "A PLAYER");
+        if (!takeover) {
+            if (BrainPlayerBlowup)      BrainPlayerBlowup(pid);
+            else if (BrainForceVerdict) BrainForceVerdict(pid, false);
+        }
+        printf("MATCHMSG|surrender|seat=%d|ai=%d|%s has surrendered\n",
+               gone, takeover ? 1 : 0, who);
+        fflush(stdout);
+        chat_say(g_engineFrame, net_seat_rgb(gone),
+                 takeover ? "%s HAS SURRENDERED (TAKEN OVER BY THE COMPUTER)"
+                          : "%s HAS SURRENDERED", who);
+        /* AND IF IT WAS US, the map opens: a spectator with a shroud is watching a black
+           rectangle. Presentation only, and only on this machine. */
+        if (gone == nm_seat()) {
+            g_surrendered = 1;
+            shroud_reveal(1);
+            sb_set_spectator(1);
+        }
+        /* MARKED FOR EVERY MACHINE, not just the one that resigned: the roster draws
+           every seat and each peer has to be able to say who is still playing. */
+        if (gone >= 0 && gone < 8) g_surrSeats |= (1u << gone);
+        if (no_players_left()) end_match_nobody_left();
+    }
+}
+
+/* WHO HAS LEFT, AND WHAT BECOMES OF THEIR HOUSE. Called from brain_advance, which is
+   every path's single advance: the live loop, a scripted run and a `shot` all reach it,
+   and this lived in the live loop alone, where no gate could see it. */
+static void net_handle_departures(void)
+{
+    /* A DEPARTURE, ON THE TURN EVERY MACHINE AGREED ON, and one of
+       two endings for that seat.
+
+       AI TAKEOVER OFF: the house is flagged to lose, which is the
+       engine's own defeat path -- it blows up that player's units and
+       buildings exactly as losing does, on one frame everywhere, so no
+       peer's world diverges.
+
+       AI TAKEOVER ON (the lobby's checkbox): the house is handed to the
+       computer instead and the match carries on against it. Same turn,
+       same call on every machine, so the world stays one world; the
+       engine's own switch-to-AI is what runs, so the base keeps
+       building rather than standing still.
+
+       The id is this machine's own key for that seat, which is why the
+       mapping below and not the seat number. */
+    {
+        const int gone = nm_left_due();
+        if (gone >= 0) {
+            char who[24];
+            const char *nm = nm_seat_name(gone);
+            const unsigned long long pid = (unsigned long long)
+                ((gone == nm_seat()) ? 0 : gone + 1);
+            /* The option travels with the match: the host's checkbox
+               reached every peer's GameOpts through the lobby setup, so
+               all of them take the same arm here. A brain with no
+               takeover export falls back to the defeat it always did
+               rather than letting the house play itself for nobody. */
+            const bool takeover = (g_netAiTakeover && BrainPlayerToAI
+                                   && BrainPlayerToAI(pid));
+            snprintf(who, sizeof who, "%s",
+                     (nm && nm[0]) ? nm : "A PLAYER");
+            /* Blowup, not verdict: see CNC3D_Player_Blowup. A brain too old to
+               carry it falls back to the losing flag, which is what this did before
+               and is better than doing nothing at all. */
+            if (!takeover) {
+                if (BrainPlayerBlowup)      BrainPlayerBlowup(pid);
+                else if (BrainForceVerdict) BrainForceVerdict(pid, false);
+            }
+            printf("MATCHMSG|seat=%d|ai=%d|%s has left the game\n",
+                   gone, takeover ? 1 : 0, who);
+            fflush(stdout);
+            /* In that seat's own colour, so the message names the
+               player the way the roster and their units do: the lobby's
+               swatch is a PlayerColorType index, and step 2 of that
+               livery's ramp is the entry the square on the setup screen
+               was filled from. */
+            unsigned rgb = 0xFFFFFFu;
+            if (gone < NM_MAX_SEATS) {
+                const int lc = g_netSeatColour[gone];
+                if (lc >= 0 && lc < LIVERY_COUNT)
+                    rgb = ((unsigned)LIVERY_BAND[lc][2][0] << 16)
+                        | ((unsigned)LIVERY_BAND[lc][2][1] << 8)
+                        |  (unsigned)LIVERY_BAND[lc][2][2];
+            }
+            chat_say(g_engineFrame, rgb,
+                     takeover ? "%s HAS LEFT THE GAME (TAKEN OVER BY THE COMPUTER)"
+                              : "%s HAS LEFT THE GAME", who);
+        }
+    }
 }
 
 /* EVERY ADVANCE GOES THROUGH HERE, so that anything which must act after the engine's own
@@ -14913,16 +18312,37 @@ static bool brain_advance(uint64 player)
        here for it, because those paths advance in a loop of their own and a false from
        this function is how they stop. */
     if (nm_active()) {
+        /* THE HOST HAS GONE AND THIS IS NOT THE HOST: end it here rather than waiting out
+           the stall. In a star every link is a link to the host, so there is nothing left
+           to wait for. Not once a verdict is in -- a host that quits to its own menu after
+           the match is decided sends the same goodbye as one that walks out mid-game, and
+           a player who had just won must be shown their own result instead.
+
+           AND IT IS HERE, NOT ONLY IN THE LIVE LOOP, WHICH IS THE WHOLE POINT. The live
+           loop is unreachable from --script: every scripted and shot path advances through
+           THIS function and stops on a false. Put in the live loop alone, this check was
+           invisible to the gate written to prove it -- the fourth time that trap has been
+           sprung in this file, and the first time it was caught by the gate rather than by
+           the director. */
+        if (nm_host_gone() && !g_gameOver.valid) {
+            net_fail_say("THE HOST LEFT THE GAME");
+            return false;
+        }
         if (!g_netArmed) {
             unsigned waited = 0;
             while (!net_pre_advance()) {
                 if (nm_desynced()) {
                     fprintf(stderr, "net: DESYNC at frame %u, stopping\n", nm_desync_frame());
+                    net_fail_say("THE MACHINES STOPPED AGREEING");
                     return false;
                 }
-                if (nm_peer_left()) return false;
+                if (nm_host_gone() && !g_gameOver.valid) {
+                    net_fail_say("THE HOST LEFT THE GAME");
+                    return false;
+                }
                 if (++waited > 30000) {
                     fprintf(stderr, "net: no turn from the peer for 30 s, stopping\n");
+                    net_fail_say("THE OTHER MACHINES WENT QUIET");
                     return false;
                 }
                 SDL_Delay(1);
@@ -14931,8 +18351,19 @@ static bool brain_advance(uint64 player)
         g_netArmed = 0;
         if (nm_desynced()) {
             fprintf(stderr, "net: DESYNC at frame %u, stopping\n", nm_desync_frame());
+            net_fail_say("THE MACHINES STOPPED AGREEING");
             return false;
         }
+        /* THE TURN IS SETTLED; NOW APPLY WHAT THIS TURN OWES. A departure takes effect on
+           a turn the host named, so it has to land between the barrier and the engine's
+           step, in that order, on every machine. */
+        net_handle_departures();
+        net_handle_surrenders();
+        /* AND ANYTHING SAID SINCE THE LAST TICK. The live loop drains this every frame as
+           well, for the player sitting in a dialog; here is what covers every OTHER path
+           through the game, which is how the departure above came to have no gate for
+           four days. Draining twice is free: the ring index only ever moves forward. */
+        net_chat_service();
     }
     /* A NEW TICK IS A NEW SOUND WINDOW, and this is the only place in the program that
        knows the window moved. Every effect the advance raises comes back through ev_cb
@@ -14954,28 +18385,43 @@ static bool brain_advance(uint64 player)
    switch that snapshot already had for the command line. Turning it off makes every cell
    report clear, which reveals the ground AND every object standing on it, because the
    object passes ask the same question. */
+static int g_cheatFogApplied = -1;   /* what cheat_fog_sync last applied; boot_brain resets it */
 static void cheat_fog_sync(void)
 {
-    static int applied = -1;
     const int want = g_cheats.on[DOPT_CH_FOG] ? 1 : 0;
-    if (applied == want)
+    if (g_cheatFogApplied == want)
         return;
     /* --noshroud already turned it off from the command line; do not turn it back on
        underneath somebody who asked for that. */
     if (!g_shroudCLIOff)
         g_shroudOn = want;
-    applied = want;
+    g_cheatFogApplied = want;
 }
 
 static void cheat_show(const char* scenario)
 {
     if (g_editOn) return;        /* same modal trap as opt_show */
+    /* NOT IN A NETWORK MATCH, WITHOUT EXCEPTION. Every switch on that page
+       moves one machine's world and not the other's, which is a desync by another name;
+       the fair version of a cheat in a match is a lobby rule that travels. The page does
+       not open, and the three script doors below refuse for the same reason, so a gate
+       cannot arm a switch this key cannot. */
+    if (nm_active()) {
+        printf("CHEAT|menu|REFUSED, this is a network match\n");
+        fflush(stdout);
+        return;
+    }
     cheat_defaults_once();
     g_cheatsArmed = true;
     dopt_open_cheats(&g_optState, g_dbPack);
     g_optState.scenario = scenario;
     g_optState.version = "C&C 3D";
     dopt_set_cheats(&g_optState, &g_cheats);
+    dopt_set_cheats_locked(&g_optState, nm_active());   /* redundant under the refusal above */
+    /* AND WHAT KIND OF GAME IT IS, on the same footing: a match renames the row that ends
+       it, and a player who has already resigned can only leave. Both a Skirmish and a
+       network match count, because both are games with other commanders in them. */
+    dopt_set_match(&g_optState, g_skirmishRunning ? 1 : 0, g_surrendered);
     dopt_bind_cheats(&g_optState, cheat_apply);
     g_optOpen = true;
     SDL_ShowCursor(SDL_DISABLE);
@@ -15036,6 +18482,30 @@ static void opt_show(const char* scenario)
     dopt_open(&g_optState, g_dbPack);
     g_optState.scenario = scenario;
     g_optState.version = "C&C 3D";
+    /* RESTATE has the mission's briefing, and offers the movie only when there is a
+       player to run it and a file to play: 1995's own rule for the Video button
+       (scenario.cpp:797-803), with "no player" counting as "no file". Set after
+       dopt_open, which runs the layout the box is measured in. */
+    dopt_set_briefing(&g_optState, g_briefText,
+                      (g_moviePlay && brief_video_name()[0]) ? 1 : 0);
+    dopt_layout(&g_optState, g_dbPack);
+    /* THE SLOT DIALOG's rows come from the index this file owns, and a new save's
+       field opens on the mission and how far into it the player is, in minutes of
+       engine time (15 ticks a second is the engine's own clock, TIMER_SECOND). The
+       player types over it. Saving a skirmish is refused by game_save_slot, and the
+       button is greyed here for the same reason so the refusal is seen before the
+       click. */
+    dopt_bind_slots(&g_optState, g_skirmishRunning ? NULL : opt_slot_rows);
+    {
+        char d[48];
+        snprintf(d, sizeof d, "%s %d min", g_bootScen, g_engineFrame / (15 * 60));
+        dopt_slots_default(&g_optState, d);
+    }
+    /* WHAT KIND OF GAME THIS IS, every time the dialog opens. A match renames the row
+       that ends it to SURRENDER, and once this player has resigned that row becomes
+       LEAVE MATCH: both a Skirmish and a network match count, because both are games
+       with other commanders in them. */
+    dopt_set_match(&g_optState, g_skirmishRunning ? 1 : 0, g_surrendered);
     dopt_bind(&g_optState, NULL, opt_apply_settings);
     /* Seed the checkboxes from what the chain is ACTUALLY set to before binding, or the
        bind's immediate apply would push a zeroed struct into it and switch the picture
@@ -15047,6 +18517,7 @@ static void opt_show(const char* scenario)
         dopt_set_visuals(&g_optState, &v);
     }
     dopt_bind_visuals(&g_optState, opt_apply_visuals);
+    dopt_bind_visuals_reset(&g_optState, opt_reset_visuals);
     /* And the input switches, seeded the same way and bound to their OWN callback, so the
        page below cannot be reached through the visuals arm. */
     {
@@ -15142,6 +18613,7 @@ static bool minimap_order(float wx, float wz)
     const bool attack = vis && probe == 5;
     if (g_orderMarksOn)
         add_order_mark(cx, cy, refused ? 2 : (attack ? 1 : 0));
+    if (refused && probe == 21) say_cannot_deploy();
     printf("MINIMAP|order|cell=%d,%d|enginepx=%d,%d|probe=%d|%s%s\n",
            cx, cy, px, py, probe,
            refused ? (probe == 2 ? "REFUSED(nomove)" : "REFUSED(none)")
@@ -15174,6 +18646,77 @@ static bool minimap_order(float wx, float wz)
  *  question. F7 toggles it.
  * ---------------------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------------------- *
+ *  THE MATCH PANE: what the players say to each other, and what the match says back.
+ *
+ *  A different thing from the script feed below it, which is an editor instrument with a
+ *  header, a box and a timestamp, and which only appears when you reached the mission
+ *  from the editor. This one is the player's, and the match's news belongs in it: who
+ *  said what, who left, who was defeated.
+ *
+ *  TEN ROWS, and the store is ten deep, so "an eleventh hides the first" needs no
+ *  arithmetic in the drawer and there is never a backlog nobody can see. It stacks
+ *  downwards from under the OPTIONS plate, which is what the top left of this HUD means.
+ *
+ *  THIRTY SECONDS MEANS 450 ENGINE TICKS, and that is a decision worth stating. Ticks
+ *  stop when the world stops, so a line does not expire while the player is reading it
+ *  with the game paused; they are identical on every peer, so a line dies on the same
+ *  tick everywhere rather than drifting apart with the frame rate; and they are the only
+ *  clock a screenshot gate can reproduce. At the standard speed that is thirty seconds
+ *  of game time, which is the unit every other number on this screen already uses.
+ * ---------------------------------------------------------------------------------- */
+enum { CHAT_ROWS = 10, CHAT_LIFE_TICKS = 450 };
+struct ChatLine { char text[128]; int tick; unsigned colour; };
+static std::vector<ChatLine> g_chat;
+
+static void chat_say(int tick, unsigned colour, const char* fmt, ...)
+{
+    ChatLine c;
+    va_list ap;
+    c.tick = tick;
+    c.colour = colour;
+    va_start(ap, fmt);
+    vsnprintf(c.text, sizeof c.text, fmt, ap);
+    va_end(ap);
+    g_chat.push_back(c);
+    /* The cap and the row count are the SAME number on purpose: see the header. */
+    while (g_chat.size() > (size_t)CHAT_ROWS) g_chat.erase(g_chat.begin());
+}
+
+/* A REFUSED DEPLOY SAYS SO IN WORDS. The engine answers an MCV that cannot unfold where
+   it stands with ACTION_NO_DEPLOY and its only feedback is Speak(VOX_DEPLOY)
+   (foot.cpp), whose clip audio.cpp names "cannot deploy here". That voice is not played
+   here, so the refusal was a red ring and nothing else, and the usual cause, the
+   player's own escort standing on the 3x3 pad, was invisible. The line goes in the
+   match pane under OPTIONS, the same place and the same white as the match's other
+   news, in every game mode and not only a match.
+
+   ONE LINE FOR A BURST OF CLICKS. A player who does not understand the refusal clicks
+   again, and ten identical rows would push the chat out of the pane; a repeat inside
+   the line's own life refreshes its age instead of adding another. Presentation only:
+   the order already went to the engine, which stays the authority. */
+static void say_cannot_deploy(void)
+{
+    static const char kLine[] = "CANNOT DEPLOY HERE";
+    printf("MATCHMSG|nodeploy|tick=%d\n", g_engineFrame);
+    fflush(stdout);
+    if (!g_chat.empty() && !strcmp(g_chat.back().text, kLine)
+        && g_engineFrame - g_chat.back().tick < CHAT_LIFE_TICKS) {
+        g_chat.back().tick = g_engineFrame;
+        return;
+    }
+    chat_say(g_engineFrame, 0xFFFFFFu, "%s", kLine);
+}
+
+/* Called once per ENGINE TICK, not per frame: the age of a line is measured in the
+   world's own clock. Erasing from the front is also what makes "the rest move up" free,
+   because the drawer walks the vector from index 0. */
+static void chat_expire(int frame)
+{
+    while (!g_chat.empty() && frame - g_chat.front().tick >= CHAT_LIFE_TICKS)
+        g_chat.erase(g_chat.begin());
+}
+
 struct FeedLine { char text[96]; int tick; unsigned colour; };
 static std::vector<FeedLine> g_feed;
 static std::vector<char> g_feedGone;  /* per trigger: has it already been reported */
@@ -15184,6 +18727,15 @@ static void feed_reset(void)
     g_feed.clear();
     g_feedGone.assign(g_triggers.size(), 0);
     g_feedTick0 = -1;
+    g_chat.clear();
+    /* A NEW MISSION IS NOT STILL SHOWING THE LAST ONE'S ENDING. Both of these outlive a
+       mission otherwise: the map would open fully revealed and the next verdict would
+       think its reveal had already run. */
+    g_verdictRevealMs = -1.0;
+    g_surrendered = 0;
+    g_surrSeats = 0;
+    shroud_reveal(0);
+    sb_set_spectator(0);
 }
 
 static void feed_add(int tick, unsigned colour, const char* fmt, ...)
@@ -15245,6 +18797,96 @@ static void feed_service(int frame)
     }
 }
 
+/* ---- typing a line, and drawing the pane ------------------------------------------- */
+
+static bool g_chatEntry = false;
+static char g_chatBuf[NM_CHAT_MAX];
+
+/* What this machine's own player is called, for the echo of a line it just sent. The
+   room's table where there is one; the engine's roster otherwise. */
+static const char* chat_my_name(void)
+{
+    if (nm_active()) {
+        const char* n = nm_seat_name(nm_seat());
+        if (n && n[0]) return n;
+    }
+    return "YOU";
+}
+
+static void chat_open(void)
+{
+    /* ONLY IN A MATCH, and never on top of another modal. The editor, the options
+       dialog, the codex and the tuning panel all own the keyboard when they are up, and
+       a scenario that has already been decided has nobody left to talk to. */
+    if (!nm_active() || g_editOn || g_optOpen || g_chatEntry) return;
+    g_chatEntry = true;
+    g_chatBuf[0] = '\0';
+    /* MANDATORY. The lobby stops text input on its way out, so the game starts with it
+       off and SDL_TEXTINPUT never arrives until somebody asks for it. */
+    SDL_StartTextInput();
+}
+
+static void chat_close(bool send)
+{
+    if (send && g_chatBuf[0]) {
+        /* nm_chat_say echoes locally and puts it on the wire; the drawer reads the
+           echo back through the same path every other peer's line arrives on, so the
+           speaker sees their own line in the same colour and order everybody else does. */
+        nm_chat_say(g_chatBuf);
+    }
+    g_chatBuf[0] = '\0';
+    g_chatEntry = false;
+    SDL_StopTextInput();
+}
+
+/* THE PLAYER'S PANE: ten rows, stacked downwards from under the OPTIONS plate. No box
+   and no header, because this is not an instrument. */
+static void draw_chat_feed(int fbw, int fbh)
+{
+    if (g_editOn) return;
+    if (g_chat.empty() && !g_chatEntry) return;
+    sb_layout(fbw, fbh);
+    {
+        const float S = (float)sb_scale();
+        const float rowH = 12.0f * S;
+        const float x = 6.0f * S;
+        float y = sb_chrome_bottom() + 4.0f * S;
+        const int n = (int)g_chat.size() > CHAT_ROWS ? CHAT_ROWS : (int)g_chat.size();
+        int i;
+        begin_overlay(fbw, fbh);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        for (i = 0; i < n; i++) {
+            const ChatLine& c = g_chat[g_chat.size() - n + i];
+            const float r = ((c.colour >> 16) & 255) / 255.0f;
+            const float g = ((c.colour >> 8) & 255) / 255.0f;
+            const float b = (c.colour & 255) / 255.0f;
+            sb_text(x, y + i * rowH, c.text, S, r, g, b);
+        }
+        if (g_chatEntry) {
+            /* The line being typed sits under the ten, in this player's own colour, so
+               you can see who you are about to speak as. */
+            char line[160];
+            const unsigned mine = nm_active() ? net_seat_rgb(nm_seat()) : 0xFFFFFFu;
+            const float r = ((mine >> 16) & 255) / 255.0f;
+            const float g = ((mine >> 8) & 255) / 255.0f;
+            const float b = (mine & 255) / 255.0f;
+            const float ey = y + n * rowH;
+            snprintf(line, sizeof line, "%s: %s", chat_my_name(), g_chatBuf);
+            sb_text(x, ey, line, S, r, g, b);
+            /* AN UNDERSCORE THAT BLINKS ON THE ENGINE'S CLOCK, not the wall's: about
+               half a second at the standard rate, it holds still in a stopped world,
+               and a screenshot gate can reproduce it. */
+            if (((g_engineFrame / 8) & 1) == 0) {
+                const float cx = x + sb_text_w(line, S);
+                sb_rect(cx, ey + 9.0f * S, cx + 5.0f * S, ey + 10.0f * S, r, g, b, 1.0f);
+            }
+        }
+        glDisable(GL_BLEND);
+        end_overlay();
+    }
+}
+
 static void draw_script_feed(int fbw, int fbh)
 {
     if (!g_feedOn || !g_feedShow || g_editOn) return;
@@ -15294,6 +18936,17 @@ static void draw_script_feed(int fbw, int fbh)
     end_overlay();
 }
 
+/* OFF FOR A PLAYER, and that is the whole of BUG-20260904-974A4F.
+   A camera readout is a renderer-debugging instrument. It was drawn on every frame of
+   every game, in the top left corner, which is exactly where the sidebar puts its OPTIONS
+   and DATABASE tabs -- so it sat on top of two controls a player is meant to be able to
+   read and click, in a window and in full screen alike. It was already suppressed for the
+   editor and for the codex page, which is the same judgement made twice and never made
+   for the ordinary case.
+
+   F8 brings it back for whoever is debugging the camera. */
+static int g_camHud = 0;
+
 static void draw_cam_hud(int fbw, int fbh)
 {
     /* The editor owns the title bar this would draw into, and a camera readout is a
@@ -15304,7 +18957,8 @@ static void draw_cam_hud(int fbw, int fbh)
     if (g_camMode == CAM_N64) {
         br = 0.10f; bg = 0.22f; bb = 0.42f;
         snprintf(l1, sizeof(l1), "CAM N64  PERSPECTIVE");
-        snprintf(l2, sizeof(l2), "FOV50 YAW0 PITCH%.1f DIST%.0f  C=OLD",
+        snprintf(l2, sizeof(l2), "FOV%.0f YAW%.0f PITCH%.1f DIST%.0f  C=OLD",
+                 cam_fovy_deg(), g_camYaw * 180.0f / (float)M_PI + 0.0f,
                  n64_pitch() * 180.0f / (float)M_PI, g_dist);
     } else {
         br = 0.36f; bg = 0.22f; bb = 0.04f;
@@ -15361,8 +19015,10 @@ static double g_shroudLastMs = 0.0;
 static void shroud_dispatch_draw(void)
 {
     Uint64 t0 = 0;
-    if (!g_shroudOn || g_shroudEditorOff)
+    if (g_shroudEditorOff)
         return;                    /* the editor draws no blanket, see shroud_mod.h */
+    if (!g_shroudRimOn && (!g_shroudOn || g_shroudRevealed))
+        return;                    /* otherwise the rim alone is drawn, see shroud_is_rim */
     if (g_shroudPerfOn) { glFinish(); t0 = SDL_GetPerformanceCounter(); }
     /* Clip the blanket to the rect + margin, exactly the cells the terrain
        draws (cell_shown): a blanket over never-drawn out-of-rect cliffs was
@@ -15399,7 +19055,7 @@ static void shroud_dispatch_draw(void)
  *
  *  This used to be a transcription of TechnoClass::Draw_It: a horizontal four-row box in
  *  SCREEN space, above the object's silhouette. That is the DOS original. The console
- *  draws something structurally different, and the project owner asked for the console's:
+ *  draws something structurally different, and the requirement asked for the console's:
  *
  *      TWO untextured quads standing VERTICALLY in the world XY plane, 16 leptons wide,
  *      immediately to the WEST of the object, rising out of the terrain.
@@ -15419,8 +19075,7 @@ static void shroud_dispatch_draw(void)
  *  has CONSTANT WORLD SIZE, so it grows on screen as you zoom in. That is the tell in
  *  the project owner's own footage: the bar leans differently at different screen positions.
  *
- *  Two deliberate deviations, both registered in known-gap notes rather than hidden:
- *    - the SHOW rule. The console is selected-only; we keep HB_MODE_DAMAGED_TOO.
+ *  One deliberate deviation, recorded in the deviations register rather than hidden:
  *    - the per-type depth bias Class->vtbl[+0x1C] added to the record's Z was never
  *      identified, so we use 0.
  * ---------------------------------------------------------------------------------- */
@@ -15528,7 +19183,7 @@ static void draw_health_bars(int fbw, int fbh)
 /* ---- THE PIP ROW ---------------------------------------------------------------------
  *
  *  Harvester tiberium, Orca ammo, silo and refinery storage, transport occupancy: one
- *  strip, one pair of numbers. the project owner asked for the cartridge's own answer rather than the
+ *  strip, one pair of numbers. The requirement asked for the cartridge's own answer rather than the
  *  1995 PIPS.SHP shortcut, and it is decoded end to end in docs/pip-row.md, whose
  *  eighteen load-bearing numbers re-derive from the ROM with no disassembler.
  *
@@ -15750,13 +19405,25 @@ static void draw_pip_rows(void)
  * g_doswrenchHave, exactly as it did, rather than drawing nothing.
  *
  * WHERE IT SITS, and it is the sprite's own anchor so the two cannot disagree: the
- * object's own x and z, and a lift of half the building's extent (dimw, the same number
- * the health bar takes its length from) above the terrain under that point. The 3D draw
- * takes o.wz rather than the sprite's o.wz + overlay_zoff, because overlay_zoff exists to
- * push a FLAT QUAD standing in the world XY plane clear of the building's mesh in depth,
- * and this model is not that quad: it lies in the ground plane, over the roof, with the
- * depth test off.
+ * object's own x and z, and a lift above the terrain under that point that is the LARGER
+ * of two rules. The first is half the building's extent (dimw, the same number the health
+ * bar takes its length from), which is where the health bar and the pip row sit. The
+ * second is the building's own roof, read off its model (mesh_roof_y), plus the slab's
+ * base offset and a clearance, so that on a building whose model rises above its
+ * footprint rule (the Refinery, the Weapons Factory, the Hand of Nod, the Temple) the
+ * slab floats over the roof instead of standing inside the structure with its edge on the
+ * roofline. THE THREE OVERLAYS THEREFORE NO LONGER SHARE ONE HEIGHT on a tall building:
+ * the bar and the pips keep the footprint rule, the wrench takes the roof rule where it
+ * is higher. wrenchdump prints both (top= and base=) so the choice is measurable. The 3D
+ * draw takes o.wz rather than the sprite's o.wz + overlay_zoff, because overlay_zoff
+ * exists to push a FLAT QUAD standing in the world XY plane clear of the building's mesh
+ * in depth, and this model is not that quad: it lies in the ground plane, over the roof,
+ * with the depth test off.
  * ------------------------------------------------------------------------------------- */
+
+/* The air between a building's roof and the wrench's underside, in cells: the order of
+   magnitude the shadow nudge uses, enough to read as floating rather than resting. */
+static const float WRENCH_CLEARANCE = 0.10f;
 
 struct WrenchQuad {
     size_t idx;
@@ -15766,6 +19433,10 @@ struct WrenchQuad {
     /* Height above the terrain under the anchor, in cells -- the 3D model's ylift and
        the sprite quad's own centre, computed ONCE so the two placements cannot drift. */
     float  lift;
+    /* The two numbers the lift was chosen from, kept for wrenchdump: the building's
+       roof off its own model, and the height of the wrench slab's underside above its
+       anchor. Both 0 for a pack with no CUR05, where the sprite fallback draws. */
+    float  top, base;
 };
 
 /* WHERE EACH WRENCH WENT AND WHICH WAY IT WAS FACING, taken out of draw_mesh rather than
@@ -15810,13 +19481,38 @@ static std::vector<WrenchQuad> collect_wrenches(void)
             continue;
         const float hw = (float)g_doscrateW[DOSCRATE_WRENCH] / DOSCRATE_CELL_PX * 0.5f;
         const float hh = (float)g_doscrateH[DOSCRATE_WRENCH] / DOSCRATE_CELL_PX * 0.5f;
+        /* THE ART IS RESOLVED HERE, AT THE FIRST BUILDING THAT QUALIFIES, AND NOT ONE
+           LINE EARLIER. c3d_wrench_mesh resolves the whole console cursor set on its
+           first call and LATCHES the answer for the LIFETIME OF THE PROCESS. Asking it
+           before there is anything to draw would resolve it against whatever pack
+           happened to be loaded at that moment, and in the merged program at menu time
+           that is no pack at all -- 0 of 14, latched, and the 3D pointer gone for the
+           rest of the run. That is not hypothetical: it is the exact failure G59 was
+           written for. Reaching this line means a repairing building is on screen, and
+           no repairing building can exist before a mission is loaded. */
+        const int wmesh = c3d_wrench_mesh();
         WrenchQuad q;
         q.idx = i;
         q.z   = o.wz + overlay_zoff(o);   /* the same offset the two strips take */
-        /* Centre of the building's own extent. o.ylift is the deck height a rider gets
-           and is zero for every building; it is added anyway so this anchor cannot drift
-           away from the health bar's, which adds it too. */
-        q.lift = o.ylift + (float)o.dimw / 24.0f * 0.5f;
+        /* THE LIFT IS THE LARGER OF TWO RULES.
+           The footprint rule: the centre of the building's own extent, which is where
+           the health bar and the pip row sit. o.ylift is the deck height a rider gets
+           and is zero for every building; it is added anyway so this term cannot drift
+           away from the health bar's, which adds it too.
+           The roof rule: the building's roof read off its model, plus the height of the
+           slab's underside above the wrench's own anchor, plus the clearance. On a
+           building that is tall for its footprint the footprint rule puts the slab
+           INSIDE the structure with its edge on the roofline, which reads as a wrench
+           tucked behind the roof; this rule lifts it clear. Measured on the shipped
+           pack: the Refinery goes from 1.208 to 1.251, the Weapons Factory from 1.208 to
+           1.303, the Barracks stays at 0.8125 because its model's roof rule reads lower.
+           Both terms are pure functions of the pack and the engine's dimw, so two runs
+           print the same numbers and the sprite quad below takes the same lift. */
+        q.top  = (wmesh >= 0) ? mesh_roof_y(mesh_for(o)) : 0.0f;
+        q.base = (wmesh >= 0) ? mesh_body_base_y(wmesh) : 0.0f;
+        const float footLift = o.ylift + (float)o.dimw / 24.0f * 0.5f;
+        const float roofLift = (wmesh >= 0) ? q.top + q.base + WRENCH_CLEARANCE : 0.0f;
+        q.lift = (roofLift > footLift) ? roofLift : footLift;
         const float yc = terrain_y(o.wx, q.z) + q.lift;
         q.x0 = o.wx - hw;
         q.x1 = o.wx + hw;
@@ -15826,16 +19522,8 @@ static std::vector<WrenchQuad> collect_wrenches(void)
     }
     /* THE ART GUARD, and it asks about both kinds: CUR05 first because it is what ships,
        the 1995 sprite second because a pack baked before CUR05 existed still has it.
-       Neither present means no wrench at all, announced once at load.
-
-       IT IS ASKED LAST, AFTER THE LIST IS BUILT, AND THAT ORDER IS LOAD-BEARING.
-       c3d_wrench_mesh resolves the whole console cursor set on its first call and LATCHES
-       the answer for the LIFETIME OF THE PROCESS. Asking it before there is anything to
-       draw would resolve it against whatever pack happened to be loaded at that moment,
-       and in the merged program at menu time that is no pack at all -- 0 of 14, latched,
-       and the 3D pointer gone for the rest of the run. That is not hypothetical: it is
-       the exact failure G59 was written for. No repairing building means the question is
-       never asked, and no repairing building can exist before a mission is loaded. */
+       Neither present means no wrench at all, announced once at load. The call is the
+       latched one made above, so an empty list still never asks. */
     if (!out.empty() && c3d_wrench_mesh() < 0 && !g_doswrenchHave)
         out.clear();
     return out;
@@ -15859,10 +19547,14 @@ static void draw_repair_wrenches(void)
        One call per building into the very function the pointer uses, so the model, the
        spin, the shading flags and the two passes are shared rather than copied. The three
        trailing arguments are the whole difference: the building's own lift instead of the
-       pointer's ground nudge, depth off unconditionally (this is drawn over a structure
-       taller than itself, so a depth-tested wrench would be an invisible one), and the
-       ground-marker triangle off -- see c3d_draw_one for why that marker means something
-       over ground and nothing over a roof. */
+       pointer's ground nudge; drawn over everything with the depth TEST defeated (this is
+       drawn over a structure taller than itself, so a depth-tested wrench would be an
+       invisible one) but its depth WRITTEN, so the Enhanced light pass shades the slab
+       as the slab and not as the roof behind it -- the enum in c3d_draw_one says why; and
+       the ground-marker triangle off -- see c3d_draw_one for why that marker means
+       something over ground and nothing over a roof. Writing depth here is safe because
+       this is the last world pass of the frame: nothing drawn after it is depth tested,
+       so the slab's footprint in the buffer can hide nothing. */
     const int wmesh = c3d_wrench_mesh();
     if (wmesh >= 0) {
         const int frame = wrench_anim_frame();
@@ -15870,7 +19562,8 @@ static void draw_repair_wrenches(void)
         glColor3f(1.0f, 1.0f, 1.0f);
         for (size_t i = 0; i < qs.size(); i++) {
             const SimObject& o = g_objects[qs[i].idx];
-            c3d_draw_one(C3D_WRENCH_CODE, o.wx, o.wz, frame, qs[i].lift, true, false);
+            c3d_draw_one(C3D_WRENCH_CODE, o.wx, o.wz, frame, qs[i].lift,
+                         C3D_DEPTH_OVER_WRITE_DEPTH, false);
             /* Straight out of draw_mesh, which has just written what it was given and
                what it made of it. Not recomputed from the frame: a record built beside
                the draw agrees with itself whether or not the draw turned anything, and
@@ -16512,23 +20205,31 @@ static int texbook_mesh_for(const SimObject& o, int book)
     return it->second.mesh;
 }
 
-/* TWO KINDS OF BOOK, and telling them apart is what stops the second kind drawing twice.
-
-   For FACT, PROC's second book and SILO the payload node's own gfx pointer is NULL: the
-   geometry exists ONLY in the book's display list, our walker never read it, and the variant
-   is drawn AS WELL AS the building -- which is what the cartridge does, a second command.
+/* TWO KINDS OF BOOK, and both are drawn ON TOP of geometry the base mesh already carries.
 
    For PROC's first book, HPAD and FIX the node's gfx pointer IS the book's list, so those
-   triangles are ALREADY in the baked mesh. Drawing the variant on top of them would
-   z-fight. Detected from the data rather than from a hardcoded list: if the base mesh
-   already contains a triangle textured with the variant's swapped texture, this is the
-   second kind.
+   triangles are at the head of the baked mesh in the book's own order. Drawing the
+   variant on top of them would z-fight, so the second draw is DEPTH-BIASED, the same
+   instrument the bib decals use: same geometry, same place, pulled a hair toward the
+   camera so it wins the depth test cleanly instead of fighting for it. Detected from the
+   data rather than from a hardcoded list: the leading triangles of the base and the
+   variant share positions.
 
-   The answer for the second kind is a DEPTH-BIASED overdraw, the same instrument the bib
-   decals use: same geometry, same place, pulled a hair toward the camera so it wins the
-   depth test cleanly instead of fighting for it. It costs one extra draw of a small mesh.
-   Registered in known-gap notes as ours -- the console substitutes the G_SETTIMG in place
-   and never draws twice, which we cannot do without a per-triangle texture override in the
+   For FACT, PROC's second book and SILO the payload node's own gfx pointer is NULL, and
+   the baker reaches their geometry twice: once through the node's +0x04 word, which is
+   the node's rest matrix but parses as a display list that lands on the book's payload
+   list (so the base mesh carries a copy at the node's pose, appended after the rest of
+   the building), and once as the book variant, posed with the same node transform. The
+   two copies are bit-identical, so the variant drawn second wins under GL_LEQUAL with no
+   bias at all; this function returns false for them because the copy sits at the END of
+   the base list, and that is the intended path. The silo's fill dome and the refinery's
+   storage strip once missed that copy because the variant was baked unposed: the dome
+   stood 10.93 units inside the building's own dome and never showed, the strip stood
+   0.28 cells beside the one on the building and showed twice. The baker now refuses a
+   variant that does not land on its base copy.
+
+   The console substitutes the G_SETTIMG in place and draws the geometry once; drawing it
+   twice is ours, and cannot be avoided without a per-triangle texture override in the
    pack format. */
 static bool texbook_overdraws(int baseMesh, int varMesh)
 {
@@ -16581,7 +20282,7 @@ static inline bool cart_is_damaged(const SimObject& o)
 /* The per-type cache holds MESH INDICES into g_pack, so it cannot outlive the pack it was
    built from: pack_free invalidates every index and the next mission's load_pack renumbers
    them, so a surviving cache draws the WRONG MODEL.
-   This note used to say game_shutdown cleared it. It did not -- until 25 Aug 2026
+   This note used to say game_shutdown cleared it. It did not --
    dmg_reset had exactly one caller and it was game_load_slot, so the claim was false for
    every mission change that was not a save load. Both paths call it now. */
 static std::map<std::string, int> g_dmgCache;
@@ -16984,6 +20685,9 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
        cartridge does too -- its Remap_Table selector at RAM 0x80055D08 is chosen per
        object, and the texture book is a second command from the same draw arm. */
     g_meshFlash = g_flashOn && o.blush != 0;
+    /* Bracketed the way g_fanTex is: set for this object's draw and cleared with it at
+       the end, never left on for whatever happens to be drawn next. */
+    g_treadNow = tread_phase_of(o.id);
     /* Spin the Construction Yard's cooling fans (see g_fanTex). Finished FACTs only; a
        half-built one is still assembling and has no fans yet -- and "half-built" is the
        BState, not construction_frac >= 1, which goes true halfway through (see
@@ -17003,6 +20707,7 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
               construction_frac(o), lift, false, wobble_of(o),
               object_anim_t(mi, o));
     g_fanTex = -1;
+    g_treadNow = 0.0f;
     /* The texture-book list, on top of the building it belongs to. A building still going
        up gets none: the books are emitted from the same per-StructType jump table the
        BState branch skips (RAM 0x8003DBF4), and the predicate that used to stand here,
@@ -17025,7 +20730,7 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
        position, yaw AND HEIGHT.
 
        THE HEIGHT WAS MISSING, and it is the whole reason `lift` is a variable now
-       (24 Aug 2026). This call passed a literal 0 for ylift while the hull above took
+      . This call passed a literal 0 for ylift while the hull above took
        alt_lift(o), and transport_door_for admits a Chinook, which is an AIRCRAFT: a TRAN
        in flight drew its loading ramp welded to the terrain underneath it while the hull
        flew a full 0.9375 of a cell higher. Measured on SCB61EA's reinforcement Chinook
@@ -17125,8 +20830,202 @@ static void draw_object_rig(int rig, const SimObject& o, int pass, float rigT)
    and a polygon offset set -- so every texture bind here is wasted work except the one
    that matters, which is the CUTOUT pass's: a tree drawn as a solid card would cast a
    rectangle instead of a canopy. */
+/* THE GROUND'S NORMAL TARGET. The same cells draw_terrain draws, the same corner
+   heights, the same two triangles and the same view cull, with the corner's normal as
+   the colour and nothing else: fx_world_end depth-tests it against the scene it just
+   finished (writes off), so only the ground that is actually visible lands in the
+   target and everything standing on it keeps the light pass's own normal. */
+static void fx_draw_terrain_normals(void)
+{
+    if (g_pack.corner.empty()) return;
+    if (!g_shadeReady) terrain_shade_build();
+    const int cw = g_gridW + 1;
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_BLEND);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_CULL_FACE);
+    glBegin(GL_TRIANGLES);
+    for (size_t i = 0; i < g_pack.cell.size(); i++) {
+        const PackCell& c = g_pack.cell[i];
+        if (!cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y)) continue;
+        const float x = (float)c.x, z = (float)c.y;
+        const float y00 = terrain_corner_y(c.x,     c.y);
+        const float y10 = terrain_corner_y(c.x + 1, c.y);
+        const float y11 = terrain_corner_y(c.x + 1, c.y + 1);
+        const float y01 = terrain_corner_y(c.x,     c.y + 1);
+        const unsigned char* n00 = g_normGrid[c.y * cw + c.x];
+        const unsigned char* n10 = g_normGrid[c.y * cw + c.x + 1];
+        const unsigned char* n11 = g_normGrid[(c.y + 1) * cw + c.x + 1];
+        const unsigned char* n01 = g_normGrid[(c.y + 1) * cw + c.x];
+        /* NW, SW, NE then NE, SW, SE: the console's own diagonal, as draw_terrain. */
+        glColor3ubv(n00); glVertex3f(x,        y00, z);
+        glColor3ubv(n01); glVertex3f(x,        y01, z + 1.0f);
+        glColor3ubv(n10); glVertex3f(x + 1.0f, y10, z);
+        glColor3ubv(n10); glVertex3f(x + 1.0f, y10, z);
+        glColor3ubv(n01); glVertex3f(x,        y01, z + 1.0f);
+        glColor3ubv(n11); glVertex3f(x + 1.0f, y11, z + 1.0f);
+    }
+    glEnd();
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    /* AND THE TREES, into the same buffer with the foliage state in their alpha. */
+    tree3d_draw_normals();
+}
+
+/* THE GROUND AS A CASTER, STEEP CELLS ONLY: a cell whose corners rise less than
+   `minRise` (in cells) cannot shadow its neighbour by anything a shadow texel can
+   resolve, and a flat cell in the map is exactly the geometry that fights its own
+   depth. Colour is masked in this pass, so nothing but the two triangles matters. */
+static void draw_terrain_casters(float minRise)
+{
+    glDisable(GL_TEXTURE_2D);
+    glBegin(GL_TRIANGLES);
+    for (size_t i = 0; i < g_pack.cell.size(); i++) {
+        const PackCell& c = g_pack.cell[i];
+        if (!cell_shown(c.x, c.y)) continue;
+        const float x = (float)c.x, z = (float)c.y;
+        const float y00 = terrain_corner_y(c.x,     c.y);
+        const float y10 = terrain_corner_y(c.x + 1, c.y);
+        const float y11 = terrain_corner_y(c.x + 1, c.y + 1);
+        const float y01 = terrain_corner_y(c.x,     c.y + 1);
+        float lo = y00, hi = y00;
+        if (y10 < lo) lo = y10; if (y10 > hi) hi = y10;
+        if (y11 < lo) lo = y11; if (y11 > hi) hi = y11;
+        if (y01 < lo) lo = y01; if (y01 > hi) hi = y01;
+        if (hi - lo < minRise) continue;
+        glVertex3f(x,        y00, z);
+        glVertex3f(x,        y01, z + 1.0f);
+        glVertex3f(x + 1.0f, y10, z);
+        glVertex3f(x + 1.0f, y10, z);
+        glVertex3f(x,        y01, z + 1.0f);
+        glVertex3f(x + 1.0f, y11, z + 1.0f);
+    }
+    glEnd();
+    glEnable(GL_TEXTURE_2D);
+}
+
+/* THE CASTER PASS'S OWN VIEW BOX, in ground cells.
+ *
+ * fx_draw_shadow_casters is called from two places, and NEITHER of them is looking
+ * through the player's camera, so cell_in_view is the wrong test in both:
+ *
+ *   the SUN MAP    draws the world from the light, into an orthographic box fitted to
+ *                  the view rectangle. A wood standing behind the player, or off to the
+ *                  side, still casts INTO the frame, so anything the sun's box contains
+ *                  has to be submitted whether the camera can see it or not. What the
+ *                  box does NOT contain contributes nothing: an orthographic projection
+ *                  clips it, and a clipped triangle writes no depth.
+ *   the REFLECTION draws the world with the camera's own projection and the modelview
+ *                  mirrored about the sea, so what it shows is the camera's view of the
+ *                  slab BELOW that plane. Same rays, different pair of heights.
+ *
+ * Both come out as one XZ rectangle, which is all the object loop needs. For the sun
+ * that rectangle is the shadow of the box on the ground plane, taken by clipping the
+ * box's twelve edges to the height slab the world actually occupies and bounding what
+ * survives -- without the slab the answer is the box's full 4.5R reach along a low sun,
+ * which on any map worth culling is the whole map.
+ *
+ * WHAT THE SUN HALF ACTUALLY SAVES ON A SHIPPED MAP: NOTHING, and that is worth stating
+ * rather than leaving to be discovered. The sun box's half width is the larger view
+ * extent times 0.71 times shadow_span, so at the shipped span of 1.414 the half width
+ * IS the view extent and the box is twice the view across. Measured on the heaviest
+ * shipped map, a 62x62 play rectangle at 1280x800: the box comes out 150 by 108 cells,
+ * two and a half times the map in each direction, and all 55 trees are inside it at
+ * every camera and every zoom tried. Lower the span dial to 0.6 and the box shrinks to
+ * 66 by 47, which is how this was confirmed to be tracking its input rather than
+ * failing open. So the sun branch pays only on a grid larger than the shipped ones, and
+ * it is kept because it costs one box a frame and because the reflection branch beside
+ * it, which shares this function, culls hard: 55 trees down to 18 zoomed in. The number
+ * the log prints beside the counts is there so nobody has to take this paragraph on
+ * trust a year from now.
+ */
+static bool  g_castCullOn = false;
+static float g_castX0 = 0.0f, g_castX1 = 0.0f, g_castZ0 = 0.0f, g_castZ1 = 0.0f;
+
+static void caster_cull_bounds(void)
+{
+    float reachXZ = 0.0f, reachY = 0.0f;
+    tree3d_reach(&reachXZ, &reachY);
+    const float ylo = g_terrainHBot - 0.02f;
+    const float yhi = g_terrainHTop + reachY;
+    g_castCullOn = false;
+    if (!g_clip_to_map) return;
+
+    if (g_fxCasterPass == FXCAST_REFLECT) {
+        /* the mirror of the slab that stands above the sea, seen by the real camera */
+        const float p = g_fxCasterPlaneY;
+        g_castCullOn = view_plane_box(g_fbW, g_fbH, 2.0f * p - yhi, p + 0.02f,
+                                      &g_castX0, &g_castX1, &g_castZ0, &g_castZ1);
+        g_castBoxReflOn = g_castCullOn ? 1 : 0;
+        g_castBoxRefl[0] = g_castX0; g_castBoxRefl[1] = g_castX1;
+        g_castBoxRefl[2] = g_castZ0; g_castBoxRefl[3] = g_castZ1;
+        return;
+    }
+
+    /* THE SUN BOX, clipped to the slab. Corner c(i) takes its s sign from bit 0, its u
+       sign from bit 1 and near/far from bit 2, so two corners share an edge exactly when
+       their indices differ in one bit -- which is the twelve edges, written once. */
+    const float R = g_fxSunR;
+    float cx[8], cy[8], cz[8];
+    for (int i = 0; i < 8; i++) {
+        const float a = (i & 1) ? R : -R;
+        const float b = (i & 2) ? R : -R;
+        const float c = (i & 4) ? g_fxSunFar : g_fxSunNear;
+        cx[i] = g_fxSunEye[0] + g_fxSunS[0]*a + g_fxSunU[0]*b + g_fxSunDir[0]*c;
+        cy[i] = g_fxSunEye[1] + g_fxSunS[1]*a + g_fxSunU[1]*b + g_fxSunDir[1]*c;
+        cz[i] = g_fxSunEye[2] + g_fxSunS[2]*a + g_fxSunU[2]*b + g_fxSunDir[2]*c;
+    }
+    float bx0 = 1e30f, bx1 = -1e30f, bz0 = 1e30f, bz1 = -1e30f;
+    int hits = 0;
+    for (int i = 0; i < 8; i++) {
+        if (cy[i] < ylo || cy[i] > yhi) continue;
+        if (cx[i] < bx0) bx0 = cx[i];
+        if (cx[i] > bx1) bx1 = cx[i];
+        if (cz[i] < bz0) bz0 = cz[i];
+        if (cz[i] > bz1) bz1 = cz[i];
+        hits++;
+    }
+    for (int i = 0; i < 8; i++)
+        for (int bit = 1; bit <= 4; bit <<= 1) {
+            const int j = i ^ bit;
+            if (j < i) continue;                  /* each edge once */
+            for (int k = 0; k < 2; k++) {
+                const float h = k ? yhi : ylo;
+                const float d = cy[j] - cy[i];
+                if (d == 0.0f) continue;
+                const float t = (h - cy[i]) / d;
+                if (t < 0.0f || t > 1.0f) continue;
+                const float px = cx[i] + t * (cx[j] - cx[i]);
+                const float pz = cz[i] + t * (cz[j] - cz[i]);
+                if (px < bx0) bx0 = px;
+                if (px > bx1) bx1 = px;
+                if (pz < bz0) bz0 = pz;
+                if (pz > bz1) bz1 = pz;
+                hits++;
+            }
+        }
+    /* No intersection at all means the sun box misses the world entirely, which is a
+       camera this pass cannot have been fitted to. Say nothing rather than cull
+       everything: a wrong empty box is a frame with no shadows in it. */
+    if (hits == 0) return;
+    g_castX0 = bx0; g_castX1 = bx1; g_castZ0 = bz0; g_castZ1 = bz1;
+    g_castCullOn = true;
+    g_castBoxSunOn = 1;
+    g_castBoxSun[0] = bx0; g_castBoxSun[1] = bx1;
+    g_castBoxSun[2] = bz0; g_castBoxSun[3] = bz1;
+}
+
+/* Can a tree whose trunk is in cell (x,y) reach this caster pass's box? The pad is the
+   crown's own reach plus the two cells of float slop every box in this file carries. */
+static inline bool tree3d_cell_casts(int x, int y)
+{
+    if (!g_castCullOn) return true;
+    return cell_in_box(x, y, g_treeCullPad, g_castX0, g_castX1, g_castZ0, g_castZ1);
+}
+
 static void fx_draw_shadow_casters(void)
 {
+    /* First, because the object loop below asks it once per tree. */
+    caster_cull_bounds();
     glEnable(GL_TEXTURE_2D);
     glDisable(GL_BLEND);
     glDisable(GL_ALPHA_TEST);
@@ -17140,7 +21039,8 @@ static void fx_draw_shadow_casters(void)
         /* The SUN'S view, not the player's: a plateau outside the player's cull box
            still casts into it, so the per-frame view cull stands down for this pass. */
         g_cullOn = false;
-        draw_terrain();
+        if (g_fx.shadow_terrain_rise > 0.0f) draw_terrain_casters(g_fx.shadow_terrain_rise);
+        else draw_terrain();
         g_cullOn = true;
     }
 
@@ -17156,6 +21056,26 @@ static void fx_draw_shadow_casters(void)
             float rigT = -1.0f;
             const int rig = mcvrig_for(o, &rigT);
             if (rig >= 0) { draw_object_rig(rig, o, mode, rigT); continue; }
+            /* the rebuilt tree casts its own shadow, from the same geometry and
+               the same alpha test, so the silhouette on the ground is the one
+               the player can see in the canopy -- but only if it is inside the box
+               this pass is drawing into. visible() carries no frustum term, so
+               without the test the whole map's trees are submitted twice more. */
+            if (tree3d_claims(o)) {
+                const bool casts = tree3d_cell_casts(o.cx, o.cy);
+                if (mode == MODE_CUTOUT) {
+                    /* counted per PASS, because the two boxes are different sizes for
+                       different reasons and one aggregate cannot tell a wide sun box
+                       from a reflection cull that is not working */
+                    if (g_fxCasterPass == FXCAST_REFLECT) {
+                        if (casts) g_nTreeRefl++; else g_nTreeReflCut++;
+                    } else {
+                        if (casts) g_nTreeSun++;  else g_nTreeSunCut++;
+                    }
+                }
+                if (casts) tree3d_draw(o, mode);
+                continue;
+            }
             const int mi = mesh_for(o);
             if (mi >= 0) {
                 draw_object_mesh(mi, o, mode);
@@ -17188,7 +21108,7 @@ static void fx_draw_shadow_casters(void)
     glEnable(GL_ALPHA_TEST);
     glAlphaFunc(GL_GREATER, 0.5f);
     g_spriteShadowPass = g_spriteShadowOn;
-    for (size_t i = 0; i < g_objects.size(); i++) {
+    for (size_t i = 0; g_infantryDraw && i < g_objects.size(); i++) {
         const SimObject& o = g_objects[i];
         if (o.kind != K_INFANTRY || !visible(o))
             continue;
@@ -17261,7 +21181,7 @@ static int fx_light_class(const char* n)
     return FXLC_NONE;
 }
 
-/* A LIGHT OUTLIVES THE THING THAT LIT IT. (the project owner, 19 Aug 2026: "When it appears alongside
+/* A LIGHT OUTLIVES THE THING THAT LIT IT. (Reported: "When it appears alongside
    the muzzleflash, it instantly disappears again... Whenever a realtime light appears due
    to an explosion, muzzleflash etc. it should fade out. Not instantly disappear.")
 
@@ -17405,6 +21325,13 @@ static void fx_gather_lights(void)
             L.radius = 3.0f;
             L.r = 0.36f; L.g = 1.00f; L.b = 0.30f;
             L.power = g_fx.tib_glow * (0.25f + 0.75f * (float)b.n / 16.0f);
+            /* AND IT BREATHES WITH THE CRYSTALS, so the green a field casts on the
+               units driving through it varies the way the crystals themselves do,
+               each 4x4 block on its own phase. Gated on the crystals actually being
+               drawn: with them off this light is exactly the constant it has always
+               been, which is what keeps a chain without them byte-identical. */
+            if (g_fx.tib3d && g_tib3dHave)
+                L.power *= tib3d_pulse(tib3d_hash(b.key & 63, b.key >> 6, 7u));
         }
     }
 }
@@ -17479,6 +21406,7 @@ static void draw_frame(int fbw, int fbh)
        it is why the pick, the camera clamp and the radar are untouched by it.
        With the chain off, rw==fbw and nothing at all has been bound. */
     g_fxCasters = fx_draw_shadow_casters;
+    g_fxGroundNormals = fx_draw_terrain_normals;
     int rw = fbw, rh = fbh;
     fx_world_begin(fbw, fbh, &rw, &rh);
 
@@ -17525,6 +21453,10 @@ static void draw_frame(int fbw, int fbh)
 
     /* One place decides where the camera legally is, and it is the place that knows the
        real framebuffer size. Zoom changes and window resizes are covered for free. */
+    /* THE PERSPECTIVE ROW'S YAW, written ahead of the clamp so the clamp cages the
+       turned view (view_ground_bounds reads g_camYaw). Classic writes the zero that was
+       always there. */
+    cam_apply_option();
     if (g_clamp_camera)
         clamp_camera(fbw, fbh);
     set_camera(fbw, fbh);
@@ -17535,6 +21467,16 @@ static void draw_frame(int fbw, int fbh)
     g_viewValid = true;
     /* The terrain cull box rides the same clamped camera, for the same reason. */
     terrain_cull_bounds(fbw, fbh);
+    /* And the trees' box, which is the same rays asked at the height a canopy reaches.
+       Here rather than inside the tree passes because all four of them want the one
+       answer, and two of them run with the matrices of another view entirely. */
+    tree3d_cull_bounds(fbw, fbh);
+    /* The tree counters are zeroed HERE and not with the mesh counters further down,
+       because the sun map draws its casters before that point and would have its whole
+       tally wiped a few lines after making it. */
+    g_nTreeLit = g_nTreeLitCut = g_nTreeNrm = g_nTreeNrmCut = 0;
+    g_nTreeSun = g_nTreeSunCut = g_nTreeRefl = g_nTreeReflCut = 0;
+    g_castBoxSunOn = g_castBoxReflOn = 0;
 
     /* TIER 2. The screen-space passes reconstruct a world position from the depth
        buffer, which needs this frame's own view-projection; and the sun's box is
@@ -17563,15 +21505,26 @@ static void draw_frame(int fbw, int fbh)
     draw_seabed();
     draw_water();
     draw_terrain();
+    /* ENHANCED (water_mod.h): after the terrain, the wash laps a little way up the
+       sand and the foam rolls over the opaque edge that used to be the coast. */
+    water_shore_draw();
     /* AFTER terrain: the real tiberium art is a flat decal with depth writes off,
        so anything opaque drawn later at y=0 would overpaint it. The fallback
        crystals are depth-written and order-independent, but they follow the same
        slot for one code path. */
     draw_tiberium();
+    /* The tiberium ground goes here, between the two: it is ground cover in its own
+       right, so it belongs over the terrain and under the scorch marks a battle leaves
+       on top of it. Enhanced only; Classic returns from it immediately. */
+    draw_tiberium_ground();
     /* The smudges go with it, and AFTER it: a crater under a tiberium field is
        suppressed by the console's own priority rather than by draw order, but the
        aprons must land on top of the ground and under everything solid. */
     draw_smudges();
+    /* AND AFTER BOTH DECALS: the crystals are solid and write depth, so drawn earlier
+       they would take the depth test away from the scorch under them and the apron
+       beside them. Enhanced only; Classic returns from this immediately. */
+    draw_tiberium_solid();
 
     if (g_grid) {
         glDisable(GL_TEXTURE_2D);
@@ -17617,6 +21570,15 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
+        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's
+           own tree model, in this pass and every other, so the two can never both
+           draw. It is alpha tested and depth written, so it belongs in the cutout
+           pass and in the shadow caster and nowhere else. */
+        if (tree3d_claims(o)) {
+            if (MODE_OPAQUE == MODE_CUTOUT || MODE_OPAQUE == MODE_SHADOW)
+                tree3d_draw(o, MODE_OPAQUE);
+            continue;
+        }
         if (mi >= 0) {
             draw_object_mesh(mi, o, MODE_OPAQUE);
             g_nMesh++;
@@ -17717,6 +21679,14 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
+        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's own
+           tree model in EVERY pass, so the two can never both draw. It is alpha tested
+           and depth written, so it draws in the cutout pass and in the shadow caster,
+           and is simply skipped in the others. */
+        if (tree3d_claims(o)) {
+            tree3d_draw(o, MODE_SHADOW);
+            continue;
+        }
         if (mi >= 0)
             draw_object_mesh(mi, o, MODE_SHADOW);
         else if (g_clumpTrees && o.kind == K_TERRAIN) {
@@ -17761,6 +21731,18 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
+        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's own
+           tree model in EVERY pass, so the two can never both draw. It is alpha tested
+           and depth written, so it draws in the cutout pass and in the shadow caster,
+           and is simply skipped in the others.
+           AND IT IS TESTED AGAINST THE FRAME. order is built from visible(), which has
+           no frustum term at all, so without this line every tree in the map is submitted
+           in full whatever the camera is looking at. */
+        if (tree3d_claims(o)) {
+            if (tree3d_cell_in_view(o.cx, o.cy)) { g_nTreeLit++; tree3d_draw(o, MODE_CUTOUT); }
+            else                                   g_nTreeLitCut++;
+            continue;
+        }
         if (mi >= 0)
             draw_object_mesh(mi, o, MODE_CUTOUT);
         else if (g_clumpTrees && o.kind == K_TERRAIN) {
@@ -17828,6 +21810,13 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
+        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's own
+           tree model in EVERY pass, so the two can never both draw. It is alpha tested
+           and depth written, so it draws in the cutout pass and in the shadow caster,
+           and is simply skipped in the others. */
+        if (tree3d_claims(o)) {
+            continue;
+        }
         if (mi >= 0)
             draw_object_mesh(mi, o, MODE_XLU);
         else if (g_clumpTrees && o.kind == K_TERRAIN) {
@@ -18091,7 +22080,7 @@ static void draw_frame(int fbw, int fbh)
         glColor3f(1.0f, 1.0f, 1.0f);
     }
 
-    for (size_t i = 0; i < g_objects.size(); i++) {
+    for (size_t i = 0; g_infantryDraw && i < g_objects.size(); i++) {
         const SimObject& o = g_objects[i];
         if (o.kind != K_INFANTRY || !visible(o))
             continue;
@@ -18113,11 +22102,78 @@ static void draw_frame(int fbw, int fbh)
     glDisable(GL_ALPHA_TEST);
     glDisable(GL_TEXTURE_2D);
 
+    /* 6a2: THE GRASS, AFTER EVERY SPRITE AND EVERY MESH.
+       It began one pass after the cutout walls, which put it under the infantry: a blade
+       standing in front of a rifleman was painted over by him, because grass writes no
+       depth and so cannot occlude anything drawn later, and every sprite pass is later.
+       Grass in front of a man has to cover him, so the pass moved down here instead of
+       the sprites moving up: the men are alpha tested with depth writes ON (just above),
+       so a blade behind one is now correctly rejected by the depth test and only a blade
+       genuinely in front of him draws over him.
+
+       WHAT IT IS STILL IN FRONT OF, and each of these is wanted: the translucent faces of
+       pass 5b, which write no depth, so a blade nearer than the glass draws over it and a
+       blade behind the building is rejected by the building's own opaque depth; and the
+       infantry ground shadows of 6a, which a blade in front of should cover.
+
+       WHAT IS STILL IN FRONT OF IT, and each of these is also wanted: the combat effects
+       below, the shroud blanket, and the whole UI. The shroud one is load bearing. The
+       blanket rides just above the ground with its depth writes off, so it composites
+       over a blade rather than being rejected by it, which is what makes the field's
+       shroud channel a colour term and not a sorting problem. Moving this pass BELOW the
+       shroud would put lit grass on unexplored map.
+
+       The order of the three calls is the whole of the contract:
+         grass_bake_sync   builds or repairs the static field. It is the same lazy guard
+                           the water field applies, and it has three outcomes: a new
+                           scenario rebuilds everything, a terrain-sheet flip rebuilds the
+                           COLOUR alone (the mask comes from the cartridge sheet and
+                           rebuilding it off the 1995 sheet would carpet every road in
+                           grass), and anything else is a no-op.
+         grass_crush_sim   replays the recorded ticks into the crush field. It binds its
+                           own framebuffer, saves and restores fifteen pieces of state and
+                           both matrix stacks, and never calls fx_fullscreen_quad.
+         grass_draw        the pass itself.
+       IF grass_crush_sim RETURNS 0 THE GRASS MUST NOT DRAW, because with no cover channel
+       there is nothing keeping blades out from under a hull. grass_draw asks
+       grass_crush_ready() on its own account and declines, so this is belt and braces. */
+    if (g_fxActive && g_fx.grass) {
+        /* WHERE THE POINTER IS, handed in rather than reached for: the cursor's world
+           position is declared far below the point these three headers are included, so
+           the grass cannot read it and the host tells it instead. Zero strength whenever
+           there is no pointer on the map, which covers every headless run, the option
+           dialog being open, and the pointer sitting over the sidebar. */
+        const bool touching = g_cursorOn && g_cursorOnMap
+                              && g_mouseScrC >= 0.0f && !g_optOpen;
+        grass_touch_set(g_cursorWX, g_cursorWZ, touching ? 1.0f : 0.0f);
+        grass_bake_sync(grass_bake_cfg_default());
+        /* g_grassHave GATES THE FIELD, not just the draw, and leaving it out was a real
+           cost on every map the bake turns away. The bake refuses a grid over its ceiling
+           and a buffer over its budget, which today is every map above 64 cells a side,
+           and leaves g_grassHave at 0. Without this test the crush field is still
+           allocated and still stepped every frame, eight megabytes and up, to feed a pass
+           that then declines on its own second line. grass_bake_sync stays OUTSIDE the
+           test because it is the call that SETS the flag: test first and the bake never
+           runs and there is never any grass. */
+        if (g_grassHave && grass_crush_sim())
+            grass_draw();
+    }
+
     /* 6b: combat effects -- the engine's own anims (muzzle flashes, impacts,
        explosions) and visible bullets, over the units, under the UI. Effects in
        shroud-hidden cells are culled inside efx_draw (assembly change: the module
        predates the shroud pass) so nothing flashes above the black. */
     efx_draw(g_bbRight, g_bbUp);
+
+    /* 6b-2: THE RAIN (rain_mod.h), Enhanced only. After every object and effect so the
+       streaks composite over them, BEFORE the shroud blanket so rain over ground nobody
+       has seen is covered by the black exactly as an object would be, and inside the
+       scene target so the chain blooms and grades it. Depth-tested, no depth written. */
+    rain_streaks_draw();
+    /* and the crowns they throw where they land in standing water */
+    rain_splash_draw();
+    /* the bed goes up and down with them */
+    rain_audio_update();
 
     /* 6c: the shroud, after every object pass (objects standing in unexplored cells
        were skipped by visible(), so nothing pokes out of the black). Range = the whole
@@ -18179,8 +22235,11 @@ static void draw_frame(int fbw, int fbh)
        sidebar so a bar can never paint over the panel. */
     draw_health_bars(fbw, fbh);
     draw_pip_rows();
-    /* The repair wrench rides with the other two per-object overlays: same plane, same
-       anchors, and drawn after them so it is never hidden by a bar it overlaps. */
+    /* The repair wrench rides with the other two per-object overlays: same plane, the
+       same x and z anchors (its height is its own: the building's roof where that is
+       higher than the bar's footprint rule), and drawn after them so it is never hidden
+       by a bar it overlaps. It is the LAST world pass, and draw_repair_wrenches relies
+       on that: it writes depth without testing it. */
     draw_repair_wrenches();
 
     /* ================= THE SEAM =================================================
@@ -18228,6 +22287,7 @@ static void draw_frame(int fbw, int fbh)
         begin_overlay(fbw, fbh);
         sb_draw_placement(fbw, fbh);
         sb_draw_panel(fbw, fbh);
+        uc_draw(fbw, fbh);
         sb_draw_queue_digits(fbw, fbh);
         sb_draw_tooltip(fbw, fbh);
         end_overlay();
@@ -18238,8 +22298,9 @@ static void draw_frame(int fbw, int fbh)
     /* NOT OVER THE CODEX. The camera readout is a debug instrument that lives in the top
        left corner, which is exactly where the page puts its faction emblem; left on, it
        prints across it. Nothing else in the frame wants it while a modal page is up. */
-    if (!g_cxOpen) draw_cam_hud(fbw, fbh);
+    if (!g_cxOpen && g_camHud) draw_cam_hud(fbw, fbh);
     draw_script_feed(fbw, fbh);
+    draw_chat_feed(fbw, fbh);
 
     /* Do_Win / Do_Lose, the announcement half. THE CONSOLE DOES NOT PRINT TEXT: it
        covers the whole screen -- battlefield and sidebar alike -- with two BLACK.IMG
@@ -18253,7 +22314,16 @@ static void draw_frame(int fbw, int fbh)
        like working art -- and it is not the DOS truth either (real DOS uses VCR.FNT
        through a gradient palette, not the sidebar's FONT.SHP), which is exactly why it
        must never ship silently. The dwell-and-leave part lives in the game loop. */
-    if (g_gameOver.valid) {
+    /* THE MAP FIRST, THEN THE WORD. When a match is decided the whole map
+       is revealed for a few seconds so everybody can see how it actually ended, and only
+       then does the banner cover it. Before this the banner landed on the same frame as
+       the verdict, over a battlefield still mostly under fog.
+
+       A campaign mission is untouched: g_verdictRevealMs is only armed in a match, so
+       Do_Win there still announces immediately, which is what the cartridge does. */
+    if (g_gameOver.valid && !verdict_banner_due()) {
+        /* the reveal window: no banner yet, and the shroud is off. */
+    } else if (g_gameOver.valid) {
         begin_overlay(fbw, fbh);
         if (!verdict_draw(fbw, fbh, g_gameOver.win)) {
             const char* l1 = "MISSION";
@@ -18370,65 +22440,13 @@ static bool grab_and_write(const char* path, int w, int h)
  *  Boot the brain
  * ================================================================================== */
 
-/* The platform's own name for the brain. Everything below that is not an explicit
-   --dylib is derived from this, so a shipped build never has to be told where its own
-   brain is. */
-#ifdef _WIN32
-#  define CNC3D_BRAIN_LIB "TiberianDawn.dll"
-#else
-#  define CNC3D_BRAIN_LIB "TiberianDawn.dylib"
-#endif
-
-/* The brain lives in one place in the working tree, another in the installed
-   share/CNC3D tree, and a third beside the binary in a shipped build. Probe all of
-   them rather than making the caller care.
-
-   THE SHIPPED-BUILD CASE WAS MISSING AND IT COST the project owner A TEST ROUND. Both original
-   candidates are paths relative to THIS REPO's layout and both name the macOS
-   extension, so in the Windows zip, where the brain sits in the same folder as the
-   .exe and there is no ../brain at all, neither could ever hit. The failure was as
-   confusing as it could have been: a Windows binary reporting that it could not load
-   "../brain/lib/TiberianDawn.dylib". The .bat launchers pass --dylib explicitly, so
-   this only bit when the .exe was started on its own, which is the obvious thing to do
-   with a folder full of files.
-
-   ORDER MATTERS AND THE REPO PATHS STAY FIRST. Probing beside the binary first would
-   change which brain the Mac gates load: both game/ and playable/ have a
-   TiberianDawn.dylib sitting in them, so a developer who rebuilt brain/vanilla would
-   silently get whichever stale copy was nearest instead of the one just built. Last
-   resort, not first.
-
-   SDL_GetBasePath rather than the bare filename, because it answers "beside the
-   executable" even when the working directory is somewhere else, which is what happens
-   when a build is started from a shortcut rather than from its own folder. The bare
-   name is tried too, for the case where the base path cannot be determined. */
+/* WHERE THE BRAIN IS. Moved wholesale into game/brain_path.h, because the
+   lobby had grown a SECOND, worse copy of this search and the disagreement between the
+   two stopped a Windows player joining a Mac host. CNC3D_BRAIN_LIB and find_brain's body
+   both live there now; the header carries the account. */
 static const char* find_brain(const char* explicitPath)
 {
-    static const char* candidates[] = {
-        "../brain/lib/TiberianDawn.dylib",
-        "../brain/vanilla/build-native/tiberiandawn/TiberianDawn.dylib",
-        CNC3D_BRAIN_LIB,
-        NULL
-    };
-    static char beside[1024];
-
-    if (explicitPath)
-        return explicitPath;
-    for (int i = 0; candidates[i]; i++)
-        if (access(candidates[i], R_OK) == 0)
-            return candidates[i];
-
-    char* base = SDL_GetBasePath();
-    if (base) {
-        snprintf(beside, sizeof beside, "%s%s", base, CNC3D_BRAIN_LIB);
-        SDL_free(base);
-        if (access(beside, R_OK) == 0)
-            return beside;
-    }
-
-    /* Nothing found. Name the platform's own library rather than candidates[0], so the
-       error the player sees is about a file that could plausibly have existed. */
-    return CNC3D_BRAIN_LIB;
+    return cnc3d_find_brain(explicitPath);
 }
 
 /* The brain is loaded and initialised ONCE per process, and re-armed per mission.
@@ -18468,13 +22486,43 @@ static bool arm_skirmish(const GameOpts* o)
         return false;
     }
 
-    /* A NETWORK MATCH SEATS TWO HUMANS FIRST, and may have no computer at all. Outside a
-       match the arithmetic is exactly what it always was. */
+    /* WHICH SEATS PLAY. A match from the lobby says so seat by seat (GameOpts::seat_mode):
+       a BLOCKed seat is not handed to the engine at all, a BOT seat is a computer wherever
+       it sits, and everything else is a person. rows[] maps the engine's roster row back
+       to the WIRE seat, because the lockstep names seats and the engine names rows, and
+       the two stop agreeing the moment a seat is skipped. With no modes said -- a
+       skirmish, or the command line's own handshake -- the roster is the prefix it always
+       was: humans first, computers after, row k is seat k. */
     const bool net = nm_active() != 0;
-    const int humans = net ? 2 : 1;
-    const int ai = net ? ((o->ai_count < 0) ? 0 : (o->ai_count > 6 ? 6 : o->ai_count))
-                       : ((o->ai_count < 1) ? 1 : (o->ai_count > 7 ? 7 : o->ai_count));
-    const int players = ai + humans;
+    int rows[8];
+    int players = 0, humans = 0;
+    bool modes = false;
+    /* A SKIRMISH FROM THE LOBBY SAYS ITS SEATS TOO (the AI Players gauge is
+       gone and a seat can be BLOCKed in the middle), so the modes count in every kind of
+       game; only the command line's own --ai, which never writes seat_mode, is the
+       prefix rule. */
+    for (int i = 0; i < 8; i++) if (o->seat_mode[i]) modes = true;
+    if (modes) {
+        /* nm_seats() is the last MATCH's setup and is stale or zero outside one; a
+           skirmish walks all eight, and the app writes BLOCK past the roster. */
+        const int seats = net ? (nm_seats() > 8 ? 8 : nm_seats()) : 8;
+        for (int i = 0; i < seats; i++) {
+            if (o->seat_mode[i] == NM_SEAT_BLOCK) continue;
+            rows[players++] = i;
+            if (o->seat_mode[i] != NM_SEAT_BOT) humans++;
+        }
+    } else {
+        humans = net ? nm_humans() : 1;
+        const int ai = net ? ((o->ai_count < 0) ? 0 : (o->ai_count > 6 ? 6 : o->ai_count))
+                           : ((o->ai_count < 1) ? 1 : (o->ai_count > 7 ? 7 : o->ai_count));
+        players = ai + humans;
+        for (int i = 0; i < players; i++) rows[i] = i;
+    }
+    if (players < 2) {
+        fprintf(stderr, "skirmish: the seat table leaves %d player(s); a match needs two\n", players);
+        return false;
+    }
+    g_matchRows = players > 8 ? 8 : players;
 
     CNCMultiplayerOptionsStruct opts;
     memset(&opts, 0, sizeof(opts));
@@ -18492,6 +22540,8 @@ static bool arm_skirmish(const GameOpts* o)
        It is only safe with bases ON: with bases off nobody ever has either, so every
        house is declared dead about a second into the match. */
     opts.DestroyStructures = o->bases ? true : false;
+    /* SHORT GAME: the lobby's box, straight through to the engine's own defeat test. */
+    opts.ShortGame = o->short_game ? true : false;
 
     /* THE ROSTER IS HEAP, NOT STACK, AND THE REASON IS ITS SIZE RATHER THAN ITS LIFETIME.
        CNCPlayerInfoStruct carries ActionWithSelected[MAX_EXPORT_CELLS], one byte a cell,
@@ -18504,12 +22554,19 @@ static bool arm_skirmish(const GameOpts* o)
     std::vector<CNCPlayerInfoStruct> roster(8);
     CNCPlayerInfoStruct* const list = roster.data();
     memset(list, 0, sizeof(CNCPlayerInfoStruct) * roster.size());
-    for (int i = 0; i < players; i++) {
-        CNCPlayerInfoStruct& p = list[i];
-        const bool human = (i < humans);
+    for (int k = 0; k < players; k++) {
+        const int i = rows[k];                       /* the WIRE seat this row plays */
+        CNCPlayerInfoStruct& p = list[k];
+        const bool human = modes ? (o->seat_mode[i] != NM_SEAT_BOT) : (i < humans);
         const int house = o->player_house[i] ? 1 : 0;
         const int team  = o->player_team[i];
-        snprintf(p.Name, sizeof p.Name, "%s", human ? "PLAYER" : "COMPUTER");
+        /* THE NAME THE PLAYER TYPED: the engine copies it into MPlayerNames[] and onto
+           the house, which is what the MAP button's player list reads, and what the
+           1995 defeat line prints. Empty keeps the old wording. */
+        if (o->player_name[i][0])
+            snprintf(p.Name, sizeof p.Name, "%s", o->player_name[i]);
+        else
+            snprintf(p.Name, sizeof p.Name, "%s", human ? "PLAYER" : "COMPUTER");
         /* THE LOBBY'S OWN FACTION FOR THIS SEAT (26 Aug 2026, the project owner's request). It used to
            be "the opposite side, for every computer, always", and the reason given was
            that the cartridge carries two house texture sets and no more.
@@ -18548,7 +22605,17 @@ static bool arm_skirmish(const GameOpts* o)
            joiner gives seat 1 the id 0 and seat 0 the id 1, and the roster ORDER, which is
            what the simulation does read, is identical on both. G138 advances its two
            instances under two different contexts to prove the simulation does not care. */
-        if (net) p.GlyphxPlayerID = (i == nm_seat()) ? 0ULL : (i < humans ? 1ULL : (unsigned long long)i);
+        /* EVERY SEAT NEEDS ITS OWN ID, and with eight of them the old expression stopped
+           giving them one: it handed 1 to EVERY non-local human, so in a four player
+           match three seats shared an id and Set_Player_Context resolved all three to
+           whichever house the engine found first. Local seat 0, everybody else i + 1,
+           which is unique on this machine and is all the id has to be. */
+        if (net) p.GlyphxPlayerID = (i == nm_seat()) ? 0ULL : (unsigned long long)(i + 1);
+        /* AND THE SAME PAIR, KEPT, so every later reader asks by the id this row was
+           given rather than by its position. See g_matchId. */
+        if (k < 8) { g_matchId[k] = p.GlyphxPlayerID; g_matchFaction[k] = house; }
+        /* AND THE SAME PAIR AGAIN, for the seat and the person: see g_matchSeat. */
+        if (k < 8) { g_matchSeat[k] = i; g_matchHuman[k] = human ? 1 : 0; }
         /* THE TEAM IS THE FIELD THAT DOES THE WORK. CNC_Set_Multiplayer_Data copies it to
            MPlayerTeamIDs (dllinterface.cpp:759) and GlyphX_Assign_Houses then calls
            Make_Ally for every pair that shares one (:1044-1058). Equality is all it
@@ -18556,7 +22623,11 @@ static bool arm_skirmish(const GameOpts* o)
            team per seat is a free-for-all and any two seats sharing a number are allies
            for the whole match. */
         p.Team = team;
-        p.StartLocationIndex = (o->start_wp[i] >= 0) ? o->start_wp[i] : i;
+        /* AN UNPICKED START IS THE ENGINE'S TO DEAL: RANDOM_START_POSITION
+           makes GlyphX_Assign_Houses shuffle the unclaimed starts on the synchronised
+           stream, so the deal is the same on every peer. It used to fall back to the
+           seat index, which made "nobody picked" indistinguishable from "seat i". */
+        p.StartLocationIndex = (o->start_wp[i] >= 0) ? o->start_wp[i] : CNC3D_START_RANDOM;
         p.IsAI = !human;
         /* AllyFlags: the same alliance as a bitmask over the LOBBY's seat indices, self
            included. Say plainly what it is worth: the engine does NOT read this field on
@@ -18569,7 +22640,7 @@ static bool arm_skirmish(const GameOpts* o)
            engine's answer back rather than trusting either. */
         unsigned int allies = 0;
         for (int j = 0; j < players; j++)
-            if (o->player_team[j] == team)
+            if (o->player_team[rows[j]] == team)
                 allies |= (1u << j);
         p.AllyFlags = allies;
     }
@@ -18584,11 +22655,12 @@ static bool arm_skirmish(const GameOpts* o)
             o->bases ? "on" : "off", o->tiberium ? "on" : "off");
     /* ONE LINE PER SEAT, so what the screen showed and what the engine was handed can be
        compared by a script instead of by eye. This is the handoff itself, printed after
-       the call that accepted it. */
+       the call that accepted it. seat= is the WIRE seat the row plays (rows[]), which is
+       the lobby's own numbering: with seat 4 BLOCKed the lines read 0,1,2,3,5. */
     for (int i = 0; i < players; i++)
         fprintf(stderr, "skirmish: seat=%d|name=%s|house=%s|team=%d|colour=%d|ai=%d|"
                         "start=%d|allies=0x%02X\n",
-                i, list[i].Name, list[i].House ? "Nod" : "GDI", list[i].Team + 1,
+                rows[i], list[i].Name, list[i].House ? "Nod" : "GDI", list[i].Team + 1,
                 (int)list[i].ColorIndex, list[i].IsAI ? 1 : 0,
                 list[i].StartLocationIndex, (unsigned)list[i].AllyFlags);
     /* AND THE COLOURS AS A SET, because "every seat got the colour the screen showed" and
@@ -18650,9 +22722,18 @@ static void skirmish_report_teams(const GameOpts* o)
        it without knowing anything about HousesType. */
     const int players = (o->ai_count < 1) ? 2 : ((o->ai_count > 7 ? 7 : o->ai_count) + 1);
     int asked = 0;
-    for (int j = 0; j < players; j++)
-        if (o->player_team[j] == o->player_team[0])
-            asked++;
+    bool modes = false;
+    for (int j = 0; j < 8; j++) if (o->seat_mode[j]) modes = true;
+    if (modes) {
+        /* Seat by seat, skipping a BLOCKed one: the roster is not a prefix any more. */
+        for (int j = 0; j < 8; j++)
+            if (o->seat_mode[j] != NM_SEAT_BLOCK && o->player_team[j] == o->player_team[0])
+                asked++;
+    } else {
+        for (int j = 0; j < players; j++)
+            if (o->player_team[j] == o->player_team[0])
+                asked++;
+    }
     g_skirmishTeamsOk = (bits == asked) ? 1 : 0;
     fprintf(stderr, "skirmish: engine allies for the human = 0x%02X, %d house(s); "
                     "the lobby asked for %d\n",
@@ -18690,7 +22771,6 @@ static bool skirmish_open_camera(void)
 static bool g_brainLoaded = false;
 /* Whether the RUNNING match is a skirmish. Not the same question as the option, because
    the option is re-read on every mission start and the campaign runs in the same process. */
-static bool g_skirmishRunning = false;
 
 static bool boot_brain(const char* dylib, const char* content, const char* dir,
                        const char* scen, int build, const GameOpts* o)
@@ -18703,11 +22783,24 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
     g_cheatTechSent = 0;
     g_cheatFogSent = 1;
     g_cheatInvulnSent = 0;
+    /* A MATCH BOOTS WITH EVERY CHEAT OFF, whatever was toggled before joining. The
+       refusals in cheat_show and the script verbs stop a switch being SET during a match;
+       this stops one set in a skirmish beforehand from acting in it. Keyed on the
+       options' net_mode and not nm_active(), because this runs above both
+       net_match_prepare call sites and the match is not live yet on the CLI path. The
+       fog memory goes too, or the next single-player mission would see the switch as
+       already applied and never restore the fog the player left off. */
+    if (o != NULL && o->net_mode != 0) {
+        dopt_cheats_defaults(&g_cheats);
+        g_cheatsInit = true;
+        g_cheatsArmed = false;
+        g_cheatFogApplied = -1;
+    }
     /* Build Anywhere belongs in this list for the same reason as the three above, and
        for a sharper one: DisplayClass::Init_Clear zeroes the house mask on every
        scenario start, so if the shadow still said 1 the switch would never be re-sent
        and the cheat would look enabled in the menu while doing nothing from mission two
-       onward. Left out of this block when the switch was added on 26 Aug 2026. */
+       onward. Left out of this block when the switch was added. */
     g_cheatBuildAnySent = 0;
 
     if (g_brainLoaded) {
@@ -18720,6 +22813,10 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
             static GameOpts netopts;
             if (!net_match_prepare(o, &netopts)) return false;
             o = &netopts;
+        } else if (o && o->net_mode && nm_active()) {
+            /* THE LOBBY'S MATCH. The handshake is done; the switch still has to be
+               thrown, and it was not. */
+            if (!net_arm_from_lobby(o)) return false;
         }
         if (skirmish && !arm_skirmish(o))
             return false;
@@ -18727,6 +22824,8 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
             fprintf(stderr, "CNC_Start_Custom_Instance FAILED on restart "
                             "(content=%s dir=%s scen=%s mp=%d)\n",
                     content, dir, scen, (int)skirmish);
+            boot_refuse("The engine refused to start mission %s (content %s, missions %s)",
+                        scen, content, dir);
             return false;
         }
         static CNCMapDataStruct remap;
@@ -18737,6 +22836,10 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
             g_mapY = remap.MapCellY;
             g_mapW = remap.MapCellWidth;
             g_mapH = remap.MapCellHeight;
+            g_playX = remap.OriginalMapCellX;
+            g_playY = remap.OriginalMapCellY;
+            g_playW = remap.OriginalMapCellWidth;
+            g_playH = remap.OriginalMapCellHeight;
             /* THE SECOND MISSION GETS ITS OWN TERRAIN DECORATION. Without this the
                list from mission one survives into mission two, which draws wrecks on
                cells that do not carry the template and misses the ones that do. */
@@ -18762,7 +22865,16 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
     }
 
     void* hnd = dlopen(dylib, RTLD_NOW);
-    if (!hnd) { fprintf(stderr, "dlopen FAILED: %s\n", dlerror()); return false; }
+    if (!hnd) {
+        /* dlerror() answers ONCE and clears itself, so it is read into a local before
+           anything else can ask. On Windows the shim behind it reports GetLastError
+           and says out loud when 126 means a dependency rather than the file. */
+        const char* why = dlerror();
+        fprintf(stderr, "dlopen FAILED: %s\n", why ? why : "(no reason given)");
+        boot_refuse("The engine library %s could not be loaded: %s", dylib,
+                    why ? why : "no reason was given");
+        return false;
+    }
     fprintf(stderr, "brain: %s\n", dylib);
     BrainInit     = (CNC_Init_t)dlsym(hnd, "CNC_Init");
     BrainConfig   = (CNC_Config_t)dlsym(hnd, "CNC_Config");
@@ -18780,6 +22892,9 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
     BrainSetInvincible = (CNC3D_SetInvincible_t)dlsym(hnd, "CNC3D_Set_Invincible");
     BrainSetBuildAnywhere = (CNC3D_SetBuildAnywhere_t)dlsym(hnd, "CNC3D_Set_Build_Anywhere");
     BrainForceVerdict = (CNC3D_ForceVerdict_t)dlsym(hnd, "CNC3D_Force_Verdict");
+    BrainPlayerToAI   = (CNC3D_PlayerToAI_t)dlsym(hnd, "CNC3D_Player_To_AI");
+    BrainPlayerIsAI   = (CNC3D_PlayerIsAI_t)dlsym(hnd, "CNC3D_Player_Is_AI");
+    BrainPlayerBlowup = (CNC3D_PlayerBlowup_t)dlsym(hnd, "CNC3D_Player_Blowup");
     BrainProximityOk = (CNC3D_ProximityOk_t)dlsym(hnd, "CNC3D_Proximity_Ok");
     BrainGrantSupers   = (CNC3D_GrantSupers_t)dlsym(hnd, "CNC3D_Grant_Superweapons");
     BrainSetRally      = (CNC3D_SetRally_t)dlsym(hnd, "CNC3D_Set_Rally");
@@ -18816,7 +22931,18 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
     BrainSelInfo     = (CNC3D_Sel_Info_t)dlsym(hnd, "CNC3D_Sel_Info");
     BrainProbe       = (CNC3D_Probe_t)dlsym(hnd, "CNC3D_Probe_Object_At");
     if (!BrainInit || !BrainConfig || !BrainStart || !BrainGetState || !BrainAdvance) {
-        fprintf(stderr, "dlsym FAILED\n");
+        /* Name the entry points that are missing, so a library of the wrong kind (an
+           unpatched engine, or one built for another project) is told apart from a
+           truncated one. */
+        char missing[160] = "";
+        if (!BrainInit)     strncat(missing, " CNC_Init", sizeof missing - strlen(missing) - 1);
+        if (!BrainConfig)   strncat(missing, " CNC_Config", sizeof missing - strlen(missing) - 1);
+        if (!BrainStart)    strncat(missing, " CNC_Start_Custom_Instance", sizeof missing - strlen(missing) - 1);
+        if (!BrainGetState) strncat(missing, " CNC_Get_Game_State", sizeof missing - strlen(missing) - 1);
+        if (!BrainAdvance)  strncat(missing, " CNC_Advance_Instance", sizeof missing - strlen(missing) - 1);
+        fprintf(stderr, "dlsym FAILED:%s\n", missing);
+        boot_refuse("The engine library %s is not the game's engine: it has no%s", dylib,
+                    missing);
         return false;
     }
 
@@ -18960,12 +23086,17 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
         static GameOpts netopts;
         if (!net_match_prepare(o, &netopts)) return false;
         o = &netopts;
+    } else if (o && o->net_mode && nm_active()) {
+        /* THE LOBBY'S MATCH: see the sibling site above. */
+        if (!net_arm_from_lobby(o)) return false;
     }
     if (skirmish && !arm_skirmish(o))
         return false;
     if (!BrainStart(content, dir, scen, build, skirmish)) {
         fprintf(stderr, "CNC_Start_Custom_Instance FAILED (content=%s dir=%s scen=%s mp=%d)\n",
                 content, dir, scen, (int)skirmish);
+        boot_refuse("The engine refused to start mission %s (content %s, missions %s)",
+                    scen, content, dir);
         return false;
     }
 
@@ -18977,6 +23108,10 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
         g_mapY = mapdata.MapCellY;
         g_mapW = mapdata.MapCellWidth;
         g_mapH = mapdata.MapCellHeight;
+        g_playX = mapdata.OriginalMapCellX;
+        g_playY = mapdata.OriginalMapCellY;
+        g_playW = mapdata.OriginalMapCellWidth;
+        g_playH = mapdata.OriginalMapCellHeight;
         /* THE ONLY READ THIS FILE MAKES PAST ScenarioName, and the one that made the
            macro pair at the top of the file matter. It checks the layout before it
            believes a byte of it; see wreck_mod.h. */
@@ -19011,6 +23146,25 @@ static void report_coverage(void)
                     "%d absent-from-cartridge, %d vehicle shadows\n",
             g_nMesh, g_nSprite, g_nFallback, g_nInvisible, g_nComposed,
             g_nNoCartType, g_nVShadow);
+    if (g_nTreeLit + g_nTreeLitCut + g_nTreeNrm + g_nTreeNrmCut
+        + g_nTreeSun + g_nTreeSunCut + g_nTreeRefl + g_nTreeReflCut > 0)
+        fprintf(stderr, "trees: last frame submitted %d of %d lit, %d of %d into the "
+                        "ground normals, %d of %d into the sun map and %d of %d into "
+                        "the water reflection; the rest stood outside the box the pass "
+                        "in question draws into\n",
+                g_nTreeLit,  g_nTreeLit  + g_nTreeLitCut,
+                g_nTreeNrm,  g_nTreeNrm  + g_nTreeNrmCut,
+                g_nTreeSun,  g_nTreeSun  + g_nTreeSunCut,
+                g_nTreeRefl, g_nTreeRefl + g_nTreeReflCut);
+    if (g_castBoxSunOn || g_castBoxReflOn)
+        fprintf(stderr, "       the boxes those two drew into, in cells: sun %s"
+                        "%.1f..%.1f x %.1f..%.1f, reflection %s%.1f..%.1f x %.1f..%.1f "
+                        "(a box wider than the map is not a broken test, it is a pass "
+                        "that really does need every caster)\n",
+                g_castBoxSunOn ? "" : "none, ",
+                g_castBoxSun[0], g_castBoxSun[1], g_castBoxSun[2], g_castBoxSun[3],
+                g_castBoxReflOn ? "" : "none, ",
+                g_castBoxRefl[0], g_castBoxRefl[1], g_castBoxRefl[2], g_castBoxRefl[3]);
     if (!g_fallbackTypes.empty()) {
         fprintf(stderr, "      fallback types:");
         for (std::map<std::string, int>::iterator it = g_fallbackTypes.begin();
@@ -19334,7 +23488,10 @@ static void ui_rbtn_up(int fbw, int fbh, bool* lpress, bool* band)
    the DOS bar. The 640x480 HUD is the exception: its three window-pinned plates sit in a
    tab row along the TOP of the window, so they lie across the whole of the top strip and
    across the first rows of the left one, and edge_scroll_allowed is where that is
-   answered.
+   answered. The unit card is the other overlap on that HUD: pinned to the bottom-left
+   corner, it lies across the bottom strip for its width and the left strip for its
+   height whenever anything is selected, and both strips scroll through it for the same
+   reason the plates do not stop the top one.
 
    On the width. The 1995 engine scrolled from a single pixel column, the last column of
    the seen buffer. Twelve is ours: one pixel is a fair target at 320x200 and an
@@ -19427,6 +23584,21 @@ static bool rpush_step(float mc, float mr, int fbw, int fbh, float dt)
 static bool edge_scroll_allowed(int mx, int my, int fbw, int fbh)
 {
     if (fxp_over_panel((float)mx, fbh)) return false;
+    /* THE UNIT CARD GETS NO VETO HERE, and it used to have one. The card is pinned to
+       the window's bottom-left corner, so a veto over its rectangle killed the bottom
+       strip across the card's width, the left strip across its height and the corner
+       between them, for as long as anything was selected: measured as exactly the
+       card's rectangle at every window size tried, 640x480 through 1920x1080. The
+       strips answer the SCREEN edge, the rule the east strip and the 640x480 tab
+       plates below already follow, and the corner of the window is a screen edge.
+
+       Nothing the card does passes through this guard. A press on it is taken by
+       uc_click at the head of the press ladders before the map is asked, so the tabs,
+       the smaller cameos and the main cameo keep working with the veto gone; the right
+       button, the wheel and the cursor ask uc_over in their own ladders. THE PRICE IS
+       NAMED: the lower edge_px() rows of the tab row and the first edge_px() columns
+       of tab 1 pan the map while hovered, the way the DOS MAP button's last columns
+       and the tab plates' first rows do. */
     /* THE WINDOW'S LAST edge_px() COLUMNS ARE EXEMPT FROM THE PANEL VETO, because that
        strip IS a scroll trigger now and the veto would cancel the one gesture it was
        added for: the bar covers those columns, so sb_over_panel refuses there every
@@ -19692,7 +23864,11 @@ static bool playtest_edge_push(SDL_Window* win, int vpX, int vpY, int dw, int dh
 
 static int unproject_test_mode(int fbw, int fbh, int mode)
 {
-    struct Case { float camX, camZ, zoom, dist; float yaw, pitch; const char* what; };
+    /* iso and the four after it are the Perspective row's dials; the rows without them
+       leave them zero, which is "off". G1 runs without --gfx, so a dial case switches
+       the chain on itself and the run restores what it found. */
+    struct Case { float camX, camZ, zoom, dist; float yaw, pitch; const char* what;
+                  int iso; float isoYaw, isoPitch, isoFov, isoDist; };
     const Case cases[] = {
         { (float)g_mapX + g_mapW * 0.5f, (float)g_mapY + g_mapH * 0.5f,
           g_zoom, N64_DIST_DEF, 0.0f, -1.0f, "centre, default zoom" },
@@ -19708,6 +23884,7 @@ static int unproject_test_mode(int fbw, int fbh, int mode)
            exercises them. Four headings around the compass plus two odd ones, and
            pitches from nearly level to steeply overhead -- level itself is excluded
            because a ray that never descends has no ground intersection to round-trip. */
+        { 49.0f, 50.5f, 0.0f, N64_DIST_DEF, -0.7854f, -1.0f, "yaw -45 (Isometric)" },
         { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.7854f, -1.0f, "yaw 45" },
         { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  1.5708f, -1.0f, "yaw 90" },
         { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  3.1416f, -1.0f, "yaw 180" },
@@ -19717,10 +23894,22 @@ static int unproject_test_mode(int fbw, int fbh, int mode)
         { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.0f,     1.4835f, "pitch 85" },
         { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.9163f,  0.5236f, "yaw 52 pitch 30" },
         { 37.125f, 21.875f, 0.0f, 3417.5f,  -1.2217f,  1.1345f, "yaw -70 pitch 65" },
+        /* THE PERSPECTIVE ROW'S DIALS. The field of view and the distance scale are
+           new inputs to the projection AND to the inverse; the tilt goes through
+           n64_pitch like the editor's. The defaults row is the shipped look. */
+        { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.0f, -1.0f, "iso defaults",          1,  16.0f, 53.0f, 48.0f, 1.10f },
+        { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.0f, -1.0f, "iso fov 35",            1, -45.0f,  0.0f, 35.0f, 1.00f },
+        { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.0f, -1.0f, "iso fov 70",            1, -45.0f,  0.0f, 70.0f, 1.00f },
+        { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.0f, -1.0f, "iso pitch 30, yaw 0",   1,   0.0f, 30.0f, 50.0f, 1.00f },
+        { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.0f, -1.0f, "iso pitch 75",          1, -45.0f, 75.0f, 50.0f, 1.00f },
+        { 49.0f, 50.5f, 0.0f, N64_DIST_DEF,  0.0f, -1.0f, "iso dist 0.6",          1, -45.0f,  0.0f, 50.0f, 0.60f },
+        { 49.0f, 50.5f, 0.0f, DIST_MAX_OURS, 0.0f, -1.0f, "iso dist 1.8 furthest", 1, -45.0f,  0.0f, 50.0f, 1.80f },
+        { 42.5f, 33.25f, 0.0f, 2733.0f,      0.0f, -1.0f, "iso combined odd",      1, -30.0f, 55.0f, 62.5f, 1.35f },
     };
     const int   saveMode = g_camMode;
     const float saveX = g_camX, saveZ = g_camZ, saveZoom = g_zoom, saveDist = g_dist;
     const float saveYaw = g_camYaw, savePitch = g_camPitchFree;
+    const FxState saveFx = g_fx;
     double worstPos = 0.0, worstPix = 0.0;
     long badCells = 0, nCells = 0, nPix = 0, behind = 0, sky = 0;
     int failed = 0;
@@ -19733,8 +23922,18 @@ static int unproject_test_mode(int fbw, int fbh, int mode)
         g_zoom = cases[ci].zoom; set_dist(cases[ci].dist);
         /* The free camera is an N64-camera feature; under CAM_ORTHO these cases would
            just repeat the first five, so they are skipped rather than double-counted. */
-        if (mode != CAM_N64 && (cases[ci].yaw != 0.0f || cases[ci].pitch >= 0.0f)) continue;
-        g_camYaw = cases[ci].yaw; g_camPitchFree = cases[ci].pitch;
+        if (mode != CAM_N64 && (cases[ci].yaw != 0.0f || cases[ci].pitch >= 0.0f || cases[ci].iso))
+            continue;
+        g_fx = saveFx;
+        if (cases[ci].iso) {
+            g_fx.enabled = 1; g_fx.perspective = (float)FX_PERSP_ISO;
+            g_fx.iso_yaw = cases[ci].isoYaw; g_fx.iso_pitch = cases[ci].isoPitch;
+            g_fx.iso_fov = cases[ci].isoFov; g_fx.iso_dist = cases[ci].isoDist;
+            g_camPitchFree = -1.0f;
+            cam_apply_option();              /* the dials own the yaw and the basis */
+        } else {
+            g_camYaw = cases[ci].yaw; g_camPitchFree = cases[ci].pitch;
+        }
         double cworstPos = 0.0, cworstPix = 0.0;
         long cbad = 0, cbehind = 0, csky = 0;
 
@@ -19790,10 +23989,11 @@ static int unproject_test_mode(int fbw, int fbh, int mode)
             }
         }
         if (mode == CAM_N64)
-            printf("UNPROJ| %-24s cam=%.3f,%.3f dist=%.0f yaw=%.1f pitch=%.1fdeg : worst pos %.3e "
+            printf("UNPROJ| %-24s cam=%.3f,%.3f dist=%.0f yaw=%.1f pitch=%.1fdeg fov=%.1f cells=%.2f : worst pos %.3e "
                    "cells, worst pixel %.3e px, mismatches %ld, behind %ld, sky %ld\n",
                    cases[ci].what, cases[ci].camX, cases[ci].camZ, g_dist,
                    g_camYaw * 180.0 / M_PI, n64_pitch() * 180.0 / M_PI,
+                   cam_fovy_deg(), n64_dist_cells(),
                    cworstPos, cworstPix, cbad, cbehind, csky);
         else
             printf("UNPROJ| %-24s cam=%.3f,%.3f zoom=%.3f : worst pos %.3e cells, "
@@ -19821,6 +24021,7 @@ static int unproject_test_mode(int fbw, int fbh, int mode)
        and the caller's position has to win over it. */
     set_cam_mode(saveMode);
     g_camX = saveX; g_camZ = saveZ; g_zoom = saveZoom;
+    g_fx = saveFx;
     g_camYaw = saveYaw; g_camPitchFree = savePitch;
     set_dist(saveDist);
     return failed;
@@ -20188,8 +24389,79 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    rig >= 0 ? rigT : -1.0f,
                    nf > 1 ? structure_anim_frame(o, nf) : -1.0f);
         }
+    } else if (!strcmp(cmd, "armdump")) {
+        /* armdump TYPE PART: the animation delta one part of every building of TYPE is
+           being drawn with RIGHT NOW, as a bearing rather than nine numbers. Read off the
+           same baked matrices and the same frame draw_mesh uses, lerped the same way, so
+           this is what is on screen and not a second opinion. az is the part's local +Z
+           (the boresight of a dish, its feed spike) turned into a compass bearing about
+           the vertical, el its elevation above the horizon, roll the angle the part's own
+           up axis makes with vertical. A dish that pans keeps roll near 0 and walks az;
+           a dish that has gone over shows roll climbing past 90. */
+        char want[32] = ""; int part = 0;
+        if (sscanf(arg, "%31s %d", want, &part) < 1) {
+            printf("SCRIPT|armdump wants TYPE [PART]\n"); g_scriptFails++;
+        } else {
+            for (size_t i = 0; i < g_objects.size(); i++) {
+                const SimObject& o = g_objects[i];
+                if (o.kind != K_BUILDING || strcmp(o.type, want)) continue;
+                const int mi = mesh_for(o);
+                if (mi < 0 || mi >= (int)g_pack.mesh.size()) continue;
+                const PackMesh& m = g_pack.mesh[mi];
+                const int nf = m.animFrames;
+                const int nparts = (int)m.parts.size();
+                if (nf <= 1 || part < 0 || part >= nparts) {
+                    printf("ARMMAT|%s|id=%d|frames=%d|parts=%d|part=%d|none\n",
+                           o.type, o.id, nf, nparts, part);
+                    continue;
+                }
+                float t = structure_anim_frame(o, nf);
+                if (t < 0.0f) t = 0.0f;
+                int af0 = (int)t;
+                float mix = t - (float)af0;
+                if (af0 >= nf) { af0 = nf - 1; mix = 0.0f; }
+                int af1 = af0 + 1;
+                if (af1 >= nf) af1 = nf - 1;
+                const float* m0 = &m.animMat[((size_t)af0 * nparts + part) * 12];
+                const float* m1 = &m.animMat[((size_t)af1 * nparts + part) * 12];
+                float am[12];
+                for (int q = 0; q < 12; q++) am[q] = m0[q] + (m1[q] - m0[q]) * mix;
+                /* local +Z and local +Y after the delta (column-vector form, as drawn) */
+                const float fx = am[2], fy = am[6], fz = am[10];
+                const float uy = am[5];
+                const float az = atan2f(fx, fz) * 57.29578f;
+                const float el = asinf(fy > 1.0f ? 1.0f : (fy < -1.0f ? -1.0f : fy)) * 57.29578f;
+                const float roll = acosf(uy > 1.0f ? 1.0f : (uy < -1.0f ? -1.0f : uy)) * 57.29578f;
+                printf("ARMMAT|%s|id=%d|frame=%.2f|part=%d|az=%.1f|el=%.1f|roll=%.1f"
+                       "|m=%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f|t=%.2f,%.2f,%.2f\n",
+                       o.type, o.id, t, part, az, el, roll,
+                       am[0], am[1], am[2], am[4], am[5], am[6], am[8], am[9], am[10],
+                       am[3], am[7], am[11]);
+            }
+        }
     } else if (!strcmp(cmd, "state")) {
         print_cam("state");
+    } else if (!strcmp(cmd, "persp")) {
+        /* persp [classic|iso]: the Advanced page's Perspective row, driven headlessly.
+           `gfx perspective N` reaches the same dial; this one also reads back the yaw
+           the camera actually holds, and says whether Enhanced is on, because the row
+           is Enhanced only (cam_option_yaw) and a run without --gfx would otherwise
+           look like a row that does nothing. */
+        if (!strcasecmp(arg, "classic") || !strcmp(arg, "0"))
+            g_fx.perspective = (float)FX_PERSP_CLASSIC;
+        else if (!strcasecmp(arg, "iso") || !strcasecmp(arg, "isometric") || !strcmp(arg, "1"))
+            g_fx.perspective = (float)FX_PERSP_ISO;
+        else if (arg[0]) { printf("SCRIPT|persp wants classic|iso\n"); g_scriptFails++; }
+        cam_apply_option();
+        clamp_camera(fbw, fbh);
+        /* The dials' fields are APPENDED: G207 cuts fields 2 and 3 of this line. The
+           distance is the dial as set; cells is what the rig actually uses, so under
+           Classic the two disagree on purpose (dist parked, cells unscaled). */
+        printf("PERSP|%d|yaw=%.1f|enhanced=%d|mode=%s|pitch=%.1f|fov=%.1f|dist=%.2f|cells=%.2f\n",
+               (int)(g_fx.perspective + 0.5f), g_camYaw * 180.0f / (float)M_PI + 0.0f,
+               g_fx.enabled, cam_mode_name(), n64_pitch() * 180.0f / (float)M_PI,
+               cam_fovy_deg(), g_fx.iso_dist, n64_dist_cells());
+        print_cam("persp");
     } else if (!strcmp(cmd, "cam")) {
         float x, z;
         if (sscanf(arg, "%f %f", &x, &z) == 2) { g_camX = x; g_camZ = z; }
@@ -20392,6 +24664,49 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         const int raw = g_pack.corner.empty() ? -1 : (int)g_pack.corner[ri];
         printf("SBRRAW|%d,%d|raw=%d|padon=%d|pad=%d|seen=%d\n", rx, ry, raw,
                g_padOn[ri] ? 1 : 0, (int)g_padH[ri], (int)corner_raw(rx, ry));
+    } else if (!strcmp(cmd, "padcheck")) {
+        /* padcheck -- THE PAD'S ONE PROMISE, AS A READOUT: no standing building has a
+           footprint corner above the height it is drawn at. GATE/PROOF ONLY. One line
+           per building: raw is the highest of its own footprint corners before any
+           neighbour touched them, pad and low are the highest and lowest padded corners
+           of its footprint box, anchor is the ground draw_mesh stands the model on, in
+           the same 1/64-cell units (terrain_y is re-zeroed on the map's median corner,
+           so the base is added back), and buried says whether the pad is above the
+           anchor. The summary counts the buried, the lifted (raised above their own
+           ground by a neighbour) and the flat (every footprint corner at one height).
+           A building sunk into the ground was only ever visible by looking; this turns
+           it into a number a gate can refuse. */
+        int nb = 0, nburied = 0, nlifted = 0, nflat = 0, maxlift = 0;
+        for (size_t i = 0; i < g_objects.size(); i++) {
+            const SimObject& o = g_objects[i];
+            if (o.kind != K_BUILDING || o.limbo)
+                continue;
+            const int fw = o.fw > 0 ? o.fw : 1, fh = o.fh > 0 ? o.fh : 1;
+            int raw = -1, pad = -1, low = 256;
+            for (int dz = 0; dz <= fh; dz++)
+                for (int dx = 0; dx <= fw; dx++) {
+                    const int cx = o.cx + dx, cz = o.cy + dz;
+                    if (cx < 0 || cx > g_gridW || cz < 0 || cz > g_gridH) continue;
+                    const int r = g_pack.corner.empty() ? 0
+                                : (int)g_pack.corner[cz * (g_gridW + 1) + cx];
+                    const int h = g_pack.corner.empty() ? 0 : (int)corner_raw(cx, cz);
+                    if (r > raw) raw = r;
+                    if (h > pad) pad = h;
+                    if (h < low) low = h;
+                }
+            const float anchor = (terrain_y(o.wx, o.wz) + g_terrainBase) * 64.0f;
+            const int buried = (float)pad > anchor + 0.5f;
+            nb++;
+            nburied += buried;
+            if (pad > raw) { nlifted++; if (pad - raw > maxlift) maxlift = pad - raw; }
+            if (low == pad) nflat++;
+            printf("PADCHECK|%s|id=%d|cell=%d,%d|size=%dx%d|raw=%d|pad=%d|low=%d"
+                   "|anchor=%.2f|buried=%d\n",
+                   o.type, o.id, o.cx, o.cy, fw, fh, raw, pad, low, anchor, buried);
+        }
+        printf("PADCHECK|summary|buildings=%d|buried=%d|lifted=%d|maxlift=%d|flat=%d\n",
+               nb, nburied, nlifted, maxlift, nflat);
+        fflush(stdout);
     } else if (!strcmp(cmd, "sbrshade")) {
         /* sbrshade X Y -- the baked terrain LIGHT at one corner, built on demand.
            GATE/PROOF ONLY, and it exists because the shading is this brush's entire
@@ -20937,6 +25252,42 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                g_sbState.powerProduced, g_sbState.powerDrained,
                g_h6Rows, hud640_meter_segs(g_h6Rows),
                hud640_meter_y(g_h6Rows, flvl), hud640_meter_y(g_h6Rows, dlvl));
+    } else if (!strcmp(cmd, "powerforce")) {
+        /* powerforce PRODUCED DRAINED | powerforce off -- replace the brain's two power
+           numbers where the sidebar receives them (sb_poll), so a gate can reach a state
+           no shipped scenario starts in. Test instrument only; nothing in play calls it.
+           The drawn-colour records are cleared, so a `powerdrawn` after this can only
+           report frames drawn under the forced reading. */
+        int p = 0, d = 0;
+        if (arg && !strcmp(arg, "off")) {
+            g_sbPowerForce = false;
+        } else if (arg && sscanf(arg, "%d %d", &p, &d) == 2 && p >= 0 && d >= 0) {
+            g_sbPowerForce = true;
+            g_sbPowerForceP = p;
+            g_sbPowerForceD = d;
+        } else {
+            printf("POWERFORCE|FAILED|want PRODUCED DRAINED or off [%s]\n", arg ? arg : "");
+            g_scriptFails++;
+            return true;
+        }
+        g_sbDrawnDosPower = g_sbDrawnHudPower = -2;
+        g_sbDrawnDosIndex = -1;
+        g_sbDrawnHudCount[0] = g_sbDrawnHudCount[1] = g_sbDrawnHudCount[2] = 0;
+        sb_poll();
+        printf("POWERFORCE|on=%d|watts=%d/%d\n", g_sbPowerForce ? 1 : 0,
+               g_sbState.powerProduced, g_sbState.powerDrained);
+    } else if (!strcmp(cmd, "powerdrawn")) {
+        /* The power colour each sidebar last DREW, read back out of its own pixels
+           (sb_draw_panel and sb_draw_panel_640). powerdump above says what each rule
+           would choose; this says what reached the screen, which is the thing a player
+           sees and the only thing that can catch a sidebar deciding on the wrong rule.
+           Take a `shot` with `hud 0` and another with `hud 1` first: each sidebar is only
+           read back on a frame that draws it. */
+        printf("POWERDRAWN|dos=%d|dos_index=%d|hud=%d|hud_green=%d|hud_amber=%d"
+               "|hud_red=%d|force=%d\n",
+               g_sbDrawnDosPower, g_sbDrawnDosIndex, g_sbDrawnHudPower,
+               g_sbDrawnHudCount[0], g_sbDrawnHudCount[1], g_sbDrawnHudCount[2],
+               g_sbPowerForce ? 1 : 0);
     } else if (!strcmp(cmd, "silodump")) {
         /* Which image of the silo's fill book each SILO is showing, and why. `state` is
            the cartridge's own arm; -1 there means the renderer fell back to the clock,
@@ -20955,6 +25306,54 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    o.id, o.house, o.cx, o.cy, n, st,
                    (g_engineFrame / 2) % (n > 0 ? n : 1),
                    g_engineFrame, overlay_zoff(o));
+        }
+    } else if (!strcmp(cmd, "texbookdump")) {
+        /* Every texture-book variant in the loaded pack against the base mesh it is drawn
+           over: how many of its triangles land exactly on a base triangle (all three
+           positions equal, wherever in the base's list that triangle sits). The console
+           draws a book's geometry once with a substituted image; this renderer draws the
+           base and then the variant, and the two are one picture only when they coincide.
+           A variant that misses its base stands beside the building as a second copy, or
+           inside it as an invisible one: the refinery once wore two storage strips and
+           the silo's fill dome once hid inside the building's own dome, both because the
+           variant was baked without its node's pose. onbase < tris on any line here is
+           that bug, in whatever pack is loaded. One line per book, taken at its first
+           slot, since every slot of a book is the same triangles reskinned. */
+        for (std::map<std::string, PackType>::const_iterator ti = g_pack.type.begin();
+             ti != g_pack.type.end(); ++ti) {
+            const std::string& type = ti->first;
+            const int bmi = ti->second.mesh;
+            if (bmi < 0 || bmi >= (int)g_pack.mesh.size()) continue;
+            for (int book = 0; book < 4; book++) {
+                const int n = texbook_slots(type.c_str(), book);
+                if (n <= 0) continue;
+                char code[24];
+                snprintf(code, sizeof code, "%s%c0", type.c_str(), "TUVW"[book]);
+                std::map<std::string, PackType>::iterator vi = g_pack.type.find(code);
+                if (vi == g_pack.type.end()) continue;
+                const int vmi = vi->second.mesh;
+                if (vmi < 0 || vmi >= (int)g_pack.mesh.size()) continue;
+                const PackMesh& bm = g_pack.mesh[bmi];
+                const PackMesh& vm = g_pack.mesh[vmi];
+                int onbase = 0;
+                for (size_t i = 0; i < vm.tris.size(); i++) {
+                    bool hit = false;
+                    for (size_t j = 0; j < bm.tris.size() && !hit; j++) {
+                        bool same = true;
+                        for (int k = 0; k < 3 && same; k++) {
+                            const PackVert& a = vm.tris[i].v[k];
+                            const PackVert& b = bm.tris[j].v[k];
+                            same = (a.x == b.x && a.y == b.y && a.z == b.z);
+                        }
+                        hit = same;
+                    }
+                    if (hit) onbase++;
+                }
+                printf("TEXBOOK|%s|book=%d|slots=%d|code=%s|mesh=%d|tris=%d|onbase=%d"
+                       "|over=%d\n",
+                       type.c_str(), book, n, code, vmi, (int)vm.tris.size(), onbase,
+                       texbook_overdraws(bmi, vmi) ? 1 : 0);
+            }
         }
     } else if (!strcmp(cmd, "pipdump")) {
         /* Every pip row the frame WOULD draw, off the same collector the draw pass uses,
@@ -21184,11 +25583,19 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 const ScreenPoly s = object_screen_poly(g_objects[oi], fbw, fbh, false);
                 float c, r;
                 poly_centre(s, &c, &r);
-                if (aim_on_screen("DBLTAPOBJ", objlab(type, nth), c, r, fbw, fbh)
-                    && !ui_select_same_type(c, r, fbw, fbh, false)) {
-                    printf("DBLTAPOBJ|%s|DECLINED not the player's own mobile unit\n",
-                           objlab(type, nth));
-                    g_scriptFails++;
+                /* THE WHOLE GESTURE, not half of it, because the live loop's second
+                   half is now reachable. A decline used to mean one thing -- not the
+                   player's own mobile unit -- and was counted as a failure. It has a
+                   second meaning since the tap learned to stand aside for a deploy, and
+                   in the live loop a decline FALLS THROUGH to the ordinary click. A verb
+                   that stopped at the decline could not test the thing the gesture now
+                   does, and would have called the correct behaviour a failure. */
+                if (aim_on_screen("DBLTAPOBJ", objlab(type, nth), c, r, fbw, fbh)) {
+                    if (!ui_select_same_type(c, r, fbw, fbh, false)) {
+                        printf("DBLTAPOBJ|%s|DECLINED, falling through to the click\n",
+                               objlab(type, nth));
+                        ui_click_action(c, r, fbw, fbh, false, false, false);
+                    }
                 }
             }
         } else { printf("SCRIPT|dbltapobj wants TYPE [N]\n"); g_scriptFails++; }
@@ -21205,6 +25612,13 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             printf("GROUP|BAD ARGS|%s\n", arg ? arg : "");
             fflush(stdout);
         }
+    } else if (!strcmp(cmd, "unitcard")) {
+        /* The unit card's state and where its controls are; see unitcard_mod.h. */
+        uc_script_report(fbw, fbh);
+    } else if (!strcmp(cmd, "cardclick")) {
+        /* cardclick tab N | mini N | main -- a press on one of the card's controls, at
+           that control's own centre, through the same uc_click a hand reaches. */
+        uc_script_click(arg, fbw, fbh);
     } else if (!strcmp(cmd, "superrecharge")) {
         /* GATE ONLY, and deliberately reachable from nothing else: no key, no menu, no
            command-line switch. It exists because no shipped scenario starts with the
@@ -21422,6 +25836,11 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         /* riders 0|1 -- draw the transport deck or not. The gate's control leg. */
         g_ridersDraw = (atoi(arg) != 0);
         printf("RIDERS|draw=%d\n", g_ridersDraw ? 1 : 0);
+    } else if (!strcmp(cmd, "infdraw")) {
+        /* infdraw 0|1 -- draw the infantry billboards or not. The gate's control leg,
+           the same shape as riders above; it changes nothing the brain reports. */
+        g_infantryDraw = (atoi(arg) != 0);
+        printf("INFDRAW|draw=%d\n", g_infantryDraw ? 1 : 0);
     } else if (!strcmp(cmd, "walls")) {
         /* walls 0|1 -- draw the wall passes or not. The gate's control leg (see
            g_wallsDraw); it changes nothing the brain reports. */
@@ -21515,6 +25934,23 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         printf("WALLDUMP-END|cells=%d|drawn=%d\n", (int)g_walls.size(), drawn);
     } else if (!strcmp(cmd, "efxdump")) {
         efx_dump();
+        /* WHERE EACH BULLET MESH'S CENTRE LANDS ON THE GLASS, one line per drawn bullet,
+           projected exactly as the bullet pass draws it (ground under the coordinate,
+           the altitude lift, the middle of the box). efx_dump itself cannot say this:
+           the effects module predates the projection. A gate reads the bright box off
+           the screenshot and holds it to this pixel, which is what proves a laid shell
+           is centred on its own coordinate and not trailing or leading it. */
+        for (size_t i = 0; i < g_efxBullets.size(); i++) {
+            const EfxBullet& b = g_efxBullets[i];
+            if (b.invis || efx_bullet_model(b.name) < 0) continue;
+            const bool flat = efx_bullet_lays_flat(b.name);
+            const float y = terrain_y(b.wx, b.wz)
+                          + efx_bullet_centre_lift(efx_bullet_lift(b), flat);
+            float c, r;
+            world_to_screen(b.wx, y, b.wz, fbw, fbh, &c, &r);
+            printf("EFXDUMP|BULLETSCR|%s|id=%d|scr=%.1f,%.1f|flat=%d\n",
+                   b.name, b.id, c, r, flat ? 1 : 0);
+        }
     } else if (!strcmp(cmd, "shatterdump")) {
         shatter_dump();
     } else if (!strcmp(cmd, "rally")) {
@@ -21948,6 +26384,11 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             static const char* names[] = {"CLEAR", "DARK", "HIDDEN"};
             printf("SHROUDAT|%d,%d|%s\n", cx, cy, names[shroud_state_at(cx, cy)]);
         } else { printf("SCRIPT|shroudat wants CX CY\n"); g_scriptFails++; }
+    } else if (!strcmp(cmd, "rim")) {
+        /* rim 0|1: the always-shrouded edge ring, off for the A/B and back on. */
+        g_shroudRimOn = atoi(arg) ? 1 : 0;
+        g_shroudCornersDirty = 1;
+        printf("RIM|on=%d\n", g_shroudRimOn);
     } else if (!strcmp(cmd, "shroudsoft")) {
         /* shroudsoft 0|1 -- pick the hard per-cell squares or the N64 vertex fade,
            for A/B screenshots inside one run of one binary. */
@@ -21984,6 +26425,31 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             g_shroudPerfOn = 0;
             printf("SHROUDPERF|mode=%s|frames=%d|min=%.3fms|mean=%.3fms|max=%.3fms\n",
                    g_shroudSoft ? "soft" : "hard", nf, mn, sum / nf, mx);
+        }
+    } else if (!strcmp(cmd, "frameperf")) {
+        /* frameperf N -- draw N whole frames, each glFinish-bracketed, and report
+           min/mean/max milliseconds for draw_frame as it stands (every dial as set).
+           The shroud's twin, for the whole picture: the way to price a pass is to run
+           this with the pass off and on and read the difference, not to guess. */
+        int nf = atoi(arg);
+        if (nf <= 0) nf = 60;
+        {
+            int dw = fbw, dh = fbh;
+            double sum = 0.0, mn = 1e9, mx = 0.0;
+            SDL_GL_GetDrawableSize(win, &dw, &dh);
+            for (int i = 0; i < nf; i++) {
+                glFinish();
+                const Uint64 t0 = SDL_GetPerformanceCounter();
+                draw_frame(dw, dh);
+                glFinish();
+                const double ms = (double)(SDL_GetPerformanceCounter() - t0) * 1000.0
+                                  / (double)SDL_GetPerformanceFrequency();
+                sum += ms;
+                if (ms < mn) mn = ms;
+                if (ms > mx) mx = ms;
+            }
+            printf("FRAMEPERF|frames=%d|size=%dx%d|min=%.3fms|mean=%.3fms|max=%.3fms|rain=%d\n",
+                   nf, dw, dh, mn, sum / nf, mx, g_fx.rain_fx ? 1 : 0);
         }
     } else if (!strcmp(cmd, "shrouddarktest")) {
         /* SYNTHETIC: photograph the blended DARK pass, which TD's engine can never
@@ -22071,11 +26537,16 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    o.type, o.house, o.id, o.repairing, o.wrench, o.str, o.maxstr);
         }
         /* WORLD quantities, like hbdump's: two runs at different camera distances must
-           print identical numbers here, which is the proof this is world space. */
+           print identical numbers here, which is the proof this is world space. top is
+           the building's roof off its own model and base the height of the slab's
+           underside above the wrench's anchor, both in cells, so a gate can assert the
+           lift against the two numbers it was chosen from rather than recompute them. */
         for (size_t i = 0; i < qs.size(); i++) {
             const SimObject& o = g_objects[qs[i].idx];
-            printf("WRENCHQUAD|%s|id=%d|dimw=%d|x0=%.4f|x1=%.4f|y0=%.4f|y1=%.4f|z=%.4f\n",
-                   o.type, o.id, o.dimw, qs[i].x0, qs[i].x1, qs[i].y0, qs[i].y1, qs[i].z);
+            printf("WRENCHQUAD|%s|id=%d|dimw=%d|x0=%.4f|x1=%.4f|y0=%.4f|y1=%.4f|z=%.4f"
+                   "|top=%.4f|base=%.4f\n",
+                   o.type, o.id, o.dimw, qs[i].x0, qs[i].x1, qs[i].y0, qs[i].y1, qs[i].z,
+                   qs[i].top, qs[i].base);
         }
         /* WHAT THE LAST FRAME ACTUALLY DREW, out of draw_mesh's own witnesses. This is
            the leg a dead or reversed animation cannot survive: `face` is the DirType the
@@ -22205,6 +26676,127 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    g_selNav, ok ? "PASS" : "FAIL");
             if (!ok) g_scriptFails++;
         } else { printf("SCRIPT|expecttar wants CELLX CELLY\n"); g_scriptFails++; }
+    } else if (!strcmp(cmd, "takeover")) {
+        /* takeover PID -- hand one player's house to the computer, which is what the
+           lobby's AI TAKEOVER checkbox does to a seat that walks out of a match. The
+           verb exists because the match path needs a second peer and a real departure
+           before it can be reached at all, and the ENGINE half of it -- does the house stop being human, does
+           it start playing -- is a plain single-player question. 0 is this machine's own
+           player; a network seat is its index plus one, the same key the departure
+           block uses.
+
+           The before and after are both read back off the brain rather than assumed, so
+           a build whose export went missing reads was=-1 and fails rather than printing
+           a confident ok=0 that looks like a refusal. */
+        const unsigned long long pid = (unsigned long long)(arg && arg[0] ? atoi(arg) : 0);
+        if (!BrainPlayerToAI || !BrainPlayerIsAI) {
+            printf("TAKEOVER|pid=%llu|NO EXPORT (old TiberianDawn build)\n", pid);
+            g_scriptFails++;
+        } else {
+            const int was = BrainPlayerIsAI(pid);
+            const bool ok = BrainPlayerToAI(pid);
+            const int now = BrainPlayerIsAI(pid);
+            printf("TAKEOVER|pid=%llu|was=%d|ok=%d|now=%d\n", pid, was, ok ? 1 : 0, now);
+        }
+    } else if (!strcmp(cmd, "say")) {
+        /* say TEXT -- the same call the Return key's line makes when it is sent, so a
+           gate exercises the real path rather than the transport underneath it. */
+        if (arg && arg[0]) {
+            snprintf(g_chatBuf, sizeof g_chatBuf, "%s", arg);
+            g_chatEntry = true;
+            chat_close(true);
+        }
+    } else if (!strcmp(cmd, "wait")) {
+        /* wait MS -- let REAL time pass, which `tick` cannot do.
+           Almost everything in this game is measured in engine ticks, and a script can
+           step those as fast as the machine allows: 3000 ticks run in about two seconds.
+           A few things are deliberately wall-clock instead, because they are about how
+           long a PERSON looks at something rather than how long the world runs: the
+           victory reveal before the banner, and the banner's own dwell. Without this
+           verb those were unreachable by any gate, which is how a timed sequence ends up
+           with nothing watching it. */
+        const int ms = arg && arg[0] ? atoi(arg) : 0;
+        if (ms > 0) {
+            const Uint32 t0 = SDL_GetTicks();
+            while ((int)(SDL_GetTicks() - t0) < ms) SDL_Delay(5);
+        }
+        printf("WAIT|ms=%d\n", ms);
+        fflush(stdout);
+    } else if (!strcmp(cmd, "hud")) {
+        /* hud 0|1 -- the DOS bar or the 640 replacement, from a script.
+           The HUD switch deliberately does not come from --gfx (see
+           game_visuals_default_enhanced), which is right for a player and leaves the
+           standalone renderer unable to draw the plate a gate needs to measure against:
+           anything anchored to the OPTIONS plate could only be checked by eye. A
+           presentation switch, like `walls` and `crates`. */
+        sb_set_hud_new(atoi(arg) != 0);
+        printf("HUD|new=%d\n", sb_hud_is_new());
+        fflush(stdout);
+    } else if (!strcmp(cmd, "chatopen")) {
+        /* chatopen [TEXT] -- open the typing line and leave it open, with TEXT already
+           in it. What Return does, minus the sending, so a picture can be taken of the
+           caret and the half typed line. */
+        chat_open();
+        if (arg && arg[0]) snprintf(g_chatBuf, sizeof g_chatBuf, "%s", arg);
+        printf("CHATOPEN|on=%d|chrome=%.1f|hudnew=%d|scale=%d|buf=%s\n",
+               g_chatEntry ? 1 : 0, sb_chrome_bottom(), sb_hud_is_new(), sb_scale(),
+               g_chatBuf);
+        fflush(stdout);
+    } else if (!strcmp(cmd, "chatdump")) {
+        /* chatdump -- the player's pane, row by row, oldest first. The ROWS line is what
+           proves the ten row cap and the thirty second expiry; each line carries the tick
+           it was said on so a gate can measure the age it died at. */
+        printf("CHAT|rows=%d|frame=%d\n", (int)g_chat.size(), g_engineFrame);
+        for (size_t i = 0; i < g_chat.size(); i++)
+            printf("CHAT|%d|tick=%d|rgb=%06X|%s\n", (int)i, g_chat[i].tick,
+                   g_chat[i].colour & 0xFFFFFFu, g_chat[i].text);
+        fflush(stdout);
+    } else if (!strcmp(cmd, "roster")) {
+        /* roster 0|1 -- open or shut the MAP button's player list.
+           The button itself is a sidebar hit, and the probe verb next to it only
+           REPORTS hits, so this panel could be dumped as data but never drawn for a
+           picture. A presentation switch, like `hud`. */
+        g_sbRoster = atoi(arg) != 0;
+        printf("ROSTERPANEL|shown=%d\n", g_sbRoster ? 1 : 0);
+        fflush(stdout);
+    } else if (!strcmp(cmd, "rosterdump")) {
+        /* rosterdump -- the MAP button's player list, as data.
+           This panel has now been wrong three times in a row and had no gate: it showed
+           every player as PLAYER because the lobby's handles were dropped on the way to
+           the match, it asked the engine for player ids that exist on no machine in a
+           net game, and it sized itself off the COMPUTER count, which is zero in an all
+           human room. None of those are visible in a screenshot of a two player game,
+           and all three are one line each here. */
+        SbRosterRow rr[SB_ROSTER_MAX];
+        const int rn = sb_roster_fetch(rr, SB_ROSTER_MAX);
+        printf("ROSTER|rows=%d\n", rn);
+        for (int i = 0; i < rn; i++)
+            printf("ROSTER|%d|name=%s|colour=%d|house=%d|kills=%d|defeated=%d\n",
+                   i, rr[i].name, rr[i].colour, rr[i].house, rr[i].kills, rr[i].defeated);
+        fflush(stdout);
+    } else if (!strcmp(cmd, "blowup")) {
+        /* blowup PID -- destroy one player's house, the way a surrender or a departure
+           without AI Takeover does. 0 is this machine's own player; a network seat is
+           its index plus one, the same key the departure block uses. */
+        const unsigned long long pid = (unsigned long long)(arg && arg[0] ? atoi(arg) : 0);
+        if (!BrainPlayerBlowup) {
+            printf("BLOWUP|pid=%llu|NO EXPORT (old TiberianDawn build)\n", pid);
+            g_scriptFails++;
+        } else {
+            const bool ok = BrainPlayerBlowup(pid);
+            printf("BLOWUP|pid=%llu|ok=%d\n", pid, ok ? 1 : 0);
+        }
+        fflush(stdout);
+    } else if (!strcmp(cmd, "creditsdump")) {
+        /* The bank as the engine holds it, the value the readout is printing, and how
+           often the credit tick has sounded each way since the world booted. */
+        printf("CREDITS|credits=%d|counter=%d|tib=%d|prev=%d|laststep=%+d"
+               "|up=%d|down=%d|novoice=%d|silent=%d\n",
+               g_sbState.valid ? g_sbState.credits : -1,
+               g_sbState.valid ? g_sbState.creditsCounter : -1,
+               g_sbState.valid ? g_sbState.tiberium : -1,
+               g_cashPrev, g_cashLastStep, g_cashUp, g_cashDown, g_cashNoVoice, g_cashSilent);
+        fflush(stdout);
     } else if (!strcmp(cmd, "player")) {
         printf("PLAYER|house=%s|credits=%d|selection=%d|what=%s|mission=%s|nav=%d|tar=%d\n",
                g_playerHouse[0] ? g_playerHouse : "(unknown)", g_playerCredits,
@@ -22959,9 +27551,23 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                rows, hud640_bar_h(rows), g_h6Scale, cells, ok);
         if (cells != ok) g_scriptFails++;
     } else if (!strcmp(cmd, "gfxpanel")) {
-        const int want = atoi(arg) ? 1 : 0;
+        /* THE HARNESS'S DOOR, and deliberately not cooked out: see fxp_toggle.
+              gfxpanel 1            open it at wherever it was left
+              gfxpanel 1 grass      open it and scroll to the group that row sits in
+           The second form exists because the table is deeper than one screen: without
+           it nothing below the fold can be photographed or asserted at all. */
+        int want = 0; char row[64] = "";
+        const int nread = sscanf(arg, "%d %63s", &want, row);
+        want = (nread >= 1 && want) ? 1 : 0;
         if (want != fxp_is_open()) fxp_toggle();
-        printf("GFX|panel=%s\n", fxp_is_open() ? "open" : "closed");
+        int scrolled = 1;
+        if (want && row[0]) {
+            scrolled = fxp_scroll_to(row, fbh);
+            if (!scrolled) { printf("GFX|panel|no row named '%s'\n", row); g_scriptFails++; }
+        }
+        printf("GFX|panel=%s%s%s\n", fxp_is_open() ? "open" : "closed",
+               (want && row[0] && scrolled) ? "|at=" : "",
+               (want && row[0] && scrolled) ? row : "");
     } else if (!strcmp(cmd, "minimapoff")) {
         sb_set_radar(false);
         printf("MINIMAP|off\n");
@@ -23047,8 +27653,35 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 (void)aim_on_screen("CURSOROBJ", objlab(type, nth), c, r, fbw, fbh);
                 g_mouseScrC = c; g_mouseScrR = r;
                 update_cursor(fbw, fbh);
-                printf("CURSOROBJ|%s|at=%.1f,%.1f|shape=%s\n",
-                       objlab(type, nth), c, r, cur_name(cur_type()));
+                /* WHERE THE POINTER LANDED versus where the thing it is pointing at is
+                   actually drawn, both in cells, and the distance between them. Without
+                   this the verb could only say which SHAPE appeared, so a pointer that
+                   drew a body length behind the unit -- the terrain ray's hit rather than
+                   the unit's own anchor -- reported exactly the same line as one standing
+                   on it, and the fault was invisible to every gate. */
+                const float ox = g_objects[oi].wx, oz = g_objects[oi].wz;
+                const float gap = sqrtf((g_cursorWX - ox) * (g_cursorWX - ox)
+                                      + (g_cursorWZ - oz) * (g_cursorWZ - oz));
+                /* AND WHAT THE BARE RAY WOULD HAVE SAID, so a gate on `gap` cannot go
+                   quietly vacuous: if the two ever agree everywhere the gate is measuring
+                   a camera in which the fault cannot appear, not a fix. */
+                float rx = 0.0f, rz = 0.0f;
+                screen_to_world(c, r, fbw, fbh, &rx, &rz);
+                const float rgap = sqrtf((rx - ox) * (rx - ox) + (rz - oz) * (rz - oz));
+                /* THE NEW FIELDS GO BEFORE shape=, NOT AFTER IT, and that is not
+                   cosmetic. This line ended in `shape=X` from the day it was written and
+                   at least one gate greps for that with the end-of-line anchor
+                   (`shape=deploy$`, G73's opening click). Appending to the end turned that
+                   gate red without touching anything it was about -- the pointer read
+                   deploy exactly as before, the pattern simply stopped matching. Anything
+                   added here goes in the middle, so the line keeps the tail it has
+                   always had. */
+                printf("CURSOROBJ|%s|at=%.1f,%.1f"
+                       "|world=%.3f,%.3f|obj=%.3f,%.3f|gap=%.3f"
+                       "|ray=%.3f,%.3f|raygap=%.3f|shape=%s\n",
+                       objlab(type, nth), c, r,
+                       g_cursorWX, g_cursorWZ, ox, oz, gap, rx, rz, rgap,
+                       cur_name(cur_type()));
             }
         }
     } else if (!strcmp(cmd, "expectcursor")) {
@@ -23154,9 +27787,13 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
     } else if (!strcmp(cmd, "cheats")) {
         /* The cheat page, opened the way the star key opens it, so a gate exercises the
            real entry point rather than a private one. */
-        cheat_show("SCRIPT");
-        printf("CHEATS|open|page=%d|selected=%d\n", g_optState.page,
-               g_optState.selected);
+        if (nm_active()) {
+            printf("CHEATS|REFUSED|network match\n");
+        } else {
+            cheat_show("SCRIPT");
+            printf("CHEATS|open|page=%d|selected=%d\n", g_optState.page,
+                   g_optState.selected);
+        }
     } else if (!strcmp(cmd, "proximity")) {
         /* proximity CODE X Y -- would the engine let CODE be placed at X,Y as far as the
            base-adjacency rule is concerned? Gate G107 asks it either side of the Build
@@ -23186,8 +27823,12 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             if (!strcmp(which, "buildany")) idx = DOPT_CH_BUILDANY;
         }
         cheat_defaults_once();
-        g_cheatsArmed = true;   /* a script asking for a switch is asking for it to act */
-        if (idx >= 0) {
+        if (nm_active()) {
+            /* The same refusal the key gets. Not armed, not set: a switch left set here
+               would act again the moment a single-player mission boots. */
+            printf("CHEATSET|REFUSED|network match\n");
+        } else if (idx >= 0) {
+            g_cheatsArmed = true;   /* a script asking for a switch is asking for it to act */
             g_cheats.on[idx] = on ? 1 : 0;
             printf("CHEATSET|%s=%d\n", which, g_cheats.on[idx]);
         } else {
@@ -23219,7 +27860,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         {
             /* Every item's rectangle on the page as it is drawn, so a gate can prove
                nothing overlaps anything else. The cheat page grew from six rows to
-               seven plus a second button row on 26 Aug 2026 and the old geometry
+               seven plus a second button row and the old geometry
                comment's "SIX rows ... still end clear" was the only thing standing
                between that and two controls sharing a pixel. */
             int i, x, y, w, h;
@@ -23274,6 +27915,34 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
            reads. */
         printf("OPTSWAP|swap=%d|fx_swap=%d|enhanced=%d\n",
                g_optState.gp.on[DOPT_G_SWAPBTN], g_fx.swap_buttons, g_fx.enabled);
+        /* THE DISPLAY ROWS, on a line of their own for the reason OPTSWAP gives. Two
+           claims per row again: the dialog's value and the dial it wrote. */
+        {
+            int nfit = 0, k;
+            for (k = 0; k < g_optState.vis.nres; k++)
+                if (g_optState.vis.res_fit[k]) nfit++;
+            /* The three display fields are APPENDED, for the reason OPTVIS gives: the
+               gates that read this line match substrings of it. */
+            printf("OPTDISP|mode=%d|res=%d|nres=%d|uiscale=%d|resdisabled=%d|uidisabled=%d"
+                   "|fx_mode=%d|fx_res=%dx%d|fx_ui=%d|sb_div=%d"
+                   "|desktop=%dx%d|usable=%dx%d|nfit=%d\n",
+                   g_optState.vis.dispmode, g_optState.vis.residx, g_optState.vis.nres,
+                   g_optState.vis.uiscale,
+                   dopt_item_disabled(&g_optState, DOPT_VE_RESOLUTION),
+                   dopt_item_disabled(&g_optState, DOPT_VE_UISCALE),
+                   (int)g_fx.display_mode, (int)g_fx.res_w, (int)g_fx.res_h,
+                   (int)g_fx.ui_scale, g_sbUiDiv,
+                   g_resInfo.deskw, g_resInfo.deskh, g_resInfo.usablew, g_resInfo.usableh,
+                   nfit);
+        }
+        /* THE PERSPECTIVE ROW (v0.6.8), on a line of its own for the same reason: the
+           dialog's value, the dial, and the yaw the camera actually holds. */
+        printf("OPTPERSP|value=%d|disabled=%d|fx_persp=%d|yaw=%.1f|enhanced=%d"
+               "|pitch=%.1f|fov=%.1f|dist=%.2f\n",
+               g_optState.vis.perspective,
+               dopt_item_disabled(&g_optState, DOPT_VE_PERSPECTIVE),
+               (int)(g_fx.perspective + 0.5f), g_camYaw * 180.0f / (float)M_PI + 0.0f,
+               g_fx.enabled, n64_pitch() * 180.0f / (float)M_PI, cam_fovy_deg(), g_fx.iso_dist);
         /* EVERY RECTANGLE ON THE ADVANCED PAGE while that is the page showing, so a gate
            can prove no two controls share a pixel. The cheat page already carries this
            dump for the same reason, and this column has just grown a twelfth row: the
@@ -23286,6 +27955,20 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 if (dopt_item_rect(&g_optState, i, &x, &y, &w, &h))
                     printf("ADVRECT|%d|%s|%d,%d|%dx%d\n", i,
                            dopt_item_label(&g_optState, i), x, y, w, h);
+            /* THE DROP ROWS' VALUE BOXES, on a prefix of their own (G121 and G143 count
+               ADVRECT lines and split them by position): where the row's label ends,
+               where its box starts, and the least width the box's widest entry needs.
+               A label running under its box is what this line exists to show: three
+               rows did, for a day, while every rectangle audit was green. */
+            for (i = 0; i < DOPT_VE_COUNT; i++) {
+                int bx, by, bw, bh;
+                if (!dopt_texset_box_rect_pub(&g_optState, i, &bx, &by, &bw, &bh)) continue;
+                printf("ADVDROP|%d|%s|lab=%d..%d|box=%d,%d|%dx%d|need=%d|gap=%d\n", i,
+                       dopt_item_label(&g_optState, i), DOPT_A_LABEL_X,
+                       DOPT_A_LABEL_X + g_optState.labw[i] - 1, bx, by, bw, bh,
+                       dopt_drop_need_pub(&g_optState, g_dbPack, i),
+                       bx - (DOPT_A_LABEL_X + g_optState.labw[i]));
+            }
         }
     } else if (!strcmp(cmd, "optgp")) {
         /* WHAT THE GAMEPLAY PAGE SAYS, AND WHAT THE GAME SAYS BACK. Two claims per switch.
@@ -23294,11 +27977,15 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
            fx_enabled is printed so a gate can assert INDEPENDENCE. */
         int hx = 0, hy = 0, hw = 0, hh = 0;
         const int head = dopt_gp_head_rect(&g_optState, g_dbPack, &hx, &hy, &hw, &hh);
-        printf("OPTGP|page=%d|swap=%d|fx_swap=%d|push=%d|fx_push=%d|fx_enabled=%d"
+        /* cash= sits BEFORE fx_enabled= and never at the end: box= is extracted anchored
+           to the end of the line, so a field appended after it would break that read. */
+        printf("OPTGP|page=%d|swap=%d|fx_swap=%d|push=%d|fx_push=%d|cash=%d|fx_cash=%d"
+               "|fx_enabled=%d"
                "|head=%d|headrect=%d,%d %dx%d|box=%d..%d,%d..%d\n",
                g_optState.page,
                g_optState.gp.on[DOPT_G_SWAPBTN], g_fx.swap_buttons,
                g_optState.gp.on[DOPT_G_RPUSH], g_fx.right_drag_scroll,
+               g_optState.gp.on[DOPT_G_CASHTICK], g_fx.cash_tick,
                g_fx.enabled, head, hx, hy, hw, hh,
                DOPT_V_X, DOPT_V_X + DOPT_V_W - 1, DOPT_V_Y, DOPT_V_Y + DOPT_V_H - 1);
         if (g_optState.page == DOPT_PAGE_GAMEPLAY) {
@@ -23308,6 +27995,39 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                     printf("GPRECT|%d|%s|%d,%d|%dx%d\n", i,
                            dopt_item_label(&g_optState, i), x, y, w, h);
         }
+        fflush(stdout);
+    } else if (!strcmp(cmd, "optctl")) {
+        /* WHAT THE GAME CONTROLS PAGE HOLDS, READ WITHOUT TOUCHING IT. The five values
+           could only be read off the line optslider prints, and that line is printed
+           AFTER a drag, so reading all five untouched took one run per slider. This
+           verb moves nothing, so a gate can ask what a player is handed.
+
+           seeded says whether the block has been filled in yet, and tick is the answer
+           game_speed_setting is giving the tick loop at this instant. Both halves are
+           printed because the promise is that they AGREE: before the dialog is opened
+           the block is still zero and the tick rate comes from the shipped defaults,
+           and after it is seeded it comes from the same place, so a player's first
+           mission must not change pace the first time ESC is pressed.
+
+           THE ship_ HALF IS THE SHIPPED BLOCK ITSELF, and it is here because the live
+           block cannot stand in for it. Opening the dialog seeds speed and scroll out of
+           dopt_settings_init, but it then overwrites all three VOLUMES with what the
+           mixer is actually playing at, so the numbers on the sliders are an answer about
+           this launch's volume switches and not about the shipped defaults at all. A
+           reader of the first half alone would think the volume defaults were covered
+           when changing them could not move it. These five come straight out of the
+           seeder and move the moment it does. */
+        DOPT_Settings shipped;
+        dopt_settings_init(&shipped);
+        printf("OPTCTL|seeded=%d|speed=%d|scroll=%d|music=%d|sound=%d|speech=%d"
+               "|tick=%d|vol_top=%d"
+               "|ship_speed=%d|ship_scroll=%d|ship_music=%d|ship_sound=%d|ship_speech=%d\n",
+               g_optSeeded ? 1 : 0,
+               g_optState.set.speed, g_optState.set.scrollrate,
+               g_optState.set.music, g_optState.set.sound, g_optState.set.speech,
+               game_speed_setting(), DOPT_VOL_TOP,
+               shipped.speed, shipped.scrollrate,
+               shipped.music, shipped.sound, shipped.speech);
         fflush(stdout);
     } else if (!strcmp(cmd, "optscroll")) {
         /* optscroll N: the wheel, headless. It calls dopt_scroll, which is exactly what
@@ -23328,10 +28048,12 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                            dopt_item_label(&g_optState, i), x, y, w, h);
         }
         fflush(stdout);
-    } else if (!strcmp(cmd, "opttex") || !strcmp(cmd, "optinf")) {
+    } else if (!strcmp(cmd, "opttex") || !strcmp(cmd, "optinf") || !strcmp(cmd, "optpersp")) {
         /* One verb per drop list, sharing every leg: `opttex` drives the terrain row and
            `optinf` the infantry one, so a gate can say which it means. */
-        const int g_optTexRow = !strcmp(cmd, "optinf") ? DOPT_VE_INFSET : DOPT_VE_TEXSET;
+        const int g_optTexRow = !strcmp(cmd, "optinf")   ? DOPT_VE_INFSET
+                              : !strcmp(cmd, "optpersp") ? DOPT_VE_PERSPECTIVE
+                              :                            DOPT_VE_TEXSET;
         /* THE TERRAIN-ART DROP LIST, driven headlessly. It is the one control on the
            Advanced page that optclick cannot reach, because its entries are not dialog
            items -- they are drawn over them and hit-tested ahead of them -- so it needs
@@ -23343,7 +28065,26 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         int n = -1;
         char what[24] = {0};
         const int nargs = sscanf(arg, "%23s %d", what, &n);
-        if (nargs >= 1 && !strcmp(what, "open"))        g_optState.texdrop = g_optTexRow;
+        if (nargs >= 1 && !strcmp(what, "open")) {
+            int bx, by, bw, bh;
+            if (g_optState.page == DOPT_PAGE_ADVANCED
+                && !dopt_texset_box_rect_pub(&g_optState, g_optTexRow, &bx, &by, &bw, &bh)) {
+                /* SCROLL THE WELL TO THE ROW, the way optclick does: a row past the fold
+                   has no rectangle on purpose, and a list cannot open on a row that is
+                   not showing. The Perspective row pushed the infantry art
+                   row past the fold at every size, which is how this arm was found
+                   missing: G202 could open its list only while the list's row happened
+                   to fit. Same clamp as optclick's. */
+                const int last = (DOPT_VE_COUNT > DOPT_A_VIEW_ROWS) ? DOPT_VE_COUNT - DOPT_A_VIEW_ROWS : 0;
+                int top = (g_optTexRow < g_optState.advTop) ? g_optTexRow
+                                                            : g_optTexRow - (DOPT_A_VIEW_ROWS - 1);
+                if (top > last) top = last;
+                if (top < 0) top = 0;
+                g_optState.advTop = top;
+                printf("OPTIONS|script|scrolled|advTop=%d|for=%s\n", top, cmd);
+            }
+            g_optState.texdrop = g_optTexRow;
+        }
         else if (nargs >= 1 && !strcmp(what, "close")) { g_optState.texdrop = -1;
                                                          g_optState.texhot = -1; }
         else if (nargs == 2 && (!strcmp(what, "hover") || !strcmp(what, "pick"))) {
@@ -23365,27 +28106,252 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             int i;
             int bx, by, bw, bh;
             const int haverow = dopt_texset_box_rect_pub(&g_optState, g_optTexRow, &bx,&by,&bw,&bh);
-            printf("%s|page=%d|advTop=%d|boxrect=%d|open=%d|value=%d|remaster_ok=%d|hot=%d",
-                   g_optTexRow == DOPT_VE_INFSET ? "OPTINF" : "OPTTEX",
+            printf("%s|page=%d|advTop=%d|boxrect=%d|open=%d|value=%d|remaster_ok=%d|dos_tex_ok=%d|hot=%d",
+                   g_optTexRow == DOPT_VE_INFSET ? "OPTINF"
+                   : g_optTexRow == DOPT_VE_PERSPECTIVE ? "OPTPERSP" : "OPTTEX",
                    g_optState.page, g_optState.advTop, haverow,
                    g_optState.texdrop == g_optTexRow,
                    g_optTexRow == DOPT_VE_INFSET ? g_optState.vis.infset
-                                                 : g_optState.vis.texset,
-                   g_optState.vis.remaster_ok, g_optState.texhot);
-            for (i = 0; i < DOPT_TEX_COUNT; i++) {
-                const char* tip = dopt_texset_tooltip(&g_optState, i);
-                printf("|%d=%s%s", i, dopt_drop_label(g_optTexRow, i), tip ? " (DISABLED)" : "");
+                   : g_optTexRow == DOPT_VE_PERSPECTIVE ? g_optState.vis.perspective
+                                                        : g_optState.vis.texset,
+                   g_optState.vis.remaster_ok, g_optState.vis.dos_tex_ok, g_optState.texhot);
+            /* The entries by the row's own count and text, so the Perspective list (two
+               entries, no art tooltips) reads through the same door; for the two art
+               rows count and text are what they were, so those lines do not move. */
+            {
+                const int nent = dopt_drop_count(&g_optState, g_optTexRow);
+                for (i = 0; i < nent; i++) {
+                    const char* tip = g_optTexRow == DOPT_VE_PERSPECTIVE
+                                    ? NULL : dopt_texset_tooltip(&g_optState, i);
+                    printf("|%d=%s%s", i, dopt_drop_text(&g_optState, g_optTexRow, i),
+                           tip ? " (DISABLED)" : "");
+                }
             }
-            if (g_optTexRow == DOPT_VE_INFSET)
+            if (g_optTexRow == DOPT_VE_PERSPECTIVE)
+                printf("|fx_persp=%d|yaw=%.1f|enhanced=%d|pitch=%.1f|fov=%.1f|dist=%.2f\n",
+                       (int)(g_fx.perspective + 0.5f), g_camYaw * 180.0f / (float)M_PI + 0.0f,
+                       g_fx.enabled, n64_pitch() * 180.0f / (float)M_PI, cam_fovy_deg(),
+                       g_fx.iso_dist);
+            else if (g_optTexRow == DOPT_VE_INFSET)
                 printf("|fx_infset=%d|drawing=%s\n", (int)g_fx.infset,
                        fx_infset_name(fx_infset_get()));
             else
-                printf("|fx_texset=%d|drawing=%s\n", (int)g_fx.texset,
-                       fx_texset_name(fx_texset_get()));
+                /* `asked` AND `drawing`, because they are not the same thing and the
+                   line used to print only the first while calling it "drawing". A pack
+                   with no DOS atlas answers the request with the cartridge, and the
+                   readout said DOS: the one instrument that could have named this bug
+                   was repeating the request back. */
+                printf("|fx_texset=%d|asked=%s|drawing=%s|atlasN64=%d|atlasDos=%d|atlasNow=%d\n",
+                       (int)g_fx.texset, fx_texset_name(fx_texset_get()),
+                       fx_texset_name(terrain_texset_drawn()),
+                       g_pack.terrainTex, g_pack.terrainTexDos, terrain_atlas_index());
             if (g_optState.texhot >= 0) {
                 const char* tip = dopt_texset_tooltip(&g_optState, g_optState.texhot);
                 if (tip) printf("OPTTEX|tooltip|%s\n", tip);
             }
+        }
+    } else if (!strcmp(cmd, "optres")) {
+        /* THE RESOLUTION LIST, driven headlessly: the opttex family's twin for the one
+           drop list whose entries come from the display, with the legs that list needs
+           and the others do not.
+             optres                 report
+             optres open|close      work the list (open scrolls the current entry into view)
+             optres hover N         put the pointer on entry N (raises its tip)
+             optres pick N          click entry N, scrolled into view first; a greyed entry refuses
+             optres scroll D        the wheel, D rows, while the list is open
+             optres bar upper|lower press the slider well at its top or bottom pixel
+             optres inject DW DH UW UH W1xH1,W2xH2,...
+                                    build the list for THAT display instead of this one:
+                                    desktop DWxDH, usable room UWxUH, the driver's modes
+           The readout carries every entry, with (DISABLED) after one the open list
+           refuses (through the same tooltip the pointer would raise), and then what the
+           list was built from: the dial, the desktop, the usable room, the counts, and
+           where the desktop landed. */
+        int n = -1;
+        char what[24] = {0};
+        const int nargs = sscanf(arg, "%23s %d", what, &n);
+        if (nargs >= 1 && !strcmp(what, "inject")) {
+            int dw = 0, dh = 0, uw = 0, uh = 0, at = 0;
+            char list[512] = {0};
+            if (sscanf(arg, "%23s %d %d %d %d %511s", what, &dw, &dh, &uw, &uh, list) == 6) {
+                const char* s = list;
+                g_resInject.n = 0;
+                while (*s && g_resInject.n < (int)(sizeof g_resInject.mw / sizeof g_resInject.mw[0])) {
+                    int w = 0, h = 0, used = 0;
+                    if (sscanf(s, "%dx%d%n", &w, &h, &used) < 2 || used <= 0) break;
+                    g_resInject.mw[g_resInject.n] = w;
+                    g_resInject.mh[g_resInject.n] = h;
+                    g_resInject.n++;
+                    s += used;
+                    if (*s == ',') s++;
+                }
+                g_resInject.on = 1;
+                g_resInject.deskw = dw; g_resInject.deskh = dh;
+                g_resInject.usablew = uw; g_resInject.usableh = uh;
+                vis_seed_res(&g_optState.vis);
+                g_optState.texdrop = -1;
+                g_optState.texhot = -1;
+                g_optState.restop = 0;
+                at = g_resInject.n;
+                printf("OPTRES|inject|desktop=%dx%d|usable=%dx%d|modes=%d|nres=%d\n",
+                       dw, dh, uw, uh, at, g_optState.vis.nres);
+            } else {
+                printf("SCRIPT|optres inject wants DESKW DESKH USABLEW USABLEH W1xH1,W2xH2,...\n");
+                g_scriptFails++;
+            }
+        }
+        else if (nargs >= 1 && !strcmp(what, "open")) {
+            int bx, by, bw, bh;
+            if (g_optState.page == DOPT_PAGE_ADVANCED
+                && !dopt_texset_box_rect_pub(&g_optState, DOPT_VE_RESOLUTION, &bx, &by, &bw, &bh)) {
+                /* The same well scroll opttex does, for a row past the fold. */
+                const int last = (DOPT_VE_COUNT > DOPT_A_VIEW_ROWS) ? DOPT_VE_COUNT - DOPT_A_VIEW_ROWS : 0;
+                int top = (DOPT_VE_RESOLUTION < g_optState.advTop) ? DOPT_VE_RESOLUTION
+                                                                   : DOPT_VE_RESOLUTION - (DOPT_A_VIEW_ROWS - 1);
+                if (top > last) top = last;
+                if (top < 0) top = 0;
+                g_optState.advTop = top;
+                printf("OPTIONS|script|scrolled|advTop=%d|for=%s\n", top, cmd);
+            }
+            dopt_drop_open(&g_optState, DOPT_VE_RESOLUTION);
+        }
+        else if (nargs >= 1 && !strcmp(what, "close")) { g_optState.texdrop = -1;
+                                                         g_optState.texhot = -1; }
+        else if (nargs == 2 && !strcmp(what, "scroll")) {
+            if (g_optState.texdrop != DOPT_VE_RESOLUTION) {
+                printf("SCRIPT|optres scroll|the list is not open\n");
+                g_scriptFails++;
+            } else {
+                dopt_scroll(&g_optState, n);
+            }
+        }
+        else if (nargs >= 1 && !strcmp(what, "bar")) {
+            char half[16] = {0};
+            int bx, by, bw, bh;
+            sscanf(arg, "%23s %15s", what, half);
+            if (!dopt_res_bar_rect(&g_optState, &bx, &by, &bw, &bh)) {
+                printf("SCRIPT|optres bar|no slider well (list shut, or it holds no more than it shows)\n");
+                g_scriptFails++;
+            } else if (!strcmp(half, "upper")) {
+                dopt_press(&g_optState, bx + bw / 2, by);
+            } else if (!strcmp(half, "lower")) {
+                dopt_press(&g_optState, bx + bw / 2, by + bh - 1);
+            } else {
+                printf("SCRIPT|optres bar wants upper|lower\n");
+                g_scriptFails++;
+            }
+        }
+        else if (nargs == 2 && (!strcmp(what, "hover") || !strcmp(what, "pick"))) {
+            int x, y, w, h;
+            if (!strcmp(what, "pick") && g_optState.texdrop == DOPT_VE_RESOLUTION
+                && n >= 0 && n < g_optState.vis.nres) {
+                /* SCROLL THE LIST TO THE ENTRY, the way a hand would with the wheel
+                   before clicking: an entry outside the list's window has no rectangle
+                   on purpose. */
+                const int shown = g_optState.vis.nres < DOPT_RES_VIEW ? g_optState.vis.nres : DOPT_RES_VIEW;
+                int top = g_optState.restop;
+                if (n < top) top = n;
+                if (n >= top + shown) top = n - shown + 1;
+                if (top != g_optState.restop) {
+                    dopt_scroll(&g_optState, top - g_optState.restop);
+                    printf("OPTIONS|script|scrolled|restop=%d|for=optres pick %d\n",
+                           g_optState.restop, n);
+                }
+            }
+            if (!dopt_texset_item_rect_pub(&g_optState, DOPT_VE_RESOLUTION, n, &x, &y, &w, &h)) {
+                printf("SCRIPT|optres|entry %d has no rectangle (list shut, row scrolled "
+                       "out of the well, or entry outside the list's window)\n", n);
+                g_scriptFails++;
+            } else if (!strcmp(what, "hover")) {
+                dopt_motion(&g_optState, x + w / 2, y + h / 2);
+            } else {
+                dopt_press(&g_optState, x + w / 2, y + h / 2);
+            }
+        } else if (nargs >= 1) {
+            printf("SCRIPT|optres wants open|close|hover N|pick N|scroll D|bar upper|lower|inject ...\n");
+            g_scriptFails++;
+        }
+        {
+            int i, bx, by, bw, bh, lx = 0, ly = 0, lw = 0, lh = 0, lany = 0, rowh = 0;
+            int barx = 0, bary = 0, barw = 0, barh = 0;
+            const int haverow = dopt_texset_box_rect_pub(&g_optState, DOPT_VE_RESOLUTION, &bx, &by, &bw, &bh);
+            const int open = (g_optState.texdrop == DOPT_VE_RESOLUTION);
+            const int havebar = dopt_res_bar_rect(&g_optState, &barx, &bary, &barw, &barh);
+            int over = 0, nfit = 0;
+            for (i = 0; i < g_optState.vis.nres; i++) {
+                int ex, ey, ew, eh;
+                if (g_optState.vis.res_fit[i]) nfit++; else over++;
+                if (dopt_texset_item_rect_pub(&g_optState, DOPT_VE_RESOLUTION, i, &ex, &ey, &ew, &eh)) {
+                    if (!lany) { lx = ex; ly = ey; lw = ew; lh = eh; lany = 1; }
+                    else {
+                        if (ey < ly) { lh += ly - ey; ly = ey; }
+                        if (ey + eh > ly + lh) lh = ey + eh - ly;
+                    }
+                    rowh = eh;
+                }
+            }
+            printf("OPTRES|page=%d|advTop=%d|boxrect=%d|open=%d|value=%d|hot=%d|nres=%d",
+                   g_optState.page, g_optState.advTop, haverow, open,
+                   g_optState.vis.residx, g_optState.texhot, g_optState.vis.nres);
+            for (i = 0; i < g_optState.vis.nres; i++) {
+                const char* tip = dopt_texset_tooltip(&g_optState, i);
+                printf("|%d=%s%s", i, dopt_drop_text(&g_optState, DOPT_VE_RESOLUTION, i),
+                       tip ? " (DISABLED)" : "");
+            }
+            printf("|fx_res=%dx%d|fx_mode=%d|desktop=%dx%d|usable=%dx%d|bounds=%d"
+                   "|nmodes=%d|nmodes_distinct=%d|desktop_listed=%d|desktop_entry=%d"
+                   "|over_desktop=%d|nfit=%d|restop=%d|shown=%d|list=%d,%d,%dx%d|rowh=%d"
+                   "|bar=%d,%d,%dx%d|display=%d|injected=%d\n",
+                   (int)g_fx.res_w, (int)g_fx.res_h, (int)g_fx.display_mode,
+                   g_resInfo.deskw, g_resInfo.deskh, g_resInfo.usablew, g_resInfo.usableh,
+                   (g_resInfo.usablew > 0 && g_resInfo.usableh > 0) ? 1 : 0,
+                   g_resInfo.nmodes, g_resInfo.ndistinct, g_resInfo.desktop_listed,
+                   /* entry 0 is the desktop by construction; say so from the list, not the rule */
+                   (g_optState.vis.nres > 0 && g_optState.vis.res_w[0] == g_resInfo.deskw
+                    && g_optState.vis.res_h[0] == g_resInfo.deskh) ? 0 : -1,
+                   over, nfit, g_optState.restop,
+                   open ? (g_optState.vis.nres < DOPT_RES_VIEW ? g_optState.vis.nres : DOPT_RES_VIEW) : 0,
+                   lx, ly, lw, lh, rowh,
+                   havebar ? barx : -1, havebar ? bary : -1, havebar ? barw : 0, havebar ? barh : 0,
+                   g_resInfo.display, g_resInject.on);
+            if (g_optState.texhot >= 0) {
+                const char* tip = dopt_texset_tooltip(&g_optState, g_optState.texhot);
+                const char* info = dopt_texset_infotip(&g_optState, g_optState.texhot);
+                if (tip) printf("OPTRES|tooltip|%s\n", tip);
+                else if (info) printf("OPTRES|tooltip|%s\n", info);
+            }
+            fflush(stdout);
+        }
+    } else if (!strcmp(cmd, "opttype")) {
+        /* opttype TEXT: type into the save dialog's description field, through the
+           same dopt_text the SDL_TEXTINPUT branch calls. "opttype" alone clears the
+           field with backspaces, one per character, through the same key path. */
+        if (arg && *arg) {
+            dopt_text(&g_optState, arg);
+        } else {
+            int n = (int)strlen(dopt_slot_descr(&g_optState));
+            while (n-- > 0) dopt_key(&g_optState, DOPT_KEY_BACKSPACE);
+        }
+        printf("OPTIONS|script|type|descr=%s|ok-disabled=%d\n", dopt_slot_descr(&g_optState),
+               g_optState.page == DOPT_PAGE_SLOTS
+                   ? dopt_item_disabled(&g_optState, DOPT_SL_OK) : -1);
+    } else if (!strcmp(cmd, "optrow")) {
+        /* optrow N: press the Nth row of the slot list, by its rectangle, the way a
+           pointer would: the click lands in the well and the row is worked out from
+           the y, exactly as dopt_activate does it for a hand. */
+        int r = -1, x, y, w, h;
+        if (arg && sscanf(arg, "%d", &r) == 1 && g_optState.page == DOPT_PAGE_SLOTS
+            && dopt_item_rect(&g_optState, DOPT_SL_LIST, &x, &y, &w, &h)
+            && r >= g_optState.sl.top && r < g_optState.sl.nrows
+            && (r - g_optState.sl.top) * DOPT_SL_ROW_H < h) {
+            const int ry = y + 1 + (r - g_optState.sl.top) * DOPT_SL_ROW_H + DOPT_SL_ROW_H / 2;
+            dopt_press(&g_optState, x + w / 2, ry);
+            dopt_release(&g_optState, x + w / 2, ry);
+            printf("OPTIONS|script|row|%d|sel=%d|descr=%s\n", r, g_optState.sl.sel,
+                   dopt_slot_descr(&g_optState));
+        } else {
+            printf("SCRIPT|optrow|no such visible row '%s'\n", arg ? arg : "");
+            g_scriptFails++;
         }
     } else if (!strcmp(cmd, "optclick")) {
         /* optclick NAME: press and release on an item, by its DOS label. */
@@ -23397,10 +28363,27 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             printf("SCRIPT|optclick|no item named '%s' on page %d\n", arg,
                    g_optState.page);
             g_scriptFails++;
-        } else if (!dopt_item_rect(&g_optState, hit, &x, &y, &w, &h)) {
-            printf("SCRIPT|optclick|%s has no rectangle\n", arg);
-            g_scriptFails++;
         } else {
+            int have = dopt_item_rect(&g_optState, hit, &x, &y, &w, &h);
+            if (!have && g_optState.page == DOPT_PAGE_ADVANCED && hit < DOPT_VE_COUNT) {
+                /* SCROLL THE WELL TO THE ROW, the way a person would before clicking it:
+                   the Advanced page holds more rows than it shows (six display rows
+                   joined the top), and a row past the fold has no
+                   rectangle on purpose. The clamp is dopt_adv_clamp's, restated because
+                   that one is static to dosopt.c. */
+                const int last = (DOPT_VE_COUNT > DOPT_A_VIEW_ROWS) ? DOPT_VE_COUNT - DOPT_A_VIEW_ROWS : 0;
+                int top = (hit < g_optState.advTop) ? hit : hit - (DOPT_A_VIEW_ROWS - 1);
+                if (top > last) top = last;
+                if (top < 0) top = 0;
+                g_optState.advTop = top;
+                printf("OPTIONS|script|scrolled|advTop=%d|for=%s\n", top, arg);
+                have = dopt_item_rect(&g_optState, hit, &x, &y, &w, &h);
+            }
+            if (!have) {
+                printf("SCRIPT|optclick|%s has no rectangle\n", arg);
+                g_scriptFails++;
+                goto optclick_done;
+            }
             dopt_press(&g_optState, x + w / 2, y + h / 2);
             act = dopt_release(&g_optState, x + w / 2, y + h / 2);
             printf("OPTIONS|script|click|%s|at=%d,%d|act=%d|page=%d\n", arg,
@@ -23411,6 +28394,36 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             if (act == DOPT_ACT_RESUME) { g_optOpen = false; cur_unlock(); }
             else if (act == DOPT_ACT_SAVE) { if (opt_do_save()) { g_optOpen = false; cur_unlock(); } }
             else if (act == DOPT_ACT_LOAD) { if (opt_do_load()) { g_optOpen = false; cur_unlock(); } }
+            else if (act == DOPT_ACT_DELETE) { opt_do_delete(); }
+            else if (act == DOPT_ACT_VIDEO) {
+                /* The standalone renderer has no player, so this arm is reached only
+                   through a Restate with no text (which goes straight to the movie).
+                   The dialog closes as it would have; nothing plays. */
+                g_optOpen = false; cur_unlock();
+                printf("OPTIONS|restate|video|none|no player in this binary\n");
+            }
+            if (g_optOpen && g_optState.page == DOPT_PAGE_SLOTS) {
+                /* The slot dialog is up: its mode, rows and field, so a gate can read
+                   what the player would see rather than trust the click. */
+                int ri;
+                printf("SLOTS|open|mode=%d|rows=%d|sel=%d|top=%d|descr=%s|ok-disabled=%d\n",
+                       g_optState.sl.mode, g_optState.sl.nrows, g_optState.sl.sel,
+                       g_optState.sl.top, g_optState.sl.descr,
+                       dopt_item_disabled(&g_optState, DOPT_SL_OK));
+                for (ri = 0; dopt_slot_row_text(&g_optState, ri); ri++)
+                    printf("SLOTS|row|%d|slot=%d|%s\n", ri, g_optState.sl.rows[ri].slot,
+                           dopt_slot_row_text(&g_optState, ri));
+            }
+            if (g_optState.page == DOPT_PAGE_RESTATE) {
+                /* The objective box is up: say what it holds, so a gate can compare
+                   the lines against the mission file rather than trust the click. */
+                int li;
+                printf("RESTATE|open|lines=%d|video=%d|box=%d,%d %dx%d\n",
+                       g_optState.brlines, g_optState.rvideo, g_optState.rx,
+                       g_optState.ry, g_optState.rw, g_optState.rh);
+                for (li = 0; dopt_brief_line(&g_optState, li); li++)
+                    printf("RESTATE|line|%s\n", dopt_brief_line(&g_optState, li));
+            }
             /* Abort and Restart both END the mission interactively. A script cannot
                follow them out, because the script path has no exit_reason to hand back:
                `quit` simply returns false and the run finishes. So the dialog is closed
@@ -23428,7 +28441,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    ticking after this to see it land.
 
                    THE DECIDED-SCENARIO GUARD IS THE INTERACTIVE ARM'S, and it was
-                   missing here until 26 Aug 2026. A scenario that has already been
+                   missing here. A scenario that has already been
                    decided must not have a second verdict flagged over the top of the win
                    chain that is already running, and a script can reach that state as
                    easily as a player can -- more easily, because it can click faster.
@@ -23438,7 +28451,13 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 const bool wantwin = (act == DOPT_ACT_CHEAT_WIN);
                 g_optOpen = false;
                 cur_unlock();
-                if (g_gameOver.valid) {
+                if (nm_active()) {
+                    /* The one engine-moving cheat that had no nm_active() guard: the
+                       switches are refused in cheat_tick, but Instant Win went straight
+                       to BrainForceVerdict. Identical to the interactive arm below. */
+                    printf("CHEAT|verdict|%s|REFUSED, this is a network match\n",
+                           wantwin ? "win" : "lose");
+                } else if (g_gameOver.valid) {
                     printf("CHEAT|verdict|%s|IGNORED, this scenario is already decided\n",
                            wantwin ? "win" : "lose");
                 } else if (!BrainForceVerdict) {
@@ -23449,6 +28468,19 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                     printf("CHEAT|verdict|%s|flagged=%d|frame=%d\n",
                            wantwin ? "win" : "lose", got ? 1 : 0, g_engineFrame);
                 }
+                fflush(stdout);
+            }
+            else if (act == DOPT_ACT_SURRENDER) {
+                g_optOpen = false;
+                cur_unlock();
+                surrender_request(g_scriptOpts);
+                printf("OPTIONS|surrender|frame=%d\n", g_engineFrame);
+                fflush(stdout);
+            }
+            else if (act == DOPT_ACT_LEAVE) {
+                g_optOpen = false;
+                cur_unlock();
+                printf("OPTIONS|leave-match|frame=%d\n", g_engineFrame);
                 fflush(stdout);
             }
             else if (act == DOPT_ACT_ABORT || act == DOPT_ACT_RESTART) {
@@ -23465,6 +28497,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                        act == DOPT_ACT_RESTART ? "restart" : "abort", g_engineFrame);
                 fflush(stdout);
             }
+        optclick_done: ;
         }
     } else if (!strcmp(cmd, "optslider")) {
         /* optslider NAME FRACTION: drag a slider to a fraction of its travel, through
@@ -23561,6 +28594,8 @@ static int run_script(const char* path, SDL_Window* win, int fbw, int fbh)
 static int s_netMode = 0;
 static const char* s_netAddr = NULL;
 static int s_netPort = NM_PORT_DEFAULT;
+static int s_netPlayers = 2;   /* --players N: humans in the match. The host decides. */
+static int s_camHudOn = 0;     /* --camhud: the camera readout, off unless asked for  */
 
 int game_parse_args(int argc, char** argv, GameOpts* out)
 {
@@ -23579,7 +28614,7 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
        pointed into `../brain/`, which exists in the development tree and in no release.
        That single fact is why every shipped build has needed a launcher script to pass
        `--dir` and `--content`, and why the project owner ended up looking at four .bat files and
-       asking which one was the game (21 Aug 2026).
+       asking which one was the game.
        Probed rather than switched on a build flag, so one binary serves both layouts. */
     const char* dylib   = NULL;   /* NULL -> probe, see find_brain() */
     const char* dir     = dir_exists("missions")     ? "missions/"
@@ -23603,6 +28638,10 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     const char* efxpack = "efx.pack";
     const char* verdictpack = "verdict.pack";
     const char* dostib  = "dostib.pack";  /* the cartridge's real tiberium art */
+    const char* tib3d   = "tib3d.pack";   /* solid crystals, Enhanced only     */
+    const char* tree3d  = "tree3d.pack";  /* leafy trees, Enhanced only        */
+    int texset = -1;                      /* --texset: <0 leaves the cartridge's */
+    int enhanced_player = 0;              /* --enhanced: the whole player picture */
     const char* doscrate = "doscrate.pack"; /* the two bonus-crate overlays    */
     const char* smudge  = "smudge.pack";  /* scorch marks, craters, building aprons */
     const char* dosdata = "dosdata";   /* the 1995 sound archives                */
@@ -23622,6 +28661,11 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
        build list, because a skirmish has no campaign to unlock it. */
     int skirmish = 0, side = 0, ai_count = 1, credits = 5000;
     int mp_tiberium = 1, mp_crates = 0, mp_super = 1, mp_bases = 1;
+    /* Both of these are lobby checkboxes with no command line behind them, which left
+       the two things they change -- what happens to a house whose player walks out, and
+       whether a defenceless base is finished -- reachable only by two people and a
+       screen. The gates need them from a script. */
+    int mp_aitake = 0, mp_shortgame = 0;
     /* MEASURED ACROSS EVERY SHIPPED SKIRMISH MAP AND BOTH START POSITIONS, not chosen.
        The engine scatters the escort within about four cells of the MCV, and any unit that
        lands inside the 3x3 Construction Yard pad makes the player's first click do nothing.
@@ -23633,7 +28677,12 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     int mp_units = 0;
     int edit = 0;
     int start_wp[8];
-    for (int w = 0; w < 8; w++) start_wp[w] = -1;
+    /* SEAT ORDER BY DEFAULT: seat w starts on start w unless --start says otherwise. This
+       is the command line's rule and it is what every skirmish gate's world is built on;
+       -1 ("unpicked, deal it at random") is the LOBBY's word and arrives only from there.
+       Defaulting to -1 here moved both bases in every scripted skirmish
+       and G135's eight-thousand-tick fight never happened. */
+    for (int w = 0; w < 8; w++) start_wp[w] = w;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--dylib") && i + 1 < argc)        dylib = argv[++i];
@@ -23668,12 +28717,24 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         /* --showwindow: watch a SCRIPTED run. See the note where script implies hidden. */
         else if (!strcmp(argv[i], "--showwindow"))              g_scriptShowWindow = 1;
         else if (!strcmp(argv[i], "--skirmish"))                skirmish = 1;
-        /* A NETWORK MATCH. --host [port] waits for one joiner; --join ADDR [port] joins.
-           Both are a skirmish underneath, with two humans in seats 0 and 1 and --ai
-           computers after them (0 is allowed here, and is the two player match). */
+        /* A NETWORK MATCH. --host [port] waits for --players - 1 joiners; --join ADDR
+           [port] joins. Both are a skirmish underneath, with the humans in seats 0..N-1
+           and --ai computers after them (0 is allowed, and two humans with no computers
+           is the smallest match).
+
+           --players IS THE HOST'S AND ONLY THE HOST'S. A joiner is told how many people
+           are in the match by the handshake and has no say, exactly as it has no say
+           about the map or the credits. Passing it to a joiner is accepted and ignored
+           rather than refused, because the alternative is a player who cannot join a
+           four-way by typing the same command line as everybody else. */
         else if (!strcmp(argv[i], "--host")) {
             s_netMode = 1;
             if (i + 1 < argc && argv[i + 1][0] != '-') s_netPort = atoi(argv[++i]);
+        }
+        else if (!strcmp(argv[i], "--players") && i + 1 < argc) {
+            s_netPlayers = atoi(argv[++i]);
+            if (s_netPlayers < 2) s_netPlayers = 2;
+            if (s_netPlayers > NM_MAX_SEATS) s_netPlayers = NM_MAX_SEATS;
         }
         else if (!strcmp(argv[i], "--join") && i + 1 < argc) {
             s_netMode = 2;
@@ -23688,6 +28749,8 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--credits") && i + 1 < argc) credits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--notiberium"))              mp_tiberium = 0;
         else if (!strcmp(argv[i], "--crates"))                  mp_crates = 1;
+        else if (!strcmp(argv[i], "--aitakeover"))              mp_aitake = 1;
+        else if (!strcmp(argv[i], "--shortgame"))               mp_shortgame = 1;
         else if (!strcmp(argv[i], "--unitcount") && i + 1 < argc) mp_units = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--nosuper"))                 mp_super = 0;
         else if (!strcmp(argv[i], "--starts") && i + 1 < argc) {
@@ -23700,6 +28763,7 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                 if (*v == ',') v++;
             }
         }
+        else if (!strcmp(argv[i], "--camhud"))                  s_camHudOn = 1;
         else if (!strcmp(argv[i], "--picktest"))                picktest = true;
         else if (!strcmp(argv[i], "--nominimap"))               radar_off = true;
         /* --noshade: draw the terrain unlit, the way this build looked before the
@@ -23750,6 +28814,7 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         /* --edit takes the right-hand edge for the editor panel, so the game's own
            sidebar stands down. Ctrl+P hands it back for the duration of a playtest. */
         else if (!strcmp(argv[i], "--noshroud"))                { g_shroudOn = 0; g_shroudCLIOff = true; }
+        else if (!strcmp(argv[i], "--norim"))                   g_shroudRimOn = 0;   /* the map's edge ring uncovered: the gate's trap */
         else if (!strcmp(argv[i], "--hardshroud"))              g_shroudSoft = 0;
         else if (!strcmp(argv[i], "--clumptrees"))              g_clumpTrees = true;
         else if (!strcmp(argv[i], "--nohb"))                    g_hbOn = 0;
@@ -23762,12 +28827,33 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--efx") && i + 1 < argc)     efxpack = argv[++i];
         else if (!strcmp(argv[i], "--verdict") && i + 1 < argc) verdictpack = argv[++i];
         else if (!strcmp(argv[i], "--dostib") && i + 1 < argc)  dostib = argv[++i];
+        else if (!strcmp(argv[i], "--tib3d") && i + 1 < argc)   tib3d = argv[++i];
+        /* THE TERRAIN ART SET, and it is an explicit opt-in for the same reason
+           --dosinf is one. game_visuals_default_enhanced applies the preference for the
+           PLAYER; this instrument never does, so every gate keeps the cartridge's own
+           ground whatever a preset carries. Without this there was no way to render the
+           picture a player actually sees, which is what a look has to be judged on. */
+        else if (!strcmp(argv[i], "--texset") && i + 1 < argc)  texset = atoi(argv[++i]);
+        /* THE PLAYER'S ENHANCED PICTURE, not just the post chain. --gfx turns the chain
+           on and applies the filter, and that is ALL it does, because this program is a
+           measuring instrument: the terrain art, the infantry art, the 640x480 sidebar,
+           the UI scale and the soft decal edge are applied for the player by
+           game_visuals_default_enhanced and by the Visuals dialog, and never here.
+           So a screenshot taken with --gfx is the Enhanced CHAIN over the console's
+           sprites, sidebar and hard decal edges -- which is not the picture anybody
+           plays, and is not what a look should be judged on. This flag applies the same
+           set that function does. Opt-in, so no gate reaches it. */
+        else if (!strcmp(argv[i], "--enhanced")) { enhanced_player = 1; g_fx.enabled = 1; }
+        else if (!strcmp(argv[i], "--notib3d"))                 tib3d = NULL;
+        else if (!strcmp(argv[i], "--tree3d") && i + 1 < argc)  tree3d = argv[++i];
+        else if (!strcmp(argv[i], "--notree3d"))                tree3d = NULL;
         else if (!strcmp(argv[i], "--doscrate") && i + 1 < argc) doscrate = argv[++i];
         else if (!strcmp(argv[i], "--smudge") && i + 1 < argc)  smudge = argv[++i];
         else if (!strcmp(argv[i], "--nosmudge"))                g_smOn = false;
         else if (!strcmp(argv[i], "--dosdata") && i + 1 < argc) dosdata = argv[++i];
         else if (!strcmp(argv[i], "--audiowav") && i + 1 < argc) audiowav = argv[++i];
         else if (!strcmp(argv[i], "--nosound"))                 nosound = 1;
+        else if (!strcmp(argv[i], "--audiodevicetest"))         g_audioDeviceTest = 1;
         else if (!strcmp(argv[i], "--dumpsound"))               g_dumpsound = true;
         else if (!strcmp(argv[i], "--theme") && i + 1 < argc)   g_theme = argv[++i];
         else if (!strcmp(argv[i], "--musicvol") && i + 1 < argc) { musicvol = atoi(argv[++i]); musicvol_set = 1; }
@@ -23800,6 +28886,10 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--camflip") && i + 1 < argc) g_camflip = atof(argv[++i]);
         else if (!strcmp(argv[i], "--nopips"))                  g_pipOn = false;
         else if (!strcmp(argv[i], "--autoplay"))                g_autoplay = true;
+        else if (!strcmp(argv[i], "--autorestate"))             g_autorestate = true;
+        else if (!strcmp(argv[i], "--autoload"))                g_autoload = true;
+        else if (!strcmp(argv[i], "--autosave"))                g_autosave = true;
+        else if (!strcmp(argv[i], "--autorestateshot") && i + 1 < argc) g_autorestateShot = argv[++i];
         else if (!strcmp(argv[i], "--edgeplay"))                g_edgePlay = true;
         else if (!strcmp(argv[i], "--hidpi"))                   g_hiDpi = 1;
         else if (!strcmp(argv[i], "--noclip"))                  g_clip_to_map = false;
@@ -23818,6 +28908,10 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--dumpfacing"))              g_dumpfacing = true;
         else if (!strcmp(argv[i], "--posetest") && i + 1 < argc) posetest = argv[++i];
         else if (!strcmp(argv[i], "--turtest") && i + 1 < argc)  g_turTest = atoi(argv[++i]);
+        /* --treadtest N: hold every running track at phase N/16 instead of taking it
+           from how far the vehicle has driven, so a still screenshot can show the track
+           at a known point of its cycle. */
+        else if (!strcmp(argv[i], "--treadtest") && i + 1 < argc) g_treadTest = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--diamonds"))                g_diamonds = true;
         else if (!strcmp(argv[i], "--ordermarks"))              g_orderMarksOn = true;
         else if (!strcmp(argv[i], "--noordermarks"))            g_orderMarksOn = false;
@@ -23885,7 +28979,11 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--resize") && i + 2 < argc) {
             g_resizeW = atoi(argv[++i]); g_resizeH = atoi(argv[++i]);
         }
+#if defined(CNC3D_COOKED) && CNC3D_COOKED
+        else if (!strcmp(argv[i], "--gfxpanel")) { g_fx.enabled = 1; fprintf(stderr, "FX|panel|unavailable in a cooked build\n"); }
+#else
         else if (!strcmp(argv[i], "--gfxpanel")) { g_fx.enabled = 1; fxp_toggle(); }
+#endif
         else if (!strcmp(argv[i], "--gfxshadowdump") && i + 1 < argc)
             g_fxShadowDump = argv[++i];
         else if (!strcmp(argv[i], "--gfxsave") && i + 1 < argc)
@@ -23955,6 +29053,9 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                 "                minimapon | minimapoff | state | echo TEXT | quit |\n"
                 "                options | optclick LABEL | optslider LABEL FRACTION\n"
                 "                optscroll N (the Advanced page's wheel, N rows, +down)\n"
+                "                opttex|optinf|optpersp [open|close|hover N|pick N]\n"
+                "                optres [open|close|hover N|pick N|scroll D|bar upper|lower|\n"
+                "                       inject DW DH UW UH W1xH1,...] (the Resolution list)\n"
                 "  --picktest    verify the screen<->world inverse numerically, in BOTH\n"
                 "                camera modes, and exit\n"
                 "  --confine     MULTI-DISPLAY desktops: while the window is genuinely\n"
@@ -23980,6 +29081,12 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                 "  --dosinf F    the 1995 MS-DOS infantry sprites (default\n"
                 "                dosinfantry.pack; missing file = N64 art, loudly)\n"
                 "  --nodosinf    keep the N64 infantry billboards\n"
+                "  --texset N    terrain art: 0 the cartridge bank, 1 the 1995 DOS\n"
+                "  --enhanced    the PLAYER's Enhanced picture, not just the post\n"
+                "                chain: terrain and infantry art, the 640x480\n"
+                "                sidebar and the soft decal edge as well\n"
+                "                art, 2 Remastered. Left alone unless asked for, so\n"
+                "                every gate keeps the cartridge ground\n"
                 "  --dosmake F   OPT-IN: the 1995 MAKE.SHP scaffold instead of the\n"
                 "                default N64 section-by-section construction\n"
                 "  --dosdata D   the 1995 MS-DOS sound archives: SOUNDS.MIX, SPEECH.MIX,\n"
@@ -23987,6 +29094,18 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                 "  --audiowav F  open no sound device; render the mix into F as a WAV,\n"
                 "                clocked off the SIM, so a --script run is reproducible\n"
                 "  --nosound     no device, no recording, no noise\n"
+                "  --audiodevicetest  TEST ONLY: ask for a sound device even though the\n"
+                "                run is automated; refused unless SDL_AUDIODRIVER is set\n"
+                "  --camhud      show the camera readout from the start (F8 toggles it).\n"
+                "                Off by default: it is a debug instrument and it draws\n"
+                "                over the sidebar's OPTIONS and DATABASE tabs\n"
+                "  --host [PORT] host a network match on PORT (default 17421) and wait\n"
+                "                for --players - 1 people to join\n"
+                "  --join A [P]  join the match hosted at address A on port P\n"
+                "  --players N   how many PEOPLE are in the match, 2 to 8. The host says\n"
+                "                so and every joiner is told; passing it to a joiner is\n"
+                "                ignored. --ai N adds computers after the people, and the\n"
+                "                two together cannot pass 8 seats\n"
                 "  --dumpsound   print every sound and speech event the brain raises,\n"
                 "                with its index, position and whether the disc had it\n"
                 "  --theme NAME  open the mission on this score track instead of AOI\n"
@@ -24057,6 +29176,10 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     out->dosinf = dosinf; out->dosmake = dosmake; out->efx = efxpack;
     out->verdict = verdictpack;
     out->dostib = dostib;
+    out->tib3d = tib3d;
+    out->tree3d = tree3d;
+    out->texset = texset;
+    out->enhanced = enhanced_player;
     out->doscrate = doscrate;
     out->smudge = smudge;
     out->build = build;   out->ticks = shot_ticks;
@@ -24068,7 +29191,7 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     /* A SCRIPTED RUN IS AUTOMATED BY DEFINITION, so it does not open a window in the
        operator's face and it does not start playing music at them.
 
-       the project owner, 26 Aug 2026: "Every time you test a build / start the game, during your work
+       Reported: "Every time you test a build / start the game, during your work
        on the game, the game immediately starts playing music (because thats what the game
        does when you open a mission). This is really annoying. Also the window takes over
        the entire claude session."
@@ -24107,12 +29230,16 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     out->credits = credits;
     out->tiberium = mp_tiberium;
     out->crates = mp_crates;
+    out->ai_takeover = mp_aitake;
+    out->short_game = mp_shortgame;
     out->superweapons = mp_super;
     out->bases = mp_bases;
     out->unit_count = mp_units;
     out->net_mode = s_netMode;
     out->net_addr = s_netAddr;
     out->net_port = s_netPort;
+    out->net_players = s_netPlayers;
+    g_camHud = s_camHudOn;
     if (s_netMode) out->skirmish = 1;   /* a match is a skirmish with two humans in it */
     /* EIGHT, not six. The local array, the struct and the roster have all been eight
        long since the 8-player brain patch; this loop was the one place still stopping at
@@ -24149,12 +29276,6 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
 
    Returns 1 on success. On failure it returns 0 having printed why; the shell puts
    the menu back rather than killing the program. */
-/* WHAT MISSION IS RUNNING, kept from the boot options so a save can record it and a load
-   can refuse a slot written in a different one. The engine's payload carries the scenario
-   number, but not which .pack the renderer needs for the terrain, models and tiberium. */
-static char g_bootScen[12] = "";
-static char g_bootPack[24] = "";
-static int  g_bootBuild = 0;
 
 /* The campaign position, which the SHELL owns (g_camp in app/cnc3d.cpp) and the renderer
    only carries. Handed down before a save and read back after a load. */
@@ -24167,6 +29288,12 @@ void game_set_campaign(int active, int side, int scenario, int dir, int var)
     g_campSave[2] = (unsigned char)scenario;
     g_campSave[3] = (unsigned char)dir;
     g_campSave[4] = (unsigned char)var;
+}
+
+void game_set_movie_player(int (*play)(void* user, const char* name), void* user)
+{
+    g_moviePlay = play;
+    g_movieUser = user;
 }
 
 void game_get_campaign(int* active, int* side, int* scenario, int* dir, int* var)
@@ -24395,6 +29522,13 @@ int game_load_slot(int slot)
        A load is a DISCONTINUITY: anything here that works by diffing this tick against the
        last one has to be told, or it will read the jump as an event. */
     g_viewApplied = true;          /* or the scenario's one-shot VIEW| yanks the camera */
+    /* The campaign position the slot was saved at, so the shell reads it back after
+       the mission and a won mission carries on from where the save left it. */
+    g_campSave[0] = tab[slot].camp_active;
+    g_campSave[1] = tab[slot].camp_side;
+    g_campSave[2] = tab[slot].camp_scenario;
+    g_campSave[3] = tab[slot].camp_dir;
+    g_campSave[4] = tab[slot].camp_var;
     g_camMode = (int)tab[slot].cam_mode;
     g_camX = (float)tab[slot].camx_m / 1000.0f;
     g_camZ = (float)tab[slot].camz_m / 1000.0f;
@@ -24418,6 +29552,11 @@ int game_load_slot(int slot)
        to invalidate, and its live pool holds those indices too. Neither may survive a
        mission. g_deathFirstFrame is cleared for the same reason: engine frames restart. */
     shatter_reset();
+    /* The tread marks and the claimed footprints belong to the timeline just abandoned,
+       and the recorded tick queue is keyed on g_engineFrame, which restarts. Both go.
+       The static geometry does NOT: the terrain and the play rectangle are the same, and
+       rebuilding a 20 MB buffer on a load would be a visible stall for no reason. */
+    grass_crush_reset();
     dmg_reset();
     efx_mesh_reset();
     g_deathFirstFrame.clear();
@@ -24426,6 +29565,8 @@ int game_load_slot(int slot)
     g_sbRepairOn = false;
     g_sbSellOn = false;
     sb_cancel_placement();
+    /* The loaded world's bank is a new baseline for the credit tick, not a change. */
+    g_cashPrev = -1;
 
     refresh_objects();             /* rebuilds objects, walls, riders, tiberium, pads */
 
@@ -24435,6 +29576,15 @@ int game_load_slot(int slot)
        this the ambush you already survived arrives again on every reload. */
     enh_load_state(slot);
     g_feedTick0 = -1;
+    g_chat.clear();
+    /* A NEW MISSION IS NOT STILL SHOWING THE LAST ONE'S ENDING. Both of these outlive a
+       mission otherwise: the map would open fully revealed and the next verdict would
+       think its reveal had already run. */
+    g_verdictRevealMs = -1.0;
+    g_surrendered = 0;
+    g_surrSeats = 0;
+    shroud_reveal(0);
+    sb_set_spectator(0);
 
     if (g_au && tab[slot].music >= 0)
         cnc_music_play_index(g_au, tab[slot].music);
@@ -24445,45 +29595,117 @@ int game_load_slot(int slot)
     return 1;
 }
 
-/* SAVE and LOAD from the pause dialog. Shared by the SDL handler and the script's
-   `optclick`, because the house rule here is that a green script is evidence about the
-   real UI rather than about a parallel test path -- and the first version of this WAS a
-   parallel path, which is why the gate saw the click land and nothing happen.
+/* SAVE, LOAD and DELETE from the pause dialog. Shared by the SDL handler and the
+   script's `optclick`, because the house rule here is that a green script is evidence
+   about the real UI rather than about a parallel test path -- and the first version of
+   this WAS a parallel path, which is why the gate saw the click land and nothing happen.
 
-   There is no slot picker yet. 1995's is LoadOptionsClass, a 250x156 box with a 236x104
-   ListClass and a 236x13 EditClass shown only in SAVE mode (loaddlg.cpp:106-260), and it
-   is registered in known-gap notes as still owed. Until it exists SAVE takes the next free
-   slot and names it after the mission and the frame, and LOAD takes the newest slot
-   belonging to the mission that is running -- the only one this process can load, because
-   the terrain and models come from the .pack it booted with. */
-static bool opt_do_save(void)
+   The slot dialog (dosopt.c, loaddlg.cpp's LoadOptionsClass) names the file number and,
+   for a save, the typed description; these three do the file work. A load names a slot
+   that may belong to ANOTHER mission: the terrain and the models come from the .pack
+   this process booted with, so such a load leaves the mission through GAME_EXIT_LOADSLOT
+   and the shell boots the recorded scenario and loads the slot into it (game_boot,
+   GameOpts::load_slot1). A slot saved in the running mission loads in place. */
+static int g_pendingLoadSlot = -1;
+
+/* SDL delivers SDL_TEXTINPUT only while text input is on, and this file turns it on
+   for exactly the pages that type: the save dialog's description field here. Checked
+   after every event the dialog takes, so the page changes inside dosopt.c need no
+   hook of their own; never stopped unless this started it, because the chat line and
+   the editor's fields run their own. */
+static bool g_optTextInput = false;
+static void opt_sync_textinput(void)
 {
-    DS_Slot tab[DS_SLOTS];
-    char d[48];
-    int sl;
-    ds_read_index(tab);
-    sl = ds_first_free(tab);
-    if (sl < 0) sl = DS_SLOTS - 1;   /* overwrite the last rather than refuse to save */
-    snprintf(d, sizeof d, "%s frame %d", g_bootScen, g_engineFrame);
-    return game_save_slot(sl, d) != 0;
+    const bool want = g_optOpen && g_optState.page == DOPT_PAGE_SLOTS
+                      && g_optState.sl.mode == DOPT_SL_SAVE;
+    if (want && !g_optTextInput) { SDL_StartTextInput(); g_optTextInput = true; }
+    else if (!want && g_optTextInput) { SDL_StopTextInput(); g_optTextInput = false; }
 }
 
+/* The rows the slot dialog lists: every occupied slot, newest first (loaddlg.cpp:690
+   sorts on the file's date, which is what ds_read_index reads back), each as
+   "(GDI) description". The house is the scenario's side: a mission is played as the
+   house its code names, and no skirmish is ever saved (game_save_slot refuses). */
+static int opt_slot_rows(void* user, DOPT_SlotRow* out, int max)
+{
+    DS_Slot tab[DS_SLOTS];
+    int order[DS_SLOTS];
+    int i, j, n = 0;
+    (void)user;
+    ds_read_index(tab);
+    for (i = 0; i < DS_SLOTS; i++)
+        if (tab[i].used) order[n++] = i;
+    /* newest first; equal times fall back to the engine frame, then the number */
+    for (i = 1; i < n; i++) {
+        const int k = order[i];
+        j = i;
+        while (j > 0) {
+            const DS_Slot* a = &tab[order[j - 1]];
+            const DS_Slot* b = &tab[k];
+            const bool older = (a->mtime < b->mtime)
+                            || (a->mtime == b->mtime && a->frame < b->frame)
+                            || (a->mtime == b->mtime && a->frame == b->frame && a->slot > b->slot);
+            if (!older) break;
+            order[j] = order[j - 1];
+            j--;
+        }
+        order[j] = k;
+    }
+    if (n > max) n = max;
+    for (i = 0; i < n; i++) {
+        const DS_Slot* r = &tab[order[i]];
+        out[i].slot = r->slot;
+        snprintf(out[i].text, sizeof out[i].text, "(%s) %s",
+                 (r->scen[2] == 'B') ? "NOD" : "GDI", r->descr);
+    }
+    return n;
+}
+
+static bool opt_do_save(void)
+{
+    const int sl = dopt_slot_pick(&g_optState);
+    return game_save_slot(sl, dopt_slot_descr(&g_optState)) != 0;
+}
+
+/* Returns true when the dialog should close: the load happened here, or it has been
+   handed to the shell. The mission ends in the second case; the caller reads
+   g_pendingLoadSlot through game_pending_load_slot after game_loop returns. */
 static bool opt_do_load(void)
 {
     DS_Slot tab[DS_SLOTS];
-    int i, best = -1, bestFrame = -1;
+    const int sl = dopt_slot_pick(&g_optState);
+    if (sl < 0 || sl >= DS_SLOTS) return false;
     ds_read_index(tab);
-    for (i = 0; i < DS_SLOTS; i++)
-        if (tab[i].used && !strcmp(tab[i].scen, g_bootScen) && tab[i].frame > bestFrame) {
-            bestFrame = tab[i].frame;
-            best = i;
-        }
-    if (best < 0) {
-        printf("LOAD|no slot saved in %s\n", g_bootScen);
+    if (!tab[sl].used) {
+        printf("LOAD|slot=%d|REFUSED empty\n", sl);
         fflush(stdout);
         return false;
     }
-    return game_load_slot(best) != 0;
+    if (!g_bootScen[0] || !strcmp(tab[sl].scen, g_bootScen))
+        return game_load_slot(sl) != 0;
+    /* Another mission's slot: the shell boots that mission and loads it there. */
+    g_pendingLoadSlot = sl;
+    printf("LOAD|slot=%d|saved in %s, running %s: handing over to the shell\n",
+           sl, tab[sl].scen, g_bootScen);
+    fflush(stdout);
+    return true;
+}
+
+static bool opt_do_delete(void)
+{
+    const int sl = dopt_slot_pick(&g_optState);
+    const int ok = ds_delete(sl);
+    printf("DELETE|slot=%d|%s\n", sl, ok ? "removed" : "REFUSED");
+    fflush(stdout);
+    dopt_slots_reload(&g_optState);
+    return ok != 0;
+}
+
+int game_pending_load_slot(void)
+{
+    const int sl = g_pendingLoadSlot;
+    g_pendingLoadSlot = -1;
+    return sl;
 }
 
 int game_slot_list(DS_Slot* out, int max)
@@ -24677,11 +29899,18 @@ int game_boot(SDL_Window* win, const GameOpts* o)
 {
     crash_stage_install();
     g_bootStage = "game_boot entry";
+    g_bootRefusal[0] = 0;   /* this start's reason, not the last one's */
     if (o) {
         snprintf(g_bootScen, sizeof g_bootScen, "%s", o->scen ? o->scen : "");
         snprintf(g_bootPack, sizeof g_bootPack, "%s", o->pack ? o->pack : "");
         g_bootBuild = o->build;
         g_editOn = (o->edit != 0);
+        /* The briefing, for Restate. Read here, once per mission, from the same INI
+           the engine is about to read and from MISSION.INI when that carries none. */
+        brief_load(o->dir, o->scen, o->dosdata);
+        g_autorestateStep = 0;
+        g_autoloadStep = 0;
+        g_autosaveStep = 0;
         g_shroudEditorOff = g_editOn ? 1 : 0;
         /* Enhanced rules are read whether this is a play or an edit: PLAYING is the whole
            point of them, and the editor needs them to show what the map already carries.
@@ -24755,13 +29984,42 @@ int game_boot(SDL_Window* win, const GameOpts* o)
        not end this one at tick 0. */
     memset(&g_gameOver, 0, sizeof(g_gameOver));
     g_simTicks = 0;
+    /* The credit tick compares polls; the first poll of a new world is a baseline and
+       not a change, or a mission that opens richer than the last one ended would trill. */
+    g_cashPrev = -1;
+    g_cashLastStep = 0;
+    g_cashUp = g_cashDown = g_cashNoVoice = g_cashSilent = 0;
 
     std::string packpath;
     if (o->pack) packpath = o->pack;
     else { packpath = o->scen; packpath += ".pack"; }
 
+    /* THE ONE PRECHECK, and only one on purpose. The engine composes the mission file's
+       name exactly as this does (directory and scenario glued with no separator, then
+       .INI) and reads it as a plain file, so a name this cannot open is a name the engine
+       cannot open either, and refusing here says which file rather than "the engine
+       refused". The theater archive is deliberately NOT prechecked: the engine now
+       survives a missing or damaged one, and a check that mirrored its Theater= rules
+       imperfectly would refuse missions the engine plays. */
+    g_bootStage = "boot_precheck (the mission file)";
+    {
+        char ini[1024];
+        snprintf(ini, sizeof ini, "%s%s.INI", o->dir ? o->dir : "", o->scen ? o->scen : "");
+        FILE* pf = fopen(ini, "rb");
+        if (!pf) {
+            boot_refuse("The mission file %s is missing", ini);
+            g_bootStage = "boot_precheck refused this mission start (no mission is running)";
+            return 0;
+        }
+        fclose(pf);
+    }
+
     g_bootStage = "boot_brain (load dylib, CNC_Init, start scenario)";
     if (!boot_brain(find_brain(o->dylib), o->content, o->dir, o->scen, o->build, o)) {
+        /* Every refusal inside names itself; this is the floor under the ones that do
+           not (a lobby that could not be armed, a skirmish the engine would not seat). */
+        if (!g_bootRefusal[0])
+            boot_refuse("The engine refused to start mission %s", o->scen ? o->scen : "");
         /* A REFUSED START IS NOT A RUNNING MISSION, and the breadcrumb has to stop
            naming the step that refused. game_shutdown clears the stage on the way out of
            a mission that ran, but no caller runs a shutdown after a boot that turned
@@ -24805,16 +30063,26 @@ int game_boot(SDL_Window* win, const GameOpts* o)
     set_dist(g_dist);
     g_bootStage = "load_pack (the mission's art)";
     if (!load_pack(packpath.c_str(), g_pack)) {
+        /* load_pack has already said on stderr exactly which read refused; the player's
+           sentence only has to tell "not there" from "there but unreadable". */
+        if (access(packpath.c_str(), R_OK) != 0)
+            boot_refuse("The mission's art file %s is missing", packpath.c_str());
+        else
+            boot_refuse("The mission's art file %s is damaged or from another build",
+                        packpath.c_str());
         g_bootStage = "load_pack refused this mission start (no mission is running)";
         return 0;
     }
+    load_debug_pack(packpath.c_str());
     /* TEAM COLOURS, in the one place both halves are ready: the houses were assigned when
        the scenario was read, and the two decodes the extra liveries are built from only
        exist once the pack is loaded. The seat count is the lobby's, clamped the same way
        arm_skirmish clamps it, so the walk asks about exactly the seats that were seated. */
     if (o->skirmish && g_teamColours) {
+        /* The same count the roster uses, and for the same reason: "computers plus one"
+           counts nobody in an all human room, so half the field went unpainted. */
         const int ge_ai = (o->ai_count < 1) ? 1 : (o->ai_count > 7 ? 7 : o->ai_count);
-        livery_resolve(ge_ai + 1);
+        livery_resolve(g_matchRows > 0 ? g_matchRows : (ge_ai + 1));
         livery_build();
     }
 
@@ -24885,6 +30153,50 @@ int game_boot(SDL_Window* win, const GameOpts* o)
     }
     verdict_load(o->verdict);   /* needs the live GL context: it uploads textures */
     dostib_load(o->dostib);
+    /* Enhanced only when it draws, but loaded unconditionally: the panel can turn
+       the chain on mid-game and a load needs a live GL context, which this is. */
+    if (o->tib3d) tib3d_load(o->tib3d);
+    if (o->tree3d) tree3d_load(o->tree3d);
+    /* --texset, applied here because g_pack is loaded by now and the answer depends on
+       it. AND IT SAYS SO WHEN IT CANNOT BE HONOURED, which is the whole reason this
+       block is more than one line: a pack older than CNC3DPKG carries no DOS terrain
+       index at all (load_pack leaves terrainTexDos at -1 on any magic below 'G'), so
+       terrain_texset_drawn falls straight back to the cartridge bank. The switch itself
+       still logs that it moved, so the request looks answered, the ground is unchanged,
+       and every screenshot taken that way is the cartridge's art under another name.
+       Three rounds of previews went out that way before anybody looked at the pixels. */
+    /* THE PLAYER'S ENHANCED PICTURE. The same set game_visuals_default_enhanced applies
+       for the player, applied here because this program never calls that function: the
+       chain alone leaves the console's infantry, the 1995 sidebar and the cartridge's
+       hard decal edge in a shot that is meant to show what Enhanced looks like. */
+    if (o->enhanced) {
+        fx_filter_set(g_fx.bilinear);
+        if (o->texset < 0)
+            fx_texset_set((int)g_fx.texset);
+        fx_infset_set((int)g_fx.infset);
+        sb_set_hud_new(g_fx.new_hud != 0);
+        sb_set_ui_scale(1 + (int)(g_fx.ui_scale + 0.5f));
+        decal_set_soft(g_fx.decal_soft);
+        fprintf(stderr, "FX|enhanced|the player's picture: terrain %s, infantry %s, "
+                        "%s sidebar, decal edge %.2f, bilinear %s\n",
+                fx_texset_name(terrain_texset_drawn()), fx_infset_name(fx_infset_get()),
+                g_fx.new_hud ? "640x480" : "1995 DOS", g_fx.decal_soft,
+                g_fx.bilinear ? "on" : "off");
+    }
+    if (o->texset >= 0) {
+        fx_texset_set(o->texset);
+        /* Asking for the cartridge art on the command line is the same choice the panel
+           row makes, so it has the same consequence for the grass. */
+        fx_grass_follow_texset();
+        const int drawn = terrain_texset_drawn();
+        if (drawn != o->texset)
+            fprintf(stderr, "FX|texset|ASKED FOR %s AND THIS PACK CANNOT DRAW IT: %s "
+                            "is on the ground instead. %s carries no atlas for it "
+                            "(pack magic %.8s; the DOS bank needs CNC3DPKG or later, "
+                            "rebaked by tools/bakery/bake5.py)\n",
+                    fx_texset_name(o->texset), fx_texset_name(drawn),
+                    packpath.c_str(), g_pack.magic);
+    }
     doscrate_load(o->doscrate);
     smudge_load(o->smudge);
 
@@ -24917,8 +30229,13 @@ int game_boot(SDL_Window* win, const GameOpts* o)
            repeated. The seat count is the lobby's, clamped exactly as arm_skirmish clamps
            it, and it is set OUTSIDE the team-colour test above because --noteamcolours
            turns paint off, not players. */
-        g_rosterSeats = o->skirmish
-                      ? (((o->ai_count < 1) ? 1 : (o->ai_count > 7 ? 7 : o->ai_count)) + 1)
+        /* HOW MANY PLAYERS ARE ACTUALLY IN IT, which arm_skirmish has already counted off
+           the seat table. This used to be "computers plus one", which is right for a
+           skirmish and wrong for every match: an all human room has no computers, so an
+           eight player game drew a two row list. */
+        g_rosterSeats = o->skirmish ? (g_matchRows > 0
+                          ? g_matchRows
+                          : (((o->ai_count < 1) ? 1 : (o->ai_count > 7 ? 7 : o->ai_count)) + 1))
                       : 0;
         g_rosterN = 0;
         g_rosterFrame = -2;
@@ -24937,7 +30254,11 @@ int game_boot(SDL_Window* win, const GameOpts* o)
                       (o->scen[2] == 'B' || o->scen[2] == 'b')) ? 1 : 0;
         }
         hk.mapX = g_mapX; hk.mapY = g_mapY; hk.mapW = g_mapW; hk.mapH = g_mapH;
+        hk.playX = g_playX; hk.playY = g_playY; hk.playW = g_playW; hk.playH = g_playH;
+        hk.SayCannotPlace = say_cannot_deploy;
         if (!sb_init(hk, o->cameos, o->dospack)) {
+            boot_refuse("The sidebar's art file %s could not be loaded",
+                        o->dospack && *o->dospack ? o->dospack : "dossidebar.pack");
             g_bootStage = "sb_init refused this mission start (no mission is running)";
             return 0;
         }
@@ -24978,7 +30299,7 @@ int game_boot(SDL_Window* win, const GameOpts* o)
                     "deviation (start %.0f, "
                     "%.1f px/cell horizontally at %d wide)\n",
             N64_DIST_MIN, DIST_MAX_OURS, N64_DIST_MAX, DIST_MAX_EXTRA, g_dist,
-            (float)fbw * 256.0f / (2.0f * g_dist * tanf(25.0f * (float)M_PI / 180.0f)
+            (float)fbw * 256.0f / (2.0f * g_dist * tanf(cam_fovy_deg() * 0.5f * (float)M_PI / 180.0f)
                                    * cam_aspect(fbw, fbh)),
             fbw);
     fprintf(stderr, "camera: %s (press C in the live window to switch)\n", cam_mode_name());
@@ -25079,6 +30400,24 @@ int game_boot(SDL_Window* win, const GameOpts* o)
                                         : (float)(g_mapY + 4 + 2 * 4);
         fprintf(stderr, "posetest: %s at facings 0,32,...,224 (N,NE,E,SE,S,SW,W,NW)\n",
                 o->posetest);
+    }
+    /* A SLOT TO LOAD INTO THIS MISSION, when the shell booted it for that: the main
+       menu's Load Mission, or a pause-dialog load of another mission's slot. The boot
+       above is the same boot every mission gets, so the load lands on a world whose
+       terrain, models and sidebar belong to the slot's own scenario, which is the one
+       thing game_load_slot cannot supply itself. A load that fails is a mission start
+       that failed: the player asked for the save, not for the mission from tick one. */
+    if (o && o->load_slot1 > 0) {
+        g_bootStage = "loading the saved game";
+        if (!game_load_slot(o->load_slot1 - 1)) {
+            fprintf(stderr, "load: slot %d could not be loaded into %s\n",
+                    o->load_slot1 - 1, g_bootScen);
+            boot_refuse("The saved game in slot %d could not be loaded into mission %s",
+                        o->load_slot1 - 1, g_bootScen);
+            g_bootStage = "the saved game refused to load (no mission is running)";
+            game_shutdown();
+            return 0;
+        }
     }
     /* The mission is up. Anything that dies from here on is not a mission-start fault, and
        the stage must stop claiming that it is. */
@@ -25264,6 +30603,7 @@ void game_visuals_default_enhanced(const char* preset)
         fx_texset_set((int)g_fx.texset);
         fx_infset_set((int)g_fx.infset);
         sb_set_hud_new(g_fx.new_hud);
+        sb_set_ui_scale(1 + (int)(g_fx.ui_scale + 0.5f));
         decal_set_soft(g_fx.decal_soft);
         fprintf(stderr, "FX|preset|keeping the one named with --gfx; %s not loaded\n",
                 preset ? preset : "(none)");
@@ -25289,7 +30629,30 @@ void game_visuals_default_enhanced(const char* preset)
        never from --gfx. See sb_set_hud_new in cnc_sidebar.h for why that distinction is
        load bearing rather than fussy. */
     sb_set_hud_new(g_fx.new_hud);
+    /* The UI scale, on the same footing and by the same door. */
+    sb_set_ui_scale(1 + (int)(g_fx.ui_scale + 0.5f));
     decal_set_soft(g_fx.decal_soft);
+}
+
+int game_display_wanted(const char* preset, int* mode, int* rw, int* rh)
+{
+    FxState t;
+    int found = 0;
+    fx_defaults(&t);
+    if (preset && *preset) {
+        FILE* f = fopen(preset, "r");
+        if (f) {
+            fclose(f);
+            if (fx_load(&t, preset)) found = 1;
+        }
+    }
+    if (mode) {
+        *mode = (int)(t.display_mode + 0.5f);
+        if (*mode < 0 || *mode > FS_MODE_FULLSCREEN) *mode = FS_MODE_BORDERLESS;
+    }
+    if (rw) *rw = (int)t.res_w;
+    if (rh) *rh = (int)t.res_h;
+    return found;
 }
 
 int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
@@ -25318,6 +30681,7 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
         dopt_set_visuals(&g_optState, &v);
     }
     dopt_bind_visuals(&g_optState, opt_apply_visuals);
+    dopt_bind_visuals_reset(&g_optState, opt_reset_visuals);
     /* And the input switches, seeded the same way and bound to their OWN callback, so the
        page below cannot be reached through the visuals arm. */
     {
@@ -25473,6 +30837,233 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
     return 0;
 }
 
+/* THE MAIN MENU'S LOAD MISSION. The slot dialog in LOAD mode on the shell's window,
+   over black, run the way game_visuals_open runs the Visuals page and for the same
+   reason: there is one slot dialog in the program, and the menu borrows it rather than
+   drawing a second one that could drift. Cancel closes it with -1; a chosen row closes
+   it with the slot number, and the shell does the rest (it has the index too). */
+int game_load_menu_open(SDL_Window* win, const char* dospack, const char* shot)
+{
+    int result = -1;
+    if (!win) return -1;
+    if (!g_dbPack) {
+        char err[256];
+        g_dbPack = db_pack_load(dospack && *dospack ? dospack : "dossidebar.pack",
+                                err, sizeof err);
+        if (!g_dbPack) {
+            fprintf(stderr, "load: cannot draw the slot dialog without dossidebar.pack "
+                            "(%s)\n", err);
+            return -1;
+        }
+    }
+    /* The rows first, then the page: dopt_open_slots asks for them as it opens. */
+    dopt_bind_slots(&g_optState, opt_slot_rows);
+    dopt_open_slots(&g_optState, g_dbPack, DOPT_SL_LOAD);
+    g_optState.scenario = "";
+    g_optState.version = "C&C 3D";
+    printf("LOADMENU|open|rows=%d\n", g_optState.sl.nrows);
+    fflush(stdout);
+    g_optOpen = true;
+    {
+        /* Same pointer arrangement as the Visuals screen, same reasons. */
+        int curOk = (g_curShape != NULL);
+        if (!curOk) {
+            char cerr[256];
+            curOk = cur_init(g_dbPack, cerr, sizeof cerr) ? 1 : 0;
+            if (!curOk)
+                fprintf(stderr, "load: %s; falling back to the OS cursor\n", cerr);
+        }
+        if (curOk) {
+            SDL_ShowCursor(SDL_DISABLE);
+            cur_lock(MOUSE_NORMAL);
+        }
+    }
+    for (;;) {
+        int dw = 0, dh = 0, winw = 0, winh = 0;
+        SDL_Event e;
+        int mx = 0, my = 0, done = 0;
+        SDL_GL_GetDrawableSize(win, &dw, &dh);
+        SDL_GetWindowSize(win, &winw, &winh);
+        {
+            const float sx = winw > 0 ? (float)dw / (float)winw : 1.0f;
+            const float sy = winh > 0 ? (float)dh / (float)winh : 1.0f;
+            int wx = 0, wy = 0;
+            SDL_GetMouseState(&wx, &wy);
+            mx = (int)(wx * sx); my = (int)(wy * sy);
+            g_mouseScrC = (float)mx; g_mouseScrR = (float)my;
+        }
+        while (SDL_PollEvent(&e)) {
+            int dx, dy, act = DOPT_ACT_NONE;
+            if (fs_handle_event(&e)) continue;
+            if (e.type == SDL_QUIT) { g_optOpen = false; cur_unlock(); return -2; }
+            opt_layout(dw, dh);
+            if (e.type == SDL_KEYDOWN) {
+                int k = 0;
+                switch (e.key.keysym.sym) {
+                case SDLK_ESCAPE: k = DOPT_KEY_ESC;   break;
+                case SDLK_UP:     k = DOPT_KEY_UP;    break;
+                case SDLK_DOWN:   k = DOPT_KEY_DOWN;  break;
+                case SDLK_LEFT:   k = DOPT_KEY_LEFT;  break;
+                case SDLK_RIGHT:  k = DOPT_KEY_RIGHT; break;
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER: k = DOPT_KEY_ENTER; break;
+                default: break;
+                }
+                if (k) act = dopt_key(&g_optState, k);
+            } else if (e.type == SDL_MOUSEMOTION) {
+                opt_to_dos(mx, my, &dx, &dy);
+                dopt_motion(&g_optState, dx, dy);
+            } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                opt_to_dos(mx, my, &dx, &dy);
+                act = dopt_press(&g_optState, dx, dy);
+            } else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+                opt_to_dos(mx, my, &dx, &dy);
+                act = dopt_release(&g_optState, dx, dy);
+            } else if (e.type == SDL_MOUSEWHEEL) {
+                dopt_scroll(&g_optState, -e.wheel.y);
+            }
+            if (act == DOPT_ACT_RESUME) { result = -1; done = 1; }   /* Cancel: close me */
+            if (act == DOPT_ACT_LOAD)   { result = dopt_slot_pick(&g_optState); done = 1; }
+            if (act == DOPT_ACT_EXIT)   { g_optOpen = false; cur_unlock(); return -2; }
+        }
+        if (done) break;
+        cnc_screen_viewport(dw, dh);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        opt_draw(dw, dh, mx, my);
+        draw_cursor_top(dw, dh, true, (float)g_optScale);
+        if (shot) {
+            if (*shot) game_grab_png(shot, dw, dh);
+            break;
+        }
+        SDL_GL_SwapWindow(win);
+        SDL_Delay(10);
+    }
+    g_optOpen = false;
+    cur_unlock();
+    SDL_ShowCursor(SDL_ENABLE);
+    printf("LOADMENU|close|slot=%d\n", result);
+    fflush(stdout);
+    return result;
+}
+
+/* A NOTICE ON THE SHELL'S WINDOW: a captioned box with a lone OK, over black, run the
+   way game_load_menu_open runs the slot dialog and for the same reason. It exists so a
+   refused mission start is SEEN: before it, a start that turned back left one line in
+   the log and put the menu back untouched, which to a player is a button that does
+   nothing. Returns 0 when the box was dismissed, -2 when the window was closed. `shot`
+   works as it does for the slot dialog: non-NULL draws one frame, writes it when
+   non-empty, and closes without waiting for a hand. */
+int game_notice_open(SDL_Window* win, const char* dospack, const char* caption,
+                     const char* text, const char* shot)
+{
+    int result = 0;
+    if (!win) return -2;
+    if (!g_dbPack) {
+        char err[256];
+        g_dbPack = db_pack_load(dospack && *dospack ? dospack : "dossidebar.pack",
+                                err, sizeof err);
+        if (!g_dbPack) {
+            /* The one notice that cannot be drawn is the one about the very pack that
+               draws notices; the log line is all there is then. */
+            fprintf(stderr, "notice: cannot draw a box without dossidebar.pack (%s); "
+                            "the notice was: %s\n", err, text ? text : "");
+            return -2;
+        }
+    }
+    dopt_open_notice(&g_optState, g_dbPack, caption, text);
+    g_optState.scenario = "";
+    g_optState.version = "C&C 3D";
+    {
+        /* The box's rectangle in framebuffer pixels, so a picture of it can be measured
+           inside the box rather than across a frame that is mostly black. */
+        int dw = 0, dh = 0;
+        SDL_GL_GetDrawableSize(win, &dw, &dh);
+        opt_layout(dw, dh);
+        printf("NOTICE|open|caption=%s|lines=%d|rect=%d,%d,%d,%d|text=%s\n",
+               caption ? caption : "", g_optState.brlines,
+               g_optX0 + g_optState.rx * g_optScale, g_optY0 + g_optState.ry * g_optScale,
+               g_optX0 + (g_optState.rx + g_optState.rw) * g_optScale - 1,
+               g_optY0 + (g_optState.ry + g_optState.rh) * g_optScale - 1,
+               text ? text : "");
+        fflush(stdout);
+    }
+    g_optOpen = true;
+    {
+        int curOk = (g_curShape != NULL);
+        if (!curOk) {
+            char cerr[256];
+            curOk = cur_init(g_dbPack, cerr, sizeof cerr) ? 1 : 0;
+            if (!curOk)
+                fprintf(stderr, "notice: %s; falling back to the OS cursor\n", cerr);
+        }
+        if (curOk) {
+            SDL_ShowCursor(SDL_DISABLE);
+            cur_lock(MOUSE_NORMAL);
+        }
+    }
+    for (;;) {
+        int dw = 0, dh = 0, winw = 0, winh = 0;
+        SDL_Event e;
+        int mx = 0, my = 0, done = 0;
+        SDL_GL_GetDrawableSize(win, &dw, &dh);
+        SDL_GetWindowSize(win, &winw, &winh);
+        {
+            const float sx = winw > 0 ? (float)dw / (float)winw : 1.0f;
+            const float sy = winh > 0 ? (float)dh / (float)winh : 1.0f;
+            int wx = 0, wy = 0;
+            SDL_GetMouseState(&wx, &wy);
+            mx = (int)(wx * sx); my = (int)(wy * sy);
+            g_mouseScrC = (float)mx; g_mouseScrR = (float)my;
+        }
+        while (SDL_PollEvent(&e)) {
+            int dx, dy, act = DOPT_ACT_NONE;
+            if (fs_handle_event(&e)) continue;
+            if (e.type == SDL_QUIT) { g_optOpen = false; cur_unlock(); return -2; }
+            opt_layout(dw, dh);
+            if (e.type == SDL_KEYDOWN) {
+                int k = 0;
+                switch (e.key.keysym.sym) {
+                case SDLK_ESCAPE: k = DOPT_KEY_ESC;   break;
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER: k = DOPT_KEY_ENTER; break;
+                default: break;
+                }
+                if (k) act = dopt_key(&g_optState, k);
+            } else if (e.type == SDL_MOUSEMOTION) {
+                opt_to_dos(mx, my, &dx, &dy);
+                dopt_motion(&g_optState, dx, dy);
+            } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                opt_to_dos(mx, my, &dx, &dy);
+                act = dopt_press(&g_optState, dx, dy);
+            } else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+                opt_to_dos(mx, my, &dx, &dy);
+                act = dopt_release(&g_optState, dx, dy);
+            }
+            if (act == DOPT_ACT_RESUME) { result = 0; done = 1; }
+            if (act == DOPT_ACT_EXIT)   { g_optOpen = false; cur_unlock(); return -2; }
+        }
+        if (done) break;
+        cnc_screen_viewport(dw, dh);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        opt_draw(dw, dh, mx, my);
+        draw_cursor_top(dw, dh, true, (float)g_optScale);
+        if (shot) {
+            if (*shot) game_grab_png(shot, dw, dh);
+            break;
+        }
+        SDL_GL_SwapWindow(win);
+        SDL_Delay(10);
+    }
+    g_optOpen = false;
+    cur_unlock();
+    SDL_ShowCursor(SDL_ENABLE);
+    printf("NOTICE|close\n");
+    fflush(stdout);
+    return result;
+}
+
 void game_draw(SDL_Window* win)
 {
     int dw = 0, dh = 0;
@@ -25538,9 +31129,23 @@ int game_grab_png(const char* path, int w, int h)
 
 /* IS SOMETHING OTHER THAN A HAND DRIVING THIS RUN? Every automated entry point the two
    binaries have, gathered in one place, because a run that reaches the live loop with
-   none of these set is a player. IF ANOTHER ONE IS EVER ADDED, ADD IT HERE -- the shell
-   keeps the same list for the same kind of reason about sound, and the two must not
-   drift apart.
+   none of these set is a player. IF ANOTHER ONE IS EVER ADDED, ADD IT HERE.
+
+   IT DECIDES THREE THINGS, and that is the point of there being one of it:
+     - the pointer cage never closes on an automated run;
+     - the WINDOW is hidden, so nothing steals focus from whoever is working;
+     - the mixer is SILENT, unless --audiowav asked for a recording.
+
+   A TEST RUN MUST NOT TAKE THE SCREEN OR THE SPEAKERS. It is not a player, nobody asked
+   to watch it, and a suite of two hundred of them makes the desk unusable. That had to be
+   asked for twice, because the first fix covered --script alone while the three decisions
+   above lived in three separate lists across two files: --run, --autoesc and --playticks
+   opened a visible window and played music, --picktest opened one, and in the shell
+   --flowtest, --lobbyplay and --lobbyshot all did. There is one list now. ADDING AN ENTRY
+   POINT ANYWHERE ELSE AND NOT HERE IS THE BUG.
+
+   --showwindow is the escape for watching an automated run on purpose, and it applies to
+   every mode rather than only to --script.
      shot, script, hidden, picktest, posetest   the renderer's own headless modes
      forcewin_ticks                             the shell's campaign-flow driver
      playticks                                  the shell's harness and lobby drivers
@@ -25552,7 +31157,64 @@ static bool confine_automated(const GameOpts* o)
     return o->shot != NULL || o->script != NULL || o->hidden != 0
         || o->picktest != 0 || o->posetest != NULL || o->forcewin_ticks > 0
         || g_playTicks > 0 || g_run_seconds > 0.0
-        || g_autoesc > 0.0 || g_autoabort > 0.0 || g_autoplay;
+        || g_autoesc > 0.0 || g_autoabort > 0.0 || g_autoplay
+        /* THE SECOND HALF OF THE LIST, folded in. It used to live in a
+           separate expression beside audio_boot, and the two drifted exactly the way the
+           comment above predicted they would: the audio copy knew about --edgeplay and
+           the seven self-tests, and this one knew about --run, --autoesc, --autoabort
+           and --playticks, so each governed a different set and neither governed all of
+           it. One list now, and it decides all three things. */
+        || g_edgePlay || g_scripttest || g_uitest || g_elevtest
+        /* `g_turTest >= 0`, NOT `g_turTest`. It is an ANGLE and its "not asked for" value
+           is -1, which is true. The audio list this was folded in from carried the bare
+           form, so `automated` there was true on EVERY run and the whole of cnc_eyes was
+           silent by accident rather than by rule -- which is also why the gaps in that
+           list (--run, --autoesc, --playticks) never showed up as noise. G117 is what
+           caught it: the confine self-test's last pass sets no flag at all and requires
+           the answer false, and it cannot be false while a default of -1 is being read as
+           a request. A flag whose idle value is not zero has to say so at every use. */
+        || g_painttest || g_undotest || g_turTest >= 0;
+    /* g_confineTest IS DELIBERATELY NOT IN THAT LIST, and it is not an oversight.
+       --confinetest walks the decision table and returns BEFORE SDL_Init, so it opens no
+       window and no device and there is nothing for this predicate to suppress. Putting
+       it in defeats the self-test's own negative case: the last pass sets no flag at all
+       and requires the answer false, which is what makes the eleven passes before it mean
+       anything, and it cannot be false while the flag that is running the test is itself
+       in the list. It was in here for one suite run and G117 caught it, which is the
+       self-test doing exactly the job it was written for. */
+}
+
+/* IS THIS RUN A SCRIPT'S? The display rows ask before they switch the window: an
+   automated run keeps its hidden window and only writes the dial. g_scriptOpts is NULL
+   on a live run, and confine_automated is the one list that decides. */
+static bool opt_run_is_automated(void)
+{
+    return g_scriptOpts != NULL && confine_automated(g_scriptOpts);
+}
+
+/* THE ONE AUTOMATED RUN THAT STILL NEEDS A REAL, FOCUSED WINDOW.
+   confine_automated answers "is nothing but a hand driving this?", and THREE things hang
+   off that one answer: the pointer cage, the sound, and the window. Two of them are right
+   for every entry point on the list. The third is not.
+
+   --edgeplay MEASURES the behaviour of a real window at a real screen edge with the real
+   pointer. Hide its window and make the process an accessory and it never takes keyboard
+   focus, so the run reports `EDGEPLAY|FAIL|focus` and refuses to measure -- correctly,
+   because a measurement of an unfocused window would be a measurement of nothing.
+
+   THIS IS WHAT FOLDING THREE LISTS INTO ONE COST. The audio list knew about
+   --edgeplay and the window list did not, and merging them handed --edgeplay the window
+   rule along with the sound rule. It was invisible for a day and then stopped a release,
+   because G124 is SKIPPED in an ordinary suite run and only runs under
+   CNC3D_GATES_INTERACTIVE=1 -- so tools/release.sh was the first thing that could see it.
+
+   The list stays one list. This names the exception to what that list governs: the sound
+   and the cage still apply to --edgeplay, the hidden window and the accessory activation
+   policy do not. */
+static bool confine_needs_real_window(const GameOpts* o)
+{
+    (void)o;                 /* today the answer is a flag, not an option */
+    return g_edgePlay;
 }
 
 /* THE DECISION. It takes its eight facts as ARGUMENTS rather than reading them, and that
@@ -25608,6 +31270,8 @@ int game_loop(SDL_Window* win, const GameOpts* o)
        rather than a picture the project owner has to notice. */
     const int fbw0 = o->w, fbh0 = o->h;
     int exit_reason = GAME_EXIT_MENU;
+    /* CLEARED PER MISSION, so a debrief can never print the previous match's reason. */
+    g_netFailWhy[0] = '\0';
 
     /* Kept at 1. --vsync exists because a swap interval that is silently not honoured
        cost a long investigation once, and GL_SWAP makes it visible.
@@ -25632,10 +31296,16 @@ int game_loop(SDL_Window* win, const GameOpts* o)
 
        THE CURVE IS OURS and is registered as such. 1995 spends the setting as a frame
        DELAY inside its own main loop, which this build does not share, and the
-       cartridge's own timing was never decoded. What is not ours is the ANCHOR: the
-       default setting is 3 (options.cpp:73-79) and maps to exactly 15.0 Hz, the rate
-       everything in this renderer was built and gated against, so a player who never
-       touches the slider gets a byte-identical game and no gate moves.
+       cartridge's own timing was never decoded. What is not ours is the ANCHOR: setting
+       3 is the 1995 default (options.cpp:73-79) and maps to exactly 15.0 Hz, the rate
+       everything in this renderer was built and gated against.
+
+       THE SHIPPED DEFAULT IS NO LONGER THAT ANCHOR. dopt_settings_init ships speed 4,
+       18.0 Hz, so a player who never touches the slider runs a fifth faster than the
+       rate the measurements were taken at. Only the WALL CLOCK moves: this number paces
+       when the next tick is asked for and nothing else, so a run bounded by a tick count
+       does the same work and reaches the same world, and only a run bounded by seconds
+       gets more of it.
 
        Read fresh each tick rather than latched, so dragging the slider in the pause
        dialog takes effect immediately, which is what the dialog looks like it promises. */
@@ -25811,7 +31481,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                shell that is itself frontmost opens behind, the guard reads
                SDL_WINDOW_INPUT_FOCUS, and every probe reports a still camera for a reason
                that has nothing to do with the edge. Asking once is not enough either: the
-               window is not always mapped yet on the frame the ask goes out. So it is
+               window is not always mapped yet on the frame the requirement goes out. So it is
                asked every frame until the flag has been set for ten frames running, and
                if it never is the run says exactly that and fails on it. */
             if (!ep_stop && ep_base < 0) {
@@ -26297,6 +31967,13 @@ int game_loop(SDL_Window* win, const GameOpts* o)
            score, map -- or the lose movie and a retry). CountDownTimer.Set(3s) in
            scenario.cpp, transcribed. */
         if (g_gameOver.valid && gameover_ms < 0.0) {
+            /* The reveal is armed in ev_cb, where the verdict actually arrives. */
+            gameover_ms = (double)SDL_GetTicks();
+            gameover_frame = frame_count;
+        }
+        /* The dwell starts when the BANNER does. Without this the reveal would eat the
+           announcement's own three seconds and the words would flash past. */
+        if (g_gameOver.valid && gameover_ms >= 0.0 && !verdict_banner_due()) {
             gameover_ms = (double)SDL_GetTicks();
             gameover_frame = frame_count;
         }
@@ -26342,11 +32019,106 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     ((double)SDL_GetTicks() - start_ms) / 1000.0);
         }
 
+        /* --autorestate: Restate first, then the box's own button, and only then the
+           departure below. Each step waits for the page it needs, so a slow movie or a
+           missing rectangle cannot make two clicks land on one page. */
+        if (g_autorestate && g_autoLeave == 1 && g_optOpen && g_autorestateStep < 3) {
+            if (g_autorestateStep == 0 && g_optState.page == DOPT_PAGE_OPTIONS) {
+                if (dopt_item_disabled(&g_optState, DOPT_RESTATE)) {
+                    printf("RESTATE|disabled|no briefing text and no movie for %s\n",
+                           g_bootScen);
+                    fflush(stdout);
+                    g_autorestateStep = 3;
+                } else {
+                    opt_push_abort_click(mscaleX, mscaleY, DOPT_RESTATE, "Restate");
+                    g_autorestateStep = 1;
+                }
+            } else if (g_autorestateStep == 1 && g_optState.page == DOPT_PAGE_RESTATE) {
+                int li;
+                printf("RESTATE|open|lines=%d|video=%d|box=%d,%d %dx%d\n",
+                       g_optState.brlines, g_optState.rvideo, g_optState.rx,
+                       g_optState.ry, g_optState.rw, g_optState.rh);
+                for (li = 0; dopt_brief_line(&g_optState, li); li++)
+                    printf("RESTATE|line|%s\n", dopt_brief_line(&g_optState, li));
+                fflush(stdout);
+                opt_push_abort_click(mscaleX, mscaleY, DOPT_R_LEFT,
+                                     g_optState.rvideo ? "Video" : "OK");
+                g_autorestateStep = 2;
+            } else if (g_autorestateStep == 1 && g_optState.page == DOPT_PAGE_OPTIONS
+                       && !g_briefText[0]) {
+                /* no text: the click went straight to the movie, no box was shown */
+                g_autorestateStep = 2;
+            } else if (g_autorestateStep == 2 && g_optState.page == DOPT_PAGE_OPTIONS) {
+                g_autorestateStep = 3;      /* OK put the pause page back */
+            }
+        }
+
+        /* --autosave, the same shape as --autorestate above. */
+        if (g_autosave && g_autoLeave == 1 && g_optOpen && g_autosaveStep < 3) {
+            if (g_autosaveStep == 0 && g_optState.page == DOPT_PAGE_OPTIONS) {
+                if (dopt_item_disabled(&g_optState, DOPT_SAVE)) {
+                    printf("AUTOSAVE|disabled\n");
+                    fflush(stdout);
+                    g_autosaveStep = 3;
+                } else {
+                    opt_push_abort_click(mscaleX, mscaleY, DOPT_SAVE, "Save Mission");
+                    g_autosaveStep = 1;
+                }
+            } else if (g_autosaveStep == 1 && g_optState.page == DOPT_PAGE_SLOTS) {
+                SDL_Event k;
+                printf("AUTOSAVE|dialog|rows=%d|sel=%d|descr=%s\n", g_optState.sl.nrows,
+                       g_optState.sl.sel, dopt_slot_descr(&g_optState));
+                fflush(stdout);
+                memset(&k, 0, sizeof k);
+                k.type = SDL_KEYDOWN;
+                k.key.state = SDL_PRESSED;
+                k.key.keysym.sym = SDLK_RETURN;
+                k.key.keysym.scancode = SDL_SCANCODE_RETURN;
+                SDL_PushEvent(&k);
+                g_autosaveStep = 2;
+            } else if (g_autosaveStep == 2) {
+                g_autosaveStep = 3;
+            }
+        }
+
+        /* --autoload, the same shape as --autorestate above. */
+        if (g_autoload && g_autoLeave == 1 && g_optOpen && g_autoloadStep < 3) {
+            if (g_autoloadStep == 0 && g_optState.page == DOPT_PAGE_OPTIONS) {
+                if (dopt_item_disabled(&g_optState, DOPT_LOAD)) {
+                    printf("AUTOLOAD|disabled|no slots to load\n");
+                    fflush(stdout);
+                    g_autoloadStep = 3;
+                } else {
+                    opt_push_abort_click(mscaleX, mscaleY, DOPT_LOAD, "Load Mission");
+                    g_autoloadStep = 1;
+                }
+            } else if (g_autoloadStep == 1 && g_optState.page == DOPT_PAGE_SLOTS) {
+                SDL_Event k;
+                int ri;
+                printf("AUTOLOAD|dialog|rows=%d|sel=%d\n", g_optState.sl.nrows,
+                       g_optState.sl.sel);
+                for (ri = 0; dopt_slot_row_text(&g_optState, ri); ri++)
+                    printf("AUTOLOAD|row|%d|slot=%d|%s\n", ri, g_optState.sl.rows[ri].slot,
+                           dopt_slot_row_text(&g_optState, ri));
+                fflush(stdout);
+                memset(&k, 0, sizeof k);
+                k.type = SDL_KEYDOWN;
+                k.key.state = SDL_PRESSED;
+                k.key.keysym.sym = SDLK_RETURN;
+                k.key.keysym.scancode = SDL_SCANCODE_RETURN;
+                SDL_PushEvent(&k);
+                g_autoloadStep = 2;
+            } else if (g_autoloadStep == 2) {
+                g_autoloadStep = 3;
+            }
+        }
+
         /* The second half of a scripted departure: the dialog is up, so click Abort.
            Under --autoabort it dwells first, and the dwell is the point: ticks that
            accumulate while the dialog sits open are the proof the world did NOT
            pause. Clicking on the next frame proves only that Abort works. */
-        if (g_autoLeave == 1 && g_optOpen) {
+        if (g_autoLeave == 1 && g_optOpen && (!g_autorestate || g_autorestateStep >= 3)
+            && (!g_autoload || g_autoloadStep >= 3) && (!g_autosave || g_autosaveStep >= 3)) {
             double now_ms = (double)SDL_GetTicks();
             if (autoleave_dialog_ms < 0.0) {
                 autoleave_dialog_ms = now_ms;
@@ -26530,9 +32302,14 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     case SDLK_RIGHT:  k = DOPT_KEY_RIGHT; break;
                     case SDLK_RETURN:
                     case SDLK_KP_ENTER: k = DOPT_KEY_ENTER; break;
+                    case SDLK_BACKSPACE: k = DOPT_KEY_BACKSPACE; break;
                     default: break;
                     }
                     if (k) act = dopt_key(&g_optState, k);
+                } else if (e.type == SDL_TEXTINPUT) {
+                    /* The save dialog's description field. Every other page ignores
+                       typing, and dopt_text knows which page it is on. */
+                    dopt_text(&g_optState, e.text.text);
                 } else if (e.type == SDL_MOUSEMOTION) {
                     opt_to_dos((int)(e.motion.x * mscaleX), (int)(e.motion.y * mscaleY),
                                &dx, &dy);
@@ -26572,7 +32349,56 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                 } else if (act == DOPT_ACT_SAVE) {
                     if (opt_do_save()) { g_optOpen = false; cur_unlock(); }
                 } else if (act == DOPT_ACT_LOAD) {
-                    if (opt_do_load()) { g_optOpen = false; cur_unlock(); }
+                    if (opt_do_load()) {
+                        g_optOpen = false;
+                        cur_unlock();
+                        if (g_pendingLoadSlot >= 0) {
+                            /* another mission's slot: out through the shell */
+                            running = false;
+                            exit_reason = GAME_EXIT_LOADSLOT;
+                        }
+                    }
+                } else if (act == DOPT_ACT_DELETE) {
+                    opt_do_delete();
+                } else if (act == DOPT_ACT_VIDEO) {
+                    /* RESTATE'S VIDEO. goptions.cpp:375-390: the dialog ends, the
+                       briefing movie plays (the requirement if its file exists, else the
+                       action movie), and the game is drawn again underneath. The
+                       world stays paused for the length of the movie exactly as it
+                       was for the dialog: nothing here ticks the brain. The dialog is
+                       closed BEFORE the movie so that a player who closes the window
+                       during it leaves through the ordinary door. */
+                    const char* mv = brief_video_name();
+                    g_optOpen = false;
+                    cur_unlock();
+                    if (g_moviePlay && mv[0]) {
+                        const int r = g_moviePlay(g_movieUser, mv);
+                        printf("OPTIONS|restate|video|%s|%s|frame=%d\n", mv,
+                               r ? "played" : "window-closed", g_engineFrame);
+                        fflush(stdout);
+                        if (!r) { running = false; exit_reason = GAME_EXIT_APP; }
+                        else {
+                            /* The movie turned the OS pointer off; the mission draws
+                               its own and expects the host's hidden, which is how
+                               game_boot leaves it. */
+                            SDL_ShowCursor(SDL_DISABLE);
+                            if (g_autorestateShot) g_grabNextFrame = true;
+                        }
+                    } else {
+                        printf("OPTIONS|restate|video|none|no player or no file\n");
+                        fflush(stdout);
+                    }
+                    if (g_autorestate && g_autorestateStep == 2) {
+                        /* The departure carries on: reopen the dialog for Abort. */
+                        SDL_Event esc;
+                        memset(&esc, 0, sizeof esc);
+                        esc.type = SDL_KEYDOWN;
+                        esc.key.state = SDL_PRESSED;
+                        esc.key.keysym.sym = SDLK_ESCAPE;
+                        esc.key.keysym.scancode = SDL_SCANCODE_ESCAPE;
+                        SDL_PushEvent(&esc);
+                        g_autorestateStep = 3;
+                    }
                 } else if (act == DOPT_ACT_CHEAT_WIN || act == DOPT_ACT_CHEAT_LOSE) {
                     /* INSTANT WIN / INSTANT LOSE from the cheat page. The dialog closes
                        because the mission is about to end and the cheat page is the
@@ -26591,7 +32417,10 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     const bool wantwin = (act == DOPT_ACT_CHEAT_WIN);
                     g_optOpen = false;
                     cur_unlock();
-                    if (sim_over) {
+                    if (nm_active()) {
+                        printf("CHEAT|verdict|%s|REFUSED, this is a network match\n",
+                               wantwin ? "win" : "lose");
+                    } else if (sim_over) {
                         printf("CHEAT|verdict|%s|IGNORED, this scenario is already decided\n",
                                wantwin ? "win" : "lose");
                     } else if (!BrainForceVerdict) {
@@ -26602,6 +32431,21 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                         printf("CHEAT|verdict|%s|flagged=%d|frame=%d\n",
                                wantwin ? "win" : "lose", got ? 1 : 0, g_engineFrame);
                     }
+                    fflush(stdout);
+                } else if (act == DOPT_ACT_SURRENDER) {
+                    /* RESIGN. The match carries on without this player's house; they stay
+                       and watch, and the button becomes LEAVE MATCH next time. */
+                    g_optOpen = false;
+                    cur_unlock();
+                    surrender_request(o);
+                } else if (act == DOPT_ACT_LEAVE) {
+                    /* A SPECTATOR WALKS OUT. Same door the abort takes, and
+                       game_shutdown says goodbye to the peers on the way through it. */
+                    g_optOpen = false;
+                    cur_unlock();
+                    running = false;
+                    exit_reason = GAME_EXIT_MENU;
+                    printf("OPTIONS|leave-match|frame=%d\n", g_engineFrame);
                     fflush(stdout);
                 } else if (act == DOPT_ACT_ABORT) {
                     g_optOpen = false;
@@ -26652,6 +32496,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     printf("OPTIONS|exit\n");
                     fflush(stdout);
                 }
+                opt_sync_textinput();
             }
 
             /* ---- THE EDITOR'S KEYBOARD, AHEAD OF THE GAME'S ------------------------------
@@ -26691,6 +32536,34 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                      !(SDL_GetModState() & (KMOD_CTRL | KMOD_GUI)) &&
                      edit_key(e.key.keysym.sym)) {
                 /* consumed by the editor */
+            }
+            /* ---- TYPING A LINE OWNS THE KEYBOARD ------------------------------------
+               Ahead of the game's own switch on purpose. Every hotkey this game has --
+               S, X, G, Z, H, D, M, A, the digits, SPACE -- lives inside that one branch,
+               so intercepting here suppresses all of them with no per key work and no
+               list to keep up to date. Escape throws the line away, Return sends it. */
+            else if (g_chatEntry && (e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT)) {
+                if (e.type == SDL_TEXTINPUT) {
+                    const char* t = e.text.text;
+                    size_t used = strlen(g_chatBuf);
+                    for (; *t; t++) {
+                        /* Printable ASCII only: the font has no glyph for anything else,
+                           and the wire carries what the font can draw. */
+                        if ((unsigned char)*t < 0x20 || (unsigned char)*t > 0x7e) continue;
+                        if (used + 1 >= sizeof g_chatBuf) break;
+                        g_chatBuf[used++] = *t;
+                    }
+                    g_chatBuf[used] = '\0';
+                } else if (e.key.keysym.sym == SDLK_RETURN
+                           || e.key.keysym.sym == SDLK_KP_ENTER) {
+                    chat_close(true);
+                } else if (e.key.keysym.sym == SDLK_ESCAPE) {
+                    chat_close(false);
+                } else if (e.key.keysym.sym == SDLK_BACKSPACE) {
+                    const size_t used = strlen(g_chatBuf);
+                    if (used) g_chatBuf[used - 1] = '\0';
+                }
+                /* Everything else is swallowed rather than passed on. */
             }
             else if (e.type == SDL_KEYDOWN) {
                 /* CONTROL GROUPS COME FIRST, AND OFF THE SCANCODE RATHER THAN THE KEYSYM.
@@ -26891,6 +32764,12 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                             g_efxSmokeScale, all ? "  (reset)" : "");
                     break;
                 }
+                case SDLK_F8:
+                    /* The camera readout. Off by default: it is a debug instrument and it
+                       sits on top of the OPTIONS and DATABASE tabs. */
+                    g_camHud = !g_camHud;
+                    fprintf(stderr, "camera readout: %s\n", g_camHud ? "on" : "off");
+                    break;
                 case SDLK_F7:
                     /* The script feed. Only meaningful once something has armed it, so
                        pressing it in a plain playthrough says why rather than nothing. */
@@ -26903,6 +32782,14 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     }
                     break;
                 case SDLK_m:      sb_toggle_radar(); break;
+                /* RETURN OPENS THE CHAT LINE, in a match and nowhere else. It is free:
+                   ALT+Return is fullscreen and is taken above this chain, and plain
+                   Return reached no case here. chat_open refuses when another modal owns
+                   the keyboard, so this cannot steal it from the options dialog. */
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                    chat_open();
+                    break;
                 case SDLK_TAB:
                     if (!sim_over) {
                         cheat_tick();
@@ -27046,6 +32933,8 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                 } else if (eui_wheel((float)wheelx * mscaleX, (float)wheely * mscaleY, dw, dh,
                               e.wheel.y > 0 ? +1 : -1)) {
                     /* consumed */
+                } else if (uc_over((float)wheelx * mscaleX, (float)wheely * mscaleY, dw, dh)) {
+                    /* the unit card: nothing to scroll, and not the map's wheel either */
                 } else if (sb_over_panel((float)wheelx * mscaleX, (float)wheely * mscaleY, dw, dh))
                     sb_scroll_at((float)wheelx * mscaleX, (float)wheely * mscaleY, dw, dh,
                                  e.wheel.y > 0 ? -1 : 1);
@@ -27759,6 +33648,9 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                                              "from the palette first\n");
                                 break;
                         }
+                    } else if (uc_click((float)mc, (float)mr, dw, dh)) {
+                        /* consumed by the unit card: a group tab, a smaller cameo, or
+                           its bezel. It answers before the band can start. */
                     } else if (minimap_hit((float)mc, (float)mr, dw, dh, &wx, &wz)) {
                         /* LEFT ON THE RADAR IS THE ORDER, the same as everywhere else on
                            this build's left button. With nothing selected there is no
@@ -28230,7 +34122,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
            polled keyboard state every frame, so the arrow keys and the editor's fly
            camera went on driving the view behind a page that had stopped the world. A
            modal that only intercepts events is not modal. */
-        const Uint8* ks = (g_optOpen || edit_modal_up() || g_cxOpen)
+        const Uint8* ks = (g_optOpen || edit_modal_up() || g_cxOpen || g_chatEntry)
                           ? NULL : SDL_GetKeyboardState(NULL);
         float dc = 0.0f, dr = 0.0f;
         /* THE EDITOR'S FLY CAMERA, before the game's arrow pan and instead of it.
@@ -28337,6 +34229,15 @@ int game_loop(SDL_Window* win, const GameOpts* o)
 
         age_order_marks(dt);
 
+        /* THE ROOM IS HEARD EVERY FRAME, and deliberately ABOVE the pause gate below: a
+           player in the options dialog would otherwise drain nothing, so a line sent to
+           them would sit in the kernel buffer and that peer would look silent to
+           everybody else until they resumed. Neither call advances a turn. */
+        if (nm_active()) {
+            nm_service();
+            net_chat_service();
+        }
+
         /* Did the player change a game control and close the dialog? One compare a frame,
            and see opt_controls_sync for why the write lives here rather than on the eight
            separate paths that clear g_optOpen. */
@@ -28359,7 +34260,23 @@ int game_loop(SDL_Window* win, const GameOpts* o)
             continue;
         }
 
-        if (!paused && !g_optOpen && !sim_over && !codex_holds_the_world()) {
+        /* NOTHING ON ONE MACHINE HOLDS A MATCH, and this test used to let three things
+           try. The pause key, the pause DIALOG and the codex each stop the world, which
+           is right in a campaign and impossible in a game other people are playing: the
+           peers do not stop with you. Stopping here does not pause them, it stops this
+           machine TAKING ITS TURN, and that turn is what every other peer is waiting on
+           -- so the others froze, named the seat at three seconds and ended the match at
+           thirty. Opening the pause dialog in a match therefore ended everybody's game
+           about a minute later, and from the other side it looked like the match
+           finishing on its own.
+
+           A player reading this dialog during a match is not safe, and that is correct:
+           a match runs while you think about it. The campaign is untouched, so the pause
+           gate's whole question -- did the world advance while the dialog was up -- is
+           still asked and still answered the same way there. */
+        const bool holds_world = !nm_active()
+                              && (paused || g_optOpen || codex_holds_the_world());
+        if (!holds_world && !sim_over) {
             int guard = 0;
             while (now >= next_tick && guard < 5) {
                 /* A MATCH ADVANCES WHEN THE TURN IS READY AND NOT BEFORE. Not ready means
@@ -28368,14 +34285,104 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                    or a departed peer ends the session, loudly, the way the engine stopping
                    does; the design's takeover and rejoin are Phase 5. */
                 if (nm_active()) {
-                    if (nm_desynced() || nm_peer_left()) {
-                        fprintf(stderr, "net: the match is over (%s) at tick %d\n",
-                                nm_desynced() ? "DESYNC" : "the peer left", tick_count);
+                    /* A DEPARTURE IS NO LONGER THE END OF THE MATCH: one
+                       player quitting closed the whole application on every other
+                       machine. Only a parted simulation ends it now; a peer that leaves
+                       is a house that dies -- or is taken over -- on an agreed turn,
+                       inside brain_advance, which is the one place every path advances
+                       through. It used to be handled HERE, which meant no scripted run
+                       could reach it and the gate that proves it could not exist. */
+                    if (nm_desynced()) {
+                        fprintf(stderr, "net: the match is over (DESYNC) at tick %d\n",
+                                tick_count);
+                        /* NOT GAME_EXIT_ERROR ANY MORE. This closed the application: the
+                           window went away mid-match and the only account of it was a
+                           line in a log file the player has to be told how to find. A
+                           parted simulation ends the match, and a match that has ended
+                           goes to the debrief like every other one. */
+                        /* THIRTY-TWO CHARACTERS IS THE WHOLE BUDGET: the debrief's
+                           header field runs from MS_HEAD_X to 311 at seven pixels a
+                           glyph. A longer sentence does not wrap, it runs off the plate. */
+                        net_fail_say("THE MACHINES STOPPED AGREEING");
                         running = false;
-                        exit_reason = GAME_EXIT_ERROR;
+                        exit_reason = GAME_EXIT_NETLOST;
                         break;
                     }
-                    if (!net_pre_advance()) { next_tick = now; break; }
+                    /* THE HOST WENT: end it now rather than in thirty seconds. Every
+                       other player was reached THROUGH the host, so there is nothing left
+                       to wait for and the stall timer below would only be counting. */
+                    /* NOT ONCE A VERDICT IS IN. A host that quits to its own menu after
+                       the match is decided sends the same goodbye as one that walks out
+                       mid-game, and without this guard a player who had just WON would be
+                       shown "the host left the game" instead of their own result. The
+                       verdict is the older fact and it wins. */
+                    if (nm_host_gone() && !g_gameOver.valid) {
+                        fprintf(stderr, "net: the host left at tick %d; the match is "
+                                        "over\n", tick_count);
+                        net_fail_say("THE HOST LEFT THE GAME");
+                        running = false;
+                        exit_reason = GAME_EXIT_NETLOST;
+                        break;
+                    }
+                    if (!net_pre_advance()) {
+                        /* NOT READY IS NOT SILENT. Three seconds in, say who; thirty
+                           seconds in, end it the way a departed peer ends it. Without
+                           this a peer that died with no goodbye froze everyone else's
+                           world for ever with no message, which reads as a crash. */
+                        if (g_netStallSince == 0.0) {
+                            g_netStallSince = now;
+                        } else if (now - g_netStallSince > 30000.0) {
+                            /* NAME WHO WENT QUIET, on the screen and not only in the log.
+                               The three-second warning below already names them; this is
+                               the same courtesy at the end, and it is the difference
+                               between "it crashed" and "Anna's machine dropped off". */
+                            char who[64]; int wn = 0, sk;
+                            const unsigned mask = nm_waiting_mask();
+                            who[0] = '\0';
+                            for (sk = 0; sk < 8; sk++) {
+                                if (!(mask & (1u << sk))) continue;
+                                wn += snprintf(who + wn, sizeof who - (size_t)wn,
+                                               "%s%d", wn ? " AND " : "", sk);
+                                if (wn >= (int)sizeof who) break;
+                            }
+                            fprintf(stderr, "net: no turn from a peer for 30 s at tick %d; "
+                                            "the match is over\n", tick_count);
+                            /* ONE seat is worth naming and fits; a crowd is not and does
+                               not -- seven seats spelled out is four times the width the
+                               plate has. Thirty-two characters, see the desync arm. */
+                            if (who[0] && !strstr(who, " AND ")) {
+                                char msg[96];
+                                snprintf(msg, sizeof msg, "SEAT %s WENT QUIET", who);
+                                net_fail_say(msg);
+                            } else {
+                                net_fail_say("THE OTHER MACHINES WENT QUIET");
+                            }
+                            running = false;
+                            exit_reason = GAME_EXIT_NETLOST;
+                            break;
+                        } else if (now - g_netStallSince > 3000.0 && !g_netStallSaid) {
+                            g_netStallSaid = true;
+                            /* NAME WHO IS LATE. "waiting for a peer" is what a player
+                               calls a freeze; "waiting for seat 3" is a thing they can
+                               look across the room and act on. */
+                            {
+                                char who[64]; int wn = 0, sk;
+                                const unsigned mask = nm_waiting_mask();
+                                who[0] = '\0';
+                                for (sk = 0; sk < NM_MAX_SEATS; sk++)
+                                    if (mask & (1u << sk))
+                                        wn += snprintf(who + wn, sizeof who - wn,
+                                                       "%s%d", wn ? "," : "", sk);
+                                fprintf(stderr, "net: waiting for a turn from seat%s %s "
+                                                "at tick %d (%d seats in the match)\n",
+                                        (mask & (mask - 1)) ? "s" : "",
+                                        who[0] ? who : "?", tick_count, nm_seats());
+                            }
+                        }
+                        next_tick = now; break;
+                    }
+                    g_netStallSince = 0.0;
+                    g_netStallSaid = false;
                 }
                 /* The testing switches act once per engine tick, on every path that has
                    one, because three of the five are not states the engine holds: money
@@ -28402,6 +34409,12 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                         fprintf(stderr, "gameover: engine verdict %s at tick %d; "
                                         "dwelling 3s before the shell takes over\n",
                                 g_gameOver.win ? "WIN" : "LOSE", tick_count);
+                    } else if (g_netFailWhy[0]) {
+                        /* brain_advance refused the tick because the MATCH broke, and it
+                           has already said why. Not the engine stopping, so not an error
+                           exit: the shell takes this to the debrief. */
+                        running = false;
+                        exit_reason = GAME_EXIT_NETLOST;
                     } else {
                         fprintf(stderr, "CNC_Advance_Instance returned false at tick %d "
                                         "with no game-over event: the engine stopped\n",
@@ -28476,7 +34489,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
            ever written; see its definition for why that matters to every pixel gate.
            Held at 0 while the world is not advancing, so a paused or finished mission
            shows a still pose rather than one frozen mid-blend at an arbitrary phase. */
-        if (!paused && !g_optOpen && !sim_over && !codex_holds_the_world()) {
+        if (!holds_world && !sim_over) {
             double a = 1.0 - (next_tick - now) / TICK_MS;
             if (a < 0.0) a = 0.0;
             if (a > 0.999) a = 0.999;
@@ -28513,6 +34526,15 @@ int game_loop(SDL_Window* win, const GameOpts* o)
             glDisable(GL_SCISSOR_TEST);
             glViewport(0, 0, dwFull, dhFull);
             eui_draw(dwFull, dhFull);
+        }
+        if (g_grabNextFrame) {
+            /* Off the back buffer, before the swap, the same rule every other grab
+               in this file follows. */
+            g_grabNextFrame = false;
+            glFinish();
+            printf("RESTATE|shot|%s|%s\n", g_autorestateShot,
+                   grab_and_write(g_autorestateShot, dwFull, dhFull) ? "written" : "FAILED");
+            fflush(stdout);
         }
         SDL_GL_SwapWindow(win);
         frame_count++;
@@ -28571,6 +34593,22 @@ int game_loop(SDL_Window* win, const GameOpts* o)
  * ---------------------------------------------------------------------------------- */
 void game_shutdown(void)
 {
+    /* THE TABLE THE MATCH ENDS ON, taken FIRST, before anything below is pulled down.
+       The screen that draws it runs in the shell after this function returns, by which
+       time the engine is gone; this is the last moment those numbers exist. Here rather
+       than at the end of the live loop because a scripted run and a `shot` never enter
+       that loop, and a thing only the live loop can reach is a thing no gate can see --
+       which is exactly how the departure handling went four days unwatched.
+       Before nm_shutdown, too: the table records whether this was a network match, and
+       nm_shutdown is what stops that being answerable. */
+    match_stats_capture();
+    /* THE RAIN STOPS WHEN THE MISSION DOES. Its bed is a LOOPING voice, and a looping
+       voice never retires by itself: it holds its mixer slot until it is stopped by
+       hand. The only thing that stopped it was the once-a-frame update called from
+       draw_frame, so leaving a mission for the menu, where the world is not drawn, left
+       it raining over the main menu until the process ended. Here, because this is the
+       one function every exit from a mission passes through, scripted or played. */
+    rain_audio_stop();
     nm_shutdown();   /* says goodbye to the peer if there is one; a no-op otherwise */
     /* THE MISSION IS OVER, AND THE STAGE HAS TO STOP SAYING IT IS RUNNING. Nothing wrote
        g_bootStage on the way out of a mission, so from the first one onward this
@@ -28596,6 +34634,7 @@ void game_shutdown(void)
         cnc_music_stop(g_au);
     }
     g_sfxAsked = g_sfxPlayed = g_voxAsked = g_voxPlayed = 0;
+    g_defeatSaid = 0;
 
     /* The pause dialog belongs to a mission: its texture goes back with everything
        else boot allocated, and the next mission opens it closed. This is the ninth and
@@ -28623,7 +34662,15 @@ void game_shutdown(void)
     efx_free();
     verdict_free();
     dostib_free();
+    tib3d_free();
     doscrate_free();
+    smudge_free();
+    /* THE GRASS BELONGS TO THE MISSION. g_grassTile holds byte offsets into a buffer name
+       the next mission will reuse, and the ground colour texture was read back off THIS
+       pack's atlas. Freed before pack_free for the same reason the shatter cache is: the
+       indices it holds are about to stop meaning anything. */
+    grass_free();
+    grass_crush_free();
     shroud_free();
     pack_free(g_pack);
 
@@ -28654,7 +34701,7 @@ void game_shutdown(void)
        written (see the block beside its own shatter_reset), and the note on g_dmgCache
        claims "game_shutdown clears it through here" -- which was simply not true: grep
        gave dmg_reset exactly one caller and it was in game_load_slot.
-       the project owner, 25 Aug 2026: "When winning a skirmish map, and starting a new match, it starts
+       Reported: "When winning a skirmish map, and starting a new match, it starts
        when the last one ended, instead of starting a fresh map."
 
        MEASURED, on a win followed by a change of map: thirteen pieces and 155 triangles of
@@ -28718,6 +34765,19 @@ int main(int argc, char** argv)
     memset(&o, 0, sizeof(o));
     const int prc = game_parse_args(argc, argv, &o);
     if (prc) return prc;
+
+    /* --audiodevicetest ASKS FOR A REAL DEVICE on a run nobody is listening to, so it will
+       not do so without being told which driver to ask. The test it exists for names a
+       driver that cannot exist; the bare flag would open this machine's own sound card and
+       play the mission through it. */
+    if (g_audioDeviceTest) {
+        const char* drv = getenv("SDL_AUDIODRIVER");
+        if (!drv || !drv[0]) {
+            fprintf(stderr, "--audiodevicetest refused: SDL_AUDIODRIVER is not set, and without it"
+                            " this automated run would play through a real sound device\n");
+            return 2;
+        }
+    }
 
     /* --uitest BEFORE SDL_Init, because it needs nothing: no window, no GL context, no
        scenario. It compares the editor panel's layout against its hit test, and both are
@@ -28899,12 +34959,13 @@ int main(int argc, char** argv)
            The last pass is the NEGATIVE, and it is what makes the eleven before it mean
            anything: with no flag set at all the same call has to answer false, or the
            predicate is simply saying yes to everybody. */
-        for (int k = 0; k <= 11; k++) {
+        for (int k = 0; k <= 12; k++) {
             GameOpts h;
             const char* what = "a bare run";
             memset(&h, 0, sizeof h);
             g_playTicks = 0; g_run_seconds = 0.0;
             g_autoesc = 0.0; g_autoabort = 0.0; g_autoplay = false;
+            g_edgePlay = false;
             switch (k) {
             case 0:  h.shot = "x";           what = "--shot";      break;
             case 1:  h.script = "x";         what = "--script";    break;
@@ -28917,21 +34978,46 @@ int main(int argc, char** argv)
             case 8:  g_autoesc = 1.0;        what = "--autoesc";   break;
             case 9:  g_autoabort = 1.0;      what = "--autoabort"; break;
             case 10: g_autoplay = true;      what = "--autoplay";  break;
-            default: break;   /* k == 11 sets nothing, and that is the point of it */
+            case 11: g_edgePlay = true;      what = "--edgeplay";  break;
+            default: break;   /* k == 12 sets nothing, and that is the point of it */
             }
             cases++;
             const bool got = confine_automated(&h);
-            if (got != (k <= 10)) {
+            if (got != (k <= 11)) {
                 bad++;
                 printf("CONFINETEST|FAIL|%s reads automated=%d, want %d\n",
-                       what, got ? 1 : 0, (k <= 10) ? 1 : 0);
+                       what, got ? 1 : 0, (k <= 11) ? 1 : 0);
+            }
+            /* AND THE EXCEPTION, ASKED SEPARATELY AT EVERY ONE OF THEM. --edgeplay is
+               automated AND keeps its window; every other entry point is automated and
+               loses it. Asking both questions of all thirteen is what stops the next
+               person folding the second answer back into the first: the day this returns
+               true for --shot, a hundred scripted runs start taking the desk again, and
+               the day it returns false for --edgeplay, G124 cannot measure and only a
+               release finds out. */
+            cases++;
+            const bool real = confine_needs_real_window(&h);
+            if (real != (k == 11)) {
+                bad++;
+                printf("CONFINETEST|FAIL|%s reads needs-real-window=%d, want %d\n",
+                       what, real ? 1 : 0, (k == 11) ? 1 : 0);
             }
         }
+        g_edgePlay = false;
         printf("CONFINETEST|cases=%d|failures=%d\n", cases, bad);
         fflush(stdout);
         return bad ? 1 : 0;
     }
 
+    /* AND DO NOT BECOME THE ACTIVE APPLICATION. A hidden window is not by itself enough
+       on macOS: SDL gives the process the Regular activation policy, so it takes the menu
+       bar and the keyboard focus the moment it starts, which is most of what "takes over
+       my desktop" means when a suite runs a hundred of them. This hint makes it an
+       accessory process instead: no Dock tile, no activation, no focus taken. It must be
+       set BEFORE SDL_Init, which is why it is here rather than beside the window. */
+    if (confine_automated(&o) && !g_scriptShowWindow && !confine_needs_real_window(&o)) {
+        SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "1");
+    }
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
@@ -28961,7 +35047,12 @@ int main(int argc, char** argv)
     }
 
     Uint32 flags = SDL_WINDOW_OPENGL;
-    if (o.shot || o.hidden) flags |= SDL_WINDOW_HIDDEN;
+    /* HIDDEN FOR EVERY AUTOMATED RUN, not just --shot and --script. See the note on
+       confine_automated: one list decides the cage, the window and the sound -- and
+       confine_needs_real_window beside it, which is the one entry point whose whole
+       subject IS the window and which therefore keeps a visible, focusable one. */
+    if (confine_automated(&o) && !g_scriptShowWindow && !confine_needs_real_window(&o))
+        flags |= SDL_WINDOW_HIDDEN;
     /* RESIZABLE, always. It used to be set only for --resize, so the window the project owner was
        given could not be dragged to any other size at all. Nothing downstream assumes a
        fixed size: dw/dh are read fresh from SDL_GL_GetDrawableSize every frame and the
@@ -29051,12 +35142,11 @@ int main(int argc, char** argv)
 
        --audiowav is the single exception and it is deliberate: it RECORDS rather than
        plays, which is the one automated reason to want the mixer running. */
-    const bool automated =
-        o.picktest || (o.shot != NULL) || (o.script != NULL) || o.hidden ||
-        (o.posetest != NULL) || o.forcewin_ticks > 0 ||
-        g_autoplay || g_edgePlay || g_scripttest || g_uitest || g_elevtest ||
-        g_painttest || g_undotest || g_confineTest || g_turTest;
-    ab.silent = o.nosound || (automated && !o.audiowav);
+    const bool automated = confine_automated(&o);
+    /* --audiodevicetest is the other exception, and it is a test and not a player: it asks
+       for a device so the refused-device path can be exercised, and main has already
+       refused it unless SDL_AUDIODRIVER is set. --nosound still wins over it. */
+    ab.silent = o.nosound || (automated && !o.audiowav && !g_audioDeviceTest);
     CncAudio* au = audio_boot(&ab);
     game_set_audio(au);
 

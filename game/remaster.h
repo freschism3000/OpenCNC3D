@@ -185,7 +185,7 @@ static int rm_find_entry(const char* dir, const char* want, char* out, size_t n)
 #endif
 }
 
-/* THE IDENTITY TEST, WRITTEN AGAINST A REAL INSTALL (3 Sep 2026).
+/* THE IDENTITY TEST, WRITTEN AGAINST A REAL INSTALL.
    It used to look for TiberianDawn.dll and RedAlert.dll, because that is what the
    community fork of EA's own map editor tests. A real install has NEITHER, anywhere in
    the tree, so that test rejected the genuine article. Reality wins:

@@ -1,0 +1,3 @@
+tick 5
+count E1
+quit

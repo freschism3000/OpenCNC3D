@@ -1,4 +1,8 @@
 # 45 seconds of sim: long enough for IND2 (38 s) to end and the next track to start.
+# The credit tick is switched off first: SCG90EA opens with the readout rolling up from
+# 0 to 15000 over 279 ticks (about 18 s), one tone per tick on the effects bus, which
+# would fill the quiet stretch G10 measures the two buses apart on. G252 covers the tick.
+gfx cash_tick 0
 tick 2
 tick 680
 quit

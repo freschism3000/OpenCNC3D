@@ -20,6 +20,11 @@ if [ -z "$CNC3D_SKIP_VERSION_HEADER" ]; then
     sh "../tools/version.sh" --header "../game/cnc3d_build.h"
 fi
 
+# A COOKED BUILD has no F5 panel; see app/build.sh for the whole of it. This binary ships
+# in every package (make-build.sh), so it has to be able to be cooked too.
+CDEFS=""
+[ -n "$CNC3D_COOKED" ] && CDEFS="-DCNC3D_COOKED=1"
+
 # The old ROOT pointed at a temporary folder that the OS cleans; the checkout now
 # lives in the repo (brain/vanilla, gitignored). Fallback kept for odd layouts.
 ROOT=..
@@ -60,7 +65,14 @@ cc -std=c89   -O2 -g -c ../net/lockstep.c -o lockstep.o
 cc -std=gnu89 -O2 -g -c ../net/net_udp.c  -o net_udp.o
 # netmatch.c is the match itself: the handshake, one turn per tick and the desync alarm,
 # between the scheduler and the socket. It is the only net file the game calls.
+# roomcode is a relayed host's whole address. netmatch renders a room's code from the id
+# it registered, so this object comes BEFORE it and links with it everywhere.
+cc -std=gnu89 -O2 -g -c ../net/roomcode.c -o roomcode.o
 cc -std=gnu89 -O2 -g -c ../net/netmatch.c -o netmatch.o
+# netbeacon.c is LAN discovery: a host announces by broadcast and a browser listens. Same
+# rule as the two above -- it knows about a socket and nothing about a game -- so the
+# server browser can be tested with no game running at all, which is what gate_beacon does.
+cc -std=gnu89 -O2 -g -c ../net/netbeacon.c -o netbeacon.o
 
 # The two gates and the connectivity tool are STANDALONE binaries, the same category as
 # gate_optlayout below: nothing links them into the game. gate_lockstep drives the
@@ -70,7 +82,28 @@ cc -std=gnu89 -O2 -g -c ../net/netmatch.c -o netmatch.o
 # name, for the reason it excludes gate_optlayout.
 cc -std=c89   -O2 -g -o gate_lockstep ../net/gate_lockstep.c lockstep.o
 cc -std=gnu89 -O2 -g -o gate_netloop  ../net/gate_netloop.c  lockstep.o net_udp.o
-cc -std=gnu89 -O2 -g -o netcheck      ../net/netcheck.c      lockstep.o net_udp.o
+# gate_tunnel is the third of the same kind: it runs a relay, two peers and the
+# transport between them in one process, so the relayed path is tested with no relay
+# server, no second machine and no internet.
+cc -std=gnu89 -O2 -g -o gate_tunnel   ../net/gate_tunnel.c   net_udp.o
+# gate_beacon proves LAN discovery with no game and no second machine: it announces and
+# browses in one process. It runs BEFORE any server-browser pixel is drawn, because an
+# empty browser and a quiet network look identical and only one of them is a bug.
+cc -std=gnu89 -O2 -g -o gate_beacon   ../net/gate_beacon.c   netbeacon.o net_udp.o
+# gate_lobby drives the LOBBY state machine end to end -- open a room, seat a joiner,
+# refuse the start until they ready, start them both -- with no SDL and no second
+# machine. The screens call these functions and own no socket, so this is where the
+# question "does hosting and joining actually work" is answerable.
+cc -std=gnu89 -O2 -g -o gate_lobby    ../net/gate_lobby.c    netmatch.o lockstep.o net_udp.o roomcode.o
+cc -std=gnu89 -O2 -g -o netcheck      ../net/netcheck.c      lockstep.o net_udp.o roomcode.o
+cc -std=gnu89 -O2 -g -o gate_roomcode ../net/gate_roomcode.c roomcode.o
+# gate_mpbrowse: the game's own half of the internet game list. It needs the list
+# service to answer, so the suite starts a stand-in and hands it the address; it needs
+# no relay and no second machine, because the half that talks to another player is
+# gated elsewhere.
+cc -std=gnu99 -O2 -g -o gate_mpbrowse ../menu/gate_mpbrowse.c ../menu/mpbrowse.c \
+   ../launcher/lnet.c ../launcher/ljson.c roomcode.o -I../menu -I../launcher \
+   $(sdl2-config --cflags) $(sdl2-config --libs) -lcurl
 
 # cnc_twobrain: TWO brain instances in ONE process, compared per tick. It is the gate that
 # one-binary-twice cannot be: it proves two independent copies of the engine AGREE, which is
@@ -87,6 +120,15 @@ cc -std=gnu99 -O2 -g -o cnc_twobrain  ../brain/host/cnc_twobrain.c
 # It is a BUILD PRODUCT and stays out of git (.gitignore), like every other binary here.
 # It links only dosopt.o and dosbar.o; -lz is dosbar's pack reader.
 cc -std=c89 -O2 -g -o gate_optlayout gate_optlayout.c dosopt.o dosbar.o -lz
+
+# gate_rminf MEASURES WHERE A REMASTERED INFANTRY STRIP PUTS THE GROUND, off the player's
+# own install, and it is a separate binary for the same reason gate_optlayout is: the
+# arithmetic under test is in remaster_inf.h, which needs no window and no GL, so the whole
+# derivation can be re-read from the .meta files in milliseconds. C++ because
+# remaster_tex.h pulls in terrain_tiles.h. -lz is the zip reader: the sprite archives are
+# raw deflate. It exits 77 when the machine has no Remastered Collection, which is not a
+# failure and which the gate reports as a skip.
+c++ -std=gnu++98 -O2 -g -I. -o gate_rminf gate_rminf.cpp -lz
 
 # The audio engine: the mixer, the 1995 .AUD decoders and the MIX reader. Same C89
 # rule as dosbar.c and for the same reason. Every file here is portable C with no
@@ -105,8 +147,8 @@ AUDOBJ="$AUDOBJ aud_sdl.o"
 # -headerpad_max_install_names: reserve room in the Mach-O header so the dylib paths can
 # be rewritten after the link without relinking. Same flag and same reason as app/build.sh.
 clang++ -std=c++14 -O2 -g \
-    -fms-extensions -fdeclspec -D__int64="long long" \
-    -o cnc_eyes cnc_eyes.cpp dosbar.o hud640.o dosopt.o dossave.o logo3d.o lockstep.o net_udp.o netmatch.o $AUDOBJ \
+    -fms-extensions -fdeclspec -D__int64="long long" $CDEFS \
+    -o cnc_eyes cnc_eyes.cpp dosbar.o hud640.o dosopt.o dossave.o logo3d.o lockstep.o net_udp.o netmatch.o netbeacon.o roomcode.o $AUDOBJ \
     -I"$HDR" -I../audio \
     $(sdl2-config --cflags) $(sdl2-config --libs) \
     -Wl,-headerpad_max_install_names \
@@ -137,9 +179,9 @@ sh ../tools/bundle-sdl.sh . cnc_eyes
 # could never agree again and the launcher warned "rebuild" after every successful build.
 # A warning that is always on is a warning nobody reads. One list, published here.
 BUILD_SOURCES="cnc_eyes.cpp cnc_sidebar.h edit_mod.h edit_tables.h enhanced_mod.h \
-edit_emblem.h codex_mod.h codex_table.h dosbar.c hud640.c dosopt.c ../app/logo3d.c \
+edit_emblem.h codex_mod.h codex_table.h unitcard_mod.h dosbar.c hud640.c hud640.h dosopt.c ../app/logo3d.c \
 ../net/lockstep.c ../net/net_udp.c ../net/lockstep.h ../net/net_udp.h \
-../net/netmatch.c ../net/netmatch.h"
+../net/netmatch.c ../net/netmatch.h ../net/netbeacon.c ../net/netbeacon.h"
 {
     cat $BUILD_SOURCES 2>/dev/null | shasum -a 1 | cut -d" " -f1
     echo "$BUILD_SOURCES"
@@ -157,7 +199,8 @@ if [ -d ../playable ]; then
     # they were invisible to the suite: the gate reported exit 99, "the binary was not
     # built", when all three had been built and were simply somewhere else. Same shape as
     # the engine and the app, so it is staged in the same place rather than in a third.
-    for b in gate_lockstep gate_netloop netcheck cnc_twobrain; do
+    for b in gate_lockstep gate_netloop gate_tunnel gate_beacon gate_lobby gate_roomcode gate_mpbrowse netcheck cnc_twobrain \
+             gate_rminf; do
         [ -x "$b" ] && cp "$b" "../playable/$b"
     done
     # THE WORKED EXAMPLE. examples/ is tracked, playable/ is not, so the demo mission has

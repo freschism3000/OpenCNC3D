@@ -1,3 +1,4 @@
+gfxpanel 1
 tick 60
 panelprobe 2000 800
 panelprobe 300 700

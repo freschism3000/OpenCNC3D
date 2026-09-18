@@ -563,8 +563,8 @@ The scene graph has THREE node handle classes, not one. The table at RAM 0x800AC
 CAFEDEAD, then BEEFED02 at 0x800AC2D8 (apply 0x8008A6C8), then the FEEB records.
 pose_record() above accepts CAFEDEAD ONLY, and slot_tracks() reads its tracks out of the
 pose record's +0x40/+0x44/+0x48. A BEEFED02 node has no pose record, so it contributed NO
-TRACKS and the slot looked unanimated. beefed_local() (added 15 Aug) fixed those nodes'
-REST pose and stopped there; their MOTION has never been read.
+TRACKS and the slot looked unanimated. beefed_local() fixed those nodes' REST pose first;
+beefed_curves() and beefed_eval() below read their MOTION.
 
 What that cost, counted by walking every structure's graph:
     PYLE  3 BEEFED02, 0 CAFEDEAD   -- invisible. This is the static Barracks flag.
@@ -577,12 +577,13 @@ What that cost, counted by walking every structure's graph:
 
 THE CURVE FORMAT, read out of the ROM rather than assumed. A BEEFED02 handle's data
 points at four 0x1C-byte curve descriptors: T at +0x00 (3), R at +0x1C (4), S at +0x38
-(3), SO at +0x54 (4). objgraph2._curve_rest already parses a descriptor -- {data, ?,
-nkeys, stride} -- but reads key 0 only. Each key is `stride` floats, stride == 1 + 3*dim:
+(3), SO at +0x54 (4). A descriptor is {data, type, nkeys, stride, 0, pre, post};
+objgraph2._curve_rest parses the first four words and reads key 0 only. Each key is
+`stride` floats, stride == 1 + 3*dim:
 
     [0]              the key's DURATION in ticks (a DELTA, not an absolute time)
-    [1 .. dim]       control point 1     }  NOT USED HERE -- see the honesty note below
-    [dim+1 .. 2dim]  control point 2     }
+    [1 .. dim]       control point 1   (weight u(1-u)^2 in the blend below)
+    [dim+1 .. 2dim]  control point 2   (weight u^2(1-u))
     [2dim+1 .. 3dim] the key's VALUE
 
 Verified on PYLE: durations 0, 20160, 11040, 14880, 1920 accumulate to exactly 48000, and
@@ -590,17 +591,48 @@ all three of its nodes share that same 48000-tick period. Every R value is a uni
 quaternion to four decimals while the control points are not, which is what tells the
 value block from the control blocks.
 
-WHAT IS OURS AND NOT A DECODE, stated plainly: the control points are IGNORED and
-consecutive keys are blended with slerp/lerp. The cartridge's evaluator (0x8007FC6C, whose
-cycle controller at 0x8007F264 slides the window by whole periods and is why these clips
-LOOP where FEEB/CAFEDEAD cannot) presumably runs a cubic through those control points. So
-our key poses are exact and our in-betweens are straighter than the console's. Registered
-as a known gap."""
+THE EVALUATOR, transcribed from RAM 0x8007FC6C and then RUN there: anim_console_check.py
+drives the cartridge's own init (0x8008A258) and apply (0x8008A6C8) under n64emu and
+compares every baked frame with the matrix the console builds. Every descriptor in the
+model table carries type word 3 and pre/post-infinity words 1, so this is the only branch
+the data ever takes:
+
+    segment: the first key i >= 1 with time[i-1] <= t <= time[i]  (the cached cursor at
+             ctrl+0x6C/+0x70 advances on `acc + dur[i] < t`, so t exactly ON a key
+             evaluates the segment ending there at u = 1)
+    u   = (t - time[i-1]) / dur[i]
+    out = P0 * ((1-u)^2 + u(1-u)^2)          P0 = key[i-1].value    (0x800802A0..F0)
+        + C1 * u(1-u)^2                      C1 = key[i].control1   (0x8008016C..74)
+        + C2 * u^2(1-u)                      C2 = key[i].control2   (0x800801BC..C4)
+        + V  * (u^2 + u^2(1-u))              V  = key[i].value      (0x800801C8..2C)
+
+The four weights sum to one, so a segment whose four inputs agree holds still. A segment
+is NOT a slerp between its end values: the EYE dish's first segment is a 412-degree sweep
+about the vertical, carried by its two control points, where a slerp between the same two
+values gives a 308-degree sweep the other way. For dim 3 (T, S) the blend is the answer.
+For dim 4 (R, SO) the kind-2 post-process at 0x8007F988 turns the unnormalised quaternion
+(w, v) into (2w^2/s - 1, 2wv/s), s = |q|^2, which is (cos th, sin th n) for the rotation
+the quaternion represents, and 0x800865A4 builds the Rodrigues matrix from that, returning
+IDENTITY when |sin th n|^2 < 1e-10. Net effect: the rotation is normalise(out), except
+that an exact 180-degree result collapses to identity, which the SAM launcher's R curve
+does from its own key 2 onwards (value w = 0). Reproduced here, not corrected: it is what
+the console draws.
+
+Pre- and post-infinity are mode 1, CONSTANT, in every descriptor: the cycle controller at
+0x8007F264 hands back the cached first (or last) key value, post-processed, once the cycle
+count is nonzero. So a curve HOLDS before its first key and after its period, and the
+renderer's idle loop over the period is the renderer's own convention. An earlier note
+here read the controller's `base += n * period` as a wrap and called these clips
+self-looping; that is the CYCLE mode's arithmetic, which no descriptor selects."""
 
 def beefed_curves(node):
     """{'T':curve,'R':curve,'S':curve,'SO':curve} for a BEEFED02 node, or None.
 
-    A `curve` is {'time': [cumulative ticks], 'val': [[dim floats]], 'dim': n}."""
+    A `curve` is {'time': [cumulative ticks], 'dur': [per-key ticks], 'val': [[dim]],
+    'c1': [[dim]], 'c2': [[dim]], 'dim': n, 'count': nkeys, 'type': 3, 'pre': 1,
+    'post': 1}. The type and infinity words are asserted rather than trusted: the blend
+    in beefed_eval is the type-3 branch of the evaluator, and a curve of any other type
+    or end mode would be blended wrong without a sound."""
     h = m_u32(node + 8)
     if h is None or not O2._in_model_seg(h) or m_u32(h) != O2.TAG_BEEFED02:
         return None
@@ -613,39 +645,72 @@ def beefed_curves(node):
     out = {}
     for off, dim, nm in ((0x00, 3, "T"), (0x1C, 4, "R"), (0x38, 3, "S"), (0x54, 4, "SO")):
         desc = src + off
-        data, nkeys, stride = m_u32(desc), m_u32(desc + 8), m_u32(desc + 0x0C)
+        data, ctype, nkeys, stride = (m_u32(desc), m_u32(desc + 4), m_u32(desc + 8),
+                                      m_u32(desc + 0x0C))
+        pre, post = m_u32(desc + 0x14), m_u32(desc + 0x18)
         if not data or not O2._in_model_seg(data) or not nkeys:
             continue
         if stride != 1 + 3 * dim:          # not the shape objgraph2 proved; skip loudly
             continue
-        times, vals, acc = [], [], 0.0
+        assert ctype == 3, ("node %08X %s: curve type %d; only the type-3 cubic "
+                            "(jump table 0x800065B8) is transcribed" % (node, nm, ctype))
+        assert pre == 1 and post == 1, ("node %08X %s: pre/post-infinity %d/%d; only "
+                                        "CONSTANT (1) is transcribed" % (node, nm, pre, post))
+        times, durs, vals, c1s, c2s, acc = [], [], [], [], [], 0.0
         for k in range(nkeys):
             b = data + k * stride * 4
-            acc += m_f32(b)                                    # duration, a DELTA
+            dur = m_f32(b)                                     # duration, a DELTA
+            assert k == 0 or dur > 0.0, ("node %08X %s: key %d has duration %r, which "
+                                         "the evaluator divides by" % (node, nm, k, dur))
+            acc += dur
             times.append(acc)
+            durs.append(dur)
+            c1s.append([m_f32(b + (1 + i) * 4) for i in range(dim)])
+            c2s.append([m_f32(b + (1 + dim + i) * 4) for i in range(dim)])
             vals.append([m_f32(b + (1 + 2 * dim + i) * 4) for i in range(dim)])
-        out[nm] = dict(time=times, val=vals, dim=dim, count=nkeys)
+        out[nm] = dict(time=times, dur=durs, val=vals, c1=c1s, c2=c2s, dim=dim,
+                       count=nkeys, type=ctype, pre=pre, post=post)
     return out or None
 
 
+def beefed_post(out, dim):
+    """The kind-2 post-process (RAM 0x8007F988) and the Rodrigues guard (0x800865A4),
+    folded to their net effect on a quaternion: normalise, and collapse an exact
+    180-degree rotation to identity. A vector passes through untouched."""
+    if dim != 4:
+        return list(out)
+    s = sum(x * x for x in out)
+    if s == 0.0:
+        return [1.0, 0.0, 0.0, 0.0]                           # 0x8007FA6C: s == 0
+    w = out[0]
+    sinv = [2.0 * w * x / s for x in out[1:]]                # the (sin th n) half
+    if sum(x * x for x in sinv) < 1e-10:                      # the guard in 0x800865A4
+        return [1.0, 0.0, 0.0, 0.0]
+    n = math.sqrt(s)
+    return [x / n for x in out]
+
+
 def beefed_eval(curve, t):
-    """One curve at time t. Quaternions slerp, vectors lerp; clamped at both ends
-    exactly as the FEEB key search does (0x8008AF58)."""
-    ts, vs = curve["time"], curve["val"]
+    """One curve at time t: the cartridge's type-3 cubic through the two control points,
+    held CONSTANT before the first key and after the period (the note above has the
+    addresses). Not slerp(): that stays as it is for the FEEB and cursor tracks."""
+    ts, durs, vs, c1s, c2s, dim = (curve["time"], curve["dur"], curve["val"],
+                                   curve["c1"], curve["c2"], curve["dim"])
     if len(ts) == 1 or t <= ts[0]:
-        return list(vs[0])
-    if t >= ts[-1]:
-        return list(vs[-1])
-    i = 0
-    while i + 1 < len(ts) and not (ts[i] <= t <= ts[i + 1]):
+        return beefed_post(vs[0], dim)
+    if t > ts[-1]:
+        return beefed_post(vs[-1], dim)
+    i = 1
+    while i < len(ts) and ts[i] < t:
         i += 1
-    j = min(i + 1, len(ts) - 1)
-    span = ts[j] - ts[i]
-    u = 0.0 if span <= 0 else (t - ts[i]) / span
-    a, b = vs[i], vs[j]
-    if curve["dim"] == 4:
-        return slerp(a, b, u)
-    return [(1.0 - u) * a[k] + u * b[k] for k in range(len(a))]
+    u = (t - ts[i - 1]) / durs[i]
+    b1 = u * (1.0 - u) * (1.0 - u)
+    b2 = u * u * (1.0 - u)
+    b0 = (1.0 - u) * (1.0 - u) + b1
+    b3 = u * u + b2
+    p0, c1, c2, v = vs[i - 1], c1s[i], c2s[i], vs[i]
+    return beefed_post([b0 * p0[k] + b1 * c1[k] + b2 * c2[k] + b3 * v[k]
+                        for k in range(dim)], dim)
 
 
 def beefed_local_at(curves, t):
@@ -666,15 +731,26 @@ def beefed_local_at(curves, t):
 
 
 def beefed_is_animated(curves):
-    """True if any channel really moves. A BEEFED02 node whose every curve is a
-    single key, or two identical keys, is a REST POSE holder and not animation --
-    PYLE's T curves are exactly that (2 keys, same value, 0 and 48000)."""
+    """True if any channel really moves, judged on the EVALUATED curve rather than on
+    the key values. A BEEFED02 node whose every curve is a single key, or whose keys
+    all agree and whose control points do too, is a REST POSE holder and not animation:
+    PYLE's T curves are exactly that (2 keys, same value, 0 and 48000). Two equal end
+    values are not enough on their own: the Airstrip's R curve (0x801BFCA8) has two
+    identical keys and control points that swing the part 42 degrees between them, so
+    the curve is sampled every 80 ticks across its period and compared with its rest."""
     for c in curves.values():
         if c["count"] < 2:
             continue
-        v0 = c["val"][0]
-        for v in c["val"][1:]:
-            if any(abs(a - b) > 1e-6 for a, b in zip(v, v0)):
+        period = c["time"][-1]
+        if period <= 0:
+            continue
+        rest = beefed_eval(c, 0.0)
+        n = int(period // 80) + 1
+        for k in range(1, n + 1):
+            v = beefed_eval(c, min(period, k * 80.0))
+            if c["dim"] == 4 and sum(a * b for a, b in zip(v, rest)) < 0:
+                v = [-x for x in v]                     # q and -q are one rotation
+            if any(abs(a - b) > 1e-6 for a, b in zip(v, rest)):
                 return True
     return False
 
@@ -872,12 +948,13 @@ def main():
         # clip_split is an extractor-side heuristic ("split wherever nothing happens
         # for 8000 ticks") and it says so in its own docstring. It is right for FEEB
         # clips, which are laid out as separate events along one long timeline. It is
-        # WRONG for BEEFED02, whose evaluator runs a pre/post-infinity cycle
-        # controller (RAM 0x8007F264) that slides the window by whole PERIODS -- so
-        # the period IS the clip. Applied blindly it cut PYLE's single 48000-tick
-        # flag cycle into two "one-shot" fragments at 13920..34240 and 44640..48000,
-        # which is exactly backwards for the one animation in the cartridge that
-        # provably loops.
+        # WRONG for BEEFED02, whose curves are authored as ONE cycle: every key's
+        # duration accumulates to a shared period, the descriptor's pre/post-infinity
+        # words hold the curve constant outside it, and the period IS the clip.
+        # Applied blindly it cut PYLE's single 48000-tick flag cycle into two
+        # "one-shot" fragments at 13920..34240 and 44640..48000. Looping that clip is
+        # the renderer's convention (clips[0] is the idle loop), not the evaluator's:
+        # the cartridge holds the last key once the period is over.
         bperiod = 0.0
         for cur in bcurves.values():
             for c in cur.values():
@@ -1073,27 +1150,23 @@ def main():
             THE ENDPOINT TEST DOES NOT APPLY TO BEEFED02, and finding that out is the
             whole reason this function exists separately. For a FEEB/CAFEDEAD clip
             "loops" means the author brought the pose back to where it started, so
-            comparing the ends is the right question. BEEFED02 loops because its
-            EVALUATOR says so: 0x8007FC6C runs the pre/post-infinity cycle controller
-            at 0x8007F264, read here instruction by instruction --
+            comparing the ends is the right question. A BEEFED02 clip is marked as a
+            loop because it is authored as ONE CYCLE, and the renderer plays clips[0]
+            round and round by convention: PYLE's three nodes have 5, 6 and 5 keys with
+            completely different individual durations, and all three total EXACTLY
+            48000. Three independent curves landing on the same period is a shared
+            cycle, not a coincidence. Measured on PYLE, the ends do NOT meet: its three
+            nodes end 0.0022 and 0.0049 away in quaternion terms, just outside the
+            endpoint tolerance, and the endpoint test duly called the flag a one-shot.
 
-                8007F300  lwc1 f0, 0x14(fp) ; cvt.s.w    the cycle count n
-                8007F30C  lwc1 f2, (a0)                  the period, chan+0x00
-                8007F310  mul.s f0, f0, f2               n * period
-                8007F318  add.s f0, f2, f0               base + n*period
-                8007F31C  swc1 f0, 0x50(v0)              stored back
-
-            -- the window slides by whole periods forever, with the sign of chan+0x4C
-            picking the pre- or post-infinity mode at 0x8007F328. So it repeats whether
-            or not the last key lands exactly on the first. Measured on PYLE, it does
-            NOT: its three nodes end 0.0022 and 0.0049 away in quaternion terms, just
-            outside the endpoint tolerance, and the endpoint test duly called the one
-            provably-looping animation in the cartridge a one-shot.
-
-            Corroboration from the data rather than the code alone: PYLE's three nodes
-            have 5, 6 and 5 keys with completely different individual durations, and
-            all three total EXACTLY 48000. Three independent curves landing on the same
-            period is a shared cycle, not a coincidence."""
+            What the cycle controller at 0x8007F264 does with that period is worth
+            stating exactly, because an earlier version of this note read its
+            `base += n * period` arithmetic (0x8007F300..0x8007F31C) as a wrap and
+            called the clip self-looping. That arithmetic serves the CYCLE end modes;
+            the mode every descriptor in the cartridge selects is 1, CONSTANT
+            (0x8007F37C), which returns the cached last key value once the cycle count
+            is nonzero. The console, if it ever advanced these clocks, would hold the
+            last pose; the loop is ours."""
             if bperiod > 0 and idx == 0:
                 return True
             return loops(c0, c1)

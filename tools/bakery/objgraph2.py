@@ -399,9 +399,17 @@ def parts_of_node(root, axisfix=True):
                 t = _mvec_row(t, Pinv)
         WM = _mmul(M3, PM)
         Wt = [a + b for a, b in zip(_mvec_row(t, PM), Pt)]
-        # +0x00 is the part's display list; +0x04 is a second skin of the same
-        # geometry. PROC's mast, SILO's dome and FACT's crane carry geometry ONLY
-        # in the +0x04 slot (their +0x00 is NULL), so fall back to it.
+        # +0x00 is the part's display list. +0x04 is NOT a second list: it is the
+        # node's baked rest Mtx (16 s16 integer parts then 16 u16 fractions, the
+        # operand the cartridge's node walker pushes when the node has no handle;
+        # rest_matrix() in the animation extractor reads it as such). Read as a
+        # display list anyway it happens to work on exactly three nodes, and only
+        # there: the 64 bytes of matrix and the 64 bytes of Vtx data that follow
+        # parse as commands the walker tolerates, and at +0x80 the walk lands on the
+        # node's texture-book payload list. That is how PROC's storage strip, SILO's
+        # fill dome and FACT's fans reach the base mesh at the node's pose. The
+        # fallback is kept deliberately: the construction reveal, the damage blush and
+        # the shatter all draw that copy, and the posed book variant is baked onto it.
         gfx = r32(ram)
         alt = r32(ram + 4)
         pick = gfx if (gfx and _in_model_seg(gfx)) else (

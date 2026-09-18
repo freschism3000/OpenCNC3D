@@ -1572,7 +1572,7 @@ NUKE_SLOTS = [(6, 0x0100888, "dome"), (7, 0x0100E68, "stem"),
               (8, 0x01011F0, "collar"), (9, 0x0101E88, "cloud")]
 NUKE_MESH = "NUKEFX"
 NUKE_FRAMES = 31
-# the project owner ASKED FOR 2.5x, 25 Aug 2026: at the cartridge's own 0.3 the mushroom is about a
+# the requirement asked for 2.5x, 25 Aug 2026: at the cartridge's own 0.3 the mushroom is about a
 # tile and a quarter across, which is faithful and reads as small on a modern screen at
 # this camera distance. 0.3 * 2.5 = 0.75. The cartridge's number is kept in the comment
 # rather than deleted, because it is the thing to return to if faithfulness ever wins.
@@ -1959,7 +1959,7 @@ def bake_ion_effect(bank, meshes, meshindex, meshparts, meshsections, verbose=Tr
 # ---------------------------------------------------------------------------
 # THE RALLY POINT FLAG (PK4 mesh + PKB clip)
 # ---------------------------------------------------------------------------
-# the project owner, 25 Aug 2026: "Take the Flag Pole and Animated flag from the Barracks, seperate it,
+# Reported: "Take the Flag Pole and Animated flag from the Barracks, seperate it,
 # and use it for the Rally Point for all buildings."
 #
 # The Barracks has one, and it is the only flag in the cartridge. PYLE's scene graph is
@@ -2170,12 +2170,15 @@ def bake_struct_flipbooks(um, bank, meshes, meshindex, meshparts, meshsections,
       for booki, node in enumerate(nodes):
         fb = TEXBOOK.texbook(B.ROM, node)
         assert fb, "%s node %08X was expected to carry a texture book and does not" % (tc, node)
-        # THE GEOMETRY IS NOT IN THE TYPE'S ROOT MESH, and that is the discovery that
-        # closes this out. The node carrying the book has dl = 0 at node+0x00; its
-        # drawable list hangs off the payload instead, as `src`. Our walker follows
-        # node+0x00 and node+0x0C only, so these faces have NEVER been extracted -- which
-        # is why FACT's 69 baked triangles contain no fan, and why every rule written over
-        # them found something else. Walk the payload's own list.
+        # THE GEOMETRY IS NOT REACHED THROUGH node+0x00, and that is the discovery that
+        # closed the fans out. The node carrying the book has dl = 0 at node+0x00; its
+        # drawable list hangs off the payload instead, as `src`. A walker that follows
+        # node+0x00 and node+0x0C only never sees these faces, which is why FACT's 69
+        # baked triangles once contained no fan and every rule written over them found
+        # something else. Walk the payload's own list. (objgraph2 has since grown a
+        # fallback through node+0x04 that reaches the same triangles for FACT, PROC's
+        # second book and SILO, so the base mesh carries a copy at the node's pose; the
+        # variant baked here is posed onto that copy and overdraws it, see below.)
         dl = TEXBOOK.ram_to_rom(fb["src"])
         assert dl is not None, "%s: the book's display list %08X is in no known segment" % (
             tc, fb["src"])
@@ -2200,11 +2203,64 @@ def bake_struct_flipbooks(um, bank, meshes, meshindex, meshparts, meshsections,
         assert len(set(idx)) == len(idx), \
             "%s: two of the book's images collapsed onto one bank entry" % tc
         tris = bake_mesh_prim(dl, bank)
+        # POSED WITH THE BOOK NODE'S OWN MOUNT TRANSFORM, exactly as bake_mesh_parts
+        # poses every part of the base mesh. The cartridge's node walker pushes the
+        # node's matrix (the handle's pose, else the baked Mtx at node+0x04) before it
+        # emits the payload list, so the book's triangles are drawn where the node
+        # stands, not where the list's raw vertices lie. Baked raw, two of the six books
+        # landed away from their building: the silo's fill dome 10.93 units below the
+        # dome the base mesh already draws (hidden inside it, so no fill level ever
+        # showed), and the refinery's storage strip 0.28 cells east and 0.17 cells north
+        # of the strip on the building, un-rotated by the node's 7 degrees, so the
+        # refinery wore two strips and the animated one stood in the open. The four
+        # books on a root or identity node bake byte-identical either way.
+        hit = [p for p in _graph_of(um[tc]) if p["node"] == node]
+        if hit:
+            assert len(hit) == 1, "%s: book node %08X is walked %d times" % (
+                tc, node, len(hit))
+            M, t = hit[0]["M"], hit[0]["t"]
+            tris = [(ti, mode, wrap,
+                     [xform((x, y, z), M, t) + (u, v, r_, g_, b_, a_)
+                      for (x, y, z, u, v, r_, g_, b_, a_) in tri])
+                    for (ti, mode, wrap, tri) in tris]
+        else:
+            # No scene graph (SUBPARTS off): the base mesh was baked from the bare
+            # display list with no transform either, so identity is the matching pose.
+            assert not B.SUBPARTS, "%s: book node %08X is not in the slot's walk" % (
+                tc, node)
         parts = []
         base_bi = idx[0]
         nswap = sum(1 for t in tris if t[0] == base_bi)
         assert nswap > 0, \
             "%s: the baked list draws nothing with the book's base texture" % tc
+        # THE TRIPWIRE. Where the base mesh already carries a run of triangles on the
+        # book's base texture (the walker reaches the same geometry through node+0x04,
+        # which is the node's rest Mtx read as a display list: 128 bytes of matrix and
+        # vertex data parse as harmless commands before the payload list at +0x80), the
+        # posed variant must land ON that copy: every variant triangle's three positions
+        # found among the base's, to 1e-3, as a set because the base holds FACT's fans in
+        # a different order. A pose slip then fails the bake instead of shipping a second
+        # strip beside the first or a dome hidden inside another. Skipped for the GDI
+        # re-walk, which passes empty mesh containers.
+        base_name = um[tc]["mesh"]
+        if base_name in meshindex:
+            base_tris = meshes[meshindex[base_name]][1]
+            def _pos(tri):
+                return tuple((round(x, 3), round(y, 3), round(z, 3))
+                             for (x, y, z, _u, _v, _r, _g, _b, _a) in tri)
+            base_pos = set(_pos(bt[3]) for bt in base_tris if bt[0] == base_bi)
+            if base_pos:
+                missing = [_pos(tri) for (ti, _m, _w, tri) in tris
+                           if ti == base_bi and _pos(tri) not in base_pos]
+                assert not missing, (
+                    "%s book %d: %d of %d posed variant triangles are not on the base "
+                    "mesh's own copy of this geometry (first: %s). The book node's "
+                    "transform and the base walk disagree, which draws the book beside "
+                    "its building instead of on it." % (
+                        tc, booki, len(missing), nswap, missing[0]))
+                if verbose:
+                    print("texture book: %s book %d posed onto the base mesh's copy "
+                          "(%d/%d triangles coincide)" % (tc, booki, nswap, nswap))
         # One mesh per IMAGE, deduplicated by name so a second scenario reuses it.
         meshfor = []
         for k, bi in enumerate(idx):
@@ -2438,6 +2494,18 @@ def build(scen, outpath, verbose=True, heights=None, cmvals=None):
     # atlases come out byte-identical and share one bank slot rather than paying twice.
     terrain_dos_tex = -1
     dosname = terr.get("atlasDos")
+    # DERIVED WHEN THE MANIFEST DOES NOT SAY, because most of them do not and the field
+    # is not really information: the second atlas is named after the theater, exactly as
+    # the first is, so "DESERT_tiles.png" implies "DESERT_tiles_dos.png". 87 of 91 shipped
+    # manifests carry a null here -- they were written before that art existed -- and
+    # trusting the field meant every one of those maps baked a pack with no second atlas
+    # and a terrain switch that took the click and did nothing. A file that is THERE is a
+    # better answer than a field that was written before it was. The scale assert below
+    # still guards it, so a derived name that does not actually match fails loudly.
+    if not dosname and terr.get("atlas", "").endswith("_tiles.png"):
+        cand = terr["atlas"][:-len("_tiles.png")] + "_tiles_dos.png"
+        if os.path.exists(os.path.join(B.ASSETS, "terrain", cand)):
+            dosname = cand
     if dosname:
         dosatlas = Image.open(os.path.join(B.ASSETS, "terrain", dosname)).convert("RGBA")
         dw, dh = dosatlas.size

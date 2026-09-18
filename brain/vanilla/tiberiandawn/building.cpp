@@ -16,13 +16,16 @@
 // MODIFIED for C&C 3D in August 2026. This is not EA's original file.
 // Two separate changes. First, rally points for factories: a new
 // CNC3D_Can_Rally test (a player-owned IsFactory building that is not a
-// Construction Yard), a move click on such a building now posts the existing
-// ARCHIVE event to store a rally target, What_Action reports ACTION_MOVE for
-// it in both overloads, units leaving through Exit_Object and Mission_Unload
-// are sent to that rally target instead of the exit cell, and a captured
-// building's rally target is cleared. Second, the cheat menu's Build
-// Anywhere: Passes_Proximity_Check drops the base adjacency requirement for
-// a house that has the cheat on, keeping only the In_Radar on-map test.
+// Construction Yard and not a helipad), a move click on such a building now
+// posts the existing ARCHIVE event to store a rally target, What_Action
+// reports ACTION_MOVE for it in both overloads, a vehicle leaving through
+// Mission_Unload is sent to that rally target after its door track, a soldier
+// leaving through Exit_Object still walks to the exit cell and carries the
+// rally target in its own ArchiveTarget for InfantryClass::Per_Cell_Process
+// to read there, and a captured building's rally target is cleared. Second,
+// the cheat menu's Build Anywhere: Passes_Proximity_Check drops the base
+// adjacency requirement for a house that has the cheat on, keeping only the
+// In_Radar on-map test.
 // It DOES change the game simulation.
 // The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
 // and NOTICE.md lists every modified file.
@@ -449,26 +452,26 @@ void BuildingClass::Debug_Dump(MonoClass* mono) const
 {
     Validate();
     mono->Set_Cursor(0, 0);
-    mono->Print("ÚName:ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂMission:ÄÄÄÂTarCom:ÂÄÄÄÄÄÄÄÂRadio:ÂCoord:ÄÄÂÄÄÄÄÄÄÄÄÂSt:Ä¿\n"
-                "³                   ³           ³       ³       ³      ³        ³        ³    ³\n"
-                "ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂNÂYÂHealth:ÄÂÄÄÄÁÄÂTurret:ÂÄÄÄÄÄÁÂÄBuilding:ÄÄÂCargo:ÄÄÄÄÁÄÄÄÄ´\n"
-                "³Active........³ ³ ³        ³     ³       ³      ³            ³               ³\n"
-                "³Limbo.........³ ³ ÃÄÄÄÄÄÄÄÄÁÄÄÄÄÄÁÄÄÄÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´\n"
-                "³Owned.........³ ³ ³Last Message:                                             ³\n"
-                "³Discovered....³ ³ ÃTimer:ÂArm:ÂÄÄÄÄÄÄÂTiberium:ÂFlash:ÂStage:ÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ\n"
-                "³Selected......³ ³ ³      ³    ³      ³         ³      ³      ³                \n"
-                "³Teathered.....³ ³ ÃÄÄÄÄÄÄÁÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄÙ                \n"
-                "³Locked on Map.³ ³ ³                                                           \n"
-                "³Is A Loaner...³ ³ ³                                                           \n"
-                "³              ³ ³ ³                                                           \n"
-                "³              ³ ³ ³                                                           \n"
-                "³              ³ ³ ³                                                           \n"
-                "³Repairing.....³ ³ ³                                                           \n"
-                "³              ³ ³ ³                                                           \n"
-                "³              ³ ³ ³                                                           \n"
-                "³Recoiling.....³ ³ ³                                                           \n"
-                "³To Display....³ ³ ³                                                           \n"
-                "ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÁÄÙ                                                           \n");
+    mono->Print("ÃšName:Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã‚Mission:Ã„Ã„Ã„Ã‚TarCom:Ã‚Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã‚Radio:Ã‚Coord:Ã„Ã„Ã‚Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã‚St:Ã„Â¿\n"
+                "Â³                   Â³           Â³       Â³       Â³      Â³        Â³        Â³    Â³\n"
+                "ÃƒÃ„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã‚NÃ‚YÃ‚Health:Ã„Ã‚Ã„Ã„Ã„ÃÃ„Ã‚Turret:Ã‚Ã„Ã„Ã„Ã„Ã„ÃÃ‚Ã„Building:Ã„Ã„Ã‚Cargo:Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Â´\n"
+                "Â³Active........Â³ Â³ Â³        Â³     Â³       Â³      Â³            Â³               Â³\n"
+                "Â³Limbo.........Â³ Â³ ÃƒÃ„Ã„Ã„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Â´\n"
+                "Â³Owned.........Â³ Â³ Â³Last Message:                                             Â³\n"
+                "Â³Discovered....Â³ Â³ ÃƒTimer:Ã‚Arm:Ã‚Ã„Ã„Ã„Ã„Ã„Ã„Ã‚Tiberium:Ã‚Flash:Ã‚Stage:Ã‚Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã™\n"
+                "Â³Selected......Â³ Â³ Â³      Â³    Â³      Â³         Â³      Â³      Â³                \n"
+                "Â³Teathered.....Â³ Â³ ÃƒÃ„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„ÃÃ„Ã„Ã„Ã„Ã„Ã„Ã™                \n"
+                "Â³Locked on Map.Â³ Â³ Â³                                                           \n"
+                "Â³Is A Loaner...Â³ Â³ Â³                                                           \n"
+                "Â³              Â³ Â³ Â³                                                           \n"
+                "Â³              Â³ Â³ Â³                                                           \n"
+                "Â³              Â³ Â³ Â³                                                           \n"
+                "Â³Repairing.....Â³ Â³ Â³                                                           \n"
+                "Â³              Â³ Â³ Â³                                                           \n"
+                "Â³              Â³ Â³ Â³                                                           \n"
+                "Â³Recoiling.....Â³ Â³ Â³                                                           \n"
+                "Â³To Display....Â³ Â³ Â³                                                           \n"
+                "Ã€Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„Ã„ÃÃ„ÃÃ„Ã™                                                           \n");
     mono->Set_Cursor(1, 1);
     mono->Printf("%s:%s", House->Class->IniName, Class->IniName);
     mono->Set_Cursor(35, 3);
@@ -2116,15 +2119,22 @@ void BuildingClass::Active_Click_With(ActionType action, ObjectClass* object)
  * BuildingClass::CNC3D_Can_Rally -- may this building take a rally point? (project CNC3D)     *
  *                                                                                             *
  *    True for a FACTORY the local player owns: a barracks, a Hand of Nod, a war factory, an   *
- *    airstrip, a helipad. False for everything else, and false for a Construction Yard, whose *
+ *    airstrip. False for everything else, and false for a Construction Yard, whose            *
  *    ACTION_MOVE already means "undeploy and drive there" and must keep meaning that.         *
  *                                                                                             *
  *    IsFactory is the type flag the engine already uses to mean "this building produces       *
  *    things" (type.h:638), so this asks the engine's own question rather than a new one.      *
+ *                                                                                             *
+ *    The HELIPAD is IsFactory too and is refused by name. Nothing a helipad produces ever     *
+ *    leaves it: the RTTI_AIRCRAFT arm of Exit_Object parks the new craft on the pad itself,   *
+ *    so a rally point on a helipad would be stored and drawn and honoured by nothing. It is   *
+ *    refused here, at the one test every rally path asks, so the click offers no MOVE cursor  *
+ *    and the CNC3D_Set_Rally export refuses it the same way.                                  *
  *=============================================================================================*/
 bool BuildingClass::CNC3D_Can_Rally(void) const
 {
     if (*this == STRUCT_CONST) return (false);
+    if (*this == STRUCT_HELIPAD) return (false);
     if (!Class->IsFactory) return (false);
     return (House == PlayerPtr);
 }
@@ -2354,14 +2364,19 @@ int BuildingClass::Exit_Object(TechnoClass* base)
                 if (base->Unlimbo(start, dir)) {
 
                     base->Assign_Mission(MISSION_MOVE);
-                    /*	CNC3D: walk to the RALLY POINT if this factory has one, otherwise
-                    **	to the exit cell exactly as before. Target_Legal is provably false
-                    **	here in a vanilla run (see the note in Active_Click_With), so this
-                    **	clause cannot change vanilla behaviour. */
+                    base->Assign_Destination(::As_Target(cell));
+                    /*	CNC3D: the RALLY POINT, if this factory has one, rides along in the
+                    **	soldier's own ArchiveTarget and is read back at the exit cell, where
+                    **	the tether is cut (InfantryClass::Per_Cell_Process). The exit cell
+                    **	stays the destination above, so the soldier leaves through the door
+                    **	the way it always did. Handing it the rally as its destination here
+                    **	instead sent it straight from the door point, out through the side
+                    **	wall of the hut and across the building's own footprint. A fresh
+                    **	soldier's ArchiveTarget is TARGET_NONE, and Target_Legal on a
+                    **	factory is provably false in a vanilla run (see the note in
+                    **	What_Action), so this clause cannot change vanilla behaviour. */
                     if (Target_Legal(ArchiveTarget)) {
-                        base->Assign_Destination(ArchiveTarget);
-                    } else {
-                        base->Assign_Destination(::As_Target(cell));
+                        base->ArchiveTarget = ArchiveTarget;
                     }
 
                     /*
@@ -3057,7 +3072,21 @@ void BuildingClass::Repair(int control)
             sound = VOC_SCOLD;
         } else {
             sound = VOC_BUTTON;
-            Clicked_As_Target(PlayerPtr->Class->House); // 2019/09/20 JAS - Added record of who clicked on the object
+            /*
+            **	CNC3D: the flashing house must not come from PlayerPtr in a match.
+            **	Clicked_As_Target (techno.cpp) writes FlashCount AND
+            **	FlashCountPerPlayer[house]. Both are members of every TechnoClass and both
+            **	are decremented every tick by FlasherClass::Process, so they are shared
+            **	simulation state and not presentation. PlayerPtr is whoever is sitting at
+            **	THIS machine, so for one repair order each peer wrote a DIFFERENT index of
+            **	FlashCountPerPlayer -- silently, because only the shared FlashCount reaches
+            **	the object dump and this call gives that the same 7 everywhere.
+            **	The repair order is stamped by the owner and the REPAIR arm in event.cpp
+            **	verifies that before it runs, so Owner() is the same value on every peer
+            **	and is PlayerPtr's own house on the machine that clicked: identical
+            **	behaviour there, agreement everywhere else.
+            */
+            Clicked_As_Target(CNC3D_Lockstep ? Owner() : PlayerPtr->Class->House);
             IsWrenchVisible = true;
         }
     } else {
@@ -3117,8 +3146,23 @@ void BuildingClass::Sell_Back(int control)
             //			Transmit_Message(RADIO_RUN_AWAY);
             //			Transmit_Message(RADIO_OVER_OUT);
             Assign_Mission(MISSION_DECONSTRUCTION);
-            // Changed for multiplayer ST - 3/13/2019 5:31PM
-            if (Is_Owned_By_Player()) {
+            /*
+            **	CNC3D: this is the defect gate G194 caught, and it is the visible one.
+            **	The guard below is Is_Owned_By_Player(), which is literally
+            **	`House == PlayerPtr` (techno.cpp), so on a SELL order the seller's machine
+            **	set FlashCount to 7 and every other peer left it 0. Two instances of the
+            **	engine in ONE process, no networking anywhere near it, diverged four ticks
+            **	after any sell, and the live desync alarm hashes that same field.
+            **	Under lockstep the house comes from the object rather than from the
+            **	machine, which is the same value on every peer and is exactly the value
+            **	this line already computed on the machine that clicked. See
+            **	BuildingClass::Repair above for the full reasoning; event.cpp's own
+            **	Clicked_As_Target call already takes the house from the order this way.
+            */
+            if (CNC3D_Lockstep) {
+                Clicked_As_Target(Owner());
+                // Changed for multiplayer ST - 3/13/2019 5:31PM
+            } else if (Is_Owned_By_Player()) {
                 // if (IsOwnedByPlayer) {
                 Clicked_As_Target(
                     PlayerPtr->Class->House); // 2019/09/20 JAS - Added record of who clicked on the object
@@ -5624,7 +5668,7 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
     ** the sidebar reads. This one is called from HouseClass::Place_Object
     ** (house.cpp:2920) and decides whether the click is actually HONOURED. Hooking only
     ** the first two gives a green cursor over a far cell and a click that is silently
-    ** refused, which is exactly what shipped for an hour on 26 Aug 2026 -- and the gate
+    ** refused, which is exactly what shipped for an hour -- and the gate
     ** written for it went green, because it queried the cursor routine.
     **
     ** It lifts the ADJACENCY rule only. In_Radar is still demanded of every cell the

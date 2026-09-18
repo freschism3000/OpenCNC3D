@@ -1,0 +1,17 @@
+tick 30
+gfx ui_scale 1
+band 0 0 1279 680
+group 1 2
+tick 1
+unitcard
+cam 45 45
+edgeat 2 958 20
+cam 45 45
+edgeat 100 958 20
+cam 45 45
+edgeat 2 800 20
+cam 45 45
+edgeat 600 958 20
+cam 45 45
+edgeat 2 300 20
+quit

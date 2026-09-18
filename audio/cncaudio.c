@@ -369,6 +369,47 @@ int cnc_audio_on_sound_effect(CncAudio *au, int sfx_index, int variation, int x,
     return cnc_audio_play_named(au, name, MIX_BUS_FX, gain, pan, pri);
 }
 
+int cnc_audio_on_ui_effect(CncAudio *au, int sfx_index, int gain)
+{
+    char name[32];
+    int h;
+
+    if (!au)
+        return -1;
+    if (sfx_index < 0 || sfx_index >= SFX_VOC_COUNT)
+        return -1;
+    if (gain < 0)
+        gain = 0;
+    if (gain > MIX_GAIN_MAX)
+        gain = MIX_GAIN_MAX;
+    sfx_voc_filename(sfx_index, 0, au->juvenile, name, (int)sizeof name);
+
+    /* No placement rule: the caller named the volume, and there is nowhere to pan an
+     * effect that has no position. Recorded for the same reason the placed path records
+     * its decision, so a headless run can print what was asked for. */
+    au->last_gain = gain;
+    au->last_pan = 0;
+
+    /* The same .JUV fallback as the placed path, for the same reason. */
+    if (!bank_has(au->bank, name) && sfx_voc[sfx_index].where == SFX_JUV)
+        snprintf(name, sizeof name, "%s.AUD", sfx_voc[sfx_index].name);
+
+    /* The duplicate window, applied after the fallback so the name counted is the file
+     * that would really be played, and never to a name the disc does not have, for the
+     * reason the placed path gives. */
+    if (bank_has(au->bank, name) && !sfx_dupe_ok(au, name))
+        return CNC_SFX_DUPLICATE;
+
+    h = cnc_audio_play_named(au, name, MIX_BUS_FX, gain, 0, sfx_voc[sfx_index].priority);
+    /* A clip that exists and still got no handle was refused by mixer_play: every voice
+     * busy and none of them cheaper than this one. That is not the disc's fault, and a
+     * log that spelled it the same way as a missing file would send the reader to the
+     * wrong place. */
+    if (h < 0 && bank_has(au->bank, name))
+        return CNC_SFX_NOVOICE;
+    return h;
+}
+
 void cnc_audio_last_effect(const CncAudio *au, int *gain, int *pan)
 {
     if (gain) *gain = au ? au->last_gain : 0;

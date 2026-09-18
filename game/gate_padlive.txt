@@ -1,0 +1,27 @@
+# A BUILDING THE PLAYER PLACES BESIDE A TALLER ONE RISES TO ITS LEVEL, through the
+# sidebar, on the first GDI mission's own base.
+#
+# SCG01EC hands the player a Construction Yard at (53,51) standing on 125. The cell
+# column directly east of it, x 56, falls from 113 to 90 down the map's ramp, and a
+# Barracks placed at (56,52) shares that column with the yard's footprint. The old
+# rule left the Barracks at its own 113 and gave the shared column to the yard, so
+# the Barracks' west half went under the ground the moment it was placed. The two
+# footprints touch, so they are levelled together: the Barracks' own east column,
+# which the yard never reaches, must read the yard's 125 as well.
+tick 60
+cheatset money 1
+cheatset instant 1
+tick 20
+build PYLE
+ready PYLE
+startplace PYLE
+place 56 52
+tick 60
+padcheck
+sbrraw 56 53
+sbrraw 58 52
+sbrraw 58 54
+cam 56 53
+dist 2400
+shot shots/padlive_scg01ec.png
+quit

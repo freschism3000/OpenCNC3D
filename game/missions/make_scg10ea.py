@@ -64,7 +64,7 @@ TWO BOATS, BECAUSE THE ENGINE SPLITS THE GUNBOAT INTO TWO DISJOINT ABILITIES
   returns x = MapCellX + MapCellWidth), so:
     - the TEAM boat (reinforcement) can be steered N/S but is IsLocked=false FOREVER:
       its Can_Fire is FIRE_RANGE at any distance; it tracks targets with the turret
-      but can never shoot. Verified live with an instrumented brain (see NOTES.md).
+      but can never shoot. Verified live with an instrumented brain.
     - a PRE-PLACED boat ([UNITS], on-map) is IsLocked=true and fires normally, but
       can never join a team: TeamClass::Add (team.cpp ~662) refuses members whose
       mission is HUNT, and every gunboat mission collapses to HUNT within one tick

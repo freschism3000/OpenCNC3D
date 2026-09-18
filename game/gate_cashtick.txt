@@ -1,0 +1,22 @@
+# THE CREDITS TICK (G252). The credits readout walks toward the bank one step per tick
+# (CreditClass::AI: the difference >> 5, bounded 1..143) and each step sounds TONE15
+# going up, TONE16 going down. The money switch puts 25000 more in the bank at once, so
+# twenty ticks later the readout must show exactly 5000 + 20 * 143 = 7860 with twenty
+# up-ticks sounded; the switch is then dropped, the readout is given time to arrive, and
+# a power plant is started, whose drip payment walks the readout down and sounds the
+# down-tick. Deploying the MCV first so a build queue exists at all.
+tick 5
+lclickobj MCV:@me
+actclickobj MCV:@me
+tick 100
+creditsdump
+cheatset money 1
+tick 20
+creditsdump
+cheatset money 0
+tick 400
+creditsdump
+build NUKE
+tick 40
+creditsdump
+quit

@@ -85,6 +85,92 @@ index b3bbb7a..9ef9b4e 100644
      ptr = malloc(size);
      if (ptr) {
          const_cast<FileClass&>(file).Read(ptr, size);
+diff --git a/common/mixfile.h b/common/mixfile.h
+index 109c35f..b3e3ed5 100644
+--- a/common/mixfile.h
++++ b/common/mixfile.h
+@@ -12,6 +12,17 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Both MixFileClass constructors now refuse a file whose header carries a
++// negative entry count or data size, or whose entry table cannot be read in
++// full. Such a file is left off the mixfile list, so lookups in it answer
++// "not found" instead of searching an unallocated or half-read table. A file
++// with a sound header is read exactly as before.
++// It does not change the game simulation.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header: /CounterStrike/MIXFILE.H 1     3/03/97 10:25a Joe_bostic $ */
+ 
+@@ -321,10 +332,30 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename)
+     /*
+     **	Load up the offset control array. If RAM is exhausted, then the mixfile is invalid.
+     */
++    /*
++    **	C&C 3D: a header that cannot be believed is an archive that holds nothing. The
++    **	count is a signed 16-bit field, so a damaged file can carry a negative one, which
++    **	is a negative allocation and then a search over a NULL table; a positive count on
++    **	a file too short to hold its table leaves the table uninitialised and searched as
++    **	if it were sorted. Either ends in a fault inside mission start. The file is
++    **	refused here instead: it is never attached to the list, so every lookup answers
++    **	"not here" and the caller decides what to do without the entry.
++    */
++    if (Count < 0 || DataSize < 0) {
++        Count = 0;
++        DataSize = 0;
++        return;
++    }
+     HeaderBuffer = new SubBlock[Count];
+     if (HeaderBuffer == NULL)
+         return;
+-    straw->Get(HeaderBuffer, Count * sizeof(SubBlock));
++    if (straw->Get(HeaderBuffer, Count * sizeof(SubBlock)) != (int)(Count * sizeof(SubBlock))) {
++        delete[] HeaderBuffer;
++        HeaderBuffer = NULL;
++        Count = 0;
++        DataSize = 0;
++        return;
++    }
+ 
+     for (int i = 0; i < Count; i++) {
+         HeaderBuffer[i].CRC = le32toh(HeaderBuffer[i].CRC);
+@@ -453,10 +484,30 @@ MixFileClass<T, TCRC>::MixFileClass(char const* filename, PKey const* key)
+     /*
+     **	Load up the offset control array. If RAM is exhausted, then the mixfile is invalid.
+     */
++    /*
++    **	C&C 3D: a header that cannot be believed is an archive that holds nothing. The
++    **	count is a signed 16-bit field, so a damaged file can carry a negative one, which
++    **	is a negative allocation and then a search over a NULL table; a positive count on
++    **	a file too short to hold its table leaves the table uninitialised and searched as
++    **	if it were sorted. Either ends in a fault inside mission start. The file is
++    **	refused here instead: it is never attached to the list, so every lookup answers
++    **	"not here" and the caller decides what to do without the entry.
++    */
++    if (Count < 0 || DataSize < 0) {
++        Count = 0;
++        DataSize = 0;
++        return;
++    }
+     HeaderBuffer = new SubBlock[Count];
+     if (HeaderBuffer == NULL)
+         return;
+-    straw->Get(HeaderBuffer, Count * sizeof(SubBlock));
++    if (straw->Get(HeaderBuffer, Count * sizeof(SubBlock)) != (int)(Count * sizeof(SubBlock))) {
++        delete[] HeaderBuffer;
++        HeaderBuffer = NULL;
++        Count = 0;
++        DataSize = 0;
++        return;
++    }
+ 
+     for (int i = 0; i < Count; i++) {
+         HeaderBuffer[i].CRC = le32toh(HeaderBuffer[i].CRC);
 diff --git a/tiberiandawn/CMakeLists.txt b/tiberiandawn/CMakeLists.txt
 index a26cf46..a6c57cb 100644
 --- a/tiberiandawn/CMakeLists.txt
@@ -239,11 +325,128 @@ index 583120f..d54809a 100644
                                                | HOUSEF_BAD, // Who can own this aircraft type.
                                            WEAPON_NONE,
                                            WEAPON_NONE,
+diff --git a/tiberiandawn/aircraft.cpp b/tiberiandawn/aircraft.cpp
+index e27af1c..4372f5c 100644
+--- a/tiberiandawn/aircraft.cpp
++++ b/tiberiandawn/aircraft.cpp
+@@ -12,6 +12,17 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Adds one clause to the cargo plane's drop in AircraftClass::Mission_Unload:
++// a vehicle set down at an airstrip that holds a rally point (a CNC3D
++// addition, stored in the airstrip's ArchiveTarget) is given MISSION_MOVE to
++// that cell after the engine's own scatter. A harvester is left alone and
++// keeps the harvest mission its Unlimbo gave it.
++// It DOES change the game simulation.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\aircraft.cpv   2.12   19 Jun 1995 09:27:22   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -1149,6 +1160,37 @@ int AircraftClass::Mission_Unload(void)
+                                 unit->IsALoaner = false;
+                                 unit->IsLocked = true;
+                                 unit->Scatter(0, true);
++
++                                /*
++                                **	CNC3D: and THEN the airstrip's rally point, the same field
++                                **	the barracks and the war factory read. The building this
++                                **	plane is in radio contact with is the airstrip that ordered
++                                **	the delivery (PICK_AIRSTRIP hailed it, and vanilla has just
++                                **	dereferenced it for the exit cell), and the Assign_Target
++                                **	below clears TarCom, not the contact. Scatter must still
++                                **	run above: it is what moves the vehicle off the drop cell
++                                **	when no rally is set. A legal rally replaces the cell it
++                                **	chose, and a rally set, moved or cleared while the plane
++                                **	was inbound is what the drop honours.
++                                **
++                                **	A HARVESTER is left to Scatter. Its Unlimbo gave it
++                                **	MISSION_HARVEST through Enter_Idle_Mode, the airstrip is
++                                **	the only place a Nod harvester comes from, and a move
++                                **	order would park it at the rally in guard instead of
++                                **	sending it to the field; the war factory's exit likewise
++                                **	re-assigns MISSION_HARVEST at the door.
++                                **
++                                **	Target_Legal(ArchiveTarget) on a building is provably
++                                **	false in a vanilla run (see the note in
++                                **	BuildingClass::What_Action), so this is inert there.
++                                */
++                                TechnoClass* strip = Contact_With_Whom();
++                                if (strip != NULL && strip->What_Am_I() == RTTI_BUILDING
++                                    && Target_Legal(strip->ArchiveTarget) && unit->What_Am_I() == RTTI_UNIT
++                                    && *((UnitClass*)unit) != UNIT_HARVESTER) {
++                                    unit->Assign_Mission(MISSION_MOVE);
++                                    unit->Assign_Destination(strip->ArchiveTarget);
++                                }
+                             }
+                             ScenarioInit--;
+ 
 diff --git a/tiberiandawn/anim.cpp b/tiberiandawn/anim.cpp
-index 1360f92..2a1c494 100644
+index 1360f92..15d45bf 100644
 --- a/tiberiandawn/anim.cpp
 +++ b/tiberiandawn/anim.cpp
-@@ -785,19 +785,17 @@ void AnimClass::AI(void)
+@@ -12,6 +12,17 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Two changes in AnimClass. The constructor's drop-zone smoke reveal, which
++// reads PlayerPtr, is withheld in a lockstep network match, where one
++// machine's viewpoint must not decide another machine's missions. AI's kill
++// time compares a beacon's deadline against the frame counter rather than
++// the Windows wall clock, so a beacon expires on every platform.
++// It DOES change the game simulation.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\anim.cpv   2.18   16 Oct 1995 16:48:48   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -645,9 +656,35 @@ AnimClass::AnimClass(AnimType animnum, COORDINATE coord, unsigned char timedelay
+     **	Drop zone smoke always reveals the map around itself.
+     */
+     if (*this == ANIM_LZ_SMOKE) {
+-        // Added PlayerPtr here as Sight_From now needs to know who to perform the action for. This should be OK as it's
+-        // not used in MP. ST - 3/28/2019 2:43PM
+-        Map.Sight_From(PlayerPtr, Coord_Cell(coord), 4, false);
++        /*
++        **	CNC3D lockstep: the 2019 comment that stood here said "This should be OK as
++        **	it's not used in MP", and that assumption is what this gate replaces.
++        **
++        **	PlayerPtr is the house of whoever is sitting at THIS machine, and Sight_From
++        **	is not presentation: it reaches DisplayClass::Map_Cell, which sets bits in
++        **	CellClass::IsMappedByPlayerMask and IsVisibleByPlayerMask, and those are read
++        **	by TechnoClass::Per_Cell_Process (which can spring EVENT_DISCOVERED and switch
++        **	an ambusher to MISSION_HUNT) and by MapClass::Cell_Threat, which scores AI
++        **	targets. So one machine's viewpoint would decide another machine's missions.
++        **
++        **	Same shape and same reason as DisplayClass::Calculated_Cell's SOURCE_VISIBLE
++        **	arm, which refuses a local-camera-derived cell in a match and says so.
++        **
++        **	WHAT THE GATE COSTS, and it is written down rather than discovered later: a
++        **	lockstep match gets no drop-zone reveal from an ACTION_DZ trigger. Nothing
++        **	shipped reaches it (no shipped multiplayer map carries a DZ trigger), but a
++        **	user map can, and the faithful answer for the day one does is to reveal for
++        **	the TRIGGER'S OWN house, which is shared, rather than for this machine's.
++        */
++        if (CNC3D_Lockstep) {
++            GlyphX_Debug_Print("AnimClass: drop-zone smoke reveals the map for PlayerPtr, the LOCAL "
++                               "seat's house, which is not shared between peers. It reveals nothing "
++                               "in a network match.");
++        } else {
++            // Added PlayerPtr here as Sight_From now needs to know who to perform the action for.
++            // ST - 3/28/2019 2:43PM
++            Map.Sight_From(PlayerPtr, Coord_Cell(coord), 4, false);
++        }
+     }
+ 
+     /*
+@@ -785,19 +822,17 @@ void AnimClass::AI(void)
      }
  
      /*
@@ -1006,10 +1209,10 @@ index bdc34f3..1905745 100644
                                      WEAPON_NONE,
                                      WEAPON_NONE,
 diff --git a/tiberiandawn/building.cpp b/tiberiandawn/building.cpp
-index 91f1bec..81380fb 100644
+index 91f1bec..75649c8 100644
 --- a/tiberiandawn/building.cpp
 +++ b/tiberiandawn/building.cpp
-@@ -12,6 +12,21 @@
+@@ -12,6 +12,24 @@
  // distributed with this program. You should have received a copy of the
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
@@ -1017,13 +1220,16 @@ index 91f1bec..81380fb 100644
 +// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
 +// Two separate changes. First, rally points for factories: a new
 +// CNC3D_Can_Rally test (a player-owned IsFactory building that is not a
-+// Construction Yard), a move click on such a building now posts the existing
-+// ARCHIVE event to store a rally target, What_Action reports ACTION_MOVE for
-+// it in both overloads, units leaving through Exit_Object and Mission_Unload
-+// are sent to that rally target instead of the exit cell, and a captured
-+// building's rally target is cleared. Second, the cheat menu's Build
-+// Anywhere: Passes_Proximity_Check drops the base adjacency requirement for
-+// a house that has the cheat on, keeping only the In_Radar on-map test.
++// Construction Yard and not a helipad), a move click on such a building now
++// posts the existing ARCHIVE event to store a rally target, What_Action
++// reports ACTION_MOVE for it in both overloads, a vehicle leaving through
++// Mission_Unload is sent to that rally target after its door track, a soldier
++// leaving through Exit_Object still walks to the exit cell and carries the
++// rally target in its own ArchiveTarget for InfantryClass::Per_Cell_Process
++// to read there, and a captured building's rally target is cleared. Second,
++// the cheat menu's Build Anywhere: Passes_Proximity_Check drops the base
++// adjacency requirement for a house that has the cheat on, keeping only the
++// In_Radar on-map test.
 +// It DOES change the game simulation.
 +// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
 +// and NOTICE.md lists every modified file.
@@ -1031,7 +1237,7 @@ index 91f1bec..81380fb 100644
  
  /* $Header:   F:\projects\c&c\vcs\code\building.cpv   2.13   02 Aug 1995 17:00:14   JOE_BOSTIC  $ */
  /***********************************************************************************************
-@@ -2097,6 +2112,23 @@ void BuildingClass::Active_Click_With(ActionType action, ObjectClass* object)
+@@ -2097,6 +2115,30 @@ void BuildingClass::Active_Click_With(ActionType action, ObjectClass* object)
   * HISTORY:                                                                                    *
   *   07/04/1995 JLB : Created.                                                                 *
   *=============================================================================================*/
@@ -1039,15 +1245,22 @@ index 91f1bec..81380fb 100644
 + * BuildingClass::CNC3D_Can_Rally -- may this building take a rally point? (project CNC3D)     *
 + *                                                                                             *
 + *    True for a FACTORY the local player owns: a barracks, a Hand of Nod, a war factory, an   *
-+ *    airstrip, a helipad. False for everything else, and false for a Construction Yard, whose *
++ *    airstrip. False for everything else, and false for a Construction Yard, whose            *
 + *    ACTION_MOVE already means "undeploy and drive there" and must keep meaning that.         *
 + *                                                                                             *
 + *    IsFactory is the type flag the engine already uses to mean "this building produces       *
 + *    things" (type.h:638), so this asks the engine's own question rather than a new one.      *
++ *                                                                                             *
++ *    The HELIPAD is IsFactory too and is refused by name. Nothing a helipad produces ever     *
++ *    leaves it: the RTTI_AIRCRAFT arm of Exit_Object parks the new craft on the pad itself,   *
++ *    so a rally point on a helipad would be stored and drawn and honoured by nothing. It is   *
++ *    refused here, at the one test every rally path asks, so the click offers no MOVE cursor  *
++ *    and the CNC3D_Set_Rally export refuses it the same way.                                  *
 + *=============================================================================================*/
 +bool BuildingClass::CNC3D_Can_Rally(void) const
 +{
 +    if (*this == STRUCT_CONST) return (false);
++    if (*this == STRUCT_HELIPAD) return (false);
 +    if (!Class->IsFactory) return (false);
 +    return (House == PlayerPtr);
 +}
@@ -1055,7 +1268,7 @@ index 91f1bec..81380fb 100644
  void BuildingClass::Active_Click_With(ActionType action, CELL cell)
  {
      Validate();
-@@ -2110,6 +2142,12 @@ void BuildingClass::Active_Click_With(ActionType action, CELL cell)
+@@ -2110,6 +2152,12 @@ void BuildingClass::Active_Click_With(ActionType action, CELL cell)
  
          COORDINATE coord = Map.Pixel_To_Coord(Get_Mouse_X(), Get_Mouse_Y());
          OutList.Add(EventClass(ANIM_MOVE_FLASH, PlayerPtr->Class->House, coord, 1 << PlayerPtr->Class->House));
@@ -1068,24 +1281,76 @@ index 91f1bec..81380fb 100644
      }
  }
  
-@@ -2316,7 +2354,15 @@ int BuildingClass::Exit_Object(TechnoClass* base)
-                 if (base->Unlimbo(start, dir)) {
+@@ -2317,6 +2365,19 @@ int BuildingClass::Exit_Object(TechnoClass* base)
  
                      base->Assign_Mission(MISSION_MOVE);
--                    base->Assign_Destination(::As_Target(cell));
-+                    /*	CNC3D: walk to the RALLY POINT if this factory has one, otherwise
-+                    **	to the exit cell exactly as before. Target_Legal is provably false
-+                    **	here in a vanilla run (see the note in Active_Click_With), so this
-+                    **	clause cannot change vanilla behaviour. */
+                     base->Assign_Destination(::As_Target(cell));
++                    /*	CNC3D: the RALLY POINT, if this factory has one, rides along in the
++                    **	soldier's own ArchiveTarget and is read back at the exit cell, where
++                    **	the tether is cut (InfantryClass::Per_Cell_Process). The exit cell
++                    **	stays the destination above, so the soldier leaves through the door
++                    **	the way it always did. Handing it the rally as its destination here
++                    **	instead sent it straight from the door point, out through the side
++                    **	wall of the hut and across the building's own footprint. A fresh
++                    **	soldier's ArchiveTarget is TARGET_NONE, and Target_Legal on a
++                    **	factory is provably false in a vanilla run (see the note in
++                    **	What_Action), so this clause cannot change vanilla behaviour. */
 +                    if (Target_Legal(ArchiveTarget)) {
-+                        base->Assign_Destination(ArchiveTarget);
-+                    } else {
-+                        base->Assign_Destination(::As_Target(cell));
++                        base->ArchiveTarget = ArchiveTarget;
 +                    }
  
                      /*
                      **	Establish radio contact so unload coordination can occur. This
-@@ -3154,10 +3200,49 @@ ActionType BuildingClass::What_Action(ObjectClass* object) const
+@@ -3011,7 +3072,21 @@ void BuildingClass::Repair(int control)
+             sound = VOC_SCOLD;
+         } else {
+             sound = VOC_BUTTON;
+-            Clicked_As_Target(PlayerPtr->Class->House); // 2019/09/20 JAS - Added record of who clicked on the object
++            /*
++            **	CNC3D: the flashing house must not come from PlayerPtr in a match.
++            **	Clicked_As_Target (techno.cpp) writes FlashCount AND
++            **	FlashCountPerPlayer[house]. Both are members of every TechnoClass and both
++            **	are decremented every tick by FlasherClass::Process, so they are shared
++            **	simulation state and not presentation. PlayerPtr is whoever is sitting at
++            **	THIS machine, so for one repair order each peer wrote a DIFFERENT index of
++            **	FlashCountPerPlayer -- silently, because only the shared FlashCount reaches
++            **	the object dump and this call gives that the same 7 everywhere.
++            **	The repair order is stamped by the owner and the REPAIR arm in event.cpp
++            **	verifies that before it runs, so Owner() is the same value on every peer
++            **	and is PlayerPtr's own house on the machine that clicked: identical
++            **	behaviour there, agreement everywhere else.
++            */
++            Clicked_As_Target(CNC3D_Lockstep ? Owner() : PlayerPtr->Class->House);
+             IsWrenchVisible = true;
+         }
+     } else {
+@@ -3071,8 +3146,23 @@ void BuildingClass::Sell_Back(int control)
+             //			Transmit_Message(RADIO_RUN_AWAY);
+             //			Transmit_Message(RADIO_OVER_OUT);
+             Assign_Mission(MISSION_DECONSTRUCTION);
+-            // Changed for multiplayer ST - 3/13/2019 5:31PM
+-            if (Is_Owned_By_Player()) {
++            /*
++            **	CNC3D: this is the defect gate G194 caught, and it is the visible one.
++            **	The guard below is Is_Owned_By_Player(), which is literally
++            **	`House == PlayerPtr` (techno.cpp), so on a SELL order the seller's machine
++            **	set FlashCount to 7 and every other peer left it 0. Two instances of the
++            **	engine in ONE process, no networking anywhere near it, diverged four ticks
++            **	after any sell, and the live desync alarm hashes that same field.
++            **	Under lockstep the house comes from the object rather than from the
++            **	machine, which is the same value on every peer and is exactly the value
++            **	this line already computed on the machine that clicked. See
++            **	BuildingClass::Repair above for the full reasoning; event.cpp's own
++            **	Clicked_As_Target call already takes the house from the order this way.
++            */
++            if (CNC3D_Lockstep) {
++                Clicked_As_Target(Owner());
++                // Changed for multiplayer ST - 3/13/2019 5:31PM
++            } else if (Is_Owned_By_Player()) {
+                 // if (IsOwnedByPlayer) {
+                 Clicked_As_Target(
+                     PlayerPtr->Class->House); // 2019/09/20 JAS - Added record of who clicked on the object
+@@ -3154,10 +3244,49 @@ ActionType BuildingClass::What_Action(ObjectClass* object) const
          action = ACTION_NONE;
      }
  
@@ -1135,7 +1400,7 @@ index 91f1bec..81380fb 100644
      return (action);
  }
  
-@@ -3182,9 +3267,21 @@ ActionType BuildingClass::What_Action(CELL cell) const
+@@ -3182,9 +3311,21 @@ ActionType BuildingClass::What_Action(CELL cell) const
      Validate();
      ActionType action = TechnoClass::What_Action(cell);
  
@@ -1157,7 +1422,7 @@ index 91f1bec..81380fb 100644
  
      /*
      **	Don't allow targeting of SAM sites, even if the CTRL key
-@@ -3601,6 +3698,12 @@ bool BuildingClass::Captured(HouseClass* newowner)
+@@ -3601,6 +3742,12 @@ bool BuildingClass::Captured(HouseClass* newowner)
  {
      Validate();
      if (Can_Capture() && newowner != House) {
@@ -1170,7 +1435,7 @@ index 91f1bec..81380fb 100644
          switch (Owner()) {
          case HOUSE_GOOD:
              Speak(VOX_GDI_CAPTURED);
-@@ -5151,6 +5254,14 @@ int BuildingClass::Mission_Unload(void)
+@@ -5151,6 +5298,14 @@ int BuildingClass::Mission_Unload(void)
                      unit->Assign_Mission(MISSION_MOVE);
                      unit->Force_Track(DriveClass::OUT_OF_WEAPON_FACTORY, Adjacent_Cell(Center_Coord(), FACING_SW));
                      unit->Set_Speed(128);
@@ -1185,7 +1450,7 @@ index 91f1bec..81380fb 100644
                      Status = LEAVE;
                  } else {
                      Close_Door(2, 11);
-@@ -5504,6 +5615,24 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
+@@ -5504,6 +5659,24 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
      **	cells to these are of friendly persuasion, then consider the proximity check to
      **	have been a success.
      */
@@ -1210,7 +1475,7 @@ index 91f1bec..81380fb 100644
      short const* ptr = Occupy_List(true);
      while (*ptr != REFRESH_EOL) {
          CELL cell = homecell + *ptr++;
-@@ -5511,6 +5640,9 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
+@@ -5511,6 +5684,9 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
          if (!Map.In_Radar(cell))
              return (false);
  
@@ -1220,7 +1485,7 @@ index 91f1bec..81380fb 100644
          for (FacingType facing = FACING_N; facing < FACING_COUNT; facing++) {
              CELL newcell = Adjacent_Cell(cell, facing);
  
-@@ -5530,5 +5662,5 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
+@@ -5530,5 +5706,5 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
              }
          }
      }
@@ -1548,10 +1813,10 @@ index b20427a..98f201f 100644
      Set_Font_Palette(fontpalette);
  
 diff --git a/tiberiandawn/display.cpp b/tiberiandawn/display.cpp
-index 20ff4f6..3896171 100644
+index 20ff4f6..908829f 100644
 --- a/tiberiandawn/display.cpp
 +++ b/tiberiandawn/display.cpp
-@@ -12,6 +12,19 @@
+@@ -12,6 +12,25 @@
  // distributed with this program. You should have received a copy of the
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
@@ -1565,13 +1830,19 @@ index 20ff4f6..3896171 100644
 +// the house's existing base; ground buildability is decided elsewhere and is
 +// not affected.
 +// It DOES change the game simulation.
++// MODIFIED again in September 2026: Init_Theater no longer copies the theater
++// palette from a NULL pointer when the theater archive is missing, empty or
++// damaged. The palette is zeroed, one line is printed for the host's log, and
++// the scenario goes on loading. Only reached when the archive is unusable;
++// with the archive present the function is unchanged. It does NOT change the
++// game simulation.
 +// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
 +// and NOTICE.md lists every modified file.
 +//
  
  /* $Header:   F:\projects\c&c\vcs\code\display.cpv   2.16   16 Oct 1995 16:48:24   JOE_BOSTIC  $ */
  /***********************************************************************************************
-@@ -268,6 +281,14 @@ void DisplayClass::Init_Clear(void)
+@@ -268,6 +287,14 @@ void DisplayClass::Init_Clear(void)
  {
      MapClass::Init_Clear();
  
@@ -1586,7 +1857,73 @@ index 20ff4f6..3896171 100644
      /*
      ** Clear any object being placed
      */
-@@ -862,6 +883,40 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object)
+@@ -317,6 +344,29 @@ void DisplayClass::Init_IO(void)
+     }
+ }
+ 
++/***********************************************************************************************
++ * CNC3D_Report_Missing_Palette -- Says, once per lookup, that a theater palette was not found. *
++ *                                                                                             *
++ *    C&C 3D. The host runs this engine as a library and keeps its log; the engine's own       *
++ *    debug print compiles to nothing in a release build, so the line goes out the way every   *
++ *    other host-facing readout in this modified engine does, as a prefixed line on stdout.    *
++ *                                                                                             *
++ * INPUT:   palname  -- the palette entry that was asked for (TEMPERAT.PAL and its kin)        *
++ *          root     -- the theater archive's root name (TEMPERAT, WINTER, DESERT)             *
++ *=============================================================================================*/
++static void CNC3D_Report_Missing_Palette(char const* palname, char const* root)
++{
++    char msg[160];
++    sprintf(msg,
++            "CNC3D|theater|%s is in no loaded archive: %s.MIX is missing, empty or damaged; "
++            "palette zeroed, mission continues",
++            palname,
++            root);
++    printf("%s\n", msg);
++    fflush(stdout);
++    GlyphX_Debug_Print(msg);
++}
++
+ /***********************************************************************************************
+  * DisplayClass::Init_Theater -- Performs theater-specific initialization (mixfiles, etc)      *
+  *                                                                                             *
+@@ -401,7 +451,20 @@ void DisplayClass::Init_Theater(TheaterType theater)
+     */
+     sprintf(fullname, "%s.PAL", Theaters[theater].Root);
+     void const* ptr = MFCD::Retrieve(fullname);
+-    Mem_Copy((void*)ptr, GamePalette, 768);
++    /*
++    **	C&C 3D: the palette entry is looked up in the theater archive, and when that
++    **	archive is missing, empty or damaged the lookup answers NULL. Copying from NULL
++    **	is a fault inside mission start, so the palette is zeroed instead and the fault
++    **	is reported through the host's log. Nothing below depends on the palette holding
++    **	real colours: the fading tables are built from it and rebuilt from the same
++    **	(zeroed) bytes, and a host that draws with its own palette never reads it.
++    */
++    if (ptr != NULL) {
++        Mem_Copy((void*)ptr, GamePalette, 768);
++    } else {
++        CNC3D_Report_Missing_Palette(fullname, Theaters[theater].Root);
++        memset(GamePalette, 0, 768);
++    }
+ 
+     Mem_Copy(GamePalette, OriginalPalette, 768);
+ 
+@@ -506,7 +569,12 @@ void DisplayClass::Init_Theater(TheaterType theater)
+     */
+     sprintf(fullname, "%s.PAL", Theaters[theater].Root);
+     ptr = MFCD::Retrieve(fullname);
+-    Mem_Copy((void*)ptr, GamePalette, 768);
++    /* The same guard as above: the archive did not grow the entry meanwhile. */
++    if (ptr != NULL) {
++        Mem_Copy((void*)ptr, GamePalette, 768);
++    } else {
++        memset(GamePalette, 0, 768);
++    }
+     Mem_Copy(GamePalette, OriginalPalette, 768);
+ #endif
+ 
+@@ -862,6 +930,40 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object)
   *   06/07/1994 JLB : Handles concrete check.                                                  *
   *   10/11/1994 BWG : Added IsProximate check for ore refineries                               *
   *=============================================================================================*/
@@ -1627,7 +1964,7 @@ index 20ff4f6..3896171 100644
  bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
                                            HousesType house,
                                            short const* list,
-@@ -876,6 +931,27 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
+@@ -876,6 +978,27 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
          return (true);
      }
  
@@ -1655,7 +1992,7 @@ index 20ff4f6..3896171 100644
      if (!object || object->What_Am_I() != RTTI_BUILDINGTYPE) {
          return (true);
      }
-@@ -2837,7 +2913,23 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
+@@ -2837,7 +2960,23 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
          case SOURCE_AIR:
              cell = Scen.Waypoint[WAYPT_REINF];
              if (cell < 1) {
@@ -1680,7 +2017,7 @@ index 20ff4f6..3896171 100644
                  return (cell);
              } else {
                  if ((*this)[cell].Cell_Techno()) {
-@@ -2856,7 +2948,50 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
+@@ -2856,7 +2995,50 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
          **	Dramatic entry point is somewhere on the visible screen as defined
          **	by the current tactical map position.
          */
@@ -1770,7 +2107,7 @@ index 42d052d..f311642 100644
      ObjectClass* Cell_Object(CELL cell, int x = 0, int y = 0);
      ObjectClass* Next_Object(ObjectClass* object);
 diff --git a/tiberiandawn/dllinterface.cpp b/tiberiandawn/dllinterface.cpp
-index 383e098..335cde7 100644
+index 383e098..935d909 100644
 --- a/tiberiandawn/dllinterface.cpp
 +++ b/tiberiandawn/dllinterface.cpp
 @@ -12,6 +12,27 @@
@@ -1809,7 +2146,15 @@ index 383e098..335cde7 100644
  #include <stdio.h>
  
  #include "function.h"
-@@ -785,6 +807,39 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Clear_Object_Selection(uint64
+@@ -725,6 +747,7 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Set_Multiplayer_Data(int scena
+     Special.IsVisceroids = game_options.SpawnVisceroids;
+     Special.IsCaptureTheFlag = game_options.CaptureTheFlag;
+     Special.IsEarlyWin = game_options.DestroyStructures;
++    Special.IsShortGame = game_options.ShortGame;
+     Special.ModernBalance = game_options.ModernBalance;
+ 
+     Rule.AllowSuperWeapons = game_options.EnableSuperweapons; // Are superweapons available
+@@ -785,6 +808,39 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Clear_Object_Selection(uint64
  
      Unselect_All();
  
@@ -1849,7 +2194,7 @@ index 383e098..335cde7 100644
      return true;
  }
  
-@@ -881,7 +936,15 @@ void GlyphX_Assign_Houses(void)
+@@ -881,7 +937,15 @@ void GlyphX_Assign_Houses(void)
      HousesType house2;
      HouseClass* housep2;
  
@@ -1866,7 +2211,7 @@ index 383e098..335cde7 100644
  
      /*
      **	Init the 'used' flag for all houses & colors to 0
-@@ -915,9 +978,29 @@ void GlyphX_Assign_Houses(void)
+@@ -915,9 +979,29 @@ void GlyphX_Assign_Houses(void)
          }
      }
  
@@ -1898,7 +2243,7 @@ index 383e098..335cde7 100644
              int t = random_start_locations[j];
              random_start_locations[j] = random_start_locations[i];
              random_start_locations[i] = t;
-@@ -1378,6 +1461,28 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Start_Custom_Instance(const ch
+@@ -1378,6 +1462,28 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Start_Custom_Instance(const ch
  
      Clear_Scenario();
  
@@ -1927,7 +2272,7 @@ index 383e098..335cde7 100644
      if (!Read_Scenario_Ini_File(scenario_file_name, bin_file_name, scenario_name, true)) {
          return false;
      }
-@@ -1696,7 +1801,26 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Advance_Instance(uint64 player
+@@ -1696,7 +1802,26 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Advance_Instance(uint64 player
      /*
      ** Very rarely, the human players will get a message from the computer.
      */
@@ -1955,7 +2300,7 @@ index 383e098..335cde7 100644
          DLLExportClass::Computer_Message(false);
      }
  
-@@ -3681,7 +3805,16 @@ extern "C" __declspec(dllexport) void __cdecl CNC_Handle_Input(InputRequestEnum
+@@ -3681,7 +3806,16 @@ extern "C" __declspec(dllexport) void __cdecl CNC_Handle_Input(InputRequestEnum
          CELL cell = Coord_Cell(coord);
  
          if (Map.Pixel_To_Coord(x1, y1)) {
@@ -1973,7 +2318,7 @@ index 383e098..335cde7 100644
          }
  
          break;
-@@ -4571,6 +4704,17 @@ bool DLLExportClass::Passes_Proximity_Check(CELL cell_in,
+@@ -4571,6 +4705,17 @@ bool DLLExportClass::Passes_Proximity_Check(CELL cell_in,
      */
      short const* occupy_list = placement_type->Occupy_List(true);
  
@@ -1991,7 +2336,7 @@ index 383e098..335cde7 100644
      while (*occupy_list != REFRESH_EOL) {
  
          CELL center_cell = cell_in + *occupy_list++;
-@@ -4579,12 +4723,12 @@ bool DLLExportClass::Passes_Proximity_Check(CELL cell_in,
+@@ -4579,12 +4724,12 @@ bool DLLExportClass::Passes_Proximity_Check(CELL cell_in,
              return false;
          }
  
@@ -2006,7 +2351,7 @@ index 383e098..335cde7 100644
  }
  
  /**************************************************************************************************
-@@ -5039,8 +5183,17 @@ bool DLLExportClass::MP_Construction_Action(SidebarRequestEnum construction_acti
+@@ -5039,8 +5184,17 @@ bool DLLExportClass::MP_Construction_Action(SidebarRequestEnum construction_acti
  
                                  /*
                                  ** Execute immediately so we get the sidebar feedback
@@ -2025,7 +2370,7 @@ index 383e098..335cde7 100644
                                  return true;
                              }
                          }
-@@ -5190,8 +5343,25 @@ bool DLLExportClass::Place(uint64 player_id, int buildable_type, int buildable_i
+@@ -5190,8 +5344,25 @@ bool DLLExportClass::Place(uint64 player_id, int buildable_type, int buildable_i
  
              /*
              ** Call the place directly instead of queueing it, so we can evaluate the return code.
@@ -2052,7 +2397,7 @@ index 383e098..335cde7 100644
                  PlacementType[CurrentLocalPlayerIndex] = NULL;
              }
          }
-@@ -5529,8 +5699,35 @@ bool DLLExportClass::Get_Shroud_State(uint64 player_id, unsigned char* buffer_in
+@@ -5529,8 +5700,35 @@ bool DLLExportClass::Get_Shroud_State(uint64 player_id, unsigned char* buffer_in
  
              CNCShroudEntryStruct& shroud_entry = shroud->Entries[entry_index];
  
@@ -2090,7 +2435,7 @@ index 383e098..335cde7 100644
              shroud_entry.IsJamming = false;
              shroud_entry.ShadowIndex = -1;
  
-@@ -6003,12 +6200,26 @@ void DLLExportClass::Glyphx_Queue_AI(void)
+@@ -6003,12 +6201,26 @@ void DLLExportClass::Glyphx_Queue_AI(void)
      //	Move events from the OutList (events generated by this player) into the
      //	DoList (the list of events to execute).
      //------------------------------------------------------------------------
@@ -2122,7 +2467,7 @@ index 383e098..335cde7 100644
      }
  
      /*
-@@ -6023,7 +6234,44 @@ void DLLExportClass::Glyphx_Queue_AI(void)
+@@ -6023,7 +6235,44 @@ void DLLExportClass::Glyphx_Queue_AI(void)
      ** ST - 3/12/2019 10:51AM
      */
  
@@ -2168,7 +2513,7 @@ index 383e098..335cde7 100644
  
          HousesType house;
          HouseClass* housep;
-@@ -6478,7 +6726,20 @@ void DLLExportClass::Repair(uint64 player_id, int object_id)
+@@ -6478,7 +6727,20 @@ void DLLExportClass::Repair(uint64 player_id, int object_id)
  
                  if (building && building->Can_Repair() && building->House
                      && building->House->Class->House == PlayerPtr->Class->House) {
@@ -2190,7 +2535,7 @@ index 383e098..335cde7 100644
                  }
              }
          }
-@@ -6536,7 +6797,19 @@ void DLLExportClass::Sell(uint64 player_id, int object_id)
+@@ -6536,7 +6798,19 @@ void DLLExportClass::Sell(uint64 player_id, int object_id)
                  GlyphX_Debug_Print("DLLExportClass::Sell -- trying to sell a non-active building");
              } else {
                  if (building->House && building->House->Class->House == PlayerPtr->Class->House) {
@@ -2211,7 +2556,7 @@ index 383e098..335cde7 100644
                  }
              }
          }
-@@ -7308,16 +7581,27 @@ void DLLExportClass::Computer_Message(bool last_player_taunt)
+@@ -7308,16 +7582,27 @@ void DLLExportClass::Computer_Message(bool last_player_taunt)
      }
  
      if (ai_player_count) {
@@ -2241,7 +2586,7 @@ index 383e098..335cde7 100644
          }
  
          On_Message(ai_players[ai_player_index], "", 15.0f, MESSAGE_TYPE_COMPUTER_TAUNT, taunt_index);
-@@ -7718,4 +8002,1858 @@ void DLL_Code_Pointers(void)
+@@ -7718,4 +8003,1995 @@ void DLL_Code_Pointers(void)
  void DLL_Decode_Pointers(void)
  {
      DLLExportClass::Decode_Pointers();
@@ -2686,6 +3031,26 @@ index 383e098..335cde7 100644
 +    }
 +
 +    /*
++    **	CNC3D: WHICH CONTROL GROUP THIS OBJECT IS IN. FootClass::Group (foot.h) is the
++    **	storage Handle_Team (conquer.cpp) assigns and recalls by; it is 0..9 for a member
++    **	and 0xFF for a unit in no group. Exported so the HUD's unit card can show how many
++    **	units each group holds without keeping a second list that would drift from the
++    **	engine's: a unit that dies, or is reassigned to another group, leaves this field
++    **	changed and the card reads that directly.
++    **
++    **	Read only, FootClass only (infantry, vehicles, aircraft). -1 for a building or a
++    **	terrain object, which cannot be in a group, and -1 for a reader whose brain
++    **	predates the export, which the card reads as "no groups known" rather than as
++    **	ten empty ones.
++    */
++    int group = -1;
++    if (obj->What_Am_I() == RTTI_INFANTRY || obj->What_Am_I() == RTTI_UNIT
++        || obj->What_Am_I() == RTTI_AIRCRAFT) {
++        unsigned char g = ((FootClass*)obj)->Group;
++        group = (g <= 9) ? (int)g : -1;
++    }
++
++    /*
 +    **	CNC3D: THE FOUR CONDITIONS A HARVESTER'S OWN ANIMATION IS GATED ON.
 +    **
 +    **	The 1995 engine tests exactly these four before it picks a harvesting shape:
@@ -2740,7 +3105,7 @@ index 383e098..335cde7 100644
 +              into no-ops rather than failing. New fields go BEFORE it. */
 +           "|blush=%d|flash=%d|tcx=%d|tcy=%d|pips=%d|maxpips=%d|alt=%d"
 +           "|cloak=%d|cstage=%d|repairing=%d|wrench=%d"
-+           "|harv=%d|rotating=%d|navset=%d|driving=%d|primary=%d|act=%d\n",
++           "|harv=%d|rotating=%d|navset=%d|driving=%d|primary=%d|group=%d|act=%d\n",
 +           kind,
 +           obj->Class_Of().IniName,
 +           owner,
@@ -2789,6 +3154,7 @@ index 383e098..335cde7 100644
 +           navset,
 +           driving,
 +           primary,
++           group,
 +           act);
 +}
 +
@@ -3625,6 +3991,122 @@ index 383e098..335cde7 100644
 +    return HOUSE_NONE;
 +}
 +
++/**************************************************************************************************
++ * CNC3D_Player_To_AI -- Hands one player's house to the computer (project CNC3D).
++ *
++ * WHY THIS EXISTS. When somebody leaves a network match the room's AI TAKEOVER option says
++ * their base should carry on under the computer rather than blow up. The engine already
++ * knows how to do that: it is the #else arm of CNC_Handle_Player_Switch_To_AI, the path
++ * the Remastered build takes when KILL_PLAYER_ON_DISCONNECT is not defined. That arm is
++ * unreachable here, because the define is on and because it works on PlayerPtr through
++ * Set_Player_Context, which is per-machine state -- every peer has to apply this to the
++ * SAME house on the same frame, so the house is named rather than made current.
++ *
++ * WasHuman is what the score screen reads afterwards, so a taken-over player is still
++ * reported as the person who started the match rather than as a computer.
++ *
++ * The MCV loop is the original's: a house whose owner walked away mid-deploy would
++ * otherwise sit on a vehicle it will never unload, and the AI does not think to.
++ *
++ * Returns false when player_id names nobody, or when the house is already the computer's.
++ **************************************************************************************************/
++/**************************************************************************************************
++ * CNC3D_Player_Is_AI -- Is this player's house being played by the computer? (project CNC3D)
++ *
++ * The read that makes CNC3D_Player_To_AI checkable. CNCPlayerInfoStruct carries an IsAI
++ * field, but Get_Player_Info_State never fills it -- it is an INPUT to
++ * CNC_Set_Multiplayer_Data and nothing more -- so there was no way to ask the engine
++ * afterwards whether a house is human or computer.
++ *
++ * Returns 1 for the computer, 0 for a person, -1 when player_id names nobody.
++ **************************************************************************************************/
++/**************************************************************************************************
++ * CNC3D_Player_Blowup -- Destroys one player's house, the way a disconnect does (project CNC3D).
++ *
++ * WHY NOT CNC3D_Force_Verdict(player, false). Flag_To_Lose raises IsToLose, and
++ * HouseClass::AI only acts on IsToLose "if (GameToPlay == GAME_NORMAL)" (house.cpp).
++ * In a GlyphX multiplayer match -- which is every match this game plays -- that flag is
++ * therefore read by nobody: the departed player's base stood there untouched, being
++ * played by no one, and the log said the house had been flagged to lose. It had; the
++ * engine simply never looks.
++ *
++ * Flag_To_Die is the multiplayer-aware one, and it is what the engine's own
++ * KILL_PLAYER_ON_DISCONNECT arm calls. IsToDie has no GAME_NORMAL guard: a second later
++ * (BorrowedTime) HouseClass::AI runs Blowup_All and then MPlayer_Defeated, which is what
++ * puts "<name> has been defeated." on every player's screen. Units and buildings go up,
++ * on the same turn on every machine, because every machine calls this from the same turn.
++ *
++ * Returns whatever the flag returns: false when the house is already winning, losing or
++ * dying, so a second goodbye for one seat cannot restart the explosion.
++ **************************************************************************************************/
++extern "C" __declspec(dllexport) bool __cdecl CNC3D_Player_Blowup(uint64 player_id)
++{
++    HousesType house = CNC3D_House_Of_Player(player_id);
++    if (house == HOUSE_NONE) {
++        return false;
++    }
++
++    HouseClass* hptr = HouseClass::As_Pointer(house);
++    if (hptr == NULL) {
++        return false;
++    }
++
++    return hptr->Flag_To_Die();
++}
++
++extern "C" __declspec(dllexport) int __cdecl CNC3D_Player_Is_AI(uint64 player_id)
++{
++    HousesType house = CNC3D_House_Of_Player(player_id);
++    if (house == HOUSE_NONE) {
++        return -1;
++    }
++
++    HouseClass* hptr = HouseClass::As_Pointer(house);
++    if (hptr == NULL) {
++        return -1;
++    }
++
++    return hptr->IsHuman ? 0 : 1;
++}
++
++extern "C" __declspec(dllexport) bool __cdecl CNC3D_Player_To_AI(uint64 player_id)
++{
++    HousesType house = CNC3D_House_Of_Player(player_id);
++    if (house == HOUSE_NONE) {
++        return false;
++    }
++
++    HouseClass* hptr = HouseClass::As_Pointer(house);
++    if (hptr == NULL || !hptr->IsHuman) {
++        return false;
++    }
++
++    hptr->WasHuman = true;
++    hptr->IsHuman = false;
++    hptr->IsStarted = true;
++    hptr->IQ = Rule.MaxIQ;
++    hptr->IsBaseBuilding = true;
++
++    /*
++    ** Start the unload mission for MCVs, exactly as the disconnect path does.
++    */
++    for (int index = 0; index < Units.Count(); index++) {
++        UnitClass* obj = Units.Ptr(index);
++
++        if (obj && !obj->IsInLimbo && obj->House == hptr) {
++            if (*obj == UNIT_MCV) {
++                obj->Assign_Mission(MISSION_GUARD);
++                obj->Assign_Target(TARGET_NONE);
++                obj->Assign_Destination(TARGET_NONE);
++                obj->Assign_Mission(MISSION_UNLOAD);
++                obj->Commence();
++            }
++        }
++    }
++
++    return true;
++}
++
 +extern "C" __declspec(dllexport) bool __cdecl CNC3D_Set_Invincible(uint64 player_id, bool on)
 +{
 +    HousesType house = CNC3D_House_Of_Player(player_id);
@@ -4103,7 +4585,7 @@ index 383e098..335cde7 100644
 +    return true;
 +}
 diff --git a/tiberiandawn/dllinterface.h b/tiberiandawn/dllinterface.h
-index fa8179c..24c34c8 100644
+index fa8179c..06a423d 100644
 --- a/tiberiandawn/dllinterface.h
 +++ b/tiberiandawn/dllinterface.h
 @@ -12,6 +12,16 @@
@@ -4138,6 +4620,14 @@ index fa8179c..24c34c8 100644
  enum EventCallbackMessageEnum
  {
      MESSAGE_TYPE_DIRECT = 0,
+@@ -747,6 +765,7 @@ struct CNCMultiplayerOptionsStruct
+     bool MPlayerAftermathUnits;
+     bool CaptureTheFlag;
+     bool DestroyStructures; // New early win condition via destroying all a player's structures
++    bool ShortGame;         // CNC3D: defences and walls do not keep a player alive
+     bool ModernBalance;
+ };
+ 
 diff --git a/tiberiandawn/drive.cpp b/tiberiandawn/drive.cpp
 index dc4499d..4c76d29 100644
 --- a/tiberiandawn/drive.cpp
@@ -4178,10 +4668,27 @@ index dc4499d..4c76d29 100644
                      crushed = true;
  
 diff --git a/tiberiandawn/event.cpp b/tiberiandawn/event.cpp
-index 7eeab65..cea2cf8 100644
+index 7eeab65..aa1fa11 100644
 --- a/tiberiandawn/event.cpp
 +++ b/tiberiandawn/event.cpp
-@@ -440,7 +440,17 @@ void EventClass::Execute(void)
+@@ -12,6 +12,16 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Two changes in EventClass::Execute. The REPAIR arm requires the ordering
++// house to own the building, the test the SELL arm always had. A beacon's
++// thirty second kill time is a frame number rather than the Windows wall
++// clock, so peers agree on it and it expires on every platform.
++// It DOES change the game simulation.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\event.cpv   2.17   16 Oct 1995 16:50:28   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -440,7 +450,17 @@ void EventClass::Execute(void)
      case REPAIR:
          CCDebugString("C&C95 - Repair packet received\n");
          techno = As_Techno(Data.Target.Whom);
@@ -4200,7 +4707,7 @@ index 7eeab65..cea2cf8 100644
              techno->Repair(-1);
          }
          break;
-@@ -478,17 +488,23 @@ void EventClass::Execute(void)
+@@ -478,17 +498,23 @@ void EventClass::Execute(void)
  
              /*
              **	Beacons have a 30-second kill time.
@@ -4234,10 +4741,26 @@ index 7eeab65..cea2cf8 100644
          }
          break;
 diff --git a/tiberiandawn/event.h b/tiberiandawn/event.h
-index 7c431ac..94a5df0 100644
+index 7c431ac..bf7ffe8 100644
 --- a/tiberiandawn/event.h
 +++ b/tiberiandawn/event.h
-@@ -92,15 +92,22 @@ public:
+@@ -12,6 +12,15 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Narrows EventClass::Frame from 27 bits to 24 and widens ID from 4 bits to
++// 7, so an order can name one of 128 houses, and pins the structure at 22
++// bytes with a static_assert because it is the network wire unit.
++// It does not change the game simulation; it changes the wire format.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\event.h_v   2.19   16 Oct 1995 16:46:14   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -92,15 +101,22 @@ public:
  
      /*
      ** 'Frame' is the frame that the command should execute on.
@@ -4264,7 +4787,7 @@ index 7c431ac..94a5df0 100644
  
      /*
      ** This bit tells us if we've already executed this event.
-@@ -243,4 +250,16 @@ public:
+@@ -243,4 +259,16 @@ public:
  };
  #pragma pack(pop)
  
@@ -4470,7 +4993,7 @@ index 5fde0a2..0f489c0 100644
  
  /***********************************************************************************************
 diff --git a/tiberiandawn/house.cpp b/tiberiandawn/house.cpp
-index 7e9f27c..9312694 100644
+index 7e9f27c..fa60aa6 100644
 --- a/tiberiandawn/house.cpp
 +++ b/tiberiandawn/house.cpp
 @@ -12,6 +12,22 @@
@@ -4688,6 +5211,21 @@ index 7e9f27c..9312694 100644
                      id = MPlayerID[i];
                  }
              }
+@@ -4814,7 +4955,13 @@ void HouseClass::Check_Pertinent_Structures(void)
+         BuildingClass* b = Buildings.Ptr(index);
+ 
+         if (b && b->IsActive && b->House == this) {
+-            if (!b->Class->IsWall) {
++            /*
++            **  CNC3D SHORT GAME: an armed building is a defence, and a defence is not
++            **  a base. With the option on, only a building that could rebuild the
++            **  house keeps it in the match; walls never counted either way.
++            */
++            if (!b->Class->IsWall
++                && !(Special.IsShortGame && b->Class->Primary != WEAPON_NONE)) {
+                 if (!b->IsInLimbo && b->Strength > 0) {
+                     any_good_buildings = true;
+                     break;
 diff --git a/tiberiandawn/house.h b/tiberiandawn/house.h
 index 1ffcb36..465f1d6 100644
 --- a/tiberiandawn/house.h
@@ -4928,10 +5466,94 @@ index 0003135..f6b2538 100644
                                        WEAPON_NONE,
                                        WEAPON_NONE,
 diff --git a/tiberiandawn/infantry.cpp b/tiberiandawn/infantry.cpp
-index 9b527ac..1876954 100644
+index 9b527ac..69e3fb4 100644
 --- a/tiberiandawn/infantry.cpp
 +++ b/tiberiandawn/infantry.cpp
-@@ -1807,7 +1807,20 @@ short const* InfantryClass::Overlap_List(void) const
+@@ -12,6 +12,19 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Three changes. In Per_Cell_Process the sabotage arm records the saboteur's
++// own house rather than this machine's in a lockstep match, and the tether
++// cut reads a factory rally point (a CNC3D addition, carried in the
++// soldier's own ArchiveTarget by BuildingClass::Exit_Object) and sends the
++// soldier on from the exit cell. Overlap_List drops the selection term in a
++// lockstep match, so cell occupancy does not depend on which peer has the
++// soldier selected.
++// It DOES change the game simulation.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\infantry.cpv   2.19   16 Oct 1995 16:50:30   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -719,7 +732,15 @@ void InfantryClass::Per_Cell_Process(bool center)
+             int temp = Special.IsScatter;
+ 
+             building->IsGoingToBlow = true;
+-            building->Clicked_As_Target(PlayerPtr->Class->House,
++            /*
++            **	CNC3D: the saboteur's own house rather than this machine's, for the reason
++            **	written out in BuildingClass::Sell_Back. This site never showed in a dump
++            **	because the line after it immediately overwrites FlashCount with the same
++            **	20 on every peer -- but FlashCountPerPlayer[] keeps whichever index it was
++            **	handed, so each peer recorded a different house as having clicked, and
++            **	nothing exports that array for a gate to notice.
++            */
++            building->Clicked_As_Target(CNC3D_Lockstep ? Owner() : PlayerPtr->Class->House,
+                                         20); // 2019/09/20 JAS - Added record of who clicked on the object
+             building->Clicked_As_Target(building->Owner(), 20);
+             building->CountDown.Set(20);
+@@ -740,7 +761,46 @@ void InfantryClass::Per_Cell_Process(bool center)
+     **	unit might actually be a building.
+     */
+     if (center && IsTethered) {
++        /*
++        **	CNC3D: a factory's rally point. BuildingClass::Exit_Object parks it in this
++        **	soldier's own ArchiveTarget (always a CELL target) and leaves the destination
++        **	as the exit cell, so the soldier walks out through the door first. This is
++        **	that cell: the tether is cut here and the walk to the rally begins from here,
++        **	the way a vehicle finishes its door track before it turns for the rally.
++        **
++        **	The contact is read BEFORE the transmit, which is what breaks it. The last
++        **	term is the one that keeps a player's own order: an order given between the
++        **	spawn and the door is honoured by the engine with the tether still on, and
++        **	only when this cell is still the soldier's destination is the exit walk the
++        **	one that is ending here. Without it a move order given at the door would be
++        **	overridden at the first cell centre.
++        **
++        **	The tests keep it inert in a vanilla run: a fresh soldier's ArchiveTarget is
++        **	TARGET_NONE, the computer's units (which the AI shuffle gives an archive cell
++        **	at Unlimbo) are excluded by IsHuman, a transport order writes an OBJECT
++        **	target under MISSION_ENTER, and a guard-area order changes the mission.
++        **	Nothing else reaches a MISSION_MOVE soldier tethered to a factory with a
++        **	legal cell archive.
++        **
++        **	And when a human soldier leaves a factory WITHOUT the walk to the rally,
++        **	because the player gave it an order at the door, the carried CELL is dropped
++        **	rather than left behind, since a later guard-area order would otherwise
++        **	centre on it. A guard-area order given in that window has just written its
++        **	own centre there and is left alone, and so is an OBJECT archive (a transport
++        **	order's), which this hook never wrote.
++        */
++        TechnoClass const* cnc3d_from = Contact_With_Whom();
++        const bool cnc3d_factory = cnc3d_from != NULL && cnc3d_from->What_Am_I() == RTTI_BUILDING
++                                   && ((BuildingClass const*)cnc3d_from)->Class->IsFactory && House->IsHuman;
++        const bool cnc3d_rally = cnc3d_factory && Mission == MISSION_MOVE && Target_Legal(ArchiveTarget)
++                                 && Is_Target_Cell(ArchiveTarget) && Coord_Cell(Coord) == As_Cell(NavCom);
+         Transmit_Message(RADIO_UNLOADED);
++        if (cnc3d_rally) {
++            Assign_Destination(ArchiveTarget);
++            ArchiveTarget = TARGET_NONE;
++        } else if (cnc3d_factory && Mission != MISSION_GUARD_AREA && Is_Target_Cell(ArchiveTarget)) {
++            ArchiveTarget = TARGET_NONE;
++        }
+         if (House->Class->House == HOUSE_GOOD) {
+             Do_Action(DO_GESTURE1);
+         } else {
+@@ -1807,7 +1867,20 @@ short const* InfantryClass::Overlap_List(void) const
  {
      Validate();
      // return(Coord_Spillage_List(Coord, 24 + ((IsSelected || Doing > DO_WALK)?12:0)));
@@ -5232,6 +5854,59 @@ index 425890b..b679f25 100644
       + (sizeof(AircraftClass) + sizeof(AircraftTypeClass) + sizeof(AnimClass) + sizeof(AnimTypeClass)                  \
          + sizeof(BuildingClass) + sizeof(BuildingTypeClass) + sizeof(BulletClass) + sizeof(BulletTypeClass)            \
          + sizeof(HouseClass) + sizeof(HouseTypeClass) + sizeof(InfantryClass) + sizeof(InfantryTypeClass)              \
+diff --git a/tiberiandawn/scenario.cpp b/tiberiandawn/scenario.cpp
+index 47f8b42..c1320b2 100644
+--- a/tiberiandawn/scenario.cpp
++++ b/tiberiandawn/scenario.cpp
+@@ -12,6 +12,14 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Clear_Scenario resets the synchronised random stream in a lockstep match,
++// so a second scenario in one process starts where a fresh process would.
++// It DOES change the game simulation, in a lockstep match only.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\scenario.cpv   2.17   16 Oct 1995 16:52:08   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -346,6 +354,33 @@ void Fill_In_Data(void)
+  *=============================================================================================*/
+ void Clear_Scenario(void)
+ {
++    /*
++    **	CNC3D lockstep: put the SYNCHRONISED simulation stream back where a freshly
++    **	launched process holds it, because nothing else in the DLL ever does.
++    **
++    **	Scen.RandomNumber is written in exactly two places, both inside Init_Random
++    **	(init.cpp), and Init_Random is never reached in the DLL: it sits inside
++    **	Select_Game, which returns early when RunningAsDLL. The design leans on that,
++    **	and correctly, to conclude that no seed has to cross the wire -- every peer
++    **	holds RandomClass(0). What the reasoning missed is that it holds RandomClass(0)
++    **	only for the FIRST scenario a process runs. Clear_Scenario resets every heap and
++    **	every subsystem and does not touch this generator, so a second scenario in the
++    **	same process inherits the stream exactly where the first one left it.
++    **
++    **	That is a desync waiting for a lobby. Today a match is armed from the command
++    **	line and is therefore always a process's first scenario, so both peers really do
++    **	start at 0. The moment a player can host from the menu after finishing a
++    **	skirmish, that player's stream is hundreds of draws along and a freshly launched
++    **	joiner's is at zero, and the two simulate different worlds from the first tick
++    **	with no cause the alarm can name.
++    **
++    **	Gated, because outside a match this changes what the second mission of a session
++    **	rolls, and the 1995 answer is the default here as everywhere else.
++    */
++    if (CNC3D_Lockstep) {
++        Scen.RandomNumber = RandomClass(0);
++    }
++
+     EndCountDown = TICKS_PER_SECOND * 30;
+     CrateCount = 0;
+     CrateTimer = 0;
 diff --git a/tiberiandawn/session.h b/tiberiandawn/session.h
 index 0986712..3804c5b 100644
 --- a/tiberiandawn/session.h
@@ -5274,6 +5949,48 @@ index 0986712..3804c5b 100644
  
  //...........................................................................
  // Max sizes of packets we want to send
+diff --git a/tiberiandawn/special.h b/tiberiandawn/special.h
+index 78ad08f..97e7624 100644
+--- a/tiberiandawn/special.h
++++ b/tiberiandawn/special.h
+@@ -12,6 +12,15 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// Adds one flag, IsShortGame, to SpecialClass: a house is finished when it
++// has no structure left that could rebuild it. Read only by
++// Check_Pertinent_Structures, and off unless set for the match.
++// It DOES change the game simulation when the flag is on.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\special.h_v   2.15   16 Oct 1995 16:47:36   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -72,6 +81,7 @@ public:
+         IsFromInstall = false;
+         IsSeparate = false;
+         IsEarlyWin = false;
++        IsShortGame = false;
+         HealthBarDisplayMode = HB_SELECTED;
+         ResourceBarDisplayMode = RB_SELECTED;
+         ModernBalance = false;
+@@ -235,6 +245,13 @@ public:
+     */
+     unsigned IsEarlyWin : 1;
+ 
++    /*
++    **  CNC3D: SHORT GAME. A house is finished when it has no structures left that
++    **  could rebuild it, so defences and walls do not keep it alive. Read only by
++    **  Check_Pertinent_Structures. Off unless the host ticks it in the lobby.
++    */
++    unsigned IsShortGame : 1;
++
+     /*
+     ** Health bar display mode
+     */
 diff --git a/tiberiandawn/startup.cpp b/tiberiandawn/startup.cpp
 index 8536cc9..c04a1e0 100644
 --- a/tiberiandawn/startup.cpp
@@ -5303,7 +6020,7 @@ index 8536cc9..c04a1e0 100644
  #include "common/ini.h"
  #include "common/paths.h"
 diff --git a/tiberiandawn/techno.cpp b/tiberiandawn/techno.cpp
-index 07b96eb..5763e08 100644
+index 07b96eb..993251f 100644
 --- a/tiberiandawn/techno.cpp
 +++ b/tiberiandawn/techno.cpp
 @@ -12,6 +12,15 @@
@@ -5322,7 +6039,53 @@ index 07b96eb..5763e08 100644
  
  /* $Header:   F:\projects\c&c\vcs\code\techno.cpv   2.13   02 Aug 1995 17:01:08   JOE_BOSTIC  $ */
  /***********************************************************************************************
-@@ -4056,7 +4065,7 @@ void TechnoClass::Base_Is_Attacked(TechnoClass const* enemy)
+@@ -696,11 +705,40 @@ bool TechnoClass::Revealed(HouseClass* house)
+  *=============================================================================================*/
+ void TechnoClass::Hidden(void)
+ {
+-    // ST - 3/13/2019 4:56PM
+-    if (!Is_Discovered_By_Player()) {
+-        return;
+-    }
+-    // if (!IsDiscoveredByPlayer) return;
++    /*
++    **	CNC3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
++    **	cleared a mask every machine shares.
++    **
++    **	    if (!Is_Discovered_By_Player()) return;
++    **
++    **	Is_Discovered_By_Player() with no argument is
++    **	`IsDiscoveredByPlayerMask & (1 << PlayerPtr->Class->House)`, so on the peer whose
++    **	local human had seen this object the whole per-house mask was wiped, and on every
++    **	other peer it was left standing. An object enters limbo on every machine at once,
++    **	so every machine has to clear the same mask or they stop agreeing.
++    **
++    **	It reaches the simulation through TechnoClass::Revealed, which early-returns on
++    **	that mask: a peer that kept the bit skips Look() and the MISSION_AMBUSH to
++    **	MISSION_HUNT switch, and a peer that wiped it performs both. Different shroud and
++    **	a different mission for the same object.
++    **
++    **	NOT RARE. Every AI house's harvester limbos and survives on every trip to a
++    **	refinery, all match long, and a disconnected human's house has IsHuman flipped
++    **	false, which puts all of its objects on this arm too.
++    **
++    **	UNGATED, and that is the rule and not a preference. In the campaign the mask can
++    **	only ever hold PlayerPtr's own bit: Set_Discovered_By_Player is reached under
++    **	GAME_NORMAL only from the `house == PlayerPtr` arm of Revealed, and the two
++    **	remaining writers of the legacy bool sit inside #ifndef REMASTER_BUILD and are not
++    **	compiled. So outside a match the removed guard was false exactly when the mask was
++    **	already zero, and clearing zero is what it always did. There is nothing here for
++    **	CNC3D_Lockstep to pick between.
++    **
++    **	NO GATE COVERS THIS, and the gap register says so rather than implying otherwise:
++    **	the object dump exports neither IsDiscoveredByPlayerMask nor IsDiscoveredByPlayer,
++    **	so the divergence it fixes is invisible to the two-brain gate, to the loopback
++    **	pair gate and to the live desync alarm alike.
++    */
+     if (!House->IsHuman) {
+         Clear_Discovered_By_Players();
+     }
+@@ -4056,7 +4094,7 @@ void TechnoClass::Base_Is_Attacked(TechnoClass const* enemy)
   * HISTORY:                                                                                    *
   *   07/29/1995 JLB : Created.                                                                 *
   *=============================================================================================*/
@@ -5547,10 +6310,25 @@ index c2cd33f..72e1822 100644
                                         WEAPON_TOMAHAWK,
                                         WEAPON_NONE,
 diff --git a/tiberiandawn/unit.cpp b/tiberiandawn/unit.cpp
-index 0441431..9f4e7b7 100644
+index 0441431..20e7709 100644
 --- a/tiberiandawn/unit.cpp
 +++ b/tiberiandawn/unit.cpp
-@@ -2980,11 +2980,20 @@ short const* UnitClass::Overlap_List(void) const
+@@ -12,6 +12,14 @@
+ // distributed with this program. You should have received a copy of the
+ // GNU General Public License along with permitted additional restrictions
+ // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
++//
++// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// UnitClass::Overlap_List drops the selection term in a lockstep match, so
++// the cells a vehicle overlaps do not depend on which peer has it selected.
++// It DOES change the game simulation, in a lockstep match only.
++// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
++// and NOTICE.md lists every modified file.
++//
+ 
+ /* $Header:   F:\projects\c&c\vcs\code\unit.cpv   2.17   16 Oct 1995 16:48:28   JOE_BOSTIC  $ */
+ /***********************************************************************************************
+@@ -2980,11 +2988,20 @@ short const* UnitClass::Overlap_List(void) const
          return (&_gunboat[0]);
      }
  

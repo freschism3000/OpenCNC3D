@@ -23,6 +23,8 @@ base=$(cat "$here/VERSION" 2>/dev/null | tr -d '[:space:]')
 case "$1" in
 --next)
     # Increments of 0.0.1, a project rule: every build gets a number.
+    # The line moved to 0.7.x by decision: VERSION was set to 0.7.0, a number that is
+    # never cut, so the first build on it is 0.7.1 and each one after adds 0.0.1 as before.
     echo "$base" | awk -F. '{ printf "%d.%d.%d\n", $1, $2, $3 + 1 }'
     exit 0
     ;;

@@ -32,7 +32,8 @@
  *          [engine gates the damaged case on Special.HealthBarDisplayMode ==
  *           HB_DAMAGED; vanilla's default is HB_SELECTED (special.h:75). Which of the
  *           two applies is a RUNTIME mode here rather than a compile-time one, read
- *           from the F5 dial hb_mode, and HB_MODE_DAMAGED_TOO is its default. The enum
+ *           from the F5 dial hb_mode, and HB_MODE_SELECTED is its default -- the engine's
+ *           own. The enum
  *           beside hb_should_show carries the reasoning and the third position, off.]
  *        - ratio = Cardinal_To_Fixed(MaxStrength, Strength)       (object.cpp:1707)
  *                = (Strength << 8) / MaxStrength                  (common/misc.cpp:18)
@@ -237,9 +238,28 @@ static int shroud_fetch(shroud_getstate_fn getstate)
 /* SHROUD_* for a map cell. Off-grid is HIDDEN: the world beyond the exported rect has
    by definition never been seen. With no valid snapshot (fetch failed, or shroud off)
    everything reports CLEAR so the renderer degrades to exactly the old behaviour. */
+/* THE RIM. The outermost ring of cells of the play rectangle, and
+   everything beyond it, is shroud that nothing lifts: not the shroud switch, not
+   --noshroud, not a revealed map after a match, not a unit standing on it. The
+   director: "the furthermost right, left, top, down cells of every map in the entire
+   game should always be covered by Shroud, EVEN if shroud / fog of war is turned off,
+   and should never be able to be revealed." It is asked FIRST in every question below,
+   ahead of every switch, which is what makes it unliftable. The one exception is the
+   editor (g_shroudEditorOff), which must be able to paint the edge cells it hides.
+   --norim / the `rim` verb exist so a gate can photograph the rule against its own
+   absence. */
+static int g_shroudRimOn = 1;
+static int shroud_is_rim(int cellx, int celly)
+{
+    if (!g_shroudRimOn || g_shroudGW <= 0 || g_shroudGH <= 0) return 0;
+    return cellx <= g_shroudGX || cellx >= g_shroudGX + g_shroudGW - 1
+        || celly <= g_shroudGY || celly >= g_shroudGY + g_shroudGH - 1;
+}
 static int shroud_state_at(int cellx, int celly)
 {
     int gx, gy;
+    if (shroud_is_rim(cellx, celly))
+        return SHROUD_HIDDEN;
     if (!g_shroudOn || !g_shroudValid)
         return SHROUD_CLEAR;
     gx = cellx - g_shroudGX;
@@ -257,10 +277,46 @@ static int shroud_state_at(int cellx, int celly)
    restores the mission's real fog exactly. */
 static int g_shroudEditorOff = 0;
 
+/* AND THE SAME OVERRIDE FOR A PLAYER WHO IS NO LONGER PLAYING. A match that has been
+   decided shows everybody the whole map for a moment before the banner, and a player who
+   surrendered or was defeated keeps seeing it, so they can watch the rest of the game out
+   rather than stare at a black rectangle.
+   
+   PRESENTATION ONLY, and that is load bearing in a match: the engine dumps every object
+   regardless of visibility, this renderer culls at draw time, and the desync hash is
+   taken over that dump. Revealing the map therefore cannot part two worlds. The ENGINE's
+   own unshroud (DEBUG_REQUEST_UNSHROUD) would, which is why it is not used here.
+   
+   Separate from g_shroudOn on purpose: that one also stops the per-tick snapshot being
+   fetched, which is wrong for a spectator, whose world keeps moving underneath the
+   override and must stay fresh. */
+static int g_shroudRevealed = 0;
+
+static void shroud_reveal(int on);
+
+/* The blanket is drawn for the rim alone when the shroud proper is not in play. */
+static int shroud_rim_only(void)
+{
+    return !g_shroudOn || !g_shroudValid || g_shroudRevealed;
+}
+
+
 static int shroud_cell_hidden(int cellx, int celly)
 {
     if (g_shroudEditorOff) return 0;
+    if (shroud_is_rim(cellx, celly)) return 1;      /* before the reveal: never lifted */
+    if (g_shroudRevealed) return 0;
     return shroud_state_at(cellx, celly) == SHROUD_HIDDEN;
+}
+
+/* The corner coverage field is cached, so a reveal that only flipped the flag would show
+   the old soft edges for one more frame. Dirty it here and the next frame rebuilds. */
+static void shroud_reveal(int on)
+{
+    const int want = on ? 1 : 0;
+    if (g_shroudRevealed == want) return;
+    g_shroudRevealed = want;
+    g_shroudCornersDirty = 1;
 }
 
 /* SYNTHETIC TEST ONLY: reclassify every CLEAR cell of the local snapshot as DARK so
@@ -328,8 +384,8 @@ static void shroud_draw(int x0, int y0, int x1, int y1, shroud_cellshown_fn show
 {
     int x, y, s;
 
-    if (!g_shroudOn || !g_shroudValid)
-        return;
+    if (!g_shroudRimOn && (!g_shroudOn || !g_shroudValid))
+        return;                       /* the rim alone still draws, see shroud_is_rim */
 
     /* The same one-cell overhang the soft path takes. G17 compares these two paths
        against each other, so they have to agree on the range or the gate measures the
@@ -432,6 +488,8 @@ static int g_shroudSoft = 1;   /* 1 = soft (N64 look), 0 = hard per-cell squares
 
 static float shroud_opacity(int cellx, int celly)
 {
+    if (shroud_is_rim(cellx, celly)) return 1.0f;
+    if (g_shroudRevealed) return 0.0f;             /* rim-only: the rest is open */
     switch (shroud_state_at(cellx, celly)) {
         case SHROUD_HIDDEN: return 1.0f;
         case SHROUD_DARK:   return SHROUD_DARK_ALPHA;
@@ -456,10 +514,17 @@ static void shroud_build_corners(void)
     g_shroudCornersDirty = 0;
 }
 
+/* The corner field depends on which MODE built it (the shroud proper, or the rim
+   alone), and the mode can change between frames without anyone dirtying the cache:
+   --noshroud at boot, a reveal at match end, the rim verb in a script. */
+static int g_shroudCornersMode = -1;
 static void shroud_corners_sync(void)
 {
-    if (g_shroudCornersDirty)
+    const int mode = (g_shroudRimOn << 2) | (shroud_rim_only() << 1) | (g_shroudRevealed ? 1 : 0);
+    if (g_shroudCornersDirty || mode != g_shroudCornersMode) {
         shroud_build_corners();
+        g_shroudCornersMode = mode;
+    }
 }
 
 static float shroud_corner_a(int x, int y)
@@ -509,7 +574,11 @@ static float shroud_corner_vis(int x, int y)
        black and looked like the terrain had failed to draw at all. */
     if (g_shroudEditorOff)
         return 1.0f;
-    if (!g_shroudOn || !g_shroudValid || !g_shroudTerrainLight || !g_shroudSoft)
+    if (!g_shroudTerrainLight || !g_shroudSoft)
+        return 1.0f;
+    /* With the shroud proper out of play the field still carries the rim, so the
+       ground under the rim goes dark with its blanket rather than glowing beneath it. */
+    if (!g_shroudRimOn && (!g_shroudOn || !g_shroudValid || g_shroudRevealed))
         return 1.0f;
     shroud_corners_sync();
     return 1.0f - shroud_corner_a(x, y);
@@ -537,10 +606,11 @@ static float shroud_corner_vis(int x, int y)
    which is exactly our GL_MODULATE against a per-vertex colour with env subtracted. */
 static float shroud_vis_at(float wx, float wz)
 {
-    if (g_shroudEditorOff)      /* the editor sees everything: see shroud_corner_vis */
+    if (g_shroudEditorOff)                        /* see shroud_corner_vis */
         return 1.0f;
-    if (!g_shroudOn || !g_shroudValid)
+    if (!g_shroudRimOn && (!g_shroudOn || !g_shroudValid || g_shroudRevealed))
         return 1.0f;
+    shroud_corners_sync();
     const int cx = (int)floorf(wx), cz = (int)floorf(wz);
     const float fx = wx - (float)cx, fz = wz - (float)cz;
     const float v00 = 1.0f - shroud_corner_a(cx,     cz);
@@ -566,8 +636,8 @@ static void shroud_draw_soft(int x0, int y0, int x1, int y1, shroud_cellshown_fn
 {
     int x, y;
 
-    if (!g_shroudOn || !g_shroudValid)
-        return;
+    if (!g_shroudRimOn && (!g_shroudOn || !g_shroudValid))
+        return;                       /* the rim alone still draws, see shroud_is_rim */
 
     /* ONE RING OUTSIDE THE WORLD GRID. The blanket rides 0.11 world units above the
        ground it covers (SHROUD_BLACK_Y + the 0.06 pad in shroud_ground_y), and under a

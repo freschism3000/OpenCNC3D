@@ -1,0 +1,7 @@
+tick 40
+rosterdump
+tick 200
+rosterdump
+chatdump
+tick 20
+quit

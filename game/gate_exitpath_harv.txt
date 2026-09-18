@@ -1,0 +1,19 @@
+# G249, leg E. A HARVESTER IGNORES THE AIRSTRIP'S RALLY. Same strip, same rally as leg D.
+#
+# The airstrip is the only place a Nod harvester comes from, and its Unlimbo gives it
+# MISSION_HARVEST. A move order to the rally would park it there in guard, so the drop
+# leaves a harvester to the engine's own scatter and it drives to the tiberium field.
+# The assertion is that it is never under MISSION_MOVE and never at the rally cell.
+# The scenario already has one Nod harvester, so the new one is index 1.
+tick 30
+cam 13 56
+zoom max
+cheatset instant 1
+rally AFLD 0 9 58
+tick 2
+rallydump
+count HARV:BadGuy
+build HARV
+watch HARV:BadGuy 1 700
+obj HARV:BadGuy 1
+quit

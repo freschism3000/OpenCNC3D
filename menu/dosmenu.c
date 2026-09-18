@@ -29,7 +29,7 @@
  * label     Verbatim from CONQUER.ENG in the 1995 LOCAL.MIX; bake_dosmenu.py
  *           prints the same strings out of the archive so these can be checked
  *           against the data rather than trusted. The comment is the conquer.h
- *           text number. DM_TESTMAP is ours and has no number.
+ *           text number. DM_SPECIAL and the other items marked ours have no number.
  * disabled  GadgetClass::IsDisabled (gadget.h). Drawn, never selectable.
  * narrow    menus.cpp:483/489: Exit is the one button that is neither full width
  *           nor left aligned with the rest. A flag rather than an `item == DM_EXIT`
@@ -45,21 +45,21 @@ typedef struct
 
 static const DM_ItemDef dm_items[DM_ITEM_COUNT] = {
     /* label                disabled narrow */
-    {"Test Map", 0, 0},           /*  --  ours                    */
-    {"Special Ops", 0, 0},        /*  --  ours; the expandbtn slot */
+    {"Special Ops", 0, 0},        /*  --  ours; the expandbtn slot. The Test Map is
+                                         the last row of the list behind it. */
     {"User Maps", 0, 0},          /*  --  ours; the editor's own singleplayer maps */
     {"Start New Game", 0, 0},     /*  25  TXT_START_NEW_GAME; live since the campaign
                                          flow landed (side select -> briefing ->
                                          mission -> score -> map) */
-    /* DISABLED, and drawn disabled, because there is no save system behind it. It used
-       to be a fully live button that did nothing at all when clicked, which is worse
-       than the DOS original: 1995 drew a disabled gadget in the disabled colourway and
-       REFUSED the click (gadget.cpp:632 guards the whole Clicked_On dispatch with
-       `if (!next_button->IsDisabled)`). Now the same happens here. It is drawn in the
-       disabled palette, the keyboard walk steps over it, and the mouse cannot reach it. */
-    {"Load Mission", 1, 0},       /*  53  TXT_LOAD_MISSION        */
+    /* LIVE. It opens the slot dialog on the title plate and the shell boots the mission
+       the chosen slot was saved in, then loads it. It was drawn disabled for as long as
+       there was no save system behind it, because 1995 drew a disabled gadget in the
+       disabled colourway and REFUSED the click (gadget.cpp:632 guards the whole
+       Clicked_On dispatch with `if (!next_button->IsDisabled)`), and a live button
+       that does nothing is worse than that. */
+    {"Load Mission", 0, 0},       /*  53  TXT_LOAD_MISSION        */
     {"Skirmish", 0, 0},           /*  --  ours; TXT_MULTIPLAYER_GAME's slot */
-    {"Multiplayer", 1, 0},        /* 210  TXT_MULTIPLAYER_GAME    */
+    {"Multiplayer", 0, 0},        /* 210  TXT_MULTIPLAYER_GAME    */
     {"Intro & Sneak Peek", 0, 0}, /*  26  TXT_INTRO               */
     {"Visuals", 0, 0},            /*  --  ours                    */
     {"Exit Game", 0, 1}           /*  64  TXT_EXIT_GAME           */
@@ -92,8 +92,8 @@ void dm_state_init(DM_State *st)
 {
     memset(st, 0, sizeof(*st));
     /* menus.cpp:731-735: curbutton is 0 when the sixth item is present, 1 when it
-     * is not, i.e. the engine boots onto the first button that is actually there.
-     * Start New Game is disabled here, so the same rule lands on Test Map. */
+     * is not, i.e. the engine boots onto the first button that is actually there,
+     * which is Special Ops, the sixth-item slot. */
     st->selected = dm_first_enabled();
     st->pressed = -1;
     st->version = "";

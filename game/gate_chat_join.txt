@@ -1,0 +1,6 @@
+tick 25
+say JOINER SPEAKING
+tick 40
+chatdump
+tick 540
+quit

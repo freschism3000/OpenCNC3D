@@ -133,7 +133,7 @@ python3 tools/heightmap-viewer/export_dosinf.py
 
 Without the third the viewer falls back to the cartridge's five-facing billboards
 rather than losing its infantry. Nothing in `public/data` is committed, for the same reason no baked pack is:
-it is regenerated from `data/rom` by one command. See `DATA.md`.
+it is regenerated from `data/rom` by one command. See `data/rom/README.md`.
 
 `public/vendor/` is three.js 0.185.1, also not committed. Restore it with:
 

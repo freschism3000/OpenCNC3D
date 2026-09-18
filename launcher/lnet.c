@@ -37,6 +37,18 @@ static void ln_win_err(char *err, int errlen, const char *what)
     snprintf(err, (size_t)errlen, "%s (WinINet error %lu)", what, (unsigned long)code);
 }
 
+/* BOUND EVERY WAIT. WinINet's own defaults are minutes long, and a caller that is
+ * waiting for one of these on a worker thread cannot be shut down until it returns:
+ * a screen closing behind an unanswered request would sit there frozen. libcurl is
+ * already bounded on the other backend, so this only brings Windows into line. */
+static void ln_win_timeouts(HINTERNET h)
+{
+    DWORD connect_ms = 15000, send_ms = 20000, receive_ms = 20000;
+    InternetSetOptionA(h, INTERNET_OPTION_CONNECT_TIMEOUT, &connect_ms, sizeof connect_ms);
+    InternetSetOptionA(h, INTERNET_OPTION_SEND_TIMEOUT, &send_ms, sizeof send_ms);
+    InternetSetOptionA(h, INTERNET_OPTION_RECEIVE_TIMEOUT, &receive_ms, sizeof receive_ms);
+}
+
 /* Open a URL and hand back the request handle plus the two things the caller
  * needs to know about it. Returns NULL with `err` set. */
 static HINTERNET ln_open(HINTERNET *session, const char *url, const char *key,
@@ -54,6 +66,7 @@ static HINTERNET ln_open(HINTERNET *session, const char *url, const char *key,
         ln_win_err(err, errlen, "could not start a connection");
         return NULL;
     }
+    ln_win_timeouts(*session);
 
     headers[0] = '\0';
     if (key && *key)
@@ -143,6 +156,133 @@ char *ln_get_text(const char *url, const char *key, long cap, char *err, int err
     }
     buf[got] = '\0';
     InternetCloseHandle(req);
+    InternetCloseHandle(session);
+    return buf;
+}
+
+char *ln_post_text(const char *url, const char *key, const char *body,
+                   const char *content_type, long cap, char *err, int errlen)
+{
+    /* A POST CANNOT GO THROUGH InternetOpenUrl, which is why this does not simply
+     * reuse ln_open: that call chooses the method itself and has nowhere to put a
+     * body. The URL has to be taken apart and the request built by hand instead. */
+    HINTERNET session = NULL, conn = NULL, req = NULL;
+    URL_COMPONENTSA uc;
+    char host[256], path[1024], headers[640];
+    DWORD status = 0, len = sizeof status, idx = 0;
+    DWORD flags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE
+                  | INTERNET_FLAG_NO_UI | INTERNET_FLAG_KEEP_CONNECTION;
+    const char *ctype = (content_type && *content_type) ? content_type : "application/json";
+    const DWORD blen = (DWORD)(body ? strlen(body) : 0);
+    char *buf;
+    long got = 0;
+
+    memset(&uc, 0, sizeof uc);
+    uc.dwStructSize = sizeof uc;
+    uc.lpszHostName = host;
+    uc.dwHostNameLength = sizeof host;
+    uc.lpszUrlPath = path;
+    uc.dwUrlPathLength = sizeof path;
+    if (!InternetCrackUrlA(url, 0, 0, &uc) || !host[0]) {
+        snprintf(err, (size_t)errlen, "that is not an address this build can post to");
+        return NULL;
+    }
+    if (!path[0]) {
+        path[0] = '/';
+        path[1] = '\0';
+    }
+    /* HttpOpenRequest DOES NOT READ THE SCHEME. Left to itself it would talk plain
+     * HTTP to port 443 and fail in a way that looks like the server being down, so
+     * the flag has to be set here from what the URL actually said. */
+    if (uc.nScheme == INTERNET_SCHEME_HTTPS)
+        flags |= INTERNET_FLAG_SECURE;
+
+    session = InternetOpenA(LN_AGENT, INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+    if (!session) {
+        ln_win_err(err, errlen, "could not start a connection");
+        return NULL;
+    }
+    ln_win_timeouts(session);
+
+    conn = InternetConnectA(session, host, uc.nPort, NULL, NULL,
+                            INTERNET_SERVICE_HTTP, 0, 0);
+    if (!conn) {
+        ln_win_err(err, errlen, "could not reach the game list");
+        InternetCloseHandle(session);
+        return NULL;
+    }
+
+    req = HttpOpenRequestA(conn, "POST", path, NULL, NULL, NULL, flags, 0);
+    if (!req) {
+        ln_win_err(err, errlen, "could not reach the game list");
+        InternetCloseHandle(conn);
+        InternetCloseHandle(session);
+        return NULL;
+    }
+
+    snprintf(headers, sizeof headers, "Content-Type: %s\r\n%s%s%s",
+             ctype,
+             (key && *key) ? LN_KEY_HEADER : "",
+             (key && *key) ? key : "",
+             (key && *key) ? "\r\n" : "");
+
+    if (!HttpSendRequestA(req, headers, (DWORD)strlen(headers),
+                          (LPVOID)body, blen)) {
+        ln_win_err(err, errlen, "could not reach the game list");
+        InternetCloseHandle(req);
+        InternetCloseHandle(conn);
+        InternetCloseHandle(session);
+        return NULL;
+    }
+
+    /* THE STATUS IS NOT OPTIONAL HERE. On the GET side a failed query lets the body
+     * through, which for a manifest is merely unhelpful; for a publish it would
+     * report success for a row the server rejected, so a status nobody could read
+     * is treated as a failure rather than shrugged at. */
+    if (!HttpQueryInfoA(req, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status,
+                        &len, &idx)) {
+        ln_win_err(err, errlen, "the game list gave no answer this build could read");
+        InternetCloseHandle(req);
+        InternetCloseHandle(conn);
+        InternetCloseHandle(session);
+        return NULL;
+    }
+    if (status != 200) {
+        snprintf(err, (size_t)errlen, "the game list refused this game (HTTP %lu)",
+                 (unsigned long)status);
+        InternetCloseHandle(req);
+        InternetCloseHandle(conn);
+        InternetCloseHandle(session);
+        return NULL;
+    }
+
+    buf = (char *)malloc((size_t)cap + 1);
+    if (!buf) {
+        snprintf(err, (size_t)errlen, "out of memory");
+        InternetCloseHandle(req);
+        InternetCloseHandle(conn);
+        InternetCloseHandle(session);
+        return NULL;
+    }
+    for (;;) {
+        DWORD n = 0;
+        if (!InternetReadFile(req, buf + got, (DWORD)(cap - got), &n)) {
+            ln_win_err(err, errlen, "the connection broke while reading");
+            free(buf);
+            InternetCloseHandle(req);
+            InternetCloseHandle(conn);
+            InternetCloseHandle(session);
+            return NULL;
+        }
+        if (n == 0)
+            break;
+        got += (long)n;
+        if (got >= cap)
+            break;
+    }
+    buf[got] = '\0';
+    InternetCloseHandle(req);
+    InternetCloseHandle(conn);
     InternetCloseHandle(session);
     return buf;
 }
@@ -362,6 +502,79 @@ char *ln_get_text(const char *url, const char *key, long cap, char *err, int err
     curl_easy_cleanup(c);
     if (rc != CURLE_OK) {
         ln_curl_err(err, errlen, rc, status, detail);
+        free(sink.buf);
+        return NULL;
+    }
+    sink.buf[sink.got] = '\0';
+    return sink.buf;
+}
+
+char *ln_post_text(const char *url, const char *key, const char *body,
+                   const char *content_type, long cap, char *err, int errlen)
+{
+    CURL *c = curl_easy_init();
+    struct curl_slist *hdrs = NULL;
+    LN_Sink sink;
+    char detail[CURL_ERROR_SIZE];
+    char ctype_hdr[128];
+    char key_hdr[256];
+    CURLcode rc;
+    long status = 0;
+
+    if (!c) {
+        snprintf(err, (size_t)errlen, "could not start a connection");
+        return NULL;
+    }
+    sink.buf = (char *)malloc((size_t)cap + 1);
+    sink.got = 0;
+    sink.cap = cap;
+    if (!sink.buf) {
+        snprintf(err, (size_t)errlen, "out of memory");
+        curl_easy_cleanup(c);
+        return NULL;
+    }
+    detail[0] = '\0';
+
+    snprintf(ctype_hdr, sizeof ctype_hdr, "Content-Type: %s",
+             (content_type && *content_type) ? content_type : "application/json");
+    hdrs = curl_slist_append(hdrs, ctype_hdr);
+    if (key && *key) {
+        snprintf(key_hdr, sizeof key_hdr, LN_KEY_HEADER "%s", key);
+        hdrs = curl_slist_append(hdrs, key_hdr);
+    }
+    /* A HUNDRED-CONTINUE ROUND TRIP FOR A ROW THIS SIZE IS PURE LATENCY, and some
+     * servers never answer it, which turns a publish into a stall. */
+    hdrs = curl_slist_append(hdrs, "Expect:");
+
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_USERAGENT, LN_AGENT);
+    curl_easy_setopt(c, CURLOPT_POST, 1L);
+    curl_easy_setopt(c, CURLOPT_POSTFIELDS, body ? body : "");
+    curl_easy_setopt(c, CURLOPT_POSTFIELDSIZE, (long)(body ? strlen(body) : 0));
+    /* REDIRECTS ARE REFUSED RATHER THAN FOLLOWED. Following one turns a POST into a
+     * GET and drops the body, so the publish would report success having sent
+     * nothing. Left unfollowed it comes back as a status that is not 200 and is
+     * reported as the failure it is. */
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 0L);
+    curl_easy_setopt(c, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 15L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 20L);
+    curl_easy_setopt(c, CURLOPT_ERRORBUFFER, detail);
+    curl_easy_setopt(c, CURLOPT_HTTPHEADER, hdrs);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, ln_sink);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &sink);
+    rc = curl_easy_perform(c);
+    curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &status);
+    curl_slist_free_all(hdrs);
+    curl_easy_cleanup(c);
+    if (rc != CURLE_OK) {
+        ln_curl_err(err, errlen, rc, status, detail);
+        free(sink.buf);
+        return NULL;
+    }
+    if (status != 200) {
+        snprintf(err, (size_t)errlen, "the game list refused this game (HTTP %ld)", status);
         free(sink.buf);
         return NULL;
     }

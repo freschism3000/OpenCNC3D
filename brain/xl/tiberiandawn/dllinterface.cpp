@@ -726,6 +726,7 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Set_Multiplayer_Data(int scena
     Special.IsVisceroids = game_options.SpawnVisceroids;
     Special.IsCaptureTheFlag = game_options.CaptureTheFlag;
     Special.IsEarlyWin = game_options.DestroyStructures;
+    Special.IsShortGame = game_options.ShortGame;
     Special.ModernBalance = game_options.ModernBalance;
 
     Rule.AllowSuperWeapons = game_options.EnableSuperweapons; // Are superweapons available
@@ -9285,6 +9286,122 @@ static HousesType CNC3D_House_Of_Player(uint64 player_id)
         }
     }
     return HOUSE_NONE;
+}
+
+/**************************************************************************************************
+ * CNC3D_Player_To_AI -- Hands one player's house to the computer (project CNC3D).
+ *
+ * WHY THIS EXISTS. When somebody leaves a network match the room's AI TAKEOVER option says
+ * their base should carry on under the computer rather than blow up. The engine already
+ * knows how to do that: it is the #else arm of CNC_Handle_Player_Switch_To_AI, the path
+ * the Remastered build takes when KILL_PLAYER_ON_DISCONNECT is not defined. That arm is
+ * unreachable here, because the define is on and because it works on PlayerPtr through
+ * Set_Player_Context, which is per-machine state -- every peer has to apply this to the
+ * SAME house on the same frame, so the house is named rather than made current.
+ *
+ * WasHuman is what the score screen reads afterwards, so a taken-over player is still
+ * reported as the person who started the match rather than as a computer.
+ *
+ * The MCV loop is the original's: a house whose owner walked away mid-deploy would
+ * otherwise sit on a vehicle it will never unload, and the AI does not think to.
+ *
+ * Returns false when player_id names nobody, or when the house is already the computer's.
+ **************************************************************************************************/
+/**************************************************************************************************
+ * CNC3D_Player_Is_AI -- Is this player's house being played by the computer? (project CNC3D)
+ *
+ * The read that makes CNC3D_Player_To_AI checkable. CNCPlayerInfoStruct carries an IsAI
+ * field, but Get_Player_Info_State never fills it -- it is an INPUT to
+ * CNC_Set_Multiplayer_Data and nothing more -- so there was no way to ask the engine
+ * afterwards whether a house is human or computer.
+ *
+ * Returns 1 for the computer, 0 for a person, -1 when player_id names nobody.
+ **************************************************************************************************/
+/**************************************************************************************************
+ * CNC3D_Player_Blowup -- Destroys one player's house, the way a disconnect does (project CNC3D).
+ *
+ * WHY NOT CNC3D_Force_Verdict(player, false). Flag_To_Lose raises IsToLose, and
+ * HouseClass::AI only acts on IsToLose "if (GameToPlay == GAME_NORMAL)" (house.cpp).
+ * In a GlyphX multiplayer match -- which is every match this game plays -- that flag is
+ * therefore read by nobody: the departed player's base stood there untouched, being
+ * played by no one, and the log said the house had been flagged to lose. It had; the
+ * engine simply never looks.
+ *
+ * Flag_To_Die is the multiplayer-aware one, and it is what the engine's own
+ * KILL_PLAYER_ON_DISCONNECT arm calls. IsToDie has no GAME_NORMAL guard: a second later
+ * (BorrowedTime) HouseClass::AI runs Blowup_All and then MPlayer_Defeated, which is what
+ * puts "<name> has been defeated." on every player's screen. Units and buildings go up,
+ * on the same turn on every machine, because every machine calls this from the same turn.
+ *
+ * Returns whatever the flag returns: false when the house is already winning, losing or
+ * dying, so a second goodbye for one seat cannot restart the explosion.
+ **************************************************************************************************/
+extern "C" __declspec(dllexport) bool __cdecl CNC3D_Player_Blowup(uint64 player_id)
+{
+    HousesType house = CNC3D_House_Of_Player(player_id);
+    if (house == HOUSE_NONE) {
+        return false;
+    }
+
+    HouseClass* hptr = HouseClass::As_Pointer(house);
+    if (hptr == NULL) {
+        return false;
+    }
+
+    return hptr->Flag_To_Die();
+}
+
+extern "C" __declspec(dllexport) int __cdecl CNC3D_Player_Is_AI(uint64 player_id)
+{
+    HousesType house = CNC3D_House_Of_Player(player_id);
+    if (house == HOUSE_NONE) {
+        return -1;
+    }
+
+    HouseClass* hptr = HouseClass::As_Pointer(house);
+    if (hptr == NULL) {
+        return -1;
+    }
+
+    return hptr->IsHuman ? 0 : 1;
+}
+
+extern "C" __declspec(dllexport) bool __cdecl CNC3D_Player_To_AI(uint64 player_id)
+{
+    HousesType house = CNC3D_House_Of_Player(player_id);
+    if (house == HOUSE_NONE) {
+        return false;
+    }
+
+    HouseClass* hptr = HouseClass::As_Pointer(house);
+    if (hptr == NULL || !hptr->IsHuman) {
+        return false;
+    }
+
+    hptr->WasHuman = true;
+    hptr->IsHuman = false;
+    hptr->IsStarted = true;
+    hptr->IQ = Rule.MaxIQ;
+    hptr->IsBaseBuilding = true;
+
+    /*
+    ** Start the unload mission for MCVs, exactly as the disconnect path does.
+    */
+    for (int index = 0; index < Units.Count(); index++) {
+        UnitClass* obj = Units.Ptr(index);
+
+        if (obj && !obj->IsInLimbo && obj->House == hptr) {
+            if (*obj == UNIT_MCV) {
+                obj->Assign_Mission(MISSION_GUARD);
+                obj->Assign_Target(TARGET_NONE);
+                obj->Assign_Destination(TARGET_NONE);
+                obj->Assign_Mission(MISSION_UNLOAD);
+                obj->Commence();
+            }
+        }
+    }
+
+    return true;
 }
 
 extern "C" __declspec(dllexport) bool __cdecl CNC3D_Set_Invincible(uint64 player_id, bool on)

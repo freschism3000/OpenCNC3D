@@ -8,8 +8,8 @@
 # history so the repo does not grow ~23 MB per build; playable builds are published as
 # GitHub Releases instead.
 #
-# NOTE: data/rom and data/dosdata (the cartridge dump and the 1995 CD) ARE committed
-# while this repository is private. See DATA.md before making it public.
+# NOTE: data/rom and data/dosdata (the cartridge dump and the 1995 CD) are game data;
+# see BUILDING.md for what you have to bring.
 *.dSYM/
 *.dylib
 *.log
@@ -47,9 +47,24 @@ shots/
 cnc3d
 cnc_eyes
 preview
+# MAPS MADE IN THE EDITOR ARE PERSONAL, AND THEY ARE NEVER SOURCE. edit_save() writes
+# every one of them into <missions>/user_maps -- including an autosave every two minutes
+# that nobody asked for -- and the gate suite leaves scratch maps there too. None of it
+# has ever been tracked; this rule is here so that stays true by rule rather than by luck,
+# and it is matched by an --exclude in BOTH packagers, because the folder shipped inside
+# v0.6.6 on both platforms before anybody looked.
+#
+# The two worked examples are the exception and they live in game/examples/, which IS
+# tracked: they are put into a package by name, never by this folder.
+user_maps/
+
 # The standalone pause-dialog layout gate. game/build.sh rebuilds it from
 # game/gate_optlayout.c, which IS tracked; the binary is a product like every other here.
 game/gate_optlayout
+
+# The standalone Remastered-infantry placement gate, same rule: game/gate_rminf.cpp is
+# tracked and the binary built from it is a product.
+game/gate_rminf
 
 # The lockstep gates and the connectivity tool, same rule: the .c files under net/ are
 # tracked and the binaries game/build.sh makes from them are products. netcheck is the one
@@ -59,6 +74,21 @@ game/gate_lockstep
 game/cnc_twobrain
 game/gate_netloop
 game/netcheck
+# These two were COMMITTED as binaries by a `git add -A` in the commit that
+# wrote them, before their names reached this file, and were untracked again on the 5th.
+# The pattern is the one the top of this file already warns about.
+game/gate_beacon
+game/gate_lobby
+# And the relay gate's binary, which arrived with the tunnel work and whose name had not
+# reached this file. release.sh refuses to run with anything untracked in the tree, so a
+# product missing from here stops a build rather than merely cluttering a listing.
+game/gate_tunnel
+# And the room code's gate, which arrived with the relay work for the same reason.
+game/gate_roomcode
+# And the internet game list's gate, which arrived with the browser work and missed this
+# file in exactly the way gate_tunnel did. Found on the first macOS build of it: the
+# binary stood untracked in game/, which is the state release.sh refuses to run in.
+game/gate_mpbrowse
 audio/audtest
 audio/banktest
 audio/mixtest
@@ -83,7 +113,7 @@ tools/bakery/**/__pycache__/
 !tools/bakery/sharecopy/eyes/bake_pk4.pyc
 
 # n64_terrain.py's per-scenario intermediates. Regenerated from the ROM in about four
-# minutes for all 36 missions, and 96 MB if committed -- the same rule DATA.md applies
+# minutes for all 36 missions, and 96 MB if committed -- the same rule applies
 # to baked packs. Proven regenerable byte for byte: re-running the tool reproduces the
 # already-tracked SCG01EA/SCB01EA/SCG02EA files with zero differing cells.
 # Files already in history stay tracked; this only stops new ones being added.
@@ -92,7 +122,7 @@ tools/bakery/sharecopy/assets/terrain/terrain_*.png
 game/*.o.tmp
 
 # --------------------------------------------------------------------------------
-# multiple machines, ONE REPO (rule added 18 Aug 2026 by the project owner)
+# multiple machines, ONE REPO
 #
 # the project owner works this project from a Mac and a Windows machine and GitHub is the only
 # thing between them, so ANY work that lives only in a working copy is work that can
@@ -133,7 +163,8 @@ game/.build-sources.sha
 brain/xl/build-native/
 brain/xl/build-win/
 
-# patch(1) leftovers. One of these reached a commit on 3 Sep 2026 via `git add -A`;
+# patch(1) leftovers. One of these reached a commit via `git add -A`;
 # it was a whole stale copy of cnc_eyes.cpp and the hygiene hook caught it, not a person.
 *.orig
 *.rej
+launcher/cnc3d-launch

@@ -42,6 +42,19 @@ ASSETS = [
     # every line of the feature in place and the feature invisible, so there is no such
     # category any more: a chunk named in this table and missing from disk is an error.
     ("meter_drain",  "meter_drain_mark.png",   1),
+    # THE UNIT CARD, cut from the chunks above by unitcard_art.py: the radar bezel as a
+    # body, the blank tab plate as ten group tabs, the well at half size for the smaller
+    # cameos, and GRAD6FNT at the tab strip's scale and at 1x as fixed-cell fonts (ASCII
+    # 32..95, one glyph per frame). hud640_card_ok checks the sizes at load.
+    ("card_body",    "card_body.png",          1),
+    ("card_tab",     "card_tab.png",           4),
+    ("card_mini",    "card_mini.png",          2),
+    ("font_big",     "font_big.png",          64),
+    ("font_mid",     "font_mid.png",          64),
+    ("font_small",   "font_small.png",        64),
+    ("card_frame",   "card_frame.png",         1),
+    ("card_seg_lit",   "card_seg_lit.png",     1),
+    ("card_seg_unlit", "card_seg_unlit.png",   1),
 ]
 
 def bake():

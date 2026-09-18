@@ -1,0 +1,6 @@
+tick 197
+lclickobj MCV:@me
+actclickobj MCV:@me
+tick 3
+player
+quit

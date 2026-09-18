@@ -47,6 +47,12 @@ done
 
 INC="-I../game -I../menu -I../video -I../audio"
 CDEFS="-DGL_SILENCE_DEPRECATION"
+# A COOKED BUILD: tools/release.sh sets CNC3D_COOKED=1 for the packages it cuts, and the
+# define removes the F5 tuning panel's every door (game/fx_panel.h). A developer's own
+# build never sets it. It has to reach cnc_eyes.cpp and cnc3d.cpp, which is why both
+# clang++ lines below now take $CDEFS -- neither did before, and a define that missed
+# the very file the panel lives in would be a cook that cooked nothing.
+[ -n "$CNC3D_COOKED" ] && CDEFS="$CDEFS -DCNC3D_COOKED=1"
 
 # The C half: DOS rasteriser, menu, menu shell, movie decoder, and the audio engine.
 #
@@ -59,7 +65,11 @@ AUDIO_SRC="../audio/sosadpcm.c ../audio/wsadpcm.c ../audio/wsaud.c ../audio/mixf
            ../audio/cncaudio.c ../audio/wavio.c ../audio/audiotap.c \
            ../audio/audioboot.c ../audio/audio_sdl.c"
 AUDIO_OBJ=""
-for f in ../game/dosbar.c ../game/hud640.c ../game/dosopt.c ../game/dossave.c ../menu/dosmenu.c ../menu/dosops.c ../menu/doslobby.c ../menu/dosmenu_shell.c \
+# mpbrowse.c is the internet game list; lnet.c and ljson.c are the HTTP client and JSON
+# reader it asks through, shared with the launcher rather than copied into a second set
+# that would drift away from it.
+for f in ../game/dosbar.c ../game/hud640.c ../game/dosopt.c ../game/dossave.c ../menu/dosmenu.c ../menu/dosops.c ../menu/doslobby.c ../menu/dosmp.c ../menu/dosmenu_shell.c \
+         ../menu/mpbrowse.c ../launcher/lnet.c ../launcher/ljson.c \
          ../video/vqaplay.c ../video/movieplay.c ../video/moviesnd.c \
          ../video/pngwrite.c campaign.c logo3d.c $AUDIO_SRC; do
     o=$(basename "$f" .c).o
@@ -80,24 +90,29 @@ for f in $AUDIO_SRC; do AUDIO_OBJ="$AUDIO_OBJ $(basename "$f" .c).o"; done
 # reasoning as the renderer build.
 cc -std=c89   -O2 -g -c ../net/lockstep.c -o lockstep.o
 cc -std=gnu89 -O2 -g -c ../net/net_udp.c  -o net_udp.o
+# roomcode: a relayed host's address, rendered by netmatch from the id it registered.
+cc -std=gnu89 -O2 -g -c ../net/roomcode.c -o roomcode.o
 cc -std=gnu89 -O2 -g -c ../net/netmatch.c -o netmatch.o
+# netbeacon.c is LAN discovery, which the multiplayer screen's server browser reads.
+cc -std=gnu89 -O2 -g -c ../net/netbeacon.c -o netbeacon.o
 
 # The C++ half: the tactical renderer as a library, plus the state machine.
 clang++ -std=c++14 -O2 -g \
-    -fms-extensions -fdeclspec -D__int64="long long" -DCNC3D_NO_MAIN \
+    -fms-extensions -fdeclspec -D__int64="long long" -DCNC3D_NO_MAIN $CDEFS \
     -c ../game/cnc_eyes.cpp -o cnc_eyes.o \
     -I"$HDR" $INC $(sdl2-config --cflags)
 
-clang++ -std=c++14 -O2 -g -c cnc3d.cpp -o cnc3d.o -I"$HDR" $INC $(sdl2-config --cflags)
+clang++ -std=c++14 -O2 -g -c cnc3d.cpp -o cnc3d.o $CDEFS -I"$HDR" $INC $(sdl2-config --cflags)
 
 # -headerpad_max_install_names: reserve room in the Mach-O header so the dylib paths can
 # be rewritten afterwards without relinking. Today's rewrite happens to shrink the string
 # (a 50 character Homebrew path becomes a 36 character @executable_path one) so it would
 # fit anyway, but that is luck, not a property, and it stops being true the moment the
 # library or the prefix is renamed.
-clang++ -o cnc3d cnc3d.o cnc_eyes.o dosbar.o hud640.o dosopt.o dossave.o dosmenu.o dosops.o doslobby.o dosmenu_shell.o \
-    vqaplay.o movieplay.o moviesnd.o pngwrite.o campaign.o logo3d.o lockstep.o net_udp.o netmatch.o $AUDIO_OBJ \
-    $(sdl2-config --libs) -Wl,-headerpad_max_install_names -framework OpenGL -lz
+clang++ -o cnc3d cnc3d.o cnc_eyes.o dosbar.o hud640.o dosopt.o dossave.o dosmenu.o dosops.o doslobby.o dosmp.o dosmenu_shell.o \
+    vqaplay.o movieplay.o moviesnd.o pngwrite.o campaign.o logo3d.o lockstep.o net_udp.o netmatch.o netbeacon.o roomcode.o \
+    mpbrowse.o lnet.o ljson.o $AUDIO_OBJ \
+    $(sdl2-config --libs) -Wl,-headerpad_max_install_names -framework OpenGL -lz -lcurl
 
 # MAKE THE BINARY LOAD SDL FROM BESIDE ITSELF, not from the build machine's Homebrew.
 # The linker writes the absolute path it linked against (/usr/local/opt/sdl2-compat/...),

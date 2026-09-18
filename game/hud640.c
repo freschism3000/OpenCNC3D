@@ -450,10 +450,12 @@ void hud640_draw_bar(unsigned char *rgba, const H6_Pack *p, const H6_State *st)
      *    belonging to the same design as frames 1..3, and it is position-independent.
      *    Skipping it left the chassis's OLD plate showing at rest and the new one on
      *    hover, so the button visibly changed shape under the pointer. */
-    h6_blit(rgba, H6_BAR_W, barh, hud640_asset(p, "btn_repair"),
-            st->repair_frame, H6_BTN_REPAIR_X, H6_BTN_REPAIR_Y);
-    h6_blit(rgba, H6_BAR_W, barh, hud640_asset(p, "btn_sell"),
-            st->sell_frame, H6_BTN_SELL_X, H6_BTN_SELL_Y);
+    if (st->repair_frame >= 0)
+        h6_blit(rgba, H6_BAR_W, barh, hud640_asset(p, "btn_repair"),
+                st->repair_frame, H6_BTN_REPAIR_X, H6_BTN_REPAIR_Y);
+    if (st->sell_frame >= 0)
+        h6_blit(rgba, H6_BAR_W, barh, hud640_asset(p, "btn_sell"),
+                st->sell_frame, H6_BTN_SELL_X, H6_BTN_SELL_Y);
     h6_blit(rgba, H6_BAR_W, barh, hud640_asset(p, "btn_map"),
             st->map_frame, H6_BTN_MAP_X, H6_BTN_MAP_Y);
     for (i = 0; i < 4; i++) {
@@ -500,4 +502,275 @@ void hud640_draw_tab(unsigned char *rgba, const H6_Pack *p, const char *label,
     for (i = 0; i < n; i++)
         h6_blit(rgba, H6_BAR_W, H6_TAB_H, digits, buf[i] - '0', x + i * cell,
                 (H6_TAB_H - digits->h) / 2);
+}
+
+/* ==================================================================================
+ *  THE UNIT CARD. See the block in hud640.h.
+ * ================================================================================== */
+
+/* Proportional text out of a fixed-cell font strip. The strip carries ASCII 32..95,
+   one glyph per cell against the cell's left edge, and the advance is the glyph's own
+   ink width plus one: measured off the alpha the first time a font is used, then kept.
+   Two fonts, so two small caches, keyed on the asset they were measured from. */
+#define H6_FONT_FIRST 32
+#define H6_FONT_LAST  95
+#define H6_FONT_N     (H6_FONT_LAST - H6_FONT_FIRST + 1)
+
+typedef struct { const H6_Asset *a; unsigned char adv[H6_FONT_N]; } H6_FontCache;
+static H6_FontCache h6_fonts[2];
+
+static const H6_FontCache *h6_font_measure(const H6_Asset *a)
+{
+    int i, c, x, y, ink;
+    H6_FontCache *fc = NULL;
+    if (!a || a->frames < H6_FONT_N) return NULL;
+    for (i = 0; i < 2; i++) if (h6_fonts[i].a == a) return &h6_fonts[i];
+    for (i = 0; i < 2; i++) if (!h6_fonts[i].a) { fc = &h6_fonts[i]; break; }
+    if (!fc) fc = &h6_fonts[0];
+    fc->a = a;
+    for (c = 0; c < H6_FONT_N; c++) {
+        ink = 0;
+        for (y = 0; y < a->h; y++) {
+            const unsigned char *row = a->rgba + ((size_t)y * a->w * a->frames + (size_t)c * a->w) * 4;
+            for (x = 0; x < a->w; x++)
+                if (row[x * 4 + 3] && x + 1 > ink) ink = x + 1;
+        }
+        /* A space has no ink; give it a third of a cell so words stay words. */
+        fc->adv[c] = (unsigned char)(ink ? ink + 1 : a->w / 3);
+    }
+    return fc;
+}
+
+static int h6_text_width(const H6_Asset *a, const char *text)
+{
+    const H6_FontCache *fc = h6_font_measure(a);
+    int w = 0;
+    if (!fc || !text) return 0;
+    for (; *text; text++) {
+        int c = (unsigned char)*text;
+        if (c >= 'a' && c <= 'z') c -= 32;
+        if (c < H6_FONT_FIRST || c > H6_FONT_LAST) continue;
+        w += fc->adv[c - H6_FONT_FIRST];
+    }
+    return w > 0 ? w - 1 : 0;
+}
+
+int hud640_text_width(const H6_Pack *p, const char *font, const char *text)
+{
+    return h6_text_width(hud640_asset(p, font), text);
+}
+
+/* Print, upper-casing on the way: the font carries no lower case, which is also true
+   of every word the 1995 sidebar prints. Returns the x after the last glyph. */
+static int h6_print(unsigned char *dst, int dw, int dh, const H6_Asset *a,
+                    const char *text, int x, int y)
+{
+    const H6_FontCache *fc = h6_font_measure(a);
+    if (!fc || !text) return x;
+    for (; *text; text++) {
+        int c = (unsigned char)*text;
+        if (c >= 'a' && c <= 'z') c -= 32;
+        if (c < H6_FONT_FIRST || c > H6_FONT_LAST) continue;
+        h6_blit(dst, dw, dh, a, c - H6_FONT_FIRST, x, y);
+        x += fc->adv[c - H6_FONT_FIRST];
+    }
+    return x;
+}
+
+int hud640_card_ok(const H6_Pack *p)
+{
+    static int said = 0;
+    const H6_Asset *body = hud640_asset(p, "card_body");
+    const H6_Asset *tab  = hud640_asset(p, "card_tab");
+    const H6_Asset *mini = hud640_asset(p, "card_mini");
+    const H6_Asset *big  = hud640_asset(p, "font_big");
+    const H6_Asset *mid  = hud640_asset(p, "font_mid");
+    const H6_Asset *sml  = hud640_asset(p, "font_small");
+    if (body && tab && mini && big && mid && sml
+        && body->w == H6_CARD_W && body->h == H6_CARD_BODY_H
+        && tab->w == H6_CARD_TAB_W && tab->h == H6_CARD_TAB_H && tab->frames >= 4
+        && mini->w == H6_CARD_MINI_W && mini->h == H6_CARD_MINI_H && mini->frames >= 2
+        && big->frames >= H6_FONT_N && mid->frames >= H6_FONT_N && sml->frames >= H6_FONT_N)
+        return 1;
+    if (!said) {
+        said = 1;
+        fprintf(stderr, "HUD640|no unit card: this hud640.pack %s\n",
+                body ? "carries card art of another size" : "predates the card art");
+    }
+    return 0;
+}
+
+/* A 64x48 cameo box at half size, 2x2 box filtered. The source is opaque art, so
+   the average is over four full pixels and no alpha weighting is needed. */
+static void h6_blit_half(unsigned char *dst, int dw, int dh,
+                         const unsigned char *src, int dx, int dy)
+{
+    int x, y;
+    if (!src) return;
+    for (y = 0; y < H6_CAMEO_H / 2; y++) {
+        const int ty = dy + y;
+        if (ty < 0 || ty >= dh) continue;
+        for (x = 0; x < H6_CAMEO_W / 2; x++) {
+            const int tx = dx + x;
+            const unsigned char *s0 = src + ((size_t)(y * 2) * H6_CAMEO_W + (size_t)(x * 2)) * 4;
+            const unsigned char *s1 = s0 + (size_t)H6_CAMEO_W * 4;
+            unsigned char *d;
+            if (tx < 0 || tx >= dw) continue;
+            d = dst + ((size_t)ty * dw + tx) * 4;
+            d[0] = (unsigned char)((s0[0] + s0[4] + s1[0] + s1[4]) / 4);
+            d[1] = (unsigned char)((s0[1] + s0[5] + s1[1] + s1[5]) / 4);
+            d[2] = (unsigned char)((s0[2] + s0[6] + s1[2] + s1[6]) / 4);
+            d[3] = 255;
+        }
+    }
+}
+
+/* The power meter's own colour rotation, applied to a rectangle of the card: green is
+   left alone, amber lifts red to the green, red drops the green away. One rule for
+   the meter and the health bar, so a base browning out and a tank on its last legs
+   read as the same warning. */
+static void h6_rotate_green(unsigned char *rgba, int dw, int dh,
+                            int x0, int y0, int x1, int y1, int color)
+{
+    int px, py;
+    if (color <= 0) return;
+    for (py = (y0 < 0 ? 0 : y0); py < y1 && py < dh; py++) {
+        for (px = (x0 < 0 ? 0 : x0); px < x1 && px < dw; px++) {
+            unsigned char *q = rgba + ((size_t)py * dw + px) * 4;
+            if (!q[3]) continue;
+            if (q[0] < q[1]) q[0] = q[1];
+            if (color >= 2) {
+                q[1] = (unsigned char)(q[1] / 4);
+                q[2] = (unsigned char)(q[2] / 4);
+            }
+        }
+    }
+}
+
+void hud640_draw_card(unsigned char *rgba, const H6_Pack *p, const H6_Card *c)
+{
+    const H6_Asset *body, *tab, *mini, *mid, *sml, *frame, *lit, *unlit;
+    char buf[32];
+    int i, x, y, wx, wy;
+    const int W = H6_CARD_W, H = H6_CARD_H;
+
+    if (!rgba || !p || !c) return;
+    if (!hud640_card_ok(p)) return;
+    body  = hud640_asset(p, "card_body");
+    tab   = hud640_asset(p, "card_tab");
+    mini  = hud640_asset(p, "card_mini");
+    mid   = hud640_asset(p, "font_mid");
+    sml   = hud640_asset(p, "font_small");
+    /* The card's own frame and segments where the pack carries them: the ring cut to
+     * the well's octagon, and a segment closed at the top. An older pack falls back
+     * to the sidebar's pieces, which are the same art with square corners and an
+     * open top. */
+    frame = hud640_asset(p, "card_frame");
+    if (!frame) frame = hud640_asset(p, "cell_frame");
+    lit   = hud640_asset(p, "card_seg_lit");
+    unlit = hud640_asset(p, "card_seg_unlit");
+    if (!lit || !unlit) {
+        lit   = hud640_asset(p, "meter_lit");
+        unlit = hud640_asset(p, "meter_unlit");
+    }
+    memset(rgba, 0, (size_t)W * H * 4);
+
+    /* 1. the bezel, whose window is opaque dark: everything else goes on after it */
+    h6_blit(rgba, W, H, body, 0, 0, 0);
+    wx = H6_CARD_WIN_X;
+    wy = H6_CARD_WIN_Y;
+
+    /* 2. the main unit's well: cameo, then the frame ring back over it, exactly as a
+     *    build slot is drawn, at the same offsets (H6_CAMEO_DX/DY, H6_FRAME_DX/DY) */
+    x = wx + H6_CARD_CELL_X;
+    y = wy + H6_CARD_CELL_Y;
+    if (c->cameo) {
+        h6_blit_cameo(rgba, W, H, c->cameo, H6_CAMEO_W, H6_CAMEO_H,
+                      x + H6_CAMEO_DX, y + H6_CAMEO_DY, x, y, H6_CELL_W, H6_CELL_H);
+    } else if (c->code[0]) {
+        /* No art for this type: its code in the well, so the well is never blank. */
+        const int tw = h6_text_width(sml, c->code);
+        h6_print(rgba, W, H, sml, c->code, x + (H6_CELL_W - tw) / 2,
+                 y + (H6_CELL_H - sml->h) / 2);
+    }
+    if (frame) h6_blit(rgba, W, H, frame, 0, x + H6_FRAME_DX, y + H6_FRAME_DY);
+
+    /* 3. the name across the top of the window, then health and damage beside the
+     *    well. The name is fitted: a long one loses its tail rather than running into
+     *    the bezel, and the size of a multiple selection follows it. */
+    {
+        const int avail = H6_CARD_WIN_W - 2 * H6_CARD_NAME_X;
+        char name[48];
+        int n;
+        if (c->count > 1) sprintf(name, "%.32s  x%d", c->name, c->count);
+        else              sprintf(name, "%.40s", c->name);
+        /* The middle size first; a name that will not fit at that size drops to the
+           small one whole rather than losing its tail, so "Mobile Construction Yard"
+           stays a name and not a fragment. Only then is anything cut. */
+        const H6_Asset *nf = (h6_text_width(mid, name) > avail) ? sml : mid;
+        n = (int)strlen(name);
+        while (n > 0 && h6_text_width(nf, name) > avail) name[--n] = 0;
+        h6_print(rgba, W, H, nf, name, wx + H6_CARD_NAME_X,
+                 wy + H6_CARD_NAME_Y + (mid->h - nf->h) / 2);
+    }
+    x = wx + H6_CARD_TEXT_X;
+    if (lit && unlit && c->maxstr > 0) {
+        /* Whole segments, like the power meter: lit from the left, unlit after. The
+           rounding is UP so a unit that still has any health at all shows one lit
+           segment, which is the 1995 bar's one-pixel sliver in this vocabulary. */
+        const int segw = lit->w;
+        int on = (c->str * H6_CARD_BAR_SEGS + c->maxstr - 1) / c->maxstr;
+        if (on > H6_CARD_BAR_SEGS) on = H6_CARD_BAR_SEGS;
+        if (c->str <= 0) on = 0;
+        for (i = 0; i < H6_CARD_BAR_SEGS; i++)
+            h6_blit(rgba, W, H, i < on ? lit : unlit, 0,
+                    x + i * segw, wy + H6_CARD_BAR_Y);
+        h6_rotate_green(rgba, W, H, x, wy + H6_CARD_BAR_Y,
+                        x + on * segw, wy + H6_CARD_BAR_Y + lit->h, c->health_color);
+    }
+    sprintf(buf, "%d/%d", c->str < 0 ? 0 : c->str, c->maxstr < 0 ? 0 : c->maxstr);
+    h6_print(rgba, W, H, sml, buf, x, wy + H6_CARD_NUM_Y);
+    if (c->damage >= 0) sprintf(buf, "DMG %d", c->damage);
+    else                strcpy(buf, "UNARMED");
+    h6_print(rgba, W, H, sml, buf, x + 78, wy + H6_CARD_NUM_Y);
+    (void)hud640_asset(p, "font_big");
+
+    /* 4. the rest of the selection: a row of smaller wells, filled left to right, the
+     *    last one carrying "+N" when the row is too short for the selection */
+    for (i = 0; i < H6_CARD_MINIS && i < c->nmini; i++) {
+        const H6_CardMini *m = &c->mini[i];
+        x = wx + H6_CARD_MINI_X + i * H6_CARD_MINI_PITCH;
+        y = wy + H6_CARD_MINI_Y;
+        h6_blit(rgba, W, H, mini, m->frame, x, y);
+        if (c->overflow > 0 && i == c->nmini - 1) {
+            int tw;
+            sprintf(buf, "+%d", c->overflow);
+            tw = h6_text_width(sml, buf);
+            h6_print(rgba, W, H, sml, buf, x + (H6_CARD_MINI_W - tw) / 2,
+                     y + (H6_CARD_MINI_H - sml->h) / 2);
+        } else if (m->rgba) {
+            h6_blit_half(rgba, W, H, m->rgba, x + 2, y + 2);
+        }
+    }
+
+    /* 5. the ten control-group tabs, keyed the way the keyboard is: 1..9 then 0 */
+    for (i = 0; i < H6_CARD_TABS; i++) {
+        int f = c->group_frame[i];
+        x = i * H6_CARD_TAB_W;
+        y = H6_CARD_BODY_H;
+        if (f < 0) f = 0;
+        if (c->group_count[i] <= 0) f = 0;
+        h6_blit(rgba, W, H, tab, f, x, y);
+        /* The key in the top-left corner, clear of the tab's own left bevel (three
+         * columns) and top lip, the count centred on the row below it. */
+        sprintf(buf, "%d", (i + 1) % 10);
+        h6_print(rgba, W, H, sml, buf, x + 5, y + 4);
+        if (c->group_count[i] > 0) {
+            int tw;
+            sprintf(buf, "%d", c->group_count[i] > 99 ? 99 : c->group_count[i]);
+            tw = h6_text_width(sml, buf);
+            h6_print(rgba, W, H, sml, buf, x + (H6_CARD_TAB_W - tw) / 2,
+                     y + H6_CARD_TAB_H - 3 - sml->h);
+        }
+    }
 }

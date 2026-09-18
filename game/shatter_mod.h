@@ -912,7 +912,7 @@ static void shatter_draw(int pass, bool fadingPass)
                    reads as a slab being deleted; a settling one reads as rubble the
                    ground is taking back, and the terrain's own depth buffer does the
                    work -- the piece is progressively occluded by the hill it is lying
-                   on rather than dissolving in mid-air. the project owner asked for this by name on
+                   on rather than dissolving in mid-air. The requirement asked for this by name on
                    24 Aug 2026 after seeing the shrink.
                    The distance is the piece's own full height, so it is exactly buried
                    at the end whatever its size, plus a hair so nothing pokes through. */

@@ -39,6 +39,7 @@
 #include "lpath.h"
 #include "lui.h"
 #include "lupdate.h"
+#include "lzip.h"
 #include "pngwrite.h"
 
 #include <SDL.h>
@@ -150,21 +151,27 @@ typedef struct
  * anywhere, which is what --dir is for when it does not.
  * ------------------------------------------------------------------------ */
 
+/* dosmenu.pack, or an install record (lz_is_install). The record counts because an
+ * update replaces dosmenu.pack by renaming, and a kill between the two renames
+ * leaves the folder without one: a launcher that did not recognise its own folder
+ * then would never reach the recovery that puts it back. Finding a folder only
+ * decides where to READ: nothing is changed in one that lz_is_install refuses. */
 static int l_has_install(const char *dir)
 {
     char probe[1200];
     FILE *f;
     snprintf(probe, sizeof probe, "%s/dosmenu.pack", dir);
     f = fopen(probe, "rb");
-    if (!f)
-        return 0;
-    fclose(f);
-    return 1;
+    if (f) {
+        fclose(f);
+        return 1;
+    }
+    return lz_is_install(dir);
 }
 
 static void l_find_install(L_App *a)
 {
-    char cur[1024];
+    char cur[1024], own[1024];
     int level;
 
     if (a->dir[0] && l_has_install(a->dir))
@@ -173,10 +180,12 @@ static void l_find_install(L_App *a)
     if (!lp_self(cur, sizeof cur))
         snprintf(cur, sizeof cur, "./x");
     lp_dirname(cur);
+    snprintf(own, sizeof own, "%s", cur);
 
     /* Up to five levels: MacOS -> Contents -> C&C3D.app -> the folder, with one
      * spare. A miss leaves `dir` at the executable's own folder, which is where
-     * the error message will then say it looked. */
+     * the error message will then say it looked, and not at whatever folder five
+     * levels up the walk stopped in. */
     for (level = 0; level < 5; level++) {
         char before[1024];
         if (l_has_install(cur)) {
@@ -189,7 +198,7 @@ static void l_find_install(L_App *a)
             break; /* at the root: there is nowhere further up to look */
     }
     if (!a->dir[0])
-        snprintf(a->dir, sizeof a->dir, "%s", cur);
+        snprintf(a->dir, sizeof a->dir, "%s", own);
 }
 
 /* Read the whole of a file. Returns a NUL-terminated buffer the caller owns, or
@@ -390,13 +399,31 @@ static void l_layout(L_App *a)
  * off the plate on purpose, so it cannot press an edge button. */
 static void l_to_menu(const L_App *a, int wx, int wy, int *mx, int *my)
 {
+    /* NEVER DIVIDE BY THE SCALE WITHOUT LOOKING AT IT FIRST. l_layout is the only
+       writer of a->scale and it runs inside l_present, so on the very first pass of
+       the frame loop -- which polls events BEFORE anything is presented -- the scale
+       is still the zero the memset left. An integer divide by zero is not a wrong
+       answer on any machine this ships to; it is SIGFPE, and the app dies before it
+       has drawn a pixel.
+
+       That is the whole crash: double-clicking the app in Finder leaves the pointer
+       exactly where the window opens, so SDL has a mouse motion queued before the
+       first frame, and the launcher quit unexpectedly with no message. Starting it
+       with the pointer elsewhere -- or over SSH, with no pointer at all -- ran
+       perfectly, which is what made it look like a bad build rather than a bug.
+
+       main now lays out once before the loop as well, so these coordinates are right
+       on frame 0 rather than merely safe. This guard stays regardless: a divisor a
+       reader has to prove non-zero by tracing two call sites is a divisor that will
+       be zero again one day. */
+    const int sc = a->scale > 0 ? a->scale : 1;
     int fx = (int)(wx * a->px), fy = (int)(wy * a->py);
     if (fx < a->vpx || fy < a->vpy) {
         *mx = *my = -1000;
         return;
     }
-    *mx = (fx - a->vpx) / a->scale;
-    *my = (fy - a->vpy) / a->scale;
+    *mx = (fx - a->vpx) / sc;
+    *my = (fy - a->vpy) / sc;
 }
 
 static void l_present(L_App *a)
@@ -467,7 +494,7 @@ static void l_set_buttons(L_App *a)
         a->btn[i].disabled = 0;
     }
 
-    /* the project owner, 24 Aug 2026: "if theres a new version available the play button
+    /* Reported: "if theres a new version available the play button
      * should say Update". One button, two jobs, and the label is the only place
      * the difference shows: a second button that is usually inert would make the
      * common case look like the exceptional one. */
@@ -608,6 +635,16 @@ static void l_set_notes(L_App *a, const char *blob)
 static void l_activate(L_App *a, int item)
 {
     LU_Phase ph = a->up ? lu_phase(a->up) : LU_NOTCONFIGURED;
+
+    /* A DISABLED BUTTON IS DISABLED FOR THE KEYBOARD TOO. lui_button_hit refuses a
+       disabled button, so the MOUSE could never press one; Return, Enter and Space went
+       straight here and pressed it anyway. PLAY and EDITOR are disabled precisely while
+       an update is downloading, so the keyboard could leave the launcher mid-download --
+       the loop exits, the launcher execs the game, and the half-written update is
+       abandoned with nothing to finish it. Refused at the one place both paths pass
+       through rather than at the key handler, so a third caller cannot reintroduce it. */
+    if (item >= 0 && item < L_BTN_COUNT && a->btn[item].disabled)
+        return;
 
     switch (item) {
     case L_BTN_PLAY:
@@ -819,9 +856,40 @@ static void l_usage(void)
            "  --update         check and, if there is one, install it. No window.\n");
 }
 
+#ifdef __APPLE__
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+/* THE LOCAL NETWORK PROMPT, ASKED FOR HERE, while this window is the one on screen.
+ * macOS 15 asks once whether an app may talk to the local network, the first time the
+ * app sends to a local address. The game asks that question fullscreen, from a JOIN, and
+ * the answer to a dialog nobody saw is silence: the packet is dropped, the host never
+ * hears it, and the joiner is told the host did not answer (the first two real-network
+ * tests, 5 and 6 Sep 2026). One datagram to the subnet broadcast on the game browser's
+ * port, from the launcher, puts the dialog up here, windowed, before any game. Every
+ * browser drops it: wrong size, wrong magic. */
+static void mac_local_network_probe(void)
+{
+    struct sockaddr_in a;
+    int one = 1;
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &one, sizeof one);
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_port = htons(17420);
+    a.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    (void)sendto(fd, "CNC3D?", 6, 0, (struct sockaddr *)&a, sizeof a);
+    close(fd);
+}
+#endif
+
 int main(int argc, char **argv)
 {
     L_App a;
+#ifdef __APPLE__
+    mac_local_network_probe();
+#endif
     char err[512];
     char shot[1024];
     char path[1200];
@@ -874,9 +942,26 @@ int main(int argc, char **argv)
         scale = 1;
 
     l_find_install(&a);
+
+    /* AN UNFINISHED UPDATE IS FINISHED BEFORE ANYTHING IS READ, by a launcher that
+     * gets the install lock. lu_create takes it and undoes, or completes, whatever
+     * update was killed part way. Read first, the version would be that update's
+     * half-written claim, and the menu art could be missing or be the half of a pack
+     * that refuses to load, so the launcher would stop at the message below and never
+     * get this far again. Running this before the pack has been proven to load is
+     * safe because it changes nothing in a folder lz_is_install does not recognise as
+     * an install.
+     *
+     * NOT IN EVERY CASE. While another launcher holds the lock (one updating this
+     * folder at this moment, say), or while the undo is refused because something
+     * still has a file open, nothing is recovered here and the folder is read as it
+     * stands: the window says nothing about it, and --play starts the game over it. */
+    a.up = lu_create(a.dir, NULL);
     l_read_installed(&a);
+    lu_set_installed(a.up, a.version);
 
     if (play_now) {
+        lu_destroy(a.up); /* the lock belongs to the launcher, never to the game */
         if (!l_launch(a.dir, L_GAME_EXE, err, sizeof err)) {
             fprintf(stderr, "%s\n", err);
             return 1;
@@ -898,6 +983,7 @@ int main(int argc, char **argv)
                  "The launcher belongs in the same folder as the game, or inside "
                  "C&C3D.app in it.",
                  a.dir, err);
+        lu_destroy(a.up);
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "C&C 3D", msg, NULL);
         fprintf(stderr, "%s\n", msg);
         return 1;
@@ -920,7 +1006,6 @@ int main(int argc, char **argv)
                                   "install missing it still plays.");
     free(local_notes);
 
-    a.up = lu_create(a.dir, a.version);
     snprintf(a.status, sizeof a.status, " ");
 
     /* THE HEADLESS PATH, for the gate suite and for a support question that has to
@@ -999,6 +1084,13 @@ int main(int argc, char **argv)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    /* THE LAYOUT IS KNOWN BEFORE THE FIRST EVENT IS READ, not after the first frame is
+     * drawn. The loop below polls events first and presents last, and l_layout used to
+     * run only inside l_present -- so every event in the first pass was mapped through
+     * a scale and a viewport origin of zero. Once here, with the window and the GL
+     * context up, so the drawable size it asks for is the real one. */
+    l_layout(&a);
 
     /* Ask the host what it has, at once, so the answer is usually on screen before
      * the player has finished reading the changelog they already had. */

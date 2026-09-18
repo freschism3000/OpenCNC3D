@@ -1,0 +1,15 @@
+# THE REFINERY'S STORAGE STRIP, ONCE. The refinery's second texture book is a two-triangle
+# strip on the building's west corner that fills with yellow bands while a harvester
+# siphons. Baked without its node's pose (a 7-degree yaw and a 308-unit offset) the strip
+# stood 0.28 cells beside the copy the building already carries, so the refinery wore two
+# columns and only the wrong one filled. The gate runs this twice, with and without
+# --notexbook, renaming the shot between runs, at a tick where the Test Map's harvester
+# is unloading (stage 21): the book's pixels must change inside the corner column and
+# nowhere in the box the second column used to fill.
+tick 30
+look PROC 0
+zoom max
+tick 1020
+anims
+shot shots/procstrip.png
+quit

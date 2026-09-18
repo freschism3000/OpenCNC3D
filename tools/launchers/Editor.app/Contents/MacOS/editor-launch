@@ -2,7 +2,7 @@
 # ============================================================================
 #  Editor -- the mission editor, for testing whatever is currently being built.
 #
-#  the project owner asked for one app in playable/ that is ALWAYS the current thing, so that
+#  the requirement asked for one app in playable/ that is ALWAYS the current thing, so that
 #  testing never means "which binary did I actually just run?". Three rules keep
 #  that promise, and each of them exists because the obvious version of this
 #  launcher would quietly break it:

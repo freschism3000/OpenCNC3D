@@ -1,0 +1,4 @@
+tick 260
+rosterdump
+tick 20
+quit

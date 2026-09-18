@@ -1,0 +1,8 @@
+look MTNK 1
+zoom max
+lclickobj MTNK 1
+order 54 52 c
+tick 16
+efxdump
+shot shots/shell_x.png
+quit

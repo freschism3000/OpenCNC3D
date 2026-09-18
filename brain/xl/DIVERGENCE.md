@@ -216,10 +216,24 @@ except where noted):
   adjacency rule (DisplayClass, DLLExportClass and BuildingClass), because
   hooking only the cursor routines gives a green cursor and a click that is
   silently refused -- which is what the classic brain shipped for an hour
-  on 26 Aug 2026. `DisplayClass::CNC3D_BuildAnywhereHouses` is uint64_t
+ . `DisplayClass::CNC3D_BuildAnywhereHouses` is uint64_t
   here where the classic brain has unsigned: the 64-house phase widens
   every house mask, and this one would otherwise be found by a player at
   slot 32 rather than by a compiler.
+
+- PORTED 17 Sep 2026, by hand, the rally-point corrections the classic brain
+  took in `building.cpp`, `infantry.cpp` and `aircraft.cpp`. The barracks and
+  Hand of Nod arm of `BuildingClass::Exit_Object` assigns the exit cell as the
+  destination again and carries the rally in the soldier's own `ArchiveTarget`;
+  `InfantryClass::Per_Cell_Process` reads it back at the tether cut, so a
+  soldier leaves through the door before it turns for the rally instead of
+  walking out through the side of the hut. The cargo plane's drop in
+  `AircraftClass::Mission_Unload` sends a delivered vehicle (never a harvester)
+  to the airstrip's rally. `CNC3D_Can_Rally` refuses `STRUCT_HELIPAD`, whose
+  craft never leave it. The three sites are the same code in both trees
+  (the XL `Exit_Object` differs one line above, in how it takes the door
+  direction, and is otherwise unchanged); gate G249 measures the classic brain
+  and nothing yet measures the fork's copy.
 
 ## Pathfinder
 
@@ -371,3 +385,25 @@ changed by hand: `tiberiandawn/` is the directory this fork is allowed to differ
 so nothing asserts the two files are equal and a fix in one does not travel to the
 other. A big map is where a player is most likely to reach for that cheat, which is
 why the fork wanted it as much as the engine it forked from.
+
+## A missing theater archive no longer ends mission start
+
+`DisplayClass::Init_Theater` (display.cpp) copied the theater palette out of
+`MFCD::Retrieve("<THEATER>.PAL")` with no check on the answer, twice. When the
+theater archive is missing, zero length or damaged the lookup answers NULL and the
+copy is a NULL dereference inside `CNC_Start_Custom_Instance`, the crash any play
+folder assembled without its content/ archives met at every mission start. Both
+copies now zero the palette instead, and the first prints one
+`CNC3D|theater|` line for the host's log. With the archive present nothing changes.
+
+**This is NOT a divergence from the unforked engine.** It was fixed there first and
+ported here by hand, the same two guards and the same reporter, because `tiberiandawn/`
+is the directory this fork is allowed to differ in and a fix in one copy does not
+travel to the other. The fork's copy also gained the modification notice the licence
+asks for, which the unforked copy already carried for an earlier change.
+
+The same round guarded `common/mixfile.h` against a header it cannot believe (a
+negative entry count, or a table the file is too short to hold), which is where a
+damaged archive faulted once the palette copy no longer did. That file is in
+`common/`, so it is NOT a divergence at all: the fork's copy is the byte-identical
+copy `tools/check-xl-common.sh` demands, and it flowed here by that rule.

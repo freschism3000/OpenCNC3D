@@ -27,6 +27,12 @@ tools/win/editor-bundle-README.txt  text eol=crlf
 *.command  text eol=lf
 *.script   text eol=lf
 
+# The F5 panel's saved presets. Undeclared until now, which is how the tuned preset came
+# to be CRLF from one machine and LF from the other: a file the panel rewrites in full on
+# every SAVE is the worst possible shape for that drift, because each save from the other
+# platform arrives as a whole-file rewrite rather than as the handful of dials that moved.
+*.cfg      text eol=lf
+
 # Windows batch files are CRLF, because that is what they are.
 *.bat      text eol=crlf
 *.cmd      text eol=crlf

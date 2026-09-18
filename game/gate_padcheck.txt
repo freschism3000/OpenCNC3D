@@ -1,0 +1,23 @@
+# THE PAD NEVER BURIES A BUILDING, on a shipped base that used to prove otherwise.
+#
+# SCB07EC pre-places a GDI base on three levels of ground: a Barracks at (45,52) on
+# dead-flat 64, a Power Plant beside it at (47,51) whose ground reaches 87, a
+# Construction Yard at (43,49) whose apron's second row lies on the Barracks' north
+# edge, and a Refinery at (41,52) on 101. Under the old shared-corner rule the taller
+# pad won every corner two buildings touched, so the Barracks was drawn at its own 64
+# while its north edge read 76 and its east column 87: both quonset huts cut short
+# and the plate sliced. padcheck turns that into numbers: every standing building's
+# highest padded footprint corner against the ground its model is drawn on.
+#
+# The corner reads below are the Barracks' own south corners, which no neighbour
+# touches, and its east column, which the plant shares. They must agree, because the
+# building is one flat model and can only stand at one height.
+tick 10
+padcheck
+sbrraw 45 54
+sbrraw 46 54
+sbrraw 47 53
+look PYLE 0
+zoom 2
+shot shots/padcheck_scb07ec.png
+quit

@@ -133,8 +133,14 @@ function texture(ctx, ti, wrap, gdi) {
 
 /* -------------------------------------------------------------- geometry */
 /* geo.bin layout per asset: pos f32[9n] uv f32[6n] col u8[12n] tex i16[n]
- * mode u8[n] wrap u8[n]. Triangles are regrouped here by (pass, texture, wrap, mode)
- * so the whole model draws in a handful of calls in the renderer's own order. */
+ * mode u8[n] wrap u8[n] part u8[n]. Triangles are regrouped here by (pass, texture,
+ * wrap, mode) so the whole model draws in a handful of calls in the renderer's own
+ * order.
+ *
+ * THE NODE INDEX HAS TO TRAVEL WITH THE VERTEX. In the pack a part is a contiguous run
+ * of triangles and the renderer walks it with one monotone cursor; regrouping destroys
+ * the run, so the animation would have nothing to attach a node's matrix to. One byte
+ * per triangle, expanded to one per vertex here. */
 function buildMesh(asset) {
   const n = asset.tris, o = asset.off;
   if (!n) return { groups: [], verts: null };
@@ -144,6 +150,7 @@ function buildMesh(asset) {
   const tex = new Int16Array(GEO, o + n * 72, n);
   const mode = new Uint8Array(GEO, o + n * 74, n);
   const wrap = new Uint8Array(GEO, o + n * 75, n);
+  const part = new Uint8Array(GEO, o + n * 76, n);
 
   const bucket = new Map();
   for (let i = 0; i < n; i++) {
@@ -158,6 +165,7 @@ function buildMesh(asset) {
   const total = n * 3;
   const P = new Float32Array(total * 3), U = new Float32Array(total * 2);
   const C = new Uint8Array(total * 4);
+  const NODE = new Uint8Array(total);
   let w = 0;
   for (const g of groups) {
     g.first = w;
@@ -172,16 +180,17 @@ function buildMesh(asset) {
         C[w * 4 + 1] = col[i * 12 + k * 4 + 1];
         C[w * 4 + 2] = col[i * 12 + k * 4 + 2];
         C[w * 4 + 3] = col[i * 12 + k * 4 + 3];
+        NODE[w] = part[i];
         w++;
       }
     }
     g.count = g.tris.length * 3;
     delete g.tris;
   }
-  return { groups, P, U, C, count: total };
+  return { groups, P, U, C, node: NODE, count: total };
 }
 
-function upload(ctx, mesh) {
+function upload(ctx, mesh, posed) {
   const gl = ctx.gl;
   if (!mesh.vbo) {
     mesh.vbo = gl.createBuffer(); mesh.ubo = gl.createBuffer();
@@ -192,6 +201,13 @@ function upload(ctx, mesh) {
     gl.bufferData(gl.ARRAY_BUFFER, mesh.U, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, mesh.cbo);
     gl.bufferData(gl.ARRAY_BUFFER, mesh.C, gl.STATIC_DRAW);
+  }
+  // The rest pose is uploaded once; a posed frame overwrites it, and going back to the
+  // rest pose puts it back. One buffer either way, so nothing else in draw changes.
+  if (posed || mesh.wasPosed) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vbo);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, posed ? mesh.PA : mesh.P);
+    mesh.wasPosed = !!posed;
   }
   gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vbo);
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
@@ -228,8 +244,12 @@ const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
                          a[0] * b[1] - a[1] * b[0]];
 function norm(v) { const l = Math.hypot(...v) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
 
-function fit(asset) {
-  const [lo, hi] = asset.bbox;
+/* THE BOX A PLAYING MODEL NEEDS is not the box its rest pose needs: the MCV deploy rig
+ * ends its clip about 2.2x the size it starts it, and a camera framed on the rest pose
+ * loses the construction yard halfway through. anim.bbox is the whole clip's box, baked
+ * by the exporter. */
+function fit(asset, animated) {
+  const [lo, hi] = (animated && asset.anim && asset.anim.bbox) || asset.bbox;
   const c = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
   const r = Math.max(1, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2);
   return { c, r };
@@ -243,7 +263,7 @@ function draw(ctx, mesh, asset, cam, opt) {
   gl.clearColor(0, 0, 0, 0);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   if (!mesh || !mesh.groups.length) return;
-  const { c, r } = fit(asset);
+  const { c, r } = fit(asset, opt.posed);
   const d = cam.dist * r;
   const eye = [c[0] + d * Math.cos(cam.pitch) * Math.sin(cam.yaw),
                c[1] + d * Math.sin(cam.pitch),
@@ -254,7 +274,7 @@ function draw(ctx, mesh, asset, cam, opt) {
   gl.uniformMatrix4fv(u.uMvp, false, new Float32Array(mvp));
   gl.uniform1f(u.uShade, opt.shade ? 1 : 0);
   gl.uniform1f(u.uFlat, opt.wire ? 1 : 0);
-  upload(ctx, mesh);
+  upload(ctx, mesh, opt.posed);
   gl.depthMask(true); gl.disable(gl.BLEND);
   for (const pass of [0, 1]) {
     if (pass === 1) {
@@ -373,11 +393,170 @@ function card(a) {
 const esc = s => String(s).replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+/* ------------------------------------------------------------------ animation
+ *
+ * WHAT PLAYS, AND HOW FAST, IS THE GAME'S DECISION AND NOT THIS PAGE'S. Every number
+ * used below arrives in assets.json from tools/art/anim_rates.py, which is a
+ * transcription of the renderer's own structure_anim_frame and of the cartridge's
+ * per-StructType draw arms; the evidence for each one is in docs/animation-drivers.md.
+ * The only arithmetic here is the SHAPE of the walk, and the renderer does it the same
+ * way: wrap the counter by the segment, fold it if the arm folds, and lerp between the
+ * two baked frames either side of the result.
+ *
+ * The pack stores, per baked frame and per node, a 3x4 DELTA from the rest pose, row
+ * major, applied as v' = M * v + t in mesh units, plus one visibility byte per node per
+ * frame. A node the clip has not reached yet is ABSENT rather than sitting at its rest
+ * pose (the construction yard's pad is empty while the MCV is still unfolding), which is
+ * why a hidden node's triangles collapse to a point here rather than being drawn.
+ *
+ * A CLIP IS NOT ALWAYS A LOOP, and three of them are not walked by a clock at all: the
+ * war factory's is indexed by its door position, the SAM's by its launcher facing, the
+ * refinery rig's by the refinery's own unload stage. Those are swept at the rate the
+ * game moves them and held at each end; the sweep is the game's, the hold is this
+ * page's, and the panel says so rather than letting the difference pass. */
+let ANIMBUF = null, animFetch = null;
+const CLIPS = new Map();
+
+function loadAnim() {
+  if (animFetch) return animFetch;
+  animFetch = fetch(DATA + 'anim.bin').then(r => r.arrayBuffer())
+    .then(b => { ANIMBUF = b; return b; }).catch(() => null);
+  return animFetch;
+}
+
+/* The two views over anim.bin for one asset: nf*np 3x4 matrices, then nf*np bytes. */
+function clipOf(a) {
+  if (!ANIMBUF || !a.anim || a.anim.off === undefined) return null;
+  let c = CLIPS.get(a.id);
+  if (!c) {
+    const cells = a.anim.frames * a.anim.parts;
+    c = { mat: new Float32Array(ANIMBUF, a.anim.off, cells * 12),
+          vis: new Uint8Array(ANIMBUF, a.anim.off + cells * 48, cells) };
+    CLIPS.set(a.id, c);
+  }
+  return c;
+}
+
+const wrapf = (x, n) => { const v = x % n; return v < 0 ? v + n : v; };
+
+/* Seconds held at each end of a swept clip. THIS IS THE ONE NUMBER ON THIS PAGE THAT THE
+ * GAME DOES NOT SUPPLY, and it exists only because these three clips are not loops: a
+ * door that ran straight from open back to open would read as a door slamming. */
+const HOLD = { door: 1.0, sam: 0.6, procrig: 0.6, mcvrig: 1.0 };
+
+/* Forward, hold, back, hold. `hold` is this page's; the run is the game's rate. */
+function sweep(t, f0, f1, fps, hold) {
+  const n = Math.max(1, f1 - f0 - 1), run = n / fps;
+  let x = wrapf(t, 2 * run + 2 * hold);
+  if (x < run) return f0 + x * fps;
+  x -= run;
+  if (x < hold) return f0 + n;
+  x -= hold;
+  if (x < run) return f0 + n - x * fps;
+  return f0;
+}
+/* Once through, then hold at the end before it starts again. */
+function once(t, f0, f1, fps, hold) {
+  const n = Math.max(1, f1 - f0 - 1), run = n / fps;
+  const x = wrapf(t, run + hold);
+  return x < run ? f0 + x * fps : f0 + n;
+}
+
+function segmentsOf(a) {
+  const d = (a.anim && a.anim.driver) || null;
+  if (d && d.segments && d.segments.length) return d.segments;
+  return [{ name: 'clip', f0: 0, f1: (a.anim ? a.anim.frames : 0), plays: true, why: '' }];
+}
+
+/* The clip frame this model is on `t` seconds into playback. */
+function clipFrame(a, t, mode, segi) {
+  const an = a.anim;
+  if (!an || an.frames <= 1) return 0;
+  const d = an.driver || {};
+  const nf = an.frames;
+  if (mode === 'clip') {                       // the whole baked clip, end to end
+    const fps = 15 / (an.ticks_per_frame || 1);
+    return wrapf(t * fps, nf);
+  }
+  const segs = segmentsOf(a);
+  const seg = segs[Math.min(segi, segs.length - 1)];
+  const f0 = seg.f0, f1 = Math.min(seg.f1, nf), n = f1 - f0;
+  const fps = d.fps || 15;
+  if (n <= 1 || !seg.plays || d.plays === false) return f0;
+  switch (d.driver) {
+    case 'arm': {
+      const span = d.folded ? (n - 1) * 2 : n;
+      const x = wrapf(t * fps, span);
+      const f = (d.folded && x >= n) ? (n - 1) * 2 - x : x;
+      return f0 + Math.min(Math.max(f, 0), n - 1);
+    }
+    case 'door':
+    case 'sam':
+    case 'procrig': return sweep(t, f0, f1, fps, HOLD[d.driver]);
+    case 'mcvrig':  return once(t, f0, f1, fps, HOLD.mcvrig);
+    default:        return f0 + wrapf(t * fps, n);
+  }
+}
+
+/* How long one cycle of what is CURRENTLY selected takes. The driver table's own period
+ * is for the segment the game plays by default, and a viewer that has picked the other
+ * one would otherwise be told the wrong number. */
+function cycleSeconds(a, mode, segi) {
+  const an = a.anim, d = an.driver || {};
+  if (mode === 'clip') return an.frames / (15 / (an.ticks_per_frame || 1));
+  const segs = segmentsOf(a), seg = segs[Math.min(segi, segs.length - 1)];
+  const n = Math.min(seg.f1, an.frames) - seg.f0, fps = d.fps || 15;
+  if (n <= 1 || !seg.plays || d.plays === false) return 0;
+  const run = (n - 1) / fps;
+  switch (d.driver) {
+    case 'arm':     return (d.folded ? (n - 1) * 2 : n) / fps;
+    case 'door':
+    case 'sam':
+    case 'procrig': return 2 * run + 2 * HOLD[d.driver];
+    case 'mcvrig':  return run + HOLD.mcvrig;
+    default:        return n / fps;
+  }
+}
+
+/* Write the posed vertices into mesh.PA. Elementwise lerp of the two baked matrices is
+ * what the renderer does, and it is only valid because the baker resampled the tracks
+ * densely enough that consecutive frames are close: that is the baker's contract. */
+function poseMesh(mesh, a, frame) {
+  const c = clipOf(a);
+  if (!c || !mesh.node) return false;
+  const np = a.anim.parts, nf = a.anim.frames;
+  let f0 = Math.floor(frame);
+  if (!(f0 >= 0)) f0 = 0;
+  if (f0 > nf - 1) f0 = nf - 1;
+  const mix = Math.min(1, Math.max(0, frame - f0));
+  const f1 = Math.min(f0 + 1, nf - 1);
+  const M = mesh.M || (mesh.M = new Float32Array(np * 12));
+  const V = mesh.V || (mesh.V = new Uint8Array(np));
+  for (let p = 0; p < np; p++) {
+    const o0 = (f0 * np + p) * 12, o1 = (f1 * np + p) * 12;
+    for (let q = 0; q < 12; q++)
+      M[p * 12 + q] = c.mat[o0 + q] + (c.mat[o1 + q] - c.mat[o0 + q]) * mix;
+    V[p] = c.vis[f0 * np + p];
+  }
+  const P = mesh.P, PA = mesh.PA || (mesh.PA = new Float32Array(P.length));
+  const node = mesh.node;
+  for (let v = 0; v < mesh.count; v++) {
+    const p = node[v] < np ? node[v] : 0, i = v * 3;
+    if (!V[p]) { PA[i] = PA[i + 1] = PA[i + 2] = 0; continue; }
+    const m = p * 12, x = P[i], y = P[i + 1], z = P[i + 2];
+    PA[i]     = M[m]     * x + M[m + 1] * y + M[m + 2]  * z + M[m + 3];
+    PA[i + 1] = M[m + 4] * x + M[m + 5] * y + M[m + 6]  * z + M[m + 7];
+    PA[i + 2] = M[m + 8] * x + M[m + 9] * y + M[m + 10] * z + M[m + 11];
+  }
+  return true;
+}
+
 /* ------------------------------------------------------------------- detail */
 const detail = document.getElementById('detail');
 const view = document.getElementById('view');
 let vctx = null, vmesh = null, vcam = null, vspin = 0, vraf = 0;
-const vopt = { tex: true, shade: true, wire: false, gdi: false };
+const vopt = { tex: true, shade: true, wire: false, gdi: false, posed: false };
+const vplay = { on: false, mode: 'game', seg: 0, t: 0, frame: 0, last: 0, drag: false };
 
 function openDetail(a) {
   selected = a;
@@ -396,9 +575,72 @@ function openDetail(a) {
     a.code + ' · ' + a.category + ' · ' + a.tris + ' triangles';
   document.getElementById('dBody').innerHTML = infoHTML(a);
   for (const ti of a.tex) texture(vctx, ti, 0, false);
+  vplay.mode = 'game'; vplay.seg = 0; vplay.t = 0; vplay.frame = 0; vplay.last = 0;
+  vplay.on = !!(a.anim && a.anim.off !== undefined);
+  vopt.posed = false;
+  renderTransport(a);
+  if (a.anim && a.anim.off !== undefined)
+    loadAnim().then(() => { if (selected === a) renderTransport(a); });
   resize();
   loop();
 }
+
+/* ---------------------------------------------------------------- transport */
+const transport = document.getElementById('anim');
+const aPlay = document.getElementById('aPlay');
+const aScrub = document.getElementById('aScrub');
+const aRead = document.getElementById('aRead');
+const aMode = document.getElementById('aMode');
+const aSeg = document.getElementById('aSeg');
+
+function renderTransport(a) {
+  const an = a && a.anim;
+  transport.classList.toggle('show', !!an);
+  if (!an) return;
+  const ready = ANIMBUF && an.off !== undefined;
+  aScrub.max = Math.max(0, an.frames - 1);
+  aScrub.disabled = aPlay.disabled = aMode.disabled = !ready;
+  const segs = segmentsOf(a);
+  aSeg.innerHTML = '';
+  for (let i = 0; i < segs.length; i++) {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = segs[i].name + (segs[i].plays ? '' : ' (never played)');
+    aSeg.appendChild(o);
+  }
+  aSeg.value = String(Math.min(vplay.seg, segs.length - 1));
+  aSeg.style.display = (segs.length > 1 && vplay.mode === 'game') ? '' : 'none';
+  aSeg.disabled = !ready;
+  aMode.value = vplay.mode;
+  aPlay.textContent = vplay.on ? '‖' : '▶';
+  readTransport();
+}
+
+function readTransport() {
+  const a = selected, an = a && a.anim;
+  if (!an) return;
+  if (!ANIMBUF || an.off === undefined) {
+    aRead.textContent = an.frames + ' frames, loading…';
+    return;
+  }
+  const d = an.driver || {};
+  const bits = [Math.round(vplay.frame) + ' / ' + (an.frames - 1)];
+  if (vplay.mode === 'clip') {
+    bits.push((15 / (an.ticks_per_frame || 1)).toFixed(0) + ' fps (baked grid)');
+    bits.push(cycleSeconds(a, 'clip', 0).toFixed(2) + ' s a cycle');
+  } else if (d.plays === false || !segmentsOf(a)[vplay.seg].plays) {
+    bits.push('held: the game does not play this');
+  } else {
+    bits.push(fmtFps(d.fps) + ' fps');
+    const cyc = cycleSeconds(a, vplay.mode, vplay.seg);
+    if (cyc) bits.push(cyc.toFixed(2) + ' s a cycle');
+  }
+  aRead.textContent = bits.join('  ·  ');
+  if (!vplay.drag) aScrub.value = String(Math.round(vplay.frame));
+}
+
+const fmtFps = v => (Math.abs(v - Math.round(v)) < 0.005
+  ? String(Math.round(v)) : v.toFixed(2).replace(/0$/, ''));
 
 function infoHTML(a) {
   const t = [];
@@ -415,17 +657,48 @@ function infoHTML(a) {
   row('Cartridge mesh', esc(a.mesh));
   if (a.sections) row('Build sections', a.sections +
     ' <span class="pill">assembles piece by piece</span>');
-  if (a.anim) row('Animation', a.anim.frames + ' frames, ' +
-    a.anim.clips.map(c => c.t0 + '-' + c.t1 + (c.loop ? ' loop' : ' once')).join(', '));
+  if (a.anim) {
+    const d = a.anim.driver || {};
+    row('Animation', a.anim.frames + ' frames, ' + a.anim.parts + ' nodes, clip ' +
+      a.anim.clips.map(c => c.t0 + '-' + c.t1 + (c.loop ? ' loop' : ' once')).join(', '));
+    row('Plays at', d.plays === false ? 'nothing: it holds one frame'
+      : fmtFps(d.fps) + ' baked frames a second' +
+        (d.period ? ', ' + d.period.toFixed(2) + ' s a cycle' : ''));
+    row('Driven by', esc(d.fps_source || 'the pack’s baked grid') +
+      (d.cite ? ' <span class="pill">' + esc(d.cite) + '</span>' : ''));
+  }
   if (a.gdi) row('House palette', 'GDI variant present');
   t.push('</dl>');
   t.push('<div class="note">' + esc(a.provenance) + '.</div>');
-  // Say what this view is NOT, rather than let a still stand in for a clip.
-  if (a.anim)
-    t.push('<div class="note">This model carries a baked animation clip. The gallery ' +
-      'draws its rest pose; nothing here is playing, and which frame the game shows is ' +
-      'decided by the engine rather than by playback. The clip goes out with the FBX.' +
-      '</div>');
+  // Say exactly which rule is being played, and where it stops being the game's.
+  if (a.anim) {
+    const d = a.anim.driver || {};
+    t.push('<div class="note">' + esc(d.note || '') + '</div>');
+    if (d.hold)
+      t.push('<div class="note">In the game this model does not animate: ' +
+        esc(d.hold) + '. The transport still plays the clip so the art can be looked ' +
+        'at; switch it to <b>whole clip</b> to see all of it.</div>');
+    const idle = ['door', 'sam', 'procrig'].indexOf(d.driver) >= 0;
+    if (idle)
+      t.push('<div class="note">This clip is not indexed by a clock: the game picks a ' +
+        'frame from the door’s position, the launcher’s facing or the ' +
+        'refinery’s own unload stage. The page sweeps it at the rate the game ' +
+        'moves it and pauses at each end; the sweep is the game’s, the pause is ' +
+        'this page’s.</div>');
+    const dead = (d.segments || []).filter(sg => !sg.plays);
+    for (const sg of dead)
+      t.push('<div class="note">Frames ' + sg.f0 + ' to ' + (sg.f1 - 1) + ' are ' +
+        esc(sg.why || 'never reached by the game') + ', and the game never plays them. ' +
+        'They are in the clip and in the FBX.</div>');
+    const tl = (EXPORTS[a.code] || {}).fbx && EXPORTS[a.code].fbx.timeline;
+    if (tl)
+      t.push('<div class="note">The FBX puts every key on a whole frame: one baked ' +
+        'frame is ' + tl.spacing + ' timeline frame' + (tl.spacing === 1 ? '' : 's') +
+        ' at ' + tl.fps + ' fps' +
+        (tl.error_pct ? ', which is ' + Math.abs(tl.error_pct).toFixed(2) +
+         '% off this model’s exact rate because no whole rate expresses it' : '') +
+        '.</div>');
+  }
   if (a.modes.length && a.modes.every(m => m === 'shadow' || m === 'xlu'))
     t.push('<div class="note">Every triangle here draws in a blended pass: this is a ' +
       'SHADOW mesh, the flat plate the cartridge lays on the ground under something ' +
@@ -480,9 +753,23 @@ function resize() {
 
 function loop() {
   cancelAnimationFrame(vraf);
-  const tick = () => {
+  vplay.last = 0;
+  const tick = now => {
     if (!detail.classList.contains('show')) return;
+    // Real elapsed time, clamped so a backgrounded tab does not jump the clip forward
+    // by however long the page was hidden.
+    const dt = vplay.last ? Math.min(0.25, (now - vplay.last) / 1000) : 0;
+    vplay.last = now;
     if (vspin) vcam.yaw += 0.006;
+    vopt.posed = false;
+    if (selected && selected.anim && ANIMBUF && selected.anim.off !== undefined) {
+      if (vplay.on) {
+        vplay.t += dt;
+        vplay.frame = clipFrame(selected, vplay.t, vplay.mode, vplay.seg);
+      }
+      vopt.posed = poseMesh(vmesh, selected, vplay.frame);
+      readTransport();
+    }
     draw(vctx, vmesh, selected, vcam, vopt);
     vraf = requestAnimationFrame(tick);
   };
@@ -539,6 +826,30 @@ function closeDetail() {
     if (i < 0) return;
     openDetail(SHOWN[(i + d + SHOWN.length) % SHOWN.length]);
   };
+  const setPlay = on => {
+    vplay.on = on;
+    aPlay.textContent = on ? '‖' : '▶';
+  };
+  aPlay.onclick = () => setPlay(!vplay.on);
+  aMode.onchange = () => {
+    vplay.mode = aMode.value; vplay.t = 0; vplay.seg = 0;
+    renderTransport(selected); setPlay(true);
+  };
+  aSeg.onchange = () => {
+    vplay.seg = parseInt(aSeg.value, 10) || 0; vplay.t = 0;
+    readTransport();
+  };
+  // Scrubbing pauses: the counter and the slider are the same number, and letting both
+  // write it is how a scrub bounces back to wherever the clock had got to.
+  aScrub.addEventListener('pointerdown', () => { vplay.drag = true; setPlay(false); });
+  const endDrag = () => { vplay.drag = false; };
+  aScrub.addEventListener('pointerup', endDrag);
+  aScrub.addEventListener('pointercancel', endDrag);
+  aScrub.addEventListener('input', () => {
+    setPlay(false);
+    vplay.frame = parseFloat(aScrub.value) || 0;
+    readTransport();
+  });
   document.getElementById('dPrev').onclick = () => step(-1);
   document.getElementById('dNext').onclick = () => step(1);
   document.getElementById('dClose').onclick = closeDetail;
@@ -552,6 +863,17 @@ function closeDetail() {
     if (e.key === 'Escape') closeDetail();
     if (e.key === 'ArrowLeft') step(-1);
     if (e.key === 'ArrowRight') step(1);
+    if (e.key === ' ' && selected && selected.anim) {
+      e.preventDefault();
+      setPlay(!vplay.on);
+    }
+    if ((e.key === ',' || e.key === '.') && selected && selected.anim) {
+      setPlay(false);
+      const nf = selected.anim.frames;
+      vplay.frame = Math.min(nf - 1, Math.max(0,
+        Math.round(vplay.frame) + (e.key === '.' ? 1 : -1)));
+      readTransport();
+    }
   });
 })();
 
@@ -571,7 +893,7 @@ function crc32(buf) {
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 /* Store method, so no deflate implementation is needed and the archive stays
- * byte-checkable. Fixed timestamp (1 Jan 2026) so the same selection zips the same. */
+ * byte-checkable. Fixed timestamp so the same selection zips the same. */
 const DOSDATE = ((2026 - 1980) << 9) | (1 << 5) | 1;
 function zip(files) {
   const enc = new TextEncoder();

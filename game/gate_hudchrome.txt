@@ -6,6 +6,11 @@
 # column, and these plates are pinned to the WINDOW. The click fell through to the map and
 # the 1995 pointer was suppressed, so the cartridge's 3-D cursor drew in the world -- under
 # the sidebar overlay, which is literally "the cursor goes behind it".
+# THE UI SCALE IS PINNED AT 1x. Opening the dialog applies the dials, and the
+# shipped default is -2x, which halves this bar at 960 rows and moves every plate this
+# script probes by absolute pixel. The pixel-gate rule: pin every dial between the
+# geometry and the glass, or the gate measures the art direction.
+gfx ui_scale 0
 tick 20
 sbhit 160 17
 sbhit 800 17

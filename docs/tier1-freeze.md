@@ -101,7 +101,7 @@ categories and conflating them is how a record like this ages badly.
 
 **Network multiplayer.** Declared Tier 2 only in `docs/design-multiplayer.md` section 8 and
 `docs/tier1-gap.md:20`, and the menu already refuses the click (`menu/dosmenu.c:62`,
-`tier1/t1_menu.c:103`). The declaration was made on 30 Aug 2026 at 12:17 UTC and the first
+`tier1/t1_menu.c:103`). The declaration was made at 12:17 UTC and the first
 `net/` file landed at 21:10 the same day, so it preceded the netcode **by nine hours**. It
 did precede it. It is not a long standing precedent, and the record should not imply one.
 
@@ -215,7 +215,7 @@ Two smaller things also owed, both found while writing this and neither belongin
 branch:
 
 - `tools/win98/mkterrain.py` does not understand `CNC3DPKF` v15, so Tier 1 cannot consume any
-  pack baked since 26 Aug 2026.
+  pack baked.
 - The wrong invariant comment at `tier1/w98_glidegame.c:1766-1770`.
 
 ---
@@ -240,11 +240,11 @@ down so that the decision to leave it undone stays a decision.
 
 Kept because each was believed by somebody competent and will be believed again:
 
-- `docs/win98-port.md:33` sizes the parked Tier 2 renderer seam at "12,646 lines". That was
-  true on 19 Aug 2026. `game/cnc_eyes.cpp` is **26,216 lines** today, so the parked work is
+- The Win98 port notes sized the parked Tier 2 renderer seam at "12,646 lines". That was
+  true when the port was written. `game/cnc_eyes.cpp` is **26,216 lines** today, so the parked work is
   roughly twice as expensive as the record says.
 - `docs/design-xl-brain.md:74` describes a length prefixed pack format as future work. It
-  shipped on 26 Aug 2026 as `CNC3DPKF` v15.
+  shipped as `CNC3DPKF` v15.
 - `docs/tier1-gap.md:40` still lists VI output gamma as Tier 1's one real loss with its Glide
   answer "not written". Nothing in `tier1/` implements it: there is no `grGammaCorrectionValue`
   anywhere and no occurrence of "gamma" in any `tier1/*.c`. It is unbuilt on both sides.

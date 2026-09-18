@@ -1,0 +1,37 @@
+# THE SLOT DIALOG. Save Mission, Load Mission and Delete Mission from the pause dialog,
+# each through the 1995 LoadOptionsClass box (loaddlg.cpp) as dosopt.c draws it, driven by
+# the same clicks a hand makes. `opttype` with no text clears the field with backspaces;
+# `optrow N` presses the Nth visible row of the list. The SLOTS|open readouts are what the
+# gate reads: the rows, the field, and whether the action button is live.
+tick 300
+objdump
+options
+optclick Save Mission
+shot shots/sl/save_open.png
+opttype
+opttype Alpha base 1
+shot shots/sl/save_typed.png
+optclick Save
+slots
+options
+optclick Save Mission
+optrow 1
+opttype
+opttype Second save
+optclick Save
+slots
+tick 200
+objdump
+options
+optclick Load Mission
+shot shots/sl/load_open.png
+optclick Load
+objdump
+options
+optclick Delete Mission
+optclick Delete
+shot shots/sl/delete_ask.png
+optclick Yes
+slots
+optclick Resume Mission
+quit

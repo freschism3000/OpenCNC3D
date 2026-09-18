@@ -130,11 +130,85 @@ Match, and the update is 15 MB. Differ, or unknown, and it is the whole package.
   extraction rather than being sanitised
 - **Zip64** is refused rather than misread
 - the **unix permission bits** are honoured, so the game binary keeps its executable bit
-- the running launcher is stepped aside **only if the zip actually carries a replacement**
+- whether the zip is **wrapped in a folder**, read off the archive: the binary-only zip is
+  flat on macOS and wrapped on Windows
+
+### Unpacking over a folder that is in use
+
+On Windows the launcher has its own `.exe` and `SDL2.dll` loaded from the folder it is
+updating, and Windows will not open either for writing. So the extractor:
+
+- **never rewrites a file that is already identical**: same size and same CRC-32 as the
+  zip's entry, and it is left alone
+- **writes a changed file beside itself** as `<name>.cnc3d-new`, checks it, and only then
+  renames the old one to `<name>.old` and the new one into place, which Windows allows for
+  a loaded DLL or a running `.exe`. **A name never holds a half-written file**, so a kill
+  cannot leave a partial launcher, `SDL2.dll` or `dosmenu.pack`, or a macOS launcher
+  without its executable bit. A file that cannot be renamed **fails the update by name**
+- **journals every step before taking it**, in `cnc3d-update.journal` in the game folder,
+  and forces each journal line and each new file to the disk before the step that rests on
+  it
+- **puts everything back if any entry fails**, so a failed update leaves the folder as it
+  was rather than a new game beside an old engine. A new copy something still holds is
+  renamed out of the way rather than removed, because on Windows a removal while a scanner
+  has the file open leaves its name taken; if even the rename is refused the error says so,
+  the old copy keeps its `.old` name, and the next start puts it back from the journal
+- **checks every file it writes** against the CRC-32 and size the zip records, so a damaged
+  download is refused even when the release publishes no SHA-256
+- writes **`BUILD-ID.txt` after every other entry, then the site's changelog and the
+  install record** it makes itself, all inside the journal, whatever order the zip lists
+  them in, so a half-finished update never claims the new version
+- when it starts, **finishes an update that was killed** part way, from its journal,
+  **before it reads the installed version or loads anything**, then removes the old copies
+  a finished update could not remove at the time, **by the names its journal kept** in
+  `cnc3d-update.done`, and a leftover download. The folder is still recognised by its
+  install record when `dosmenu.pack` is between its two renames
+- **holds a lock on the game folder** for as long as the launcher runs, so a second
+  launcher on the same folder neither recovers nor updates until the first has gone
+
+### What the launcher will change, and where
+
+- **Only an install.** A folder is one when it holds `cnc3d-install.txt` as a plain file,
+  whatever it says, which both packagers write into every package (or, for the moment an update is
+  replacing that record, when the journal names it as stepped aside and the stepped-aside
+  copy is there). The lock is refused anywhere else, and recovery, the download and the
+  extraction all need the lock, so a launcher copied into a Downloads or home folder, or
+  pointed at one with `--dir`, reads what it can and changes nothing. A journal or a
+  `dosmenu.pack` alone does not make a folder an install.
+- **Only named files.** The launcher removes nothing it did not write except the copies an
+  update's journal records that update making, each by the exact name its line gives:
+  `<name>.old<n>` for the file it stepped aside or the undo's spare, `<name>.cnc3d-new`
+  for its new copy, and only while `<name>` itself exists. Each of those names was free
+  when its line was written, and an update fails, naming the file, rather than take a
+  `<name>.cnc3d-new` that is already there. There is no search of the folder by pattern,
+  so a player's own `cnc3d.old` or `notes.txt.old` is never touched, beside a shipped
+  file or not.
+- **Only inside.** Every path is the install folder plus a name that is not absolute,
+  names no drive or stream and has no `..`, reached through real folders: a journal line,
+  or a zip entry, whose way down passes a symbolic link or a junction is not acted on (an
+  update naming one fails). A link on a file's own name is renamed or removed as a link,
+  never written through, and a file with a second hard link has its mode left alone.
+
+Outside the launcher: the macOS app (`mac_launch.c`) never starts the game while a
+journal is in the folder, and still recognises the folder while the journal says one of
+the files it looks for is between its two renames. The Windows installer renames an
+unfinished journal to `cnc3d-update.done` before it writes anything, since the launcher
+cannot tell a reinstalled file from one the killed update wrote. On Windows the launcher
+carries a manifest that makes its narrow file APIs UTF-8 (Windows 10 1903 and later),
+because its install folder is inside the user's own folder.
+
+The launcher doing an update is the one already installed, and launchers up to v0.6.11
+write in zip order, write the install record wherever the zip lists it, and stop at the
+first refusal, which is always `SDL2.dll`. So the Windows full package ends
+`CHANGELOG.txt`, `cnc3d-install.txt`, `BUILD-ID.txt`, `SDL2.dll`; the binary-only zip is
+flat and ends `BUILD-ID.txt`, `SDL2.dll`; and `tools/release.sh` refuses a Windows zip of
+any other shape, or whose `SDL2.dll` is not the one pinned in
+`tools/win/setup-toolchain.sh`.
 
 `tools/launcher/selftest.sh` exercises all of it against a fake site that speaks the real
-three routes, including the 302, in both the with-manifest and without-manifest cases.
-Three of those behaviours are there because that test caught them going wrong.
+three routes, including the 302, in the with-manifest, without-manifest and wrapped-zip
+cases, with on-disk stand-ins for files Windows would refuse to write. Several of those
+behaviours are there because that test caught them going wrong.
 
 ## The Windows installer
 

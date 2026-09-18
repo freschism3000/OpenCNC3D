@@ -346,6 +346,33 @@ void Fill_In_Data(void)
  *=============================================================================================*/
 void Clear_Scenario(void)
 {
+    /*
+    **	CNC3D lockstep: put the SYNCHRONISED simulation stream back where a freshly
+    **	launched process holds it, because nothing else in the DLL ever does.
+    **
+    **	Scen.RandomNumber is written in exactly two places, both inside Init_Random
+    **	(init.cpp), and Init_Random is never reached in the DLL: it sits inside
+    **	Select_Game, which returns early when RunningAsDLL. The design leans on that,
+    **	and correctly, to conclude that no seed has to cross the wire -- every peer
+    **	holds RandomClass(0). What the reasoning missed is that it holds RandomClass(0)
+    **	only for the FIRST scenario a process runs. Clear_Scenario resets every heap and
+    **	every subsystem and does not touch this generator, so a second scenario in the
+    **	same process inherits the stream exactly where the first one left it.
+    **
+    **	That is a desync waiting for a lobby. Today a match is armed from the command
+    **	line and is therefore always a process's first scenario, so both peers really do
+    **	start at 0. The moment a player can host from the menu after finishing a
+    **	skirmish, that player's stream is hundreds of draws along and a freshly launched
+    **	joiner's is at zero, and the two simulate different worlds from the first tick
+    **	with no cause the alarm can name.
+    **
+    **	Gated, because outside a match this changes what the second mission of a session
+    **	rolls, and the 1995 answer is the default here as everywhere else.
+    */
+    if (CNC3D_Lockstep) {
+        Scen.RandomNumber = RandomClass(0);
+    }
+
     EndCountDown = TICKS_PER_SECOND * 30;
     CrateCount = 0;
     CrateTimer = 0;

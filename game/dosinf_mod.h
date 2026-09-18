@@ -50,6 +50,27 @@ struct DosStrip {
        DOS ones -- carries its own, so infantry_quad_size puts the same sized man on the
        ground out of a much bigger cell. */
     float tpu;
+    /* WHERE THE CELL SITS AGAINST THE MAN'S OWN ANCHOR, in this strip's own texels.
+       `drop` is how far the cell's BOTTOM ROW falls below his ground line, `ox` how far
+       the cell's CENTRE lies right of his anchor column. The draw stands the ground line
+       on the terrain rather than the cell's bottom edge, centres the card on the anchor
+       rather than on the cell, and lays the `drop` rows below the line flat on the
+       ground in front of him rather than sinking them into it, where the terrain's
+       depth would hide them and, the card leaning back at the camera pitch, his boots
+       and shins with them.
+
+       BOTH ARE ZERO FOR THE PACK'S OWN STRIPS and nothing about them changes: the 1995
+       baker already unifies every action of a type onto one feet line and one centre, so
+       cell bottom IS ground line there. The Remastered art does not. Each of its frames
+       is a tight crop of a logical canvas that is constant per type, and an attack pose's
+       crop reaches far below the feet because the muzzle flash, the flame jet and the
+       rocket exhaust are drawn INTO the frame. Standing that crop's bottom row on the
+       terrain lifts the whole man by the overhang, and the overhang is large: measured on
+       a real install, E1's prone-firing crop bottom is 39 logical rows below his standing
+       one, E3's standing fire 28, E4's standing flame 47 and RMBO's prone fire 49. At
+       these strips' scale that is between a third and a half of the man's own height --
+       which is what "the attacking sprites are jumping up" was. */
+    float ox, drop;
     GLuint gl;
 };
 

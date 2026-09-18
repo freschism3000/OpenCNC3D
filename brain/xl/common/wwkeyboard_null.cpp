@@ -1,5 +1,5 @@
 //
-// CNC3D — null keyboard backend for the headless "brain" build.
+// CNC3D: null keyboard backend for the headless "brain" build.
 //
 // Vanilla Conquer's remaster library (commonr) is already headless for audio and video:
 // COMMONR_SRC pulls in soundio_null.cpp and video_null.cpp. The one thing it hardcodes is

@@ -27,6 +27,13 @@ WHAT IS IN IT
 Click a thumbnail to open a model. Drag to orbit, wheel to zoom, shift+drag to
 pan, left/right arrows to step through the category, Esc to close.
 
+24 models carry an animation and play it. The bar under the model has play and
+pause (space), a frame scrubber (, and . step one frame) and two rules to play
+by: GAME DRIVER runs the clip the way the game runs it, at the speed the game
+runs it, and WHOLE CLIP runs the whole thing at the pack's own 15 frames a second
+so you can see the parts the game never plays. Where a building's clip has more
+than one animation in it, a second dropdown picks which.
+
 The buttons under the model:
 
   textured       the cartridge's own texture sheets on or off
@@ -54,9 +61,12 @@ Both ask for a format:
 
   FBX 7.4 binary (default)  Keeps the node hierarchy and the cartridge's own
                             pivots, so a turret still rotates about the point
-                            the game rotates it about. Blender reads binary FBX
-                            only. This is the format to use if a model is going
-                            to an artist and coming back.
+                            the game rotates it about, and the animation as real
+                            curves with every key on a whole frame. The file
+                            declares the frame rate the game plays that model at,
+                            so the timeline plays at the right speed. Blender
+                            reads binary FBX only. This is the format to use if
+                            a model is going to an artist and coming back.
   OBJ + MTL                 Universal. Carries no pivots: a turret arrives as
                             loose geometry.
   glTF 2.0                  Web-native, with the baked vertex colours as COLOR_0
@@ -74,6 +84,14 @@ The models are dark. That is correct: the cartridge bakes its shading into the
 vertex colours and a vehicle averages about RGB 60. The gallery lightens the
 BACKDROP rather than the model, so what you see is the game's own colour.
 
-Nothing here is animated. 22 models carry a real animation clip and the gallery
-draws their rest pose; the panel says so on those models. The clip does go out
-with the FBX.
+Two buildings hold still on purpose: the Advanced Guard Tower and the Hand of
+Nod's globe. That is not a missing feature. On the cartridge neither one has an
+animation rate to advance its counter by, so the game can only ever show their
+first frame, and the panel says so. Switch the bar to WHOLE CLIP to see the rest
+of the art anyway.
+
+Three more are swept rather than played: the war factory picks its frame from the
+door's position, the SAM site from its launcher's facing, and the refinery rig
+from the refinery's own unload stage. None of those is a clock, so the viewer runs
+them forward and back at the rate the game moves them and pauses at each end. The
+speed is the game's; the pause is the viewer's.

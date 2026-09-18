@@ -8,16 +8,31 @@
  * State.
  * ------------------------------------------------------------------------ */
 
+int do_row_playable(const DO_State *st, int index)
+{
+    if (!st || !st->list || index < 0 || index >= st->count)
+        return 0;
+    return st->list[index].header ? 0 : 1;
+}
+
 void do_state_init(DO_State *st, const DO_Mission *list, int count)
 {
+    int i;
     if (!st)
         return;
     memset(st, 0, sizeof *st);
     st->list = list;
     st->count = count;
-    st->selected = count > 0 ? 0 : -1;
     st->top = 0;
     st->pressed = DO_HIT_NONE;
+    for (i = 0; i < count; i++)
+        if (list[i].header)
+            st->grouped = 1;
+    /* The selection opens on the first MISSION, which under a heading is row 1. A
+       heading can never be the selection: nothing could be played from it. */
+    st->selected = -1;
+    for (i = 0; i < count; i++)
+        if (!list[i].header) { st->selected = i; break; }
 }
 
 static void do_show_selected(DO_State *st)
@@ -34,15 +49,45 @@ static void do_show_selected(DO_State *st)
 
 void do_move(DO_State *st, int delta)
 {
-    if (!st || st->count <= 0)
+    int want, dir;
+    if (!st || st->count <= 0 || st->selected < 0 || delta == 0)
         return;
-    st->selected += delta;
+    want = st->selected + delta;
     /* No wrap. A list this long is walked, not cycled, and the 1995 ListClass
      * (list.cpp:329-352) clamps at both ends rather than wrapping. */
-    if (st->selected < 0)
-        st->selected = 0;
-    if (st->selected >= st->count)
-        st->selected = st->count - 1;
+    if (want < 0)
+        want = 0;
+    if (want >= st->count)
+        want = st->count - 1;
+    /* A heading is not a stop: carry on in the direction of travel until a mission
+       row is under the cursor, and if there is none that way (the list opens on a
+       heading, say) stay put rather than land on something unplayable. */
+    dir = delta > 0 ? 1 : -1;
+    while (want >= 0 && want < st->count && st->list[want].header)
+        want += dir;
+    if (want < 0 || want >= st->count)
+        return;
+    st->selected = want;
+    do_show_selected(st);
+}
+
+void do_move_home(DO_State *st)
+{
+    int i;
+    if (!st || st->count <= 0)
+        return;
+    for (i = 0; i < st->count; i++)
+        if (!st->list[i].header) { st->selected = i; break; }
+    do_show_selected(st);
+}
+
+void do_move_end(DO_State *st)
+{
+    int i;
+    if (!st || st->count <= 0)
+        return;
+    for (i = st->count - 1; i >= 0; i--)
+        if (!st->list[i].header) { st->selected = i; break; }
     do_show_selected(st);
 }
 
@@ -83,7 +128,8 @@ int do_hit_test(const DO_State *st, int mx, int my)
     if (in_rect(mx, my, DO_LIST_X, DO_LIST_Y, DO_LIST_W, DO_LIST_H)) {
         row = (my - DO_LIST_Y) / DO_ROW_H;
         ix = st->top + row;
-        if (ix >= 0 && ix < st->count)
+        /* A heading answers as nothing, the way a disabled gadget does. */
+        if (ix >= 0 && ix < st->count && !st->list[ix].header)
             return ix;
     }
     return DO_HIT_NONE;
@@ -109,7 +155,7 @@ void do_draw(DB_Surface *s, const DB_Pack *p, const DO_State *st)
 {
     const DB_Font *grad;
     unsigned char fp[16], fpsel[16], fpdim[16];
-    int i, row, y, tx;
+    int i, row, y, tx, nx;
 
     if (!s || !p || !st)
         return;
@@ -141,6 +187,15 @@ void do_draw(DB_Surface *s, const DB_Pack *p, const DO_State *st)
         m = &st->list[i];
         y = DO_LIST_Y + row * DO_ROW_H;
 
+        /* A SECTION HEADING: bright, flush left, no fill, never the selection. The
+           bright ramp is what the selected row prints in, so a heading reads as a
+           label and not as a greyed-out mission. */
+        if (m->header) {
+            db_print(s, grad, m->name ? m->name : "", DO_LIST_X + 3, y, fpsel,
+                     DB_FONT6_XSPACING);
+            continue;
+        }
+
         /* list.cpp:236-243 fills the selected line and prints it bright. */
         if (i == st->selected) {
             db_fill_rect(s, DO_LIST_X, y, DO_LIST_X + DO_LIST_W - 1, y + DO_ROW_H - 1,
@@ -150,10 +205,17 @@ void do_draw(DB_Surface *s, const DB_Pack *p, const DO_State *st)
             pal = fp;
         }
 
-        db_print(s, grad, m->nod ? "NOD" : "GDI", DO_LIST_X + 3, y, pal,
-                 DB_FONT6_XSPACING);
+        /* Under a heading the side is already said, so the row is indented instead
+           of prefixed; a flat list (the user maps) keeps its GDI/NOD column. */
+        if (st->grouped) {
+            nx = DO_LIST_X + 14;
+        } else {
+            db_print(s, grad, m->nod ? "NOD" : "GDI", DO_LIST_X + 3, y, pal,
+                     DB_FONT6_XSPACING);
+            nx = DO_LIST_X + 28;
+        }
         if (m->name && *m->name) {
-            db_print(s, grad, m->name, DO_LIST_X + 28, y, pal, DB_FONT6_XSPACING);
+            db_print(s, grad, m->name, nx, y, pal, DB_FONT6_XSPACING);
             /* The scenario code, right aligned: what the player types into a bug
              * report, and dim so it does not compete with the title. */
             tx = DO_LIST_X + DO_LIST_W - 3 - db_string_width(grad, m->scen,
@@ -163,7 +225,7 @@ void do_draw(DB_Surface *s, const DB_Pack *p, const DO_State *st)
         } else {
             /* No title anywhere in the data, so the code IS the name and stands in the
              * title column at full strength rather than being printed twice. */
-            db_print(s, grad, m->scen, DO_LIST_X + 28, y, pal, DB_FONT6_XSPACING);
+            db_print(s, grad, m->scen, nx, y, pal, DB_FONT6_XSPACING);
         }
     }
 

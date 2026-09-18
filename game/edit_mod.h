@@ -5,7 +5,7 @@
  *
  *  The editor was prototyped in a browser, which settled its design and -- far more
  *  valuably -- derived every placement rule against the cartridge and proved each one.
- *  What it could never be is the thing the project owner asked for: a native Windows and Mac
+ *  What it could never be is the thing the requirement asked for: a native Windows and Mac
  *  application where pressing Play starts the mission in the SAME window. That is what
  *  this is. docs/design-map-editor.md carries the rules and the measurements; this file
  *  carries none of the reasoning, only the code.
@@ -101,7 +101,7 @@ static bool g_editOn      = false;   /* --edit was given                        
      - the DOCUMENT grid: the pack's own cell dims, g_gridW x g_gridH.
      - the INI CELL stride: a mission file's flat cell numbers are y*64+x for a legacy
        map and y*128+x when [MAP] says Version=1 -- the engine's own rule for that format.
-   They are named apart because they are different facts, and on 27 Aug 2026 they stopped
+   They are named apart because they are different facts, and they stopped
    being the same NUMBER as well: the storage ceiling went to 256 and the file stride did
    not, because it cannot. A big map's cell numbers are y*128+x in every file that already
    exists and in the engine that reads them, so deriving the stride from the ceiling would
@@ -458,7 +458,7 @@ static bool edit_bin_parse_sparse(const unsigned char* raw, size_t n)
     }
     /* A sparse .BIN is the 128-wide format and says so nowhere, so the document it
        produces is 128 square -- the FORMAT's size, never this build's storage ceiling.
-       These read C3D_MAP_MAX until 27 Aug 2026, which was the same number by accident. */
+       These read C3D_MAP_MAX, which was the same number by accident. */
     g_editBinW = C3D_INI_STRIDE;
     g_editBinH = C3D_INI_STRIDE;
     return true;
@@ -3754,7 +3754,7 @@ static void eui_draw_openlist(const EuiLayout* L, float lx, float ly, float lw, 
     const float S = L->s;
     if (!g_mapListBuilt) edit_build_maplist();
 
-    /* The two tabs the project owner asked for, here and in the game's own map lists. */
+    /* The two tabs the requirement asked for, here and in the game's own map lists. */
     {
         static const char* TB[2] = { "USER MAPS", "OFFICIAL MAPS" };
         const float tw = (lw - 6 * S) * 0.5f;
@@ -12077,7 +12077,7 @@ static void edit_draw_horizon(int fbw, int fbh)
        centre row plus the tangent of the pitch over the half-field. Clamped so a steep
        look still paints the whole window rather than nothing. */
     const float p = n64_pitch();
-    const float halfFov = (N64_FOVY_DEG * 0.5f) * 0.0174533f;
+    const float halfFov = (cam_fovy_deg() * 0.5f) * 0.0174533f;
     float hy = (float)fbh * 0.5f * (1.0f + tanf(p) / tanf(halfFov));
     if (hy < 0.0f) hy = 0.0f;
     if (hy > (float)fbh) hy = (float)fbh;
@@ -13349,7 +13349,7 @@ static void edit_set_mode(int m)
 
 
 /* ------------------------------------------------------------------------------------
- *  THE EDITOR CAMERA -- Unreal's, as the project owner asked for
+ *  THE EDITOR CAMERA -- Unreal's, as the requirement asked for
  *
  *      right mouse held + move    look around
  *      W A S D                    fly, relative to where you are looking

@@ -20,6 +20,20 @@
 #   gate_lockstep.c     a standalone GATE binary: it drives the lockstep turn scheduler
 #                       with no sockets and no engine. Same category as gate_optlayout.c.
 #   gate_netloop.c      the same scheduler again over real loopback datagrams. Standalone.
+#   gate_roomcode.c     the room code -- a relayed host's whole address -- exhaustively,
+#                       with no socket involved at all. roomcode.c ITSELF is in the
+#                       Windows build; only its gate is not.
+#   gate_tunnel.c       the relayed transport against a relay it runs itself, so the
+#                       internet path is tested with no relay server and no second
+#                       machine. Standalone, same category.
+#   gate_beacon.c       a standalone GATE binary: it announces a game on the LAN and
+#                       browses for it with no game running at all. Standalone.
+#   gate_lobby.c        a standalone GATE binary: it drives the lobby state machine end
+#                       to end -- host, seat, ready, start, kick. Standalone.
+#   gate_rminf.cpp      a standalone GATE binary: it re-derives the Remastered infantry
+#                       placement from the player's own install, with no window and no
+#                       GL. THE ONE .cpp ON THIS LIST, which is why the pattern below
+#                       carries a second alternative rather than only a .c one.
 #   netcheck.c          the two peer connectivity tool a person runs BY HAND before
 #                       blaming the game for a match that will not start. Standalone, and
 #                       deliberately not shipped inside either binary.
@@ -29,7 +43,7 @@ cd "$(dirname "$0")/../.."
 . tools/win/sources.sh
 
 win_list=$(for f in $WIN_GAME_C $WIN_MENU_C $WIN_VIDEO_C $WIN_AUDIO_C $WIN_APP_C \
-                    $WIN_NET_C $WIN_EYES_CPP $WIN_APP_CPP; do basename "$f"; done | sort -u)
+                    $WIN_NET_C $WIN_HTTP_C $WIN_EYES_CPP $WIN_APP_CPP; do basename "$f"; done | sort -u)
 
 # What the Mac scripts actually compile. Both scripts name their sources as paths with a
 # .c or .cpp on the end, so pulling those out of the text is exact rather than a guess.
@@ -42,7 +56,7 @@ mac_list=$( { grep -oE '\.\./[a-z]+/[a-zA-Z0-9_]+\.(c|cpp)|(^|[ 	])[a-zA-Z0-9_]+
                   | grep -E '^[a-z0-9]+$' | sed 's/$/.c/'
               # audio_sdl.c is compiled on its own line in game/build.sh, not via AUDIO.
             } | xargs -n1 basename 2>/dev/null | sort -u \
-                | grep -vE '^(audio_null|playvqa|gate_optlayout|gate_lockstep|gate_netloop|netcheck)\.c$' )
+                | grep -vE '^(audio_null|playvqa|gate_optlayout|gate_lockstep|gate_netloop|gate_tunnel|netcheck|gate_beacon|gate_lobby|gate_roomcode|gate_mpbrowse)\.c$|^gate_rminf\.cpp$' )
 
 missing=$(comm -13 "$(echo "$win_list" > /tmp/.w$$; echo /tmp/.w$$)" \
                    "$(echo "$mac_list" > /tmp/.m$$; echo /tmp/.m$$)")
@@ -82,7 +96,7 @@ fi
 nested=$(grep -ohE '\.\./[a-z0-9_]+/[a-zA-Z0-9_]+/[a-zA-Z0-9_]+\.(c|cpp)' \
                 app/build.sh game/build.sh 2>/dev/null | grep -v '^\.\./brain/host/' | sort -u)
 for f in $WIN_GAME_C $WIN_MENU_C $WIN_VIDEO_C $WIN_AUDIO_C $WIN_APP_C \
-         $WIN_NET_C $WIN_EYES_CPP $WIN_APP_CPP; do
+         $WIN_NET_C $WIN_HTTP_C $WIN_EYES_CPP $WIN_APP_CPP; do
     case "$f" in */*/*) nested="$nested
 $f" ;; esac
 done
@@ -101,7 +115,7 @@ fi
 # silently dropped from the link. The comparison above cannot see it either, because
 # sort -u collapses the pair into one entry that matches on both sides.
 dupes=$(for f in $WIN_GAME_C $WIN_MENU_C $WIN_VIDEO_C $WIN_AUDIO_C $WIN_APP_C \
-                 $WIN_NET_C $WIN_EYES_CPP $WIN_APP_CPP; do
+                 $WIN_NET_C $WIN_HTTP_C $WIN_EYES_CPP $WIN_APP_CPP; do
             basename "$f"
         done | sort | uniq -d)
 if [ -n "$dupes" ]; then

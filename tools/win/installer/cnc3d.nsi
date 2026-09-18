@@ -116,6 +116,20 @@ Section "C&C 3D" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
 
+  ; AN UPDATE THE LAUNCHER DID NOT FINISH IS ABANDONED BEFORE ANY FILE GOES IN.
+  ; The launcher finishes such an update when it next starts, by putting back every
+  ; file named in cnc3d-update.journal, and it cannot tell a file this installer
+  ; has just written from one that update wrote. Left in place, the journal would
+  ; undo part of this install, or all of it, the first time the launcher ran.
+  ; Renamed to cnc3d-update.done instead, the launcher reads it as an update that
+  ; is over: it puts nothing back, and removes only the old and half-written copies
+  ; the journal's lines record that update making, by those exact names, now that
+  ; every file they sit beside is this install's. The launcher never looks for such
+  ; copies by any other means. If that name is still taken by an earlier one, the
+  ; journal is removed instead, and those copies stay.
+  Rename "$INSTDIR\cnc3d-update.journal" "$INSTDIR\cnc3d-update.done"
+  Delete "$INSTDIR\cnc3d-update.journal"
+
   ; The whole staged folder, recursively. It is the same tree the zip is made
   ; from, so anything the zip carries the installer carries.
   File /r "${PAYLOAD}/*"

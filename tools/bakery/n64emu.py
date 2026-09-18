@@ -49,7 +49,7 @@ class CPU:
     def __init__(self, mem):
         self.m = mem
         self.r = [0]*32
-        self.f = [0]*32          # raw 64-bit FPR words
+        self.f = [0]*32          # 32-bit FPR words; a double is the even/odd PAIR
         self.fcr31 = 0
         self.hi = self.lo = 0
         self.pc = 0
@@ -57,14 +57,31 @@ class CPU:
         self.trace = False
         self.icount = 0
 
-    # ---- FPU helpers (32 fp regs, MIPS III: even-odd pairs for doubles) ----
+    # ---- FPU helpers -------------------------------------------------------------
+    # The cartridge runs its FPU with Status.FR = 0, the pairing the o32 ABI expects: a
+    # double lives in an EVEN register and the odd one above it, low word in the even
+    # register. The compiler's idiom for a double zero is `mtc1 zero,f2 ; mtc1 zero,f3`,
+    # which only produces 0.0 when f3 IS the upper half of f2. Modelling every register
+    # as its own 64-bit slot broke exactly that idiom: the upper half of f2 kept whatever
+    # the last ldc1 into f2 had left there (a 1.0 in the animation curve evaluator), so a
+    # compare against "zero" was a compare against 1.0, and the emulated curve
+    # post-process returned identity at every tick where the quaternion's squared length
+    # came out as exactly 1.0f. Four ticks of the SAM launcher's clip did, one tick wide
+    # each, and no such spike exists in the console's own arithmetic.
     def fs(self, i):   return struct.unpack(">f", struct.pack(">I", self.f[i] & M32))[0]
     def setfs(self, i, v):
-        self.f[i] = (self.f[i] & ~M32) | struct.unpack(">I", struct.pack(">f", v))[0]
-    def fd(self, i):   return struct.unpack(">d", struct.pack(">Q", self.f[i] & M64))[0]
-    def setfd(self, i, v): self.f[i] = struct.unpack(">Q", struct.pack(">d", v))[0]
+        self.f[i] = struct.unpack(">I", struct.pack(">f", v))[0]
+    def fd(self, i):
+        i &= ~1
+        q = ((self.f[i + 1] & M32) << 32) | (self.f[i] & M32)
+        return struct.unpack(">d", struct.pack(">Q", q))[0]
+    def setfd(self, i, v):
+        i &= ~1
+        q = struct.unpack(">Q", struct.pack(">d", v))[0]
+        self.f[i] = q & M32
+        self.f[i + 1] = (q >> 32) & M32
     def fw(self, i):   return s32(self.f[i] & M32)
-    def setfw(self, i, v): self.f[i] = (self.f[i] & ~M32) | (v & M32)
+    def setfw(self, i, v): self.f[i] = v & M32
 
     def run(self, entry, args=(), maxi=200_000_000):
         RET = 0x80700000
@@ -232,10 +249,15 @@ class CPU:
             word = self.m.r32(al)
             mask = (M32 >> (32-sh)) if sh else 0
             self.m.w32(al, (word & mask) | ((r[rt] << sh) & M32))
-        elif op == 49: self.f[rt] = (self.f[rt] & ~M32) | self.m.r32((r[rs]+simm) & M32)   # lwc1
-        elif op == 53: self.f[rt] = self.m.r64((r[rs]+simm) & M32)                          # ldc1
+        elif op == 49: self.f[rt] = self.m.r32((r[rs]+simm) & M32)                         # lwc1
+        elif op == 53:                                                                      # ldc1
+            q = self.m.r64((r[rs]+simm) & M32)
+            self.f[rt & ~1] = q & M32
+            self.f[(rt & ~1) + 1] = (q >> 32) & M32
         elif op == 57: self.m.w32((r[rs]+simm) & M32, self.f[rt] & M32)                     # swc1
-        elif op == 61: self.m.w64((r[rs]+simm) & M32, self.f[rt])                           # sdc1
+        elif op == 61:                                                                      # sdc1
+            self.m.w64((r[rs]+simm) & M32,
+                       ((self.f[(rt & ~1) + 1] & M32) << 32) | (self.f[rt & ~1] & M32))
         elif op == 47: pass                                        # cache
         elif op == 55: r[rt] = self.m.r64((r[rs]+simm) & M32) & M32   # ld (32-bit truncate)
         elif op == 63: self.m.w64((r[rs]+simm) & M32, r[rt])           # sd

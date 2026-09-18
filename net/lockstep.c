@@ -66,14 +66,29 @@ static void turn_clear(LsTurn* t)
     t->reported = 0;
 }
 
-/* Clear one turn slot across every seat. Called when a turn number first becomes current
-   for a ring index that an older turn used to own, so a stale turn's orders can never be
-   mistaken for the new one's. */
-static void ring_claim(LsState* s, unsigned turn)
+/* WHO OWNS A RING SLOT, AND WHEN IT IS WIPED. A slot is shared by every turn with the same
+ * residue modulo LS_HISTORY, so each one must be emptied before the next turn that owns it
+ * can be written, and never while the turn that owns it now may still be asked for. The
+ * two halves of a slot are written by different things, so they are wiped at different
+ * moments:
+ *
+ *   ANOTHER SEAT'S HALF is written only by ls_on_packet, which accepts a turn only while
+ *   it is below turn_exec + LS_HISTORY. That is exactly the moment the previous owner of
+ *   the slot has executed, so wiping it on EXECUTION is both early enough and sufficient.
+ *   It used to be wiped a second time when this peer began stamping that turn, which
+ *   threw away whatever a peer running ahead had already delivered for it; with enough of
+ *   a lead that was more turns than the redundancy window could send again.
+ *
+ *   THIS PEER'S OWN HALF is written only by ls_local_order and ls_pack, both at
+ *   turn_send + max_ahead, so it is wiped when stamping begins there and NOT when the turn
+ *   executes. Executing a turn does not end anybody else's need for it: a peer that lost
+ *   every packet carrying it is still waiting, and ls_pack_from can only send again what
+ *   this peer still holds. */
+static void ring_claim_others(LsState* s, unsigned turn)
 {
     int i;
     for (i = 0; i < LS_MAX_SEATS; i++) {
-        turn_clear(&s->ring[RING(turn)][i]);
+        if (i != s->me) turn_clear(&s->ring[RING(turn)][i]);
     }
 }
 
@@ -81,21 +96,30 @@ static void ring_claim(LsState* s, unsigned turn)
 
 int ls_init(LsState* s, int seats, int me)
 {
+    return ls_init_ahead(s, seats, me, LS_MAX_AHEAD);
+}
+
+int ls_init_ahead(LsState* s, int seats, int me, int ahead)
+{
     unsigned t;
 
     if (!s || seats < 1 || seats > LS_MAX_SEATS || me < 0 || me >= seats) {
         return LS_ERR_RANGE;
     }
+    /* CLAMPED, NOT TRUSTED: this arrives from the wire, and a peer that asked for zero
+       would pre-agree no turns at all and stamp orders into the turn already executing. */
+    if (ahead < LS_AHEAD_MIN) ahead = LS_AHEAD_MIN;
+    if (ahead > LS_AHEAD_MAX) ahead = LS_AHEAD_MAX;
     memset(s, 0, sizeof(*s));
     s->seats = seats;
     s->me = me;
-    s->max_ahead = LS_MAX_AHEAD;
+    s->max_ahead = ahead;
     s->turn_exec = 0;
     s->turn_send = 0;
 
     /* THE OPENING TURNS ARE PRE-AGREED EMPTY, and without this the match never starts.
-       Orders queued on turn 0 are stamped to execute on turn LS_MAX_AHEAD, so nobody has
-       anything to say about turns 0 through LS_MAX_AHEAD-1; if the scheduler still waited
+       Orders queued on turn 0 are stamped to execute on turn max_ahead, so nobody has
+       anything to say about turns 0 through max_ahead-1; if the scheduler still waited
        to be told about them it would wait forever. Marking them reported for every seat
        is the same thing the 1995 engine did by starting its send counter ahead of its
        execute counter. */
@@ -138,6 +162,20 @@ int ls_local_order(LsState* s, const void* bytes, int len)
     return LS_OK;
 }
 
+int ls_turn_room(const LsState* s, int len)
+{
+    const LsTurn* t;
+    int room;
+
+    if (!s || len <= 0 || len > LS_ORDER_MAX) return 0;
+    t = &s->ring[RING(s->turn_send + (unsigned)s->max_ahead)][s->me];
+    room = (LS_TURN_BYTES - t->used) / (len + 1);
+    if (room < 0) room = 0;
+    /* The count is one byte on the wire. */
+    if (room > 255 - t->count) room = 255 - t->count;
+    return room > 0 ? room : 0;
+}
+
 /* ---------------------------------------------------------------------------- packing */
 
 int ls_pack(LsState* s, void* out, int outmax)
@@ -146,9 +184,17 @@ int ls_pack(LsState* s, void* out, int outmax)
     unsigned top;
     int off, blocks, k;
 
-    if (!s || !p || outmax < 12) return LS_ERR_RANGE;
+    if (!s || !p || outmax < 12) return -LS_ERR_RANGE;
 
     top = s->turn_send + (unsigned)s->max_ahead;
+    /* THE NEWEST TURN MUST FIT, and this refuses rather than sends a packet without it.
+       The walk below stops on size, which is right for the older redundant copies and
+       catastrophic for the newest one: this peer has just marked that turn as spoken for,
+       so dropping it puts an empty packet on the wire and leaves every other peer waiting
+       on a turn that will never be sent again. LS_TURN_BYTES makes it impossible for the
+       caller's own orders to overflow a full-sized buffer; what this catches is a buffer
+       smaller than LS_PACKET_MAX. */
+    if (12 + 3 + s->ring[RING(top)][s->me].used > outmax) return -LS_ERR_TOO_BIG;
 
     /* This peer has now spoken for the turn it was stamping, even if it queued nothing.
        Done before the walk below so the newest block is always marked reported. */
@@ -164,7 +210,12 @@ int ls_pack(LsState* s, void* out, int outmax)
 
     /* Newest turn first, then back through the redundancy window. Stop early rather than
        overrun the packet: losing the OLDEST redundant copy is a recoverable degradation,
-       while emitting an oversized datagram fragments every packet in the match. */
+       while emitting an oversized datagram fragments every packet in the match. The
+       newest block is never what is dropped here; it was checked above.
+       THE WINDOW IS THE FULL LS_REDUNDANCY AT EVERY LOOKAHEAD, because this peer's own
+       turns are kept after they execute so that ls_pack_from can answer with them. It was
+       shorter at a small lookahead while executing wiped them. See ls_pack's contract for
+       what that costs. */
     for (k = 0; k < LS_REDUNDANCY; k++) {
         const LsTurn* t;
         unsigned turn;
@@ -191,10 +242,67 @@ int ls_pack(LsState* s, void* out, int outmax)
 
     /* Move on to stamping the next turn. */
     s->turn_send++;
-    ring_claim(s, s->turn_send + (unsigned)s->max_ahead);
-    /* ring_claim wiped the slot this peer is about to stamp into, including its reported
-       flag, which is correct: it has not spoken for that turn yet. */
+    /* The slot this peer is about to stamp into is wiped, including its reported flag,
+       which is correct: it has not spoken for that turn yet. Only this peer's own half;
+       see ring_claim_others for why the rest of the slot is left alone. */
+    turn_clear(&s->ring[RING(s->turn_send + (unsigned)s->max_ahead)][s->me]);
 
+    return off;
+}
+
+int ls_pack_from(const LsState* s, unsigned from, void* out, int outmax)
+{
+    unsigned char* p = (unsigned char*)out;
+    unsigned newest, top, turn;
+    int off, n, k;
+
+    if (!s || !p || outmax < 12) return -LS_ERR_RANGE;
+    if (s->turn_send == 0) return 0;                        /* nothing spoken for yet */
+    newest = s->turn_send - 1u + (unsigned)s->max_ahead;    /* the last turn ls_pack sent */
+    if (from > newest) return 0;                            /* not stamped yet: nothing to send */
+    /* The slot for `from` has been handed to a later turn once stamping has reached
+       from + LS_HISTORY, and what it holds then is not that turn's orders. */
+    if (from + (unsigned)(LS_HISTORY - 1) < s->turn_send + (unsigned)s->max_ahead) return 0;
+
+    /* OLDEST FIRST when deciding what fits, the reverse of ls_pack. The turn asked for is
+       the one that matters, so it is the one that must not be the block left out. */
+    off = 12;
+    n = 0;
+    for (turn = from; turn <= newest && n < LS_REDUNDANCY; turn++) {
+        const LsTurn* t = &s->ring[RING(turn)][s->me];
+        if (!t->reported) break;
+        if (off + 3 + t->used > outmax || off + 3 + t->used > LS_PACKET_MAX) {
+            /* SAID PLAINLY WHEN IT IS THE ASKED-FOR TURN THAT WILL NOT FIT, because a
+               caller that read that as 0 would take "your buffer is too small" for
+               "there is nothing to send" and leave the asking peer stuck for ever with
+               nothing written down. LS_TURN_BYTES makes it unreachable with a full-sized
+               buffer; it is here so a smaller one fails loudly instead. */
+            if (n == 0) return -LS_ERR_TOO_BIG;
+            break;
+        }
+        off += 3 + t->used;
+        n++;
+    }
+    if (n == 0) return 0;
+    top = from + (unsigned)n - 1u;
+
+    /* THE SAME PACKET ls_pack WRITES, so the receiver needs no second parser: a top, and
+       the blocks newest first beneath it. */
+    put_u32(p + 0, LS_MAGIC);
+    put_u16(p + 4, LS_VERSION);
+    p[6] = (unsigned char)s->me;
+    p[7] = (unsigned char)n;
+    put_u32(p + 8, top);
+    off = 12;
+    for (k = 0; k < n; k++) {
+        const LsTurn* t = &s->ring[RING(top - (unsigned)k)][s->me];
+        put_u16(p + off, (unsigned)t->used); off += 2;
+        p[off++] = (unsigned char)t->count;
+        if (t->used > 0) {
+            memcpy(p + off, t->bytes, (size_t)t->used);
+            off += t->used;
+        }
+    }
     return off;
 }
 
@@ -293,14 +401,61 @@ int ls_on_packet(LsState* s, const void* bytes, int len)
 
 /* --------------------------------------------------------------------------- the gate */
 
+int ls_set_absent(LsState* s, int seat)
+{
+    return ls_set_absent_at(s, seat, 0u);
+}
+
+int ls_set_absent_at(LsState* s, int seat, unsigned turn)
+{
+    if (!s || seat < 0 || seat >= s->seats || seat == s->me) return LS_ERR_RANGE;
+    /* A turn already gone by is an absence that starts now. Clamping rather than refusing,
+       because the caller that gets here is a peer catching up on a goodbye it heard late,
+       and the alternative is a seat that is never skipped at all. */
+    if (turn < s->turn_exec) turn = s->turn_exec;
+    /* THE LAST CALLER WINS, because the caller is the one that knows whose number this is:
+       a seat can be named locally as a guess and then again by the host, whose number is
+       the one every peer must end up on, and a scheduler that kept the first would keep
+       the guess. Whoever calls this is responsible for not overwriting the host with a
+       guess; see how the goodbye is handled. */
+    s->absent[seat] = 1;
+    s->absent_from[seat] = turn;
+    return LS_OK;
+}
+
+/* Has `seat` stopped counting by the time turn `turn` runs? */
+static int seat_gone_by(const LsState* s, int seat, unsigned turn)
+{
+    return s->absent[seat] && turn >= s->absent_from[seat];
+}
+
+unsigned ls_seat_first_missing(const LsState* s, int seat)
+{
+    unsigned t;
+    if (!s || seat < 0 || seat >= s->seats) return 0;
+    for (t = s->turn_exec; t < s->turn_exec + (unsigned)(LS_HISTORY - 1); t++) {
+        if (!s->ring[RING(t)][seat].reported) return t;
+    }
+    return s->turn_exec + (unsigned)(LS_HISTORY - 1);
+}
+
 int ls_turn_ready(const LsState* s)
 {
     int i;
     if (!s) return 0;
     for (i = 0; i < s->seats; i++) {
+        /* A computer has nothing to say, and neither has a seat that has walked out, from
+           the turn it walked out on. Below that turn it is still a seat and is waited for,
+           because its last orders execute on every peer or on none. */
+        if (seat_gone_by(s, i, s->turn_exec)) continue;
         if (!s->ring[RING(s->turn_exec)][i].reported) return 0;
     }
     return 1;
+}
+
+int ls_ahead(const LsState* s)
+{
+    return s ? s->max_ahead : LS_MAX_AHEAD;
 }
 
 unsigned ls_waiting_mask(const LsState* s)
@@ -309,6 +464,7 @@ unsigned ls_waiting_mask(const LsState* s)
     int i;
     if (!s) return 0;
     for (i = 0; i < s->seats; i++) {
+        if (seat_gone_by(s, i, s->turn_exec)) continue;
         if (!s->ring[RING(s->turn_exec)][i].reported) m |= (1u << i);
     }
     return m;
@@ -328,6 +484,12 @@ void ls_run_turn(LsState* s, LsOrderSink sink, void* user)
     for (seat = 0; seat < s->seats; seat++) {
         const LsTurn* t = &s->ring[RING(turn)][seat];
         int off = 0, n;
+        /* A SEAT THAT HAS GONE CONTRIBUTES NOTHING FROM ITS OWN TURN ON, whether or not
+           its orders happen to be sitting in this peer's ring. That is the other half of
+           ls_set_absent_at: skipping it in the barrier alone would let a peer that
+           received the departing seat's last packet execute those orders while a peer
+           that did not executed none, and the two worlds would part on the spot. */
+        if (seat_gone_by(s, seat, turn)) continue;
         for (n = 0; n < t->count; n++) {
             int olen;
             if (off + 1 > t->used) break;
@@ -339,10 +501,11 @@ void ls_run_turn(LsState* s, LsOrderSink sink, void* user)
     }
 
     s->turn_exec++;
-    /* The slot this turn occupied is now free for a future turn. Claiming it here rather
-       than lazily means a peer that sends a turn far ahead cannot find a stale reported
-       flag waiting for it. */
-    ring_claim(s, turn);
+    /* The other seats' half of the slot this turn occupied is now free for a future turn.
+       Claiming it here rather than lazily means a peer that sends a turn far ahead cannot
+       find a stale reported flag waiting for it. This peer's own half is kept until it
+       stamps into the slot again; see ring_claim_others. */
+    ring_claim_others(s, turn);
 }
 
 unsigned ls_exec_turn(const LsState* s) { return s ? s->turn_exec : 0; }

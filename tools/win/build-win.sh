@@ -11,7 +11,7 @@
 # how the code was written; at 64 it truncates, and GCC is right to refuse it. Building
 # i686 makes the question disappear instead of suppressing it, and it is the same
 # architecture the promised Win98 / Voodoo 2 target needs. Nothing here depends on the
-# larger address space. See docs/win-build.md.
+# larger address space. See BUILDING.md.
 #
 # WHY NO SOURCE WAS EDITED TO MAKE THIS WORK. Every file except game/cnc_eyes.cpp already
 # carried its own `#ifdef __APPLE__` GL guard. The renderer did not, and it is the file
@@ -65,6 +65,9 @@ INC="-I$ROOT/compat/win -I$ROOT/game -I$ROOT/menu -I$ROOT/video -I$ROOT/audio \
      -I$SDL2_ROOT/include/SDL2 -I$SDK/include"
 LIBDIRS="-L$SDL2_ROOT/lib -L$SDK/lib/$HOST"
 CDEFS="-DGL_SILENCE_DEPRECATION"
+# A COOKED BUILD has no F5 panel (see app/build.sh). $CDEFS already reaches every object
+# below, so this one line is the whole of the Windows half.
+[ -n "$CNC3D_COOKED" ] && CDEFS="$CDEFS -DCNC3D_COOKED=1"
 
 echo "== C sources ($HOST)"
 # THE C DIALECT SPLIT IS THE MAC BUILD'S, NOT A NEW ONE.
@@ -92,9 +95,26 @@ AUDIO_C89=$(echo $WIN_AUDIO_C | tr ' ' '\n' | grep -v audio_sdl.c | tr '\n' ' ')
 compile_c c89   $WIN_GAME_C $AUDIO_C89
 compile_c gnu99 audio/audio_sdl.c $WIN_MENU_C $WIN_VIDEO_C $WIN_APP_C
 # The scheduler is strict C89; the socket file needs gnu89 for the winsock headers.
+#
+# NAMED ONE BY ONE, and that is a trap this build has already fallen into. Every other
+# group above is compiled from its $WIN_* variable, so adding a file to tools/win/sources.sh
+# is enough for it -- but these four carry three different C standards between them, so the
+# variable is only ever READ by check-sources.sh and never compiled from. netbeacon.c was
+# added to WIN_NET_C, passed the drift check on the strength of that, and then failed at
+# the LINK with a dozen undefined nb_* symbols, because nothing here compiled it. If you
+# add a net source, it needs a line here as well as a name there.
 compile_c c89   net/lockstep.c
 compile_c gnu89 net/net_udp.c
 compile_c gnu89 net/netmatch.c
+compile_c gnu89 net/netbeacon.c
+# The room code is a relayed host's address, so it is part of the game and not a tool.
+compile_c gnu89 net/roomcode.c
+
+# The HTTP client, for the internet game list. gnu99 because it is written in the same
+# style as the launcher that already builds it, and it needs a line here for the reason
+# spelled out above: a name in sources.sh is read by the drift check and compiled by
+# nobody.
+compile_c gnu99 $WIN_HTTP_C
 
 echo "== renderer"
 # -fpermissive for the same reason the brain build needs it, and only for that reason:
@@ -131,7 +151,11 @@ $CXX -std=c++14 -O2 -g -fms-extensions -fpermissive \
 # driver appends its own dynamic -lwinpthread after everything we pass.
 # -lws2_32 is winsock, for net/net_udp.c. It goes AFTER the objects that reference it,
 # which is what the rest of this line already assumes.
-LIBS="-lmingw32 -lSDL2main -Wl,-Bdynamic -lSDL2 -Wl,-Bstatic -lopengl32 -lz -lws2_32 -static"
+# -lwininet is the HTTP client's transport, and it sits inside the static island beside
+# -lopengl32 for the same reason everything else here does: this linker resolves left to
+# right, so a library named before the objects that need it resolves nothing. That slot is
+# where the launcher's own working link line puts it.
+LIBS="-lmingw32 -lSDL2main -Wl,-Bdynamic -lSDL2 -Wl,-Bstatic -lopengl32 -lwininet -lz -lws2_32 -static"
 
 echo "== link"
 # THE ICON AND THE VERSION BLOCK, compiled into cnc3d.exe as resources. One executable per
@@ -178,8 +202,44 @@ else
     echo "WARNING: no cnc3d.ico (run tools/launchers/make_icon.py); shipping without an icon" >&2
 fi
 
-$CXX -o "$OUT/cnc_eyes.exe" "$OBJ/cnc_eyes_main.o" $COBJ $LIBDIRS $LIBS
-$CXX -o "$OUT/cnc3d.exe"    "$OBJ/cnc3d.o" "$OBJ/cnc_eyes_lib.o" $RCOBJ $COBJ $LIBDIRS $LIBS
+# THE UTF-8 MANIFEST, on both executables. The per-user directory SDL_GetPrefPath answers
+# is UTF-8, and it is handed to the C runtime's fopen for the log, the saves and the
+# world dump. Windows reads that path in the process code page, so a user name the code
+# page cannot spell (a Polish, Cyrillic or Japanese one on most machines) gave the game a
+# path it could not open: no per-user log, no saves, and an empty world where the dump
+# was. The launcher has carried this manifest since it was written; the game did not.
+# It makes the process code page UTF-8 on Windows 10 version 1903 and later, and earlier
+# Windows ignores the element. Resource 1 of type 24 (RT_MANIFEST) is the one Windows
+# reads when it starts a process. Compiled into its own object rather than folded into
+# cnc3d.rc, because cnc_eyes.exe carries no icon and no version block and needs this.
+cat > "$OBJ/game.manifest" <<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>
+XML
+printf '1 24 "game.manifest"\n' > "$OBJ/game_manifest.rc"
+MANOBJ=""
+if ( cd "$OBJ" && $HOST-windres game_manifest.rc -O coff -o game_manifest.o 2>"$OBJ/manifest.err" ); then
+    MANOBJ="$OBJ/game_manifest.o"
+    echo "== manifest: UTF-8 code page declared for cnc3d.exe and cnc_eyes.exe"
+else
+    echo "WARNING: windres could not compile the manifest; both executables will ship without the UTF-8 code page" >&2
+    sed 's/^/  windres: /' "$OBJ/manifest.err" >&2
+fi
+
+# LARGE ADDRESS AWARE, on both. A 32-bit process is given 2 GB of address space unless
+# its header says it can take more, and a mission start maps the engine, every pack, the
+# GL driver and the audio into that space at once. The engine's pointer encoding goes
+# through intptr_t and the same code already runs at 64-bit addresses on macOS, so
+# nothing in it assumes the top bit is clear. With the flag a 64-bit Windows gives the
+# process 4 GB. Read back with objdump -p: the Characteristics word carries 0x20.
+$CXX -Wl,--large-address-aware -o "$OUT/cnc_eyes.exe" "$OBJ/cnc_eyes_main.o" $MANOBJ $COBJ $LIBDIRS $LIBS
+$CXX -Wl,--large-address-aware -o "$OUT/cnc3d.exe"    "$OBJ/cnc3d.o" "$OBJ/cnc_eyes_lib.o" $RCOBJ $MANOBJ $COBJ $LIBDIRS $LIBS
 
 cp "$SDL2_ROOT/bin/SDL2.dll" "$OUT/"
 
@@ -195,9 +255,18 @@ cp "$SDL2_ROOT/bin/SDL2.dll" "$OUT/"
 # with STATUS_STACK_OVERFLOW (0xC00000FD) before printing a byte. Found on the Windows
 # box, 3 Sep 2026. The lasting fix is to stop putting the scheduler state on the stack
 # at all, which is the net/ author's call; this makes the shipped tool run today.
+#
+# ITS SOURCE LIST IS ITS OWN AND IS NOT CHECKED BY ANYTHING. The drift guard compares the
+# two builds' GAME sources; netcheck is a standalone tool, so a file the Mac links into it
+# and this line does not is caught by nothing until the link fails. That is how the room
+# code broke this build: net/roomcode.c was added to the game's list on both platforms
+# correctly, and netcheck, which prints and reads those codes, was linked without it here
+# and kept linking on the Mac. A new net source that netcheck calls needs adding HERE as
+# well as to sources.sh.
 echo "== netcheck.exe"
 $CC -std=gnu89 -O2 -g -Wall -Wl,--stack,16777216 -o "$OUT/netcheck.exe" \
-    "$ROOT/net/netcheck.c" "$ROOT/net/lockstep.c" "$ROOT/net/net_udp.c" -lws2_32
+    "$ROOT/net/netcheck.c" "$ROOT/net/lockstep.c" "$ROOT/net/net_udp.c" \
+    "$ROOT/net/roomcode.c" -lws2_32
 
 # THE HEADLESS BRAIN HOST AND THE TWO-BRAIN GATE, for the Windows half of Phase 0
 # (docs/design-multiplayer.md section 10). Both are dependency-free C over LoadLibrary,

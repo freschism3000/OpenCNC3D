@@ -4,7 +4,7 @@ cartridge's, for A/B comparison only.
 
 WHY THIS EXISTS
 
-The question this answers (2 Sep 2026): do the cartridge's textures look lower resolution
+The question this answers: do the cartridge's textures look lower resolution
 than the PC game's, the grass and the cliffs especially? The cartridge and the PC draw the same
 24x24 cell, so nothing is lower RESOLUTION; what differs is COLOUR DEPTH. The cart splits
 its terrain into a 4bpp bank (16 colours from a shared sub-palette, `ND4` picks which) and

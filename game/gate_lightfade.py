@@ -11,6 +11,9 @@ from PIL import Image, ImageChops
 # things a count alone cannot give: that the light SURVIVES its source, and that it is
 # strictly falling while it does. A light that lingered at constant brightness would pass
 # a "still lit" test and be just as wrong as one that snaps off.
+#
+# The frame the peak falls on is printed too, so the gate can check that its control arm
+# (both fade dials at 0) is measuring the same light as each lit arm.
 base = sys.argv[1]          # lights OFF reference frames, %02d
 lit  = sys.argv[2]          # lights ON frames, %02d
 n    = int(sys.argv[3])
@@ -34,4 +37,7 @@ for j in range(len(tail)):
     if j and tail[j] >= tail[j - 1]:
         break
     steps += 1
-print("LIGHTFADE|peak=%d|decaysteps=%d" % (peak, steps))
+# the lit pixels on the frame right after the peak: a light that holds its brightness once
+# its source ends is still bright there and stops falling, one that snaps off is not
+after = tail[0] if tail else 0
+print("LIGHTFADE|peak=%d|decaysteps=%d|peakframe=%d|after=%d" % (peak, steps, pi, after))

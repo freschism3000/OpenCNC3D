@@ -1,6 +1,62 @@
+# G92 run B: THE GUARDS. Things that leave the engine's dump without dying.
+#
+# On SCG90EA, because it is a gate map where a harvester actually docks: the refinery is
+# there from the start with two harvesters working for it. The MCV deploys on tick 5, and
+# the run is long enough for both harvesters to make a delivery. The dump is sampled every
+# 100 ticks, which is several samples inside each dock, so the gate can see a harvester
+# sitting limboed in the refinery AFTER any line the vanish sweep printed about it.
 tick 5
 lclickobj MCV:@me
 actclickobj MCV:@me
-tick 2500
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
+tick 100
+cargodump
 shatterdump
 quit

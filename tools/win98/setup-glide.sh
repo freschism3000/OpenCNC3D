@@ -2,8 +2,8 @@
 # One-time setup of the 3dfx Glide SDK for the Windows 98 Tier 1 build.
 #
 # Glide has no redistributable SDK any more, so this assembles one from two sources that
-# both still exist, and pins nothing to a scratch work the way the earlier Game
-# Browser work did (its SDK path pointed into /private/tmp and evaporated).
+# both still exist, and pins nothing to a temporary directory the way an earlier
+# attempt did (its SDK path pointed into a scratch folder and evaporated).
 #
 #   1. HEADERS come from sezero/glide, the maintained mirror of 3dfx's own GPL release.
 #   2. The IMPORT LIBRARY is built from the REAL glide2x.dll off the project owner's Voodoo 2 box.

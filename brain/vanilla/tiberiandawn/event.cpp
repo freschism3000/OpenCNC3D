@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// Two changes in EventClass::Execute. The REPAIR arm requires the ordering
+// house to own the building, the test the SELL arm always had. A beacon's
+// thirty second kill time is a frame number rather than the Windows wall
+// clock, so peers agree on it and it expires on every platform.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\event.cpv   2.17   16 Oct 1995 16:50:28   JOE_BOSTIC  $ */
 /***********************************************************************************************

@@ -127,26 +127,83 @@ BUILDSTR=$(tools/version.sh --release)
 restore() {
     git checkout -q -- VERSION 2>/dev/null || true
     tools/version.sh --header game/cnc3d_build.h
+    # THE COOKED BINARIES ARE STILL IN playable/ on this path. Say so rather than spend
+    # three minutes rebuilding under a failure the operator is about to read.
+    echo "NOTE: playable/ holds the COOKED binaries (no F5). Run game/build.sh and" >&2
+    echo "      app/build.sh to put the developer build back." >&2
 }
 
 # ---------------------------------------------------------------- 4. build both halves
 say "building macOS"
-CNC3D_SKIP_VERSION_HEADER=1 CNC3D_BUILD_ID="$TAG" game/make-build.sh || { restore; die "the macOS build failed."; }
+# CNC3D_COOKED=1: THE PACKAGES ARE COOKED. The F5 tuning panel's player doors (the key
+# and --gfxpanel) are compiled out of the binaries this cuts, and both packagers refuse a
+# cooked package whose binaries do not carry the refusal. This is the only place in the
+# tree that knows a build is a release, so it is the only place the flag is set: a
+# developer's own build never sees it. The gates below run on these cooked binaries --
+# the ones that ship are the ones proved -- and step 7b puts the developer build back
+# into playable/ afterwards, uncooked, so this machine keeps F5.
+CNC3D_COOKED=1 CNC3D_SKIP_VERSION_HEADER=1 CNC3D_BUILD_ID="$TAG" game/make-build.sh || { restore; die "the macOS build failed."; }
 
 say "building Windows"
 # A dry run still COMPILES the Windows half, because "does it build" is the whole point;
 # it just does not spend minutes zipping 845 MB of game data nobody is going to send.
 WINARG=""
 [ "$DRY" = "1" ] && WINARG="--no-zip"
-CNC3D_SKIP_VERSION_HEADER=1 CNC3D_BUILD_ID="$TAG" tools/win/make-build-win.sh $WINARG || { restore; die "the Windows build failed.
+CNC3D_COOKED=1 CNC3D_SKIP_VERSION_HEADER=1 CNC3D_BUILD_ID="$TAG" tools/win/make-build-win.sh $WINARG || { restore; die "the Windows build failed.
        Both platforms come from one commit, so a Windows failure stops the release rather
        than shipping half of it."; }
+
+# THE WINDOWS ZIPS END IN A FIXED ORDER, asked of the files that will be published, the
+# full one before anything is tagged. Every installed launcher up to v0.6.11 unpacks in
+# zip order, writes the install record whenever the zip reaches it, and stops at
+# SDL2.dll, which it has loaded. So the full package ends CHANGELOG.txt,
+# cnc3d-install.txt, BUILD-ID.txt, SDL2.dll: such a launcher stopped anywhere earlier has
+# not yet claimed the new version, and one that reaches SDL2.dll has written everything
+# else. The binary-only zip carries no record, ends BUILD-ID.txt, SDL2.dll, and is FLAT,
+# because those launchers unpack it without stripping a folder. make-build-win.sh makes
+# both shapes and refuses a zip without them; this is the same question where it ships.
+win_zip_tail() {   # win_zip_tail <zip> <prefix> <name>...: its last entries, in this order
+    _z=$1
+    _p=$2
+    shift 2
+    [ "$(unzip -Z1 "$_z" 2>/dev/null | tail -n $#)" = "$(for _f in "$@"; do printf '%s%s\n' "$_p" "$_f"; done)" ]
+}
+
+# AND SDL2.DLL IS THE PINNED ONE. Listed last it is the one file an old launcher fails to
+# write, which is harmless exactly while the shipped DLL is byte identical to the one
+# installed. A release whose SDL2.dll differs leaves every player updating with such a
+# launcher on the old DLL under a record naming the new version. The DLL is pinned by
+# content beside SDL2_VER in tools/win/setup-toolchain.sh, whose note says when moving the
+# pin is safe; CNC3D_SDL2_CHANGE=1 releases anyway. Asked of the staged folder too, so a
+# dry run, which zips nothing, still asks it.
+SDL2_DLL_PIN=$(sed -n 's/^SDL2_DLL_SHA256=//p' tools/win/setup-toolchain.sh)
+win_sdl_pinned() {   # win_sdl_pinned <sha256 of the SDL2.dll about to ship>
+    [ "$CNC3D_SDL2_CHANGE" = "1" ] && return 0
+    [ -n "$SDL2_DLL_PIN" ] && [ "$1" = "$SDL2_DLL_PIN" ]
+}
+SDL2_NOT_PINNED="is not the pinned one (SDL2_DLL_SHA256 in
+       tools/win/setup-toolchain.sh). Launchers up to v0.6.11 cannot replace SDL2.dll, so a
+       player updating with one would keep the old DLL under a record naming $TAG. If the
+       change is meant, read the note at the pin and re-run with CNC3D_SDL2_CHANGE=1."
+WINSDL="build/win-dist/CNC3D-windows-$TAG/SDL2.dll"
+[ -f "$WINSDL" ] && win_sdl_pinned "$(shasum -a 256 "$WINSDL" | cut -d' ' -f1)" \
+    || { restore; die "the staged Windows SDL2.dll ($WINSDL) $SDL2_NOT_PINNED Nothing is tagged."; }
+if [ "$DRY" != "1" ]; then
+    WINFULL="$HOME/Desktop/CNC3D-windows-$TAG.zip"
+    win_zip_tail "$WINFULL" "CNC3D-windows-$TAG/" CHANGELOG.txt cnc3d-install.txt BUILD-ID.txt SDL2.dll \
+        || { restore; die "the Windows package does not end CHANGELOG.txt, cnc3d-install.txt,
+       BUILD-ID.txt, SDL2.dll ($WINFULL). Every installed launcher up to v0.6.11 writes the
+       record where the zip lists it and stops at SDL2.dll, so a player updating with one
+       could be left claiming $TAG over files it never wrote. Nothing is tagged."; }
+    win_sdl_pinned "$(unzip -p "$WINFULL" "CNC3D-windows-$TAG/SDL2.dll" | shasum -a 256 | cut -d' ' -f1)" \
+        || { restore; die "the SDL2.dll in $WINFULL $SDL2_NOT_PINNED Nothing is tagged."; }
+fi
 
 # ---------------------------------------------------------------- 5. the gates
 say "gates"
 GLOG=$(mktemp)
 
-# THE PARKED GATES. the project owner, 27 Aug 2026, on these five: "Park all of these bugs for
+# THE PARKED GATES. Reported on these five: "Park all of these bugs for
 # v.0.6.4, and let's get v.0.6.3 out of the door."
 #
 # THIS IS A DELIBERATE WEAKENING OF A RELEASE GATE and it is written as a NAMED list
@@ -157,7 +214,6 @@ GLOG=$(mktemp)
 #
 #   G21   hovercraft riders draw off the deck (jeep=0, deckpx=0, outside=1066)
 #   G36g  bilinear fringe leaves 13 key-colour pixels behind
-#   G81   one unit in three keeps smoothing through a teleport (snapped=2, want 3)
 #   G90   death shed: a batched tick steps over the 8-tick death window, so
 #         nothing is observed dying and the pixel arm is vacuous
 #   G104  mission reset: the same batched-tick skip, same vacuous result
@@ -167,6 +223,12 @@ GLOG=$(mktemp)
 # identically, same numbers, same assertions. Nothing in 0.6.3 caused any of them.
 # G90 and G104 are ONE bug with a diagnosed cause -- the sim-advance loop observes only
 # the last tick of a batched `tick N` -- and the fix belongs there, not in the scripts.
+#
+# G81 WAS PARKED HERE AND IS NOT NOW, because its red was never the game. It blamed a
+# smoothing bug, "one unit in three keeps smoothing through a teleport", and the gate was
+# in fact sampling a rifleman who was never aboard the hovercraft. Fixed in the gate: it
+# samples the deck's own three riders, requires every sample to have smoothing on, and
+# passes on the real build. The other four above are unchanged.
 #
 # G130 WAS PARKED FOR v0.6.4 AND IS NOT PARKED NOW, because the waiver asked for one of two
 # things and both were done: the intermittency is explained AND the gate is hardened.
@@ -189,21 +251,32 @@ GLOG=$(mktemp)
 # exact, but no suite run has confirmed it. If G130 goes red again the diagnosis was
 # incomplete rather than wrong, and the next reading to take is whether the two peers are
 # still a turn apart or something else has changed.
-# G194 IS PARKED FOR THIS RELEASE ONLY, and the condition is written here rather than
-# remembered. It is the two-brain lockstep gate and it reports two instances of the engine
-# diverging after a SELL order, in one process, with no networking involved. That is the
-# engine's own determinism and it is the one defect class lockstep cannot tolerate.
+# G194 IS UNPARKED AS OF 4 SEP 2026 AND MUST NOT GO BACK ON THIS LIST. It was parked for
+# v0.6.5 only, reporting two instances of the engine diverging after a SELL order in one
+# process with no networking involved, which is the one defect class lockstep cannot
+# tolerate. The condition written here was that any release CLAIMING a networking feature
+# had to take it off this list and go green first.
 #
-# WHY IT IS PARKED ANYWAY: v0.6.5 neither ships nor advertises multiplayer. The feature is
-# mid Phase 3 on its own branch, the changelog does not mention it, and no player of this
-# release can reach the path the gate exercises.
+# It is off the list because it is FIXED, not because the condition was waived.
+# BuildingClass::Sell_Back took the flashing house from PlayerPtr behind an
+# Is_Owned_By_Player() guard, which is `House == PlayerPtr`, so the seller's machine set
+# FlashCount to 7 and every other peer left it 0. Under lockstep the house now comes from
+# the object rather than from the machine. Two sibling sites went with it, in both brains.
+# The fix was mutation tested by putting the defect back and watching the gate report the
+# original signature again.
 #
-# WHAT MUST NOT HAPPEN: this entry surviving into a release that DOES claim multiplayer.
-# Any release with a networking feature in its changelog has to take G194 off this list
-# and go green, or it ships a lockstep that can disagree with itself about a sell.
-PARKED_GATES="G21 G36g G81 G90 G104 G194"
+# THE STANDING RULE SURVIVES THE FIX and is what to read if this ever comes up again: a
+# release with a networking feature in its changelog cannot park G194, because a lockstep
+# that can disagree with itself about a sell is not a lockstep.
+PARKED_GATES="G21 G36g G90 G104"
 
-RUNDIR="$ROOT/playable" sh playable/gates.sh "$TAG" > "$GLOG" 2>&1 || true
+# CNC3D_GATES_INTERACTIVE=1 FOR A RELEASE, ALWAYS. A handful of gates cannot run in the
+# background because what they measure IS a focused window and a real pointer (G124 is the
+# list today), so an ordinary suite run skips them and says so, and the operator is not
+# interrupted while working. A release is the one moment where full coverage is worth
+# taking the desk for a minute, and cutting a build on a suite that skipped a gate is
+# exactly the kind of quiet coverage loss this file exists to prevent.
+CNC3D_GATES_INTERACTIVE=1 RUNDIR="$ROOT/playable" sh playable/gates.sh "$TAG" > "$GLOG" 2>&1 || true
 TAIL=$(tail -1 "$GLOG")
 echo "$TAIL"
 
@@ -211,6 +284,18 @@ echo "$TAIL"
 # read off gates.sh's EXIT CODE, which is non-zero whenever any gate fails -- so a suite
 # that ran perfectly well and reported "120 pass, 5 fail" was announced as "the gate
 # suite did not finish", sending the reader after a crash that never happened.
+# AND IT MUST NOT HAVE SKIPPED ANYTHING. The line above sets the switch that runs every
+# gate, so a "skipped" in the summary means one refused to run rather than that it was not
+# asked, and a release with unrun gates is a release with unknown coverage.
+case "$TAIL" in
+*skipped*)
+    echo "the gate suite SKIPPED a gate even with CNC3D_GATES_INTERACTIVE=1 set:" >&2
+    echo "  $TAIL" >&2
+    echo "a release cannot be cut on a suite that did not run every gate." >&2
+    exit 1
+    ;;
+esac
+
 case "$TAIL" in
 *" pass, "*" fail"*) : ;;
 *) tail -40 "$GLOG"; restore; die "the gate suite did not finish -- it never printed a
@@ -346,7 +431,7 @@ say "pushing main, the tag, and the two release pointers"
 git push -q origin main
 git push -q origin "$TAG"
 
-# THE macos AND windows POINTER BRANCHES ARE NO LONGER PUSHED. the project owner, 27 Aug 2026, after
+# THE macos AND windows POINTER BRANCHES ARE NO LONGER PUSHED. Reported after
 # they stopped v0.6.3 between the tag and the build.
 #
 # WHAT HAPPENED. They are set, not merged, so each release force-moves them from wherever
@@ -547,8 +632,28 @@ MACBIN_GOT=$(unzip -Z1 "$MACBINS" 2>/dev/null | wc -l | tr -d ' ')
        entries and should have $MACBIN_WANT ($MACBIN_LIST). A short bins zip unzipped
        over an older release folder is how a Mac ends up with new binaries and no SDL."
 echo "   bins zip: $MACBIN_GOT entries ($MACBIN_LIST)"
-CNC3D_BUILD_ID="$TAG" tools/win/make-build-win.sh --bins-only >/dev/null 2>&1 || true
+# NOT OPTIONAL. The packager refuses a zip of the wrong shape by deleting it and failing,
+# and this used to discard that failure and go on to publish one asset short, so the
+# checks below could only ever have caught a stale file.
+WBLOG=$(mktemp)
+CNC3D_COOKED=1 CNC3D_BUILD_ID="$TAG" tools/win/make-build-win.sh --bins-only >"$WBLOG" 2>&1 \
+    || { tail -15 "$WBLOG" >&2; die "the Windows binary-only packager failed (its last lines
+       are above). The tag and branches are pushed and nothing is published; fix it and
+       re-run the publish step."; }
+rm -f "$WBLOG"
 WINBINS=$(ls -t "$HOME/Desktop"/CNC3D-windows-"$TAG"-bins.zip 2>/dev/null | head -1)
+[ -n "$WINBINS" ] || die "the Windows binary-only packager succeeded and left no
+       $HOME/Desktop/CNC3D-windows-$TAG-bins.zip. The tag and branches are pushed and nothing
+       is published; re-run the publish step once it does."
+win_zip_tail "$WINBINS" "" BUILD-ID.txt SDL2.dll && ! unzip -Z1 "$WINBINS" | grep -q / \
+    || die "the Windows binary-only zip is not flat with BUILD-ID.txt and SDL2.dll last
+       ($WINBINS). Launchers up to v0.6.11 unpack it without stripping a folder, so a
+       wrapped one lands in a subfolder and records $TAG over the old binaries. The tag and
+       branches are pushed and nothing is published; fix tools/win/make-build-win.sh and
+       re-run the publish step."
+win_sdl_pinned "$(unzip -p "$WINBINS" SDL2.dll | shasum -a 256 | cut -d' ' -f1)" \
+    || die "the SDL2.dll in $WINBINS $SDL2_NOT_PINNED The tag and branches are pushed and
+       nothing is published."
 
 # THE MANIFEST ASSET. One small text file listing a SHA-256 for every zip and
 # the data fingerprint each package carries. cnc3dgame.com's /api/builds lists
@@ -658,6 +763,21 @@ SRC
     echo "published $TAG: $GOT assets, both playable builds plus the binary-only updates"
 fi
 
+# ---------------------------------------------------------------- 7b. the developer build back
+# THE COOKED BINARIES ARE STILL IN playable/, staged there by the packager in step 4, and
+# this machine plays and tunes from playable/. Now that the packages are proved and
+# published, put the developer build (with F5) back: the same two scripts restore()'s
+# note tells the operator to run by hand on the failure path. This step used to be
+# promised by a comment and done by nobody, and playable/ stayed cooked after every
+# successful release until the next developer build happened to run.
+say "putting the developer build back into playable/ (uncooked, with F5)"
+if (cd game && sh build.sh >/dev/null 2>&1) && (cd app && sh build.sh >/dev/null 2>&1); then
+    echo "playable/ holds the developer build again"
+else
+    echo "NOTE: the developer rebuild failed; playable/ still holds the COOKED binaries" >&2
+    echo "      (no F5). Run game/build.sh and app/build.sh by hand." >&2
+fi
+
 # ---------------------------------------------------------------- 8. the launchers
 # THERE IS NO EIGHTH STEP ANY MORE, and that is the point of reading the site.
 # cnc3dgame.com's Builds section is generated from this repo's GitHub releases,
@@ -666,7 +786,7 @@ fi
 # check, with nothing else to upload and no second place to forget.
 #
 # This used to be a private keyed host with its own upload step. It was replaced
-# on 24 Aug 2026 when the project owner pointed out the site already had a Builds section: two
+# when the project owner pointed out the site already had a Builds section: two
 # publishing paths for one build is two things to keep in step, and the launcher
 # and the website disagreeing about what the newest build is would be a bug
 # nobody could see from either side.

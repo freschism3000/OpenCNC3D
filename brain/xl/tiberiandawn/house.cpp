@@ -4849,7 +4849,13 @@ void HouseClass::Check_Pertinent_Structures(void)
         BuildingClass* b = Buildings.Ptr(index);
 
         if (b && b->IsActive && b->House == this) {
-            if (!b->Class->IsWall) {
+            /*
+            **  CNC3D SHORT GAME: an armed building is a defence, and a defence is not
+            **  a base. With the option on, only a building that could rebuild the
+            **  house keeps it in the match; walls never counted either way.
+            */
+            if (!b->Class->IsWall
+                && !(Special.IsShortGame && b->Class->Primary != WEAPON_NONE)) {
                 if (!b->IsInLimbo && b->Strength > 0) {
                     any_good_buildings = true;
                     break;

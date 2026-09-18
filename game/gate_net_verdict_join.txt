@@ -1,0 +1,4 @@
+tick 60
+blowup 0
+tick 150
+quit

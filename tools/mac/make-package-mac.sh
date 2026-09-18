@@ -58,7 +58,14 @@ need_dir() {
     [ -d "$SRC/$1" ] || die "$1 is not a directory in $SRC (a dangling symlink counts).
        It is on the macOS package's allow-list."
     # -L dereferences, --exclude drops the Finder's droppings before they reach the zip.
-    rsync -aL --exclude '.DS_Store' "$SRC/$1" "$OUT/"
+    #
+    # AND user_maps, WHICH IS SOMEBODY'S PERSONAL FOLDER AND NOT CONTENT. The editor saves
+    # every map into playable/missions/user_maps -- including an autosave every two minutes
+    # that nobody pressed -- and the gate suite leaves scratch maps there too. This rsync is
+    # recursive, so all of it shipped: v0.6.6 carried 61 files of one person's own maps to
+    # everybody who downloaded it. The two tracked worked examples are put back by name
+    # below, because they ARE content and the exclusion would otherwise take them with it.
+    rsync -aL --exclude '.DS_Store' --exclude 'user_maps/' "$SRC/$1" "$OUT/"
 }
 
 # ---- the program ------------------------------------------------------------------
@@ -143,6 +150,20 @@ need_file CONQUER.MIX
 need_dir content       # the two theatre .MIX stubs the terrain loader wants
 need_dir missions      # the scenario INIs
 need_dir movies        # LOGO.VQA and INTRO2.VQA
+# THE WORKED EXAMPLES GO BACK IN, BY NAME. need_dir excludes user_maps wholesale because
+# it is a personal folder, and these two are the exception: game/examples/ tracks them,
+# game/build.sh stages them, and the editor's own documentation walks a reader through
+# them. Named one at a time rather than by a pattern, so the day somebody's map is called
+# USER92 it does NOT quietly rejoin the package.
+_ex="$OUT/missions/user_maps"
+mkdir -p "$_ex"
+for _m in USER90 USER91; do
+    for _e in INI BIN HGT; do
+        [ -f "$SRC/missions/user_maps/$_m.$_e" ] &&
+            cp "$SRC/missions/user_maps/$_m.$_e" "$_ex/"
+    done
+done
+
 
 # DOSDATA IS THE ONE THAT HAS TO BE DEREFERENCED, AND IT IS CHECKED AFTERWARDS.
 # In playable/ it is a SYMLINK into data/dosdata so that a local test folder does not
@@ -190,6 +211,40 @@ need_dir dosdata
        It is the ONLY thing a player double-clicks now, so there is no fallback to ship
        instead of it."
 rsync -aL --exclude '.DS_Store' "$ROOT/tools/launchers/C&C3D.app" "$OUT/"
+# THE BUNDLE'S EXECUTABLE IS THE COMPILED cnc3d-launch, AND THE BUNDLE IS SIGNED. Both
+# halves are one fix for one fault, found across two Macs: macOS asks the
+# player once whether an app may use the local network and refuses every packet until
+# they answer, but it only asks about an app it can NAME and VERIFY, and the process
+# doing the asking has to still BE that app. A bundle whose executable is a script that
+# execs a binary outside the bundle is neither, so the question was never put and LAN
+# play was impossible on a Mac with no way to find out why.
+#
+# TWO TRAPS, both of which cost hours and both of which look like a corrupt download:
+#   - A minimum-OS version newer than the player's Mac makes LaunchServices refuse the
+#     bundle with -10825 and no explanation. Build machines run a newer SDK than players
+#     do, so cnc3d-launch MUST be built through tools/mac/deployment-target.sh, and
+#     universal, or an Apple Silicon Mac cannot run the app's own executable.
+#   - No certificate is involved here. This is ad-hoc signing, not notarisation, and the
+#     right-click-Open an unsigned download needs is unchanged.
+if [ -x "$ROOT/launcher/cnc3d-launch" ]; then
+    cp "$ROOT/launcher/cnc3d-launch" "$OUT/C&C3D.app/Contents/MacOS/cnc3d-launch"
+    chmod +x "$OUT/C&C3D.app/Contents/MacOS/cnc3d-launch"
+else
+    die "launcher/cnc3d-launch is missing. launcher/build.sh makes it. Without it the
+       bundle ships the old shell script, which cannot be signed and cannot hold the
+       app identity the local-network permission is attached to: LAN play then fails on
+       every Mac, silently."
+fi
+if command -v codesign >/dev/null 2>&1; then
+    codesign --force -s - "$OUT/C&C3D.app" 2>/dev/null \
+        || echo "note: ad-hoc signing C&C3D.app failed; the Local Network prompt will not appear" >&2
+fi
+# NOT SIGNED, and that is a finding, not an omission: an ad-hoc signature on
+# this bundle, whose executable is a shell script, makes macOS 15 refuse to open it at
+# all ("not supported on this version of macOS"), while the unsigned bundle opens with
+# the usual right-click-Open. The Local Network prompt does not need the signature: it
+# needs the usage text in Info.plist and a send the player can see, which the launcher
+# now makes before any game window.
 [ -d "$OUT/C&C3D.app" ] || die "C&C3D.app did not make it into the package. It is the
        default double-click, the one thing that always works, and the READ-ME
        names it first. The tracked master is tools/launchers/C&C3D.app."
@@ -201,7 +256,7 @@ _n=$(ls -A "$OUT"/*.command 2>/dev/null | wc -l | tr -d ' ')
 [ "$_n" = "0" ] || die "a .command launcher reached the package ($_n of them). The macOS
        package ships C&C3D.app and nothing else to double-click; see the note above."
 
-# THE APP OPENS THE LAUNCHER. (the project owner, 24 Aug 2026: "Make sure its the default
+# THE APP OPENS THE LAUNCHER. (Reported: "Make sure its the default
 # executeable / app for Windows / Mac, from release v0.6.3 and going forward.")
 #
 # C&C3D.app is a tracked script wrapper, because a binary cannot be committed

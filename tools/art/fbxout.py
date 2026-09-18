@@ -29,6 +29,7 @@ import zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "bakery"))
 import packinspect as PI  # noqa: E402
+import anim_rates as ANIM  # noqa: E402
 
 TRI_STRIDE = 4 + 2 + 3 * (5 * 4 + 4)      # int tex, u8 mode, u8 wrap, 3 x PackVert
 TRI_FMT = "<i2B" + "5f4B" * 3
@@ -150,6 +151,65 @@ def p70(pairs):
 KTIME_PER_SEC = 46186158000          # FBX's own time unit
 ENGINE_HZ = 15.0                     # the sim tick the baked frame grid is on
 
+# THE TIMELINE IS RULED IN WHOLE FRAMES AND EVERY KEY SITS ON ONE, which it did not used
+# to be. The keys were written at the baked grid's 15 Hz while the file declared TimeMode
+# 14, and 14 is not a frame rate both readers agree on: the FBX SDK calls it eCustom and
+# reads CustomFrameRate, which was not written, while Blender's own table has no eCustom
+# entry at all and reads 14 as 96 fps. Either way the importer's frame rate and the keys'
+# frame rate disagreed, and the clip arrived on fractional frames -- 6.4 apart under
+# Blender's reading -- which is unusable for an artist who has to move a key.
+#
+# The rule now: ONE BAKED FRAME OCCUPIES A WHOLE NUMBER OF TIMELINE FRAMES, and the file
+# declares a WHOLE frame rate chosen so the clip plays at the speed the game plays it.
+# Whole matters twice over: an importer that rounds the declared rate to an integer (which
+# is what a scene frame rate is) then rounds to the same number the keys were written
+# against, so the keys stay on integers under either reading.
+#
+# STANDARD_RATES are the values the FBX SDK's own TimeMode enum and Blender's importer
+# table agree on. Preferring one of those means the file needs no CustomFrameRate to be
+# read correctly, so it lands on whole frames in every tool rather than only in Blender.
+STANDARD_RATES = ((24, 11), (25, 10), (30, 6), (48, 5), (50, 4),
+                  (60, 3), (100, 2), (120, 1))
+MAX_DECLARED_FPS = 240
+
+
+def timeline(code, mesh):
+    """The FBX timeline for one model: declared frame rate, and how many timeline frames
+    one baked frame occupies.
+
+    `fps` the rate written into GlobalSettings, always a whole number
+    `spacing` timeline frames per baked frame, always a whole number >= 1
+    `exact` the rate the game actually walks this clip at, from anim_rates
+    `timemode` the TimeMode enum value, or 0 for "read CustomFrameRate"
+    `error_pct` how far the declared rate sits from the exact one, 0 almost always
+    """
+    a = mesh.get("anim") or {}
+    frames = a.get("frames", 0)
+    exact = ANIM.fbx_frame_rate(code, frames, a.get("ticks_per_frame", 1) or 1)
+    if not exact or exact <= 0:
+        exact = ENGINE_HZ
+    for fps, mode in STANDARD_RATES:                 # a rate every reader agrees on
+        k = fps / exact
+        if abs(k - round(k)) < 1e-9 and round(k) >= 1:
+            return dict(fps=fps, spacing=int(round(k)), exact=exact, timemode=mode,
+                        error_pct=0.0)
+    for k in range(1, 17):                           # a whole rate, read as custom
+        fps = exact * k
+        if abs(fps - round(fps)) < 1e-9 and round(fps) <= MAX_DECLARED_FPS:
+            return dict(fps=int(round(fps)), spacing=k, exact=exact, timemode=0,
+                        error_pct=0.0)
+    fps = max(1, int(round(exact)))                  # nothing whole is reachable
+    return dict(fps=fps, spacing=1, exact=exact, timemode=0,
+                error_pct=100.0 * (fps - exact) / exact)
+
+
+def keytime(frame, tl):
+    """A baked frame's absolute FBX time, landing on timeline frame `frame * spacing`."""
+    per = KTIME_PER_SEC * tl["spacing"]
+    if per % tl["fps"] == 0:
+        return int(frame) * (per // tl["fps"])
+    return int(round(frame * per / float(tl["fps"])))
+
 
 def decompose(M):
     """A baked frame's 3x4 delta -> (translation, XYZ Euler degrees, scale).
@@ -205,12 +265,12 @@ def anim_track(mesh, part_index, pivot):
     return out
 
 
-def curve_nodes(objects, conns, layer_id, model_id, track, base):
+def curve_nodes(objects, conns, layer_id, model_id, track, base, tl):
     """One AnimationCurveNode per animated channel, with its three curves. Channels
        that never move are skipped, so an artist opening the file sees only what the
        cartridge actually animates."""
     made = 0
-    keytimes = [int(round(k["frame"] / ENGINE_HZ * KTIME_PER_SEC)) for k in track]
+    keytimes = [keytime(k["frame"], tl) for k in track]
     for chan, prop, dflt in (("T", "Lcl Translation", base),
                              ("R", "Lcl Rotation", (0.0, 0.0, 0.0)),
                              ("S", "Lcl Scaling", (1.0, 1.0, 1.0))):
@@ -376,12 +436,13 @@ def build(pack, code, mesh, outdir, house):
     # artist's timeline instead of arriving as a note in a text file.
     anim = mesh["anim"]
     layer_id = None
+    tl = timeline(code, mesh)
     if anim and anim["frames"]:
         nf = anim["frames"]
         stack_id, layer_id = newid(), newid()
         counts["AnimationStack"] += 1
         counts["AnimationLayer"] += 1
-        stop = int(round((nf - 1) / ENGINE_HZ * KTIME_PER_SEC))
+        stop = keytime(nf - 1, tl)
         st = objects.kid("AnimationStack", ("L", stack_id),
                          ("S", fbxname("%s_clip" % code, "AnimStack")), ("S", ""))
         st.add(p70([[("S", "LocalStart"), ("S", "KTime"), ("S", "Time"), ("S", ""), ("L", 0)],
@@ -480,7 +541,8 @@ def build(pack, code, mesh, outdir, house):
         if layer_id is not None:
             track = anim_track(mesh, nd["index"], (px, py, pz))
             if track:
-                ncurves = curve_nodes(objects, conns, layer_id, mid_, track, (px, py, pz))
+                ncurves = curve_nodes(objects, conns, layer_id, mid_, track,
+                                      (px, py, pz), tl)
                 counts["AnimationCurveNode"] += ncurves // 3
                 counts["AnimationCurve"] += ncurves
 
@@ -513,9 +575,16 @@ def build(pack, code, mesh, outdir, house):
         [("S", "CoordAxis"), ("S", "int"), ("S", "Integer"), ("S", ""), ("I", 0)],
         [("S", "CoordAxisSign"), ("S", "int"), ("S", "Integer"), ("S", ""), ("I", 1)],
         [("S", "UnitScaleFactor"), ("S", "double"), ("S", "Number"), ("S", ""), ("D", 1.0)],
-        # 14 = TimeMode "Frames30". The keys carry absolute times either way; this only
-        # decides what the artist's timeline is ruled in.
-        [("S", "TimeMode"), ("S", "enum"), ("S", ""), ("S", ""), ("I", 14)],
+        # THE RATE THE KEYS WERE WRITTEN AGAINST, so the importer rules the timeline in
+        # the same frames the keys sit on. TimeMode carries it when the rate is one of
+        # the enum's own values, which is the case for most models and needs nothing
+        # else read; CustomFrameRate carries it otherwise and is written either way.
+        [("S", "TimeMode"), ("S", "enum"), ("S", ""), ("S", ""), ("I", tl["timemode"])],
+        [("S", "CustomFrameRate"), ("S", "double"), ("S", "Number"), ("S", ""),
+         ("D", float(tl["fps"]))],
+        [("S", "TimeSpanStart"), ("S", "KTime"), ("S", "Time"), ("S", ""), ("L", 0)],
+        [("S", "TimeSpanStop"), ("S", "KTime"), ("S", "Time"), ("S", ""),
+         ("L", keytime(max(0, (anim or {}).get("frames", 1) - 1), tl))],
     ]))
     defs = N("Definitions")
     defs.kid("Version", ("I", 100))
@@ -565,6 +634,9 @@ def main():
     roots, nodes, texmeta = build(pack, code, mesh, outdir, house)
     fbx = os.path.join(outdir, code + ".fbx")
     write_fbx(fbx, roots)
+    tl = timeline(code, mesh)
+    a0 = mesh["anim"] or {}
+    drv = ANIM.driver(code, a0.get("frames", 0), a0.get("ticks_per_frame", 1) or 1)
     man = dict(
         type=code, pack=os.path.basename(packpath), cartridge_mesh=mesh["name"],
         house_palette=house,
@@ -573,12 +645,20 @@ def main():
         total_triangles=mesh["ntris"],
         animation=dict(
             frames=(mesh["anim"] or {}).get("frames", 0),
-            playback_hz=ENGINE_HZ,
+            baked_grid_hz=ENGINE_HZ,
+            game_frames_per_second=round(tl["exact"], 6),
+            timeline_frame_rate=tl["fps"],
+            timeline_frames_per_baked_frame=tl["spacing"],
+            timeline_rate_error_percent=round(tl["error_pct"], 4),
+            driver=drv,
             clips=[dict(first_frame=c["t0"], last_frame=c["t1"],
                         loop=bool(c["loop"]))
                    for c in (mesh["anim"] or {}).get("clips", [])],
-            note=("the baked clip. WHICH frame the game shows is decided by the "
-                  "engine, not by playback: see docs/animation-drivers.md")),
+            note=("the baked clip. Every key sits on a whole timeline frame: one baked "
+                  "frame is %d of them at %d fps, which is the speed the game walks "
+                  "this clip. WHICH frame the game shows is decided by the engine, not "
+                  "by playback: see docs/animation-drivers.md"
+                  % (tl["spacing"], tl["fps"]))),
         construction_sections=list(mesh["sections"]),
         nodes=nodes, textures=texmeta,
         return_contract=dict(

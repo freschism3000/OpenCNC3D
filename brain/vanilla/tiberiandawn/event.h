@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// Narrows EventClass::Frame from 27 bits to 24 and widens ID from 4 bits to
+// 7, so an order can name one of 128 houses, and pins the structure at 22
+// bytes with a static_assert because it is the network wire unit.
+// It does not change the game simulation; it changes the wire format.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\event.h_v   2.19   16 Oct 1995 16:46:14   JOE_BOSTIC  $ */
 /***********************************************************************************************

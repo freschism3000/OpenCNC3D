@@ -1,0 +1,34 @@
+tick 20
+say HOST SPEAKING
+tick 40
+chatdump
+tick 30
+say FILL 01
+tick 2
+say FILL 02
+tick 2
+say FILL 03
+tick 2
+say FILL 04
+tick 2
+say FILL 05
+tick 2
+say FILL 06
+tick 2
+say FILL 07
+tick 2
+say FILL 08
+tick 2
+say FILL 09
+tick 2
+say FILL 10
+tick 2
+say FILL 11
+tick 2
+say FILL 12
+tick 2
+chatdump
+tick 470
+chatdump
+tick 5
+quit

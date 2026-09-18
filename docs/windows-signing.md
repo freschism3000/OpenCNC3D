@@ -12,6 +12,11 @@ rather than re-litigated. **Nothing in it is implemented.** What shipped alongsi
 free half: the download's READ-ME now tells players how to get past the warning, and the
 executable now carries a version resource so a report can say which build it came from.
 
+**Decided: Option A. The Windows build stays unsigned.** The READ-ME's Unblock step is the
+answer to the report, and the costed options below are kept in case that changes. The Mac
+download is the one to sign instead: a Developer ID signature and notarization, so Gatekeeper
+opens the first launch without a workaround. None of that is built yet.
+
 ---
 
 ## 1. What the warning actually is

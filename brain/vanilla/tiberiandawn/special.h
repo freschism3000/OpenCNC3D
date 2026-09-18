@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// Adds one flag, IsShortGame, to SpecialClass: a house is finished when it
+// has no structure left that could rebuild it. Read only by
+// Check_Pertinent_Structures, and off unless set for the match.
+// It DOES change the game simulation when the flag is on.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\special.h_v   2.15   16 Oct 1995 16:47:36   JOE_BOSTIC  $ */
 /***********************************************************************************************
@@ -72,6 +81,7 @@ public:
         IsFromInstall = false;
         IsSeparate = false;
         IsEarlyWin = false;
+        IsShortGame = false;
         HealthBarDisplayMode = HB_SELECTED;
         ResourceBarDisplayMode = RB_SELECTED;
         ModernBalance = false;
@@ -234,6 +244,13 @@ public:
     ** New anti-griefing early win mode. ST - 1/31/2020 3:42PM
     */
     unsigned IsEarlyWin : 1;
+
+    /*
+    **  CNC3D: SHORT GAME. A house is finished when it has no structures left that
+    **  could rebuild it, so defences and walls do not keep it alive. Read only by
+    **  Check_Pertinent_Structures. Off unless the host ticks it in the lobby.
+    */
+    unsigned IsShortGame : 1;
 
     /*
     ** Health bar display mode

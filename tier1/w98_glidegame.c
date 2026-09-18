@@ -1763,13 +1763,14 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
                 save_bmp(g_sc.shot);
                 report("shot %s at frame %d (menu)", g_sc.shot, frame);
             }
-            /* TEST MAP and START NEW GAME both mean "play the one scenario this build
-             * carries". Load, Multiplayer and Intro are drawn DISABLED by the module
-             * itself and cannot be picked; Exit leaves. Everything the menu cannot yet
-             * do is a grey slab on screen rather than a live button that does nothing,
-             * which is the 1995 dialog's own way of saying it. */
+            /* START NEW GAME (and Special Ops, whose list this tier does not draw)
+             * both mean "play the one scenario this build carries". Load, Multiplayer
+             * and Intro are drawn DISABLED by the module itself and cannot be picked;
+             * Exit leaves. Everything the menu cannot yet do is a grey slab on screen
+             * rather than a live button that does nothing, which is the 1995 dialog's
+             * own way of saying it. */
             if (pick == DM_EXIT) { report("menu: exit"); ++frame; break; }
-            if (pick == DM_TESTMAP || pick == DM_START)
+            if (pick == DM_SPECIAL || pick == DM_START)
             {
                 g_inmenu = 0;
                 report("menu: %s -> %s", dm_item_label(pick), g_scen);

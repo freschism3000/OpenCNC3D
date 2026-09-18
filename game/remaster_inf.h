@@ -35,9 +35,15 @@
  *     baker, so they are GENERATED into dosinf_dotable.h from the brain's own idata.cpp
  *     rather than transcribed. shp = Frame + facenum*Jump + stage.
  *
- *  2. THE CROP BOTTOM IS THE SHADOW'S BOTTOM, NOT THE FEET. Anchoring a frame on its
- *     crop box floats every man off the ground by the length of his drop shadow. The
- *     anchor is computed from the LOGICAL frame, which is constant per type.
+ *  2. THE CROP BOTTOM IS NOT THE GROUND LINE, and every action's crop bottom is a
+ *     DIFFERENT row. Each frame is a tight crop of a logical canvas that is constant per
+ *     type, so a crop box says nothing on its own about where the man's feet are; and an
+ *     attack pose's crop reaches well below them, because the muzzle flash, the flame jet
+ *     and the rocket exhaust are drawn into the frame. Standing each strip's own bottom
+ *     row on the terrain therefore lifts the man by that overhang the moment he fires --
+ *     39 logical rows for E1's prone fire, 47 for E4's standing flame, measured. So the
+ *     type gets ONE anchor, read off its STAND action (ri_type_anchor), and every strip
+ *     carries its offset from that anchor (RiSheet::ox / ::drop) for the draw to apply.
  *
  *  3. ZIP MEMBERS ARE RAW DEFLATE. The tree's existing zlib calls (edit_mod.h's
  *     uncompress, cnc_eyes.cpp's compress2) are the RFC1950 wrapped form and fail on
@@ -428,6 +434,7 @@ typedef struct RiSheet {
     int   frames, facings, stages;
     int   fw, fh, cols;
     float tpu;                        /* texels per world unit for THIS strip */
+    float ox, drop;                   /* the cell against the type's anchor; see below */
 } RiSheet;
 
 RI_MAYBE_UNUSED static void ri_sheet_free(RiSheet* s)
@@ -470,8 +477,8 @@ static int ri_load_frame(const RiZip* z, const char* lowty, int shp, RiFrame* f)
    STAND gives 4.76 and FIRE 4.69 but WALK gives 3.72, so a walking man drew about a fifth
    larger than a standing one. In the 1995 art every strip shares one texels-per-unit and
    the relative sizes come from the art itself; this restores that. */
-static int ri_union_box(const RiZip* z, const char* lowty, const short row[3],
-                        int* w, int* h)
+static int ri_action_box(const RiZip* z, const char* lowty, const short row[3],
+                         int box[4])
 {
     const int Frame = row[0], Count = row[1], Jump = row[2];
     const int facings = Jump > 0 ? 8 : 1;
@@ -502,18 +509,52 @@ static int ri_union_box(const RiZip* z, const char* lowty, const short row[3],
         free(mb);
     }
     if (!got || x1 <= x0 || y1 <= y0) return 0;
-    *w = x1 - x0; *h = y1 - y0;
+    box[0] = x0; box[1] = y0; box[2] = x1; box[3] = y1;
+    return 1;
+}
+
+/* The same box as a width and a height, for the one caller that wants only the scale. */
+RI_MAYBE_UNUSED static int ri_union_box(const RiZip* z, const char* lowty,
+                                        const short row[3], int* w, int* h)
+{
+    int b[4];
+    if (!ri_action_box(z, lowty, row, b)) return 0;
+    *w = b[2] - b[0]; *h = b[3] - b[1];
+    return 1;
+}
+
+/* THE TYPE'S ANCHOR, in logical coordinates: the column the man stands on and the row he
+   stands ON. Taken from his STAND action, whose union box is the tight one -- eight
+   frames, no weapon effect, no lean -- and which is also the action rm_inf_tpu measures
+   the scale from, so one reference serves both.
+
+   IT HAS TO BE ONE ANCHOR PER TYPE, and that is the whole of the fix. Every strip here is
+   cropped to its OWN action's union box, and the boxes do not agree: measured on a real
+   install, E1's stand ends at logical row 118 and his prone fire at 157, E4's stand at 119
+   and his standing flame at 166. Standing each cell's bottom row on the terrain therefore
+   puts a different logical row on the ground for every action, and the man rises by the
+   difference the moment he opens fire. The 1995 baker never had this problem because it
+   unifies the actions onto one feet line while it bakes; here the strips are built lazily,
+   one action at a time, so the agreement is carried as an OFFSET on each strip instead. */
+RI_MAYBE_UNUSED static int ri_type_anchor(const RiZip* z, const char* lowty,
+                                          const short stand[3], int* ax, int* ay)
+{
+    int b[4];
+    if (!ri_action_box(z, lowty, stand, b)) return 0;
+    *ax = (b[0] + b[2]) / 2;      /* his centre column */
+    *ay = b[3];                   /* the row his standing crop ends on */
     return 1;
 }
 
 /* Build one (type, action) strip. `row` is the {Frame, Count, Jump} triple from
-   dosinf_dotable.h; dos_fw is the DOS strip's own frame width, which sets the scale.
+   dosinf_dotable.h; dos_fw is the DOS strip's own frame width, which sets the scale;
+   (ax, ay) is the type's anchor from ri_type_anchor.
    Returns 0 when the type has no art for this action, which is a normal answer. */
 RI_MAYBE_UNUSED static int ri_build_strip(const RiZip* z, const char* lowty,
                                           const short row[3], int dos_fw,
                                           const RiBand* band,
                                           const unsigned char ramp[16][3],
-                                          float tpu, RiSheet* out)
+                                          float tpu, int ax, int ay, RiSheet* out)
 {
     const int Frame = row[0], Count = row[1], Jump = row[2];
     const int facings = Jump > 0 ? 8 : 1;
@@ -563,6 +604,11 @@ RI_MAYBE_UNUSED static int ri_build_strip(const RiZip* z, const char* lowty,
     /* ONE SCALE FOR THE WHOLE TYPE, handed in. See ri_union_box for why it cannot be
        derived here from this action's own box. */
     out->tpu = tpu;
+    /* THE CELL AGAINST THE ANCHOR, which is what the draw needs and the cell alone cannot
+       say. Both are in this strip's own texels, which are logical units one for one: the
+       cell is a window on the logical canvas, not a resampling of it. */
+    out->ox   = (float)((x0 + x1) / 2 - ax);   /* cell centre right of his anchor column */
+    out->drop = (float)(y1 - ay);              /* cell bottom below his ground line */
     (void)dos_fw;
     out->rgba = (unsigned char*)calloc((size_t)out->texw * out->texh, 4);
     if (!out->rgba) goto done;

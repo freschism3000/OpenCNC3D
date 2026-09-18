@@ -497,6 +497,8 @@ int camp_open(Camp *c, SDL_Window *win, struct CncAudio *au,
             fprintf(stderr, "campaign: %s -- score screen runs without its logo\n", lerr);
     }
     c->logo_side = -1;          /* memset made this 0, which is GDI */
+    c->logo_x = LOGO_PX; c->logo_y = LOGO_PY;
+    c->logo_w = LOGO_PW; c->logo_h = LOGO_PH;
 
     err[0] = 0;
     return 1;
@@ -618,7 +620,7 @@ static void camp_draw(Camp *c)
        is the synthetic clock under --flowtest, so a flow shot is reproducible. */
     if (c->logo_ok && c->logo_side >= 0) {
         /* EACH FACTION DRAWS ITS OWN BRIEFING LOGO, and never the title disc.
-           the project owner, 26 Aug 2026, over a recording of a GDI score screen turning its Nod
+           Reported over a recording of a GDI score screen turning its Nod
            face forward: "Both Logos combined into onw", then "use BRF_LOGO_GDI
            (dl_01E9A50) for the GDI score screen, and BRF_LOGO_NOD (dl_01EF058) for
            the Nod screen." Those are slots 0 and 1 of the pack.
@@ -636,8 +638,8 @@ static void camp_draw(Camp *c)
            other faction. */
         const float ang = camp_logo_angle(c);
         logo3d_draw(&c->logo, c->logo_side ? LOGO3D_NOD : LOGO3D_GDI, fbh,
-                    x0 + LOGO_PX * scale, y0 + LOGO_PY * scale,
-                    LOGO_PW * scale, LOGO_PH * scale, ang, fade,
+                    x0 + c->logo_x * scale, y0 + c->logo_y * scale,
+                    c->logo_w * scale, c->logo_h * scale, ang, fade,
                     0.0f, 0.0f, 1.0f, 1.0f, LOGO3D_TILT_DEFAULT);
     }
 }
@@ -1889,6 +1891,8 @@ int camp_score(Camp *c, const CampScore *s, int side, int scenario)
     /* The spinning faction logo belongs to THIS screen only; camp_draw serves all
        three, so the other two turn it off again on the way in. */
     c->logo_side = side;
+    c->logo_x = LOGO_PX; c->logo_y = LOGO_PY;
+    c->logo_w = LOGO_PW; c->logo_h = LOGO_PH;
     c->logo_t0 = camp_now(c);
 
     /* score.cpp's own per-house layout tables */
@@ -1897,7 +1901,7 @@ int camp_score(Camp *c, const CampScore *s, int side, int scenario)
     static const int nodtxx[2] = {150, 224}, nodtxy[2] = {102, 102};
     static const int bldggy[2] = {138, 128}, bldgny[2] = {150, 140};
 
-    /* BOTH FACTIONS WEAR NOD'S SCORE SCREEN. the project owner, 26 Aug 2026: "Apply the Nod
+    /* BOTH FACTIONS WEAR NOD'S SCORE SCREEN. Reported: "Apply the Nod
        Scorescreen to GDI mission (with the GDI music and emblem), and we'll test
        that out."
 
@@ -1955,7 +1959,7 @@ int camp_score(Camp *c, const CampScore *s, int side, int scenario)
        houses even though the same function branches on house for the palette and the
        background art, so NOD_WIN1.AUD -- 372,405 bytes of it, sitting in the shipped
        SCORES.MIX -- was written, pressed and never played. It is in no theme table and
-       referenced by no code in the 1995 source. the project owner asked for it back on 26 Aug 2026.
+       referenced by no code in the 1995 source. The requirement asked for it back.
        A DELIBERATE DEVIATION from 1995 and registered as one in known-gap notes. */
     if (c->au) {
         cnc_music_stop(c->au);
@@ -2184,6 +2188,389 @@ closed:
     return -1;
 }
 
+/* ==================================================================================== *
+ *  THE SCREEN A MATCH ENDS ON
+ *
+ *  Same plate, same medallion, same music as the campaign's score screen above, and one
+ *  number kept from it: how long the match took. Everything else on it is new, because
+ *  everything else the campaign screen reports is a comparison against a designer's par,
+ *  and a match has no par. It has other commanders.
+ *
+ *  ONE SHARED GRID, ROWS, AND A BAR MEASURED AGAINST THE LEADER. That is the whole idea,
+ *  taken from how a modern strategy game presents a finished match, and it happens to be
+ *  period correct: this engine's own score screen already animates horizontal bars, so
+ *  bars are native here and cost nothing. Every cell is a number AND a length, so "was it
+ *  close" is answered before a single figure is read.
+ *
+ *  THE COLUMNS ARE WHAT THE ENGINE ACTUALLY COUNTS. Killed, razed, lost and harvested are
+ *  all kept per player by the engine's own sidebar state. There is deliberately no BUILT
+ *  column, which the first sketch of this screen had: nothing counts it, and a number
+ *  nobody counts is a number that would have to be invented. LOST reads better anyway --
+ *  killed against lost is the shape of a match in two figures.
+ *
+ *  THE SCORE IS A VISIBLE SUM of the three columns beside it: two a kill, five a razing,
+ *  and tiberium divided by ten so it sits in the same range instead of swamping them. It
+ *  is printed on the screen as a footnote for the same reason it is a simple sum: a total
+ *  the player cannot reconstruct from the row it sits in is a number they have to take on
+ *  trust. LOST is shown and not scored; it is context, not a penalty, and subtracting it
+ *  would let a score go negative and make the bars meaningless.
+ *
+ *  WINNERS FIRST, then by score. The local commander's row is marked, so you find
+ *  yourself without reading names.
+ * ==================================================================================== */
+
+/* Eight bars have to be told apart on a plate whose palette has no remap band, so the row
+   ramps are taken from the disc's OWN score palettes rather than from the battlefield's
+   liveries: those four ramps are the only indices this plate is guaranteed to hold. Seat
+   order follows the livery order as closely as four hues allow, and light/dark of the same
+   hue separates the second four. */
+static const unsigned char camp_ms_bar[8] = {
+    0xEA, 0x68, 0x28, 0x18, 0xEC, 0x6C, 0x2C, 0x1C
+};
+static const unsigned char *camp_ms_pal(int colour)
+{
+    switch (colour & 7) {
+    case 0: return camp_sc_yellowpal;
+    case 1: return camp_sc_bluepal;
+    case 2: return camp_sc_redpal;
+    case 3: return camp_sc_greenpal;
+    case 4: return camp_sc_yellowpal;
+    case 5: return camp_sc_bluepal;
+    case 6: return camp_sc_greenpal;
+    default: return camp_sc_redpal;
+    }
+}
+
+/* Right aligned at `rx`, which is what makes a column of figures scannable: the digits
+   line up under each other instead of the words they follow. */
+static void camp_ms_right(Camp *c, const char *text, int rx, int y,
+                          const unsigned char pal[16])
+{
+    const int w = (int)strlen(text) * 7;
+    camp_print16(c, "SCOREFNT", text, rx - w, y, pal);
+}
+
+/* THE PANEL, and why there is one. The plate under this screen is a technical schematic,
+   all red and cyan grid work, and a table of figures laid straight onto it is unreadable.
+   So the table gets its own black panel with a green frame, inset far enough that the
+   plate still shows as a border: the screen keeps the campaign's identity, and the
+   numbers keep their legibility. The medallion sits INSIDE the panel, top left, in a box
+   of its own, with the verdict and the match's line beside it. */
+#define MS_PANEL_X0  4
+#define MS_PANEL_Y0  4
+#define MS_PANEL_X1 315
+#define MS_PANEL_Y1 176
+#define MS_LOGO_X    7
+#define MS_LOGO_Y    6
+#define MS_LOGO_W   66
+#define MS_LOGO_H   50
+#define MS_HEAD_X   82
+/* CONTINUE, below the panel rather than inside it: eight commanders fill the panel to
+   its floor, and a button that a full room pushes off the screen is a button that works
+   only in the games where it is least needed. */
+#define MS_BTN_X0  115
+#define MS_BTN_X1  205
+#define MS_BTN_Y0  180
+#define MS_BTN_Y1  193
+#define MS_X0        8
+#define MS_KILL    126
+#define MS_RAZE    170
+#define MS_LOST    214
+#define MS_TIB     266
+#define MS_SCORE   311
+#define MS_ROW_Y    70
+#define MS_ROW_H    13
+#define MS_BAR_W   295
+/* How many steps a bar's count takes at most. The campaign's own tally walks one step per
+   PIXEL of bar, up to 119; eight commanders doing that would outlast anyone's patience, so
+   the sweep is capped and the numbers step in proportion with it. */
+#define MS_MAX_STEPS 34
+
+/* The CONTINUE button, in the plate's own idiom: a dark face, a bright top and left edge
+   and a dark bottom and right one, which is how every raised control in this game is
+   drawn. `pressed` swaps the two edges, so the button moves when it is clicked. */
+static void camp_ms_button(Camp *c, int pressed)
+{
+    const unsigned char hi = pressed ? 0x14 : 0x1D, lo = pressed ? 0x1D : 0x14;
+    const char *label = "CONTINUE";
+    camp_fill(c, MS_BTN_X0, MS_BTN_Y0, MS_BTN_X1, MS_BTN_Y1, DB_BLACK);
+    camp_fill(c, MS_BTN_X0, MS_BTN_Y0, MS_BTN_X1, MS_BTN_Y0, hi);
+    camp_fill(c, MS_BTN_X0, MS_BTN_Y0, MS_BTN_X0, MS_BTN_Y1, hi);
+    camp_fill(c, MS_BTN_X0, MS_BTN_Y1, MS_BTN_X1, MS_BTN_Y1, lo);
+    camp_fill(c, MS_BTN_X1, MS_BTN_Y0, MS_BTN_X1, MS_BTN_Y1, lo);
+    camp_print16(c, "SCOREFNT", label,
+                 MS_BTN_X0 + ((MS_BTN_X1 - MS_BTN_X0) - (int)strlen(label) * 7) / 2 + 1,
+                 MS_BTN_Y0 + 3, camp_sc_greenpal);
+}
+
+static int camp_ms_in_button(int x, int y)
+{
+    return x >= MS_BTN_X0 && x <= MS_BTN_X1 && y >= MS_BTN_Y0 && y <= MS_BTN_Y1;
+}
+
+/* Count_Up_Print, right aligned. The campaign's own camp_countup erases a box to the
+   RIGHT of x, which is wrong for a column of figures that line up on their last digit; and
+   the box it clears has to be the width of the FINAL value, not of the value being drawn,
+   or a number that shrinks a digit leaves its old tail behind. Clearing to the final width
+   is also what keeps the erase inside its own column: the widest figure this screen shows
+   is five digits, 35 pixels, against a 44 pixel column pitch. */
+static void camp_ms_countup(Camp *c, int val, int rx, int y, const unsigned char pal[16],
+                            int final)
+{
+    char buf[16], fin[16];
+    int w, fw;
+    snprintf(buf, sizeof buf, "%d", val);
+    snprintf(fin, sizeof fin, "%d", final);
+    w = (int)strlen(buf) * 7;
+    fw = (int)strlen(fin) * 7;
+    camp_fill(c, rx - fw, y, rx, y + 7, DB_BLACK);
+    camp_print16(c, "SCOREFNT", buf, rx - w, y, pal);
+}
+
+
+/* The column right edges, and the row geometry. 320 wide with a seven pixel advance
+   leaves 45 characters, so the name is capped at nine and the four figures take the rest. */
+
+int camp_match_score(Camp *c, const CampMatch *m, int side)
+{
+    const CampEntry *bg = camp_entry(c, "SCORE_N");
+    CampCtx k;
+    int order[8];
+    int i, j, frame, best = 1, steps, skip = 0;
+    char buf[48];
+
+    if (!bg || !m || m->nrows <= 0) return 0;
+
+    printf("CAMPAIGN|matchscore|rows=%d|win=%d|seconds=%d|net=%d|side=%s|map=%s\n",
+           m->nrows, m->win, m->seconds, m->net, side ? "Nod" : "GDI", m->map);
+    fflush(stdout);
+
+    /* WINNERS FIRST, THEN BY SCORE. A plain insertion sort over at most eight rows: the
+       simplest correct thing is the right one at this size. */
+    for (i = 0; i < m->nrows; i++) order[i] = i;
+    for (i = 1; i < m->nrows; i++) {
+        const int key = order[i];
+        const CampMatchRow *a = &m->row[key];
+        for (j = i - 1; j >= 0; j--) {
+            const CampMatchRow *b = &m->row[order[j]];
+            const int abetter = (!a->defeated && b->defeated)
+                             || (a->defeated == b->defeated && a->score > b->score);
+            if (!abetter) break;
+            order[j + 1] = order[j];
+        }
+        order[j + 1] = key;
+    }
+    for (i = 0; i < m->nrows; i++)
+        if (m->row[i].score > best) best = m->row[i].score;
+
+    camp_ctx_init(&k, c);
+    memset(c->plate, 0, sizeof(c->plate));
+    camp_use_pal(c, bg->pal);
+    c->fade = 0;
+    camp_show_mouse(c, 0);
+    /* The same turning medallion the campaign's screen carries, in a box of its own: the
+       campaign's box is where this screen's table has to go. */
+    c->logo_side = side;
+    c->logo_x = MS_LOGO_X; c->logo_y = MS_LOGO_Y;
+    c->logo_w = MS_LOGO_W; c->logo_h = MS_LOGO_H;
+    c->logo_t0 = camp_now(c);
+
+    /* The campaign screen's own music, by the same rule: Nod gets the track 1995 pressed
+       and never played. */
+    if (c->au) {
+        cnc_music_stop(c->au);
+        cnc_music_play_theme(c->au, side ? "NOD_WIN1" : "WIN1", 1);
+    }
+
+    camp_blit(c, bg, 1);
+    k.fade_step = 256 / 7 + 1;
+    if (!camp_ctx_delay(&k, 7)) goto closed;
+    camp_sfx(c, "COUNTRY4.AUD", 90);
+    for (frame = 1; frame < bg->frames; frame++) {
+        camp_blit(c, bg, frame);
+        if (!camp_ctx_delay(&k, 2)) goto closed;
+    }
+
+
+    /* The panel the table stands on, and its frame. */
+    camp_fill(c, MS_PANEL_X0, MS_PANEL_Y0, MS_PANEL_X1, MS_PANEL_Y1, DB_BLACK);
+    camp_fill(c, MS_PANEL_X0, MS_PANEL_Y0, MS_PANEL_X1, MS_PANEL_Y0, 0x18);
+    camp_fill(c, MS_PANEL_X0, MS_PANEL_Y1, MS_PANEL_X1, MS_PANEL_Y1, 0x18);
+    camp_fill(c, MS_PANEL_X0, MS_PANEL_Y0, MS_PANEL_X0, MS_PANEL_Y1, 0x18);
+    camp_fill(c, MS_PANEL_X1, MS_PANEL_Y0, MS_PANEL_X1, MS_PANEL_Y1, 0x18);
+
+    /* THE VERDICT, typed rather than printed, because that is how this screen speaks. */
+    snprintf(buf, sizeof buf, "%s", m->win ? "MISSION ACCOMPLISHED" : "MISSION FAILED");
+    camp_ctx_type_str(&k, buf,
+                      MS_HEAD_X + (311 - MS_HEAD_X - (int)strlen(buf) * 7) / 2, 10,
+                      m->win ? camp_sc_yellowpal : camp_sc_redpal);
+    while (camp_ctx_typing(&k))
+        if (!camp_ctx_delay(&k, 1)) goto closed;
+
+    snprintf(buf, sizeof buf, "%s   %s", m->net ? "MULTIPLAYER" : "SKIRMISH",
+             m->map[0] ? m->map : "-");
+    camp_print16(c, "SCOREFNT", buf,
+                 MS_HEAD_X + (311 - MS_HEAD_X - (int)strlen(buf) * 7) / 2, 24,
+                 camp_sc_greenpal);
+    /* THE ONE NUMBER KEPT FROM THE MISSION TALLY: how long it took. */
+    snprintf(buf, sizeof buf, "TIME %d:%02d", m->seconds / 60, m->seconds % 60);
+    camp_print16(c, "SCOREFNT", buf,
+                 MS_HEAD_X + (311 - MS_HEAD_X - (int)strlen(buf) * 7) / 2, 36,
+                 camp_sc_greenpal);
+
+    /* WHY IT ENDED TAKES THIS LINE WHEN THERE IS A WHY. A match that fell over -- the
+       simulations parted, or a machine stopped answering -- used to close the whole
+       application, so this screen never saw one of those endings at all. Now it does, and
+       on that screen the reason outranks the arithmetic: a player who has just lost
+       twenty minutes needs to know whether it was their network or their game. The sum
+       comes back on every ordinary finish, which is all of them. */
+    snprintf(buf, sizeof buf, "%s",
+             m->ended[0] ? m->ended : "SCORE = K x2 + R x5 + TIB/10");
+    camp_print16(c, "SCOREFNT", buf,
+                 MS_HEAD_X + (311 - MS_HEAD_X - (int)strlen(buf) * 7) / 2, 48,
+                 camp_sc_greenpal);
+
+    camp_fill(c, MS_X0, 60, 311, 60, 0x18);   /* the rule under the header */
+
+    camp_print16(c, "SCOREFNT", "COMMANDER", MS_X0, 62, camp_sc_greenpal);
+    camp_ms_right(c, "KILL",  MS_KILL,  62, camp_sc_greenpal);
+    camp_ms_right(c, "RAZE",  MS_RAZE,  62, camp_sc_greenpal);
+    camp_ms_right(c, "LOST",  MS_LOST,  62, camp_sc_greenpal);
+    camp_ms_right(c, "TIB",   MS_TIB,   62, camp_sc_greenpal);
+    camp_ms_right(c, "SCORE", MS_SCORE, 62, camp_sc_greenpal);
+    camp_sfx(c, "SFX4.AUD", 120);
+    if (!camp_ctx_delay(&k, 8)) goto closed;
+
+    /* ONE COMMANDER AT A TIME, and each one's bar filling as their figures count up to
+       meet it. This is the campaign tally's own idiom, transcribed rather than invented:
+       a bleep on every step of the count, the numbers walking up in proportion with the
+       bar, and a beat between sections. A table that simply appeared would be finished
+       before the eye reached it; drawn this way the reader is walked down the standings
+       in the order they finished, which is the whole point of sorting them.
+
+       ANY KEY SKIPS THE REST, exactly as the mission tally's count-up does: once you
+       have seen the shape of it there is no reason to sit through the rest, and a screen
+       that cannot be hurried is a screen that gets in the way. The final state is always
+       drawn, whether it was reached a step at a time or in one go. */
+    for (i = 0; i < m->nrows && MS_ROW_Y + i * MS_ROW_H + 11 <= 174; i++) {
+        const CampMatchRow *r = &m->row[order[i]];
+        const unsigned char *pal = camp_ms_pal(r->colour);
+        const int y = MS_ROW_Y + i * MS_ROW_H;
+        const int by = y + 9;
+        const int full = MS_BAR_W * r->score / best;
+        int st;
+        char nm[12];
+
+        /* The commander arrives: their name first, in their own livery, with the same
+           note the campaign screen sounds when a new line of the tally opens. The local
+           one is marked so you find yourself without reading names. */
+        snprintf(nm, sizeof nm, "%s%.9s", r->is_local ? ">" : " ", r->name);
+        camp_print16(c, "SCOREFNT", nm, MS_X0, y, pal);
+        if (!skip) {
+            camp_sfx(c, "SFX4.AUD", 90);
+            if (!camp_ctx_delay(&k, 5)) goto closed;
+            if (k.keyed) { skip = 1; k.keyed = 0; }
+        }
+
+        /* Then the count. The bar and all five figures move together, so the length and
+           the numbers arrive at the same instant rather than one explaining the other
+           afterwards. */
+        steps = full > 0 ? full : 1;
+        if (steps > MS_MAX_STEPS) steps = MS_MAX_STEPS;
+        if (!skip) {
+            for (st = 1; st < steps; st++) {
+                const int len = full * st / steps;
+                if (len > 0)
+                    camp_fill(c, MS_X0, by, MS_X0 + len, by + 1,
+                              camp_ms_bar[r->colour & 7]);
+                camp_ms_countup(c, r->killed * st / steps,    MS_KILL,  y, pal, r->killed);
+                camp_ms_countup(c, r->razed * st / steps,     MS_RAZE,  y, pal, r->razed);
+                camp_ms_countup(c, r->lost * st / steps,      MS_LOST,  y, pal, r->lost);
+                camp_ms_countup(c, r->harvested * st / steps, MS_TIB,   y, pal, r->harvested);
+                camp_ms_countup(c, r->score * st / steps,     MS_SCORE, y, pal, r->score);
+                camp_sfx(c, "BEEPY6.AUD", 60);
+                if (!camp_ctx_delay(&k, 1)) goto closed;
+                if (k.keyed) { skip = 1; k.keyed = 0; break; }
+            }
+        }
+
+        /* The finished row, always: the numbers are the truth and must never be left at
+           whatever step the skip happened to interrupt. */
+        if (full > 0)
+            camp_fill(c, MS_X0, by, MS_X0 + full, by + 1, camp_ms_bar[r->colour & 7]);
+        camp_ms_countup(c, r->killed,    MS_KILL,  y, pal, r->killed);
+        camp_ms_countup(c, r->razed,     MS_RAZE,  y, pal, r->razed);
+        camp_ms_countup(c, r->lost,      MS_LOST,  y, pal, r->lost);
+        camp_ms_countup(c, r->harvested, MS_TIB,   y, pal, r->harvested);
+        camp_ms_countup(c, r->score,     MS_SCORE, y, pal, r->score);
+        if (!skip && !camp_ctx_delay(&k, 14)) goto closed;
+        /* PART WAY DOWN THE TABLE, PHOTOGRAPHED. The finished board proves the figures
+           and the bar lengths; it says nothing about whether the commanders arrived one
+           at a time or all at once, which is the thing that can quietly stop happening.
+           A shot with the third row complete and the rest still blank is what tells a
+           gate the difference. */
+        if (i == 2) {
+            static int mid_once = 0;
+            camp_shot(c, "flow_matchscore_mid.png", &mid_once);
+        }
+    }
+
+    /* CONTINUE. Drawn before the shot on purpose: a button a gate cannot see in the
+       photograph is a button that can go missing without anything noticing. */
+    camp_ms_button(c, 0);
+    /* And a pointer to press it with. The campaign's own score screen is deliberately
+       pointerless, because it has nothing to press; this one has. Not under the harness,
+       which has nobody to move it: it would be drawn parked wherever it happened to be,
+       and a gate that measures bar lengths off the photograph would measure the arrow
+       sitting on one of them. */
+    if (!camp_autopilot) camp_show_mouse(c, 1);
+
+    /* The finished board, photographed, which is the only way a gate can see a screen
+       that is otherwise reachable only by playing a whole match to its end. */
+    {
+        static int shot_once = 0;
+        camp_shot(c, "flow_matchscore.png", &shot_once);
+    }
+
+    /* AND IT WAITS TO BE DISMISSED. A click on CONTINUE or any key; a click anywhere
+       else does nothing, which is what makes it a button rather than a screen that
+       happens to close. Not for ever, and not at all under autopilot, which has nobody
+       to press anything: a wait with no bound is how a headless run hangs instead of
+       failing.
+
+       The press is DRAWN, so the button moves under the pointer the way every other
+       control in this game does. */
+    if (!camp_autopilot) {
+        int held = 0;
+        for (;;) {
+            if (k.keyed) break;
+            if (k.clickx >= 0) {
+                if (camp_ms_in_button(k.clickx, k.clicky)) {
+                    camp_ms_button(c, 1);
+                    camp_sfx(c, "BLEEP2.AUD", 110);
+                    if (!camp_ctx_delay(&k, 4)) goto closed;
+                    camp_ms_button(c, 0);
+                    break;
+                }
+                k.clickx = -1;          /* a miss: keep waiting */
+            }
+            if (held++ >= 60 * 60) break;
+            if (!camp_ctx_delay(&k, 1)) goto closed;
+        }
+    }
+
+    k.fade_step = -(256 / 7 + 1);
+    if (!camp_ctx_delay(&k, 7)) goto closed;
+    if (c->au) cnc_music_stop(c->au);
+    c->fade = 256;
+    return 0;
+
+closed:
+    if (c->au) cnc_music_stop(c->au);
+    c->fade = 256;
+    return -1;
+}
+
 /* ------------------------------------------------------------------ map selection */
 
 /* mapsel.cpp's CountryArray, transcribed IN FULL: indexed [scenario][ScenDir], the
@@ -2380,7 +2767,7 @@ int camp_mapsel(Camp *c, int side, int scenario, char *dir, char *var)
 
     *dir = 'E';
     *var = 'A';
-    /* NOD HAS ITS OWN REELS AS OF 26 Aug 2026. This was `if (side != 0) return 0`
+    /* NOD HAS ITS OWN REELS. This was `if (side != 0) return 0`
        with a note calling them a registered gap needing CD-2. They were never
        missing: EARTH_A.WSA, AFRICA.WSA and CLICK_A.CPS sit in the GENERAL.MIX we
        already ship, beside the GDI three, and nobody had looked. the project owner, 26 Aug:

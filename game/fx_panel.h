@@ -150,7 +150,18 @@ static int fxp_over_panel(float col, int fbh)
 
 /* NO GL HERE. This is reachable from argv parsing, which on the shipping binary runs
    before the window exists, and the font atlas is built lazily by fxp_draw for exactly
-   that reason: a toggle that uploaded a texture would segfault on --gfxpanel. */
+   that reason: a toggle that uploaded a texture would segfault on --gfxpanel.
+
+   A COOKED BUILD HAS NO PLAYER'S DOOR TO THIS ("F5 off in cooked builds, on
+   for the developer's own machine"). Three things call it: the F5 key (fxp_event, below),
+   the --gfxpanel switch (cnc_eyes.cpp's argv loop) and the `gfxpanel` script verb. Under
+   CNC3D_COOKED the first two are not compiled in and say so by name if asked; the script
+   verb stays, because it is the harness's door and nothing else's -- a script file is
+   what the gate suite feeds a binary, and the suite is what proves the cooked binaries
+   before they ship (G39 and G144 open the panel through it). A player has no script.
+   The define is set by tools/release.sh alone, through the build scripts; a developer's
+   own build never sets it and keeps F5 with nothing to remember. The packagers refuse a
+   cooked package whose binary does not carry the --gfxpanel refusal sentence. */
 static void fxp_toggle(void)
 {
     g_fxpOpen = !g_fxpOpen;
@@ -160,14 +171,33 @@ static void fxp_toggle(void)
 
 /* Anything that changes a value goes through here, so the one setting with a side
    effect outside the shader uniforms cannot be changed without its side effect. */
+/* Defined in cnc_sidebar.h, which the renderer includes after this header. */
+static void sb_set_ui_scale(int div);
+/* Defined in cnc_eyes.cpp beside the camera; the Perspective row's yaw. */
+static void cam_apply_option(void);
+
 static void fxp_after_change(const FxParam* p)
 {
     if (p && !strcmp(p->key, "bilinear"))
         fx_filter_set(g_fx.bilinear);
-    if (p && !strcmp(p->key, "texset"))
+    if (p && !strcmp(p->key, "texset")) {
         fx_texset_set((int)g_fx.texset);
+        /* and the grass with it: it is tuned against the 1995 bank and turns itself off
+           on the cartridge one, remembering the tick so coming back restores it */
+        fx_grass_follow_texset();
+    }
     if (p && !strcmp(p->key, "infset"))
         fx_infset_set((int)g_fx.infset);
+    /* The UI scale reaches the sidebar from here too: a person dragging the row is a
+       person changing it. The display rows do NOT -- this is reachable before the window
+       exists (see fxp_toggle), and the Visuals dialog is where a mode is applied. */
+    if (p && !strcmp(p->key, "ui_scale"))
+        sb_set_ui_scale(1 + (int)(g_fx.ui_scale + 0.5f));
+    /* The Perspective dial and the ISOMETRIC group turn the camera. The frame hook
+       would catch it a frame later; a drag, a `gfx iso_yaw N` or a loaded preset gets
+       it now, ahead of any pick. */
+    if (p && (!strcmp(p->key, "perspective") || !strncmp(p->key, "iso_", 4)))
+        cam_apply_option();
 }
 
 static void fxp_apply_all_side_effects(void)
@@ -175,6 +205,7 @@ static void fxp_apply_all_side_effects(void)
     fx_filter_set(g_fx.bilinear);
     fx_texset_set((int)g_fx.texset);
     fx_infset_set((int)g_fx.infset);
+    cam_apply_option();
 }
 
 /* ---- Row layout -------------------------------------------------------------------
@@ -193,6 +224,35 @@ static int fxp_walk(int fbh, int scale, FxpRowFn fn, void* ctx)
         y += h;
     }
     return y + g_fxpScroll - FXP_TOP;      /* total content height, unscrolled */
+}
+
+/* SCROLL SO THAT A NAMED ROW IS ON SCREEN, and put its GROUP heading at the top rather
+   than the row itself, so the section arrives with its title and its neighbours instead
+   of one slider floating alone.
+
+   This exists because the table is 205 rows deep and nothing could reach past the first
+   screenful without a mouse. A person has a wheel; a script had no way at all, so no gate
+   could photograph a row below the fold or assert that it renders. Returns 0 when the key
+   is not a row, which is the caller's cue to say so rather than scroll somewhere
+   arbitrary. */
+static int fxp_scroll_to(const char* key, int fbh)
+{
+    if (!key || !key[0]) return 0;
+    int y = FXP_TOP, groupY = FXP_TOP, found = -1;
+    for (const FxParam* p = FX_PARAMS; p->kind != FXP_END; p++) {
+        if (p->kind == FXP_GROUP) groupY = y;
+        if (p->kind != FXP_GROUP && !strcmp(p->key, key)) { found = groupY; break; }
+        y += (p->kind == FXP_GROUP) ? FXP_ROWH + 7 : FXP_ROWH;
+    }
+    if (found < 0) return 0;
+    const int scale = fxp_scale(fbh);
+    const int content = fxp_walk(fbh, scale, NULL, NULL);
+    int maxs = content - (fbh / scale - FXP_TOP) + FXP_ROWH * 2;
+    if (maxs < 0) maxs = 0;
+    g_fxpScroll = found - FXP_TOP;
+    if (g_fxpScroll > maxs) g_fxpScroll = maxs;
+    if (g_fxpScroll < 0) g_fxpScroll = 0;
+    return 1;
 }
 
 /* ---- Hit testing ------------------------------------------------------------------ */
@@ -261,7 +321,11 @@ static void fxp_button(int which)
    lands on a slider must not also order a tank across the map behind it. */
 static int fxp_event(const SDL_Event* e, int fbw, int fbh, float mscaleX, float mscaleY)
 {
+#if !(defined(CNC3D_COOKED) && CNC3D_COOKED)
+    /* F5, the developer's door. Not compiled into a cooked build: the key then falls
+       through to the game like any other unbound key. */
     if (e->type == SDL_KEYDOWN && e->key.keysym.sym == SDLK_F5) { fxp_toggle(); return 1; }
+#endif
     if (!g_fxpOpen) return 0;
 
     const int scale = fxp_scale(fbh);
@@ -327,6 +391,10 @@ static int fxp_event(const SDL_Event* e, int fbw, int fbh, float mscaleX, float 
                 }
             return 1;
         }
+        /* Above the first row's own area is the header, which the rows are clipped out
+           of. A click there lands on nothing rather than on whatever has scrolled
+           underneath it, so what can be clicked is what can be seen. */
+        if (my < FXP_TOP) return 1;
 
         FxpHit h; h.mx = mx; h.my = my; h.idx = -1; h.onTrack = 0;
         fxp_walk(fbh, scale, fxp_hit_row, &h);
@@ -493,8 +561,29 @@ static void fxp_draw(int fbw, int fbh)
                  0.85f, 0.92f, 0.95f, 1.0f);
     }
 
-    FxpDraw d; d.sc = sc; d.fbh = fbh;
-    fxp_walk(fbh, scale, fxp_draw_row, &d);
+    /* THE ROWS ARE CLIPPED TO THEIR OWN AREA. The title, the state line and the button
+       strip are drawn above and BEFORE them, so a scrolled list painted straight over all
+       three: the top of the panel became two sets of text on top of each other, worst
+       exactly when the list is long enough that scrolling is the only way to reach the
+       bottom of it. The clicks were never at risk, because the button band is hit tested
+       first and consumes its whole width whatever it lands on, but reading a slider
+       through a button is not tuning. The scissor is put back the way it was found:
+       the editor's playtest containment leaves one standing, and this runs inside the
+       frame rather than at the end of it. */
+    {
+        GLint oldBox[4] = { 0, 0, 0, 0 };
+        const GLboolean hadScissor = glIsEnabled(GL_SCISSOR_TEST);
+        glGetIntegerv(GL_SCISSOR_BOX, oldBox);
+        const int clipTop = FXP_TOP * scale;
+        glScissor(0, 0, FXP_W * scale, fbh > clipTop ? fbh - clipTop : 0);
+        glEnable(GL_SCISSOR_TEST);
+
+        FxpDraw d; d.sc = sc; d.fbh = fbh;
+        fxp_walk(fbh, scale, fxp_draw_row, &d);
+
+        glScissor(oldBox[0], oldBox[1], oldBox[2], oldBox[3]);
+        if (!hadScissor) glDisable(GL_SCISSOR_TEST);
+    }
 
     /* the status strip, pinned to the bottom so a long list cannot scroll it away */
     fxp_rect(0.0f, (float)fbh - 14 * sc, FXP_W * sc, 14 * sc, 0.10f, 0.12f, 0.14f, 0.96f);

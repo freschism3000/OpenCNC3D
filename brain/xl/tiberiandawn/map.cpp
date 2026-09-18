@@ -1645,7 +1645,7 @@ void MapClass::Logic(void)
     **	scenarios walk the whole stride space as before.
     **
     **	BOTH SHIPPED FORMATS ARE CLASSIC CONTENT, which this test got wrong
-    **	until 27 Aug 2026: it read MAP_VERSION_NORMAL only, so a Version=1
+    **: it read MAP_VERSION_NORMAL only, so a Version=1
     **	map -- the retail skirmish conversions and everything the editor
     **	makes -- swept the full 1024 stride and sheared against the classic
     **	brain on identical content. MAP_VERSION_MEGA is 128-wide outright and

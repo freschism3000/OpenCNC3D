@@ -15,7 +15,7 @@
 #
 #     "A required .DLL file, API-MS-WIN-CRT-CONVERT-L1-1-0.DLL, was not found."
 #
-# That was measured on the real box on 19 Aug 2026, not inferred.
+# That was measured on the real box, not inferred.
 #
 # The fix needs no new toolchain. mingw-w64 also ships libmsvcrt-os.a, which is the
 # GENUINE msvcrt.dll import library, so we discard the default library set and name
@@ -25,7 +25,7 @@
 #
 # Proven on the box: a C++14 program built this way runs on Windows 98 SE with
 # std::vector, std::map, std::string, std::sort, an 8 MB new[], static constructors
-# and try/catch all working. See docs/win98-port.md for the transcript.
+# and try/catch all working.
 set -e
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
 #define getcwd _getcwd
@@ -68,8 +69,12 @@ const char *ds_get_dir(void) { return g_dsDir; }
 const char *ds_payload_path(int slot)
 {
     if (!g_dsDir[0]) return "";
-    /* 1995's own name (saveload.cpp:110), 8.3-safe so Win98 takes it unchanged. */
-    snprintf(g_dsPath, sizeof g_dsPath, "%sSAVEGAME.%03d", g_dsDir, slot);
+    /* 1995's own name (saveload.cpp:110), 8.3-safe so Win98 takes it unchanged, in the
+       case the engine's file layer actually writes it: RawFileClass::Set_Name lowercases
+       every name it is handed before creating a file (rawfile.cpp:174). On the
+       case-insensitive filesystems this build runs on the two spellings are one file
+       either way; spelling it the engine's way keeps it one file everywhere. */
+    snprintf(g_dsPath, sizeof g_dsPath, "%ssavegame.%03d", g_dsDir, slot);
     return g_dsPath;
 }
 
@@ -89,6 +94,35 @@ int ds_payload_exists(int slot)
     f = fopen(p, "rb");
     if (!f) return 0;
     fclose(f);
+    return 1;
+}
+
+long ds_payload_mtime(int slot)
+{
+    struct stat sb;
+    const char *p = ds_payload_path(slot);
+    if (!p || !*p) return 0;
+    if (stat(p, &sb) != 0) return 0;
+    return (long)sb.st_mtime;
+}
+
+int ds_delete(int slot)
+{
+    DS_Slot tab[DS_SLOTS];
+    char side[640];
+    const char *p;
+    if (!g_dsDir[0] || slot < 0 || slot >= DS_SLOTS) return 0;
+    p = ds_payload_path(slot);
+    if (ds_payload_exists(slot) && remove(p) != 0) return 0;
+    /* The Enhanced-rules sidecar the renderer writes beside the payload. Its absence
+       is not an error: a slot saved with no rules has none. */
+    snprintf(side, sizeof side, "%s.enh", p);
+    remove(side);
+    /* And the record. ds_read_index has already dropped a record whose payload is
+       gone, so this write is what makes the drop permanent. */
+    ds_read_index(tab);
+    memset(&tab[slot], 0, sizeof tab[slot]);
+    ds_write_index(tab);
     return 1;
 }
 
@@ -181,8 +215,12 @@ int ds_read_index(DS_Slot out[DS_SLOTS])
         if (fread(rec, 1, DS_REC, f) != DS_REC) break;
         if (ds_unpack(rec, &out[i])) {
             /* A record whose payload has been deleted from under us is NOT a slot. */
-            if (ds_payload_exists(out[i].slot)) n++;
-            else out[i].used = 0;
+            if (ds_payload_exists(out[i].slot)) {
+                out[i].mtime = ds_payload_mtime(out[i].slot);
+                n++;
+            } else {
+                out[i].used = 0;
+            }
         }
     }
     fclose(f);

@@ -705,11 +705,40 @@ bool TechnoClass::Revealed(HouseClass* house)
  *=============================================================================================*/
 void TechnoClass::Hidden(void)
 {
-    // ST - 3/13/2019 4:56PM
-    if (!Is_Discovered_By_Player()) {
-        return;
-    }
-    // if (!IsDiscoveredByPlayer) return;
+    /*
+    **	CNC3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
+    **	cleared a mask every machine shares.
+    **
+    **	    if (!Is_Discovered_By_Player()) return;
+    **
+    **	Is_Discovered_By_Player() with no argument is
+    **	`IsDiscoveredByPlayerMask & (1 << PlayerPtr->Class->House)`, so on the peer whose
+    **	local human had seen this object the whole per-house mask was wiped, and on every
+    **	other peer it was left standing. An object enters limbo on every machine at once,
+    **	so every machine has to clear the same mask or they stop agreeing.
+    **
+    **	It reaches the simulation through TechnoClass::Revealed, which early-returns on
+    **	that mask: a peer that kept the bit skips Look() and the MISSION_AMBUSH to
+    **	MISSION_HUNT switch, and a peer that wiped it performs both. Different shroud and
+    **	a different mission for the same object.
+    **
+    **	NOT RARE. Every AI house's harvester limbos and survives on every trip to a
+    **	refinery, all match long, and a disconnected human's house has IsHuman flipped
+    **	false, which puts all of its objects on this arm too.
+    **
+    **	UNGATED, and that is the rule and not a preference. In the campaign the mask can
+    **	only ever hold PlayerPtr's own bit: Set_Discovered_By_Player is reached under
+    **	GAME_NORMAL only from the `house == PlayerPtr` arm of Revealed, and the two
+    **	remaining writers of the legacy bool sit inside #ifndef REMASTER_BUILD and are not
+    **	compiled. So outside a match the removed guard was false exactly when the mask was
+    **	already zero, and clearing zero is what it always did. There is nothing here for
+    **	CNC3D_Lockstep to pick between.
+    **
+    **	NO GATE COVERS THIS, and the gap register says so rather than implying otherwise:
+    **	the object dump exports neither IsDiscoveredByPlayerMask nor IsDiscoveredByPlayer,
+    **	so the divergence it fixes is invisible to the two-brain gate, to the loopback
+    **	pair gate and to the live desync alarm alike.
+    */
     if (!House->IsHuman) {
         Clear_Discovered_By_Players();
     }

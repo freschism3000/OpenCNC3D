@@ -1,0 +1,33 @@
+# THE ADVANCED COMMUNICATIONS CENTRE'S DISH: one clean pan, upright, and the same pan the
+# cartridge's own curve evaluator produces. The dish's rotation curve is a type-3 cubic
+# through two control points per key; blended as a slerp between key values it panned
+# the other way, 308 degrees instead of 412, and then followed the authored tumble for
+# 850 frames. armdump reads the delta the dish is drawn with as a bearing: az is the
+# feed spike's compass bearing, roll the angle its up axis makes with vertical. The
+# renderer's arm advances one cartridge frame every two ticks, so tick 48 is cartridge
+# frame 24. The last two samples fall where the authored clip somersaults; the idle
+# window keeps them inside the pan.
+tick 48
+look EYE
+zoom max
+anims
+armdump EYE 1
+tick 48
+anims
+armdump EYE 1
+tick 48
+anims
+armdump EYE 1
+tick 48
+anims
+armdump EYE 1
+shot shots/eyedish_f096.png
+tick 384
+anims
+armdump EYE 1
+shot shots/eyedish_f288.png
+tick 192
+anims
+armdump EYE 1
+shot shots/eyedish_f384.png
+quit

@@ -51,7 +51,7 @@ game. Until then the answer to each is the same, which is why they are one entry
 These were considered and left on the board or in `missing.md` instead, because each is a
 live question rather than a deferred feature:
 
-- **The N64 sidebar** (`docs/design-n64-sidebar.md`). Decoded in full and parked
+- **The N64 sidebar**. Decoded in full and parked
   pending a design decision. Its own decision, and several of the entries above wait on it.
 - **A Linux port and console ports** (`FR-20260822-0462FB`, `FR-20260824-EC4C85`). A third
   build target is a project question, not a feature request.

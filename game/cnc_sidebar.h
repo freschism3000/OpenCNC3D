@@ -120,6 +120,12 @@
    pushed into the sidebar only where a PLAYER changed it: the Enhanced path the shipping
    binary boots through, and the Visuals screen. This mirrors bilinear exactly. */
 static void sb_set_hud_new(int on);
+/* THE UI SCALE DIVISOR: 1 keeps the largest whole-number zoom that fits, 2
+   halves it and rounds, never below 1. The same rule as sb_set_hud_new about who
+   calls it: the Enhanced path, the Visuals dialog and the F5 panel -- never --gfx, never
+   a preset a gate loads -- so every pixel gate keeps the picture it pins. */
+static void sb_set_ui_scale(int div);
+static int g_sbUiDiv = 1;
 
 /* The 640x480 replacement HUD. Both paths are compiled; g_hudNew picks one at runtime so
  * the old DOS bar stays available for comparison until the new one is signed off. */
@@ -256,6 +262,16 @@ struct SbHooks {
     const char* (*CellBlocker)(int cellx, int celly);
     /* GAME_STATE_STATIC_MAP geometry; also the placement grid origin and size */
     int mapX, mapY, mapW, mapH;
+    /* THE PLAYABLE RECTANGLE, WHICH IS NOT THE ONE ABOVE. The brain widens the rectangle
+       it reports by a cell on each side and keeps the scenario's own in OriginalMapCell*
+       (dllinterface.cpp, GAME_STATE_STATIC_MAP), so the placement grid carries a ring of
+       cells no building may cover. Zero width means unknown, and then the overlay
+       refuses nothing extra. See sb_on_play_map. */
+    int playX, playY, playW, playH;
+    /* A placement this file refuses before sending it is said the way the engine says a
+       refused placement: VOX_DEPLOY, "cannot deploy here" (house.cpp Place_Object). NULL
+       says nothing. */
+    void (*SayCannotPlace)(void);
     /* radar.cpp:348 picks the bezel by house: the Brotherhood gets RADARNOD. */
     int nod;
 };
@@ -516,6 +532,13 @@ static int        g_hudNewWish = -1;
    pause dialog reads the state as CLASSIC -- correctly, and Classic correctly means the
    DOS bar -- and applying it switched the HUD out from under the gate mid-run. The gate
    now asks for the chain, so the dialog sees ENHANCED and the HUD it set up survives. */
+static void sb_set_ui_scale(int div)
+{
+    if (div < 1) div = 1;
+    if (div > 2) div = 2;
+    g_sbUiDiv = div;
+}
+
 static void sb_set_hud_new(int on)
 {
     g_hudNewWish = on ? 1 : 0;
@@ -589,8 +612,7 @@ static void h6_tdr_load(const char* path)
 
 /* THIS SET IS NOT THE CARTRIDGE'S, and that has to be said at the point of substitution.
    art/cameos-tdr is 54 generated 128x96 PNGs, 49 of them made by an image model from the
-   1995 manual renders (tools/sidebar_redesign/cameos_tdr.py; provenance in
-   art/cameos-tdr/provenance/RECIPE.md), and the measured drift is recorded
+   1995 manual renders (tools/sidebar_redesign/cameos_tdr.py), and the measured drift is recorded
    from the source art. It is used for these four tiles because the alternative is a
    captioned rectangle, not because it is faithful. On the WALL page that puts two soft
    renders beside SBAG, CYCL and BRIK, which are flat 32x25 console pixel art of the same
@@ -763,7 +785,43 @@ static bool g_sbRoster = false;
 static SbRosterRow g_sbRosterRow[SB_ROSTER_MAX];
 static int  g_sbRosterN = 0;
 
+/* THIS PLAYER IS OUT OF THE MATCH AND IS WATCHING. A commander who has surrendered or
+   been defeated keeps the screen -- that is the point of staying to watch -- but owns
+   nothing to build with, repair or sell, so every control that spends money or touches a
+   building is not merely refused, it is ABSENT. A dead cameo you can still press is worse
+   than no cameo: it looks like the match is still yours.
+
+   One flag, read in two places: sb_poll drops the build list and the two building buttons
+   on the way in, so nothing is drawn and nothing is hittable, and sb_click refuses the
+   same three by name in case a rectangle outlives its contents. */
+static int g_sbSpectator = 0;
+
+static void sb_set_spectator(int on)
+{
+    g_sbSpectator = on ? 1 : 0;
+}
+
 static std::vector<unsigned char> g_sbBuf;
+
+/* A FORCED POWER READING, for a gate script and nothing else (the `powerforce` verb).
+   No shipped scenario starts with drain above twice production, so the one state where
+   the watt rule and the bar-pixel rule choose different colours cannot be played to on
+   cue. When set, these two numbers replace the brain's PowerProduced and PowerDrained at
+   the one place the sidebar receives them, so everything downstream -- the Power_Height
+   conversion, both colour decisions and both rasterisers -- runs exactly as it would on
+   a real base in that state. */
+static bool g_sbPowerForce = false;
+static int  g_sbPowerForceP = 0, g_sbPowerForceD = 0;
+
+/* THE POWER COLOUR EACH SIDEBAR PUT ON SCREEN, read back out of the pixels it rasterised
+   on its last frame rather than recomputed from the numbers it was handed, so a sidebar
+   that decides its colour on the wrong rule, or ignores the decision, reports what it
+   drew. 0 green, 1 yellow, 2 red; -1 a frame was drawn with no known power colour in the
+   sampled pixels; -2 that sidebar has not drawn since start-up or since the last
+   `powerforce`. The `powerdrawn` verb prints them. */
+static int g_sbDrawnDosPower = -2, g_sbDrawnDosIndex = -1;
+static int g_sbDrawnHudPower = -2;
+static int g_sbDrawnHudCount[3] = { 0, 0, 0 };
 
 static void sb_poll(void)
 {
@@ -782,9 +840,26 @@ static void sb_poll(void)
     g_sbState.maxTiberium = s->MaxTiberium;
     g_sbState.powerProduced = s->PowerProduced;
     g_sbState.powerDrained = s->PowerDrained;
+    if (g_sbPowerForce) {                 /* a gate's forced reading; see its declaration */
+        g_sbState.powerProduced = g_sbPowerForceP;
+        g_sbState.powerDrained = g_sbPowerForceD;
+    }
     g_sbState.repairEnabled = s->RepairBtnEnabled;
     g_sbState.sellEnabled = s->SellBtnEnabled;
     g_sbState.radarActive = s->RadarMapActive;
+    /* A SPECTATOR BUILDS NOTHING. Emptied here rather than at the draw, so the strip, the
+       scroll clamp, the hit test and the click path all agree without any of them needing
+       to know why: there is simply nothing in the list. */
+    if (g_sbSpectator) {
+        g_sbState.repairEnabled = 0;
+        g_sbState.sellEnabled = 0;
+        /* AND THE RADAR STAYS ON. It is the engine's answer to "does this house own a
+           radar", and a house that has just resigned owns nothing -- so the map went
+           dark at the exact moment watching the rest of it became the whole point. The
+           shroud is already lifted for the same reason. */
+        g_sbState.radarActive = 1;
+        return;
+    }
     int n = s->EntryCount[0] + s->EntryCount[1];
     for (int i = 0; i < n; i++) {
         const CNCSidebarEntryStruct& e = s->Entries[i];
@@ -966,6 +1041,16 @@ static void sb_request(SidebarRequestEnum r, int idx, short cx, short cy)
 {
     if (idx < 0 || idx >= (int)g_sbState.entry.size() || !g_sb.SidebarReq) return;
     const SbEntry& e = g_sbState.entry[idx];
+    /* EVERY PLACEMENT THAT LEAVES FOR THE ENGINE IS SAID, HERE, where it leaves. The
+       SIDEBAR-PLACE line in sb_place_at is printed before the placement is judged, so it
+       reads the same whether a placement was refused on this side or sent anyway; this
+       line is the only one that tells the two apart. The absolute cell is printed beside
+       the grid cell the request carries. */
+    if (r == SIDEBAR_REQUEST_PLACE) {
+        printf("SIDEBAR-REQUEST|PLACE|%s|cell=%d,%d|grid=%d,%d\n", e.name,
+               cx + g_sb.mapX, cy + g_sb.mapY, cx, cy);
+        fflush(stdout);
+    }
     g_sb.SidebarReq(r, 0, e.btype, e.bid, cx, cy);
 }
 
@@ -1076,7 +1161,7 @@ static void sb_queue_pump(void)
 
 static bool sb_queueable(const SbEntry& e)
 {
-    /* v1 is infantry, vehicles and aircraft -- what the project owner asked for. BUILDINGS are
+    /* v1 is infantry, vehicles and aircraft -- what the requirement asked for. BUILDINGS are
        excluded on purpose and it is not a dodge: a finished building does not auto-exit
        its factory (sidebar.cpp:1704-1709 has no PLACE event for RTTI_BUILDING), so it
        sits completed and busy until a human places it. A building queue needs a "hold the
@@ -1129,15 +1214,51 @@ static int sb_grid_index(int cellx, int celly)
     return gy * g_sb.mapW + gx;
 }
 
+/* May a foundation cover this absolute cell? The engine's rule is MapClass::In_Radar,
+   which BuildingTypeClass::Legal_Placement (bdata.cpp) applies to every cell of
+   Occupy_List(true), the bib included, when the placement order runs.
+
+   THE PLACEMENT GRID'S OWN FLAGS DO NOT CARRY THIS RULE. The grid is the playable
+   rectangle plus a one cell ring, and a ring cell reports its terrain in GenerallyClear
+   like any other. PassesProximityCheck tests In_Radar only on the footprint cells it
+   visits before it finds one beside the base (DLLExportClass::Passes_Proximity_Check,
+   dllinterface.cpp), and a bibbed building's list starts with the bib under its bottom
+   row. So an origin on the grid's top row, or a building whose bib hangs below the
+   map's last row, passes both flags and is refused when the order runs, and the building
+   stays in its factory. Measured on SCM01EA with the base at 17,11: a Power Plant at
+   15,10, grid row 0, read legal and never left limbo, in a skirmish and in a lockstep
+   match alike. */
+static bool sb_on_play_map(int cellx, int celly)
+{
+    if (g_sb.playW <= 0 || g_sb.playH <= 0) return true;
+    return cellx >= g_sb.playX && cellx < g_sb.playX + g_sb.playW
+        && celly >= g_sb.playY && celly < g_sb.playY + g_sb.playH;
+}
+
+/* Every cell the pending building would cover, bib included, is on the playable map. */
+static bool sb_footprint_on_map(int cellx, int celly)
+{
+    if (g_sbPlaceIdx < 0 || g_sbPlaceIdx >= (int)g_sbState.entry.size()) return false;
+    const SbEntry& e = g_sbState.entry[g_sbPlaceIdx];
+    const int origin = celly * SB_STRIDE + cellx;
+    for (size_t k = 0; k < e.occupy.size(); k++) {
+        const int c = origin + e.occupy[k];
+        if (!sb_on_play_map(c % SB_STRIDE, c / SB_STRIDE)) return false;
+    }
+    return true;
+}
+
 /* Would the pending building be legal with its ORIGIN on this absolute cell?
-   proximity on the origin (the engine already folded the footprint into that test)
-   AND every occupied cell generally clear. */
+   Proximity on the origin (the engine folded the footprint into that test, but not the
+   map's edge), every occupied cell generally clear, and every occupied cell on the
+   playable map. */
 static bool sb_legal_origin(int cellx, int celly)
 {
     if (!g_sbPlacing || g_sbPlaceIdx < 0
         || g_sbPlaceIdx >= (int)g_sbState.entry.size()) return false;
     int oi = sb_grid_index(cellx, celly);
     if (oi < 0 || !g_sbPlaceProx[oi]) return false;
+    if (!sb_footprint_on_map(cellx, celly)) return false;
     const SbEntry& e = g_sbState.entry[g_sbPlaceIdx];
     int origin = celly * SB_STRIDE + cellx;
     for (size_t k = 0; k < e.occupy.size(); k++) {
@@ -1187,9 +1308,22 @@ static bool sb_place_at(int cellx, int celly)
     if (!g_sbPlacing || g_sbPlaceIdx < 0) return false;
     int gx = cellx - g_sb.mapX, gy = celly - g_sb.mapY;
     if (gx < 0 || gy < 0 || gx >= g_sb.mapW || gy >= g_sb.mapH) return false;
-    printf("SIDEBAR-PLACE|%s|cell=%d,%d|grid=%d,%d|legal=%d\n",
+    const bool onmap = sb_footprint_on_map(cellx, celly);
+    printf("SIDEBAR-PLACE|%s|cell=%d,%d|grid=%d,%d|legal=%d%s\n",
            g_sbState.entry[g_sbPlaceIdx].name, cellx, celly, gx, gy,
-           sb_legal_origin(cellx, celly) ? 1 : 0);
+           sb_legal_origin(cellx, celly) ? 1 : 0,
+           onmap ? "" : "|REFUSED off the map");
+    /* A FOUNDATION OFF THE MAP IS NOT SENT. The engine would refuse it when the order runs
+       (sb_on_play_map), and in a lockstep match placement mode has already ended by then,
+       so the player would lose the cursor with the building still in its factory and
+       nothing said. Refused here, placement mode stays on and the refusal is said in the
+       engine's own words. Every other refusal still goes to the engine, which stays the
+       authority on the ground itself. */
+    if (!onmap) {
+        fflush(stdout);
+        if (g_sb.SayCannotPlace) g_sb.SayCannotPlace();
+        return false;
+    }
     sb_request(SIDEBAR_REQUEST_PLACE, g_sbPlaceIdx, (short)gx, (short)gy);
     return true;
 }
@@ -1254,6 +1388,15 @@ static void sb_layout(int fbw, int fbh)
         int s = fbh / H6_BAR_H;
         if (s < 1) s = 1;
         while (s > 1 && H6_BAR_W * s * 3 > fbw) s--;
+        /* THE UI SCALE: the largest zoom divided by the player's divisor and
+           ROUNDED to a whole number, never below 1. Whole numbers only, for the reason
+           the comment above gives: at 1692 rows the largest is 3, so -2x is 3/2 rounded
+           to 2 and -3x and -4x are both 1. The rows and the width follow the zoom below,
+           so a smaller bar shows more build rows, which is the point of it. */
+        if (g_sbUiDiv > 1) {
+            const int t = (s + g_sbUiDiv / 2) / g_sbUiDiv;
+            s = t < 1 ? 1 : t;
+        }
         g_h6Scale = (float)s;
         g_dbScale = s;                                   /* same scale: the cursor matches */
         /* THE LETTERBOX IS SPENT ON BUILD ROWS INSTEAD OF BLACK. The whole-number zoom
@@ -1286,6 +1429,16 @@ static void sb_layout(int fbw, int fbh)
 }
 
 static int sb_scale(void) { return g_dbScale; }
+
+/* WHERE THE TOP CHROME ENDS, in framebuffer rows. The OPTIONS plate is pinned to g_dbY0
+   and is one tab tall, so this is the first row underneath it and the place anything
+   claiming "top left, under OPTIONS" has to start. Reads the same two values
+   sb_chrome_hit tests against, so the pane and the button's hit box cannot drift; and it
+   recomputes rather than caching, because the UI scale is a live video setting. */
+static float sb_chrome_bottom(void)
+{
+    return (g_hudNew && g_h6Pack) ? g_dbY0 + (float)H6_TAB_H * g_h6Scale : 0.0f;
+}
 
 /* HOW BIG ONE DOS PIXEL IS ON SCREEN.
 
@@ -1617,9 +1770,33 @@ static void sb_roster_draw(DB_Surface* s, const DB_Pack* p, int ox, int oy, int 
         if (strlen(txt) > 9) { txt[9] = '.'; txt[10] = 0; }
         db_font_palette_grad(fp, col, DB_TBLACK);
         db_print(s, f, txt, ox, y, fp, DB_FONT6_XSPACING);
-        snprintf(txt, sizeof txt, "%2d", r.kills);
-        db_print(s, f, txt, rightx - db_string_width(f, txt, DB_FONT6_XSPACING), y, fp,
-                 DB_FONT6_XSPACING);
+        /* THE RIGHT HAND COLUMN SAYS WHAT HAPPENED TO THEM. A living commander shows
+           their kills; one who has been defeated or has surrendered shows that they are
+           watching instead, because a kill count stops meaning anything the moment it
+           stops changing. The row was ALREADY dimmed to grey for a defeated player and
+           nothing else said so -- and seat colour 6 IS grey, so for that one seat a
+           defeat was invisible.
+
+           TWO WORDS, PICKED BY WHAT FITS. This list lives in the radar hole, which is
+           70px wide on the DOS bar and 130px on the 640 art HUD, and it has to share
+           that line with the name: SPECTATOR is 54px, which fits beside a name on the
+           big HUD and cannot on the small one. So the long word is used when there is
+           room for it and the short one when there is not, rather than truncating a
+           player's name to three letters to make a label fit. */
+        {
+            char right[16];
+            if (r.defeated) {
+                const int used = ox + db_string_width(f, txt, DB_FONT6_XSPACING) + 3;
+                snprintf(right, sizeof right, "SPECTATOR");
+                if (rightx - db_string_width(f, right, DB_FONT6_XSPACING) < used)
+                    snprintf(right, sizeof right, "SPEC");
+            } else {
+                snprintf(right, sizeof right, "%2d", r.kills);
+            }
+            db_print(s, f, right,
+                     rightx - db_string_width(f, right, DB_FONT6_XSPACING), y, fp,
+                     DB_FONT6_XSPACING);
+        }
         y += step;
     }
 }
@@ -1831,6 +2008,18 @@ static void sb_draw_panel(int fbw, int fbh)
     db_draw_credits_tab(&g_dbSurf, g_dbPack,
                         g_sbState.valid ? g_sbState.creditsCounter : 0);
 
+    /* WHAT THE POWER GAUGE WAS FILLED WITH, read off the rasterised screen. The pixel is
+       the bottom row of the fill (db_draw_power fills bottom - ph + 1 .. bottom - 1 over
+       DB_POW_X + 2 .. DB_POW_X + 5), where neither the tick marks, which the fill covers,
+       nor the drain marker, which sits at bottom - dh, can be. An empty gauge leaves the
+       light grey inside of the bar there and reads -1. */
+    {
+        const unsigned char ix =
+            g_dbScreen[(DB_POW_Y + DB_POW_HEIGHT - 2) * DB_SCREEN_W + DB_POW_X + 3];
+        g_sbDrawnDosIndex = ix;
+        g_sbDrawnDosPower = (ix == DB_GREEN) ? 0 : (ix == DB_YELLOW) ? 1 : (ix == DB_RED) ? 2 : -1;
+    }
+
     /* 2. one conversion ---------------------------------------------------------- */
     for (int y = 0; y < SB_TEX_H; y++)
         memcpy(g_dbCrop + (size_t)y * SB_TEX_W,
@@ -2006,8 +2195,14 @@ static void h6_fill_state(H6_State* st)
     /* Repair and Sell are IsToggleType, so they have an engaged look on top of the two
        pointer states; DOS did the same job by turning the caption red
        (textbtn.cpp:336). Map is momentary, so it never reaches H6_FR_ACTIVE. */
-    st->repair_frame = sb_frame_for(SBH_REPAIR, -1, g_sbRepairOn ? 1 : 0);
-    st->sell_frame   = sb_frame_for(SBH_SELL,   -1, g_sbSellOn   ? 1 : 0);
+    /* GONE, NOT GREYED, and that is forced rather than chosen: the button art carries
+       four frames -- resting, hover, pressed, engaged -- and no disabled one, so there is
+       nothing to draw a dead button WITH. An absence is honest; a resting plate that
+       refuses the press is not. */
+    st->repair_frame = g_sbSpectator ? -1
+                     : sb_frame_for(SBH_REPAIR, -1, g_sbRepairOn ? 1 : 0);
+    st->sell_frame   = g_sbSpectator ? -1
+                     : sb_frame_for(SBH_SELL,   -1, g_sbSellOn   ? 1 : 0);
     st->map_frame    = sb_frame_for(SBH_MAP,    -1, 0);
     st->options_frame = sb_frame_for(SBH_OPTIONS, -1, 0);
     /* THE OPEN CODEX LATCHES THE PLATE DOWN. The tab strips carry three frames, not the
@@ -2489,6 +2684,35 @@ static void sb_draw_panel_640(int fbw, int fbh)
 
     hud640_draw_bar(g_h6Bar, g_h6Pack, &st);
     const int barh = hud640_bar_h(g_h6Rows);
+    /* WHAT THE POWER METER WAS DRAWN IN, read off the composed bar. The whole lit fill is
+       read, from its top edge (hud640_meter_y, the same lattice the fill is tiled on) down
+       to the channel floor, and not only its bottom segment: a warning that reached one
+       segment and left the rest green would read as a warning there and show the player a
+       green meter. The delivered segment is green; hud640.c signals overdraw by rotating
+       it (amber lifts red up to the green, red also quarters green and blue), so each lit
+       pixel is sorted by hue, every class is counted and the most common class wins.
+       Chassis greys, the empty channel and the blue drain marker fall in no class. */
+    {
+        const int y1 = H6_METER_Y0 + hud640_meter_h(g_h6Rows);
+        int n[3] = { 0, 0, 0 };
+        for (int py = hud640_meter_y(g_h6Rows, st.power_level); py < y1 && py < barh; py++) {
+            if (py < 0) continue;
+            for (int px = H6_METER_X; px < H6_METER_X + H6_METER_W && px < H6_BAR_W; px++) {
+                const unsigned char* q = g_h6Bar + ((size_t)py * H6_BAR_W + px) * 4;
+                const int r = q[0], g = q[1], b = q[2];
+                if (!q[3]) continue;
+                if (g > r + 24 && g > b + 24)                                n[0]++;
+                else if (r > b + 24 && (r > g ? r - g : g - r) <= 8)         n[1]++;
+                else if (r > g * 2 + 24 && r > b * 2 + 24)                   n[2]++;
+            }
+        }
+        g_sbDrawnHudCount[0] = n[0];
+        g_sbDrawnHudCount[1] = n[1];
+        g_sbDrawnHudCount[2] = n[2];
+        g_sbDrawnHudPower = (n[0] + n[1] + n[2] == 0) ? -1
+                          : (n[2] >= n[1] && n[2] >= n[0]) ? 2
+                          : (n[1] >= n[0]) ? 1 : 0;
+    }
     h6_upload(&g_h6TexBar, g_h6Bar, H6_BAR_W, barh);
 
     const float bw = (float)H6_BAR_W * g_h6Scale, bh = (float)barh * g_h6Scale;
@@ -2687,33 +2911,40 @@ static void sb_draw_placement(int fbw, int fbh)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_TEXTURE_2D);
 
-    /* 1. the whole legal region, faint. This is the decoded GAME_STATE_PLACEMENT grid,
-          shown so the overlay can be read rather than trusted. */
-    glBegin(GL_TRIANGLES);
-    for (int y = 0; y < g_sb.mapH; y++) {
-        for (int x = 0; x < g_sb.mapW; x++) {
-            int i = y * g_sb.mapW + x;
-            if (!g_sbPlaceProx[i]) continue;
-            bool ok = sb_legal_origin(g_sb.mapX + x, g_sb.mapY + y);
-            glColor4f(ok ? 0.15f : 0.95f, ok ? 1.0f : 0.55f, 0.15f, ok ? 0.32f : 0.20f);
-            sb_place_cell_tris(g_sb.mapX + x, g_sb.mapY + y, fbw, fbh);
-        }
-    }
-    glEnd();
-
-    /* 2. the cursor: the pending building's actual footprint under the mouse */
+    /* THE FOOTPRINT AND NOTHING ELSE, which is what the original draws.
+       
+       There used to be a pass before this one that painted every legal cell on the whole
+       map, hundreds of them at once. Its own comment said what it was: the decoded
+       placement grid "shown so the overlay can be read rather than trusted" -- a
+       diagnostic, printed over the battlefield, that shipped. 1995 marks only the cells
+       the pending building would occupy (Cursor_Mark walks the CursorSize list, and
+       CellClass::Draw_It paints on IsCursorHere alone), so a player sees the building
+       they are holding and not a map-wide legality field.
+       
+       The diagnostic itself is not lost. sb_placemap still prints the whole grid as
+       ASCII, which is what the gates read; it simply is not painted on the glass. */
     if (g_sbHoverX >= 0 && g_sbPlaceIdx >= 0
         && g_sbPlaceIdx < (int)g_sbState.entry.size()) {
         const SbEntry& e = g_sbState.entry[g_sbPlaceIdx];
-        bool ok = sb_legal_origin(g_sbHoverX, g_sbHoverY);
-        int origin = g_sbHoverY * SB_STRIDE + g_sbHoverX;
+        /* PROXIMITY IS PART OF THE COLOUR NOW, not just the alpha. The engine evaluates
+           it for the ORIGIN and it already folds in the whole footprint, so it answers
+           "may this building start here". With the map-wide field gone there is nothing
+           left to compare a footprint against, and a Power Plant dragged outside the base
+           ring would otherwise paint solid green and then refuse the click. 1995 ANDs the
+           same two facts: the proximity check and the per-cell clear flag. A cell off
+           the playable map is red as well, because the flags do not say so and the
+           engine refuses any foundation that covers one (sb_on_play_map). */
+        const int oi = sb_grid_index(g_sbHoverX, g_sbHoverY);
+        const bool prox = (oi >= 0 && g_sbPlaceProx[oi]);
+        const int origin = g_sbHoverY * SB_STRIDE + g_sbHoverX;
         glBegin(GL_TRIANGLES);
         for (size_t k = 0; k < e.occupy.size(); k++) {
             int c = origin + e.occupy[k];
             int cxx = c % SB_STRIDE, cyy = c / SB_STRIDE;
             int gi = sb_grid_index(cxx, cyy);
-            bool cellok = (gi >= 0 && g_sbPlaceClear[gi]);
-            glColor4f(cellok ? 0.2f : 1.0f, cellok ? 1.0f : 0.2f, 0.2f, ok ? 0.45f : 0.35f);
+            bool cellok = prox && (gi >= 0 && g_sbPlaceClear[gi])
+                          && sb_on_play_map(cxx, cyy);
+            glColor4f(cellok ? 0.2f : 1.0f, cellok ? 1.0f : 0.2f, 0.2f, 0.45f);
             sb_place_cell_tris(cxx, cyy, fbw, fbh);
         }
         glEnd();
@@ -2966,6 +3197,11 @@ static bool sb_click(float col, float row, int fbw, int fbh, bool right)
                hit == SBH_UP ? "up" : "down", before, g_sbTop[c]);
         return true;
     }
+    /* NOT WHILE WATCHING. The list is already empty, so a cameo cannot be reached, but
+       the two building buttons keep their rectangles whatever the state says -- and a
+       button that still latches a mode a spectator cannot use is a control that lies. */
+    if (g_sbSpectator && (hit == SBH_REPAIR || hit == SBH_SELL || hit == SBH_ITEM))
+        return true;
     if (hit == SBH_REPAIR) { if (!right) sb_toggle_repair(); return true; }
     if (hit == SBH_SELL)   { if (!right) sb_toggle_sell();   return true; }
     if (hit == SBH_MAP) {
@@ -3659,8 +3895,8 @@ static bool sb_init(const SbHooks& h, const char* cameopack, const char* dospack
 }
 
 /* Undo sb_init, exactly. Every glGenTextures in this file has its glDeleteTextures
-   here, the DOS pack goes back to db_pack_free, and every latch that describes a
-   MISSION rather than the program is reset: the build columns' scroll position, the
+   here, all three packs sb_init reads go back to their own free, and every latch that
+   describes a MISSION rather than the program is reset: the build columns' scroll position, the
    pending placement, the repair/sell toggles and the radar's forced state. Leaving
    any of those set would carry mission one's sidebar into mission two.
 
@@ -3683,6 +3919,23 @@ static void sb_free(void)
         db_pack_free(g_dbPack);
     g_dbPack = NULL;
     db_state_clear(&g_dbState);
+
+    /* THE OTHER TWO PACKS sb_init READS GO BACK HERE AS WELL, and until now neither did.
+       sb_init loads three containers -- the DOS sidebar, the 640x480 HUD and the C&C95
+       cameo set -- and only the first was released, so every boot/shutdown round trip
+       allocated a fresh copy of the other two and dropped the previous one on the floor.
+       Measured over six boot/shutdown cycles in one process: 950 KB a cycle for the HUD
+       pack and 524 KB a cycle for the cameo pack, both climbing with no ceiling.
+       g_hudNew is derived from g_h6Pack, so it has to go false with it; g_hudNewWish is
+       the PLAYER'S dial and is deliberately left alone, exactly like the tuning dials
+       fx_shutdown keeps. */
+    if (g_h6Pack)
+        hud640_free(g_h6Pack);
+    g_h6Pack = NULL;
+    g_hudNew = false;
+    if (g_h6CamPack)
+        db_pack_free(g_h6CamPack);
+    g_h6CamPack = NULL;
 
     memset(&g_sb, 0, sizeof(g_sb));
     g_sbState.valid = false;

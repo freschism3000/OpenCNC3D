@@ -11,9 +11,23 @@
  *
  * 2. TOKENS ARE NOT ENTRY POINTS. On Windows, anything past 1.1 must be fetched from the
  *    driver at runtime through wglGetProcAddress; opengl32.dll exports only the 1.1 set.
- *    The renderer calls exactly two such functions, both from GL 1.3 multitexture:
- *    glActiveTexture and glMultiTexCoord2f. They are resolved lazily below, on first
- *    call, which is safe because both are only ever called with a context current.
+ *    The renderer calls four such functions, all from GL 1.3 multitexture:
+ *    glActiveTexture, glClientActiveTexture, glMultiTexCoord2f and glMultiTexCoord3f.
+ *    They are resolved lazily below, on first call, which is safe because all four are
+ *    only ever called with a context current.
+ *
+ *    ADDING A FIFTH IS A THREE LINE JOB AND FORGETTING IT BREAKS ONLY WINDOWS. A call
+ *    past GL 1.1 that is not listed here compiles against a framework header that
+ *    declares the whole of GL, and fails here with "was not declared in this scope".
+ *    That has now happened twice: once when the water surface began sending a colour
+ *    down the third texture unit, and again when the trees began feeding their bone
+ *    indices in through a second texture COORDINATE ARRAY, which needs the client side
+ *    selector rather than the server side one. Both times the other platform built
+ *    clean and this one did not compile at all.
+ *
+ *    The cheapest way to catch the next one is to list every gl* call in the tree and
+ *    subtract what <GL/gl.h> declares plus what this file defines; anything left over
+ *    is a break waiting for the next push.
  *
  * Tier 1 note: neither function is new debt. Multitexture is already used on the Mac
  * build, and the Voodoo 2 has two texture units, so the Glide backend has an answer for
@@ -46,8 +60,10 @@ extern "C" {
    which on any machine that can run this at all should not happen; the call then does
    nothing rather than jumping through a null pointer, so a missing entry point shows up
    as a texture drawn without its second unit and not as a crash. */
-static PFNGLACTIVETEXTUREPROC     cnc3d_glActiveTexture_p;
+static PFNGLACTIVETEXTUREPROC       cnc3d_glActiveTexture_p;
+static PFNGLCLIENTACTIVETEXTUREPROC cnc3d_glClientActiveTexture_p;
 static PFNGLMULTITEXCOORD2FPROC   cnc3d_glMultiTexCoord2f_p;
+static PFNGLMULTITEXCOORD3FPROC   cnc3d_glMultiTexCoord3f_p;
 
 /* BOTH SPELLINGS, CORE FIRST AND THEN ARB, AND THIS IS NOT BELT AND BRACES.
  *
@@ -101,6 +117,22 @@ static void cnc3d_gl_activetexture(GLenum tex)
     if (cnc3d_glActiveTexture_p) cnc3d_glActiveTexture_p(tex);
 }
 
+/* THE CLIENT SIDE SELECTOR, WHICH IS A DIFFERENT SWITCH FROM ITS SERVER SIDE TWIN.
+   glActiveTexture chooses which unit the texture state calls apply to; this one chooses
+   which unit glTexCoordPointer and the GL_TEXTURE_COORD_ARRAY enable apply to. Vertex
+   arrays that feed a second unit need this one, and setting the wrong switch silently
+   points the array at unit zero, which draws the geometry with the first unit's
+   coordinates replaced. */
+static void cnc3d_gl_clientactivetexture(GLenum tex)
+{
+    if (!cnc3d_glClientActiveTexture_p) {
+        cnc3d_glClientActiveTexture_p = (PFNGLCLIENTACTIVETEXTUREPROC)
+            cnc3d_gl_proc2("glClientActiveTexture", "glClientActiveTextureARB");
+        if (!cnc3d_glClientActiveTexture_p) cnc3d_gl_mt_complain("glClientActiveTexture");
+    }
+    if (cnc3d_glClientActiveTexture_p) cnc3d_glClientActiveTexture_p(tex);
+}
+
 static void cnc3d_gl_multitexcoord2f(GLenum tex, GLfloat s, GLfloat t)
 {
     if (!cnc3d_glMultiTexCoord2f_p) {
@@ -111,11 +143,27 @@ static void cnc3d_gl_multitexcoord2f(GLenum tex, GLfloat s, GLfloat t)
     if (cnc3d_glMultiTexCoord2f_p) cnc3d_glMultiTexCoord2f_p(tex, s, t);
 }
 
+/* THE THREE COMPONENT FORM, which the water surface uses to send a per vertex colour
+   down the third texture unit rather than a coordinate. Same two spellings and the same
+   silent-but-loud failure as its sibling above: an unresolved entry point draws without
+   that unit instead of jumping through a null pointer. */
+static void cnc3d_gl_multitexcoord3f(GLenum tex, GLfloat s, GLfloat t, GLfloat r)
+{
+    if (!cnc3d_glMultiTexCoord3f_p) {
+        cnc3d_glMultiTexCoord3f_p = (PFNGLMULTITEXCOORD3FPROC)
+            cnc3d_gl_proc2("glMultiTexCoord3f", "glMultiTexCoord3fARB");
+        if (!cnc3d_glMultiTexCoord3f_p) cnc3d_gl_mt_complain("glMultiTexCoord3f");
+    }
+    if (cnc3d_glMultiTexCoord3f_p) cnc3d_glMultiTexCoord3f_p(tex, s, t, r);
+}
+
 #ifdef __cplusplus
 }
 #endif
 
 #define glActiveTexture(t)          cnc3d_gl_activetexture(t)
+#define glClientActiveTexture(t)    cnc3d_gl_clientactivetexture(t)
 #define glMultiTexCoord2f(t, s, u)  cnc3d_gl_multitexcoord2f((t), (s), (u))
+#define glMultiTexCoord3f(t, s, u, v) cnc3d_gl_multitexcoord3f((t), (s), (u), (v))
 
 #endif

@@ -1,0 +1,25 @@
+# G249, leg D. THE AIRSTRIP HONOURS ITS RALLY. SCB70EA, airstrip at 13,55 (4 by 2),
+# rally SOUTH-WEST of it at 9,58.
+#
+# A buggy built at an airstrip is flown in by the cargo plane, which sets it down on
+# the strip's exit cell and lets the engine's scatter move it one cell off the drop.
+# With the rally stored on the strip the vehicle must then drive to 9,58 under
+# MISSION_MOVE. The watch starts while the buggy is still in limbo (cell 127,127,
+# mission None), so the sequence proves the vehicle came by air and was then sent on,
+# rather than that something stood at 9,58 already. Instant build so the run is the
+# plane's flight and the drive, not the production clock.
+tick 30
+cam 13 56
+zoom max
+cheatset instant 1
+rally AFLD 0 9 58
+tick 2
+rallydump
+count BGGY:BadGuy
+build BGGY
+watch BGGY:BadGuy 3 340
+shot shots/exitpath_d_drop.png
+watch BGGY:BadGuy 3 360
+obj BGGY:BadGuy 3
+shot shots/exitpath_d_end.png
+quit

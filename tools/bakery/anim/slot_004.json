@@ -22,7 +22,7 @@
    "node": "0x801B59D8",
    "depth": 0,
    "parent": null,
-   "bake_part_index": null,
+   "bake_part_index": 0,
    "gfx_rom": null,
    "rest_matrix": null,
    "rest_world": {

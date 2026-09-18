@@ -108,25 +108,28 @@
 
 /* The buttons, in the order menus.cpp:738-746 fills buttons[].
  *
- * DM_TESTMAP is ours and is deliberately FIRST, in the slot the engine itself
- * reserves for a sixth item. menus.cpp:544-552 builds `expandbtn` (TXT_NEW_MISSIONS,
- * Covert Operations) at `starty` BEFORE startbtn, menus.cpp:738 makes it buttons[0],
- * and menus.cpp:731-735 sets curbutton = 0 when it is present, so the extra item is
- * both above Start New Game and the default selection. That is the only six button
- * main menu C&C ever shipped, and Test Map is playing exactly New Missions' part:
- * it is not a footnote under the normal modes, it is the way into the game. With
- * Start New Game dead it also has to be where the cursor lands at boot, which the
- * engine's own curbutton = 0 gives us for free. */
+ * DM_SPECIAL is FIRST, in the slot the engine itself reserves for a sixth item.
+ * menus.cpp:544-552 builds `expandbtn` (TXT_NEW_MISSIONS, Covert Operations) at
+ * `starty` BEFORE startbtn, menus.cpp:738 makes it buttons[0], and menus.cpp:731-735
+ * sets curbutton = 0 when it is present, so the extra item is both above Start New
+ * Game and the default selection. That is the only six button main menu C&C ever
+ * shipped, and Special Ops is playing exactly New Missions' part.
+ *
+ * THE TEST MAP USED TO BE A BUTTON OF ITS OWN in this slot, above Special Ops, from the
+ * days when the campaign did not exist and it was the one way into the game. It is now
+ * the LAST ROW of the Special Ops list, under a TEST MAPS heading with the cartridge's
+ * own test scenarios: a sandbox is not a game mode, and the main menu is the one
+ * screen every player reads. Nothing about the map itself changed. */
 typedef enum
 {
-    DM_TESTMAP = 0, /* ours; the engine's sixth-item slot (expandbtn)            */
     /* OURS, and it is playing the part the engine's expandbtn was built for: the 1995
        menu grew a New Missions button when the Covert Operations disc was installed
        (menus.cpp:544-552, TXT_NEW_MISSIONS). This is that button. "Special Ops" is the
        cartridge's own word for these -- the string is in the ROM at 0x22384C, beside
        SPECIAL OPS 2 -- and the list behind it holds both the cartridge's own
-       non-campaign scenarios and the fifteen from the Covert Operations disc. */
-    DM_SPECIAL,     /* ours: the SPECIAL OPS mission list                        */
+       non-campaign scenarios and the fifteen from the Covert Operations disc, filed by
+       faction and then by source, with the test scenarios last. */
+    DM_SPECIAL = 0, /* ours: the SPECIAL OPS mission list; the expandbtn slot   */
     /* OURS. The maps made in the editor, singleplayer ones only -- a multiplayer map has
        no briefing and no objective, so offering it here would start a game nobody can
        win. Those appear in the Skirmish map list instead, on its own tab. */
@@ -139,15 +142,18 @@ typedef enum
        of them exists, and calling the one that exists "Multiplayer" would promise the
        other. */
     DM_SKIRMISH,    /* ours, in TXT_MULTIPLAYER_GAME's slot                      */
-    /* Drawn, disabled, and honest: there is no networking. It sits below Skirmish rather
-       than above it so the live entry is the one the eye reaches first. */
+    /* LIVE. It was drawn disabled for as long as the sentence "there is
+       no networking" was true; there is now, so it opens the multiplayer screen: host a
+       game on your network, browse for one, and wait in the room until everyone is ready.
+       It sits below Skirmish because that is the entry most people want most of the
+       time, not because this one is lesser. */
     DM_MULTIPLAYER, /* TXT_MULTIPLAYER_GAME                                      */
     DM_INTRO,       /* TXT_INTRO, "Intro & Sneak Peek"                           */
-    /* OURS, like Test Map. The 1995 menu had no picture settings because there was one
-       picture. Eight items still fit the engine's own box: menus.cpp keeps D_DIALOG_H at
-       136 on both branches and tightens the step instead, so eight at step 11 from row
-       25 occupy rows 25..111, clear of the version line at 116 and inside a box that
-       ends at 136. Nothing is grown. */
+    /* OURS, like Special Ops. The 1995 menu had no picture settings because there was
+       one picture. Eight items still fit the engine's own box: menus.cpp keeps
+       D_DIALOG_H at 136 on both branches and tightens the step instead, so eight at
+       step 11 from row 25 occupy rows 25..111, clear of the version line at 116 and
+       inside a box that ends at 136. Nothing is grown. */
     DM_VISUALS,     /* ours: CLASSIC / ENHANCED and the element checkboxes        */
     DM_EXIT,        /* TXT_EXIT_GAME                                             */
     DM_ITEM_COUNT
@@ -264,7 +270,7 @@ int dm_hit_test(const DM_State *st, int mx, int my);
 int dm_next_item(const DM_State *st, int item, int delta);
 
 /* The verbatim DOS label. The five stock ones are resolved from CONQUER.ENG at bake
- * time; DM_TESTMAP is ours and has no CONQUER.ENG number. */
+ * time; DM_SPECIAL and the other items marked ours have no CONQUER.ENG number. */
 const char *dm_item_label(int item);
 
 /* GadgetClass::IsDisabled for this item: drawn, never selectable. Non-zero if the

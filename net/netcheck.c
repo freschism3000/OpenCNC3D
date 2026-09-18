@@ -37,6 +37,10 @@
  */
 #include "lockstep.h"
 #include "net_udp.h"
+#include "roomcode.h"
+/* For the probe's wire constants only. This tool does not link netmatch, and nothing it
+   uses from that header is more than a #define. */
+#include "netmatch.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,7 +119,15 @@ static void nap_ms(int ms)
 static unsigned now_ms(void)
 {
 #if defined(_WIN32)
-    return (unsigned)GetTickCount();
+    /* THE PERFORMANCE COUNTER, NOT GetTickCount. The tick count moves in steps of 10 to
+       16 ms, which is most of a round trip to a nearby relay, so every reading this tool
+       prints would be rounded to whichever step it straddled. */
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER now;
+    if (freq.QuadPart == 0 && !QueryPerformanceFrequency(&freq)) freq.QuadPart = 0;
+    if (freq.QuadPart == 0 || !QueryPerformanceCounter(&now)) return (unsigned)GetTickCount();
+    return (unsigned)((now.QuadPart / freq.QuadPart) * 1000
+                      + ((now.QuadPart % freq.QuadPart) * 1000) / freq.QuadPart);
 #else
     struct timeval tv;
     gettimeofday(&tv, 0);
@@ -219,19 +231,337 @@ static void sink(void* user, int seat, const void* bytes, int len)
                             + (unsigned)((seat << 16) | (b[0] << 8) | len)) & 0xFFFFFFFFu);
 }
 
+/* CnCNet's V3 tunnels all listen here; the master list carries the port per server but
+   every official one advertises this. */
+#define NC_RELAY_PORT 50001
+/* One of CnCNet's public V3 tunnels, verified answering. Overridable on the command line
+   because the point of this tool is to try things by hand. */
+#define NC_RELAY_DEFAULT "49.13.152.109"
+
+/* PING ONE RELAY AND SAY WHAT CAME BACK. Twelve bytes of nonce go out inside a 50-byte
+   datagram and the server returns them verbatim, so a wrong echo is as informative as no
+   echo: it means something answered that is not speaking this protocol. */
+static int relay_ping(const char* host, unsigned short port)
+{
+    NetSock* s;
+    unsigned char nonce[4], echo[12], want[12];
+    int i, got = 0;
+    unsigned waited = 0;
+
+    /* The echo is the request's first twelve bytes, and its first EIGHT are the two id
+       fields, which a ping must leave at zero. So four bytes are ours to choose and the
+       expected answer is eight zeros followed by them. */
+    for (i = 0; i < 4; i++) nonce[i] = (unsigned char)(0xA5 ^ (i * 31 + 7));
+    memset(want, 0, sizeof want);
+    memcpy(want + 8, nonce, 4);
+    s = net_open(0);
+    if (!s) {
+        printf("RELAY|%s:%u|no socket\n", host, (unsigned)port);
+        return 3;
+    }
+    if (net_tunnel_ping_send(s, host, port, nonce) < 0) {
+        printf("RELAY|%s:%u|could not send (name did not resolve, or the send was "
+               "refused)\n", host, (unsigned)port);
+        net_close(s);
+        return 4;
+    }
+    /* Two seconds, in tenths. A tunnel that has not answered by then is not going to. */
+    for (waited = 0; waited < 2000 && !got; waited += 100) {
+        got = net_tunnel_ping_recv(s, echo);
+        if (!got) nap_ms(100);
+    }
+    if (!got) {
+        printf("RELAY|%s:%u|NO ANSWER in 2 s. UDP %u may be blocked leaving this "
+               "network, or that server is down.\n", host, (unsigned)port, (unsigned)port);
+        net_close(s);
+        return 5;
+    }
+    if (memcmp(echo, want, 12) != 0) {
+        printf("RELAY|%s:%u|ANSWERED, BUT NOT WITH OUR BYTES. Something is listening "
+               "there that does not speak Tunnel V3.\n", host, (unsigned)port);
+        net_close(s);
+        return 6;
+    }
+    printf("RELAY|%s:%u|ok|echo=12 bytes, verbatim|round trip under %u ms\n",
+           host, (unsigned)port, waited ? waited : 100u);
+    net_close(s);
+    return 0;
+}
+
 static void usage(const char* me)
 {
     printf("usage: %s host [port]\n", me);
     printf("       %s join <address> [port]\n", me);
     printf("       %s selftest\n", me);
+    printf("       %s relay <host> [port]\n", me);
+    printf("       %s relayhost [relay] \n", me);
+    printf("       %s relayjoin <#CODE> [relay]\n", me);
     printf("\n");
     printf("  Runs the real lockstep scheduler over the real socket layer between two\n");
     printf("  ends, with no engine. Start the host first, then the joiner.\n");
     printf("  Default port %d, UDP. The host must be reachable on it.\n", NC_PORT_DEFAULT);
     printf("\n");
+    printf("  relay pings a CnCNet Tunnel V3 server: a 50-byte datagram it echoes the\n");
+    printf("  first 12 bytes of. It proves this build's understanding of the protocol\n");
+    printf("  against a REAL server, which a loopback test structurally cannot -- and it\n");
+    printf("  needs no registration, no session and no state on either side.\n");
+    printf("  Default relay port %d. Their limit is 20 pings per address per minute.\n",
+           NC_RELAY_PORT);
+    printf("\n");
+    printf("  relayhost and relayjoin run the SAME session through a CnCNet relay\n");
+    printf("  instead of directly. The host prints a room code; the joiner types it.\n");
+    printf("  Neither machine forwards a port, because both dial outward. This is the\n");
+    printf("  only way to prove a relay actually carries our traffic: every gate in the\n");
+    printf("  tree talks to a stand-in written from our own reading of the protocol.\n");
+    printf("\n");
     printf("  selftest needs nothing else running: it puts both peers in one process on\n");
     printf("  the loopback address, so it says whether this binary works on this machine\n");
     printf("  before anything is blamed on the network. Run it first.\n");
+    printf("\n");
+    printf("       %s probe [relay] <#CODE> [rounds]\n", me);
+    printf("       %s probe <address:port> [rounds]\n", me);
+    printf("\n");
+    printf("  probe asks a game's LOBBY how far away it is, the way the game list does:\n");
+    printf("  %d probes per round, %d, %d and %d ms apart, each round trip printed, and\n"
+           "  the minimum.\n",
+           NM_PROBE_COUNT, NM_PROBE_GAP1_MS, NM_PROBE_GAP2_MS, NM_PROBE_GAP3_MS);
+    printf("  It takes no seat and needs no passcode. A relayed room is asked through the\n");
+    printf("  relay (default %s), which costs one relay client slot for the whole run,\n",
+           NC_RELAY_DEFAULT);
+    printf("  so ask for several rounds rather than running it several times. A direct\n");
+    printf("  probe sends this machine's address to that host.\n");
+}
+
+/* ---- THE PROBE, BY HAND ------------------------------------------------------------
+   WHAT IT IS FOR. The game list's PING column is the minimum of NM_PROBE_COUNT probes,
+   and a number on a screen is only worth showing if something that prints its working
+   can reproduce it. This prints every round trip, each round's minimum, and for a
+   relayed room the relay's own echo from this machine, which is the other half of the
+   path and the first thing to compare a surprising number against.
+
+   IT WRITES THE BYTES ITSELF, from the constants in netmatch.h, rather than calling the
+   game's prober. This tool links only the transport; and a second writer of the wire is
+   also a second reading of it, which is what notices when the two drift. The schedule
+   is the game's: NM_PROBE_COUNT probes at the gaps NM_PROBE_GAP_MS gives, a round finished
+   NM_PROBE_WAIT_MS after its last probe.
+
+   ONE RELAY REGISTRATION FOR THE WHOLE RUN, however many rounds, because every id a
+   process registers is one of the eight clients a relay allows one public address, and
+   it stays counted for up to two minutes after the process exits. */
+#define NC_PROBE_ROUNDS     3
+#define NC_PROBE_ROUNDS_MAX 10
+
+/* HOST or HOST:PORT. 1 with a port, 0 with none, -1 when it is neither. */
+static int split_hostport(const char* text, char* host, int hostmax, unsigned short* port)
+{
+    const char* c = strrchr(text, ':');
+    size_t n;
+    if (!c) {
+        snprintf(host, (size_t)hostmax, "%s", text);
+        return host[0] ? 0 : -1;
+    }
+    n = (size_t)(c - text);
+    if (n == 0 || n >= (size_t)hostmax || !c[1]) return -1;
+    memcpy(host, text, n);
+    host[n] = '\0';
+    *port = (unsigned short)atoi(c + 1);
+    return *port ? 1 : -1;
+}
+
+/* The relay's own echo, timed: this machine to the relay and back. On a plain socket of
+   its own, because a tunnel socket swallows the echo. THE LEAST OF THREE, because one
+   echo on a fresh socket was measured reading 123 ms from a relay that a full relayed
+   round trip crossed twice in 42: the first datagram of a new flow can wait on the
+   router in front of this machine, and a single sample cannot tell that from distance.
+   Three of the twenty pings a minute a relay allows an address. -1 when none came back
+   within two seconds of being sent. */
+static int relay_echo_ms(const char* host, unsigned short port)
+{
+    NetSock* ps = net_open(0);
+    unsigned char nonce[4], echo[12];
+    int k, i, best = -1;
+    if (!ps) return -1;
+    for (k = 0; k < 3; k++) {
+        const unsigned seed = now_ms() ^ (unsigned)(k * 0x9E3779B9u);
+        unsigned t0;
+        for (i = 0; i < 4; i++) nonce[i] = (unsigned char)((seed >> (i * 8)) & 0xFFu);
+        t0 = now_ms();
+        if (net_tunnel_ping_send(ps, host, port, nonce) < 0) break;
+        while (now_ms() - t0 < 2000u) {
+            if (net_tunnel_ping_recv(ps, echo) && memcmp(echo + 8, nonce, 4) == 0) {
+                const int ms = (int)(now_ms() - t0);
+                if (best < 0 || ms < best) best = ms;
+                break;
+            }
+            nap_ms(1);
+        }
+        nap_ms(130);
+    }
+    net_close(ps);
+    return best;
+}
+
+static int probe_cmd(int argc, char** argv)
+{
+    char relay[128], host[128], target[64], mins[160];
+    unsigned short rport = NC_RELAY_PORT, dport = 0;
+    unsigned long room = 0ul;
+    const char* code = NULL;
+    NetSock* s;
+    NetAddr peer, from;
+    unsigned char in[64], pkt[NM_PROBE_BYTES];
+    int relayed = 0, rounds = NC_PROBE_ROUNDS, argi, round;
+    int best_all = -1, answered_all = 0, sent_all = 0, echo = -1;
+    unsigned version = 0;
+
+    snprintf(relay, sizeof relay, "%s", NC_RELAY_DEFAULT);
+    if (argc < 3) { usage(argv[0]); return 2; }
+    if (argc >= 4 && argv[3][0] == '#') {
+        relayed = 1;
+        code = argv[3];
+        argi = 4;
+        if (split_hostport(argv[2], relay, (int)sizeof relay, &rport) < 0) {
+            printf("netcheck: '%s' is not a relay address.\n", argv[2]);
+            return 2;
+        }
+    } else if (argv[2][0] == '#') {
+        relayed = 1;
+        code = argv[2];
+        argi = 3;
+    } else {
+        argi = 3;
+        if (split_hostport(argv[2], host, (int)sizeof host, &dport) != 1) {
+            printf("netcheck: '%s' is neither a room code (#K7M-3QX) nor address:port.\n",
+                   argv[2]);
+            return 2;
+        }
+    }
+    if (argc > argi) {
+        rounds = atoi(argv[argi]);
+        if (rounds < 1) rounds = 1;
+        if (rounds > NC_PROBE_ROUNDS_MAX) rounds = NC_PROBE_ROUNDS_MAX;
+    }
+    if (relayed && !rc_decode(code, &room)) {
+        printf("netcheck: '%s' is not a room code. They look like #K7M-3QX.\n", code);
+        return 2;
+    }
+    if (net_startup() != 0) {
+        printf("netcheck: this platform's networking would not start.\n");
+        return 3;
+    }
+    memset(&peer, 0, sizeof peer);
+    if (relayed) {
+        const unsigned long my_id = rc_draw_peer_id();
+        if (!rc_encode(room, target)) snprintf(target, sizeof target, "%lu", room);
+        echo = relay_echo_ms(relay, rport);
+        s = my_id ? net_open_tunnel(relay, rport, my_id) : NULL;
+        if (!s) {
+            printf("PROBE|target=%s|could not open a socket through the relay at %s:%u\n",
+                   target, relay, (unsigned)rport);
+            net_shutdown();
+            return 3;
+        }
+        net_addr_tunnel(&peer, room);
+        if (echo >= 0)
+            printf("PROBE|target=%s|via=%s:%u|relay-echo=%dms\n", target, relay,
+                   (unsigned)rport, echo);
+        else
+            printf("PROBE|target=%s|via=%s:%u|relay-echo=none in 2 s\n", target, relay,
+                   (unsigned)rport);
+    } else {
+        if (net_resolve(host, dport, &peer) != 0) {
+            printf("netcheck: could not resolve '%s'.\n", host);
+            net_shutdown();
+            return 2;
+        }
+        s = net_open(0);
+        if (!s) {
+            printf("netcheck: could not open a UDP socket.\n");
+            net_shutdown();
+            return 3;
+        }
+        net_addr_text(&peer, target, (int)sizeof target);
+        printf("PROBE|target=%s|direct\n", target);
+    }
+    fflush(stdout);
+
+    mins[0] = '\0';
+    for (round = 1; round <= rounds; round++) {
+        const unsigned nonce = (unsigned)rc_draw_peer_id() ^ now_ms();
+        unsigned sent_at[NM_PROBE_COUNT];
+        unsigned next = now_ms(), last = 0, mask = 0;
+        int sent = 0, got = 0, best = -1, n;
+        size_t used;
+        for (;;) {
+            if (sent < NM_PROBE_COUNT && now_ms() - next < 0x80000000u) {
+                const unsigned stamp = now_ms();
+                put_u32(pkt, NM_PROBE_WORD);
+                put_u32(pkt + 4, nonce + (unsigned)sent);
+                put_u32(pkt + 8, stamp);
+                put_u32(pkt + 12, 0u);
+                net_send(s, &peer, pkt, NM_PROBE_BYTES);
+                sent_at[sent++] = stamp;
+                last = stamp;
+                next = stamp + (unsigned)NM_PROBE_GAP_MS(sent - 1);
+            }
+            while ((n = net_recv(s, &from, in, (int)sizeof in)) > 0) {
+                unsigned idx;
+                int rtt;
+                if (n < NM_PROBE_BYTES || get_u32(in) != NM_PROBEACK_WORD) continue;
+                if (!net_addr_equal(&from, &peer)) continue;
+                idx = get_u32(in + 4) - nonce;
+                if (idx >= (unsigned)sent || (mask & (1u << idx))) continue;
+                if (get_u32(in + 8) != sent_at[idx]) continue;
+                rtt = (int)(now_ms() - sent_at[idx]);
+                mask |= 1u << idx;
+                got++;
+                if (best < 0 || rtt < best) best = rtt;
+                version = get_u32(in + 12);
+                printf("PROBE|round=%d|probe=%u|rtt=%dms\n", round, idx + 1u, rtt);
+            }
+            if (got == NM_PROBE_COUNT) break;
+            if (sent == NM_PROBE_COUNT && now_ms() - last >= (unsigned)NM_PROBE_WAIT_MS) break;
+            nap_ms(1);
+        }
+        sent_all += sent;
+        answered_all += got;
+        used = strlen(mins);
+        if (best >= 0) {
+            if (best_all < 0 || best < best_all) best_all = best;
+            printf("PROBE|round=%d|min=%dms|answers=%d/%d\n", round, best, got, sent);
+            snprintf(mins + used, sizeof mins - used, "%s%d", used ? "," : "", best);
+        } else {
+            printf("PROBE|round=%d|min=--|answers=0/%d\n", round, sent);
+            snprintf(mins + used, sizeof mins - used, "%s--", used ? "," : "");
+        }
+        fflush(stdout);
+        /* A SECOND BETWEEN ROUNDS, so no round can run into the host's limit on answers to
+           one sender. Drained meanwhile: that keeps the relay registration fresh, and an
+           answer arriving late belongs to a round that is over. */
+        if (round < rounds) {
+            const unsigned t = now_ms();
+            while (now_ms() - t < 1000u) {
+                while (net_recv(s, &from, in, (int)sizeof in) > 0) { /* late: dropped */ }
+                nap_ms(5);
+            }
+        }
+    }
+
+    if (best_all >= 0) {
+        printf("PROBE|done|target=%s|min=%dms|rounds=%d|answered=%d/%d|round-mins=%s"
+               "|host-version=%u\n", target, best_all, rounds, answered_all, sent_all,
+               mins, version);
+    } else {
+        printf("PROBE|done|target=%s|NO ANSWER|rounds=%d|answered=0/%d\n", target, rounds,
+               sent_all);
+        printf("          Silence has several causes that look the same from here: no such\n");
+        printf("          room, a match that has already started, a host built before the\n");
+        printf("          probe existed, a firewall in front of a direct host, or loss.\n");
+    }
+    fflush(stdout);
+    net_close(s);
+    net_shutdown();
+    return best_all >= 0 ? 0 : 5;
 }
 
 /* THE SYNTHETIC ORDER, in one place because two places would break the claim that the
@@ -407,6 +737,12 @@ int main(int argc, char** argv)
     time_t deadline, tdeadline;
     int have_peer = 0;
     unsigned long sent = 0, got = 0;
+    /* Relay mode: the same session, carried by a CnCNet tunnel instead of going direct.
+       Neither machine forwards a port, because both dial outward. */
+    int is_relay = 0;
+    unsigned long my_id = 0ul, peer_id = 0ul;
+    char relay_host[128];
+    snprintf(relay_host, sizeof relay_host, "%s", NC_RELAY_DEFAULT);
 
     if (argc < 2) { usage(argv[0]); return 2; }
 
@@ -423,6 +759,10 @@ int main(int argc, char** argv)
         return rc;
     }
 
+    /* Handled on its own too: it opens its own socket, speaks no lockstep and needs no
+       second copy of this tool at the far end, only a game lobby. */
+    if (!strcmp(argv[1], "probe")) return probe_cmd(argc, argv);
+
     if (!strcmp(argv[1], "host")) {
         is_host = 1;
         if (argc >= 3) port = (unsigned short)atoi(argv[2]);
@@ -430,6 +770,31 @@ int main(int argc, char** argv)
         is_host = 0;
         if (argc < 3) { usage(argv[0]); return 2; }
         if (argc >= 4) port = (unsigned short)atoi(argv[3]);
+    } else if (!strcmp(argv[1], "relayhost")) {
+        is_host = 1;
+        is_relay = 1;
+        if (argc >= 3) snprintf(relay_host, sizeof relay_host, "%s", argv[2]);
+    } else if (!strcmp(argv[1], "relayjoin")) {
+        is_host = 0;
+        is_relay = 1;
+        if (argc < 3) { usage(argv[0]); return 2; }
+        if (!rc_decode(argv[2], &peer_id)) {
+            printf("netcheck: '%s' is not a room code. They look like #K7M-3QX.\n", argv[2]);
+            return 2;
+        }
+        if (argc >= 4) snprintf(relay_host, sizeof relay_host, "%s", argv[3]);
+    } else if (!strcmp(argv[1], "relay")) {
+        int rc;
+        unsigned short rport = NC_RELAY_PORT;
+        if (argc < 3) { usage(argv[0]); return 2; }
+        if (argc >= 4) rport = (unsigned short)atoi(argv[3]);
+        if (net_startup() != 0) {
+            printf("netcheck: this platform's networking would not start.\n");
+            return 3;
+        }
+        rc = relay_ping(argv[2], rport);
+        net_shutdown();
+        return rc;
     } else {
         usage(argv[0]);
         return 2;
@@ -442,6 +807,23 @@ int main(int argc, char** argv)
 
     /* The host binds the agreed port because the joiner has to be able to name it. The
        joiner takes any port, which is what lets several joiners share one machine. */
+    if (is_relay) {
+        /* A HOST'S ID HAS TO FIT A ROOM CODE, which is thirty bits; a joiner's is never
+           written down and uses the full width. */
+        my_id = is_host ? rc_draw_host_id() : rc_draw_peer_id();
+        if (my_id == 0ul) {
+            printf("netcheck: this computer would not give a random number.\n");
+            net_shutdown();
+            return 3;
+        }
+        sock = net_open_tunnel(relay_host, NC_RELAY_PORT, my_id);
+        if (!sock) {
+            printf("netcheck: could not reach the relay at %s:%u.\n",
+                   relay_host, (unsigned)NC_RELAY_PORT);
+            net_shutdown();
+            return 3;
+        }
+    } else
     sock = net_open(is_host ? port : 0);
     if (!sock) {
         printf("netcheck: could not open a UDP socket on port %u.\n", (unsigned)port);
@@ -454,10 +836,25 @@ int main(int argc, char** argv)
 
     if (is_host) {
         seat = 0;
+        if (is_relay) {
+            char code[RC_TEXT_MAX];
+            if (!rc_encode(my_id, code)) { printf("netcheck: the drawn id will not encode.\n");
+                                           net_close(sock); net_shutdown(); return 3; }
+            printf("netcheck: hosting THROUGH THE RELAY at %s. Waiting for a joiner.\n",
+                   relay_host);
+            printf("          ROOM CODE  %s\n", code);
+            printf("          On the other machine run:  netcheck relayjoin %s\n", code);
+            /* FLUSHED, because this line exists to be READ and acted on while the process
+               keeps running. Redirected to a file, stdout is block buffered, so without
+               this the one thing the other machine needs sits in a buffer until the
+               session ends -- by which time there is nothing to join. */
+            fflush(stdout);
+        } else {
         printf("netcheck: hosting on UDP port %u. Waiting for a joiner.\n",
                (unsigned)net_local_port(sock));
         printf("          On the other machine run:  netcheck join <this machine> %u\n",
                (unsigned)net_local_port(sock));
+        }
 
         deadline = time(0) + NC_HANDSHAKE_SECS;
         while (!have_peer && time(0) < deadline) {
@@ -488,13 +885,23 @@ int main(int argc, char** argv)
         }
     } else {
         seat = 1;
-        if (net_resolve(argv[2], port, &peer) != 0) {
+        if (is_relay) {
+            /* THE HOST IS AN ID. Nothing to resolve: the relay's address was looked up
+               when the socket opened, and the room code names who to ask for. */
+            net_addr_tunnel(&peer, peer_id);
+        } else if (net_resolve(argv[2], port, &peer) != 0) {
             printf("netcheck: could not resolve '%s'.\n", argv[2]);
             net_close(sock); net_shutdown();
             return 3;
         }
-        net_addr_text(&peer, txt, (int)sizeof txt);
-        printf("netcheck: joining %s\n", txt);
+        if (is_relay) {
+            char code[RC_TEXT_MAX];
+            if (rc_encode(peer_id, code)) printf("netcheck: joining room %s\n", code);
+            else                          printf("netcheck: joining room %lu\n", peer_id);
+        } else {
+            net_addr_text(&peer, txt, (int)sizeof txt);
+            printf("netcheck: joining %s\n", txt);
+        }
 
         deadline = time(0) + NC_HANDSHAKE_SECS;
         while (!have_peer && time(0) < deadline) {

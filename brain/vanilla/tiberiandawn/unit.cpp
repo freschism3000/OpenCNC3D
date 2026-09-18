@@ -12,6 +12,14 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// UnitClass::Overlap_List drops the selection term in a lockstep match, so
+// the cells a vehicle overlaps do not depend on which peer has it selected.
+// It DOES change the game simulation, in a lockstep match only.
+// The complete diff against upstream is brain/patches/vanilla-cnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header:   F:\projects\c&c\vcs\code\unit.cpv   2.17   16 Oct 1995 16:48:28   JOE_BOSTIC  $ */
 /***********************************************************************************************

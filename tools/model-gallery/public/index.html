@@ -78,6 +78,17 @@ header{flex:none;border-bottom:1px solid var(--line);background:var(--panel)}
 #tools button{padding:5px 9px;font-size:11px}
 #tools button.on{background:var(--acc);color:#191203;border-color:var(--acc)}
 #help{position:absolute;right:16px;bottom:14px;color:var(--dim2);font-size:10px}
+/* The transport. Hidden entirely on the 214 models that carry no clip, rather than
+   sitting there greyed out on most of the gallery. */
+#anim{position:absolute;left:16px;right:16px;bottom:50px;display:none;gap:9px;
+  align-items:center;background:rgba(13,17,23,.86);border:1px solid var(--line);
+  border-radius:6px;padding:6px 10px}
+#anim.show{display:flex}
+#anim button{padding:3px 10px;font-size:12px;line-height:1.2;min-width:34px}
+#anim select{font:inherit;font-size:10.5px;color:var(--fg);background:#0b0f14;
+  border:1px solid var(--line2);border-radius:4px;padding:3px 6px}
+#aScrub{flex:1;min-width:80px;accent-color:var(--acc);background:transparent}
+#aRead{font-size:10.5px;color:var(--dim);white-space:nowrap}
 #side{width:330px;flex:none;background:var(--panel);border-left:1px solid var(--line);
   display:flex;flex-direction:column}
 #side .top{display:flex;gap:8px;align-items:center;padding:12px 14px;
@@ -164,7 +175,18 @@ legend{font-size:10px;letter-spacing:.12em;color:var(--dim2);text-transform:uppe
       <button data-t="spin">spin</button>
       <button data-t="reset">reset view</button>
     </div>
-    <div id="help">drag = orbit &middot; wheel = zoom &middot; shift+drag = pan &middot; &larr;/&rarr; = prev/next &middot; esc = close</div>
+    <div id="anim">
+      <button id="aPlay" title="play / pause (space)">&#9654;</button>
+      <input type="range" id="aScrub" min="0" max="0" step="1" value="0"
+             title="scrub the clip (, and . step one frame)">
+      <span id="aRead"></span>
+      <select id="aMode" title="which rule picks the frame">
+        <option value="game">game driver</option>
+        <option value="clip">whole clip</option>
+      </select>
+      <select id="aSeg" title="which part of the clip the engine selects"></select>
+    </div>
+    <div id="help">drag = orbit &middot; wheel = zoom &middot; shift+drag = pan &middot; space = play &middot; &larr;/&rarr; = prev/next &middot; esc = close</div>
   </div>
   <div id="side">
     <div class="top">

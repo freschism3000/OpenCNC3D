@@ -1,0 +1,28 @@
+# G249, leg A. THE EXIT COMES BEFORE THE RALLY.
+#
+# The barracks on SCG90EA stands at 57,53: its occupied row is row 53, its overlap pad
+# is row 54, the door point lies in 58,54 and the exit cell in front of the door is 58,55.
+# The rally is NORTH of the building, at 58,50, so the shortest line from the door point
+# runs straight through the hut. A soldier that honours the rally from the door point
+# walks 58,54 then 59,54 and never enters the exit cell: it leaves through the wall.
+# The soldier that leaves through the door enters 58,55 first, salutes there, and only
+# then turns for the rally along the front of the building.
+#
+# The control is this script with the rally lines taken out (the gate derives it with
+# sed), so the one thing the two runs differ in is whether a rally point was set: the
+# control soldier walks 58,54 then 58,55 and stops there.
+tick 30
+cam 57.5 53
+zoom max
+rally PYLE 0 58 50
+tick 2
+rallydump
+count E1:GoodGuy
+build E1
+watch E1:GoodGuy 4 140
+shot shots/exitpath_a_door.png
+watch E1:GoodGuy 4 280
+count E1:GoodGuy
+obj E1:GoodGuy 4
+shot shots/exitpath_a_end.png
+quit

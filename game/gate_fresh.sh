@@ -103,7 +103,7 @@ done
 # The three binaries G130 runs. A missing one is NOT reported as a failure here, because
 # G130 already goes red for exactly that and two reds for one cause reads as two problems.
 # Staleness is the part only this file can see.
-for bin in gate_lockstep gate_netloop netcheck; do
+for bin in gate_lockstep gate_netloop gate_beacon gate_lobby netcheck; do
     p="$RUNDIR/$bin"
     if [ ! -x "$p" ]; then
         echo "  $bin: not deployed (G130 reports that; game/make-build.sh copies it)"
@@ -120,6 +120,57 @@ for bin in gate_lockstep gate_netloop netcheck; do
         echo "  $bin: current"
     fi
 done
+
+# ---- gate_rminf, WHICH IS BUILT FROM game/ AND NOT FROM net/ ----------------------
+# G202's derivation leg runs this binary against the player's own Remastered install, so a
+# stale copy is a green gate on source that has since changed -- the same failure as the
+# net binaries above, from a different directory. Its sources are the game headers, which
+# is why it takes `newest` rather than `net_newest`.
+p="$RUNDIR/gate_rminf"
+if [ ! -x "$p" ]; then
+    echo "  gate_rminf: not deployed (G202 reports that; game/build.sh makes and stages it)"
+else
+    bt=$(stat -f %m "$p" 2>/dev/null || stat -c %Y "$p" 2>/dev/null)
+    if [ "$newest" -gt 0 ] && [ "$bt" -lt "$newest" ]; then
+        age=$(( (newest - bt) / 60 ))
+        echo "  gate_rminf: STALE by ${age} min -- older than $(basename "$newest_name")."
+        echo "      rebuild it:  cd $REPO/game && ./build.sh"
+        echo "      G202 runs this binary, so a stale one is a green gate on old source"
+        fail=1
+    else
+        echo "  gate_rminf: current"
+    fi
+fi
+
+# ---- cnc_twobrain, WHICH THIS FILE DID NOT WATCH AND SHOULD HAVE ------------------
+# G194 is the gate that proves two independent copies of the engine AGREE, which is the
+# single property the whole lockstep design rests on, and it is the ONLY gate that runs
+# this binary. So a stale cnc_twobrain is a green G194 measuring source that has since
+# changed -- exactly the failure the top of this file was written for, and this binary was
+# left out of it. Found while fixing the defect G194 had caught.
+#
+# It is built from brain/host/cnc_twobrain.c and nothing else (game/build.sh line 78 is one
+# cc invocation with one input), so it gets its own threshold rather than the renderer's:
+# an edit to cnc_eyes.cpp cannot make it stale and must not be allowed to say so.
+tb_src="$REPO/brain/host/cnc_twobrain.c"
+tb_bin="$RUNDIR/cnc_twobrain"
+if [ ! -f "$tb_src" ]; then
+    echo "  cnc_twobrain: no source at brain/host/cnc_twobrain.c"
+elif [ ! -x "$tb_bin" ]; then
+    echo "  cnc_twobrain: not deployed (G194 reports that; game/build.sh makes it)"
+else
+    ts=$(stat -f %m "$tb_src" 2>/dev/null || stat -c %Y "$tb_src" 2>/dev/null)
+    tb=$(stat -f %m "$tb_bin" 2>/dev/null || stat -c %Y "$tb_bin" 2>/dev/null)
+    if [ -n "$ts" ] && [ -n "$tb" ] && [ "$tb" -lt "$ts" ]; then
+        age=$(( (ts - tb) / 60 ))
+        echo "  cnc_twobrain: STALE by ${age} min -- older than cnc_twobrain.c."
+        echo "      rebuild it:  cd $REPO/game && ./build.sh"
+        echo "      G194 runs this binary, so a stale one is a green gate on old source"
+        fail=1
+    else
+        echo "  cnc_twobrain: current"
+    fi
+fi
 
 # ---- THE BRAIN ------------------------------------------------------------------
 # Link 1: is the BUILT dylib newer than every brain source?
@@ -207,7 +258,7 @@ if command -v git >/dev/null 2>&1 && [ -e "$REPO/.git" ]; then
 fi
 
 if [ "$fail" -eq 0 ]; then
-    echo "gate_fresh: all three binaries and every tracked gate script match the tree"
+    echo "gate_fresh: every deployed binary (both game binaries, the four net tools, gate_rminf, cnc_twobrain and the brain) and every tracked gate script match the tree"
     exit 0
 fi
 echo "gate_fresh: a deployed binary is older than the source it is built from"

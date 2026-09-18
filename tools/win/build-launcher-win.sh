@@ -86,6 +86,33 @@ else
     echo "WARNING: tools/launchers/cnc3d.ico is missing; no icon" >&2
 fi
 
+echo "== manifest"
+# THE LAUNCHER'S NARROW STRINGS ARE UTF-8. Every path it handles goes through a "char"
+# API: GetModuleFileNameA for its own folder, CreateFileA for the install lock, and the
+# C runtime's fopen, rename, remove and stat for the update. Windows reads all of them in
+# the process code page, and the installer's default folder is inside the player's own
+# user folder, so a user name that code page cannot spell (a Polish name on a Western
+# European machine, a Cyrillic or Japanese one on most) gave the launcher a path it could
+# not open again, and an update then failed as "could not lock the game folder". This
+# manifest makes the process code page UTF-8 on Windows 10 version 1903 and later, which
+# every one of those calls follows with no change to the code. Earlier Windows ignores
+# the element and keeps the old limit. It declares nothing else, so the rest of how
+# Windows treats the program (compatibility mode, DPI, file virtualization) is what it
+# was without a manifest.
+cat > "$OBJ/launcher.manifest" <<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>
+XML
+# Resource 1 of type 24 (RT_MANIFEST) is the one Windows reads when it starts a process.
+printf '1 24 "launcher.manifest"\n' > "$OBJ/manifest.rc"
+( cd "$OBJ" && $HOST-windres manifest.rc -O coff -o manifest.o )
+
 echo "== link"
 # The -Bdynamic island around -lSDL2 is the same trick build-win.sh documents at
 # length: -static on its own picks the static libSDL2.a, which then wants every
@@ -94,7 +121,14 @@ echo "== link"
 # SDL2.dll is the only file that has to travel beside the .exe.
 LIBS="-lmingw32 -lSDL2main -Wl,-Bdynamic -lSDL2 -Wl,-Bstatic -lopengl32 -lwininet -lz -static"
 
-$CC -mwindows -o "$OUT/C&C3D.exe" $OBJS $RCOBJ $LIBDIRS $LIBS
+$CC -mwindows -o "$OUT/C&C3D.exe" $OBJS $RCOBJ "$OBJ/manifest.o" $LIBDIRS $LIBS
+
+# Asked of the binary, not of the build: a launcher without it still links and runs,
+# and fails only on the machines the manifest is for.
+grep -aq '>UTF-8</activeCodePage>' "$OUT/C&C3D.exe" || {
+    echo "the linked launcher carries no UTF-8 code page manifest" >&2
+    exit 1
+}
 
 cp "$SDL2_ROOT/bin/SDL2.dll" "$OUT/" 2>/dev/null || true
 ls -la "$OUT/C&C3D.exe"

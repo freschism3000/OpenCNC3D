@@ -15,7 +15,7 @@
  *      red where it is not. This is the building's own occupy list out of the engine, so
  *      it is the right shape for every structure without a table of our own.
  *   3. The BUILDING ITSELF, its real mesh, translucent, standing where it would stand.
- *      That is the part the project owner asked for and the part a cell grid cannot give: a Weapons
+ *      That is the part the requirement asked for and the part a cell grid cannot give: a Weapons
  *      Factory and a Barracks both occupy a 3x3 and look nothing alike.
  *
  * The legality is the ENGINE's verdict, never ours: GAME_STATE_PLACEMENT reports, per

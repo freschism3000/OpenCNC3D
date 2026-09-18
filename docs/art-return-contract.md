@@ -4,8 +4,9 @@ What it takes to raise a vehicle's polycount and texture resolution. Three thing
 come back for a model to be usable, and what does not exist yet.
 
 **Read the last section first if you are about to promise a turnaround.** The export
-side is built and proven. The import side is NOT built. A model can go out today;
-nothing takes one back in.
+side is built and proven. The import side now exists for VEHICLES, on the `model-swap`
+branch, and is described in section 7. Buildings still cannot come back, because a
+remodelled building has no construction sections.
 
 ---
 
@@ -175,20 +176,20 @@ before an artist spends a day on a clip.
 
 ## 5. What does not exist
 
-**There is no import path.** `bake5.py` reads the ROM and only the ROM. Nothing in the
-repo can put an artist's triangles into a pack, and no format, tool or code path is
-waiting for them. Getting one model back in needs, at minimum:
+**`bake5.py` still reads the ROM and only the ROM**, and that is deliberate: it is what
+makes a bake reproducible. An imported model is applied AFTER the bake, to the baked
+pack, by `tools/art/fbxin.py` (section 7). What that leaves outstanding:
 
-- a mesh override that reads the returned FBX and replaces a type's triangle list,
-  part table and pivots
-- texture-bank injection: the artist's PNG becomes a bank entry, with the house variant
-  either supplied or derived, and the Voodoo 2 rules checked at bake time rather than
-  discovered on the box
-- per-triangle draw mode and wrap mode carried from the artist's materials
-- for buildings only, a construction section table, which today comes from the display
-  list's own vertex batches and has no counterpart in an FBX
-- a gate that renders the replaced model and compares it against the cartridge's, so a
-  bad import is caught by pixels rather than in review
+- **house colours.** The cartridge recolours a unit by swapping a GDI palette for a Nod
+  one, and 64 of a pack's 271 textures differ between them. A modern RGBA image has no
+  palette, so an imported model looks identical for both sides until an artist delivers
+  two texture sets or marks which texels are house colour.
+- **construction sections for buildings**, which today come from the display list's own
+  vertex batches and have no counterpart in an FBX. A remodelled building would appear
+  in one lump instead of assembling.
+- **node animation.** An imported mesh drops any PKB clip the mesh it replaces carried.
+- **a gate.** Nothing yet renders an imported model and asserts against it, so a bad
+  import is caught by eye rather than by pixels.
 
 **And it is a charter question before it is a work estimate.** The charter's first line
 is "a faithful PC recreation of the Nintendo 64 presentation". Higher-poly, higher-res
@@ -273,3 +274,76 @@ Glide is fixed function with no vertex stage at all. **Estimate, not a measureme
 four-bone blend on a Pentium II class CPU lands somewhere around 10,000 to 20,000 skinned
 triangles per frame at 30 fps. That is above the whole current pack, so it is not absurd,
 but nobody has measured it and it should not be planned on until somebody does.
+
+## 7. The import path, for vehicles
+
+```
+python3 tools/art/fbxin.py SCG01EA.pack MTNK "Medium tank.FBX" -o patched.pack
+python3 tools/art/fbxin.py SCG01EA.pack MTNK "Medium tank.FBX" -o x --report
+```
+
+`--report` measures and prints without writing anything: the bounding box of the mesh
+being replaced beside the bounding box of the delivered one, the node list with the
+role each name implies, and whether vertex colours arrived. That comparison is how the
+axis mapping and the scale are checked, and it should be run before every import.
+
+The tool rewrites exactly one mesh record and appends the textures it needs, copying
+every other byte of the pack through unchanged, so existing texture indices in every
+other mesh still mean what they meant. It reads the result back with the pack's own
+reader before it exits, and refuses if the mesh count, the texture count or the
+EOF-relative tail moved.
+
+**What it decides, because the cartridge stated these and an FBX does not:** the axis
+mapping and scale, the vertex colour where none was delivered (a fixed-light ramp baked
+from the delivered normals into the grey range the cartridge's own baked lighting
+occupies, or flat white under `--shade flat`), the draw and wrap mode per triangle
+(opaque and repeating unless a material is named to `--xlu` or `--cutout`), the part
+roles from the node names, and the pivots, which default to the ones the pack already
+holds for the part at that index.
+
+**The shading is ours.** A model imported this way is lit by a rule chosen in that tool,
+not by the console. That is a deviation and it is the price of accepting geometry that
+was never baked by the cartridge.
+
+### Running tracks
+
+`--tread MATERIAL` marks a material's faces as tank track. The renderer scrolls them as
+the vehicle drives, from DISTANCE TRAVELLED rather than from wall clock, so a stopped
+tank's track is still and two vehicles at different speeds do not run in step. The phase
+is accumulated in the per-tick object parse and not in the draw, so two screenshot runs
+of one script stay identical.
+
+The track faces are re-projected onto a repeating strip on the way in, because the
+delivered UVs unwrap the track onto its own atlas region and an atlas cannot be scrolled
+without dragging whatever sits next to it into view. The projection runs along the
+vehicle for the scrolling axis and across the track for the other, choosing width or
+height per face from that face's normal, and repeats every `--treadpitch` model units.
+
+`--treadframes 1` scrolls a strip continuously. Two to fifteen steps a flipbook of that
+many frames stacked down one image, and the importer squeezes the track's v into the
+first frame's band so the renderer selects a frame by adding a whole 1/frames. The count
+travels in the top nibble of the per-triangle wrap byte, which the RDP's clamp and mirror
+fields never used, so no pack format change was needed and an older renderer draws the
+track standing still.
+
+`--treadtex` supplies the strip. **When it is absent a placeholder is generated** and
+written out beside the pack, which is scaffolding rather than art: it exists so the
+speed and the direction can be judged before the real strip is drawn.
+
+**Tier 1.** This is a texture-coordinate offset and nothing else, so fixed function draws
+it unchanged and the Voodoo 2 needs no fallback.
+
+**What it looks like in play.** On a hull whose skirt covers its own running gear, seen
+from this game's camera height, the visible track is a thin band along the lower side.
+The motion is correct and it is subtle. A model meant to show its tracks has to expose
+them.
+
+### Proven on the Medium Tank
+
+A delivered hull and turret, 458 triangles against the cartridge's 91, went in and drew
+at all eight facings at the right size and orientation, with the turret rotating
+independently about the pack's own turret pivot. The delivered model needed no scaling:
+its bounding box landed within twenty units of the cartridge tank's on every axis. What
+the render showed that the numbers did not: the tank is the same grey for GDI and for
+Nod, which is the house-colour gap above, and the delivered textures are greyscale, so
+the unit reads as unpainted next to the cartridge's own.

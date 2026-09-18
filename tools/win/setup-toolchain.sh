@@ -17,7 +17,17 @@
 set -e
 
 SDK="${CNC3D_WINSDK:-$HOME/.cnc3d-winsdk}"
+# CHANGING SDL2_VER CHANGES SDL2.dll, AND A NEW SDL2.dll DOES NOT REACH EVERY PLAYER.
+# Launchers up to v0.6.11 cannot replace SDL2.dll, because they have it loaded, and they
+# write the install record before they reach it. A release carrying a different SDL2.dll
+# leaves every player who updates with one of those launchers on the old DLL, under a
+# record naming the new version, and if the new binaries need the new DLL, with a game
+# and a launcher that do not start. So tools/release.sh refuses a Windows package whose
+# SDL2.dll is not SDL2_DLL_SHA256 below, the i686 DLL every Windows release from v0.6.3
+# to v0.6.11 shipped. Move the pin only when no such launcher is left to update, or when
+# the release has another way to deliver the DLL, and say which in the commit.
 SDL2_VER=2.32.8
+SDL2_DLL_SHA256=06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e
 ZLIB_VER=1.3.1
 
 # Pinned by content, not just by version. A download that silently returns something

@@ -57,6 +57,11 @@ typedef struct DS_Slot
     int music;                   /* ThemeType playing, or -1 */
     int frame;                   /* engine frame, for the list row */
     unsigned int bytes;          /* payload size, for the list row */
+    /* NOT IN THE RECORD: the payload file's modification time, read with stat when the
+       index is read, so the slot dialog can list newest first the way loaddlg.cpp:690
+       sorts on the file's own date. The record is 128 bytes and full, and a timestamp
+       that lives in the filesystem anyway does not need a second copy. 0 if unknown. */
+    long mtime;
 } DS_Slot;
 
 /* Where the two files live. Called once by the shell with SDL_GetPrefPath's answer, or
@@ -80,6 +85,14 @@ int ds_first_free(const DS_Slot t[DS_SLOTS]);
 
 /* Does slot's payload file actually exist? */
 int ds_payload_exists(int slot);
+
+/* The payload's modification time (seconds), or 0 when it cannot be read. */
+long ds_payload_mtime(int slot);
+
+/* Delete a slot: the payload, the ".enh" sidecar beside it if there is one, and its
+   index record. Returns 1 when the payload is gone afterwards (a payload that was not
+   there counts), 0 when the directory is unset or the file could not be removed. */
+int ds_delete(int slot);
 
 #ifdef __cplusplus
 }

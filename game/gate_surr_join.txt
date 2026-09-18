@@ -1,0 +1,9 @@
+tick 30
+options
+optclick Surrender
+optclick Yes
+tick 210
+rosterdump
+chatdump
+tick 20
+quit

@@ -312,6 +312,21 @@ static int c3d_anim_frame(int frames)
    not an inference from the pack. */
 #define C3D_WRENCH_CODE  0x05
 #define C3D_WRENCH_STATE 6      /* the state row whose byte +2 is this model's period */
+/* THE CURSOR KEEPS ITS SCREEN HEADING UNDER THE PERSPECTIVE ROW'S YAW. A cursor is a
+   screen thing drawn as a world mesh, and with the world turned it turned with it (the
+   first isometric build did exactly that; the director asked for the Classic heading).
+   The turn that puts screen-up back at screen-up is the yaw in DirType units, the same
+   number the push arrows add; -1 (draw_mesh's "no yaw") becomes that turn, and the
+   spinning wrench adds it to its spin. At yaw 0 every value is what it was. The map-edge
+   arrow is NOT turned: it points at the map's edge, which is a world thing. */
+static int c3d_screen_face(int face)
+{
+    const float yaw = (g_camMode == CAM_N64) ? g_camYaw : 0.0f;
+    if (yaw == 0.0f) return face;
+    const int turn = (int)lroundf(yaw * 256.0f / (2.0f * (float)M_PI));
+    return ((face < 0 ? 0 : face) + turn) & 255;
+}
+
 static int c3d_spin_face(int code, int frame)
 {
     if (code != C3D_WRENCH_CODE || frame < 0)
@@ -454,7 +469,7 @@ static void c3d_draw_shadow(int code, float wx, float wz, int frame)
     /* THE SPIN REACHES THE SILHOUETTE, for exactly the reason the animation time above
        does: a wrench that turned while its shadow lay still would be the same defect in
        a different channel. Same call, same argument, so the two cannot drift. */
-    const int face = c3d_spin_face(code, frame);
+    const int face = c3d_screen_face(c3d_spin_face(code, frame));
     /* Both passes, so a cursor whose marker is cutout still casts its whole shape. */
     draw_mesh(mi, wx + ox, wz + oz, face, MODE_OPAQUE,
               0, 0.0f, 0, 1.0f, C3D_CURSOR_LIFT, false, WOBBLE_NONE, animT, FLATTEN);
@@ -484,14 +499,34 @@ static void c3d_draw_shadow(int code, float wx, float wz, int frame)
      ylift  height above the terrain under the anchor, in CELLS. C3D_CURSOR_LIFT for the
             pointer (the same nudge the shadow triangles get, because the ground-marker
             triangle is modelled at exactly y=0 and would z-fight); the building's own
-            half-extent for the wrench, so it floats over the roof.
-     ontop  lift the model out of the depth buffer. The pointer follows g_c3dOnTop, which
-            is a decoded-vs-reported A/B. The wrench passes true unconditionally: it is
-            drawn over a structure that is taller than it by design, so depth-testing it
-            would mean drawing nothing at all on most buildings.
+            roof plus a clearance for the wrench, so it floats over the roof.
+     depth  how the model meets the depth buffer, one of the three C3D_DEPTH_* below.
+            The pointer follows g_c3dOnTop, which is a decoded-vs-reported A/B, and so
+            passes TESTED or OVER_NO_DEPTH. The wrench passes OVER_WRITE_DEPTH
+            unconditionally: it is drawn over a structure that is taller than it by
+            design, so depth-testing it would mean drawing nothing at all on most
+            buildings, and it leaves its depth behind for the reason given at the enum.
      marker draw the model's ground-marker triangle -- the cutout pass. */
+enum C3dDepth {
+    /* An ordinary node: tested and writing, occluded by anything nearer. */
+    C3D_DEPTH_TESTED = 0,
+    /* Drawn over everything and leaving NO trace in the depth buffer. The pointer's
+       on-top path, as it was first written. */
+    C3D_DEPTH_OVER_NO_DEPTH = 1,
+    /* Drawn over everything AND writing its own depth. The test is left enabled with
+       GL_ALWAYS as the function, because a depth write only happens while the test is
+       on: a mask of GL_TRUE with the test disabled writes nothing. THE ENHANCED PICTURE
+       IS WHY THIS EXISTS. Its light pass reconstructs the surface under every pixel
+       from the depth buffer, so a wrench that left no depth was lit as the ROOF behind
+       it: the building's shading, its shadow and its occlusion painted onto the slab,
+       with the roof's own outline running across the wrench wherever a jaw crossed a
+       tower. With its depth written the pass lights the slab as the slab. Classic is
+       unchanged by construction: this is the last world pass of the frame and nothing
+       that follows it tests depth. Fixed function, nothing a Voodoo 2 cannot do. */
+    C3D_DEPTH_OVER_WRITE_DEPTH = 2
+};
 static void c3d_draw_one(int code, float wx, float wz, int frame,
-                         float ylift, bool ontop, bool marker)
+                         float ylift, C3dDepth depth, bool marker)
 {
     if (code < 0 || code >= 14) return;
     int mi = g_c3dMesh[code];
@@ -515,14 +550,18 @@ static void c3d_draw_one(int code, float wx, float wz, int frame,
        DEVIATION and is off by default: what the console does about it has not been
        decoded, and the cursor's own draw-command handler (type 2, RAM 0x8004C890) has
        not been read far enough to say. Recorded as a known gap. */
-    if (ontop) {
+    if (depth == C3D_DEPTH_OVER_NO_DEPTH) {
         glDisable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
+    } else if (depth == C3D_DEPTH_OVER_WRITE_DEPTH) {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_ALWAYS);
+        glDepthMask(GL_TRUE);
     }
     /* The spin, and the ONLY place this model's yaw comes from. See c3d_spin_face:
        every code but 0x05 gets -1 back, which is draw_mesh's "no yaw", so nothing that
        drew still before this line moves after it. */
-    const int face = c3d_spin_face(code, frame);
+    const int face = c3d_screen_face(c3d_spin_face(code, frame));
     draw_mesh(mi, wx, wz, face, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, ylift, true,
               WOBBLE_NONE, animT);
     /* THE GROUND MARKER OBEYS ITS OWN ALPHA BIT, and that is a REVERSAL. Ten of the
@@ -570,9 +609,11 @@ static void c3d_draw_one(int code, float wx, float wz, int frame,
                   WOBBLE_NONE, animT);
         glDisable(GL_ALPHA_TEST);
     }
-    if (ontop) {
+    if (depth == C3D_DEPTH_OVER_NO_DEPTH) {
         glDepthMask(GL_TRUE);
         glEnable(GL_DEPTH_TEST);
+    } else if (depth == C3D_DEPTH_OVER_WRITE_DEPTH) {
+        glDepthFunc(GL_LEQUAL);   /* the frame's own function, set once at its start */
     }
 }
 
@@ -681,18 +722,46 @@ static void c3d_draw_push(float wx, float wz)
     glColor3f(1.0f, 1.0f, 1.0f);
     if (g_c3dOnTop) { glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); }
     MODEL_SCALE = save * C3D_PUSH_HALF;
-    for (i = 0; i < 4; i++)
-        draw_mesh(g_c3dEdgeMesh,
-                  wx + OFF[i][0] * C3D_PUSH_SPREAD,
-                  wz + OFF[i][1] * C3D_PUSH_SPREAD,
-                  FACE[i], MODE_OPAQUE, 0, 0.0f, 0, 1.0f, C3D_PUSH_LIFT,
-                  true, WOBBLE_NONE, -1.0f);
+    /* UNDER THE PERSPECTIVE ROW'S YAW the four arrows follow the SCREEN's edges, which
+       is what they illustrate (rpush_step pushes in screen space): each heading gains
+       the yaw in DirType units and each offset is turned by it. The sign runs the other
+       way from sprite_facing_bias, because this turns a screen direction into a world
+       one where that turns a world direction into a screen one; check a diagonal, not a
+       cardinal, as the note above says. At yaw 0 every number here is what it was. */
+    {
+        const float yaw = (g_camMode == CAM_N64) ? g_camYaw : 0.0f;
+        const float c = cosf(yaw), s = sinf(yaw);
+        const int   turn = (int)lroundf(yaw * 256.0f / (2.0f * (float)M_PI));
+        for (i = 0; i < 4; i++) {
+            const float ox = OFF[i][0] * c - OFF[i][1] * s;
+            const float oz = OFF[i][0] * s + OFF[i][1] * c;
+            draw_mesh(g_c3dEdgeMesh,
+                      wx + ox * C3D_PUSH_SPREAD,
+                      wz + oz * C3D_PUSH_SPREAD,
+                      (FACE[i] + turn) & 255, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, C3D_PUSH_LIFT,
+                      true, WOBBLE_NONE, -1.0f);
+        }
+    }
     MODEL_SCALE = save;
     if (g_c3dOnTop) { glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); }
     glDisable(GL_TEXTURE_2D);
 }
 
+static void c3d_draw_body(int mousetype, float wx, float wz);
+
+/* THE CURSOR'S SIZE UNDER ENHANCED: the cursor_scale dial (0.7 by request, 5 Sep 2026).
+   MODEL_SCALE is the one knob draw_mesh has, and the push pointer already nests a scale
+   of its own inside it, so the multiply wraps the whole draw and is undone on the way
+   out. Classic never multiplies, so it never rounds. */
 static void c3d_draw(int mousetype, float wx, float wz)
+{
+    const float save = MODEL_SCALE;
+    if (g_fx.enabled) MODEL_SCALE = save * g_fx.cursor_scale;
+    c3d_draw_body(mousetype, wx, wz);
+    MODEL_SCALE = save;
+}
+
+static void c3d_draw_body(int mousetype, float wx, float wz)
 {
     if (!c3d_have()) return;
 
@@ -727,11 +796,12 @@ static void c3d_draw(int mousetype, float wx, float wz)
        cursor rather than per model, or the no-entry ring would double the darkness. */
     c3d_draw_shadow(C3D_STATE[st][0], wx, wz, frame);
     glColor3f(1.0f, 1.0f, 1.0f);
-    c3d_draw_one(C3D_STATE[st][0], wx, wz, frame, C3D_CURSOR_LIFT, g_c3dOnTop, true);
+    const C3dDepth pdepth = g_c3dOnTop ? C3D_DEPTH_OVER_NO_DEPTH : C3D_DEPTH_TESTED;
+    c3d_draw_one(C3D_STATE[st][0], wx, wz, frame, C3D_CURSOR_LIFT, pdepth, true);
     /* The overlay ring is state 3's model, whose own state row carries frameCount 1: it
        is static on the cartridge and stays static here. */
     if (C3D_STATE[st][3])              /* no-sell / no-repair: the ring goes on top */
-        c3d_draw_one(C3D_NOENTRY_CODE, wx, wz, -1, C3D_CURSOR_LIFT, g_c3dOnTop, true);
+        c3d_draw_one(C3D_NOENTRY_CODE, wx, wz, -1, C3D_CURSOR_LIFT, pdepth, true);
     glDisable(GL_TEXTURE_2D);
 }
 

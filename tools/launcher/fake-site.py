@@ -6,7 +6,7 @@ fake-site.py -- cnc3dgame.com's three build routes, on this machine, in one file
 
 The launcher reads the live site and nothing else, so a test that does not speak
 the site's API is not testing the launcher. This serves the same three routes,
-with the same JSON shapes, recorded from the real thing on 24 Aug 2026:
+with the same JSON shapes, recorded from the real thing:
 
     GET /api/builds                {"ok":true,"latest":{"tag":...,"assets":[
                                     {"id":..,"name":..,"size":..,
@@ -67,6 +67,7 @@ class Handler(SimpleHTTPRequestHandler):
     tag = "v0.6.3"
     assets = {}   # id -> filename
     short = None  # a filename to serve TRUNCATED, see --short
+    pad = 0       # bytes of extra changelog, see --changelog-pad
 
     def send_json(self, obj):
         body = json.dumps(obj).encode()
@@ -131,7 +132,14 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if u.path == "/api/changelog":
-            self.send_json({"ok": True, "total": len(CHANGELOG), "entries": CHANGELOG})
+            entries = list(CHANGELOG)
+            if self.pad:
+                # --changelog-pad: one more entry, that many bytes long, so the
+                # CHANGELOG.txt an update writes is big enough to be killed inside.
+                entries.append({"title": "C&C 3D v0.6.0 \"Padding\"", "version": "0.6.0",
+                                "codename": "Padding", "date": "2026-08-01",
+                                "body": "- padding\n" * (self.pad // 10)})
+            self.send_json({"ok": True, "total": len(entries), "entries": entries})
             return
 
         if u.path == "/api/download":
@@ -167,6 +175,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("folder")
     ap.add_argument("--tag", default="v0.6.3")
+    ap.add_argument("--changelog-pad", type=int, default=0,
+                    help="add a changelog entry of about this many bytes, so the "
+                         "CHANGELOG.txt an update writes is large")
     ap.add_argument("--short", default=None,
                     help="serve this filename truncated to half, while still "
                          "advertising its true length: a transfer that died")
@@ -178,6 +189,7 @@ def main():
     Handler.root = os.path.abspath(a.folder)
     Handler.tag = a.tag
     Handler.short = a.short
+    Handler.pad = a.changelog_pad
     # Ids from the name, so a run is reproducible and a log is readable.
     Handler.assets = {
         (zlib.crc32(n.encode()) & 0x7FFFFFFF): n

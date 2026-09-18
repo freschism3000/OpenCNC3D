@@ -24,7 +24,17 @@
  *                      handling in the renderer.
  *   start position     the legal index range differs per map because the engine compacts
  *                      waypoints 0..25 and then indexes the compacted list unchecked.
- *   chat               there is nobody to talk to.
+ *   chat               WAS "there is nobody to talk to", and in a skirmish there still
+ *                      is not. A network room has a chat pane and a line to type in
+ *                     , between the controls and the buttons; the shell
+ *                      carries the lines, this draws them, each in its speaker's colour.
+ *
+ * A NETWORK ROOM'S SEATS ARE A MENU. Hosting, the roster is the room's width
+ * from the host tab and every seat past the host's own is EMPTY until somebody sits in
+ * it; the host's drop down on such a seat offers BOT (a computer plays it), EMPTY (anyone
+ * may join) and BLOCK (nobody may). There is no AI Players gauge in a room: a BOT seat is
+ * the only way a computer gets in, and the mode travels on the wire like every other
+ * thing this screen decides.
  *
  * TEAMS USED TO BE ON THAT LIST AND ARE NOT ANY MORE (26 Aug 2026, the project owner's request). The
  * note said "the field works; the renderer has no ally concept, so a 2v2 would be drawn
@@ -119,15 +129,19 @@ typedef struct SK_Lobby
 {
     int map;          /* index into the caller's map array                   */
     int side;         /* the side the HUMAN plays: 0 GDI, 1 Nod              */
-    int ai_count;     /* computer opponents, 1..SK_AI_MAX                    */
+    int ai_count;     /* the COUNT of BOT seats, 0..7; the engine's player count
+                         is this plus one in a skirmish. Where they sit is mode[]. */
     int build;        /* tech level, 1..7                                    */
     int credits;      /* starting credits, every house alike                 */
     int tiberium;     /* 1 = tiberium grows and spreads                      */
     int crates;       /* 1 = bonus crates are scattered                      */
+    int aitake;       /* 1 = the computer takes over a player who leaves     */
+    int shortgame;    /* 1 = losing every non-defensive structure ends it    */
     int superweapons; /* 1 = superweapons may be built                       */
     int bases;        /* 1 = everyone starts with an MCV and builds          */
     int unit_count;   /* escort units per house beside the MCV               */
-    int start_wp[8];  /* one compacted waypoint index per player, human first */
+    int start_wp[8];  /* one compacted waypoint index per player, human first;
+                         -1 is UNPICKED and the engine deals that seat a start */
     /* PER PLAYER, human first, one entry per seat up to ai_count + 1. Entries past that
      * are still written (GDI, own team, own colour) and describe nobody.
      *   house  0 GDI, 1 Nod: the side that player's army wears and builds from.
@@ -141,6 +155,10 @@ typedef struct SK_Lobby
     int house[8];
     int team[8];
     int colour[8];
+    /* WHAT EACH SEAT IS FOR, SK_SEAT_* (the NM_SEAT_* numbers). All zero in a skirmish,
+     * where the roster is the prefix rule and this says nothing. */
+    int mode[8];
+    char name[8][12];   /* who is in each seat, off the wire */
 } SK_Lobby;
 
 /* ------------------------------------------------------------------------ *
@@ -176,14 +194,25 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * ------------------------------------------------------------------------ */
 
 #define SK_DLG_X 16
-#define SK_DLG_Y 6
+/* THE BOX GREW, and this is a deliberate departure from the ruling below
+ * that every other coordinate on this plate stays where 1995 put it: the chat pane asked
+ * for rows the dialog did not have. y 6 / h 188 became y 2 / h 196, which is eight rows
+ * and the WHOLE budget the 200 row plate holds; the box now owns rows 2..197 and content
+ * must end by 194. dosmp.c takes these four by macro, so the MULTIPLAYER screen's box,
+ * button row and status line moved with it. */
+#define SK_DLG_Y 2
 #define SK_DLG_W 288
-#define SK_DLG_H 188
+#define SK_DLG_H 196
 
 /* goptions.cpp:58 CaptionYPos = 5 * factor, and the filigree pair centred on the box's
  * top corners at (x + 12, y + 11) / (x + w - 14, y + 11). */
 #define SK_CAPTION_Y (SK_DLG_Y + 5)
 #define SK_LABEL_Y 26
+/* THE JOIN LINE, in the twelve free pixels between the caption (y 7, six tall) and the
+   PLAYERS / map heading row at SK_LABEL_Y. It is the first thing a waiting host's eye
+   lands on, which is right: while a room is open and empty, how to be joined is the only
+   thing on this screen that matters. */
+#define SK_JOIN_Y 16
 
 #define SK_ROW_H 8
 
@@ -196,7 +225,7 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * The box drawn around it runs SK_ROSTER_X - 2 .. + SK_ROSTER_W + 4, which is 22..119,
  * and the map column's own box starts at 122. Two pixels of daylight, not none.
  *
- * A FOURTH COLUMN went in on 26 Aug 2026 and the 94 did NOT move, because it cannot:
+ * A FOURTH COLUMN went in and the 94 did NOT move, because it cannot:
  * 119 and 122 are two pixels apart and the GDI/Nod pair, the status rows and the drop
  * down all start at SK_ROSTER_X. The five pixels the colour swatch needs came out of the
  * insets and the gaps instead, which were three and three and two and three. The row is
@@ -240,12 +269,12 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 /* MEASURED, not chosen: the longest map name installed, "MOOSEHEAD BARRENS", prints
  * 100 pixels wide in GRAD6FNT, and db_print does not truncate. 108 of content is that
  * plus the row's own inset on both sides. */
-#define SK_MAP_X 124
+#define SK_MAP_X 24    /* THE MAP PICKER'S list: the list left the lobby for a window behind CHANGE MAP */
 #define SK_MAP_Y 34
-#define SK_MAP_W 108
+#define SK_MAP_W 208   /* the picker's list well, three pixels short of the preview box at 237 */
 
 /* THE TWO TABS, above the list: the maps that shipped, and the ones made in the editor.
- * the project owner asked for the split because a folder of your own maps is worth nothing if it is
+ * the requirement asked for the split because a folder of your own maps is worth nothing if it is
  * mixed into a wall of SCM names.
  *
  * The list gives up a row to make space rather than the column growing: the Battlefield
@@ -269,7 +298,7 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 #define SK_TAB_X(t) (SK_MAP_X + ((t) ? (SK_TAB0_W + 2) : 0))
 #define SK_TAB_Y SK_MAP_Y
 #define SK_MAPLIST_Y (SK_MAP_Y + SK_TAB_H + 2)
-#define SK_MAP_ROWS 5
+#define SK_MAP_ROWS 15 /* fifteen rows of 8: every tab on every tree fits; the wheel and keys scroll */
 #define SK_MAP_H (SK_MAP_ROWS * SK_ROW_H)
 
 /* The preview panel, and its size is arithmetic rather than taste: the right column is
@@ -287,9 +316,27 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 #define SK_PREV_H (SK_PREVBOX_H - 4)
 
 /* Under the whole Battlefield column, list and picture alike. */
+/* THE INFO LINE, TWICE. On the lobby it is two lines under the check boxes, in the
+ * column the map list vacated: theater and size, then the start count. In the picker it
+ * is the one line it always was, across the bottom above OK and CANCEL. */
 #define SK_INFO_X 124
-#define SK_INFO_Y 94
-#define SK_INFO_W 174
+#define SK_INFO_Y 75
+#define SK_INFO_Y2 83
+#define SK_INFO_W 111
+#define SK_PK_INFO_X 24
+#define SK_PK_INFO_Y 172
+#define SK_PK_INFO_W 272
+/* THE MAP'S NAME, over the picture: right-aligned to the preview box's right edge on the
+ * heading row, cut with the two-dot ellipsis past 173 pixels (the widest retail name is
+ * 100). And the CHANGE MAP button under the picture: "Change Map" measures 58 and a
+ * button is its label plus 8, so 68, flush with the picture's right edge, on the same
+ * row as GDI / NOD. */
+#define SK_NAME_R (SK_PREVBOX_X + SK_PREVBOX_W)
+#define SK_NAME_W (SK_NAME_R - 124)
+#define SK_CHGMAP_W 68
+#define SK_CHGMAP_X (SK_PREVBOX_X + SK_PREVBOX_W - SK_CHGMAP_W)
+#define SK_CHGMAP_Y SK_SIDE_Y
+#define SK_CHGMAP_H SK_SIDE_H
 
 #define SK_SIDE_Y 92
 #define SK_SIDE_W 44
@@ -333,16 +380,25 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 #define SK_UNITS_MIN 0
 #define SK_UNITS_MAX 10
 
-#define SK_CTRL_Y 110
-#define SK_CTRL_STEP 10
-#define SK_GAUGE_X 102
+/* THE THREE GAUGES IN ONE ROW (5 Sep 2026, by request: tech level, credits and unit
+ * count side by side). Each column is 94 wide: the caption printed ABOVE its gauge,
+ * left-aligned with it, the way sounddlg.cpp labels a narrow slider two rows up; the
+ * gauge 44 wide; the value 4 to its right. Columns at 24, 118 and 212, so the third
+ * value ends inside the content edge at 298. */
+#define SK_GLABEL_Y 104          /* the captions' row                            */
+#define SK_GAUGE_Y 113           /* the gauges' row                              */
+#define SK_CTRL_STEP 10          /* the check boxes' pitch                       */
+#define SK_GAUGE_X 24
+#define SK_GAUGE_PITCH 94
 #define SK_GAUGE_W 44
 #define SK_GAUGE_H 7
-#define SK_GLABEL_R 100 /* gauge captions are right aligned to end here */
-#define SK_READ_X 150   /* the printed value, sounddlg.cpp's own idea   */
+#define SK_READ_GAP 4            /* a value starts this far right of its gauge   */
+#define SK_CONTENT_L (SK_DLG_X + 6)
+#define SK_CONTENT_R (SK_DLG_X + SK_DLG_W - 6)   /* exclusive */
 /* Far enough right that the widest printed gauge value, "10000" at 30 pixels, still
  * ends before the box; Red Alert's own check list starts at 171 in the same dialog. */
-#define SK_CHK_X 186
+#define SK_CHK_X 124   /* the column the map list vacated, left of the preview */
+#define SK_CHK_Y 34    /* four rows at SK_CTRL_STEP: 34, 44, 54, 64                          */
 #define SK_CHK_BOX 7
 #define SK_CHK_LABEL_X (SK_CHK_X + SK_CHK_BOX + 4)
 #define SK_CHK_ROW_W 111
@@ -351,12 +407,30 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * the other: what just happened, and the one fact about this screen the picture cannot
  * show -- that a roster colour is a lobby colour and nothing else. */
 #define SK_STATUS_X 24
-#define SK_STATUS_Y 150
-#define SK_STATUS_Y2 158
+#define SK_STATUS_Y 125   /* a skirmish's status row: where a room's first chat line is */
+
+/* THE CHAT, in a network room only: a well of three lines between the control block and
+ * the buttons, and a line to type in under it. In a room the status row is printed as
+ * the well's last line rather than on its own row, because the rows are spent. A
+ * skirmish draws neither and keeps its status row where it was. */
+#define SK_CHAT_X 24
+#define SK_CHAT_Y 122
+#define SK_CHAT_W 272
+#define SK_CHAT_H 50   /* 122..171: six lines, the height the relayout freed */
+#define SK_CHAT_ROWS 6
+#define SK_CHAT_ROW_H 7
+#define SK_CHAT_TEXT_X (SK_CHAT_X + 3)
+#define SK_CHAT_TEXT_Y (SK_CHAT_Y + 3)
+#define SK_CHAT_IN_X 24
+#define SK_CHAT_IN_Y 173
+#define SK_CHAT_IN_W 272
+#define SK_CHAT_IN_H 9
+#define SK_CHAT_MAX 96   /* one line, NUL included; the wire's NM_CHAT_MAX is the same */
+#define SK_CHAT_LOG 16   /* lines kept; the well shows the last SK_CHAT_ROWS of them */
 #define SK_STATUS_W 272
 
 /* Unchanged from the mission list, so Play and Cancel are in the same place on both. */
-#define SK_BTN_Y 168
+#define SK_BTN_Y 184   /* 168 until the box grew; one clear row above the inner edge */
 #define SK_BTN_H 9
 #define SK_PLAY_X 84
 #define SK_PLAY_W 60
@@ -370,7 +444,7 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * drawing model is one immediate pass into one surface with no z ordering: a popup has
  * to be drawn LAST and hit-tested FIRST. That is the whole cost and it is paid in two
  * places -- sk_draw calls sk_draw_popup after everything else, and sk_hit_test asks the
- * popup before it asks anything -- because the project owner asked for a drop down by name and a
+ * popup before it asks anything -- because the requirement asked for a drop down by name and a
  * per-row faction plus a per-row team is four choices in one place, not one.
  *
  * It is a floating box and the plate is 320x200, so its size is arithmetic, not taste.
@@ -402,11 +476,38 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * button is the button less its bevel on all four sides. */
 #define SK_POP_COL_W 12
 #define SK_POP_COLOURS 8
+/* THE START ROW: eight cells at the team strip's pitch, numbered 1..8, one per start
+ * the map has (the rest drawn locked). Lit is held; clicking the lit one lets it go. */
+#define SK_POP_START_W 12
+#define SK_POP_STARTS 8
+/* What a seat's start is on the WIRE when nobody picked one: the brain's own
+ * RANDOM_START_POSITION. Restated here because this module includes no engine header;
+ * app/cnc3d.cpp asserts it against CNC3D_START_RANDOM. On this screen an unpicked start
+ * is -1 and never this. */
+#define SK_START_RANDOM 0x7f
+/* THE SEAT ROW, host only: BOT / EMPTY / BLOCK, three buttons at the width of the whole
+ * team strip, so the fourth row lines up under the other three. */
+#define SK_POP_MODE_W 38   /* EMPTY and BLOCK measure 30 in GRAD6FNT, plus the button's 8 */
+#define SK_POP_MODES 3
 #define SK_POP_BTN_H 9
 #define SK_POP_ROW_H (SK_POP_BTN_H + 2)
 #define SK_POP_HDR_H 7
-#define SK_POP_W (SK_POP_PAD * 2 + SK_POP_LAB_W + SK_POP_TEAM_W * SK_POP_TEAMS)
-#define SK_POP_H (SK_POP_PAD * 2 + SK_POP_HDR_H + SK_POP_ROW_H * 3)
+/* As wide as the widest strip: the three seat buttons (114) outgrow the eight team and
+ * colour cells (96), and the box takes the wider so every strip lines up on one left
+ * edge. It still ends at 186, well inside the dialog's 304. */
+#define SK_POP_W (SK_POP_PAD * 2 + SK_POP_LAB_W + SK_POP_MODE_W * SK_POP_MODES)
+/* WHICH ROW EACH STRIP IS ON. The box is as tall as the rows it shows: a skirmish and a
+ * joiner get three, a host gets the SEAT row as well. SK_POP_H is the TALLEST, and it
+ * is what the clamp below is computed against. */
+#define SK_POP_ROW_SIDE 0
+#define SK_POP_ROW_START 1
+#define SK_POP_ROW_TEAM 2
+#define SK_POP_ROW_COLOUR 3
+#define SK_POP_ROW_MODE 4
+#define SK_POP_ROWS_JOINER 4   /* a joiner sets nobody's seat                   */
+#define SK_POP_ROWS_HOST 5     /* a host, AND a skirmish: BOT / BLOCK there      */
+#define SK_POP_H_ROWS(n) (SK_POP_PAD * 2 + SK_POP_HDR_H + SK_POP_ROW_H * (n))
+#define SK_POP_H SK_POP_H_ROWS(SK_POP_ROWS_HOST)
 #define SK_POP_X SK_ROSTER_X
 /* The lowest the box may start and still end inside the dialog. */
 #define SK_POP_Y_MAX (SK_DLG_Y + SK_DLG_H - 4 - SK_POP_H)
@@ -424,16 +525,26 @@ typedef enum
     SK_I_ROW7 = SK_I_ROW0 + SK_ROSTER_ROWS - 1,
     SK_I_GDI,      /* a latched pair: exactly one of the two is lit */
     SK_I_NOD,
-    SK_I_MAPS,     /* the list. Arrow keys walk it while it has focus */
-    SK_I_AI,       /* gauge */
-    SK_I_BUILD,    /* gauge */
+    /* THE CHANGE MAP BUTTON, in the slot the map list held: the list is a window now,
+     * opened from here, and the walk order below is the control block's own -- gauges,
+     * then boxes -- whatever the plate shows (the boxes sit above the gauges since the
+     * relayout of 5 Sep 2026). G86's keyboard walk is traced against THIS order. */
+    SK_I_CHANGEMAP,
+    SK_I_BUILD,    /* gauge -- FIRST of the gauges, sk_is_gauge is a range */
     SK_I_CREDITS,  /* gauge */
     SK_I_UNITS,    /* gauge -- LAST of the gauges, sk_is_gauge is a range */
     SK_I_BASES,    /* check box, drawn disabled */
     SK_I_TIBERIUM, /* check box, drawn disabled */
     SK_I_SUPER,    /* check box */
-    SK_I_CRATES,   /* check box -- LAST of the boxes, the rect maths is a range */
-    SK_I_PLAY,
+    SK_I_CRATES,   /* check box */
+    /* THE TWO RULES ADDED 6 Sep 2026, in the rows the map facts vacated. */
+    SK_I_AITAKE,   /* check box: a player who leaves is taken over by the computer */
+    SK_I_SHORTGAME,/* check box -- LAST of the boxes, the rect maths is a range */
+    /* THE CHAT INPUT, after the boxes and before PLAY so the keyboard walk stays in
+     * reading order. Rectangle and focus only in a network room; the range tests above
+     * end at SK_I_CRATES and are untouched by it. */
+    SK_I_CHAT,
+    SK_I_PLAY,     /* PLAY, or START GAME hosting, or READY as a joiner */
     SK_I_CANCEL,
     /* THE DROP DOWN'S OWN CONTROLS, last because they exist only while it is open: with
      * it shut they have no rectangle and report themselves disabled, so neither the
@@ -442,10 +553,27 @@ typedef enum
     SK_I_POP_NOD,
     SK_I_POP_T1,
     SK_I_POP_T8 = SK_I_POP_T1 + SK_POP_TEAMS - 1,
+    /* THE START STRIP: cell n is compacted start n, the index the engine's own
+     * StartLocationIndex takes and the preview's marker n. */
+    SK_I_POP_S1,
+    SK_I_POP_S8 = SK_I_POP_S1 + SK_POP_STARTS - 1,
+    /* THE SEAT STRIP, in the order the request named them. Rectangles only on a HOST's
+     * screen; a skirmish and a joiner never see the row. */
+    SK_I_POP_BOT,
+    SK_I_POP_OPEN,
+    SK_I_POP_BLOCK,
     /* THE COLOUR STRIP. Eight squares, one per PlayerColorType, in the engine's own
      * order, so SK_I_POP_C1 + n is colour index n on both sides of the handoff. */
     SK_I_POP_C1,
     SK_I_POP_C8 = SK_I_POP_C1 + SK_POP_COLOURS - 1,
+    /* THE MAP PICKER'S OWN CONTROLS, last for the same reason the popup's are: they
+     * exist only while the window covers the dialog. The list rows are not items -- a
+     * rect walk, sk_map_row_at, the way the old list was -- so the ring stays short. */
+    SK_I_PICK_TAB0,
+    SK_I_PICK_TAB1,
+    SK_I_PICK_LIST,
+    SK_I_PICK_OK,
+    SK_I_PICK_CANCEL,
     SK_I_COUNT
 } SK_Item;
 
@@ -454,6 +582,10 @@ typedef enum
 #define SK_IS_ROW(i) ((i) >= SK_I_ROW0 && (i) <= SK_I_ROW7)
 #define SK_IS_POP(i) ((i) >= SK_I_POP_GDI && (i) <= SK_I_POP_C8)
 #define SK_IS_POP_COL(i) ((i) >= SK_I_POP_C1 && (i) <= SK_I_POP_C8)
+#define SK_IS_POP_MODE(i) ((i) >= SK_I_POP_BOT && (i) <= SK_I_POP_BLOCK)
+#define SK_IS_POP_START(i) ((i) >= SK_I_POP_S1 && (i) <= SK_I_POP_S8)
+#define SK_IS_PICK(i) ((i) >= SK_I_PICK_TAB0 && (i) <= SK_I_PICK_CANCEL)
+#define SK_START_ITEM(n) (SK_I_POP_S1 + (n))   /* start n, zero based    */
 #define SK_ROW_ITEM(n) (SK_I_ROW0 + (n))   /* seat n's row control    */
 #define SK_TEAM_ITEM(n) (SK_I_POP_T1 + (n)) /* team n, zero based      */
 #define SK_COLOUR_ITEM(n) (SK_I_POP_C1 + (n)) /* colour n, PlayerColorType order */
@@ -464,8 +596,16 @@ typedef enum
  * Alert's 10, and the credit ceiling is nulldlg.cpp's own literal 10000. The 500 step
  * is Red Alert's rounding (nulldlg.cpp:2041), which Tiberian Dawn does not do and which
  * is a kindness on a 44 pixel gauge. */
-#define SK_AI_MIN 1
-#define SK_AI_MAX 7
+
+/* WHAT A SEAT IS FOR, the same numbers as net/netmatch.h's NM_SEAT_* -- this module
+ * includes no network header, so they are restated, and gate_lobby asserts the pairing.
+ * HUMAN is a seat with a person in it (or the host's own); the other three are what the
+ * host may set an empty seat to. Read through sk_row_mode(), never out of the array:
+ * the array holds the host's setting and the wire's taken table is folded in there. */
+#define SK_SEAT_HUMAN 0
+#define SK_SEAT_BOT 1
+#define SK_SEAT_OPEN 2
+#define SK_SEAT_BLOCK 3
 #define SK_BUILD_MIN 1
 #define SK_BUILD_MAX 7
 #define SK_CREDITS_MIN 0
@@ -476,6 +616,15 @@ typedef enum
 #define SK_ACT_NONE 0
 #define SK_ACT_PLAY 1
 #define SK_ACT_CANCEL 2
+/* A JOINER PRESSED READY. It is not SK_ACT_PLAY because it starts nothing: only the host
+   starts a match, and a joiner that could would be a second host. */
+#define SK_ACT_READY 3
+/* THE HOST REMOVED THE SELECTED SEAT. The caller does it, because the screen owns no
+   socket; sk_net_kick_seat says which seat was meant. */
+#define SK_ACT_KICK 4
+/* A LINE WAS TYPED AND ENTER PRESSED. The caller sends it: the screen owns no socket.
+   The text is in chat_in and the caller clears it once it has gone. */
+#define SK_ACT_SAY 5
 
 /* Keys, so this module never includes SDL. */
 #define SK_KEY_UP 1
@@ -488,6 +637,13 @@ typedef enum
 #define SK_KEY_SPACE 8
 #define SK_KEY_PGUP 9
 #define SK_KEY_PGDN 10
+/* DEL, and only a network host has anything to do with it: it removes the player in the
+   selected seat. See SK_ACT_KICK. */
+#define SK_KEY_DEL 11
+/* BACKSPACE, its own key since the chat field exists: it used to share SK_KEY_DEL, and a
+   host correcting a typo would have removed a player. It edits the chat line and does
+   nothing else anywhere. */
+#define SK_KEY_BACK 12
 
 typedef struct SK_State
 {
@@ -503,7 +659,13 @@ typedef struct SK_State
     int tab;
 
     int side;    /* 0 GDI, 1 Nod -- the HUMAN's, and seat 0 has no other store */
-    int ai;      /* opponents, SK_AI_MIN .. the map's cap   */
+    /* THE MAP PICKER: the second floating layer, drawn last, hit first,
+     * exclusive with the popup. `picker` is 1 while it covers the dialog; `pick_sel` is
+     * the candidate, an absolute index into maps[], -1 on an empty tab. `tab` and `top`
+     * are the picker's own tab and scroll. `sel` stays the COMMITTED map: OK commits,
+     * Escape and CANCEL leave it alone. */
+    int picker;
+    int pick_sel;
 
     /* PER SEAT. Seat 0 is the human and its faction IS `side` above, so this pair only
      * ever describes computers.
@@ -529,6 +691,14 @@ typedef struct SK_State
      * sk_set_row_colour is the only thing that ever writes it again. */
     int colour[SK_ROSTER_ROWS];
 
+    /* THE START PER SEAT: -1 unpicked, else a compacted start index below the selected
+     * map's `starts`. NOT a permutation, unlike colour: the count is the map's and nobody
+     * has to hold one. The invariant is that no two seats hold the same non-negative
+     * value, and sk_set_row_start is the only writer that could break it, so it refuses
+     * instead. A map change clears every pick: the index means nothing on another map.
+     * Read through sk_row_start(); the holder of a start through sk_start_holder(). */
+    int start[SK_ROSTER_ROWS];
+
     /* WHICH ROW'S DROP DOWN IS OPEN, or -1. There is at most one, it is drawn last and
      * hit-tested first, and any press outside it shuts it. */
     int popup;
@@ -536,6 +706,8 @@ typedef struct SK_State
     int credits; /* starting credits, snapped to 500        */
     int super;   /* superweapons                            */
     int crates;  /* bonus crates scattered on the map       */
+    int aitake;    /* a player who leaves is taken over by the computer */
+    int shortgame; /* a player is finished when their non-defensive structures are gone */
     int units;   /* escort units per house beside the MCV   */
 
     int selected; /* the focused control, for the keyboard walk */
@@ -543,6 +715,56 @@ typedef struct SK_State
     int drag;     /* the gauge being dragged, or -1             */
     int dragdiff; /* gauge.cpp's grab offset                    */
     int lastmx, lastmy;
+
+    /* ---------------------------------------------------------------- A NETWORK MATCH *
+     *  THE LOBBY IS THE NETWORK LOBBY. There is no second waiting-room screen, and that
+     *  is the whole point: a joiner who is asked to press READY has to be able to SEE
+     *  what they are agreeing to -- the map, the rules, who else is in and what they are
+     *  playing. A roster with a ready column and nothing else is a waiting room, and a
+     *  waiting room asks people to consent to something they cannot read.
+     *
+     *  net 0 is an ordinary skirmish and every field below is ignored.
+     *  net 1 is the HOST: every control is live, exactly as in a skirmish, and PLAY
+     *        becomes START GAME, refused until every seat is filled and readied.
+     *  net 2 is a JOINER: the map, the rules and everybody else's row are drawn but
+     *        REFUSED, and the joiner's OWN row stays live so they pick their own side,
+     *        team and colour. PLAY becomes READY and toggles.
+     *
+     *  WHY THE JOINER'S CONTROLS ARE DRAWN AND REFUSED RATHER THAN HIDDEN: the settings
+     *  are what the joiner is being asked to accept, so hiding them would remove exactly
+     *  the information READY is a decision about. Refusing a click on the host's rules
+     *  says "not yours"; hiding them says nothing at all. */
+    int net;               /* 0 skirmish, 1 hosting, 2 joined              */
+    int net_seat;          /* this peer's own seat, and its own row        */
+    int net_humans;        /* seats a person sits in or will sit in        */
+    int net_seats;         /* THE ROOM'S WIDTH: the rows drawn in a match  */
+    int net_taken[SK_ROSTER_ROWS];
+    int net_ready[SK_ROSTER_ROWS];
+    /* THE HOST'S SETTING PER SEAT, SK_SEAT_OPEN / BOT / BLOCK; ignored on seat 0 and on
+       any seat with a person in it, which sk_row_mode reports as HUMAN whatever is here.
+       In a skirmish it is not read at all. */
+    int mode[SK_ROSTER_ROWS];
+    char name[SK_ROSTER_ROWS][12];   /* who is in each seat, off the wire */
+    /* HOW OTHERS REACH THIS ROOM, one sentence, written by the shell and drawn only for a
+       HOST. Either an address to type or a room code, depending on whether the room is
+       relayed -- the host is the only person who can tell anybody, and until this line
+       existed the answer was on stdout and nowhere a player looks.
+       It goes HERE and not on the multiplayer screen's waiting room, which looks like the
+       obvious home and is unreachable: hosting returns DMS_MP_LOBBY, and the shell takes
+       that to THIS screen. A readout put there is drawn on a page nobody ever sees. */
+    char net_join[48];
+
+    /* THE CHAT (network rooms only). The lines are the shell's: it copies them off the
+     * wire and synthesises the action lines ("PLAYER 2 is Ready!") on the edges it sees,
+     * so this screen only ever draws. chat_seat is the speaker, -1 for an action line,
+     * and the line is drawn in that seat's roster colour. The typed line and its focus
+     * live here because the keyboard walk and the mouse both reach them. */
+    int chat_seat[SK_CHAT_LOG];
+    char chat_line[SK_CHAT_LOG][SK_CHAT_MAX];
+    int chat_count;          /* lines held, at most SK_CHAT_LOG; oldest is dropped   */
+    char chat_in[SK_CHAT_MAX];
+    int chat_focus;          /* the input has the keyboard                            */
+    int caret_on;            /* blink state; the shell toggles it                     */
 
     /* The bottom line. Never NULL: it either says why a locked control will not move,
      * or it says the one thing about this screen that the picture cannot. */
@@ -563,10 +785,31 @@ void sk_init(SK_State *st, const SK_Map *maps, int count, const SK_Prev *prev);
 /* "PLAYER" or "COMPUTER n", the one writer of a seat's printed name: the roster row,
  * the drop down's header, the control's label and the audit all call it. */
 void sk_seat_name(const SK_State *st, int seat, char *out, int outlen);
+/* The seat SK_ACT_KICK meant, or -1. Read straight after the action and not later: the
+   selection moves as soon as the roster changes under it. */
+int sk_net_kick_seat(const SK_State *st);
 int sk_row_house(const SK_State *st, int seat); /* 0 GDI, 1 Nod             */
+/* The row this machine's own player sits in: 0 unless this is a joiner. */
+int sk_local_seat(const SK_State *st);
 int sk_row_team(const SK_State *st, int seat);  /* ZERO BASED, prints as +1 */
 /* PlayerColorType, 0..7. Distinct for every seat, always -- see SK_State::colour. */
 int sk_row_colour(const SK_State *st, int seat);
+/* SK_SEAT_*: HUMAN for seat 0 and every taken seat; the host's setting otherwise. In a
+ * skirmish seat 0 is HUMAN and every other seat is a BOT. */
+int sk_row_mode(const SK_State *st, int seat);
+int sk_row_start(const SK_State *st, int seat);    /* -1 when unpicked          */
+/* The chat: a typed character (printable ASCII only) while the input has focus, and a
+ * finished line appended to the well. The shell calls both. */
+void sk_text(SK_State *st, char ch);
+void sk_chat_push(SK_State *st, int seat, const char *text);
+/* WHAT THE ROOM IS WAITING FOR, as the status line: the sentence the multiplayer
+ * screen's waiting room used to print, now printed here where the chat is.
+ * The shell calls it on every poll while no refusal is pending; the strings are this
+ * module's so the layout audit measures them. `measuring` is the host's START waiting on
+ * the room's round trips (nm_lobby_start_pending), which is what the line says then. */
+void sk_say_room(SK_State *st, int wanted, int filled, int all_ready, int my_ready,
+                 int measuring);
+int sk_start_holder(const SK_State *st, int start); /* the seat holding it, or -1 */
 /* The 320x200 MENU palette index a colour paints with, so the caller can draw the same
  * square this screen draws. Out of range answers colour 0 rather than reading off the
  * end. See SK_PLAYER_COLOUR in doslobby.c for where the eight numbers come from. */
@@ -600,11 +843,18 @@ int sk_map_row_at(const SK_State *st, int mx, int my);
 /* The two map-source tabs: OFFICIAL and USER MAPS. The caption is a call and not a
  * literal at the draw site so the audit measures the same string the screen prints. */
 const char *sk_tab_label(int tab);
-int  sk_tab_at(const SK_State *st, int mx, int my);
 void sk_set_tab(SK_State *st, int tab);
 
 /* The whole screen, over whatever the caller left in the surface. */
 void sk_draw(DB_Surface *s, const DB_Pack *p, const SK_State *st);
+
+/* HOW A NAME A PLAYER TYPED IS CUT TO FIT A BOX: trimmed until it fits `maxw` pixels in
+ * the menu font, trailing spaces dropped, and the last two characters turned into ".."
+ * so the cut is visible rather than reading as the real name. Writes the result to
+ * `out` (empty when nothing fits) and returns its width in pixels. One rule with one
+ * implementation, shared by the skirmish lobby and the multiplayer game list, so the
+ * layout audit on either screen measures exactly what that screen prints. */
+int sk_cut_to_width(const DB_Font *f, const char *text, int maxw, char *out, int outlen);
 
 /* HARNESS ONLY, and it draws nothing. Measures every string this screen can print --
  * every map name installed, every line either status row can carry, every label on

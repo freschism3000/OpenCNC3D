@@ -4,7 +4,7 @@
 # runtime recipe added, and it lives HERE rather than there on purpose: brain/vanilla is
 # a checkout of someone else's GPL project and repository rules keeps our changes out of it.
 #
-# The recipe itself is explained in tools/win98/build.sh and docs/win98-port.md section 2.
+# The recipe itself is explained in tools/win98/build.sh.
 # The short version: this mingw is UCRT-only and its libmsvcrt.a is a relabelled UCRT
 # import library, so the default link produces a DLL importing api-ms-win-crt-*.dll, which
 # Windows 98 does not have. Naming every library ourselves, ending in the genuine

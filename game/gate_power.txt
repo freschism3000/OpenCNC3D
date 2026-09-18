@@ -14,18 +14,35 @@
 #   was, so the two sidebars in the same build disagreed about whether the base was in
 #   trouble. It now takes the same watt rule.
 #
-# SCB35EA is the scenario because the Brotherhood there starts genuinely overdrawn --
-# 430 produced against 475 drained -- so the live arm reads a real YELLOW rather than a
-# synthesised one. A base that is comfortably in credit proves nothing here.
+# WHAT IS MEASURED is the colour each sidebar DREW, read back out of its own pixels by
+# `powerdrawn`, one shot per sidebar (`hud 0`, then `hud 1`). powerdump's colour_by_watts
+# and colour_by_pixels are what each rule WOULD choose; they are printed to prove the
+# state below really separates the two rules, not as the thing under test.
 #
-# WHAT THIS GATE DOES NOT PROVE, said plainly: no shipped scenario starts with drain above
-# TWICE production, so the RED threshold is exercised arithmetically in gates.sh against
-# the transcribed Power_Height rather than in a live mission. That arm is a calculation,
-# not a measurement, and it is labelled as one.
+# PART 1, SCB35EA as it starts: the Brotherhood is genuinely overdrawn, 430 produced
+# against 475 drained, and both sidebars must draw YELLOW. Both rules agree there, so this
+# part proves the real watts reach the drawn colour, not which rule decides it.
+#
+# PART 2 is the part that tells the rules apart. No shipped scenario starts with drain
+# above TWICE production, so `powerforce 200 500` replaces the brain's two numbers where
+# the sidebar receives them: RED by watts, YELLOW by bar pixels. Both sidebars must draw
+# RED. The reading is forced, not played to, and that is said here plainly.
 
 tick 120
 powerdump
 tick 30
 powerdump
 tick 2
+hud 0
 shot shots/power_01.png
+hud 1
+shot shots/power_02.png
+powerdrawn
+powerforce 200 500
+powerdump
+hud 0
+shot shots/power_03.png
+hud 1
+shot shots/power_04.png
+powerdrawn
+powerforce off

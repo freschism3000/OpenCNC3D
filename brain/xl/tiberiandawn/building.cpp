@@ -2101,15 +2101,22 @@ void BuildingClass::Active_Click_With(ActionType action, ObjectClass* object)
  * BuildingClass::CNC3D_Can_Rally -- may this building take a rally point? (project CNC3D)     *
  *                                                                                             *
  *    True for a FACTORY the local player owns: a barracks, a Hand of Nod, a war factory, an   *
- *    airstrip, a helipad. False for everything else, and false for a Construction Yard, whose *
+ *    airstrip. False for everything else, and false for a Construction Yard, whose            *
  *    ACTION_MOVE already means "undeploy and drive there" and must keep meaning that.         *
  *                                                                                             *
  *    IsFactory is the type flag the engine already uses to mean "this building produces       *
  *    things" (type.h:638), so this asks the engine's own question rather than a new one.      *
+ *                                                                                             *
+ *    The HELIPAD is IsFactory too and is refused by name. Nothing a helipad produces ever     *
+ *    leaves it: the RTTI_AIRCRAFT arm of Exit_Object parks the new craft on the pad itself,   *
+ *    so a rally point on a helipad would be stored and drawn and honoured by nothing. It is   *
+ *    refused here, at the one test every rally path asks, so the click offers no MOVE cursor  *
+ *    and the CNC3D_Set_Rally export refuses it the same way.                                  *
  *=============================================================================================*/
 bool BuildingClass::CNC3D_Can_Rally(void) const
 {
     if (*this == STRUCT_CONST) return (false);
+    if (*this == STRUCT_HELIPAD) return (false);
     if (!Class->IsFactory) return (false);
     return (House == PlayerPtr);
 }
@@ -2348,14 +2355,19 @@ int BuildingClass::Exit_Object(TechnoClass* base)
                 if (base->Unlimbo(start, dir)) {
 
                     base->Assign_Mission(MISSION_MOVE);
-                    /*	CNC3D: walk to the RALLY POINT if this factory has one, otherwise
-                    **	to the exit cell exactly as before. Target_Legal is provably false
-                    **	here in a vanilla run (see the note in Active_Click_With), so this
-                    **	clause cannot change vanilla behaviour. */
+                    base->Assign_Destination(::As_Target(cell));
+                    /*	CNC3D: the RALLY POINT, if this factory has one, rides along in the
+                    **	soldier's own ArchiveTarget and is read back at the exit cell, where
+                    **	the tether is cut (InfantryClass::Per_Cell_Process). The exit cell
+                    **	stays the destination above, so the soldier leaves through the door
+                    **	the way it always did. Handing it the rally as its destination here
+                    **	instead sent it straight from the door point, out through the side
+                    **	wall of the hut and across the building's own footprint. A fresh
+                    **	soldier's ArchiveTarget is TARGET_NONE, and Target_Legal on a
+                    **	factory is provably false in a vanilla run (see the note in
+                    **	What_Action), so this clause cannot change vanilla behaviour. */
                     if (Target_Legal(ArchiveTarget)) {
-                        base->Assign_Destination(ArchiveTarget);
-                    } else {
-                        base->Assign_Destination(::As_Target(cell));
+                        base->ArchiveTarget = ArchiveTarget;
                     }
 
                     /*
@@ -3051,7 +3063,21 @@ void BuildingClass::Repair(int control)
             sound = VOC_SCOLD;
         } else {
             sound = VOC_BUTTON;
-            Clicked_As_Target(PlayerPtr->Class->House); // 2019/09/20 JAS - Added record of who clicked on the object
+            /*
+            **	CNC3D: the flashing house must not come from PlayerPtr in a match.
+            **	Clicked_As_Target (techno.cpp) writes FlashCount AND
+            **	FlashCountPerPlayer[house]. Both are members of every TechnoClass and both
+            **	are decremented every tick by FlasherClass::Process, so they are shared
+            **	simulation state and not presentation. PlayerPtr is whoever is sitting at
+            **	THIS machine, so for one repair order each peer wrote a DIFFERENT index of
+            **	FlashCountPerPlayer -- silently, because only the shared FlashCount reaches
+            **	the object dump and this call gives that the same 7 everywhere.
+            **	The repair order is stamped by the owner and the REPAIR arm in event.cpp
+            **	verifies that before it runs, so Owner() is the same value on every peer
+            **	and is PlayerPtr's own house on the machine that clicked: identical
+            **	behaviour there, agreement everywhere else.
+            */
+            Clicked_As_Target(CNC3D_Lockstep ? Owner() : PlayerPtr->Class->House);
             IsWrenchVisible = true;
         }
     } else {
@@ -3111,8 +3137,23 @@ void BuildingClass::Sell_Back(int control)
             //			Transmit_Message(RADIO_RUN_AWAY);
             //			Transmit_Message(RADIO_OVER_OUT);
             Assign_Mission(MISSION_DECONSTRUCTION);
-            // Changed for multiplayer ST - 3/13/2019 5:31PM
-            if (Is_Owned_By_Player()) {
+            /*
+            **	CNC3D: this is the defect gate G194 caught, and it is the visible one.
+            **	The guard below is Is_Owned_By_Player(), which is literally
+            **	`House == PlayerPtr` (techno.cpp), so on a SELL order the seller's machine
+            **	set FlashCount to 7 and every other peer left it 0. Two instances of the
+            **	engine in ONE process, no networking anywhere near it, diverged four ticks
+            **	after any sell, and the live desync alarm hashes that same field.
+            **	Under lockstep the house comes from the object rather than from the
+            **	machine, which is the same value on every peer and is exactly the value
+            **	this line already computed on the machine that clicked. See
+            **	BuildingClass::Repair above for the full reasoning; event.cpp's own
+            **	Clicked_As_Target call already takes the house from the order this way.
+            */
+            if (CNC3D_Lockstep) {
+                Clicked_As_Target(Owner());
+                // Changed for multiplayer ST - 3/13/2019 5:31PM
+            } else if (Is_Owned_By_Player()) {
                 // if (IsOwnedByPlayer) {
                 Clicked_As_Target(
                     PlayerPtr->Class->House); // 2019/09/20 JAS - Added record of who clicked on the object
@@ -5651,5 +5692,16 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
             }
         }
     }
-    return (false);
+    /*
+    **	`anywhere`, not `false`: the Build Anywhere fix went into brain/vanilla and never
+    **	reached this fork, so the cheat was inert here. It computes the flag at the top of
+    **	this function and honours it in the loop, then refused at the fall-through anyway.
+    **	UNGATED, and that is the rule rather than a preference: CNC3D_BuildAnywhereHouses
+    **	is zero on every peer for a whole match (Clear_Scenario zeroes it through
+    **	DisplayClass::Init_Clear, and cheat_tick, its only writer in the host, returns at
+    **	`if (nm_active())` before it can touch the export), so this is bit for bit
+    **	`return (false)` on every machine and a CNC3D_Lockstep branch here would be one
+    **	nobody could observe.
+    */
+    return (anywhere);
 }

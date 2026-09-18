@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-#define H6_MAX_ASSETS 32
+#define H6_MAX_ASSETS 40
 #define H6_NAME_LEN   16
 
 /* ------------------------------------------------------------------------------------
@@ -169,6 +169,10 @@ typedef struct
      *     0 normal   1 hover   2 pressed   3 active
      * Frame 0 is never blitted - the chassis already carries the resting state. The
      * arrows have no frame 3; scrolling is momentary, so there is nothing to engage. */
+    /* -1 IS NOT A FRAME, IT IS AN ABSENCE, and only Repair and Sell can carry it: a
+     * commander who is out of the match owns nothing to repair or sell, and the art
+     * has no disabled plate to draw instead. Map keeps its own, because watching the
+     * rest of the match is the one thing a spectator is still doing. */
     int repair_frame, sell_frame, map_frame;
     int arrow_frame[4];
     /* The three window-pinned plates. options_frame existed and was never written --
@@ -209,6 +213,78 @@ int hud640_radar_zoom(int map_w, int map_h);
 /* Fractional variant: equal to the integer zoom while the map fits, below 1.0 when
    even one pixel per cell overflows the surface (128-tall maps). */
 float hud640_radar_zoomf(int map_w, int map_h);
+
+/* ---- THE UNIT CARD ------------------------------------------------------------------
+ *  The selection readout in the bottom-left corner of the Enhanced HUD: the selected
+ *  unit's cameo, name, health and damage, a row of smaller cameos for the rest of the
+ *  selection, and the ten control-group tabs under it. Same contract as the bar: the
+ *  caller fills H6_Card, this composes an RGBA rectangle, and how it reaches the screen
+ *  is the caller's business, so a fixed-function backend only has to blit it.
+ *
+ *  Every piece of chrome is cut from the shipped HUD art by
+ *  tools/sidebar_redesign/unitcard_art.py: the body is the radar bezel widened to 240,
+ *  the tabs are slices of the blank tab plate, the lettering is GRAD6FNT at three sizes. The numbers below describe that art and hud640_card_ok checks
+ *  them against the pack at load, so a re-cut body cannot silently move the window. */
+#define H6_CARD_W        240
+#define H6_CARD_BODY_H   140
+#define H6_CARD_WIN_X    11        /* the dark window inside the bezel, body-relative */
+#define H6_CARD_WIN_Y    13
+#define H6_CARD_WIN_W    216
+#define H6_CARD_WIN_H    100
+#define H6_CARD_TAB_W    24
+#define H6_CARD_TAB_H    26
+#define H6_CARD_TABS     10
+#define H6_CARD_H        (H6_CARD_BODY_H + H6_CARD_TAB_H)
+/* the main cameo's well, window-relative: same 61x45 cell, same 64x48 box and same
+   68x54 frame ring as a build slot, so it is the picture the player already knows */
+#define H6_CARD_CELL_X   4
+#define H6_CARD_CELL_Y   19
+/* the smaller cameos: 32x24, half the cameo box, each in its own well */
+#define H6_CARD_MINI_W   36
+#define H6_CARD_MINI_H   28
+#define H6_CARD_MINIS    6
+#define H6_CARD_MINI_X   3
+#define H6_CARD_MINI_Y   71
+#define H6_CARD_MINI_PITCH 35
+/* the name line across the top of the window, then the stats column right of the
+   main cameo */
+#define H6_CARD_NAME_X   4
+#define H6_CARD_NAME_Y   3
+#define H6_CARD_TEXT_X   74
+#define H6_CARD_BAR_Y    26
+#define H6_CARD_BAR_SEGS 8
+#define H6_CARD_NUM_Y    44
+
+typedef struct
+{
+    const unsigned char *rgba;       /* a 64x48 cameo box, or NULL for an empty well */
+    int  frame;                      /* the well: 0 resting, 1 under the pointer */
+} H6_CardMini;
+
+typedef struct
+{
+    const unsigned char *cameo;      /* the main unit, 64x48 RGBA, or NULL */
+    char name[40];                   /* printed on the top line; upper-cased here */
+    char code[12];                   /* printed in the well when there is no cameo */
+    int  str, maxstr;                /* health, engine numbers */
+    int  health_color;               /* 0 green, 1 amber, 2 red: the caller's rule */
+    int  damage;                     /* primary weapon damage, -1 unarmed */
+    int  count;                      /* how many objects the selection holds */
+    H6_CardMini mini[H6_CARD_MINIS]; /* the rest of the selection, in order */
+    int  nmini;                      /* how many of those slots are live */
+    int  overflow;                   /* > 0: the last slot prints +overflow instead */
+    int  group_count[H6_CARD_TABS];  /* units in control group 1..9,0 */
+    int  group_frame[H6_CARD_TABS];  /* 0 empty, 1 resting, 2 hover, 3 active */
+} H6_Card;
+
+/* Does this pack carry the card's chrome, at the sizes the layout above assumes?
+   Prints once and answers 0 on an older pack, and the caller draws no card. */
+int  hud640_card_ok(const H6_Pack *p);
+/* Compose the card: H6_CARD_W * H6_CARD_H * 4 bytes, caller owned. */
+void hud640_draw_card(unsigned char *rgba, const H6_Pack *p, const H6_Card *c);
+/* Ink width of a string in one of the two baked fonts ("font_big" / "font_small"),
+   proportional, for a caller laying text out against the same rule the card uses. */
+int  hud640_text_width(const H6_Pack *p, const char *font, const char *text);
 
 #ifdef __cplusplus
 }

@@ -230,6 +230,27 @@ static bool smudge_load(const char* path)
     return g_smHave;
 }
 
+/* GIVE THE SHEETS BACK. smudge_load APPENDS to g_smSet and has no clear of its own, so
+   without this every boot/shutdown round trip in one process left the previous mission's
+   two theaters in the vector and two more textures on the card: measured at 576 KB of
+   heap and two 192x360 RGBA textures (about 540 KB) per cycle, climbing with no ceiling.
+   smudge_set_for walks the vector and returns the FIRST match, so the stale copies were
+   also the ones being drawn from.
+
+   g_smSoftApplied is the "the dial is already baked into these texels" latch, and it has
+   to go back to its impossible value here: the next mission's sheets come off disk hard,
+   and a latch left holding the old amount would skip the re-feather and draw them hard
+   with the dial saying otherwise. */
+static void smudge_free(void)
+{
+    for (size_t i = 0; i < g_smSet.size(); i++)
+        if (g_smSet[i].tex)
+            glDeleteTextures(1, &g_smSet[i].tex);
+    g_smSet.clear();
+    g_smHave = false;
+    g_smSoftApplied = -1.0f;
+}
+
 /* The set for this scenario's theater, or none. The cartridge loads smudge art for
    TEMPERATE (2) and DESERT (0) only, and draws none in the others -- that is its own
    answer and not a gap, so an unmatched theater draws nothing rather than borrowing. */

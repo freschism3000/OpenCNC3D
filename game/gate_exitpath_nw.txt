@@ -1,0 +1,22 @@
+# G249, leg C. A rally BEHIND AND LEFT of the barracks, at 55,50 on SCG90EA.
+#
+# The worst case for a soldier that honours the rally from the door point: the line
+# from 58,54 to 55,50 crosses the building's own occupied corner at 57,53, and the
+# soldier walks 58,54 then 57,54 then 57,53, out through the left hut. Leaving through
+# the door means 58,55 first, then along the front of the pad (57,55 or 57,54) and
+# round the building's side, so the first cell above the pad row comes after the exit
+# cell, never before it.
+tick 30
+cam 57.5 53
+zoom max
+rally PYLE 0 55 50
+tick 2
+rallydump
+count E1:GoodGuy
+build E1
+watch E1:GoodGuy 4 150
+shot shots/exitpath_c_front.png
+watch E1:GoodGuy 4 300
+count E1:GoodGuy
+obj E1:GoodGuy 4
+quit

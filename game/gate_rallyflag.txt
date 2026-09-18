@@ -3,7 +3,7 @@
 # Numbered 103, not 99: a concurrent edit had already taken G99..G102 for the mission
 # editor, and two gates sharing a number makes every later report ambiguous.
 #
-# the project owner, 25 Aug 2026: "Take the Flag Pole and Animated flag from the Barracks, seperate it,
+# Reported: "Take the Flag Pole and Animated flag from the Barracks, seperate it,
 # and use it for the Rally Point for all buildings. Show the flag if you have set a rally
 # point, and have the building selected. Make the flag the player color."
 #

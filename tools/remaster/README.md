@@ -1,6 +1,6 @@
 # Reading the Remastered Collection's terrain art
 
-Reference implementations, written against and verified on a real install (3 Sep 2026).
+Reference implementations, written against and verified on a real install.
 They exist so the C port has something known-correct to be checked against, and so the
 format work does not have to be redone from documentation.
 

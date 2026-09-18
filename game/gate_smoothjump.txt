@@ -9,21 +9,35 @@
 # On 243 the drawn position must BE the engine's position. It used to be a filtered slide
 # that started 254 cells away and took the length of the filter to arrive, which is a man
 # flying in from off the map instead of stepping onto the beach.
+#
+# drawpos picks a unit by its POSITION among the riflemen, counting from 0, and a position
+# is not an id. The riders are positions 15, 16 and 17 today; position 14 is a man who was
+# never aboard. So the gate does not trust these numbers: it requires the three lines on
+# 243 to name exactly the ids the 242 dump lists in limbo, and every trail line to belong
+# to one of them, four lines each.
 smoothmove 1
 tickalpha 0.5
 tick 242
 cargodump
 tick 1
 cargodump
-drawpos E1 14
 drawpos E1 15
 drawpos E1 16
+drawpos E1 17
 tick 1
-drawpos E1 14
+drawpos E1 15
+drawpos E1 16
+drawpos E1 17
 tick 1
-drawpos E1 14
+drawpos E1 15
+drawpos E1 16
+drawpos E1 17
 tick 1
-drawpos E1 14
+drawpos E1 15
+drawpos E1 16
+drawpos E1 17
 tick 1
-drawpos E1 14
+drawpos E1 15
+drawpos E1 16
+drawpos E1 17
 quit

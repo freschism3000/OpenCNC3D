@@ -400,7 +400,7 @@ as soon as XL Phase 3 lands.
 Per rule 1 this must be declared before anything ships. **Multiplayer is Tier 2 only.**
 
 > **See `docs/tier1-freeze.md`.** Decision 9 (Enhanced becomes the shipping brain) made this
-> section load bearing, so it was checked properly for the first time on 1 Sep 2026 and that
+> section load bearing, so it was checked properly for the first time and that
 > file is the dated record of what Tier 1 has at the freeze. Two of its findings correct this
 > section rather than supporting it. Win98 stopped following the main line on **26 Aug**, when
 > the terrain pack format moved and `tools/win98/mkterrain.py` did not follow, which is five
@@ -704,7 +704,7 @@ Phases 0 to 3 deliver 8 player multiplayer and are worth shipping on their own. 
     content change. Where a fix is provably value identical, as the `SOURCE_AIR` arm turned out
     to be, it stays ungated: a branch that can never be observed is worse than no branch.
 
-**Four decisions the sixteen player choice created. All four were taken on 1 Sep 2026, the
+**Four decisions the sixteen player choice created. All four were taken, the
 same day, so Phase 4 is unblocked.**
 
 9. **Does the Enhanced fork become the game? DECIDED 1 SEP 2026: YES, ENHANCED IS THE GAME

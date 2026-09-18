@@ -765,6 +765,7 @@ struct CNCMultiplayerOptionsStruct
     bool MPlayerAftermathUnits;
     bool CaptureTheFlag;
     bool DestroyStructures; // New early win condition via destroying all a player's structures
+    bool ShortGame;         // CNC3D: defences and walls do not keep a player alive
     bool ModernBalance;
 };
 

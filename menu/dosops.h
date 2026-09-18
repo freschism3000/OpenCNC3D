@@ -22,12 +22,21 @@
 
 /* One row. `name` may be NULL, in which case the row shows the scenario code alone --
  * which is the honest answer for the cartridge-side missions, whose titles are not in
- * any string table we have found. Left open deliberately. */
+ * any string table we have found. Left open deliberately.
+ *
+ * A row with `header` set is a SECTION HEADING and not a mission: `name` is the heading
+ * ("GDI COVERT OPERATIONS"), `scen` is unused, and the row can be neither selected nor
+ * played. The keyboard walk steps over it and the hit test refuses it, the way both
+ * already treat a disabled gadget (gadget.cpp:632). The 1995 ListClass had no such row;
+ * it is ours, and it exists because the cartridge itself files these missions by faction
+ * first (its FACTION SELECTION screen sits in front of SPECIAL OPS) and then by source,
+ * which a flat list of twenty-eight codes did not show. */
 typedef struct DO_Mission
 {
     const char *scen; /* SCG22EA: the scenario the brain is started on */
     const char *name; /* "Blackout", from the mission INI's [Basic] Name=, or NULL */
     unsigned char nod; /* 0 = GDI, 1 = Nod. From the code's second letter. */
+    unsigned char header; /* 1 = a section heading, drawn and never selectable */
 } DO_Mission;
 
 /* Geometry. The dialog is the full-screen one dialog.cpp draws for a list, not the
@@ -63,12 +72,24 @@ typedef struct DO_State
     int selected; /* index into list, or -1 when the list is empty */
     int top;      /* index of the first visible row                */
     int pressed;  /* a DO_HIT_* id held under the mouse, or DO_HIT_NONE */
+    int grouped;  /* the list carries section headings: rows are indented under
+                     them and the GDI/NOD column is dropped, because the heading
+                     already says which side the mission is */
 } DO_State;
 
 void do_state_init(DO_State *st, const DO_Mission *list, int count);
 
-/* Move the selection by delta rows, scrolling `top` to keep it visible. */
+/* Move the selection by delta rows, scrolling `top` to keep it visible. A heading is
+ * stepped over in the direction of travel; a delta that lands on nothing but headings
+ * leaves the selection where it was. */
 void do_move(DO_State *st, int delta);
+
+/* The first and last mission rows (never a heading), for HOME and END. */
+void do_move_home(DO_State *st);
+void do_move_end(DO_State *st);
+
+/* Is this row a mission that can be played? 0 for a heading or an index off the list. */
+int do_row_playable(const DO_State *st, int index);
 
 /* Scroll without moving the selection (the wheel). */
 void do_scroll(DO_State *st, int delta);

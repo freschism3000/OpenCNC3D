@@ -1,0 +1,21 @@
+tick 30
+band 0 0 1279 680
+group 1 2
+tick 1
+unitcard
+cam 45 45
+edgeat 2 958 20
+cam 45 45
+edgeat 200 958 20
+cam 45 45
+edgeat 2 700 20
+cam 45 45
+edgeat 600 958 20
+cam 45 45
+edgeat 2 300 20
+cursor 2 958
+cursor 1275 500
+lclick 5 954
+unitcard
+shot shots/g250_card.png
+quit

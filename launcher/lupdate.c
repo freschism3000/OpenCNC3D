@@ -48,6 +48,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -91,6 +92,11 @@ struct LU_State
     char *notes;
     int notes_dirty;
     int cancel;
+
+    /* The install lock (lz_lock). Taken by lu_create when it can be, and asked
+     * for again by an update when it could not. */
+    LZ_Lock lk;
+    int locked;
 };
 
 /* ------------------------------------------------------------------------ *
@@ -443,7 +449,8 @@ static char *lu_read_changelog(const char *json, char *err, int errlen)
 
 /* ------------------------------------------------------------------------ *
  * cnc3d-install.txt: what this folder holds. Written by the release packager and
- * rewritten here after an update, so the next check has something true to compare.
+ * rewritten by every update, as the update's own last step, so the next check has
+ * something true to compare.
  * ------------------------------------------------------------------------ */
 
 static void lu_trim(char *s)
@@ -471,87 +478,87 @@ static void lu_read_install(LU_State *u)
     fclose(f);
 }
 
-static int lu_write_install(LU_State *u, char *err, int errlen)
+/* The record an update leaves, as text. It is not written here: lz_extract writes
+ * it as the last file of the update, inside the update's journal, so a kill or a
+ * full disk while it is being written is undone with everything else instead of
+ * leaving an empty record over a finished install. The caller holds u->lock. */
+static void lu_install_record(const LU_State *u, char *out, size_t outlen)
 {
-    char path[1200];
-    FILE *f;
-    snprintf(path, sizeof path, "%s/cnc3d-install.txt", u->dir);
-    f = fopen(path, "wb");
-    if (!f) {
-        snprintf(err, (size_t)errlen, "could not record the new version in %.300s", path);
-        return 0;
-    }
-    fprintf(f, "# written by the C&C 3D launcher after an update\n");
-    fprintf(f, "version %s\n", u->latest);
-    fprintf(f, "data_id %s\n", u->latest_data[0] ? u->latest_data : "unknown");
-    fclose(f);
-    return 1;
+    snprintf(out, outlen,
+             "# written by the C&C 3D launcher after an update\nversion %s\ndata_id %s\n",
+             u->latest, u->latest_data[0] ? u->latest_data : "unknown");
 }
 
 /* ------------------------------------------------------------------------ *
- * Replacing the launcher underneath itself.
+ * Unpacking over the install.
  *
- * The update zips carry every binary in the folder, and on Windows one of them
- * is the .exe currently running, which cannot be opened for writing. Renaming it
- * CAN be done while it runs, on Windows and on macOS both, and leaves the running
- * image untouched: the new file then lands on the free name. The stale .old is
- * swept on the next start, when nothing holds it.
+ * The update zips carry every binary in the folder, and on Windows two of them
+ * are in use by this very process: the launcher's own .exe, and SDL2.dll, which
+ * it has loaded. Neither can be opened for writing. lz_extract treats both, and
+ * every other file, the same way (the extractor's header in lzip.c has the
+ * argument): an identical file is left alone, a changed one is renamed aside and
+ * replaced, every step is journalled first, a failure puts every replaced file
+ * back, and whatever could not be removed, or an update killed part way, is
+ * finished by lz_settle when the launcher next starts.
+ *
+ * ONLY ONE LAUNCHER PER FOLDER RECOVERS OR UPDATES. The installer's finish page
+ * starts one and a player can double-click a second; the second one's recovery
+ * would put back or remove copies the first one's update still needs to undo
+ * itself, and both would download into the same cnc3d-update.zip. lu_own_install
+ * takes lz_lock on the install and holds it until lu_destroy. A launcher that
+ * cannot take it still checks for updates and still plays, but neither recovers
+ * nor installs until the other one has gone.
+ *
+ * AND ONLY IN AN INSTALL. lz_lock refuses a folder with no install record, and
+ * every step below that changes the disk (the recovery, the download, the
+ * extraction) needs the lock it hands out, so a launcher started from a folder
+ * that is not a game folder reads what it can and changes nothing.
+ *
+ * THIS FILE USED TO STEP ASIDE FOR ITS OWN .exe ONLY, and that is the defect the
+ * general rule replaced: the launcher got out of its own way and then stopped on
+ * the DLL it had loaded, with every entry before that one written and every
+ * entry after it not. The special case had an earlier defect of its own, which
+ * the extractor cannot repeat: it stepped aside unconditionally, so a zip that
+ * carried no launcher left the folder with none and reported success. The
+ * extractor only ever steps aside a file it is about to write.
+ *
+ * THE COMMIT MARKERS, which lz_extract writes after every other entry and never
+ * from an extraction that failed. cnc3d-install.txt is the file the launcher
+ * reads the installed version from; BUILD-ID.txt is the one a person reads.
+ * Either one written early, by a zip that happens to list it early, would let a
+ * half-updated folder claim the new version. The zip's own cnc3d-install.txt is
+ * not used at all: the launcher's record, and the site's changelog as
+ * CHANGELOG.txt, are handed to lz_extract as its final files, so a binary-only zip
+ * that carries no record still gets one inside the journal.
  * ------------------------------------------------------------------------ */
+static const char *const lu_markers[] = {"cnc3d-install.txt", "BUILD-ID.txt", NULL};
 
-/* The running launcher's path RELATIVE TO THE INSTALL, in the form a zip entry
- * uses. Returns 0 when the launcher lives outside the folder being updated, which
- * is the ordinary case during development and means there is nothing to step
- * aside for. */
-static int lu_self_rel(const char *dir, char *rel, int rellen)
+/* Take the install lock if this launcher does not hold it yet, and on first
+ * taking it finish whatever an earlier update left behind. Returns lz_lock's
+ * answer: 1 held, 0 another process holds it, -1 it could not be taken, -2 the
+ * folder is not an install and nothing was done to it. Called from lu_create and
+ * from the worker, never from both at once: lu_start waits for the previous
+ * worker, and lu_create runs before there is one. */
+static int lu_own_install(LU_State *u)
 {
-    char self[1200], *p;
-    size_t n = strlen(dir);
-    if (!lp_self(self, sizeof self))
-        return 0;
-    if (strncmp(self, dir, n) != 0)
-        return 0;
-    if (self[n] != '/' && self[n] != '\\')
-        return 0;
-    snprintf(rel, (size_t)rellen, "%s", self + n + 1);
-    for (p = rel; *p; p++)
-        if (*p == '\\')
-            *p = '/'; /* zip entries are forward slashed on every platform */
-    return rel[0] != '\0';
-}
-
-/* ONLY WHEN THE ZIP ACTUALLY CARRIES A REPLACEMENT, and the selftest is why that
- * sentence is here. The first version stepped aside unconditionally: against a
- * binary-only zip that did not contain the launcher, nothing replaced it, so the
- * update reported success and left the folder with no front door. A successful
- * update that removes the program you launched it from is the worst failure this
- * file can produce, so the archive is asked first. */
-static int lu_step_aside(void)
-{
-    char self[1200], old[1300];
-    if (!lp_self(self, sizeof self))
-        return 0;
-    snprintf(old, sizeof old, "%s.old", self);
-    remove(old);
-    return rename(self, old) == 0;
-}
-
-/* And back again, when the extraction that was going to replace it failed. */
-static void lu_step_back(void)
-{
-    char self[1200], old[1300];
-    if (!lp_self(self, sizeof self))
-        return;
-    snprintf(old, sizeof old, "%s.old", self);
-    rename(old, self);
-}
-
-static void lu_sweep_old(void)
-{
-    char self[1200], old[1300];
-    if (!lp_self(self, sizeof self))
-        return;
-    snprintf(old, sizeof old, "%s.old", self);
-    remove(old);
+    int rc;
+    if (u->locked)
+        return 1;
+    rc = lz_lock(u->dir, &u->lk);
+    if (rc == 1) {
+        char path[1300];
+        u->locked = 1;
+        lz_settle(&u->lk);
+        /* A download or an install killed part way leaves the zip, up to 560 MB of
+         * it, or the part of it that arrived, and with the lock held nothing else
+         * can be writing either. The folder is the lock's, which only an install
+         * gets. */
+        snprintf(path, sizeof path, "%s/cnc3d-update.zip", u->lk.dir);
+        remove(path);
+        snprintf(path, sizeof path, "%s/cnc3d-update.zip.part", u->lk.dir);
+        remove(path);
+    }
+    return rc;
 }
 
 /* ------------------------------------------------------------------------ *
@@ -638,6 +645,38 @@ static int lu_do_apply(LU_State *u, char *err, int errlen)
     int strip, small;
     char msg[256];
 
+    /* Before a byte is downloaded into the folder: see lu_own_install. */
+    switch (lu_own_install(u)) {
+    case 1:
+        break;
+    case 0:
+        snprintf(err, (size_t)errlen,
+                 "another C&C 3D launcher is using this game folder. Close it and press "
+                 "Update again.");
+        return 0;
+    case -2: {
+        /* lz_is_install refused the folder: its record is missing, or what holds the
+         * record's name is not a plain file. Asked only to say which. */
+        char rec[1300];
+        struct stat st;
+        snprintf(rec, sizeof rec, "%s/cnc3d-install.txt", u->dir);
+        if (stat(rec, &st) == 0)
+            snprintf(err, (size_t)errlen,
+                     "cnc3d-install.txt in this folder is not a plain file (it is a link or a "
+                     "folder), so the folder is not updated. Download the game again to get a "
+                     "folder that can be.");
+        else
+            snprintf(err, (size_t)errlen,
+                     "this folder has no cnc3d-install.txt, so it is not updated. Download the "
+                     "game again to get a folder that can be.");
+        return 0;
+    }
+    default:
+        snprintf(err, (size_t)errlen, "could not lock the game folder for the update (%.300s)",
+                 u->dir);
+        return 0;
+    }
+
     lu_read_install(u);
 
     /* The small update when the data provably matches, the whole package when it
@@ -645,13 +684,7 @@ static int lu_do_apply(LU_State *u, char *err, int errlen)
     SDL_LockMutex(u->lock);
     small = u->bins.id > 0 && u->latest_data[0] && u->installed_data[0]
             && !strcmp(u->latest_data, u->installed_data);
-    if (small) {
-        a = &u->bins;
-        strip = 0; /* the bins zip is flat: binaries at the root */
-    } else {
-        a = &u->full;
-        strip = 1; /* the full zip wraps everything in CNC3D-<platform>-vX.Y.Z/ */
-    }
+    a = small ? &u->bins : &u->full;
     SDL_UnlockMutex(u->lock);
 
     snprintf(msg, sizeof msg, "Downloading %.180s (%lld MB)...", a->name,
@@ -661,7 +694,12 @@ static int lu_do_apply(LU_State *u, char *err, int errlen)
     SDL_UnlockMutex(u->lock);
     lu_set(u, LU_DOWNLOADING, msg);
 
-    snprintf(zip, sizeof zip, "%s/cnc3d-update.zip", u->dir);
+    /* Into the locked install, and onto names removed first, so the download is
+     * never written through whatever a link on either name points at. */
+    snprintf(zip, sizeof zip, "%s/cnc3d-update.zip.part", u->lk.dir);
+    remove(zip);
+    snprintf(zip, sizeof zip, "%s/cnc3d-update.zip", u->lk.dir);
+    remove(zip);
     if (!ln_get_file(lu_asset_url(a->id, url, sizeof url), LCFG_KEY, zip, lu_dl_progress,
                      u, err, errlen))
         return 0;
@@ -708,37 +746,46 @@ static int lu_do_apply(LU_State *u, char *err, int errlen)
         }
     }
 
+    /* THE WRAPPER FOLDER IS READ OFF THE ARCHIVE, not assumed per kind. The full
+     * packages wrap everything in CNC3D-<platform>-vX.Y.Z/ on both platforms; the
+     * binary-only zip is flat on macOS and wrapped on Windows. Assuming "the bins
+     * zip is flat" unpacks a wrapped one into a subfolder named after the zip,
+     * leaves the install's own binaries untouched, and reports success. */
+    strip = lz_wrapped(zip);
+
     lu_set(u, LU_APPLYING, "Installing...");
     {
-        char rel[1200];
-        int stepped = 0;
-        if (lu_self_rel(u->dir, rel, sizeof rel) && lz_has_entry(zip, strip, rel))
-            stepped = lu_step_aside();
-        if (!lz_extract(zip, u->dir, strip, lu_zip_progress, u, err, errlen)) {
-            if (stepped)
-                lu_step_back();
-            remove(zip);
+        /* The files the launcher itself writes, last, inside the journal: the
+         * offline changelog, so the next start shows the notes for what is now
+         * installed even with no network, and then the install record. The notes
+         * are only ever replaced by a check, which runs on this same worker, so
+         * the pointer stays good for the length of the extraction. */
+        char record[256];
+        LZ_File extra[3];
+        int k = 0, ok;
+
+        SDL_LockMutex(u->lock);
+        lu_install_record(u, record, sizeof record);
+        if (u->notes) {
+            extra[k].name = "CHANGELOG.txt";
+            extra[k].bytes = u->notes;
+            extra[k].len = strlen(u->notes);
+            k++;
+        }
+        SDL_UnlockMutex(u->lock);
+        extra[k].name = "cnc3d-install.txt";
+        extra[k].bytes = record;
+        extra[k].len = strlen(record);
+        k++;
+        extra[k].name = NULL;
+
+        ok = lz_extract(&u->lk, zip, strip, lu_markers, extra, lu_zip_progress, u, err, errlen);
+        remove(zip);
+        if (!ok)
             return 0;
-        }
     }
-    remove(zip);
 
-    if (!lu_write_install(u, err, errlen))
-        return 0;
-
-    /* Keep the offline changelog current, so the next start shows the notes for
-     * what is now installed even with no network. */
     SDL_LockMutex(u->lock);
-    if (u->notes) {
-        char path[1200];
-        FILE *f;
-        snprintf(path, sizeof path, "%s/CHANGELOG.txt", u->dir);
-        f = fopen(path, "wb");
-        if (f) {
-            fwrite(u->notes, 1, strlen(u->notes), f);
-            fclose(f);
-        }
-    }
     snprintf(u->installed, sizeof u->installed, "%s", u->latest);
     SDL_UnlockMutex(u->lock);
     return 1;
@@ -831,8 +878,13 @@ LU_State *lu_create(const char *dir, const char *version)
     u->full.id = u->bins.id = u->manifest.id = -1;
     snprintf(u->dir, sizeof u->dir, "%s", dir ? dir : ".");
     snprintf(u->installed, sizeof u->installed, "%s", version ? version : "?");
+    /* The lock, and with it whatever the last update stepped aside and could not
+     * remove at the time, because the launcher that ran it still had it loaded, or
+     * left unfinished because it was killed. FIRST, before this or the caller reads
+     * anything out of the folder: see lupdate.h. Not taking it is not an error
+     * here: a launcher beside another one still checks and still plays. */
+    lu_own_install(u);
     lu_read_install(u);
-    lu_sweep_old();
 
     /* There is always a site to ask, so LU_NOTCONFIGURED is no longer a state the
      * launcher can start in. The enum keeps the value because lu_phase returns it
@@ -840,6 +892,15 @@ LU_State *lu_create(const char *dir, const char *version)
     u->phase = LU_IDLE;
     snprintf(u->status, sizeof u->status, " ");
     return u;
+}
+
+void lu_set_installed(LU_State *u, const char *version)
+{
+    if (!u)
+        return;
+    SDL_LockMutex(u->lock);
+    snprintf(u->installed, sizeof u->installed, "%s", version && *version ? version : "?");
+    SDL_UnlockMutex(u->lock);
 }
 
 void lu_destroy(LU_State *u)
@@ -851,6 +912,8 @@ void lu_destroy(LU_State *u)
     SDL_UnlockMutex(u->lock);
     if (u->worker)
         SDL_WaitThread(u->worker, NULL);
+    if (u->locked)
+        lz_unlock(&u->lk); /* before the game starts, so it does not hold the folder */
     free(u->notes);
     SDL_DestroyMutex(u->lock);
     free(u);
