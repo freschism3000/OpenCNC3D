@@ -60,7 +60,7 @@ int main(void)
     const NbGame* g;
     int n;
 
-    printf("CNC3D LAN beacon gate\n\n");
+    printf("OpenCNC 3D LAN beacon gate\n\n");
 
     if (!nb_browse_open()) {
         printf("FAILED: could not open the discovery port %d. Something else is on it,\n"

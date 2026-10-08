@@ -542,7 +542,7 @@ static void fxp_draw(int fbw, int fbh)
     fxp_rect(FXP_W * sc, 0.0f, 1.0f * sc, (float)fbh, 0.30f, 0.55f, 0.35f, 0.9f);
 
     /* title, state, buttons */
-    fxp_text(FXP_LABX * sc, 6 * sc, "CNC3D  TIER 2  PRESENTATION", sc,
+    fxp_text(FXP_LABX * sc, 6 * sc, "OpenCNC 3D  TIER 2  PRESENTATION", sc,
              0.60f, 0.95f, 0.65f, 1.0f);
     {
         char head[96];

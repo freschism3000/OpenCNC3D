@@ -1,5 +1,5 @@
 /* ==================================================================================== *
- *  CNC3D -- THE SIDEBAR
+ *  OpenCNC 3D -- THE SIDEBAR
  *
  *  Everything the player needs in order to BUILD: the buildable list with its cameo art,
  *  the credits/power readout, construction progress, and the placement cursor with the

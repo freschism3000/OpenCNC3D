@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds one read only inline accessor, CNC3D_Stage(), to AnimClass, which
 // returns the animation's current frame by calling Fetch_Stage() on the
 // private StageClass base so external code can read it. Nothing else is
@@ -111,7 +111,7 @@ public:
     }
 
     /*
-    ** CNC3D instrumentation (read-only). The StageClass base is private, so the object
+    ** OpenCNC 3D instrumentation (read-only). The StageClass base is private, so the object
     ** dump cannot ask an anim which frame it is on without this. No behaviour change.
     */
     int CNC3D_Stage(void) const

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — .JIM decoder.
+OpenCNC 3D — .JIM decoder.
 
 .JIM files are named per MISSION (SCB01EA.JIM pairs with SCB01EA.INI / .MAP), one per
 scenario, 56 in the ROM. Layout is a plain N64 CI8 (8-bit colour-index) image:

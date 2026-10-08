@@ -1,4 +1,4 @@
-# C&C 3D: the audio engine
+# OpenCNC 3D: the audio engine
 
 Every sound the game makes, out of the 1995 MS-DOS Tiberian Dawn discs, mixed into one
 stereo 16-bit stream at 22050 Hz.

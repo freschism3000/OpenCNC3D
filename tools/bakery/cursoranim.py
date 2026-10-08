@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- THE CURSOR ANIMATION, decoded out of the cartridge.
+OpenCNC 3D -- THE CURSOR ANIMATION, decoded out of the cartridge.
 
 Ten of the twenty console cursor states carry a frame count of 100 in the state table at
 RAM 0x80099920 (byte +2 of each 4-byte record; our transcription is C3D_STATE in

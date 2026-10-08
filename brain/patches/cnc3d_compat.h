@@ -1,5 +1,5 @@
 //
-// CNC3D: tiny Win32 compatibility shim so the CNC_* game-logic API builds off Windows.
+// OpenCNC 3D: tiny Win32 compatibility shim so the CNC_* game-logic API builds off Windows.
 //
 // After supplying a null keyboard and enabling the Microsoft language extensions
 // (-fms-extensions -fdeclspec), dllinterface.cpp needed only three Win32 conveniences.

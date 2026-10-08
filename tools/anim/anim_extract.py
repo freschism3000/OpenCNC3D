@@ -6,7 +6,7 @@ _ROOT = os.environ.get("CNC3D_ROOT") or os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 """
-CNC3D wave 5 -- THE ANIMATION SYSTEM extractor.
+OpenCNC 3D wave 5 -- THE ANIMATION SYSTEM extractor.
 
 Reads data/rom/cnc_eu.z64 and emits, per animated model slot, a resampled
 per-node TRS animation ready for the bakery.
@@ -1237,7 +1237,7 @@ def main():
                               0xFEEB0009, 0xFEEB000A, 0xFEEB000B}, used_tags
     print("  FEEB0002 keys taking the multi-turn path (spin >= 2pi): %d" % spin_over_2pi)
     assert nchecks > 0
-    print("CNC3D wave5 -- animation extractor")
+    print("OpenCNC 3D wave5 -- animation extractor")
     print("  animated model slots : %d" % len(summary))
     print("  tracks               : %d  %s" % (
         total_tracks, {("FEEB%04X" % (k & 0xFFFF)): v for k, v in sorted(used_tags.items())}))

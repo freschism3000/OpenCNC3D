@@ -564,7 +564,7 @@ def build(pack, code, mesh, outdir, house):
     head = N("FBXHeaderExtension")
     head.kid("FBXHeaderVersion", ("I", 1003))
     head.kid("FBXVersion", ("I", FBX_VERSION))
-    head.kid("Creator", ("S", "CNC3D tools/art/fbxout.py"))
+    head.kid("Creator", ("S", "OpenCNC 3D tools/art/fbxout.py"))
     gs = N("GlobalSettings")
     gs.kid("Version", ("I", 1000))
     gs.add(p70([

@@ -38,6 +38,6 @@ export PORT
   done
   echo "server did not come up on port $PORT" >&2 ) &
 
-echo "CNC3D map editor -> http://127.0.0.1:$PORT/"
+echo "OpenCNC 3D map editor -> http://127.0.0.1:$PORT/"
 echo "Ctrl-C to stop."
 exec python3 "$SERVE"

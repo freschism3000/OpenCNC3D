@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds a compile-time static_assert under EIGHTPLAYERS that CONNECT_MAX is
 // at least MAX_PLAYERS minus one, pinning the IPX connection slot count to
 // the player count. No runtime code or values are changed.

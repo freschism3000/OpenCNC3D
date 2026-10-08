@@ -1,6 +1,6 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem  C&C 3D -- launch the NEWEST build on the Desktop, on the new 640x480 HUD.
+rem  OpenCNC 3D -- launch the NEWEST build on the Desktop, on the new 640x480 HUD.
 rem
 rem  There is no build path written down in here on purpose. Every time it runs
 rem  it looks at every CNC3D-windows-* folder on the Desktop, picks the one whose

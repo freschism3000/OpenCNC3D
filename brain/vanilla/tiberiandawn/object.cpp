@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds a per-house invincibility switch: a static bitmask on ObjectClass, a
 // setter and a query, with the query added as a fourth condition on the
 // damage test in Take_Damage so objects owned by a flagged house take no
@@ -99,7 +99,7 @@ void const* ObjectTypeClass::SelectShapes = 0;
 void const* ObjectTypeClass::PipShapes = 0;
 
 /*
-**	INVINCIBILITY (project CNC3D addition; not upstream). One bit per house, in the
+**	INVINCIBILITY (project OpenCNC 3D addition; not upstream). One bit per house, in the
 **	HOUSEF_* shape. Zero means nobody, which is the value every scenario starts from
 **	because Init() below resets it and Clear_Scenario() calls Init(). See object.h for
 **	why the switch lives on ObjectClass rather than in the DLL layer.

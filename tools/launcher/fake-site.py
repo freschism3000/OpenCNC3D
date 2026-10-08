@@ -38,7 +38,7 @@ from urllib.parse import urlparse, parse_qs
 
 CHANGELOG = [
     {
-        "title": 'C&C 3D v0.6.3 "The Front Door"',
+        "title": 'OpenCNC 3D v0.6.3 "The Front Door"',
         "version": "0.6.3",
         "codename": "The Front Door",
         "date": "2026-08-24",
@@ -46,7 +46,7 @@ CHANGELOG = [
                 "- Play becomes Update when a newer build is up.\n",
     },
     {
-        "title": 'C&C 3D v0.6.2 "Now You See It"',
+        "title": 'OpenCNC 3D v0.6.2 "Now You See It"',
         "version": "0.6.2",
         "codename": "Now You See It",
         "date": "2026-08-24",
@@ -125,7 +125,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if kind:
                     item["kind"] = kind
                 entries.append(item)
-            latest = {"tag": self.tag, "name": "CNC3D " + self.tag,
+            latest = {"tag": self.tag, "name": "OpenCNC 3D " + self.tag,
                       "published": "2026-08-24T09:05:43Z", "prerelease": False,
                       "assets": entries}
             self.send_json({"ok": True, "latest": latest, "releases": [latest]})
@@ -136,7 +136,7 @@ class Handler(SimpleHTTPRequestHandler):
             if self.pad:
                 # --changelog-pad: one more entry, that many bytes long, so the
                 # CHANGELOG.txt an update writes is big enough to be killed inside.
-                entries.append({"title": "C&C 3D v0.6.0 \"Padding\"", "version": "0.6.0",
+                entries.append({"title": "OpenCNC 3D v0.6.0 \"Padding\"", "version": "0.6.0",
                                 "codename": "Padding", "date": "2026-08-01",
                                 "body": "- padding\n" * (self.pad // 10)})
             self.send_json({"ok": True, "total": len(entries), "entries": entries})

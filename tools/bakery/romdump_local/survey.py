@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — N64 ROM structural survey tool.
+OpenCNC 3D — N64 ROM structural survey tool.
 
 Read-only reconnaissance of the Command & Conquer (N64) ROM. Prints:
   - header identity (magic, internal name, cart id, region)

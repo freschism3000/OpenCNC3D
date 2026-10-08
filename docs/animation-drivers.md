@@ -24,7 +24,7 @@ field is written by the object's own 3-D draw virtual. For buildings the value
 written is a pure function of
 
 * the **StageClass counter at `building + 0x28`** (this is C&C's `Fetch_Stage()`,
-  i.e. the quantity the CNC3D brain exports as `dostage`), and
+  i.e. the quantity the OpenCNC 3D brain exports as `dostage`), and
 * the building's **StructType**, through a 59-entry **jump table of code arms**
   at RAM `0x80003D18` — one arm per structure type, each with its own hard-coded
   formula. There is no data table of clip ranges.
@@ -272,7 +272,7 @@ u  =  2 * dostage / makecnt              (building up)
 u  =  2 * (makecnt - dostage) / makecnt  (selling)
 ```
 
-Note the **factor 2** and the **absence of any `+1`**. The CNC3D note that uses
+Note the **factor 2** and the **absence of any `+1`**. The OpenCNC 3D note that uses
 `u = (dostage+1)/makecnt` is off by the +1 and by the 2× rate.
 
 ### 3.3 `BState != 0` — the per-StructType jump table (DECODED)
@@ -487,7 +487,7 @@ I dumped all 384 triples; they are byte-identical. So:
   any runtime write to `Class+0x4C`; the class array lives in the read-only
   CodeOverlay image, so I would expect it to stay 1. Flagging this as the one
   place where my decode and the project's measured `makecnt = 32` disagree, and I
-  have not resolved it. The likely reading (**INFERRED**) is that the CNC3D brain's
+  have not resolved it. The likely reading (**INFERRED**) is that the OpenCNC 3D brain's
   `makecnt` comes from the *PC* GPL build and the N64 build simply does not use
   the same number.
 
@@ -643,7 +643,7 @@ ATWR, V19, HPAD, FIX, PROC — stands still on hardware, with its clip sitting u
 in the cartridge.
 
 **This is a fact about the port, not a licence.** Reproducing it would delete almost
-every structure animation in the game. What CNC3D does instead is stated in
+every structure animation in the game. What OpenCNC 3D does instead is stated in
 the header comment of `structure_anim_frame()`: the arms
 and the clips are the cartridge's, the *triggers* are the 1995 engine's (which our
 brain still runs, `_anims[]` and all), and the counter that walks a clip is ours.

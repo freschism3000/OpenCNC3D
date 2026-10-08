@@ -1,4 +1,4 @@
-# Multiplayer: how CNC3D gets real network play, and what 16-24 players costs
+# Multiplayer: how OpenCNC 3D gets real network play, and what 16-24 players costs
 
 Investigation and design, 30 Aug 2026. Every claim about the engine is read out of the
 checkout in `brain/vanilla` and `brain/xl` (`brain/patches/UPSTREAM.txt`), and line numbers
@@ -178,7 +178,7 @@ several are live defects today.
 
 ### 3.1 The four input paths that bypass the event queue
 
-Eleven paths mutate the simulation without producing an event. Four are reachable in CNC3D
+Eleven paths mutate the simulation without producing an event. Four are reachable in OpenCNC 3D
 today, and each would change the world on one machine and nowhere else:
 
 | Path | Brain | Reached from |
@@ -211,7 +211,7 @@ The second is the dangerous one. Even where the resulting cell does not matter, 
 draws advance the shared random stream, so two peers diverge permanently from that tick
 onward.
 
-**CNC3D's current exposure is lower than the general case and must not be relied on.** The
+**OpenCNC 3D's current exposure is lower than the general case and must not be relied on.** The
 renderer deliberately never moves `TacticalCoord` (`cnc_eyes.cpp:308`), which is set only at
 scenario start (`dllinterface.cpp:1354-1357`) and restored after the start position sweep
 (`:6390`). So it is currently identical on every machine by accident of the host's design,
@@ -335,7 +335,7 @@ a CVE history.
 The lobby already exists and the precedent for the network version is in the engine's own
 source. `Net_New_Dialog` (`netdlg.cpp:2654`) is Tiberian Dawn's network host lobby: a
 `ColorListClass` roster at the top left, one row per player in that player's colour,
-formatted name-tab-side (`:3063-3070`). That is the widget CNC3D's skirmish lobby was already
+formatted name-tab-side (`:3063-3070`). That is the widget OpenCNC 3D's skirmish lobby was already
 modelled on, per `docs/design-skirmish-lobby.md` section 0.
 
 What the multiplayer version adds over the skirmish one: a network roster with join and

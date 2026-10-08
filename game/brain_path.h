@@ -48,7 +48,7 @@
 #endif
 
 /* The brain lives in one place in the working tree, another in the installed
-   share/CNC3D tree, and a third beside the binary in a shipped build. Probe all of
+   share/OpenCNC 3D tree, and a third beside the binary in a shipped build. Probe all of
    them rather than making the caller care.
 
    NEVER RETURNS NULL. With nothing found it names the platform's own library, so the

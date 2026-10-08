@@ -3590,7 +3590,7 @@ struct MapEntry {
     char scen[16];
     char kind;              /* 'U' user, 'O' official                                */
     char name[48];          /* [Basic] Name=, when the map has one                    */
-    unsigned char enhanced; /* [Basic] Enhanced=1 -- this one needs CNC3D             */
+    unsigned char enhanced; /* [Basic] Enhanced=1 -- this one needs OpenCNC 3D             */
     /* THE FOLDER IT WAS FOUND IN, and its absence is why opening a user map could not
        work. The two tabs scan two DIFFERENT directories: user_maps/ and the missions
        root. The reopen then booted the chosen scenario out of the SESSION'S launch
@@ -15988,7 +15988,7 @@ static bool edit_write_seed_ini(const char* dst)
        CNC3DTheater=SNOW for the pipeline and the editor, which read it first. */
     const char* thbrain = (thidx == 3) ? "WINTER"
                         : (thidx == 4) ? "DESERT" : thname;
-    fprintf(f, "; Written by the CNC3D map editor. Cells are y*%d + x.\r\n",
+    fprintf(f, "; Written by the OpenCNC 3D map editor. Cells are y*%d + x.\r\n",
             edit_ini_w());
     fprintf(f, "[Basic]\r\n");
     /* The map's own name if it has been given one, and its slot if it has not. Both

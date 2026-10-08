@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- terrain HEIGHTMAP extractor (bug #12: the N64's elevation source).
+OpenCNC 3D -- terrain HEIGHTMAP extractor (bug #12: the N64's elevation source).
 
 WHERE THE HEIGHTS LIVE (full evidence trail: heightmap_notes.md, same folder)
 -----------------------------------------------------------------------------

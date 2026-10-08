@@ -1,4 +1,4 @@
-/* CNC3D model gallery.
+/* OpenCNC 3D model gallery.
  *
  * Draws the cartridge's models the way the game draws them, because it reads the same
  * baked pack the game reads. The three rules that make a mesh come out right, all of

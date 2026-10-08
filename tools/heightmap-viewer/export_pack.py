@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CNC3D -- the viewer's REAL assets, taken from the game's own baked packs.
+"""OpenCNC 3D -- the viewer's REAL assets, taken from the game's own baked packs.
 
 The first version of this viewer drew objects as flat-coloured geometry and faked
 the sea with a blue plane. Both were the viewer's inventions. Neither had to be:

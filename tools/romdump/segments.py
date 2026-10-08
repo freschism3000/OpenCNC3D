@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — the overlay/segment table of Command & Conquer (N64).
+OpenCNC 3D — the overlay/segment table of Command & Conquer (N64).
 
 THIS IS THE KEY TO ALL 3D GEOMETRY AND TEXTURES. Display lists address vertices and
 textures by RAM address; the regions holding them are DMA'd overlays, so a ROM offset is

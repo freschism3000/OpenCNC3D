@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CNC3D -- heightmap viewer data exporter.
+"""OpenCNC 3D -- heightmap viewer data exporter.
 
 Emits, for every shipped N64 scenario, a compact JSON the browser viewer reads:
 

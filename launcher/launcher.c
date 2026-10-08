@@ -1,11 +1,11 @@
 /*
- * launcher.c -- C&C 3D's launcher. The thing a player double-clicks.
+ * launcher.c -- OpenCNC 3D's launcher. The thing a player double-clicks.
  *
  *   C&C3D                      open the launcher
- *   C&C3D --dir <folder>       point it at an install other than its own
- *   C&C3D --shot out.png       render one frame to a PNG and exit (no window)
- *   C&C3D --play               skip the launcher and start the game
- *   C&C3D -- --w 1600 --h 960  pass the rest to the game when Play is pressed
+ *   OpenCNC 3D --dir <folder>       point it at an install other than its own
+ *   OpenCNC 3D --shot out.png       render one frame to a PNG and exit (no window)
+ *   OpenCNC 3D --play               skip the launcher and start the game
+ *   OpenCNC 3D -- --w 1600 --h 960  pass the rest to the game when Play is pressed
  *
  * WHAT IT IS. One 320x200 dialog drawn with the game's own DOS primitives, over
  * the 1995 title plate out of TITLE.CPS: the build that is installed, the build
@@ -560,7 +560,7 @@ static void l_draw(L_App *a)
                                L_DLG_X + L_DLG_W - 14, L_DLG_Y + 11);
     }
 
-    lui_print_centered(&a->surf, a->f8, "C&C 3D", DM_SCREEN_W / 2, L_TITLE_Y,
+    lui_print_centered(&a->surf, a->f8, "OpenCNC 3D", DM_SCREEN_W / 2, L_TITLE_Y,
                        DM_TEXT_BRIGHT);
 
     /* The two numbers, side by side, because the question the player is actually
@@ -846,7 +846,7 @@ static int l_headless(L_App *a, int mode)
 
 static void l_usage(void)
 {
-    printf("C&C 3D launcher\n"
+    printf("OpenCNC 3D launcher\n"
            "  --dir <folder>   the installed game (default: found from this binary)\n"
            "  --shot <file>    render one frame to a PNG and exit\n"
            "  --scale <n>      window scale for --shot and for the window\n"
@@ -978,13 +978,13 @@ int main(int argc, char **argv)
          * (known-gap notes, "Seventeen launchers"). */
         char msg[3072];
         snprintf(msg, sizeof msg,
-                 "C&C 3D could not find its game files.\n\n"
+                 "OpenCNC 3D could not find its game files.\n\n"
                  "Looked in:\n%s\n\n%s\n\n"
                  "The launcher belongs in the same folder as the game, or inside "
                  "C&C3D.app in it.",
                  a.dir, err);
         lu_destroy(a.up);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "C&C 3D", msg, NULL);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenCNC 3D", msg, NULL);
         fprintf(stderr, "%s\n", msg);
         return 1;
     }
@@ -1061,7 +1061,7 @@ int main(int argc, char **argv)
         return 1;
     }
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    a.win = SDL_CreateWindow("C&C 3D", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    a.win = SDL_CreateWindow("OpenCNC 3D", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                              DM_SCREEN_W * scale, DM_SCREEN_H * scale, SDL_WINDOW_OPENGL);
     if (!a.win) {
         fprintf(stderr, "SDL: %s\n", SDL_GetError());
@@ -1125,7 +1125,7 @@ int main(int argc, char **argv)
     if (a.play_after == 2) {
         int room = (int)(sizeof l_game_args / sizeof *l_game_args) - l_game_argc;
         if (room < 3) {
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "C&C 3D",
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenCNC 3D",
                                      "too many forwarded arguments to add the "
                                      "editor's own", NULL);
             return 1;
@@ -1138,7 +1138,7 @@ int main(int argc, char **argv)
     if (a.play_after && !l_launch(a.dir,
                                   a.play_after == 2 ? L_EDIT_EXE : L_GAME_EXE,
                                   err, sizeof err)) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "C&C 3D", err, NULL);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenCNC 3D", err, NULL);
         return 1;
     }
     return 0;

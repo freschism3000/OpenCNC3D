@@ -1062,7 +1062,7 @@ int main(int argc, char** argv)
     memset(&A, 0, sizeof(A));
     memset(&B, 0, sizeof(B));
 
-    printf("CNC3D two-brain lockstep gate\n");
+    printf("OpenCNC 3D two-brain lockstep gate\n");
     printf("  brain A  : %s\n", src);
     printf("  brain B  : %s%s\n", srcB, (srcB == src) ? "  (same library, the normal case)" : "  (DIFFERENT library)");
     printf("  scenario : %s   ticks: %d\n\n", scenario, ticks);

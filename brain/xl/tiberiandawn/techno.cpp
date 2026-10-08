@@ -697,7 +697,7 @@ bool TechnoClass::Revealed(HouseClass* house)
 void TechnoClass::Hidden(void)
 {
     /*
-    **	CNC3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
+    **	OpenCNC 3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
     **	cleared a mask every machine shares.
     **
     **	    if (!Is_Discovered_By_Player()) return;

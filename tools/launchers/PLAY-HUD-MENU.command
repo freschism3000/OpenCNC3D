@@ -1,6 +1,6 @@
 #!/bin/sh
 # ---------------------------------------------------------------------------
-#  C&C 3D -- boots the 1995 DOS main menu with the NEW 640x480 sidebar HUD.
+#  OpenCNC 3D -- boots the 1995 DOS main menu with the NEW 640x480 sidebar HUD.
 #  Pick TEST MAP to play. ESC in game opens the Options dialog.
 #
 #  What to look at on the sidebar:

@@ -1,6 +1,6 @@
 #!/bin/sh
 # ---------------------------------------------------------------------------
-#  C&C 3D -- the new 640x480 sidebar HUD, GDI mission 1.
+#  OpenCNC 3D -- the new 640x480 sidebar HUD, GDI mission 1.
 #
 #  What to look at:
 #    * the build cells now carry the C&C95 cameos with their name bars

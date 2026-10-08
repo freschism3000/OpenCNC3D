@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 // UnitClass::Overlap_List drops the selection term in a lockstep match, so
 // the cells a vehicle overlaps do not depend on which peer has it selected.
 // It DOES change the game simulation, in a lockstep match only.
@@ -2989,7 +2989,7 @@ short const* UnitClass::Overlap_List(void) const
     }
 
     /*
-    **	CNC3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
+    **	OpenCNC 3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
     **	the bigger half. ICON_PIXEL_W * 2 is 48, and the _gigundo test is a strict greater
     **	than, so a selected vehicle took the by-hand branch at maxsize 24 and got the full
     **	3x3 ring. For a unit that is already IsFiring, IsGigundo, IsAnimAttached or Flagged

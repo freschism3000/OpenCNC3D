@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CNC3D -- MS-DOS infantry billboards for the heightmap viewer.
+"""OpenCNC 3D -- MS-DOS infantry billboards for the heightmap viewer.
 
 The viewer draws its little men as billboards baked from the N64 cartridge pack.
 The game itself stopped doing that a year ago: it draws the 1995 MS-DOS sprites

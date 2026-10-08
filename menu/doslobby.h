@@ -13,11 +13,11 @@
  * WHAT IS DRAWN IS WHAT THE ENGINE READS. The only path a client has into a match is
  * CNCMultiplayerOptionsStruct plus six CNCPlayerInfoStruct rows, and about half of the
  * 1995 dialog's controls have no field there, no effect in Tiberian Dawn, or no way to
- * reach a CNC3D pixel. Those are not drawn at all rather than drawn dead:
+ * reach a OpenCNC 3D pixel. Those are not drawn at all rather than drawn dead:
  *
  *   difficulty slider  CNC_Set_Difficulty returns immediately unless the game is
  *                      GAME_NORMAL, so every multiplayer house takes DIFF_NORMAL.
- *   player name box    the name never reaches a CNC3D pixel, and there is no edit widget.
+ *   player name box    the name never reaches a OpenCNC 3D pixel, and there is no edit widget.
  *   Shadow Regrows     Tiberian Dawn has no such field; the struct member is read by
  *                      nothing in the whole engine.
  *   Capture the Flag   the engine would honour it; there is no flag art and no flag
@@ -49,7 +49,7 @@
  * COLOUR WAS ON THAT LIST TOO AND IS NOT ANY MORE (26 Aug 2026, the project owner's request: "make
  * sure theres a colorpicker for each player as well"). The old note said a colour index
  * "changes a number nothing draws", and the second half of that is still true of the
- * TACTICAL VIEW -- CNC3D draws 3D models whose texture set is chosen by SIDE, and the
+ * TACTICAL VIEW -- OpenCNC 3D draws 3D models whose texture set is chosen by SIDE, and the
  * house's remap table never reaches a pixel here. The first half was wrong: ColorIndex
  * is not inert inside the engine. CNC_Set_Multiplayer_Data folds it into MPlayerID
  * (dllinterface.cpp:750), GlyphX_Assign_Houses unpacks it again and passes it to

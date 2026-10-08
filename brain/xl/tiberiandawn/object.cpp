@@ -86,7 +86,7 @@ void const* ObjectTypeClass::SelectShapes = 0;
 void const* ObjectTypeClass::PipShapes = 0;
 
 /*
-**	INVINCIBILITY (project CNC3D addition; not upstream). One bit per house, in the
+**	INVINCIBILITY (project OpenCNC 3D addition; not upstream). One bit per house, in the
 **	HOUSEF_* shape. Zero means nobody, which is the value every scenario starts from
 **	because Init() below resets it and Clear_Scenario() calls Init(). See object.h for
 **	why the switch lives on ObjectClass rather than in the DLL layer.

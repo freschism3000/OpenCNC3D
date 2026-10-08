@@ -1,4 +1,4 @@
-# CNC3D WEB Mission Editor -- complete feature inventory
+# OpenCNC 3D WEB Mission Editor -- complete feature inventory
 
 Files: `tools/heightmap-viewer/public/index.html` (shell + all CSS + SVG icon sheet), `tools/heightmap-viewer/public/app.js` (renderer / read path, 1688 lines), `tools/heightmap-viewer/public/editor.js` (write path, 2365 lines), `tools/heightmap-viewer/serve.py` (companion server).
 

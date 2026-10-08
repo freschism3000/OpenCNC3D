@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — decompressor for archive compression method 0x22.
+OpenCNC 3D — decompressor for archive compression method 0x22.
 
 Reverse-engineered from the N64 function at RAM 0x80052570 (ROM 0x53170), which the
 archive read-core (0x80051bb8) dispatches to when the entry's method byte is 0x22.

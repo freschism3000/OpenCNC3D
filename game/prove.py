@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- prod: one-command proof of unit production + MCV deploy on SCG01EC.
+OpenCNC 3D -- prod: one-command proof of unit production + MCV deploy on SCG01EC.
 
 Runs the three proof scripts through ./cnc_eyes and then ASSERTS on the objdump
 evidence, not on exit codes alone:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — RDP texture state machine: per-display-list texture extraction + UV mapping.
+OpenCNC 3D — RDP texture state machine: per-display-list texture extraction + UV mapping.
 
 Walks a display list tracking RDP tile state and returns, for every triangle, which
 texture was bound. Textures are decoded to RGBA using the overlay-correct resolver in

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- the N64 infantry sprite table (`../src/n64soldier.c`), palettes included.
+OpenCNC 3D -- the N64 infantry sprite table (`../src/n64soldier.c`), palettes included.
 
 WHY THIS FILE EXISTS
 --------------------

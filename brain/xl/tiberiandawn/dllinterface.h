@@ -748,7 +748,7 @@ struct CNCMultiplayerOptionsStruct
     bool MPlayerAftermathUnits;
     bool CaptureTheFlag;
     bool DestroyStructures; // New early win condition via destroying all a player's structures
-    bool ShortGame;         // CNC3D: defences and walls do not keep a player alive
+    bool ShortGame;         // OpenCNC 3D: defences and walls do not keep a player alive
     bool ModernBalance;
 };
 
@@ -863,7 +863,7 @@ struct CNCShroudStruct
 
 /**************************************************************************************
 **
-**  CNC3D XL: the ABI facts block (docs/design-xl-brain.md, abiAndHost).
+**  OpenCNC 3D XL: the ABI facts block (docs/design-xl-brain.md, abiAndHost).
 **
 **  The classic host/brain contract worked because both sides defined the same
 **  macros and hoped -- no negotiation, so a struct-sizing mismatch was a silent

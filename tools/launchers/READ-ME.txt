@@ -1,4 +1,4 @@
-C&C 3D -- macOS build
+OpenCNC 3D -- macOS build
 =====================
 
 Command & Conquer with the Nintendo 64's camera and 3D models, running on the

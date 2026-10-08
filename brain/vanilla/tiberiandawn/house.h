@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Declares, on HouseClass, a static bitmask of houses whose super weapons
 // were granted by the cheat menu plus a setter and a getter for it.
 // Declarations only; the behaviour that reads the flag lives in house.cpp.
@@ -479,7 +479,7 @@ public:
     void Sell_Wall(CELL cell);
     bool Flag_To_Die(void);
     /*
-    ** CNC3D: which houses hold their super weapons because the cheat menu granted them
+    ** OpenCNC 3D: which houses hold their super weapons because the cheat menu granted them
     ** rather than because they built the launch building. Read by Place_Special_Blast,
     ** where a nuke with no Temple of Nod would otherwise refuse to fire in single
     ** player. Set by CNC3D_Grant_Superweapons; cleared by Init with the scenario.

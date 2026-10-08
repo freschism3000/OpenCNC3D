@@ -1,4 +1,4 @@
-; cnc3d.nsi -- the Windows install wizard for C&C 3D.
+; cnc3d.nsi -- the Windows install wizard for OpenCNC 3D.
 ;
 ; Built from the Mac with makensis (brew install makensis), from the same staged
 ; folder tools/win/make-build-win.sh already produces, so the installer and the
@@ -60,7 +60,7 @@ Unicode false
   !error "OUTFILE is not defined. Run tools/win/make-installer-win.sh."
 !endif
 
-!define APPNAME    "C&C 3D"
+!define APPNAME    "OpenCNC 3D"
 !define COMPANY    "Slipgate Ironworks"
 !define REGKEY     "Software\Microsoft\Windows\CurrentVersion\Uninstall\CNC3D"
 
@@ -84,7 +84,7 @@ BrandingText "${APPNAME} ${VERSION}"
 ; The finish page offers to start the launcher, which is the thing this whole
 ; installer exists to put on the machine.
 !define MUI_FINISHPAGE_RUN "$INSTDIR\C&C3D.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Play C&C 3D"
+!define MUI_FINISHPAGE_RUN_TEXT "Play OpenCNC 3D"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\READ-ME-WINDOWS.txt"
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Read the notes for this build"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
@@ -112,7 +112,7 @@ BrandingText "${APPNAME} ${VERSION}"
 
 ; ---------------------------------------------------------------- install
 
-Section "C&C 3D" SecMain
+Section "OpenCNC 3D" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
 
@@ -168,7 +168,7 @@ SectionEnd
 LangString DESC_SecMain    ${LANG_ENGLISH} \
   "The game, its data, and the launcher that keeps it up to date."
 LangString DESC_SecDesktop ${LANG_ENGLISH} \
-  "Put a C&C 3D shortcut on the desktop."
+  "Put a OpenCNC 3D shortcut on the desktop."
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecMain}    $(DESC_SecMain)
@@ -182,7 +182,7 @@ Section "Uninstall"
   ; folder this installer wrote its own marker into. Without that check, an
   ; $INSTDIR that had been edited to C:\ would delete C:\.
   IfFileExists "$INSTDIR\C&C3D.exe" +3 0
-    MessageBox MB_ICONSTOP "That does not look like a C&C 3D install, so nothing was removed."
+    MessageBox MB_ICONSTOP "That does not look like a OpenCNC 3D install, so nothing was removed."
     Abort
 
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"

@@ -1,6 +1,6 @@
 @echo off
 rem ===========================================================================
-rem  C&C 3D -- play the SOURCE TREE this file sits in.
+rem  OpenCNC 3D -- play the SOURCE TREE this file sits in.
 rem
 rem  The two launchers beside this one play a build made somewhere else: one
 rem  follows the newest release, the other downloads the newest green CI build

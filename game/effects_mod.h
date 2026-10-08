@@ -1,5 +1,5 @@
 /* ================================================================================== *
- *  effects_mod.h -- CNC3D combat presentation: anims (muzzle flashes, impacts,
+ *  effects_mod.h -- OpenCNC 3D combat presentation: anims (muzzle flashes, impacts,
  *  explosions) and bullets in flight.
  *
  *  WHERE THE DATA COMES FROM

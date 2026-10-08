@@ -58,7 +58,7 @@
 **	THE SPARSE .BIN RECORD, AS IT IS ON DISK, WHICH IS NOT WHAT THIS BUILD'S TYPES SAY.
 **
 **	The big-map .BIN is a run of these, ascending by cell, with clear cells omitted, and
-**	it is frozen: the shipped 128 maps and everything the CNC3D editor writes are in it.
+**	it is frozen: the shipped 128 maps and everything the OpenCNC 3D editor writes are in it.
 **	The record is FOUR bytes. Spelling it with this brain's own CELL, as the code here
 **	did up to 27 Aug 2026, gets that wrong twice over in XL, where CELL is int32_t:
 **	Read_Binary_Big declared the struct with no packing at all and so read EIGHT byte

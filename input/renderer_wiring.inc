@@ -1,5 +1,5 @@
 /* ==================================================================================
- * CNC3D: how the renderer turns a screen click into a unit order.
+ * OpenCNC 3D: how the renderer turns a screen click into a unit order.
  *
  * Drop-in fragment for cnc_eyes.cpp. Not compiled on its own; it is the reference
  * for whoever wires the mouse to the brain. Everything here is verified by

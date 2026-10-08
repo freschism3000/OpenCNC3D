@@ -1,8 +1,8 @@
 @echo off
 rem ===========================================================================
-rem  C&C 3D -- play the newest build from main, rather than the newest RELEASE.
+rem  OpenCNC 3D -- play the newest build from main, rather than the newest RELEASE.
 rem
-rem  This is the file the "C&C 3D (dev)" Desktop shortcut runs. On every launch
+rem  This is the file the "OpenCNC 3D (dev)" Desktop shortcut runs. On every launch
 rem  it asks GitHub for the newest commit on main whose CI run went green. If
 rem  that is not what is already sitting in this folder it downloads the four
 rem  Windows binaries from that run and drops them in beside the data. Then it

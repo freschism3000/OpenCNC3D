@@ -1,4 +1,4 @@
-CNC3D MISSION EDITOR -- test build
+OpenCNC 3D MISSION EDITOR -- test build
 ==================================
 build v0.6.2-346-g03d2a79, 27 Aug 2026, Windows (32-bit)
 

@@ -1,4 +1,4 @@
-# CNC3D — the brain
+# OpenCNC 3D — the brain
 
 The GPL Tiberian Dawn game logic, built as a platform-agnostic library exposing the flat
 `CNC_*` C ABI, **running missions extracted from the Nintendo 64 cartridge**.

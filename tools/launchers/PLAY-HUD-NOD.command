@@ -1,6 +1,6 @@
 #!/bin/sh
 # ---------------------------------------------------------------------------
-#  C&C 3D -- the new 640x480 sidebar HUD, NOD mission 1.
+#  OpenCNC 3D -- the new 640x480 sidebar HUD, NOD mission 1.
 #  Same as PLAY-HUD-NEW but the Nod side, so the radar-off emblem is the
 #  scorpion shield rather than the GDI eagle. Press M to drop the radar.
 #  WINDOW SIZE IS LOAD-BEARING: 960 is 2 x the HUD's native 480, so the sidebar

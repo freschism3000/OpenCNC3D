@@ -1,6 +1,6 @@
 @echo off
 rem ===========================================================================
-rem  C&C 3D -- put a "C&C 3D (dev)" shortcut on the Desktop. Run this ONCE.
+rem  OpenCNC 3D -- put a "OpenCNC 3D (dev)" shortcut on the Desktop. Run this ONCE.
 rem
 rem  It builds a second, separate copy of the game that follows main instead of
 rem  following releases, and puts a shortcut to it on the Desktop. After this,
@@ -26,7 +26,7 @@ setlocal enabledelayedexpansion
 
 set "DEST=%LOCALAPPDATA%\Programs\CNC3D-dev"
 set "DESK=%USERPROFILE%\Desktop"
-set "LNKNAME=C&C 3D (dev).lnk"
+set "LNKNAME=OpenCNC 3D (dev).lnk"
 set "LNK=%DESK%\%LNKNAME%"
 
 echo.
@@ -109,7 +109,7 @@ rem  every layer in between would want it escaped differently.
 
 set "TARGET=%DEST%\PLAY-DEV.bat"
 set "ICON=%DEST%\cnc3d.exe,0"
-powershell -NoProfile -Command "$w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut($env:LNK); $s.TargetPath=$env:TARGET; $s.WorkingDirectory=$env:DEST; $s.IconLocation=$env:ICON; $s.Description='C&C 3D, newest build from main'; $s.Save()"
+powershell -NoProfile -Command "$w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut($env:LNK); $s.TargetPath=$env:TARGET; $s.WorkingDirectory=$env:DEST; $s.IconLocation=$env:ICON; $s.Description='OpenCNC 3D, newest build from main'; $s.Save()"
 if errorlevel 1 (
   echo   The shortcut could not be created.
   pause

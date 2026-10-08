@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- the cliff compass, checked PER TEMPLATE PLACEMENT.
+OpenCNC 3D -- the cliff compass, checked PER TEMPLATE PLACEMENT.
 
 docs/terrain-elevation-grammar.md section 3 averages the height gradient over every
 CELL of every SLOPE template and reports one high side per template. The map editor's

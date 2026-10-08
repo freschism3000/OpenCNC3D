@@ -4,7 +4,7 @@
      and every claim about the code carries a file and line. Where the evidence does not
      reach it says UNPROVEN, and those are the parts to be most careful with. -->
 
-# THE CNC3D MAP EDITOR: THE PLAN
+# THE OpenCNC 3D MAP EDITOR: THE PLAN
 
 *Written for the project owner first, implementer second. Every design claim from the web carries a URL; every claim from the code carries a file and line. Where the evidence does not reach, it says UNPROVEN.*
 
@@ -16,7 +16,7 @@ Section 7 asked the project owner the questions that change what gets built. He 
 so they are no longer open and the build order below is the one that follows.
 
 1. **v1 must be PLAYABLE, not export-only.** The finish line is a map made in the browser
-   appearing in the CNC3D skirmish lobby and starting. That is slice 2, and it needs no
+   appearing in the OpenCNC 3D skirmish lobby and starting. That is slice 2, and it needs no
    terrain editing and no baking: the map borrows a theater-matched pack, which is valid
    precisely because no tile was changed.
 2. **v1 EDITS SHIPPED MAPS.** Objects and ownership on top of cartridge terrain. New-map
@@ -246,7 +246,7 @@ of a bridge something blew up mid-mission.
 ### Infantry now use the 1995 DOS sprites
 
 The viewer drew infantry as the cartridge's billboards: five stored facings mirrored
-to eight. The PC game stores all eight and mirrors nothing, and CNC3D itself already
+to eight. The PC game stores all eight and mirrors nothing, and OpenCNC 3D itself already
 ships the DOS art (`game/dosinfantry.pack`), so `tools/heightmap-viewer/export_dosinf.py`
 bakes the same sprites out of the same `CONQUER.MIX` with the same `TEMPERAT.PAL`,
 importing the game's own `bake_dosinfantry.py` tables rather than retyping them. The
@@ -433,7 +433,7 @@ Download SCM01EA.INI
 
 That list is the linter, and it is the most valuable thing on this page. Every failure it catches is otherwise completely silent: a map with no pack does not error, it simply never appears in the menu (`app/cnc3d.cpp:288-292` and `:396-400`, both of which comment that an unplayable entry is worse than an absent one). An illegal tile is not rejected, it is quietly turned to clear (`brain/vanilla/tiberiandawn/map.cpp:1157`). Nothing anywhere cross-checks that the pack's theater matches the INI's.
 
-He downloads the file, drops it into `playable/missions/`, launches CNC3D, and his map is in the skirmish lobby.
+He downloads the file, drops it into `playable/missions/`, launches OpenCNC 3D, and his map is in the skirmish lobby.
 
 Twenty minutes, and he has a playable skirmish map.
 

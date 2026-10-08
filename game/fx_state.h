@@ -1793,7 +1793,7 @@ static int fx_save(const FxState* s, const char* path)
     if (!f) return 0;
     FxState d; fx_defaults(&d);
 
-    fprintf(f, "# CNC3D Tier 2 post chain -- tuned values\n"
+    fprintf(f, "# OpenCNC 3D Tier 2 post chain -- tuned values\n"
                "#\n"
                "# Written by the F5 panel. Load with:  cnc3d --gfx <this file>\n"
                "# Send this file back and the numbers in it become the new defaults in\n"

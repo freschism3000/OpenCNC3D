@@ -13,7 +13,7 @@ All line numbers below are against `game/cnc_eyes.cpp` at sha1 `be86abb` (18320 
 
 `game/cnc_eyes.cpp:18246-18247`:
 ```c
-SDL_Window* win = SDL_CreateWindow("CNC3D eyes", SDL_WINDOWPOS_CENTERED,
+SDL_Window* win = SDL_CreateWindow("OpenCNC 3D eyes", SDL_WINDOWPOS_CENTERED,
                                    SDL_WINDOWPOS_CENTERED, o.w, o.h, flags);
 ```
 Flags assembled at `cnc_eyes.cpp:18239-18245`:

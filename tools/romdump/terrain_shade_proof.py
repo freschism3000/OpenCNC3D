@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- proof renderer for the recovered N64 terrain shade (READ-ONLY).
+OpenCNC 3D -- proof renderer for the recovered N64 terrain shade (READ-ONLY).
 
 Not part of the game. A small software rasteriser that draws a scenario's heightfield
 with the map's own 24x24 theater art twice -- once at glColor(1,1,1) (what the GL build

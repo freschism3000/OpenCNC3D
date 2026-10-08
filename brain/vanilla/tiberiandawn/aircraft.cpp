@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 // Adds one clause to the cargo plane's drop in AircraftClass::Mission_Unload:
 // a vehicle set down at an airstrip that holds a rally point (a CNC3D
 // addition, stored in the airstrip's ArchiveTarget) is given MISSION_MOVE to
@@ -1162,7 +1162,7 @@ int AircraftClass::Mission_Unload(void)
                                 unit->Scatter(0, true);
 
                                 /*
-                                **	CNC3D: and THEN the airstrip's rally point, the same field
+                                **	OpenCNC 3D: and THEN the airstrip's rally point, the same field
                                 **	the barracks and the war factory read. The building this
                                 **	plane is in radio contact with is the airstrip that ordered
                                 **	the delivery (PICK_AIRSTRIP hailed it, and vanilla has just

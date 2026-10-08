@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Under the EIGHTPLAYERS build switch, defines two new house types,
 // HouseMulti7 and HouseMulti8 (grey and brown remap tables, MP7 and MP8 file
 // suffixes, civilian name and neutral radar colours), and registers both in

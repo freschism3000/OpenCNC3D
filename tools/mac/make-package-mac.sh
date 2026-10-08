@@ -282,7 +282,7 @@ echo "   C&C3D.app opens cnc3d-launcher, which can reach the site"
 # ---- the paper --------------------------------------------------------------------
 # FROM THE TRACKED MASTER, not from playable/. The copy that lived in playable/ was
 # untracked, nothing regenerated it, and it went out in every release still announcing
-# "C&C 3D v0.3.1 (macOS build, )".
+# "OpenCNC 3D v0.3.1 (macOS build, )".
 [ -f "$ROOT/tools/launchers/READ-ME.txt" ] || die "tools/launchers/READ-ME.txt is missing.
        That file is the macOS package's README and it is tracked; restore it rather than
        falling back to whatever is in $SRC."

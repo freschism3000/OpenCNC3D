@@ -1,4 +1,4 @@
-# Building C&C 3D
+# Building OpenCNC 3D
 
 This repository is source. It contains no game data, so a fresh clone will compile but
 will not run until you supply two things you already own.

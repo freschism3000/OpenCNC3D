@@ -1,5 +1,5 @@
 /*
- * w98_proto.c -- the first native Windows 98 prototype of C&C 3D.
+ * w98_proto.c -- the first native Windows 98 prototype of OpenCNC 3D.
  *
  * WHAT THIS IS, AND WHAT IT IS NOT.
  *
@@ -204,7 +204,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
                   "Could not load %s\n\n%s\n\n"
                   "It is a build product, so it is not in git. Copy it in beside the exe.",
                   packpath, packerr);
-        MessageBoxA(NULL, m, "CNC3D Win98 prototype", MB_OK | MB_ICONERROR);
+        MessageBoxA(NULL, m, "OpenCNC 3D Win98 prototype", MB_OK | MB_ICONERROR);
         return 1;
     }
 
@@ -230,9 +230,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     fill_sidebar_state(&state);
     db_surface_init(&surf, DB_SCREEN_W, DB_SCREEN_H, g_surf8);
 
-    if (!w98_open("C&C 3D -- Windows 98 software renderer", SCR_W, SCR_H, err, sizeof err))
+    if (!w98_open("OpenCNC 3D -- Windows 98 software renderer", SCR_W, SCR_H, err, sizeof err))
     {
-        MessageBoxA(NULL, err, "CNC3D Win98 prototype", MB_OK | MB_ICONERROR);
+        MessageBoxA(NULL, err, "OpenCNC 3D Win98 prototype", MB_OK | MB_ICONERROR);
         db_pack_free(pack);
         return 1;
     }
@@ -426,7 +426,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     if (rep)
     {
         double elapsed = w98_seconds() - t0;
-        fprintf(rep, "CNC3D Windows 98 software renderer prototype\r\n");
+        fprintf(rep, "OpenCNC 3D Windows 98 software renderer prototype\r\n");
         fprintf(rep, "frames=%d elapsed=%.2fs avg_fps=%.2f\r\n",
                 frames, elapsed, elapsed > 0 ? frames / elapsed : 0.0);
         fprintf(rep, "last_fps=%.2f last_pixels=%ld\r\n", fps, pixels_this_frame);

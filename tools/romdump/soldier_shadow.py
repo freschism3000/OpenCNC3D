@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D wave 6 -- the cartridge's OBJECT SHADOW inventory, recovered and asserted.
+OpenCNC 3D wave 6 -- the cartridge's OBJECT SHADOW inventory, recovered and asserted.
 
 Run:  python3 soldier_shadow.py [path/to/cnc_eu.z64]
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CNC3D map editor -- the static tables the browser needs to tell the truth.
+"""OpenCNC 3D map editor -- the static tables the browser needs to tell the truth.
 
 The editor must answer, per cell, the same question the engine will answer, and it
 must answer it identically or the maps it makes will be quietly wrong. All four

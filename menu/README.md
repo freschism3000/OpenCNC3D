@@ -1,4 +1,4 @@
-# CNC3D: the DOS main menu
+# OpenCNC 3D: the DOS main menu
 
 The 1995 MS-DOS Command & Conquer main menu, rebuilt as a standalone module and
 running natively on macOS. **No N64 content is used here at all**, by a project decision:
@@ -131,7 +131,7 @@ vertically in the blanked strip, so a line that fits sits where the 1995 one sat
 wordmark block is refitted into 138..185 to leave room for two rows if it needs them.
 
 The engine's sixth button, "New Missions", is **deliberately not implemented**. It is
-shown only when `EXPAND.DAT` is present (Covert Operations), and CNC3D has no expansion
+shown only when `EXPAND.DAT` is present (Covert Operations), and OpenCNC 3D has no expansion
 disc to detect, so the layout is always the five button one, which is what `menus.cpp`
 draws when `Expansion_Present()` is false.
 

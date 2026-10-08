@@ -59,7 +59,7 @@ typedef int (*LZ_Progress)(void *user, int done, int total);
 /* Hex, lowercase, 64 characters plus a NUL. Returns 1 on success. */
 int lz_sha256_file(const char *path, char *hex65, char *err, int errlen);
 
-/* 1 when `dir` is a C&C 3D install, the only kind of folder the calls below will
+/* 1 when `dir` is a OpenCNC 3D install, the only kind of folder the calls below will
  * change: it holds the install record, cnc3d-install.txt, as a plain file, which
  * both release packagers write into every package. What the record says is not
  * asked: launchers up to v0.6.11 rewrote it in place, so a kill could leave it empty,

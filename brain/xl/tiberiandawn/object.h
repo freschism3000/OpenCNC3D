@@ -149,7 +149,7 @@ public:
     static void Init(void);
 
     /*
-    **	INVINCIBILITY (project CNC3D addition; not upstream).
+    **	INVINCIBILITY (project OpenCNC 3D addition; not upstream).
     **
     **	WHY IT LIVES HERE. The exported debug interface already switches money
     **	(DEBUG_REQUEST_ADD_RESOURCES), instant build (DEBUG_REQUEST_END_PRODUCTION), the

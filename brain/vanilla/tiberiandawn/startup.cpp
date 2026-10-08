@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds a single include of "cnc3d_compat.h", the project's small Win32
 // compatibility shim, ahead of function.h so the file compiles with non-
 // Windows toolchains. No other line of the file is changed.
@@ -43,7 +43,7 @@
  *   main -- Initial startup routine (preps library systems).                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#include "cnc3d_compat.h"   // CNC3D: Win32 shims for non-Windows builds
+#include "cnc3d_compat.h"   // OpenCNC 3D: Win32 shims for non-Windows builds
 #include "function.h"
 #include "common/ini.h"
 #include "common/paths.h"

@@ -13,9 +13,9 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds one condition to the crush test in DriveClass::Overrun_Square so that
-// an object owned by a house flagged invincible by the CNC3D cheat is not
+// an object owned by a house flagged invincible by the OpenCNC 3D cheat is not
 // crushed by a tracked vehicle. Crushing is the only way an object dies
 // without damage being applied, so it does not pass through Take_Damage
 // where the same flag is already tested.

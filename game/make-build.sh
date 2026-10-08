@@ -4,9 +4,9 @@
 set -e
 cd "$(dirname "$0")"
 # THE DESTINATION AND THE DATA BELONG TO THE WORKING COPY THIS SCRIPT LIVES IN, and both
-# used to be spelled $HOME/CNC3D regardless of where that was.
+# used to be spelled $HOME/OpenCNC 3D regardless of where that was.
 #
-# On the one working copy whose path happens to be $HOME/CNC3D that reads the same either
+# On the one working copy whose path happens to be $HOME/OpenCNC 3D that reads the same either
 # way, which is why it survived. Anywhere else it is wrong and it is wrong SILENTLY: a
 # build run from a second checkout compiles this tree's sources and then installs them
 # over the FIRST checkout's playable folder, so one session's binaries replace another's

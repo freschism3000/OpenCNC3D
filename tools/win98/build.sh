@@ -92,7 +92,7 @@ echo "   out    : $OUT"
 # ---------------------------------------------------------------------------
 # w98proto: the first native Win98 prototype. Pure software rendering, no GL,
 # no Glide, no SDL. It links the project's OWN dosbar.c unedited, which is the
-# whole point: this is CNC3D code, not a demo written to look like it.
+# whole point: this is OpenCNC 3D code, not a demo written to look like it.
 # ---------------------------------------------------------------------------
 SRC="$ROOT/tier1/w98_gfx.c $ROOT/tier1/softras.c $ROOT/tier1/t1_draw.c $ROOT/tier1/w98_proto.c $ROOT/game/dosbar.c"
 INC="-I$ROOT/tier1 -I$ROOT/game"

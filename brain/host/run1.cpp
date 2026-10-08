@@ -1,4 +1,4 @@
-// CNC3D: actually run an N64 mission in the TD brain and print the truth.
+// OpenCNC 3D: actually run an N64 mission in the TD brain and print the truth.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

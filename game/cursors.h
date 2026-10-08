@@ -1,6 +1,6 @@
 /*
  * cursors.h -- the 1995 MS-DOS Command & Conquer mouse cursor, as a lift-and-drop
- * module for the CNC3D renderer.
+ * module for the OpenCNC 3D renderer.
  *
  * WHAT IT IS. MOUSE.SHP holds the 178 cursor frames the DOS game ever shows; the
  * table that says which frames mean what (start frame, animation length, animation

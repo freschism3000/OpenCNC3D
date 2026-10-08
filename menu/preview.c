@@ -383,7 +383,7 @@ int main(int argc, char **argv)
             return 1;
         }
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        win = SDL_CreateWindow("Command & Conquer 3D -- DOS main menu",
+        win = SDL_CreateWindow("OpenCNC 3D -- DOS main menu",
                                SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                DM_SCREEN_W * scale, DM_SCREEN_H * scale,
                                SDL_WINDOW_OPENGL);

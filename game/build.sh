@@ -1,5 +1,5 @@
 #!/bin/sh
-# CNC3D renderer build (macOS). Absolute brain path so the workspace can live anywhere.
+# OpenCNC 3D renderer build (macOS). Absolute brain path so the workspace can live anywhere.
 set -e
 cd "$(dirname "$0")"
 

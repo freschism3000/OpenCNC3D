@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- SCM90EA, the skirmish slice map: two start positions on real cartridge
+OpenCNC 3D -- SCM90EA, the skirmish slice map: two start positions on real cartridge
 terrain, and a Construction Yard pad at each one that is actually clear.
 
 WHY THIS EXISTS

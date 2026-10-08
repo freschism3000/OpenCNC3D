@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D asset baker, PK5: per-part submeshes with mount transforms and roles.
+OpenCNC 3D asset baker, PK5: per-part submeshes with mount transforms and roles.
 
 WHAT CHANGED FROM PK4. The PK4 baker (surviving as bake_pk4.pyc, loaded via
 pk4mod.py; its behaviour is reproduced byte for byte on SCB01EA before this

@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds one read-only inline accessor, CNC3D_Altitude, returning the
 // projectile's existing Altitude field in leptons so the renderer's object
 // dump can draw an arcing projectile above the ground. Nothing is written,
@@ -150,7 +150,7 @@ public:
     unsigned IsInaccurate : 1;
 
     /*
-    ** CNC3D instrumentation (read-only): the projectile's render height in leptons,
+    ** OpenCNC 3D instrumentation (read-only): the projectile's render height in leptons,
     ** private below. The object dump reports it so an arcing grenade can be drawn
     ** off the ground. No behaviour change.
     */

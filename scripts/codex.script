@@ -1,5 +1,5 @@
 # ====================================================================================
-# CNC3D -- the DATABASE tab, driven from a script so a gate can prove it.
+# OpenCNC 3D -- the DATABASE tab, driven from a script so a gate can prove it.
 #
 #   cd playable && ../game/cnc_eyes --scen SCG01EB --pack SCG01EA.pack --build 98 \
 #        --gfx --script ../scripts/codex.script

@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Under an EIGHTPLAYERS build flag, widens the playable house set from six
 // multiplayer houses to eight: adds HOUSE_MULTI7 and HOUSE_MULTI8 to
 // HousesType, adds their ownership bit macros, adds REMAP_GREY and

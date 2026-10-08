@@ -2981,7 +2981,7 @@ short const* UnitClass::Overlap_List(void) const
     }
 
     /*
-    **	CNC3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
+    **	OpenCNC 3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
     **	the bigger half. ICON_PIXEL_W * 2 is 48, and the _gigundo test is a strict greater
     **	than, so a selected vehicle took the by-hand branch at maxsize 24 and got the full
     **	3x3 ring. For a unit that is already IsFiring, IsGigundo, IsAnimAttached or Flagged

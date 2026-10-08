@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Splits the savegame version constant into a named SAVEGAME_MAGIC that
 // takes a different value under EIGHTPLAYERS, so a save file written by a
 // six-player build no longer matches and is refused instead of being loaded

@@ -1,5 +1,5 @@
 #
-# MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+# MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 # Adds an EIGHTPLAYERS build option, on by default, and passes it to both
 # the TiberianDawn and VanillaTD targets, so the engine is compiled with an
 # eight house multiplayer roster (Multi7 and Multi8) instead of the stock
@@ -170,7 +170,7 @@ endif()
 
 include(ProductVersion)
 
-# CNC3D: dllinterface.{h,cpp} (the CNC_* API) is written for MSVC and uses __int64,
+# OpenCNC 3D: dllinterface.{h,cpp} (the CNC_* API) is written for MSVC and uses __int64,
 # __declspec and types declared inside anonymous unions. Clang/GCC accept all of that
 # with the Microsoft-extension flags, so the API compiles unmodified off Windows.
 # Keeping the source untouched matters: it must still build for 32-bit Windows later.
@@ -183,7 +183,7 @@ if(BUILD_REMASTERTD AND NOT MSVC)
     endif()
 endif()
 
-# CNC3D: EIGHTPLAYERS widens the multiplayer roster from six to eight houses
+# OpenCNC 3D: EIGHTPLAYERS widens the multiplayer roster from six to eight houses
 # (Multi7/Multi8, grey and brown -- the two colors Red Alert added). Configure with
 # -DEIGHTPLAYERS=OFF to rebuild the stock six-player engine.
 option(EIGHTPLAYERS "Eight multiplayer houses instead of the stock six" ON)
@@ -193,7 +193,7 @@ else()
     set(CNC3D_EIGHTPLAYERS_DEF "")
 endif()
 
-# CNC3D: the map-editor interface is COM-based (SAFEARRAY/HRESULT/VT_UI1) and is
+# OpenCNC 3D: the map-editor interface is COM-based (SAFEARRAY/HRESULT/VT_UI1) and is
 # Windows-only. The headless brain does not need it, so it is dropped off Windows.
 if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(CNC3D_EDITOR_IFACE dllinterfaceeditor.cpp)

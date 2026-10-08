@@ -2356,7 +2356,7 @@ int BuildingClass::Exit_Object(TechnoClass* base)
 
                     base->Assign_Mission(MISSION_MOVE);
                     base->Assign_Destination(::As_Target(cell));
-                    /*	CNC3D: the RALLY POINT, if this factory has one, rides along in the
+                    /*	OpenCNC 3D: the RALLY POINT, if this factory has one, rides along in the
                     **	soldier's own ArchiveTarget and is read back at the exit cell, where
                     **	the tether is cut (InfantryClass::Per_Cell_Process). The exit cell
                     **	stays the destination above, so the soldier leaves through the door
@@ -3064,7 +3064,7 @@ void BuildingClass::Repair(int control)
         } else {
             sound = VOC_BUTTON;
             /*
-            **	CNC3D: the flashing house must not come from PlayerPtr in a match.
+            **	OpenCNC 3D: the flashing house must not come from PlayerPtr in a match.
             **	Clicked_As_Target (techno.cpp) writes FlashCount AND
             **	FlashCountPerPlayer[house]. Both are members of every TechnoClass and both
             **	are decremented every tick by FlasherClass::Process, so they are shared
@@ -3138,7 +3138,7 @@ void BuildingClass::Sell_Back(int control)
             //			Transmit_Message(RADIO_OVER_OUT);
             Assign_Mission(MISSION_DECONSTRUCTION);
             /*
-            **	CNC3D: this is the defect gate G194 caught, and it is the visible one.
+            **	OpenCNC 3D: this is the defect gate G194 caught, and it is the visible one.
             **	The guard below is Is_Owned_By_Player(), which is literally
             **	`House == PlayerPtr` (techno.cpp), so on a SELL order the seller's machine
             **	set FlashCount to 7 and every other peer left it 0. Two instances of the
@@ -3236,7 +3236,7 @@ ActionType BuildingClass::What_Action(ObjectClass* object) const
     }
 
     /*
-    **	CNC3D RALLY POINTS (project CNC3D, additive).
+    **	OpenCNC 3D RALLY POINTS (project CNC3D, additive).
     **
     **	A rally point is not a new mechanism. ArchiveTarget on a BuildingClass ALREADY is
     **	one, wired end to end -- but only for the Construction Yard: Active_Click_With
@@ -3734,7 +3734,7 @@ bool BuildingClass::Captured(HouseClass* newowner)
 {
     Validate();
     if (Can_Capture() && newowner != House) {
-        /*	CNC3D: a captured factory does NOT keep the old owner's rally point. Nothing
+        /*	OpenCNC 3D: a captured factory does NOT keep the old owner's rally point. Nothing
         **	else would ever clear it -- the only clearing site for ArchiveTarget is
         **	FootClass::Detach (foot.cpp:1909-1911), and BuildingClass does not inherit it
         **	-- so without this the new owner's units would walk to wherever the previous
@@ -5290,7 +5290,7 @@ int BuildingClass::Mission_Unload(void)
                     unit->Assign_Mission(MISSION_MOVE);
                     unit->Force_Track(DriveClass::OUT_OF_WEAPON_FACTORY, Adjacent_Cell(Center_Coord(), FACING_SW));
                     unit->Set_Speed(128);
-                    /*	CNC3D: and THEN the rally point. Force_Track must still run above
+                    /*	OpenCNC 3D: and THEN the rally point. Force_Track must still run above
                     **	-- it is the scripted track that physically drives the tank out
                     **	through the door, and skipping it leaves the tank inside the
                     **	building. The destination is re-assigned after it, so the unit
@@ -5652,7 +5652,7 @@ bool BuildingClass::Passes_Proximity_Check(CELL homecell)
     **	have been a success.
     */
     /*
-    ** CNC3D: the cheat menu's Build Anywhere. THIS is the third copy of the adjacency
+    ** OpenCNC 3D: the cheat menu's Build Anywhere. THIS is the third copy of the adjacency
     ** rule and the one that decides whether the click is actually HONOURED. Hooking
     ** only the cursor routines gives a green cursor over a far cell and a click that is
     ** silently refused.

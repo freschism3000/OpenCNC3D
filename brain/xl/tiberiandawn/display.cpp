@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 // This copy is the large-map fork's, and it carries every change the fork
 // records in brain/xl/DIVERGENCE.md. This block records one of them: Init_Theater
 // no longer copies the theater palette from a NULL pointer when the theater
@@ -279,7 +279,7 @@ void DisplayClass::Init_Clear(void)
     MapClass::Init_Clear();
 
     /*
-    ** CNC3D: drop Build Anywhere with the scenario, for the reason ObjectClass::Init
+    ** OpenCNC 3D: drop Build Anywhere with the scenario, for the reason ObjectClass::Init
     ** drops the invincibility mask -- Clear_Scenario() is on every path that begins a
     ** scenario, so a switch cleared here cannot follow the player out of a skirmish
     ** and into a campaign mission.
@@ -338,7 +338,7 @@ void DisplayClass::Init_IO(void)
 /***********************************************************************************************
  * CNC3D_Report_Missing_Palette -- Says, once per lookup, that a theater palette was not found. *
  *                                                                                             *
- *    C&C 3D. The host runs this engine as a library and keeps its log; the engine's own       *
+ *    OpenCNC 3D. The host runs this engine as a library and keeps its log; the engine's own       *
  *    debug print compiles to nothing in a release build, so the line goes out the way every   *
  *    other host-facing readout in this modified engine does, as a prefixed line on stdout.    *
  *                                                                                             *
@@ -443,7 +443,7 @@ void DisplayClass::Init_Theater(TheaterType theater)
     sprintf(fullname, "%s.PAL", Theaters[theater].Root);
     void const* ptr = MFCD::Retrieve(fullname);
     /*
-    **	C&C 3D: the palette entry is looked up in the theater archive, and when that
+    **	OpenCNC 3D: the palette entry is looked up in the theater archive, and when that
     **	archive is missing, empty or damaged the lookup answers NULL. Copying from NULL
     **	is a fault inside mission start, so the palette is zeroed instead and the fault
     **	is reported through the host's log. Nothing below depends on the palette holding
@@ -970,7 +970,7 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
     }
 
     /*
-    ** CNC3D: the cheat menu's Build Anywhere.
+    ** OpenCNC 3D: the cheat menu's Build Anywhere.
     **
     ** IT LIFTS THE ADJACENCY RULE ONLY. This routine is the whole of the "must touch
     ** your base" test and nothing else; whether the GROUND will take a foundation is
@@ -2970,7 +2970,7 @@ CELL DisplayClass::Calculated_Cell(SourceType dir, HousesType house)
             cell = Scen.Waypoint[WAYPT_REINF];
             if (cell < 1) {
                 /*
-                **	CNC3D lockstep: the original fallback read Coord_Cell(TacticalCoord), a
+                **	OpenCNC 3D lockstep: the original fallback read Coord_Cell(TacticalCoord), a
                 **	DisplayClass view member, from inside the simulation. In this build that
                 **	expression is already peer invariant and always equals XY_Cell(MapCellX,
                 **	MapCellY): under REMASTER_BUILD, DisplayClass::Set_Tactical_Position

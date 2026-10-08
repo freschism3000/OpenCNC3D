@@ -39,11 +39,11 @@ FILESUBTYPE    0x0L
     BLOCK "040904B0"
     {
       VALUE "CompanyName",     "Slipgate Ironworks"
-      VALUE "FileDescription", "C&C3D"
+      VALUE "FileDescription", "OpenCNC 3D"
       VALUE "FileVersion",     "@VER_STRING@"
-      VALUE "InternalName",    "C&C3D"
+      VALUE "InternalName",    "OpenCNC 3D"
       VALUE "OriginalFilename","C&C3D.exe"
-      VALUE "ProductName",     "C&C3D"
+      VALUE "ProductName",     "OpenCNC 3D"
       VALUE "ProductVersion",  "@VER_STRING@"
     }
   }

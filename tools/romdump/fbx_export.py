@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- export cartridge meshes as textured binary FBX.
+OpenCNC 3D -- export cartridge meshes as textured binary FBX.
 
 WHAT THIS IS FOR. The pipeline in model.py / textures.py lifts a display list into an
 OBJ plus loose PNGs, which is enough to LOOK at a mesh but loses two things a DCC app
@@ -348,7 +348,7 @@ def build_fbx(mesh, name, texfiles):
     for k, v in (("Year", 1995), ("Month", 1), ("Day", 1), ("Hour", 0),
                  ("Minute", 0), ("Second", 0), ("Millisecond", 0)):
         ct.add(k, i32(v))
-    hdr.add("Creator", s("CNC3D fbx_export.py -- Command & Conquer (N64) cartridge"))
+    hdr.add("Creator", s("OpenCNC 3D fbx_export.py -- Command & Conquer (N64) cartridge"))
     root.append(hdr)
 
     # FileId is a 16-byte blob. Some importers (Unity has been the reported one) dislike
@@ -357,7 +357,7 @@ def build_fbx(mesh, name, texfiles):
     root.append(E("FileId", raw(bytes([0x28, 0xB3, 0x2A, 0xEB, 0xB6, 0x24, 0xCC, 0xC2,
                                        0xBF, 0xC8, 0xB0, 0x2A, 0xA9, 0x2B, 0xFC, 0xF1]))))
     root.append(E("CreationTime", s("1995-01-01 00:00:00:000")))
-    root.append(E("Creator", s("CNC3D fbx_export.py")))
+    root.append(E("Creator", s("OpenCNC 3D fbx_export.py")))
 
     gs = E("GlobalSettings")
     gs.add("Version", i32(1000))

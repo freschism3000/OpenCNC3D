@@ -218,7 +218,7 @@ pass options the game no longer needs.
 TXT
 else
     cat > "$OUT/READ-ME-WINDOWS.txt" <<TXT
-C&C 3D, Windows test build
+OpenCNC 3D, Windows test build
 build $GITDESC
 
 WHAT TO DOUBLE CLICK

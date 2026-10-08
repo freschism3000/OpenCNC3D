@@ -1,6 +1,6 @@
 # Notices
 
-C&C 3D is a faithful PC recreation of the Nintendo 64 presentation of
+OpenCNC 3D is a faithful PC recreation of the Nintendo 64 presentation of
 Command & Conquer: Tiberian Dawn. It is assembled from parts with different
 origins, and this file says which is which.
 

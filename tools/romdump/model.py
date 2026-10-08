@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — F3DEX2 display-list -> OBJ mesh exporter.
+OpenCNC 3D — F3DEX2 display-list -> OBJ mesh exporter.
 
 Geometry in the N64 build is a display list plus a block of 16-byte Vtx structs.
 The DL references vertices by *RAM* address, so we first recover the overlay delta
@@ -95,7 +95,7 @@ def write_obj(path, verts, faces, name="model", tile=None):
     """
     tw, th = tile if tile else (1, 1)
     with open(path, "w") as f:
-        f.write(f"# CNC3D - extracted from Command & Conquer (N64)\no {name}\n")
+        f.write(f"# OpenCNC 3D - extracted from Command & Conquer (N64)\no {name}\n")
         for v in verts:
             f.write(f"v {v['x']} {v['y']} {v['z']}\n")
         for v in verts:

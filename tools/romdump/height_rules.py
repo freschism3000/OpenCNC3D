@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- what the N64 heightmaps are MADE OF (the follow-up to heightmap_notes.md).
+OpenCNC 3D -- what the N64 heightmaps are MADE OF (the follow-up to heightmap_notes.md).
 
 heightmap_notes.md answered WHERE the heights live (a 65x65 8-bit <SCEN>.IMG per
 scenario, world Y = byte*4, cell pitch 256). This answers WHAT IS IN THEM: whether

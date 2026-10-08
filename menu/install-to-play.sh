@@ -32,7 +32,7 @@ cp -f ./READ-ME-MENU.txt "$DEST/READ-ME-MENU.txt"
 
 cat > "$DEST/PLAY-MENU.command" <<'EOF'
 #!/bin/sh
-# CNC3D: the 1995 MS-DOS main menu, with the logo animation and music.
+# OpenCNC 3D: the 1995 MS-DOS main menu, with the logo animation and music.
 # Any key or click skips a movie. Arrows and return work; ESC quits.
 cd "$(dirname "$0")"
 exec ./cnc_menu -p dosmenu.pack \

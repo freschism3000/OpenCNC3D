@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- SCG01EC, "GDI mission 1 with a whole working base".
+OpenCNC 3D -- SCG01EC, "GDI mission 1 with a whole working base".
 
 WHY THIS EXISTS
   SCG01EB gave the player a construction yard, which proves BUILDING production. It

@@ -1,5 +1,5 @@
 /*
- * CNC3D -- skirmish_probe: does the Tiberian Dawn brain actually PLAY a skirmish?
+ * OpenCNC 3D -- skirmish_probe: does the Tiberian Dawn brain actually PLAY a skirmish?
  *
  * The claim under test: CNC_Set_Multiplayer_Data + CNC_Start_Custom_Instance(multiplayer=true)
  * gives us a match in which a house flagged IsAI builds a base with no client help at all.
@@ -345,7 +345,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    fprintf(g_rep, "=== CNC3D skirmish probe ===\n");
+    fprintf(g_rep, "=== OpenCNC 3D skirmish probe ===\n");
     fprintf(g_rep, "dylib   : %s\n", dylib);
     fprintf(g_rep, "dir     : %s\n", dir);
     fprintf(g_rep, "scenario: %s   (reads %s%s.INI and %s%s.BIN)\n", scen, dir, scen, dir, scen);

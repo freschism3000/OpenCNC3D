@@ -1,4 +1,4 @@
-/* CNC3D: decode GAME_STATE_SIDEBAR / GAME_STATE_PLACEMENT and drive construction.
+/* OpenCNC 3D: decode GAME_STATE_SIDEBAR / GAME_STATE_PLACEMENT and drive construction.
  *
  * Everything printed here comes from the public DLL API (CNC_Get_Game_State,
  * CNC_Handle_Sidebar_Request) plus the project's art-free CNC3D_Dump_Objects.

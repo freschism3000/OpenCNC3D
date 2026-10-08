@@ -318,7 +318,7 @@ def main():
     the page fetches its own endpoints relatively."""
     port = int(os.environ.get("PORT") or (sys.argv[1] if len(sys.argv) > 1 else 8099))
     exe = game_binary()
-    print("CNC3D mission editor")
+    print("OpenCNC 3D mission editor")
     print("  http://127.0.0.1:%d/" % port)
     print("  authored maps -> %s" % os.path.relpath(AUTHORED, ROOT))
     print("  play launches -> %s" % (os.path.relpath(exe, ROOT) if exe

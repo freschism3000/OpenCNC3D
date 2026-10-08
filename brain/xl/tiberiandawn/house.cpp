@@ -4850,7 +4850,7 @@ void HouseClass::Check_Pertinent_Structures(void)
 
         if (b && b->IsActive && b->House == this) {
             /*
-            **  CNC3D SHORT GAME: an armed building is a defence, and a defence is not
+            **  OpenCNC 3D SHORT GAME: an armed building is a defence, and a defence is not
             **  a base. With the option on, only a building that could rebuild the
             **  house keeps it in the match; walls never counted either way.
             */

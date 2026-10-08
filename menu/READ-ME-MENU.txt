@@ -1,4 +1,4 @@
-C&C 3D: THE MAIN MENU
+OpenCNC 3D: THE MAIN MENU
 =====================
 
 Double-click PLAY-MENU.command.
@@ -22,7 +22,7 @@ menu is not yet the way into the game.
 WHERE IT ALL COMES FROM
 -----------------------
 This screen is pure MS-DOS, no N64 content, except the title plate, which is the
-CNC3D artwork. Layout, colours and draw order are taken from the GPL Tiberian Dawn
+OpenCNC 3D artwork. Layout, colours and draw order are taken from the GPL Tiberian Dawn
 sources line by line, and the art, fonts and button labels are decoded out of the
 1995 discs. The movies are the 1995 CD's own VQA files (dosdata/movies/), decoded by
 our own player; the music is the original .AUD score. Nothing on this screen, movies

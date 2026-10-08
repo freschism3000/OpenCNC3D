@@ -1,4 +1,4 @@
-// CNC3D: headless SCRIPTED INPUT harness.
+// OpenCNC 3D: headless SCRIPTED INPUT harness.
 //
 // ===========================================================================================
 //  THE INPUT CONTRACT (measured against this brain, not guessed; see CNC3D_Get_View)

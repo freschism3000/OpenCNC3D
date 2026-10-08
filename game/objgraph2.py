@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- objgraph, EXTENDED: scene-graph walking across BOTH model segments,
+OpenCNC 3D -- objgraph, EXTENDED: scene-graph walking across BOTH model segments,
 plus per-part mount transforms. Drop-in superset of tools/romdump/objgraph.py
 (node_ptr / walk_node / display_lists keep their signatures and their GMG
 behaviour bit-for-bit; they simply now also accept ScriptModels pointers).

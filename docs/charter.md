@@ -1,4 +1,4 @@
-# CNC3D — Project Charter
+# OpenCNC 3D — Project Charter
 
 **A "PC version of C&C 64":** the Nintendo 64 3D presentation of *Command & Conquer:
 Tiberian Dawn*, driven by the GPL DOS game logic and skinned with the N64's 3D assets.

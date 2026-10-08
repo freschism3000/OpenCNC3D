@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Load_Alloc_Data now returns NULL when the file reports a size of zero or
 // less, instead of returning the non-null malloc(0) pointer that callers
 // treat as a successful load. This is a defensive fix for a crash when a
@@ -177,7 +177,7 @@ void* Load_Alloc_Data(const FileClass& file)
     void* ptr = 0;
     int size = const_cast<FileClass&>(file).Size();
 
-    /* CNC3D: a file that is neither on disk nor inside a registered mixfile reports a size
+    /* OpenCNC 3D: a file that is neither on disk nor inside a registered mixfile reports a size
     ** of ZERO rather than failing. CCFileClass::Size() (ccfile.cpp) returns a length that
     ** MixFileClass::Offset never writes when it does not find the entry, and its only
     ** diagnostic is an assert(1) that cannot fire. malloc(0) then hands back a valid

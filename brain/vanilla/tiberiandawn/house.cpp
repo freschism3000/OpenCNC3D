@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds a static bitmask of houses whose super weapons were granted by the
 // cheat menu, with a setter and getter, cleared in HouseClass::Init so the
 // grant dies with the scenario. Uses it in two places: HouseClass::AI no
@@ -906,7 +906,7 @@ void HouseClass::Init(void)
     Houses.Free_All();
 
     /*
-    ** CNC3D: the cheat's super-weapon grant dies with the scenario, exactly as the
+    ** OpenCNC 3D: the cheat's super-weapon grant dies with the scenario, exactly as the
     ** invincibility mask and Build Anywhere do. Clear_Scenario() calls this on every
     ** path that begins a scenario.
     */
@@ -1363,7 +1363,7 @@ void HouseClass::AI(void)
     */
     if (NukeStrike.Is_Present()) {
         /*
-        ** CNC3D: a cheat-granted nuke is not swept away.
+        ** OpenCNC 3D: a cheat-granted nuke is not swept away.
         **
         ** THIS SWEEP IS HARSHER THAN THE ION CANNON'S DIRECTLY ABOVE, in two ways that
         ** both bite in single player, and between them they made the Unlock
@@ -2764,7 +2764,7 @@ bool HouseClass::Place_Special_Blast(SpecialWeaponType id, CELL cell)
         break;
 
     case SPC_NUCLEAR_BOMB:
-        /* CNC3D: the nuke is the one special that can refuse silently -- it needs a
+        /* OpenCNC 3D: the nuke is the one special that can refuse silently -- it needs a
            Temple of Nod to launch from, and without one it used to return before even
            spending the charge, so the player pressed the button and NOTHING happened,
            not even a wasted shot. This line says which of the three gates it passed. */
@@ -2815,7 +2815,7 @@ bool HouseClass::Place_Special_Blast(SpecialWeaponType id, CELL cell)
                 **	sent from some off screen source.
                 */
                 /*
-                ** CNC3D: ... and in single player when the cheat menu handed the player
+                ** OpenCNC 3D: ... and in single player when the cheat menu handed the player
                 ** the super weapons: the nuke could not be fired after being unlocked
                 ** from the cheat menu with nothing else unlocked, and with no
                 ** construction yard standing.
@@ -4956,7 +4956,7 @@ void HouseClass::Check_Pertinent_Structures(void)
 
         if (b && b->IsActive && b->House == this) {
             /*
-            **  CNC3D SHORT GAME: an armed building is a defence, and a defence is not
+            **  OpenCNC 3D SHORT GAME: an armed building is a defence, and a defence is not
             **  a base. With the option on, only a building that could rebuild the
             **  house keeps it in the match; walls never counted either way.
             */

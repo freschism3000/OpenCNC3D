@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 // Adds one flag, IsShortGame, to SpecialClass: a house is finished when it
 // has no structure left that could rebuild it. Read only by
 // Check_Pertinent_Structures, and off unless set for the match.
@@ -246,7 +246,7 @@ public:
     unsigned IsEarlyWin : 1;
 
     /*
-    **  CNC3D: SHORT GAME. A house is finished when it has no structures left that
+    **  OpenCNC 3D: SHORT GAME. A house is finished when it has no structures left that
     **  could rebuild it, so defences and walls do not keep it alive. Read only by
     **  Check_Pertinent_Structures. Off unless the host ticks it in the lobby.
     */

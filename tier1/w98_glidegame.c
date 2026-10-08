@@ -711,7 +711,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     if (cmd && strstr(cmd, "radar"))   forceradar = 1;
 
     infwhy[0] = 0;
-    report("CNC3D on the 3dfx Voodoo 2");
+    report("OpenCNC 3D on the 3dfx Voodoo 2");
 
     /* Loaded FIRST, because everything below asks whether input is scripted. */
     _snprintf(path, sizeof path, "%sinput.script", g_base);

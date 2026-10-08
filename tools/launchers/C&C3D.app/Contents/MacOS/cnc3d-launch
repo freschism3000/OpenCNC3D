@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  C&C3D -- the default way to play. Double-click it.
+#  OpenCNC 3D -- the default way to play. Double-click it.
 #
 #  As of 21 Aug 2026 this is the ONLY thing in the macOS package a player runs,
 #  at the project owner's request. As of 24 Aug 2026 what it opens is the LAUNCHER
@@ -68,7 +68,7 @@ is_game_dir() {
 alert() {  # alert <message>
     osascript - "$1" >/dev/null 2>&1 <<'OSA'
 on run argv
-    display alert "C&C3D" message (item 1 of argv) as critical
+    display alert "OpenCNC 3D" message (item 1 of argv) as critical
 end run
 OSA
 }
@@ -104,7 +104,7 @@ Choose the C&C3D folder (the one holding cnc3d and the .pack files) and it will 
 
     CHOICE=$(osascript - "$MSG" 2>/dev/null <<'OSA'
 on run argv
-    display alert "C&C3D" message (item 1 of argv) ¬
+    display alert "OpenCNC 3D" message (item 1 of argv) ¬
         buttons {"Quit", "Choose Folder"} default button "Choose Folder" as critical
     return button returned of result
 end run

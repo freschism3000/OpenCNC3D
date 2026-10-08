@@ -720,7 +720,7 @@ void InfantryClass::Per_Cell_Process(bool center)
 
             building->IsGoingToBlow = true;
             /*
-            **	CNC3D: the saboteur's own house rather than this machine's, for the reason
+            **	OpenCNC 3D: the saboteur's own house rather than this machine's, for the reason
             **	written out in BuildingClass::Sell_Back. This site never showed in a dump
             **	because the line after it immediately overwrites FlashCount with the same
             **	20 on every peer -- but FlashCountPerPlayer[] keeps whichever index it was
@@ -749,7 +749,7 @@ void InfantryClass::Per_Cell_Process(bool center)
     */
     if (center && IsTethered) {
         /*
-        **	CNC3D: a factory's rally point. BuildingClass::Exit_Object parks it in this
+        **	OpenCNC 3D: a factory's rally point. BuildingClass::Exit_Object parks it in this
         **	soldier's own ArchiveTarget (always a CELL target) and leaves the destination
         **	as the exit cell, so the soldier walks out through the door first. This is
         **	that cell: the tether is cut here and the walk to the rally begins from here,
@@ -1855,7 +1855,7 @@ short const* InfantryClass::Overlap_List(void) const
     Validate();
     // return(Coord_Spillage_List(Coord, 24 + ((IsSelected || Doing > DO_WALK)?12:0)));
     /*
-    **	CNC3D lockstep: the selection term is dropped IN A MATCH ONLY.
+    **	OpenCNC 3D lockstep: the selection term is dropped IN A MATCH ONLY.
     **	Is_Selected_By_Player() reads the global PlayerPtr, so it answers differently on
     **	every peer, and this list is not advisory: MapClass::Place_Down / Pick_Up /
     **	Overlap_Down / Overlap_Up walk it into CellClass::Overlapper, and Overlap_Down ends

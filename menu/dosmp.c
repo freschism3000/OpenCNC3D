@@ -187,7 +187,7 @@ void mp_init(MP_State *st)
     st->wait_myseat = -1;
     /* A DEFAULT SO THE FIELD IS NEVER EMPTY. A game with no name is a blank row in
        somebody else's browser, which reads as a broken host rather than a shy one. */
-    snprintf(st->name, sizeof st->name, "%s", "CNC3D GAME");
+    snprintf(st->name, sizeof st->name, "%s", "OpenCNC 3D GAME");
     snprintf(st->mapname, sizeof st->mapname, "%s", "SCM01EA");
     /* The list sorts by game name, A to Z, which memset already said. Names do not change
        between heartbeats, so it is the order that moves least while a player reads it. */
@@ -722,7 +722,7 @@ int mp_prefs_write(const char *path, const MP_Prefs *p)
     if (!path || !*path || !p) return 0;
     f = fopen(path, "w");
     if (!f) return 0;
-    fprintf(f, "# CNC3D multiplayer: the game list's order and filters, and the player's name.\n"
+    fprintf(f, "# OpenCNC 3D multiplayer: the game list's order and filters, and the player's name.\n"
                "#\n"
                "# Written when one of these changes on the MULTIPLAYER screen. sort is game,\n"
                "# map, ping or players. order is up (A to Z, fewest players, fastest first)\n"

@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 // Two changes in AnimClass. The constructor's drop-zone smoke reveal, which
 // reads PlayerPtr, is withheld in a lockstep network match, where one
 // machine's viewpoint must not decide another machine's missions. AI's kill
@@ -657,7 +657,7 @@ AnimClass::AnimClass(AnimType animnum, COORDINATE coord, unsigned char timedelay
     */
     if (*this == ANIM_LZ_SMOKE) {
         /*
-        **	CNC3D lockstep: the 2019 comment that stood here said "This should be OK as
+        **	OpenCNC 3D lockstep: the 2019 comment that stood here said "This should be OK as
         **	it's not used in MP", and that assumption is what this gate replaces.
         **
         **	PlayerPtr is the house of whoever is sitting at THIS machine, and Sight_From

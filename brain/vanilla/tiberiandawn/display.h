@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Declares the Build Anywhere interface on DisplayClass inside the existing
 // USE_RA_AI block: the static per-house bitmask CNC3D_BuildAnywhereHouses
 // and the two static functions CNC3D_Set_Build_Anywhere and
@@ -197,7 +197,7 @@ public:
     bool Passes_Proximity_Check(ObjectTypeClass const* object, HousesType house, short const* list, CELL trycell) const;
 
     /*
-    ** CNC3D: the cheat menu's "Build Anywhere". A house bit here lifts the base
+    ** OpenCNC 3D: the cheat menu's "Build Anywhere". A house bit here lifts the base
     ** ADJACENCY rule for that house and nothing else -- see the comment at the
     ** hook inside Passes_Proximity_Check for why terrain stays illegal.
     */

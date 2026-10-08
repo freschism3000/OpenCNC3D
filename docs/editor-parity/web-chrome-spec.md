@@ -1,4 +1,4 @@
-# CNC3D WEB MISSION EDITOR -- EXACT CHROME SPECIFICATION
+# OpenCNC 3D WEB MISSION EDITOR -- EXACT CHROME SPECIFICATION
 
 Source files (repo-relative):
 - `tools/heightmap-viewer/public/index.html` (lines 6-590 = the entire stylesheet; lines 592-879 = markup). There is **no separate .css file**.

@@ -646,7 +646,7 @@ AnimClass::AnimClass(AnimType animnum, COORDINATE coord, unsigned char timedelay
     */
     if (*this == ANIM_LZ_SMOKE) {
         /*
-        **	CNC3D lockstep: the 2019 comment that stood here said "This should be OK as
+        **	OpenCNC 3D lockstep: the 2019 comment that stood here said "This should be OK as
         **	it's not used in MP", and that assumption is what this gate replaces.
         **
         **	PlayerPtr is the house of whoever is sitting at THIS machine, and Sight_From

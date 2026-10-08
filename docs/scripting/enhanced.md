@@ -27,7 +27,7 @@ So there are two tiers, and the boundary is not a matter of taste:
 | Conditions | one event | up to eight clauses, ALL or ANY, each negatable |
 | State | `Data` on five events, `AttachCount` | named counters |
 | Effects | the eighteen actions | the same eighteen actions |
-| Runs on | anything that reads `[Triggers]` | CNC3D only |
+| Runs on | anything that reads `[Triggers]` | OpenCNC 3D only |
 | Tagged | no | `[Basic] Enhanced=1` |
 
 ---

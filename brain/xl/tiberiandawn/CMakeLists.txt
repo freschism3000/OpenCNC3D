@@ -125,14 +125,14 @@ set(TIBDAWN_SRC
     winstub.cpp
 )
 
-# CNC3D XL: this fork builds exactly one artifact, the TiberianDawnXL shared
+# OpenCNC 3D XL: this fork builds exactly one artifact, the TiberianDawnXL shared
 # library (docs/design-xl-brain.md, BUILD). The VanillaTD executable, the icon
 # and version-resource generation, the map-editor COM interface's non-Windows
 # guard, and the remaster_mods resource copy from the vanilla file are all gone
 # with the targets that used them. The networking sources stay in the tree (the
 # fork copies tiberiandawn/ whole) but nothing here compiles them.
 
-# CNC3D: dllinterface.{h,cpp} (the CNC_* API) is written for MSVC and uses __int64,
+# OpenCNC 3D: dllinterface.{h,cpp} (the CNC_* API) is written for MSVC and uses __int64,
 # __declspec and types declared inside anonymous unions. Clang/GCC accept all of that
 # with the Microsoft-extension flags, so the API compiles unmodified off Windows.
 if(NOT MSVC)
@@ -144,7 +144,7 @@ if(NOT MSVC)
     endif()
 endif()
 
-# CNC3D: the map-editor interface is COM-based (SAFEARRAY/HRESULT/VT_UI1) and is
+# OpenCNC 3D: the map-editor interface is COM-based (SAFEARRAY/HRESULT/VT_UI1) and is
 # Windows-only. The headless brain does not need it, so it is dropped off Windows.
 if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(CNC3D_EDITOR_IFACE dllinterfaceeditor.cpp)

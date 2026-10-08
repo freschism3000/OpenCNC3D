@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 // Clear_Scenario resets the synchronised random stream in a lockstep match,
 // so a second scenario in one process starts where a fresh process would.
 // It DOES change the game simulation, in a lockstep match only.
@@ -355,7 +355,7 @@ void Fill_In_Data(void)
 void Clear_Scenario(void)
 {
     /*
-    **	CNC3D lockstep: put the SYNCHRONISED simulation stream back where a freshly
+    **	OpenCNC 3D lockstep: put the SYNCHRONISED simulation stream back where a freshly
     **	launched process holds it, because nothing else in the DLL ever does.
     **
     **	Scen.RandomNumber is written in exactly two places, both inside Init_Random

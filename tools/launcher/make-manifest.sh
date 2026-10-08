@@ -62,7 +62,7 @@ MACDATA=""
 WINDATA=""
 TMP=$(mktemp)
 {
-    echo "# C&C 3D $TAG. Written by tools/launcher/make-manifest.sh and published"
+    echo "# OpenCNC 3D $TAG. Written by tools/launcher/make-manifest.sh and published"
     echo "# as a release asset, which is how the launcher sees it: cnc3dgame.com's"
     echo "# /api/builds lists every asset of the newest release."
     echo "manifest 1"

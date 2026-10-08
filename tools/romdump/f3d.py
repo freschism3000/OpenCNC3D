@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — F3DEX2 display-list scanner and overlay-mapping solver.
+OpenCNC 3D — F3DEX2 display-list scanner and overlay-mapping solver.
 
 The N64 build keeps its 3D geometry as F3DEX2 display lists in the uncompressed
 overlay region (ROM ~0x100000-0x500000). Display lists reference vertices and other

@@ -1,5 +1,5 @@
 #
-# MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+# MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 # Selects the keyboard backend for the commonr library by platform:
 # wwkeyboard_win32.cpp on Windows, the already present wwkeyboard_null.cpp
 # everywhere else, so the headless library compiles off Windows. Build
@@ -124,7 +124,7 @@ set(COMMONR_SRC
     wwkeyboard.cpp
     wwmouse.cpp
 )
-# CNC3D: the remaster lib is already headless (soundio_null/video_null); the only
+# OpenCNC 3D: the remaster lib is already headless (soundio_null/video_null); the only
 # platform dependency left was wwkeyboard_win32.cpp, which cannot compile off Windows.
 # The remaster DLL takes all input through CNC_Handle_Input(), so a null keyboard is
 # correct AND keeps the brain free of SDL -- important because these same sources must

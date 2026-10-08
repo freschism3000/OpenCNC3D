@@ -237,7 +237,7 @@ public:
     unsigned IsEarlyWin : 1;
 
     /*
-    **  CNC3D: SHORT GAME. A house is finished when it has no structures left that
+    **  OpenCNC 3D: SHORT GAME. A house is finished when it has no structures left that
     **  could rebuild it, so defences and walls do not keep it alive. Read only by
     **  Check_Pertinent_Structures. Off unless the host ticks it in the lobby.
     */

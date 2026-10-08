@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Widens the return type of TechnoClass::Get_Ownable from unsigned char to
 // unsigned short, so the ownable-house bit mask it returns is no longer
 // truncated to its low 8 bits.
@@ -706,7 +706,7 @@ bool TechnoClass::Revealed(HouseClass* house)
 void TechnoClass::Hidden(void)
 {
     /*
-    **	CNC3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
+    **	OpenCNC 3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
     **	cleared a mask every machine shares.
     **
     **	    if (!Is_Discovered_By_Player()) return;

@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds an early return at the top of Simple_Text_Print when the requested
 // font pointer is null, so the routine draws and measures nothing instead of
 // continuing into Set_Font and the per-character width lookup with a stale
@@ -562,14 +562,14 @@ void Simple_Text_Print(char const* text, unsigned x, unsigned y, unsigned fore, 
     FontXSpacing = xspace;
     FontYSpacing = yspace;
 
-    /* CNC3D: with no content root registered at CNC_Init time, NONE of the engine's fonts
+    /* OpenCNC 3D: with no content root registered at CNC_Init time, NONE of the engine's fonts
     ** load, so every Font*Ptr here is null. Drawing text without a font is not survivable
     ** further down: Set_Font would leave FontWidthBlockPtr stale, and Char_Pixel_Width
     ** dereferences it per character. There is nothing to draw and nothing to measure, so
     ** say so here, once, rather than in each of the four routines below.
     **
     ** This matters only on the engine's own legacy title screen and main menu, which the
-    ** DLL still runs during startup. Every pixel of text CNC3D actually shows is drawn by
+    ** DLL still runs during startup. Every pixel of text OpenCNC 3D actually shows is drawn by
     ** the renderer from its own baked DOS fonts, never by this path.
     */
     if (font == NULL) {

@@ -1,5 +1,5 @@
 #!/bin/sh
-# CNC3D headless scripted-input harness -- macOS build.
+# OpenCNC 3D headless scripted-input harness -- macOS build.
 #
 # -fms-extensions -fdeclspec -D__int64="long long"
 #     the brain's dllinterface.h is Win32-flavoured C++; these make it parse on clang.

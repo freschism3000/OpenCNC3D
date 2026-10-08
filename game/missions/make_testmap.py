@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- SCG90EA, "the test map": a variation of GDI 1 built to exercise everything
+OpenCNC 3D -- SCG90EA, "the test map": a variation of GDI 1 built to exercise everything
 the renderer does in about ten minutes of play.
 
 WHY THIS EXISTS

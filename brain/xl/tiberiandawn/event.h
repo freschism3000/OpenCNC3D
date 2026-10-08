@@ -92,7 +92,7 @@ public:
 
     /*
     ** 'Frame' is the frame that the command should execute on.
-    ** CNC3D: was 27 bits, narrowed to 24 to pay for the wider ID below. 24 bits is
+    ** OpenCNC 3D: was 27 bits, narrowed to 24 to pay for the wider ID below. 24 bits is
     ** 6.4 days at 30 frames per second and 12.9 days at the 15 Hz this game runs at,
     ** which is still absurdly more than any single match. Westwood made this exact
     ** trade themselves: redalert/event.h is the same class at Frame:26 / ID:5.
@@ -101,7 +101,7 @@ public:
 
     /*
     ** House index of the player originating this event
-    ** CNC3D: was 4 bits, which names 16 houses, and four of those are the campaign
+    ** OpenCNC 3D: was 4 bits, which names 16 houses, and four of those are the campaign
     ** houses, so the classic wire tops out at twelve multiplayer slots. 7 bits names
     ** 128 and is what lets the roster grow to sixteen players and beyond. The three
     ** bits come out of Frame above, so the word is still 32 bits and the structure is
@@ -258,7 +258,7 @@ public:
 #pragma pack(pop)
 
 /*
-**	CNC3D: the wire unit's size, pinned rather than remembered.
+**	OpenCNC 3D: the wire unit's size, pinned rather than remembered.
 **
 **	This structure IS the network wire unit: lockstep sends orders by copying it whole.
 **	Its three bitfields share one 32-bit word, so the Frame:24 / ID:7 respin is meant to

@@ -1,4 +1,4 @@
-# CNC3D: the movies
+# OpenCNC 3D: the movies
 
 A player for Westwood VQA version 2, the format every Command & Conquer movie is in.
 This is what makes the intro sequence and the main menu logo animation possible, and

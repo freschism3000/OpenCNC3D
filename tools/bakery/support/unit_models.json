@@ -1891,7 +1891,7 @@
     "model_index": 191
   },
   "_meta": {
-    "_note": "CNC3D N64 type-code -> mesh mapping. Meshes are OBJs in share/CNC3D/assets/models_table/, named dl_<ROMoffset>.",
+    "_note": "OpenCNC 3D N64 type-code -> mesh mapping. Meshes are OBJs in share/CNC3D/assets/models_table/, named dl_<ROMoffset>.",
     "counts": {
       "high": 182,
       "low": 1,

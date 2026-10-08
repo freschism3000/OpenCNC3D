@@ -1,12 +1,12 @@
 #!/bin/sh
 #
 # stage-skirmish-maps.sh -- take the nine retail skirmish maps from the 1995 MS-DOS
-# disc all the way to playable CNC3D packs, in one command.
+# disc all the way to playable OpenCNC 3D packs, in one command.
 #
 # WHY THIS EXISTS
 #
 # The N64 port cut multiplayer, so the cartridge carries no terrain for the nine retail
-# skirmish scenarios SCM01EA..SCM09EA. CNC3D draws terrain only from a cartridge-shaped
+# skirmish scenarios SCM01EA..SCM09EA. OpenCNC 3D draws terrain only from a cartridge-shaped
 # <SCEN>.MAP, so without one there is no pack and no skirmish map to play on. The three
 # tools that close that gap already exist and each is validated on its own; what was
 # missing was the wiring between them, and the staging step in the middle that neither
@@ -178,7 +178,7 @@ link_relative() {   # link_relative <target-relative-to-link> <link path>
 link_relative "../../../../extracted" "$TERRAIN/share/CNC3D/assets/extracted"
 link_relative "../../../../terrain"   "$TERRAIN/share/CNC3D/assets/terrain"
 # pk4mod.py rewrites the PK4 baker's one path constant to tools/bakery/support, and the
-# baker then joins share/CNC3D onto it.
+# baker then joins share/OpenCNC 3D onto it.
 link_relative "../../sharecopy" "$ROOT/tools/bakery/support/share/CNC3D"
 
 mkdir -p "$PACKS"

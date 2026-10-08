@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — .IMG decoder (n64image.c / N64Image_Load).
+OpenCNC 3D — .IMG decoder (n64image.c / N64Image_Load).
 
 .IMG shares the same 16-byte header as .JIM, but supports several N64-native pixel
 formats. The header does not state bits-per-pixel directly, so we solve it from the

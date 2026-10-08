@@ -140,7 +140,7 @@ public:
     unsigned IsInaccurate : 1;
 
     /*
-    ** CNC3D instrumentation (read-only): the projectile's render height in leptons,
+    ** OpenCNC 3D instrumentation (read-only): the projectile's render height in leptons,
     ** private below. The object dump reports it so an arcing grenade can be drawn
     ** off the ground. No behaviour change.
     */

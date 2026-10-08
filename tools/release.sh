@@ -81,7 +81,7 @@ if ! grep -q "^## .*v$NEXT" docs/CHANGELOG.md; then
        Every build gets one, in the format the file already uses, and SHORT is the rule:
        a heading, category headings, bullets, nothing else.
 
-           ## C&C 3D v$NEXT \"Some Name\" ($(date '+%Y-%m-%d'))
+           ## OpenCNC 3D v$NEXT \"Some Name\" ($(date '+%Y-%m-%d'))
 
            ### New features
 
@@ -417,7 +417,7 @@ git commit -q -m "Build $TAG
 
 Both platforms from this commit. The gates were run on the macOS half before the tag
 went on; the Windows half is cross compiled and has to be run on Windows."
-git tag -a "$TAG" -m "CNC3D $TAG"
+git tag -a "$TAG" -m "OpenCNC 3D $TAG"
 
 # CAPTURE THE RELEASED COMMIT NOW, and never read HEAD again. On v0.5.3 the parallel
 # push landed while this script was running and main moved underneath it, so the
@@ -737,7 +737,7 @@ if true; then
 
 ---
 
-**Source.** C&C 3D is free software under the GNU General Public License v3. The
+**Source.** OpenCNC 3D is free software under the GNU General Public License v3. The
 complete corresponding source for this build, including the modified Tiberian Dawn
 game logic, is at https://github.com/freschism3000/CNC3D_Source
 SRC
@@ -745,7 +745,7 @@ SRC
     for z in "$MACZIP" "$WINZIP" "$MACBINS" "$WINBINS" "$WINSETUP" "$MANIFEST"; do
         [ -n "$z" ] && WANT=$((WANT + 1))
     done
-    gh release create "$TAG" --title "CNC3D $TAG" --notes-file "$NOTES" \
+    gh release create "$TAG" --title "OpenCNC 3D $TAG" --notes-file "$NOTES" \
         ${MACZIP:+"$MACZIP"} ${WINZIP:+"$WINZIP"} \
         ${MACBINS:+"$MACBINS"} ${WINBINS:+"$WINBINS"} \
         ${WINSETUP:+"$WINSETUP"} ${MANIFEST:+"$MANIFEST"} >/dev/null \
@@ -795,4 +795,4 @@ say "$TAG is out.
    the tag, macos and windows all point at $(git rev-parse --short "$RELCOMMIT").
    main may already be ahead of it, which is the arrangement working rather than a
    problem: the pointers name the last GATED build, not the newest commit.
-   The menu plate says: C&C 3D $BUILDSTR"
+   The menu plate says: OpenCNC 3D $BUILDSTR"

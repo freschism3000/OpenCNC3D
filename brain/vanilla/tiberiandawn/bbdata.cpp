@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Changes the impact explosion animation on four bullet types in the shipped
 // bullet table: BULLET_SSM, BULLET_SSM2 and BULLET_NUKE_UP now use
 // ANIM_ART_EXP1 instead of ANIM_FRAG1, and BULLET_GRENADE uses ANIM_GRENADE
@@ -182,7 +182,7 @@ static BulletTypeClass const ClassMissile(BULLET_SSM,
                                           MPH_ROCKET, // SPEED:		Miles per hour.
                                           5,          // ROT:			Rate of turn (degrees per tick).
                                           WARHEAD_HE, // WARHEAD:		If fires weapon, warhead type
-                                          ANIM_ART_EXP1  // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                          ANIM_ART_EXP1  // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_SSM here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table
@@ -210,7 +210,7 @@ static BulletTypeClass const ClassMissile2(BULLET_SSM2,
                                            MPH_ROCKET, // SPEED:		Miles per hour.
                                            7,          // ROT:			Rate of turn (degrees per tick).
                                            WARHEAD_HE, // WARHEAD:		If fires weapon, warhead type
-                                           ANIM_ART_EXP1  // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                           ANIM_ART_EXP1  // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_SSM2 here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table
@@ -348,7 +348,7 @@ static BulletTypeClass const ClassGrenade(BULLET_GRENADE,
                                           MPH_MEDIUM_SLOW, // SPEED:		Miles per hour.
                                           0,               // ROT:			Rate of turn (degrees per tick).
                                           WARHEAD_HE,      // WARHEAD:		If fires weapon, warhead type
-                                          ANIM_GRENADE    // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                          ANIM_GRENADE    // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_GRENADE here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table
@@ -398,7 +398,7 @@ static BulletTypeClass const ClassNukeUp(BULLET_NUKE_UP,
                                          MPH_VERY_FAST, // SPEED:		Miles per hour.
                                          0,             // ROT:			Rate of turn (degrees per tick).
                                          WARHEAD_HE,    // WARHEAD:		If fires weapon, warhead type
-                                         ANIM_ART_EXP1     // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                         ANIM_ART_EXP1     // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_NUKE_UP here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table

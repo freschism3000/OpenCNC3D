@@ -668,7 +668,7 @@ static const char* usermap_donor_pack(const char* dir, const char* scen)
     /* 0 temperate, 1 desert, 2 winter, 3 snow -- the editor's own order. Keying on
        DESERT alone sent every WINTER user map out with the temperate pack. A
        CNC3DTheater= line wins over Theater=: snow maps tell the TD brain WINTER and
-       carry their real look in the CNC3D key. */
+       carry their real look in the OpenCNC 3D key. */
     int th = 0, inMap = 0, ours = 0;
     if (f) {
         char line[512];
@@ -1914,11 +1914,11 @@ int main(int argc, char** argv)
             fflush(stdout);
             if (_dup2(_fileno(stderr), _fileno(stdout)) == 0)
                 setvbuf(stdout, NULL, _IONBF, 0);
-            fprintf(stderr, "C&C 3D %s -- log opened at %s\n", CNC3D_BUILD, logpath);
+            fprintf(stderr, "OpenCNC 3D %s -- log opened at %s\n", CNC3D_BUILD, logpath);
         } else {
             /* Still not fatal, because logging is a convenience and never a precondition.
                But say so, rather than leaving the absence to be discovered later. */
-            fprintf(stdout, "C&C 3D %s -- NO LOG: could not write cnc3d-log.txt beside the "
+            fprintf(stdout, "OpenCNC 3D %s -- NO LOG: could not write cnc3d-log.txt beside the "
                             "game or in the per-user folder\n", CNC3D_BUILD);
         }
     }
@@ -1945,7 +1945,7 @@ int main(int argc, char** argv)
                     fflush(stdout);
                     if (dup2(fileno(stderr), fileno(stdout)) >= 0)
                         setvbuf(stdout, NULL, _IONBF, 0);
-                    fprintf(stderr, "C&C 3D %s -- log opened at %s\n", CNC3D_BUILD, logpath);
+                    fprintf(stderr, "OpenCNC 3D %s -- log opened at %s\n", CNC3D_BUILD, logpath);
                 }
             }
         }
@@ -1962,7 +1962,7 @@ int main(int argc, char** argv)
        it is there so anyone can always tell which build they are running, which means a
        build made from anything other than the released commit must SAY so: CNC3D_BUILD
        is "v0.5.1" for a release and "v0.5.1+3a1f2c-dirty" for anything else. */
-    mcfg.version = "C&C 3D " CNC3D_BUILD;
+    mcfg.version = "OpenCNC 3D " CNC3D_BUILD;
     /* init.cpp:1054 starts THEME_MAP1 before Select_Game, so the menu has music from
        the moment it appears. A theme BASE NAME, not a path: MAP1 lives in TRANSIT.MIX
        rather than SCORES.MIX and the bank is the thing that knows that. */
@@ -2321,7 +2321,7 @@ int main(int argc, char** argv)
         flags |= fs_initial_flags(dispMode);
         if (dispMode == FS_MODE_WINDOWED && dispW > 0 && dispH > 0) { opt.w = dispW; opt.h = dispH; }
     }
-    SDL_Window* win = SDL_CreateWindow("Command & Conquer 3D", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* win = SDL_CreateWindow("OpenCNC 3D", SDL_WINDOWPOS_CENTERED,
                                        SDL_WINDOWPOS_CENTERED, opt.w, opt.h, flags);
     if (!win) { fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError()); return 1; }
     /* A true fullscreen window is born borderless-sized and then switched, so the mode

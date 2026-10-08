@@ -447,7 +447,7 @@ void EventClass::Execute(void)
         CCDebugString("C&C95 - Repair packet received\n");
         techno = As_Techno(Data.Target.Whom);
         /*
-        **	CNC3D: the ownership test the SELL arm below has always had and this one never
+        **	OpenCNC 3D: the ownership test the SELL arm below has always had and this one never
         **	did. Harmless in 1995 because only the owner's mouse could queue a REPAIR, and
         **	harmless in the shipped campaign because nothing there reaches this arm at all.
         **	It matters the moment orders arrive off a wire, where a peer's bytes name any
@@ -495,7 +495,7 @@ void EventClass::Execute(void)
             /*
             **	Beacons have a 30-second kill time.
             **
-            ** CNC3D lockstep: the deadline is a FRAME NUMBER, not a wall clock. The old
+            ** OpenCNC 3D lockstep: the deadline is a FRAME NUMBER, not a wall clock. The old
             ** code read GetSystemTimeAsFileTime inside #ifdef _WIN32, so a beacon expired
             ** after 30 s of wall time on Windows and NEVER expired anywhere else. That is
             ** real state divergence rather than a cosmetic one, because Delete_This()

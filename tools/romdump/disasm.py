@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — MIPS (N64) disassembly helper for locating format loaders/decompressors.
+OpenCNC 3D — MIPS (N64) disassembly helper for locating format loaders/decompressors.
 
 The resident boot segment is copied ROM[0x1000..] -> RAM[0x80000400..] by IPL3, so
     RAM  = 0x80000400 + (ROM - 0x1000)

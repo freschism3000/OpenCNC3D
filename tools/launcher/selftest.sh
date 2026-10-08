@@ -437,7 +437,7 @@ grep -q held "$WORK/holder.log" || { cat "$WORK/holder.log"; fail "the stand-in 
 FILES_BEFORE=$(grep -c 'GET /files/[^ ]*\.zip' "$WORK/site.log" || true)
 launcher/cnc3d-launcher --dir "$OLD" --update > "$WORK/locked.log" 2>&1 || true
 sed 's/^/   /' "$WORK/locked.log"
-grep -q "another C&C 3D launcher is using this game folder" "$WORK/locked.log" \
+grep -q "another OpenCNC 3D launcher is using this game folder" "$WORK/locked.log" \
     && pass "an update is refused while another launcher holds the folder" \
     || fail "an update ran while another launcher held the folder"
 [ "$(grep -c 'GET /files/[^ ]*\.zip' "$WORK/site.log" || true)" = "$FILES_BEFORE" ] \
@@ -1401,7 +1401,7 @@ grep -q "result:    installed v0.9.9" "$WORK/i5.log" && grep -q "version 0.9.9" 
     || fail "an install with an empty record was not updated"
 I5B="$HOST/record-cut"
 mkinstall "$I5B"
-printf '# written by the C&C 3D launcher after an update\n' > "$I5B/cnc3d-install.txt"
+printf '# written by the OpenCNC 3D launcher after an update\n' > "$I5B/cnc3d-install.txt"
 mv "$I5B/cnc3d" "$I5B/cnc3d.old"
 printf 'HALF WAY\n' > "$I5B/cnc3d"
 printf 'cnc3d update journal 1\nA 1 cnc3d\n' > "$I5B/cnc3d-update.journal"

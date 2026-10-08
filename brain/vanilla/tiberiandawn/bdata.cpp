@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds HOUSEF_MULTI7 and HOUSEF_MULTI8 to the ownable house bitfield of
 // every building type in the table, all 66 entries, so structures can be
 // owned and built by two multiplayer houses beyond the original six.

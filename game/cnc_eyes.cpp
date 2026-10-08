@@ -1,5 +1,5 @@
 /**************************************************************************************************
- * CNC3D "EYES" -- Command & Conquer rendered from N64 assets, driven by the live GPL brain.
+ * OpenCNC 3D "EYES" -- Command & Conquer rendered from N64 assets, driven by the live GPL brain.
  *
  * SDL2 + OpenGL 1.x fixed-function. It dlopens the Tiberian Dawn logic DLL, starts a real
  * mission, ticks it at the engine's native 15 Hz, and draws:
@@ -16690,7 +16690,7 @@ static int opt_controls_save(const char* path)
 {
     FILE* f = fopen(path, "w");
     if (!f) return 0;
-    fprintf(f, "# CNC3D game controls -- the pause menu's Game Controls page.\n"
+    fprintf(f, "# OpenCNC 3D game controls -- the pause menu's Game Controls page.\n"
                "#\n"
                "# Written when the player moves one of these and closes the dialog.\n"
                "# speed is 0..%d and scroll 0..%d, slowest to fastest. The three volumes\n"
@@ -18415,7 +18415,7 @@ static void cheat_show(const char* scenario)
     g_cheatsArmed = true;
     dopt_open_cheats(&g_optState, g_dbPack);
     g_optState.scenario = scenario;
-    g_optState.version = "C&C 3D";
+    g_optState.version = "OpenCNC 3D";
     dopt_set_cheats(&g_optState, &g_cheats);
     dopt_set_cheats_locked(&g_optState, nm_active());   /* redundant under the refusal above */
     /* AND WHAT KIND OF GAME IT IS, on the same footing: a match renames the row that ends
@@ -18481,7 +18481,7 @@ static void opt_show(const char* scenario)
     opt_controls_baseline();
     dopt_open(&g_optState, g_dbPack);
     g_optState.scenario = scenario;
-    g_optState.version = "C&C 3D";
+    g_optState.version = "OpenCNC 3D";
     /* RESTATE has the mission's briefing, and offers the movie only when there is a
        player to run it and a file to play: 1995's own rule for the Video button
        (scenario.cpp:797-803), with "no player" counting as "no file". Set after
@@ -30860,7 +30860,7 @@ int game_load_menu_open(SDL_Window* win, const char* dospack, const char* shot)
     dopt_bind_slots(&g_optState, opt_slot_rows);
     dopt_open_slots(&g_optState, g_dbPack, DOPT_SL_LOAD);
     g_optState.scenario = "";
-    g_optState.version = "C&C 3D";
+    g_optState.version = "OpenCNC 3D";
     printf("LOADMENU|open|rows=%d\n", g_optState.sl.nrows);
     fflush(stdout);
     g_optOpen = true;
@@ -30973,7 +30973,7 @@ int game_notice_open(SDL_Window* win, const char* dospack, const char* caption,
     }
     dopt_open_notice(&g_optState, g_dbPack, caption, text);
     g_optState.scenario = "";
-    g_optState.version = "C&C 3D";
+    g_optState.version = "OpenCNC 3D";
     {
         /* The box's rectangle in framebuffer pixels, so a picture of it can be measured
            inside the box rather than across a frame that is mostly black. */
@@ -35077,7 +35077,7 @@ int main(int argc, char** argv)
        fullscreen run at the requested size and quietly measure the wrong thing. */
     if (fs_start_fullscreen && !o.shot) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     if (g_resizeW > 0 && g_resizeH > 0) flags |= SDL_WINDOW_RESIZABLE;
-    SDL_Window* win = SDL_CreateWindow("CNC3D eyes", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* win = SDL_CreateWindow("OpenCNC 3D eyes", SDL_WINDOWPOS_CENTERED,
                                        SDL_WINDOWPOS_CENTERED, o.w, o.h, flags);
     if (!win) { fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError()); return 1; }
     SDL_GLContext ctx = SDL_GL_CreateContext(win);

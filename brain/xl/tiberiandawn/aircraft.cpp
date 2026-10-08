@@ -1151,7 +1151,7 @@ int AircraftClass::Mission_Unload(void)
                                 unit->Scatter(0, true);
 
                                 /*
-                                **	CNC3D: and THEN the airstrip's rally point, the same field
+                                **	OpenCNC 3D: and THEN the airstrip's rally point, the same field
                                 **	the barracks and the war factory read. The building this
                                 **	plane is in radio contact with is the airstrip that ordered
                                 **	the delivery (PICK_AIRSTRIP hailed it, and vanilla has just

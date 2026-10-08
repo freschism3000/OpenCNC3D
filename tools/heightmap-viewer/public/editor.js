@@ -1289,7 +1289,7 @@ function writeINI(m, name){
   const L = [], H = A.META.houses;
   const e = A.META.maps.find(x => x.id === m.scenario) || {};
   const P = m.playable;
-  L.push('; Written by the CNC3D map editor. Cells are y*64 + x.');
+  L.push('; Written by the OpenCNC 3D map editor. Cells are y*64 + x.');
   L.push('[Basic]');
   L.push(`Name=${name || m.scenario}`);
   L.push('Player=GoodGuy');

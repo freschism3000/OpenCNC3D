@@ -1,4 +1,4 @@
-# The skirmish lobby: what Red Alert actually has, and what CNC3D should build
+# The skirmish lobby: what Red Alert actually has, and what OpenCNC 3D should build
 
 Investigation and spec, August 2026. Every claim about the 1995 dialogs is read out of the
 GPL checkout in `brain/vanilla` (`brain/patches/UPSTREAM.txt`), and line numbers are that
@@ -55,7 +55,7 @@ the serial (null modem) game and skirmish; `gameoptions = Session.Type == GAME_S
 ### 1.1 Geometry
 
 All positions below are computed at `factor == 1`, that is the 320x200 layout, which is the
-one CNC3D's menu reproduces. The 640x400 build doubles every number
+one OpenCNC 3D's menu reproduces. The 640x400 build doubles every number
 (`factor = (SeenBuff.Get_Width() == 320) ? 1 : 2`, `:1339`).
 
 The dialog is the full screen: `d_dialog_w = 320, d_dialog_h = 200, x = 0, y = 0`
@@ -226,7 +226,7 @@ We run the TD engine. Anything RA draws that TD cannot honour is a trap.
 | `Rule.MPMaxMoney` = 10000, default 3000 | no `MPMaxMoney` in TD; the gauge maximum is the literal `10000 /* TODO: Rule.MPMaxMoney*/` and the dialog default is 10000 (`tiberiandawn/nulldlg.cpp:394`, `:360`) | pick our own default, 10000 is the ceiling |
 | Credits rounded to 500 | TD does not round (`tiberiandawn/nulldlg.cpp:749`) | rounding is ours to add, and it is a kindness on a 25 pixel gauge |
 | 8 colours, 8 players | 6 and 6 | any colour work is six wide |
-| Capture the Flag | real in TD: `Special.IsCaptureTheFlag` is read in `house.cpp`, `scenarioini.cpp` and `unit.cpp`, and every shipped skirmish INI carries flag data | the engine would honour it; **CNC3D has no flag art**, `capture the flag` occurs zero times in `game/cnc_eyes.cpp` |
+| Capture the Flag | real in TD: `Special.IsCaptureTheFlag` is read in `house.cpp`, `scenarioini.cpp` and `unit.cpp`, and every shipped skirmish INI carries flag data | the engine would honour it; **OpenCNC 3D has no flag art**, `capture the flag` occurs zero times in `game/cnc_eyes.cpp` |
 | difficulty slider | present in TD's dialog and it writes `Scen.Difficulty` | dead on our path, see section 6 |
 
 Two TD only options exist in the export struct that no 1995 dialog offers:
@@ -243,7 +243,7 @@ Our client cannot set an engine global. It fills two structs and hands them to
 outside that is unreachable. The mapping, read from
 `tiberiandawn/dllinterface.cpp:695-780`:
 
-| lobby control | struct field | engine effect | honoured by TD | visible in CNC3D |
+| lobby control | struct field | engine effect | honoured by TD | visible in OpenCNC 3D |
 |---|---|---|---|---|
 | Side | `CNCPlayerInfoStruct::House` | `HouseClass::ActLike` via `Init_Data` (`dllinterface.cpp:998`) | yes | yes, it is what `act=` reports and what picks the texture set |
 | AI opponents | count of entries with `CNCPlayerInfoStruct::IsAI` | `MPlayerIsHuman[]`, which gates the whole expert system (`house.cpp:929`) | yes | yes |
@@ -258,17 +258,17 @@ outside that is unreachable. The mapping, read from
 | Capture the flag | `CaptureTheFlag` | `Special.IsCaptureTheFlag` | yes | no art |
 | Teams and allies | `CNCPlayerInfoStruct::Team` | equal team numbers become `Make_Ally` (`dllinterface.cpp:1044-1056`) and decide the winning team at game over (`:2807`) | yes | the renderer has no ally concept: anything not yours is drawn hostile |
 | Start position | `CNCPlayerInfoStruct::StartLocationIndex` | `StartLocationOverride`, an unchecked index into the compacted waypoint list | yes | yes, but the legal range differs per map |
-| MCV undeploy | `IsMCVDeploy` | `Special.IsMCVDeploy` | yes | untested in CNC3D |
+| MCV undeploy | `IsMCVDeploy` | `Special.IsMCVDeploy` | yes | untested in OpenCNC 3D |
 | Visceroids | `SpawnVisceroids` | `Special.IsVisceroids` | yes | no visceroid art path checked |
 | **Difficulty** | none | `CNC_Set_Difficulty` returns immediately unless `GameToPlay == GAME_NORMAL` (`dllinterface.cpp:1843`) | **no** | drawing it would be a lie |
-| **Colour** | `CNCPlayerInfoStruct::ColorIndex` | `HouseClass::RemapColor`, used only by the engine's own 2D sprite renderer | set, but | **no.** CNC3D picks a texture set from `act=`, and the cartridge carries two |
-| **Player name** | `CNCPlayerInfoStruct::Name` | `HouseClass::Name`, 12 chars | set, but | **no.** The name never reaches the screen in CNC3D |
+| **Colour** | `CNCPlayerInfoStruct::ColorIndex` | `HouseClass::RemapColor`, used only by the engine's own 2D sprite renderer | set, but | **no.** OpenCNC 3D picks a texture set from `act=`, and the cartridge carries two |
+| **Player name** | `CNCPlayerInfoStruct::Name` | `HouseClass::Name`, 12 chars | set, but | **no.** The name never reaches the screen in OpenCNC 3D |
 | **Shadow regrows** | `MPlayerShadowRegrow` | nothing. The identifier appears once in the TD tree, in the header | **no** | no |
 | **Aftermath units** | `MPlayerAftermathUnits` | nothing, same as above | **no** | no |
 
 ---
 
-## 7. The spec: the CNC3D skirmish lobby
+## 7. The spec: the OpenCNC 3D skirmish lobby
 
 ### 7.1 Shape
 
@@ -362,7 +362,7 @@ computers on the same side will look alike in play. Say so in the status line ra
 pretending otherwise.
 
 Names are fixed: "PLAYER" and "COMPUTER n". There is no name box, because
-`CNCPlayerInfoStruct::Name` never reaches a CNC3D pixel.
+`CNCPlayerInfoStruct::Name` never reaches a OpenCNC 3D pixel.
 
 ### 7.4 The map list and the info line
 
@@ -439,7 +439,7 @@ drawing it.
   Easy or Hard we offer would be a mechanic we invented, not one we exposed.
 - **Colour swatches.** The cartridge carries two house texture sets, chosen by `act=`.
   A colour choice would change a number nothing draws.
-- **Player name box.** The name never reaches a CNC3D pixel, and we own no edit widget.
+- **Player name box.** The name never reaches a OpenCNC 3D pixel, and we own no edit widget.
 - **Shadow Regrows.** Tiberian Dawn has no such field. The struct member exists and is read
   by nothing.
 - **Capture the Flag.** The engine would honour it. We have no flag art and no flag handling
@@ -529,7 +529,7 @@ disagree about what already exists, that one is the closer read of the working t
 
 For `known-gap notes`:
 
-- **Crates are invisible in CNC3D.** The brain patch dumps only tiberium and wall overlays,
+- **Crates are invisible in OpenCNC 3D.** The brain patch dumps only tiberium and wall overlays,
   so `MPlayerGoodies` scatters pickups that never appear on screen. The option is therefore
   not offered.
 - **`CNCMultiplayerOptionsStruct::MPlayerShadowRegrow` and `MPlayerAftermathUnits` are read

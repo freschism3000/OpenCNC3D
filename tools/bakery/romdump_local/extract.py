@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — full asset extractor for the Command & Conquer (N64) ROM.
+OpenCNC 3D — full asset extractor for the Command & Conquer (N64) ROM.
 
 Walks every archive directory, resolves each entry to its ROM address, decompresses
 where needed, and writes real files out by type.

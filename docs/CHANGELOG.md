@@ -1,6 +1,6 @@
 # Changelog
 
-## C&C 3D v0.7.1 "On The Level" (2026-09-18)
+## OpenCNC 3D v0.7.1 "On The Level" (2026-09-18)
 
 ### New features
 
@@ -56,7 +56,7 @@
 
 ---
 
-## C&C 3D v0.6.12 "Step Aside" (2026-09-14)
+## OpenCNC 3D v0.6.12 "Step Aside" (2026-09-14)
 
 ### New features
 
@@ -94,7 +94,7 @@
 
 ---
 
-## C&C 3D v0.6.11 "Out Of The Box" (2026-09-13)
+## OpenCNC 3D v0.6.11 "Out Of The Box" (2026-09-13)
 
 ### Improvements
 
@@ -108,7 +108,7 @@
 
 ---
 
-## C&C 3D v0.6.10 "Bring Your Own Tank" (2026-09-09)
+## OpenCNC 3D v0.6.10 "Bring Your Own Tank" (2026-09-09)
 
 ### New features
 
@@ -186,7 +186,7 @@
 
 ---
 
-## C&C 3D v0.6.9 "Ask First" (2026-09-07)
+## OpenCNC 3D v0.6.9 "Ask First" (2026-09-07)
 
 ### New features
 
@@ -245,7 +245,7 @@
 
 ---
 
-## C&C 3D v0.6.8 "Another Angle" (2026-09-06)
+## OpenCNC 3D v0.6.8 "Another Angle" (2026-09-06)
 
 ### New features
 
@@ -275,7 +275,7 @@
 
 ---
 
-## C&C 3D v0.6.7 "One World" (2026-09-05)
+## OpenCNC 3D v0.6.7 "One World" (2026-09-05)
 
 ### New features
 
@@ -315,7 +315,7 @@
 
 ---
 
-## C&C 3D v0.6.6 "In Step" (2026-09-05)
+## OpenCNC 3D v0.6.6 "In Step" (2026-09-05)
 
 ### New features
 
@@ -351,7 +351,7 @@
 
 ---
 
-## C&C 3D v0.6.5 "Second Look" (2026-09-01)
+## OpenCNC 3D v0.6.5 "Second Look" (2026-09-01)
 
 A pass back over the player board: every open report was read against the code again, and
 this is the half that was cheap, unblocked and needed nobody's permission.
@@ -443,7 +443,7 @@ this is the half that was cheap, unblocked and needed nobody's permission.
 
 ---
 
-## C&C 3D v0.6.4 "Line Of Sight" (2026-08-31)
+## OpenCNC 3D v0.6.4 "Line Of Sight" (2026-08-31)
 
 ### New features
 
@@ -512,7 +512,7 @@ this is the half that was cheap, unblocked and needed nobody's permission.
 
 ---
 
-## C&C 3D v0.6.3 "Blast Radius" (2026-08-24)
+## OpenCNC 3D v0.6.3 "Blast Radius" (2026-08-24)
 
 ### New features
 
@@ -578,7 +578,7 @@ this is the half that was cheap, unblocked and needed nobody's permission.
 
 ---
 
-## C&C 3D v0.6.2 "Now You See It" (2026-08-24)
+## OpenCNC 3D v0.6.2 "Now You See It" (2026-08-24)
 
 ### Platforms and builds
 
@@ -602,7 +602,7 @@ this is the half that was cheap, unblocked and needed nobody's permission.
 
 ---
 
-## C&C 3D v0.6.1 "Skirmish" (2026-08-23)
+## OpenCNC 3D v0.6.1 "Skirmish" (2026-08-23)
 
 ### New features
 
@@ -649,7 +649,7 @@ this is the half that was cheap, unblocked and needed nobody's permission.
 
 ---
 
-## C&C 3D v0.6.0 "Clear Skies" (2026-08-22)
+## OpenCNC 3D v0.6.0 "Clear Skies" (2026-08-22)
 
 ### New features
 

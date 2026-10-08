@@ -1,5 +1,5 @@
 /*
- * CNC3D -- minimal headless host for the Tiberian Dawn "brain" (CNC_* C ABI).
+ * OpenCNC 3D -- minimal headless host for the Tiberian Dawn "brain" (CNC_* C ABI).
  *
  * Loads TiberianDawn.dylib / TiberianDawn.dll at runtime, starts a custom (loose-file)
  * scenario, ticks it, and dumps the resulting game state in plain text.
@@ -1154,7 +1154,7 @@ int main(int argc, char** argv)
         libpath = DEFAULT_BRAIN;
     }
 
-    printf("CNC3D headless host\n");
+    printf("OpenCNC 3D headless host\n");
     printf("host struct sizes (must match dllinterface.h): object=%zu list_hdr=%zu map=%zu event=%zu rules=%zu\n",
            sizeof(CNCObjectStruct),
            (size_t)offsetof(CNCObjectListStruct, Objects),

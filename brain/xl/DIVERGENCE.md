@@ -156,7 +156,7 @@ except where noted):
   objects are meaningless by the dump's own documentation).
 - The remaster's vestigial 8-bit render page (externs.h GBUFF_INIT 3072x3072,
   the collapsed MEGAMAPS value) deliberately does NOT scale with the stride:
-  1024 cells x 24px would be a 576MB page for output CNC3D never reads. A
+  1024 cells x 24px would be a 576MB page for output OpenCNC 3D never reads. A
   tactical view confined to the page's 128-cell reach is the accepted cost;
   revisit only if some later phase starts consuming the brain's own pixels.
 - INTEGER LAW notes: negative >> and negative %/ division rely on arithmetic

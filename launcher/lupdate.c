@@ -485,7 +485,7 @@ static void lu_read_install(LU_State *u)
 static void lu_install_record(const LU_State *u, char *out, size_t outlen)
 {
     snprintf(out, outlen,
-             "# written by the C&C 3D launcher after an update\nversion %s\ndata_id %s\n",
+             "# written by the OpenCNC 3D launcher after an update\nversion %s\ndata_id %s\n",
              u->latest, u->latest_data[0] ? u->latest_data : "unknown");
 }
 
@@ -651,7 +651,7 @@ static int lu_do_apply(LU_State *u, char *err, int errlen)
         break;
     case 0:
         snprintf(err, (size_t)errlen,
-                 "another C&C 3D launcher is using this game folder. Close it and press "
+                 "another OpenCNC 3D launcher is using this game folder. Close it and press "
                  "Update again.");
         return 0;
     case -2: {

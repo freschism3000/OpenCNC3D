@@ -169,7 +169,7 @@ static BulletTypeClass const ClassMissile(BULLET_SSM,
                                           MPH_ROCKET, // SPEED:		Miles per hour.
                                           5,          // ROT:			Rate of turn (degrees per tick).
                                           WARHEAD_HE, // WARHEAD:		If fires weapon, warhead type
-                                          ANIM_ART_EXP1  // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                          ANIM_ART_EXP1  // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_SSM here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table
@@ -197,7 +197,7 @@ static BulletTypeClass const ClassMissile2(BULLET_SSM2,
                                            MPH_ROCKET, // SPEED:		Miles per hour.
                                            7,          // ROT:			Rate of turn (degrees per tick).
                                            WARHEAD_HE, // WARHEAD:		If fires weapon, warhead type
-                                           ANIM_ART_EXP1  // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                           ANIM_ART_EXP1  // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_SSM2 here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table
@@ -335,7 +335,7 @@ static BulletTypeClass const ClassGrenade(BULLET_GRENADE,
                                           MPH_MEDIUM_SLOW, // SPEED:		Miles per hour.
                                           0,               // ROT:			Rate of turn (degrees per tick).
                                           WARHEAD_HE,      // WARHEAD:		If fires weapon, warhead type
-                                          ANIM_GRENADE    // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                          ANIM_GRENADE    // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_GRENADE here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table
@@ -385,7 +385,7 @@ static BulletTypeClass const ClassNukeUp(BULLET_NUKE_UP,
                                          MPH_VERY_FAST, // SPEED:		Miles per hour.
                                          0,             // ROT:			Rate of turn (degrees per tick).
                                          WARHEAD_HE,    // WARHEAD:		If fires weapon, warhead type
-                                         ANIM_ART_EXP1     // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
+                                         ANIM_ART_EXP1     // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
                                           // table (ROM 0x169360, rec byte +0x23) points BULLET_NUKE_UP here,
                                           // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
                                           // debris meshes. Deaths still do -- the cartridge's unit table

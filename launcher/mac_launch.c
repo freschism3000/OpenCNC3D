@@ -156,7 +156,7 @@ int main(void)
             while ((e = readdir(d)) != NULL) {
                 char cand[2048];
                 if (e->d_name[0] == '.') continue;
-                if (strncasecmp(e->d_name, "cnc3d", 5) != 0 && strstr(e->d_name, "C&C3D") == NULL)
+                if (strncasecmp(e->d_name, "cnc3d", 5) != 0 && strstr(e->d_name, "OpenCNC 3D") == NULL)
                     continue;
                 snprintf(cand, sizeof cand, "%s/%s", bases[i], e->d_name);
                 if (is_game_dir(cand)) { snprintf(dir, sizeof dir, "%s", cand); break; }

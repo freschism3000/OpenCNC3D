@@ -143,7 +143,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
         if (strstr(cmd, "fill")) fillmode = 1;
     }
 
-    report("CNC3D Glide proof of life");
+    report("OpenCNC 3D Glide proof of life");
     report("requested: %d triangles x %d frames at %dx%d", ntri, nframes, SCR_W, SCR_H);
 
     memset(&hw, 0, sizeof hw);

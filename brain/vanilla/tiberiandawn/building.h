@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Declares one new member function on BuildingClass, CNC3D_Can_Rally, the
 // predicate for whether a building may take a rally point. The
 // implementation and all resulting behaviour are in building.cpp.

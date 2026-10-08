@@ -185,7 +185,7 @@ public:
 #ifdef USE_RA_AI
     bool Passes_Proximity_Check(ObjectTypeClass const* object, HousesType house, short const* list, CELL trycell) const;
     /*
-    ** CNC3D: the cheat menu's "Build Anywhere". A house bit here lifts the base
+    ** OpenCNC 3D: the cheat menu's "Build Anywhere". A house bit here lifts the base
     ** ADJACENCY rule for that house and nothing else -- see the comment at the
     ** hook inside Passes_Proximity_Check for why terrain stays illegal.
     **

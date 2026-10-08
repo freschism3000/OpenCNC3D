@@ -4,7 +4,7 @@ bin_to_n64map.py -- turn a PC Tiberian Dawn terrain .BIN into a cartridge .MAP.
 
 WHY THIS EXISTS
 
-CNC3D never draws terrain from the PC .BIN. It draws it from the cartridge's own
+OpenCNC 3D never draws terrain from the PC .BIN. It draws it from the cartridge's own
 <SCEN>.MAP: 64x64 big-endian u16 N64 tile IDs indexing the theater's DA4/DA8 tile banks.
 That is what assets/terrain/n64_terrain.py resolves into terrain_<SCEN>.json, and what
 tools/bakery/bake5.py turns into <SCEN>.pack.

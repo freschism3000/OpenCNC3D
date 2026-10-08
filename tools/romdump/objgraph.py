@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D -- the object graph: why several models were missing their moving part.
+OpenCNC 3D -- the object graph: why several models were missing their moving part.
 
 A model is not one display list. The 16-byte records of the model table at RAM
 0x80099998 hold, in their last word, a pointer to a 0x1C-byte SCENE GRAPH NODE, and

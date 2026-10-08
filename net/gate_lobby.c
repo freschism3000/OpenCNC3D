@@ -683,7 +683,7 @@ int main(int argc, char **argv)
         return run_idle_joiner((unsigned short)atoi(argv[2]));
     }
 
-    printf("CNC3D lobby gate\n\n");
+    printf("OpenCNC 3D lobby gate\n\n");
 
     /* ---- legs 1 to 5: a room, a joiner, a ready, a start ---- */
     fill_setup(&setup, "SCM01EA");

@@ -228,7 +228,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     if (!pack)
     {
         _snprintf(err, sizeof err, "Could not load %s\n\n%s", packpath, packerr);
-        MessageBoxA(NULL, err, "CNC3D Win98", MB_OK | MB_ICONERROR);
+        MessageBoxA(NULL, err, "OpenCNC 3D Win98", MB_OK | MB_ICONERROR);
         return 1;
     }
     {
@@ -249,14 +249,14 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
 
     /* ---- the brain. Everything drawn below comes out of this. ---- */
     if (!wb_open(NULL, err, sizeof err))
-    { MessageBoxA(NULL, err, "CNC3D Win98 brain", MB_OK | MB_ICONERROR); return 1; }
+    { MessageBoxA(NULL, err, "OpenCNC 3D Win98 brain", MB_OK | MB_ICONERROR); return 1; }
 
     {
         char content[MAX_PATH], missions[MAX_PATH];
         _snprintf(content,  sizeof content,  "%scontent\\",  base);
         _snprintf(missions, sizeof missions, "%smissions\\", base);
         if (!wb_start(content, missions, "SCG01EA", 1, err, sizeof err))
-        { MessageBoxA(NULL, err, "CNC3D Win98 brain", MB_OK | MB_ICONERROR); return 1; }
+        { MessageBoxA(NULL, err, "OpenCNC 3D Win98 brain", MB_OK | MB_ICONERROR); return 1; }
     }
     memset(&map, 0, sizeof map);
     wb_map(&map);
@@ -274,7 +274,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
                       "%s\n\nMake it on the Mac with:\n"
                       "  tools/win98/mkterrain.py <SCEN.pack> SCG01EA.t1terr\n"
                       "and copy it in beside the exe.", err);
-            MessageBoxA(NULL, m, "CNC3D Win98 terrain", MB_OK | MB_ICONERROR);
+            MessageBoxA(NULL, m, "OpenCNC 3D Win98 terrain", MB_OK | MB_ICONERROR);
             return 1;
         }
     }
@@ -318,8 +318,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     }
     (void)ppc;
 
-    if (!w98_open("C&C 3D -- Windows 98, live mission", SCR_W, SCR_H, err, sizeof err))
-    { MessageBoxA(NULL, err, "CNC3D Win98", MB_OK | MB_ICONERROR); return 1; }
+    if (!w98_open("OpenCNC 3D -- Windows 98, live mission", SCR_W, SCR_H, err, sizeof err))
+    { MessageBoxA(NULL, err, "OpenCNC 3D Win98", MB_OK | MB_ICONERROR); return 1; }
     fb = w98_framebuffer();
     sr_bind(&tgt, SCR_W, SCR_H, fb->px, g_zbuf);
 
@@ -599,7 +599,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
         rep = fopen(packpath, "wb");
         if (rep)
         {
-            fprintf(rep, "CNC3D live mission on Windows 98\r\n");
+            fprintf(rep, "OpenCNC 3D live mission on Windows 98\r\n");
             fprintf(rep, "scenario=SCG01EA ticks=%d objects=%d\r\n", ticks, nobj);
             fprintf(rep, "map theater=%d origin=%d,%d size=%dx%d px_per_cell=%.2f\r\n",
                     map.theater, map.cellx, map.celly, map.cellw, map.cellh, ppc);

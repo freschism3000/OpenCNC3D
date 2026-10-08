@@ -50,7 +50,7 @@ def walk(blob):
     walk is checked at the end against the file length, because the one thing that must
     never happen quietly is landing on the wrong section and reading plausible rubbish."""
     o = 0
-    assert blob[0:7] == b"CNC3DPK", "not a CNC3D pack"
+    assert blob[0:7] == b"CNC3DPK", "not a OpenCNC 3D pack"
     assert blob[7:8] == b"E", "only CNC3DPKE (v14) is understood, got %r" % blob[7:8]
     o = 8 + 4 + 16 + 16                      # magic, version, scenario, theater
 

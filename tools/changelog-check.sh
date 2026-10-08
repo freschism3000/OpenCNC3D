@@ -51,7 +51,7 @@ RELINFO=$(gh api "repos/{owner}/{repo}/releases" --paginate \
 }
 RELEASES=$(echo "$RELINFO" | awk '{print $1}' | sed 's/^v//')
 
-# Every "## C&C 3D vX.Y.Z" heading in the changelog, bare number.
+# Every "## OpenCNC 3D vX.Y.Z" heading in the changelog, bare number.
 ENTRIES=$(grep '^## ' docs/CHANGELOG.md | sed -n 's/.*[[:space:]]v\([0-9][0-9.]*\).*/\1/p')
 
 FAIL=0

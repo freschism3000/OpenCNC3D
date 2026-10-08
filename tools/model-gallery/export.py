@@ -339,7 +339,7 @@ def write_gltf(path, code, tris, texlist, texnames):
             extensions={"KHR_materials_unlit": {}}))
     g = dict(
         asset=dict(version="2.0",
-                   generator="CNC3D model gallery (from the game's own baked pack)"),
+                   generator="OpenCNC 3D model gallery (from the game's own baked pack)"),
         extensionsUsed=["KHR_materials_unlit"],
         scene=0, scenes=[dict(nodes=[0])],
         nodes=[dict(mesh=0, name=code)],

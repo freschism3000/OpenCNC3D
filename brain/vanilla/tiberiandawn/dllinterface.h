@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Adds a compile-time static_assert, under an EIGHTPLAYERS guard, that
 // GAME_OVER_MULTIPLAYER_MAX_PLAYERS_TRACKED is still 8, so the end-of-game
 // stats block cannot silently drop players if the maximum player count is
@@ -765,7 +765,7 @@ struct CNCMultiplayerOptionsStruct
     bool MPlayerAftermathUnits;
     bool CaptureTheFlag;
     bool DestroyStructures; // New early win condition via destroying all a player's structures
-    bool ShortGame;         // CNC3D: defences and walls do not keep a player alive
+    bool ShortGame;         // OpenCNC 3D: defences and walls do not keep a player alive
     bool ModernBalance;
 };
 

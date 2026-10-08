@@ -4,7 +4,7 @@ index eada872..e8897ce 100644
 +++ b/common/CMakeLists.txt
 @@ -1,3 +1,13 @@
 +#
-+# MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++# MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +# Selects the keyboard backend for the commonr library by platform:
 +# wwkeyboard_win32.cpp on Windows, the already present wwkeyboard_null.cpp
 +# everywhere else, so the headless library compiles off Windows. Build
@@ -23,7 +23,7 @@ index eada872..e8897ce 100644
 -    wwkeyboard_win32.cpp
      wwmouse.cpp
  )
-+# CNC3D: the remaster lib is already headless (soundio_null/video_null); the only
++# OpenCNC 3D: the remaster lib is already headless (soundio_null/video_null); the only
 +# platform dependency left was wwkeyboard_win32.cpp, which cannot compile off Windows.
 +# The remaster DLL takes all input through CNC_Handle_Input(), so a null keyboard is
 +# correct AND keeps the brain free of SDL -- important because these same sources must
@@ -45,7 +45,7 @@ index b3bbb7a..9ef9b4e 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Load_Alloc_Data now returns NULL when the file reports a size of zero or
 +// less, instead of returning the non-null malloc(0) pointer that callers
 +// treat as a successful load. This is a defensive fix for a crash when a
@@ -62,7 +62,7 @@ index b3bbb7a..9ef9b4e 100644
      void* ptr = 0;
      int size = const_cast<FileClass&>(file).Size();
  
-+    /* CNC3D: a file that is neither on disk nor inside a registered mixfile reports a size
++    /* OpenCNC 3D: a file that is neither on disk nor inside a registered mixfile reports a size
 +    ** of ZERO rather than failing. CCFileClass::Size() (ccfile.cpp) returns a length that
 +    ** MixFileClass::Offset never writes when it does not find the entry, and its only
 +    ** diagnostic is an assert(1) that cannot fire. malloc(0) then hands back a valid
@@ -94,7 +94,7 @@ index 109c35f..b3e3ed5 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Both MixFileClass constructors now refuse a file whose header carries a
 +// negative entry count or data size, or whose entry table cannot be read in
 +// full. Such a file is left off the mixfile list, so lookups in it answer
@@ -112,7 +112,7 @@ index 109c35f..b3e3ed5 100644
      **	Load up the offset control array. If RAM is exhausted, then the mixfile is invalid.
      */
 +    /*
-+    **	C&C 3D: a header that cannot be believed is an archive that holds nothing. The
++    **	OpenCNC 3D: a header that cannot be believed is an archive that holds nothing. The
 +    **	count is a signed 16-bit field, so a damaged file can carry a negative one, which
 +    **	is a negative allocation and then a search over a NULL table; a positive count on
 +    **	a file too short to hold its table leaves the table uninitialised and searched as
@@ -144,7 +144,7 @@ index 109c35f..b3e3ed5 100644
      **	Load up the offset control array. If RAM is exhausted, then the mixfile is invalid.
      */
 +    /*
-+    **	C&C 3D: a header that cannot be believed is an archive that holds nothing. The
++    **	OpenCNC 3D: a header that cannot be believed is an archive that holds nothing. The
 +    **	count is a signed 16-bit field, so a damaged file can carry a negative one, which
 +    **	is a negative allocation and then a search over a NULL table; a positive count on
 +    **	a file too short to hold its table leaves the table uninitialised and searched as
@@ -177,7 +177,7 @@ index a26cf46..a6c57cb 100644
 +++ b/tiberiandawn/CMakeLists.txt
 @@ -1,3 +1,15 @@
 +#
-+# MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++# MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +# Adds an EIGHTPLAYERS build option, on by default, and passes it to both
 +# the TiberianDawn and VanillaTD targets, so the engine is compiled with an
 +# eight house multiplayer roster (Multi7 and Multi8) instead of the stock
@@ -195,7 +195,7 @@ index a26cf46..a6c57cb 100644
  
  include(ProductVersion)
  
-+# CNC3D: dllinterface.{h,cpp} (the CNC_* API) is written for MSVC and uses __int64,
++# OpenCNC 3D: dllinterface.{h,cpp} (the CNC_* API) is written for MSVC and uses __int64,
 +# __declspec and types declared inside anonymous unions. Clang/GCC accept all of that
 +# with the Microsoft-extension flags, so the API compiles unmodified off Windows.
 +# Keeping the source untouched matters: it must still build for 32-bit Windows later.
@@ -208,7 +208,7 @@ index a26cf46..a6c57cb 100644
 +    endif()
 +endif()
 +
-+# CNC3D: EIGHTPLAYERS widens the multiplayer roster from six to eight houses
++# OpenCNC 3D: EIGHTPLAYERS widens the multiplayer roster from six to eight houses
 +# (Multi7/Multi8, grey and brown -- the two colors Red Alert added). Configure with
 +# -DEIGHTPLAYERS=OFF to rebuild the stock six-player engine.
 +option(EIGHTPLAYERS "Eight multiplayer houses instead of the stock six" ON)
@@ -218,7 +218,7 @@ index a26cf46..a6c57cb 100644
 +    set(CNC3D_EIGHTPLAYERS_DEF "")
 +endif()
 +
-+# CNC3D: the map-editor interface is COM-based (SAFEARRAY/HRESULT/VT_UI1) and is
++# OpenCNC 3D: the map-editor interface is COM-based (SAFEARRAY/HRESULT/VT_UI1) and is
 +# Windows-only. The headless brain does not need it, so it is dropped off Windows.
 +if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
 +    set(CNC3D_EDITOR_IFACE dllinterfaceeditor.cpp)
@@ -267,7 +267,7 @@ index 583120f..d54809a 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds HOUSEF_MULTI7 and HOUSEF_MULTI8 to the owner masks of all five
 +// aircraft types (the A10 attack plane, transport helicopter, Apache, Orca
 +// and cargo plane), so the seventh and eighth multiplayer houses may own
@@ -334,7 +334,7 @@ index e27af1c..4372f5c 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Adds one clause to the cargo plane's drop in AircraftClass::Mission_Unload:
 +// a vehicle set down at an airstrip that holds a rally point (a CNC3D
 +// addition, stored in the airstrip's ArchiveTarget) is given MISSION_MOVE to
@@ -353,7 +353,7 @@ index e27af1c..4372f5c 100644
                                  unit->Scatter(0, true);
 +
 +                                /*
-+                                **	CNC3D: and THEN the airstrip's rally point, the same field
++                                **	OpenCNC 3D: and THEN the airstrip's rally point, the same field
 +                                **	the barracks and the war factory read. The building this
 +                                **	plane is in radio contact with is the airstrip that ordered
 +                                **	the delivery (PICK_AIRSTRIP hailed it, and vanilla has just
@@ -394,7 +394,7 @@ index 1360f92..15d45bf 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Two changes in AnimClass. The constructor's drop-zone smoke reveal, which
 +// reads PlayerPtr, is withheld in a lockstep network match, where one
 +// machine's viewpoint must not decide another machine's missions. AI's kill
@@ -415,7 +415,7 @@ index 1360f92..15d45bf 100644
 -        // not used in MP. ST - 3/28/2019 2:43PM
 -        Map.Sight_From(PlayerPtr, Coord_Cell(coord), 4, false);
 +        /*
-+        **	CNC3D lockstep: the 2019 comment that stood here said "This should be OK as
++        **	OpenCNC 3D lockstep: the 2019 comment that stood here said "This should be OK as
 +        **	it's not used in MP", and that assumption is what this gate replaces.
 +        **
 +        **	PlayerPtr is the house of whoever is sitting at THIS machine, and Sight_From
@@ -482,7 +482,7 @@ index ae48da8..713249d 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds one read only inline accessor, CNC3D_Stage(), to AnimClass, which
 +// returns the animation's current frame by calling Fetch_Stage() on the
 +// private StageClass base so external code can read it. Nothing else is
@@ -499,7 +499,7 @@ index ae48da8..713249d 100644
      }
  
 +    /*
-+    ** CNC3D instrumentation (read-only). The StageClass base is private, so the object
++    ** OpenCNC 3D instrumentation (read-only). The StageClass base is private, so the object
 +    ** dump cannot ask an anim which frame it is on without this. No behaviour change.
 +    */
 +    int CNC3D_Stage(void) const
@@ -519,7 +519,7 @@ index e0b6db8..118a7e4 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Changes the impact explosion animation on four bullet types in the shipped
 +// bullet table: BULLET_SSM, BULLET_SSM2 and BULLET_NUKE_UP now use
 +// ANIM_ART_EXP1 instead of ANIM_FRAG1, and BULLET_GRENADE uses ANIM_GRENADE
@@ -539,7 +539,7 @@ index e0b6db8..118a7e4 100644
                                            5,          // ROT:			Rate of turn (degrees per tick).
                                            WARHEAD_HE, // WARHEAD:		If fires weapon, warhead type
 -                                          ANIM_FRAG1  // Explosion to use upon impact.
-+                                          ANIM_ART_EXP1  // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
++                                          ANIM_ART_EXP1  // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
 +                                          // table (ROM 0x169360, rec byte +0x23) points BULLET_SSM here,
 +                                          // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
 +                                          // debris meshes. Deaths still do -- the cartridge's unit table
@@ -554,7 +554,7 @@ index e0b6db8..118a7e4 100644
                                             7,          // ROT:			Rate of turn (degrees per tick).
                                             WARHEAD_HE, // WARHEAD:		If fires weapon, warhead type
 -                                           ANIM_FRAG1  // Explosion to use upon impact.
-+                                           ANIM_ART_EXP1  // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
++                                           ANIM_ART_EXP1  // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
 +                                          // table (ROM 0x169360, rec byte +0x23) points BULLET_SSM2 here,
 +                                          // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
 +                                          // debris meshes. Deaths still do -- the cartridge's unit table
@@ -569,7 +569,7 @@ index e0b6db8..118a7e4 100644
                                            0,               // ROT:			Rate of turn (degrees per tick).
                                            WARHEAD_HE,      // WARHEAD:		If fires weapon, warhead type
 -                                          ANIM_VEH_HIT2    // Explosion to use upon impact.
-+                                          ANIM_GRENADE    // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
++                                          ANIM_GRENADE    // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
 +                                          // table (ROM 0x169360, rec byte +0x23) points BULLET_GRENADE here,
 +                                          // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
 +                                          // debris meshes. Deaths still do -- the cartridge's unit table
@@ -584,7 +584,7 @@ index e0b6db8..118a7e4 100644
                                           0,             // ROT:			Rate of turn (degrees per tick).
                                           WARHEAD_HE,    // WARHEAD:		If fires weapon, warhead type
 -                                         ANIM_FRAG1     // Explosion to use upon impact.
-+                                         ANIM_ART_EXP1     // Explosion to use upon impact. CNC3D: the CARTRIDGE'S own bullet
++                                         ANIM_ART_EXP1     // Explosion to use upon impact. OpenCNC 3D: the CARTRIDGE'S own bullet
 +                                          // table (ROM 0x169360, rec byte +0x23) points BULLET_NUKE_UP here,
 +                                          // away from the 1995 chunk-throwing anim, so an IMPACT sprays no
 +                                          // debris meshes. Deaths still do -- the cartridge's unit table
@@ -603,7 +603,7 @@ index bdc34f3..1905745 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds HOUSEF_MULTI7 and HOUSEF_MULTI8 to the ownable house bitfield of
 +// every building type in the table, all 66 entries, so structures can be
 +// owned and built by two multiplayer houses beyond the original six.
@@ -1217,7 +1217,7 @@ index 91f1bec..75649c8 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Two separate changes. First, rally points for factories: a new
 +// CNC3D_Can_Rally test (a player-owned IsFactory building that is not a
 +// Construction Yard and not a helipad), a move click on such a building now
@@ -1285,7 +1285,7 @@ index 91f1bec..75649c8 100644
  
                      base->Assign_Mission(MISSION_MOVE);
                      base->Assign_Destination(::As_Target(cell));
-+                    /*	CNC3D: the RALLY POINT, if this factory has one, rides along in the
++                    /*	OpenCNC 3D: the RALLY POINT, if this factory has one, rides along in the
 +                    **	soldier's own ArchiveTarget and is read back at the exit cell, where
 +                    **	the tether is cut (InfantryClass::Per_Cell_Process). The exit cell
 +                    **	stays the destination above, so the soldier leaves through the door
@@ -1307,7 +1307,7 @@ index 91f1bec..75649c8 100644
              sound = VOC_BUTTON;
 -            Clicked_As_Target(PlayerPtr->Class->House); // 2019/09/20 JAS - Added record of who clicked on the object
 +            /*
-+            **	CNC3D: the flashing house must not come from PlayerPtr in a match.
++            **	OpenCNC 3D: the flashing house must not come from PlayerPtr in a match.
 +            **	Clicked_As_Target (techno.cpp) writes FlashCount AND
 +            **	FlashCountPerPlayer[house]. Both are members of every TechnoClass and both
 +            **	are decremented every tick by FlasherClass::Process, so they are shared
@@ -1331,7 +1331,7 @@ index 91f1bec..75649c8 100644
 -            // Changed for multiplayer ST - 3/13/2019 5:31PM
 -            if (Is_Owned_By_Player()) {
 +            /*
-+            **	CNC3D: this is the defect gate G194 caught, and it is the visible one.
++            **	OpenCNC 3D: this is the defect gate G194 caught, and it is the visible one.
 +            **	The guard below is Is_Owned_By_Player(), which is literally
 +            **	`House == PlayerPtr` (techno.cpp), so on a SELL order the seller's machine
 +            **	set FlashCount to 7 and every other peer left it 0. Two instances of the
@@ -1355,7 +1355,7 @@ index 91f1bec..75649c8 100644
      }
  
 +    /*
-+    **	CNC3D RALLY POINTS (project CNC3D, additive).
++    **	OpenCNC 3D RALLY POINTS (project CNC3D, additive).
 +    **
 +    **	A rally point is not a new mechanism. ArchiveTarget on a BuildingClass ALREADY is
 +    **	one, wired end to end -- but only for the Construction Yard: Active_Click_With
@@ -1426,7 +1426,7 @@ index 91f1bec..75649c8 100644
  {
      Validate();
      if (Can_Capture() && newowner != House) {
-+        /*	CNC3D: a captured factory does NOT keep the old owner's rally point. Nothing
++        /*	OpenCNC 3D: a captured factory does NOT keep the old owner's rally point. Nothing
 +        **	else would ever clear it -- the only clearing site for ArchiveTarget is
 +        **	FootClass::Detach (foot.cpp:1909-1911), and BuildingClass does not inherit it
 +        **	-- so without this the new owner's units would walk to wherever the previous
@@ -1439,7 +1439,7 @@ index 91f1bec..75649c8 100644
                      unit->Assign_Mission(MISSION_MOVE);
                      unit->Force_Track(DriveClass::OUT_OF_WEAPON_FACTORY, Adjacent_Cell(Center_Coord(), FACING_SW));
                      unit->Set_Speed(128);
-+                    /*	CNC3D: and THEN the rally point. Force_Track must still run above
++                    /*	OpenCNC 3D: and THEN the rally point. Force_Track must still run above
 +                    **	-- it is the scripted track that physically drives the tank out
 +                    **	through the door, and skipping it leaves the tank inside the
 +                    **	building. The destination is re-assigned after it, so the unit
@@ -1455,7 +1455,7 @@ index 91f1bec..75649c8 100644
      **	have been a success.
      */
 +    /*
-+    ** CNC3D: the cheat menu's "Build Anywhere".
++    ** OpenCNC 3D: the cheat menu's "Build Anywhere".
 +    **
 +    ** THIS IS THE THIRD COPY OF THE ADJACENCY RULE and it is the one that MATTERS.
 +    ** The other two answer the placement CURSOR: DisplayClass::Passes_Proximity_Check
@@ -1501,7 +1501,7 @@ index 3cff8a9..78be557 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Declares one new member function on BuildingClass, CNC3D_Can_Rally, the
 +// predicate for whether a building may take a rally point. The
 +// implementation and all resulting behaviour are in building.cpp.
@@ -1530,7 +1530,7 @@ index 0d46e99..254284f 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds one read-only inline accessor, CNC3D_Altitude, returning the
 +// projectile's existing Altitude field in leptons so the renderer's object
 +// dump can draw an arcing projectile above the ground. Nothing is written,
@@ -1547,7 +1547,7 @@ index 0d46e99..254284f 100644
      unsigned IsInaccurate : 1;
  
 +    /*
-+    ** CNC3D instrumentation (read-only): the projectile's render height in leptons,
++    ** OpenCNC 3D instrumentation (read-only): the projectile's render height in leptons,
 +    ** private below. The object dump reports it so an arcing grenade can be drawn
 +    ** off the ground. No behaviour change.
 +    */
@@ -1568,7 +1568,7 @@ index fd4e462..b286294 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds two 256-entry palette remap tables, RemapGrey and RemapBrown, for
 +// multiplayer houses 7 and 8, compiled only when EIGHTPLAYERS is defined.
 +// Each table remaps only the gold house colour band (indices 176 to 191)
@@ -1645,7 +1645,7 @@ index 7926914..feab387 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Under an EIGHTPLAYERS build flag, widens the playable house set from six
 +// multiplayer houses to eight: adds HOUSE_MULTI7 and HOUSE_MULTI8 to
 +// HousesType, adds their ownership bit macros, adds REMAP_GREY and
@@ -1777,7 +1777,7 @@ index b20427a..98f201f 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds an early return at the top of Simple_Text_Print when the requested
 +// font pointer is null, so the routine draws and measures nothing instead of
 +// continuing into Set_Font and the per-character width lookup with a stale
@@ -1795,14 +1795,14 @@ index b20427a..98f201f 100644
      FontXSpacing = xspace;
      FontYSpacing = yspace;
 +
-+    /* CNC3D: with no content root registered at CNC_Init time, NONE of the engine's fonts
++    /* OpenCNC 3D: with no content root registered at CNC_Init time, NONE of the engine's fonts
 +    ** load, so every Font*Ptr here is null. Drawing text without a font is not survivable
 +    ** further down: Set_Font would leave FontWidthBlockPtr stale, and Char_Pixel_Width
 +    ** dereferences it per character. There is nothing to draw and nothing to measure, so
 +    ** say so here, once, rather than in each of the four routines below.
 +    **
 +    ** This matters only on the engine's own legacy title screen and main menu, which the
-+    ** DLL still runs during startup. Every pixel of text CNC3D actually shows is drawn by
++    ** DLL still runs during startup. Every pixel of text OpenCNC 3D actually shows is drawn by
 +    ** the renderer from its own baked DOS fonts, never by this path.
 +    */
 +    if (font == NULL) {
@@ -1821,7 +1821,7 @@ index 20ff4f6..908829f 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds the cheat menu's Build Anywhere. Defines a static per-house bitmask
 +// on DisplayClass with setter and getter, clears it in Init_Clear so it does
 +// not survive from one scenario into the next, and adds a hook in the
@@ -1847,7 +1847,7 @@ index 20ff4f6..908829f 100644
      MapClass::Init_Clear();
  
 +    /*
-+    ** CNC3D: drop Build Anywhere with the scenario, for the reason ObjectClass::Init
++    ** OpenCNC 3D: drop Build Anywhere with the scenario, for the reason ObjectClass::Init
 +    ** drops the invincibility mask -- Clear_Scenario() is on every path that begins a
 +    ** scenario, so a switch cleared here cannot follow the player out of a skirmish
 +    ** and into a campaign mission.
@@ -1864,7 +1864,7 @@ index 20ff4f6..908829f 100644
 +/***********************************************************************************************
 + * CNC3D_Report_Missing_Palette -- Says, once per lookup, that a theater palette was not found. *
 + *                                                                                             *
-+ *    C&C 3D. The host runs this engine as a library and keeps its log; the engine's own       *
++ *    OpenCNC 3D. The host runs this engine as a library and keeps its log; the engine's own       *
 + *    debug print compiles to nothing in a release build, so the line goes out the way every   *
 + *    other host-facing readout in this modified engine does, as a prefixed line on stdout.    *
 + *                                                                                             *
@@ -1893,7 +1893,7 @@ index 20ff4f6..908829f 100644
      void const* ptr = MFCD::Retrieve(fullname);
 -    Mem_Copy((void*)ptr, GamePalette, 768);
 +    /*
-+    **	C&C 3D: the palette entry is looked up in the theater archive, and when that
++    **	OpenCNC 3D: the palette entry is looked up in the theater archive, and when that
 +    **	archive is missing, empty or damaged the lookup answers NULL. Copying from NULL
 +    **	is a fault inside mission start, so the palette is zeroed instead and the fault
 +    **	is reported through the host's log. Nothing below depends on the palette holding
@@ -1969,7 +1969,7 @@ index 20ff4f6..908829f 100644
      }
  
 +    /*
-+    ** CNC3D: the cheat menu's "Build Anywhere", in the same place and the same shape as
++    ** OpenCNC 3D: the cheat menu's "Build Anywhere", in the same place and the same shape as
 +    ** the editor exemption above because it is the same kind of thing -- a rule lifted
 +    ** for somebody who asked for it to be lifted.
 +    **
@@ -1998,7 +1998,7 @@ index 20ff4f6..908829f 100644
              if (cell < 1) {
 -                cell = Coord_Cell(TacticalCoord);
 +                /*
-+                **	CNC3D lockstep: the original fallback read Coord_Cell(TacticalCoord), a
++                **	OpenCNC 3D lockstep: the original fallback read Coord_Cell(TacticalCoord), a
 +                **	DisplayClass view member, from inside the simulation. In this build that
 +                **	expression is already peer invariant and always equals XY_Cell(MapCellX,
 +                **	MapCellY): under REMASTER_BUILD, DisplayClass::Set_Tactical_Position
@@ -2077,7 +2077,7 @@ index 42d052d..f311642 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Declares the Build Anywhere interface on DisplayClass inside the existing
 +// USE_RA_AI block: the static per-house bitmask CNC3D_BuildAnywhereHouses
 +// and the two static functions CNC3D_Set_Build_Anywhere and
@@ -2096,7 +2096,7 @@ index 42d052d..f311642 100644
      bool Passes_Proximity_Check(ObjectTypeClass const* object, HousesType house, short const* list, CELL trycell) const;
 +
 +    /*
-+    ** CNC3D: the cheat menu's "Build Anywhere". A house bit here lifts the base
++    ** OpenCNC 3D: the cheat menu's "Build Anywhere". A house bit here lifts the base
 +    ** ADJACENCY rule for that house and nothing else -- see the comment at the
 +    ** hook inside Passes_Proximity_Check for why terrain stays illegal.
 +    */
@@ -2115,9 +2115,9 @@ index 383e098..935d909 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds a large read-only instrumentation and export layer that hands engine
-+// state to the CNC3D renderer and test harness: per-object dumps (position,
++// state to the OpenCNC 3D renderer and test harness: per-object dumps (position,
 +// footprint, facing, selection, cloak, flash, doors, construction and
 +// harvest state, pips, cargo), animations, bullets in flight, houses,
 +// tiberium, crates, walls, smudges, the starting view, the tactical
@@ -2142,7 +2142,7 @@ index 383e098..935d909 100644
  **
  */
  
-+#include "cnc3d_compat.h"   // CNC3D: Win32 shims for non-Windows builds
++#include "cnc3d_compat.h"   // OpenCNC 3D: Win32 shims for non-Windows builds
  #include <stdio.h>
  
  #include "function.h"
@@ -2158,7 +2158,7 @@ index 383e098..935d909 100644
  
      Unselect_All();
  
-+    /* CNC3D: RESTORE THE AllowVoice INVARIANT AT THE GESTURE BOUNDARY.
++    /* OpenCNC 3D: RESTORE THE AllowVoice INVARIANT AT THE GESTURE BOUNDARY.
 +     *
 +     * AllowVoice is the 1995 engine's "one voice per user gesture" latch: TRUE at rest,
 +     * a batch sets it false after the first object speaks, and the batch restores it on
@@ -2200,7 +2200,7 @@ index 383e098..935d909 100644
  
 -    srand(timeGetTime());
 +    /*
-+    ** CNC3D lockstep: no wall clock seeds this function. The start-position shuffle
++    ** OpenCNC 3D lockstep: no wall clock seeds this function. The start-position shuffle
 +    ** below now draws from Scen.RandomNumber (Random_Pick), the same synchronised
 +    ** stream the house-selection loop already uses a few lines down. Every peer holds
 +    ** the identical stream state here because Init_Random is never reached in the DLL
@@ -2248,7 +2248,7 @@ index 383e098..935d909 100644
      Clear_Scenario();
  
 +    /*
-+    ** CNC3D: THE CLOCK STARTS AT ZERO FOR A NEW SCENARIO.
++    ** OpenCNC 3D: THE CLOCK STARTS AT ZERO FOR A NEW SCENARIO.
 +    **
 +    ** Clear_Scenario() empties the world but leaves Frame where the last mission stopped,
 +    ** because in 1995 the reset lives in Select_Game() (init.cpp:737) under the comment
@@ -2278,7 +2278,7 @@ index 383e098..935d909 100644
      */
 -    if (GameToPlay != GAME_NORMAL && MPlayerGhosts && IRandom(0, 10000) == 1) {
 +    /*
-+    ** CNC3D lockstep: this used IRandom, which is libc rand(), so a Mac peer and a
++    ** OpenCNC 3D lockstep: this used IRandom, which is libc rand(), so a Mac peer and a
 +    ** Windows peer disagreed even from an identical seed.
 +    **
 +    ** It does NOT move to NonCriticalRandomNumber. That generator is not peer identical
@@ -2306,7 +2306,7 @@ index 383e098..935d909 100644
          if (Map.Pixel_To_Coord(x1, y1)) {
 -            PlayerPtr->Sell_Wall(cell);
 +            /*
-+            **	CNC3D lockstep: a wall sale is a SELL event with a cell target, which is the
++            **	OpenCNC 3D lockstep: a wall sale is a SELL event with a cell target, which is the
 +            **	form display.cpp's Mouse_Left_Release always queued and the SELL arm already
 +            **	understands (Is_Target_Cell). Direct only outside a match.
 +            */
@@ -2323,7 +2323,7 @@ index 383e098..935d909 100644
      short const* occupy_list = placement_type->Occupy_List(true);
  
 +    /*
-+    ** CNC3D: the cheat menu's Build Anywhere. This routine is what fills in the
++    ** OpenCNC 3D: the cheat menu's Build Anywhere. This routine is what fills in the
 +    ** PassesProximityCheck flag the placement cursor reads, so it has to agree with
 +    ** DisplayClass::Passes_Proximity_Check or the cursor would show red over ground
 +    ** the engine would happily accept. In_Radar is still required of every cell the
@@ -2356,7 +2356,7 @@ index 383e098..935d909 100644
                                  /*
                                  ** Execute immediately so we get the sidebar feedback
 +                                **
-+                                **	CNC3D lockstep: NOT in a match. This pumps the queue from inside
++                                **	OpenCNC 3D lockstep: NOT in a match. This pumps the queue from inside
 +                                **	an input handler so the PRODUCE above executes now rather than at
 +                                **	the frame boundary, on this machine only. Under lockstep the
 +                                **	order goes out through the drain like every other and the sidebar
@@ -2375,7 +2375,7 @@ index 383e098..935d909 100644
              /*
              ** Call the place directly instead of queueing it, so we can evaluate the return code.
 +            **
-+            **	CNC3D lockstep: queue the PLACE event instead, the way DisplayClass::
++            **	OpenCNC 3D lockstep: queue the PLACE event instead, the way DisplayClass::
 +            **	Mouse_Left_Release always did, and clear the placement cursor at once the way
 +            **	it always did too. The return code the comment above wants was only ever used
 +            **	to clear PlacementType, which is presentation state the host re-reads on its
@@ -2404,7 +2404,7 @@ index 383e098..935d909 100644
 -            shroud_entry.IsVisible = cellptr->Is_Visible(PlayerPtr);
 -            shroud_entry.IsMapped = cellptr->Is_Mapped(PlayerPtr);
 +            /*
-+            ** CNC3D: THE UNSHROUD DEBUG FLAG REACHES THIS EXPORT TOO.
++            ** OpenCNC 3D: THE UNSHROUD DEBUG FLAG REACHES THIS EXPORT TOO.
 +            **
 +            ** Debug_Unshroud is the engine's own "show the whole map" switch, set through
 +            ** DEBUG_REQUEST_UNSHROUD in CNC_Handle_Debug_Request below. Every other place
@@ -2444,7 +2444,7 @@ index 383e098..935d909 100644
 -        if (!DoList.Add(OutList.First())) {
 -            ;
 +    /*
-+    **	CNC3D lockstep: in a match this loop MUST NOT RUN. An order that goes straight from
++    **	OpenCNC 3D lockstep: in a match this loop MUST NOT RUN. An order that goes straight from
 +    **	OutList to DoList here is an order that executes on this machine and nowhere else,
 +    **	which is the whole desync in one statement. Under lockstep the host takes them out
 +    **	with CNC3D_Drain_Events, sends them to every peer INCLUDING ITSELF, and puts them
@@ -2473,7 +2473,7 @@ index 383e098..935d909 100644
  
 -    for (int i = 0; i < MPlayerCount; i++) {
 +    /*
-+    **	CNC3D lockstep: execute in a CANONICAL order rather than in arrival order.
++    **	OpenCNC 3D lockstep: execute in a CANONICAL order rather than in arrival order.
 +    **
 +    **	Arrival order is fine for one machine and fatal for several. Two peers receive the
 +    **	same orders over UDP in whatever sequence the network hands them over, so executing
@@ -2519,7 +2519,7 @@ index 383e098..935d909 100644
                      && building->House->Class->House == PlayerPtr->Class->House) {
 -                    building->Repair(-1);
 +                    /*
-+                    **	CNC3D lockstep: this click becomes an ORDER rather than an act. The
++                    **	OpenCNC 3D lockstep: this click becomes an ORDER rather than an act. The
 +                    **	direct call below changes this machine's world and no other, which is
 +                    **	the whole desync in one line. Under lockstep the REPAIR event EA already
 +                    **	compiled into event.cpp is queued instead, drained by the host, sent to
@@ -2541,7 +2541,7 @@ index 383e098..935d909 100644
                  if (building->House && building->House->Class->House == PlayerPtr->Class->House) {
 -                    building->Sell_Back(1);
 +                    /*
-+                    **	CNC3D lockstep: queue the SELL event instead of selling here, for the
++                    **	OpenCNC 3D lockstep: queue the SELL event instead of selling here, for the
 +                    **	reason given at Repair above. ONE DELIBERATE DIFFERENCE, confined to a
 +                    **	match: the event arm calls Sell_Back(-1), which TOGGLES, where this direct
 +                    **	call passes 1, which forces. So in a match a second click on a building
@@ -2561,7 +2561,7 @@ index 383e098..935d909 100644
  
      if (ai_player_count) {
 +        /*
-+        ** CNC3D lockstep: same reasoning as the caller. IRandom is libc rand(), which
++        ** OpenCNC 3D lockstep: same reasoning as the caller. IRandom is libc rand(), which
 +        ** does not agree across platforms, and neither of the alternatives is safe: the
 +        ** non-critical generator's stream position is itself peer dependent, and the
 +        ** synchronised one would shift every later random event in every skirmish to
@@ -2642,7 +2642,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D geometry block. The renderer needs three things the old dump did not carry:
++    **	OpenCNC 3D geometry block. The renderer needs three things the old dump did not carry:
 +    **
 +    **	  lx/ly     the exact lepton position (256 leptons per cell), so moving units are not
 +    **	            snapped to cell centres and so sub-cell placement is honest.
@@ -2682,7 +2682,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D: is this object selected BY THE LOCAL PLAYER right now. The renderer draws its
++    **	OpenCNC 3D: is this object selected BY THE LOCAL PLAYER right now. The renderer draws its
 +    **	selection brackets from this field rather than from a list of its own, so what the
 +    **	player sees bracketed is by construction what the engine will actually order about.
 +    **	IsSelectedMask is the multiplayer-safe form; IsSelected alone is only maintained in
@@ -2694,7 +2694,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D flash. FlasherClass is a base of TechnoClass (techno.h:52).
++    **	OpenCNC 3D flash. FlasherClass is a base of TechnoClass (techno.h:52).
 +    **	TechnoClass::Clicked_As_Target (techno.cpp:1871) sets FlashCount to 7 on the
 +    **	object a MegaMission is aimed at (event.cpp:586); FlasherClass::Process
 +    **	(flasher.cpp:78), run once a tick from TechnoClass::AI (techno.cpp:2053),
@@ -2719,7 +2719,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D cloak state, so a Stealth Tank can be DRAWN cloaked. Without these two the
++    **	OpenCNC 3D cloak state, so a Stealth Tank can be DRAWN cloaked. Without these two the
 +    **	renderer has no way to know a unit is cloaking at all, and draws every stealth
 +    **	tank fully opaque through its whole cycle.
 +    **
@@ -2760,7 +2760,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D combat presentation. A dying infantryman is NOT deleted at the moment of
++    **	OpenCNC 3D combat presentation. A dying infantryman is NOT deleted at the moment of
 +    **	death: Take_Damage() assigns a death Do (DO_GUN_DEATH etc., infantry.cpp) and the
 +    **	object stays in the heap playing that animation until Doing_AI() reaches the last
 +    **	stage and calls Delete_This(). The renderer therefore needs three more facts to
@@ -2773,7 +2773,7 @@ index 383e098..935d909 100644
 +    int dying = 0;
 +    int makecnt = -1;
 +    /*
-+    **	CNC3D door presentation. TechnoClass derives from DoorClass, and the war factory
++    **	OpenCNC 3D door presentation. TechnoClass derives from DoorClass, and the war factory
 +    **	drives its door through it (Mission_Unload: Open_Door(2, 11), so Stages == 10 and
 +    **	Door_Stage() runs 0..9 out and 9..0 back). The N64's own war-factory draw arm is
 +    **	`clipFrame = Door_Stage() * (59/9)`, i.e. it maps exactly those ten stages onto
@@ -2782,7 +2782,7 @@ index 383e098..935d909 100644
 +    */
 +    int doorstage = -1;
 +    /*
-+    **	CNC3D SAM presentation. MissionClass::Status is the mission state machine's own
++    **	OpenCNC 3D SAM presentation. MissionClass::Status is the mission state machine's own
 +    **	step, and the N64's SAM-site draw arm (RAM 0x8003DE24) branches on it directly:
 +    **	states 2, 3 and 6 (SAM_READY, SAM_FIRING, SAM_LOCKING) draw the launcher TRACKING,
 +    **	from PrimaryFacing; every other state draws it rising or lowering, from the stage
@@ -2801,7 +2801,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D construction presentation. For a building, `doing` is its BState and
++    **	OpenCNC 3D construction presentation. For a building, `doing` is its BState and
 +    **	`dostage` its Fetch_Stage(). While BState == BSTATE_CONSTRUCTION the 1995 draw
 +    **	(building.cpp Draw_It) shows MAKE.SHP frame Fetch_Stage() -- REVERSED when
 +    **	Mission == MISSION_DECONSTRUCTION (selling), which the renderer can see from
@@ -2820,7 +2820,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D: A VEHICLE'S OWN STAGE COUNTER. StageClass is a base of TechnoClass, so this
++    **	OpenCNC 3D: A VEHICLE'S OWN STAGE COUNTER. StageClass is a base of TechnoClass, so this
 +    **	is the SAME field the building arm above reads; it was simply never written for
 +    **	RTTI_UNIT, so every vehicle reported dostage = -1 and the renderer had no counter to
 +    **	drive a clip from.
@@ -2855,7 +2855,7 @@ index 383e098..935d909 100644
 +    obj->Class_Of().Dimensions(dimw, dimh);
 +
 +    /*
-+    **	CNC3D targeting. tcx/tcy is Coord_Cell(Target_Coord()) -- the cell the ENGINE files
++    **	OpenCNC 3D targeting. tcx/tcy is Coord_Cell(Target_Coord()) -- the cell the ENGINE files
 +    **	this object under when something is ordered to shoot it. For a BUILDING that is not
 +    **	the anchor cell x/y above, and that difference is the whole reason this field exists.
 +    **
@@ -2884,7 +2884,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D pip row. The console draws these from its own copy of exactly this
++    **	OpenCNC 3D pip row. The console draws these from its own copy of exactly this
 +    **	arithmetic: the per-object overlay arm at RAM 0x801D0A60 calls Draw_Pips
 +    **	(RAM 0x801D4530 / ROM 0x176320), which takes the count from the object's
 +    **	Pip_Count virtual and the maximum from the TYPE's Max_Pips virtual. One field pair
@@ -2936,7 +2936,7 @@ index 383e098..935d909 100644
 +    **	handle to carry per-unit animation phase across ticks.
 +    */
 +    /*
-+    **	CNC3D: HOW HIGH IT IS FLYING. AircraftClass::Altitude (aircraft.h:254), in the same
++    **	OpenCNC 3D: HOW HIGH IT IS FLYING. AircraftClass::Altitude (aircraft.h:254), in the same
 +    **	leptons everything else here uses. Zero for every other heap, so a reader can add
 +    **	it unconditionally: the cartridge does exactly that, lifting the health bar and the
 +    **	pip row by Altitude*10 for RTTI_AIRCRAFT and by nothing for anything else
@@ -2949,7 +2949,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D: WHICH SIDE THIS OBJECT FIGHTS FOR, as opposed to which house owns it.
++    **	OpenCNC 3D: WHICH SIDE THIS OBJECT FIGHTS FOR, as opposed to which house owns it.
 +    **
 +    **	The owner field above is HouseTypeClass::IniName, and in a multiplayer game that is
 +    **	Multi1..Multi6 rather than GoodGuy or BadGuy. A reader that picks its house colour,
@@ -2973,7 +2973,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D REPAIR FEEDBACK, so a structure that is repairing itself can SAY so. The
++    **	OpenCNC 3D REPAIR FEEDBACK, so a structure that is repairing itself can SAY so. The
 +    **	1995 game draws a wrench over such a building and blinks it, and a reader given
 +    **	only the strength cannot reconstruct either half: a building whose health is
 +    **	climbing might be repairing, or might be sitting on a repair bay, and neither of
@@ -3004,7 +3004,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D PRIMARY FACTORY, so a reader can say WHICH of a house's factories the next
++    **	OpenCNC 3D PRIMARY FACTORY, so a reader can say WHICH of a house's factories the next
 +    **	unit walks out of. Nothing already on this line answers it. The flag is not a
 +    **	mission, not a status and not a strength, and a reader watching two barracks has no
 +    **	way to derive it short of building a unit and seeing where it appears.
@@ -3031,7 +3031,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D: WHICH CONTROL GROUP THIS OBJECT IS IN. FootClass::Group (foot.h) is the
++    **	OpenCNC 3D: WHICH CONTROL GROUP THIS OBJECT IS IN. FootClass::Group (foot.h) is the
 +    **	storage Handle_Team (conquer.cpp) assigns and recalls by; it is 0..9 for a member
 +    **	and 0xFF for a unit in no group. Exported so the HUD's unit card can show how many
 +    **	units each group holds without keeping a second list that would drift from the
@@ -3051,7 +3051,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D: THE FOUR CONDITIONS A HARVESTER'S OWN ANIMATION IS GATED ON.
++    **	OpenCNC 3D: THE FOUR CONDITIONS A HARVESTER'S OWN ANIMATION IS GATED ON.
 +    **
 +    **	The 1995 engine tests exactly these four before it picks a harvesting shape:
 +    **	unit.cpp:2126 is "IsHarvesting && !PrimaryFacing.Is_Rotating() && !NavCom &&
@@ -3191,7 +3191,7 @@ index 383e098..935d909 100644
 +        total++;
 +    }
 +    /*
-+    **	CNC3D: THE AIRCRAFT HEAP, which this dump walked past until v0.6.0.
++    **	OpenCNC 3D: THE AIRCRAFT HEAP, which this dump walked past until v0.6.0.
 +    **
 +    **	Every other heap was here from the first version and this one never was, so no
 +    **	aircraft of any kind had ever reached the renderer: an Orca built on a helipad was
@@ -3210,7 +3210,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D transport presentation. A unit riding a transport is neither deleted nor
++    **	OpenCNC 3D transport presentation. A unit riding a transport is neither deleted nor
 +    **	moved: CargoClass::Attach (cargo.cpp:82) calls object->Limbo(), which unselects it,
 +    **	takes it off the map layer and sets IsInLimbo -- but never touches Coord. A
 +    **	reinforcement passenger was never Unlimbo'd at all (reinf.cpp attaches the cargo and
@@ -3287,7 +3287,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D combat presentation: the Anims heap IS the engine's own effect layer --
++    **	OpenCNC 3D combat presentation: the Anims heap IS the engine's own effect layer --
 +    **	muzzle flashes (ANIM_GUN_N/ANIM_MUZZLE_FLASH, spawned by TechnoClass::Fire_At),
 +    **	projectile impacts (ANIM_PIFF..., spawned by BulletClass on detonation) and
 +    **	vehicle death explosions (ANIM_FRAG1/ANIM_FBALL1, UnitClass::Take_Damage).
@@ -3326,7 +3326,7 @@ index 383e098..935d909 100644
 +            }
 +        }
 +        /*
-+        **	CNC3D biggest: AnimTypeClass::Biggest, the frame at which the animation is at
++        **	OpenCNC 3D biggest: AnimTypeClass::Biggest, the frame at which the animation is at
 +        **	its largest (adata.cpp). The renderer needs it for the one class of anim the
 +        **	engine cannot count frames for -- an art-less one, where Stages is 0 and
 +        **	AnimClass::Stage never advances, which is every FLAME-* the flamethrower
@@ -3398,7 +3398,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D tiberium presentation. The renderer draws tiberium from the engine's
++    **	OpenCNC 3D tiberium presentation. The renderer draws tiberium from the engine's
 +    **	own cell table: one line per cell whose Overlay is a tiberium patch, with
 +    **	OverlayData (the growth stage the DOS draw uses as its frame). x/y are
 +    **	per-axis cell coordinates on the engine's MEGAMAPS grid, the same space as
@@ -3420,7 +3420,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D crate presentation. Same gap as tiberium and walls: a crate is a terrain
++    **	OpenCNC 3D crate presentation. Same gap as tiberium and walls: a crate is a terrain
 +    **	OVERLAY cell, so it is in none of the heaps the OBJ| lines walk, and the renderer
 +    **	had no way to know one was there. MPlayerGoodies already scatters them
 +    **	(MapClass::Place_Random_Crate, called from scenarioini.cpp) and cell.cpp already
@@ -3448,7 +3448,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D wall presentation. Walls are terrain OVERLAY cells, not techno objects, so
++    **	OpenCNC 3D wall presentation. Walls are terrain OVERLAY cells, not techno objects, so
 +    **	they live in none of the heaps the OBJ| lines above walk -- the same gap tiberium
 +    **	had before TIB| landed. One line per wall cell:
 +    **
@@ -3492,7 +3492,7 @@ index 383e098..935d909 100644
 +        int cy = cell / 64;
 +#endif
 +        /*
-+        **	CNC3D owner: which house BUILT this wall cell. CellClass::Owner (cell.h:131)
++        **	OpenCNC 3D owner: which house BUILT this wall cell. CellClass::Owner (cell.h:131)
 +        **	is HOUSE_NONE by default (cell.cpp:136) and is set only when a wall is placed
 +        **	by a player (overlay.cpp:243), which is exactly the test the sell path makes
 +        **	(house.cpp:4715). So a wall painted into a scenario's [OVERLAY] reports None
@@ -3512,7 +3512,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D SMUDGES: the scorch marks, craters and building aprons.
++    **	OpenCNC 3D SMUDGES: the scorch marks, craters and building aprons.
 +    **
 +    **	  SMUDGE|<x>|<y>|<type>|<data>
 +    **
@@ -3549,7 +3549,7 @@ index 383e098..935d909 100644
 +    }
 +
 +    /*
-+    **	CNC3D start view. Scen.Views[0] is the scenario's own opening view cell
++    **	OpenCNC 3D start view. Scen.Views[0] is the scenario's own opening view cell
 +    **	(scenarioini.cpp reads it from the INI; single player has no useful
 +    **	HomeCellX/Y -- those are MultiplayerStartPositions). The renderer centres
 +    **	its camera here ONCE, on the first dump; reprints are idempotent data.
@@ -4388,7 +4388,7 @@ index 383e098..935d909 100644
 + * WHY THIS EXPORT EXISTS.
 + *
 + * Tiberian Dawn's trigger is one event paired with one action: no AND, no OR, no counters
-+ * (trigger.h:41-108). CNC3D's editor offers richer conditions in "Enhanced mode", and the
++ * (trigger.h:41-108). OpenCNC 3D's editor offers richer conditions in "Enhanced mode", and the
 + * only sane way to give them the game's real effects -- Create Team with its ScenarioInit
 + * bracket, Reinforce with Do_Reinforcements' edge resolution, Allow Win with its Blockage
 + * accounting -- is to let the engine run its OWN action bodies rather than reimplement
@@ -4593,7 +4593,7 @@ index fa8179c..06a423d 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds a compile-time static_assert, under an EIGHTPLAYERS guard, that
 +// GAME_OVER_MULTIPLAYER_MAX_PLAYERS_TRACKED is still 8, so the end-of-game
 +// stats block cannot silently drop players if the maximum player count is
@@ -4624,7 +4624,7 @@ index fa8179c..06a423d 100644
      bool MPlayerAftermathUnits;
      bool CaptureTheFlag;
      bool DestroyStructures; // New early win condition via destroying all a player's structures
-+    bool ShortGame;         // CNC3D: defences and walls do not keep a player alive
++    bool ShortGame;         // OpenCNC 3D: defences and walls do not keep a player alive
      bool ModernBalance;
  };
  
@@ -4637,9 +4637,9 @@ index dc4499d..4c76d29 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds one condition to the crush test in DriveClass::Overrun_Square so that
-+// an object owned by a house flagged invincible by the CNC3D cheat is not
++// an object owned by a house flagged invincible by the OpenCNC 3D cheat is not
 +// crushed by a tracked vehicle. Crushing is the only way an object dies
 +// without damage being applied, so it does not pass through Take_Damage
 +// where the same flag is already tested.
@@ -4676,7 +4676,7 @@ index 7eeab65..aa1fa11 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Two changes in EventClass::Execute. The REPAIR arm requires the ordering
 +// house to own the building, the test the SELL arm always had. A beacon's
 +// thirty second kill time is a frame number rather than the Windows wall
@@ -4694,7 +4694,7 @@ index 7eeab65..aa1fa11 100644
          techno = As_Techno(Data.Target.Whom);
 -        if (techno && techno->IsActive) {
 +        /*
-+        **	CNC3D: the ownership test the SELL arm below has always had and this one never
++        **	OpenCNC 3D: the ownership test the SELL arm below has always had and this one never
 +        **	did. Harmless in 1995 because only the owner's mouse could queue a REPAIR, and
 +        **	harmless in the shipped campaign because nothing there reaches this arm at all.
 +        **	It matters the moment orders arrive off a wire, where a peer's bytes name any
@@ -4712,7 +4712,7 @@ index 7eeab65..aa1fa11 100644
              /*
              **	Beacons have a 30-second kill time.
 +            **
-+            ** CNC3D lockstep: the deadline is a FRAME NUMBER, not a wall clock. The old
++            ** OpenCNC 3D lockstep: the deadline is a FRAME NUMBER, not a wall clock. The old
 +            ** code read GetSystemTimeAsFileTime inside #ifdef _WIN32, so a beacon expired
 +            ** after 30 s of wall time on Windows and NEVER expired anywhere else. That is
 +            ** real state divergence rather than a cosmetic one, because Delete_This()
@@ -4749,7 +4749,7 @@ index 7c431ac..bf7ffe8 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Narrows EventClass::Frame from 27 bits to 24 and widens ID from 4 bits to
 +// 7, so an order can name one of 128 houses, and pins the structure at 22
 +// bytes with a static_assert because it is the network wire unit.
@@ -4766,7 +4766,7 @@ index 7c431ac..bf7ffe8 100644
      ** 'Frame' is the frame that the command should execute on.
 -    ** 27 bits gives over 25 days of playing time without wrapping,
 -    ** at 30 frames per second, so it should be plenty!
-+    ** CNC3D: was 27 bits, narrowed to 24 to pay for the wider ID below. 24 bits is
++    ** OpenCNC 3D: was 27 bits, narrowed to 24 to pay for the wider ID below. 24 bits is
 +    ** 6.4 days at 30 frames per second and 12.9 days at the 15 Hz this game runs at,
 +    ** which is still absurdly more than any single match. Westwood made this exact
 +    ** trade themselves: redalert/event.h is the same class at Frame:26 / ID:5.
@@ -4776,7 +4776,7 @@ index 7c431ac..bf7ffe8 100644
  
      /*
      ** House index of the player originating this event
-+    ** CNC3D: was 4 bits, which names 16 houses, and four of those are the campaign
++    ** OpenCNC 3D: was 4 bits, which names 16 houses, and four of those are the campaign
 +    ** houses, so the classic wire tops out at twelve multiplayer slots. 7 bits names
 +    ** 128 and is what lets the roster grow to sixteen players and beyond. The three
 +    ** bits come out of Frame above, so the word is still 32 bits and the structure is
@@ -4792,7 +4792,7 @@ index 7c431ac..bf7ffe8 100644
  #pragma pack(pop)
  
 +/*
-+**	CNC3D: the wire unit's size, pinned rather than remembered.
++**	OpenCNC 3D: the wire unit's size, pinned rather than remembered.
 +**
 +**	This structure IS the network wire unit: lockstep sends orders by copying it whole.
 +**	Its three bitfields share one 32-bit word, so the Frame:24 / ID:7 respin is meant to
@@ -4813,7 +4813,7 @@ index ff588bf..774e515 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds extern declarations for two further house colour remap tables,
 +// RemapGrey and RemapBrown, inside an EIGHTPLAYERS guard. Declarations only,
 +// with no code and no data defined here.
@@ -4874,7 +4874,7 @@ index 9c67611..27deed0 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Under the EIGHTPLAYERS build switch, adds two more multiplayer colour
 +// entries (grey and brown) to MPlayerGColors and MPlayerTColors, and raises
 +// MPlayerMax from 6 to 8. With the switch off the file reads as upstream.
@@ -4936,7 +4936,7 @@ index 5fde0a2..0f489c0 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Under the EIGHTPLAYERS build switch, defines two new house types,
 +// HouseMulti7 and HouseMulti8 (grey and brown remap tables, MP7 and MP8 file
 +// suffixes, civilian name and neutral radar colours), and registers both in
@@ -5001,7 +5001,7 @@ index 7e9f27c..fa60aa6 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds a static bitmask of houses whose super weapons were granted by the
 +// cheat menu, with a setter and getter, cleared in HouseClass::Init so the
 +// grant dies with the scenario. Uses it in two places: HouseClass::AI no
@@ -5056,7 +5056,7 @@ index 7e9f27c..fa60aa6 100644
      Houses.Free_All();
  
 +    /*
-+    ** CNC3D: the cheat's super-weapon grant dies with the scenario, exactly as the
++    ** OpenCNC 3D: the cheat's super-weapon grant dies with the scenario, exactly as the
 +    ** invincibility mask and Build Anywhere do. Clear_Scenario() calls this on every
 +    ** path that begins a scenario.
 +    */
@@ -5071,7 +5071,7 @@ index 7e9f27c..fa60aa6 100644
      if (NukeStrike.Is_Present()) {
 -        if (!(ActiveBScan & STRUCTF_TEMPLE) && (!NukeStrike.Is_One_Time() || GameToPlay == GAME_NORMAL)) {
 +        /*
-+        ** CNC3D: a cheat-granted nuke is not swept away.
++        ** OpenCNC 3D: a cheat-granted nuke is not swept away.
 +        **
 +        ** THIS SWEEP IS HARSHER THAN THE ION CANNON'S DIRECTLY ABOVE, in two ways that
 +        ** both bite in single player, and between them they made the Unlock
@@ -5103,7 +5103,7 @@ index 7e9f27c..fa60aa6 100644
          break;
  
      case SPC_NUCLEAR_BOMB:
-+        /* CNC3D: the nuke is the one special that can refuse silently -- it needs a
++        /* OpenCNC 3D: the nuke is the one special that can refuse silently -- it needs a
 +           Temple of Nod to launch from, and without one it used to return before even
 +           spending the charge, so the player pressed the button and NOTHING happened,
 +           not even a wasted shot. This line says which of the three gates it passed. */
@@ -5120,7 +5120,7 @@ index 7e9f27c..fa60aa6 100644
                  */
 -                if (GameToPlay == GAME_NORMAL)
 +                /*
-+                ** CNC3D: ... and in single player when the cheat menu handed the player
++                ** OpenCNC 3D: ... and in single player when the cheat menu handed the player
 +                ** the super weapons: the nuke could not be fired after being unlocked
 +                ** from the cheat menu with nothing else unlocked, and with no
 +                ** construction yard standing.
@@ -5217,7 +5217,7 @@ index 7e9f27c..fa60aa6 100644
          if (b && b->IsActive && b->House == this) {
 -            if (!b->Class->IsWall) {
 +            /*
-+            **  CNC3D SHORT GAME: an armed building is a defence, and a defence is not
++            **  OpenCNC 3D SHORT GAME: an armed building is a defence, and a defence is not
 +            **  a base. With the option on, only a building that could rebuild the
 +            **  house keeps it in the match; walls never counted either way.
 +            */
@@ -5235,7 +5235,7 @@ index 1ffcb36..465f1d6 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Declares, on HouseClass, a static bitmask of houses whose super weapons
 +// were granted by the cheat menu plus a setter and a getter for it.
 +// Declarations only; the behaviour that reads the flag lives in house.cpp.
@@ -5251,7 +5251,7 @@ index 1ffcb36..465f1d6 100644
      void Sell_Wall(CELL cell);
      bool Flag_To_Die(void);
 +    /*
-+    ** CNC3D: which houses hold their super weapons because the cheat menu granted them
++    ** OpenCNC 3D: which houses hold their super weapons because the cheat menu granted them
 +    ** rather than because they built the launch building. Read by Place_Special_Blast,
 +    ** where a nuke with no Temple of Nod would otherwise refuse to fire in single
 +    ** player. Set by CNC3D_Grant_Superweapons; cleared by Init with the scenario.
@@ -5272,7 +5272,7 @@ index 0003135..f6b2538 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds HOUSEF_MULTI7 and HOUSEF_MULTI8 to the owner mask of every infantry
 +// type in the table, so houses 7 and 8 may own and build the same infantry
 +// the first six multiplayer houses can. The two bits are defined as zero
@@ -5474,10 +5474,10 @@ index 9b527ac..69e3fb4 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Three changes. In Per_Cell_Process the sabotage arm records the saboteur's
 +// own house rather than this machine's in a lockstep match, and the tether
-+// cut reads a factory rally point (a CNC3D addition, carried in the
++// cut reads a factory rally point (a OpenCNC 3D addition, carried in the
 +// soldier's own ArchiveTarget by BuildingClass::Exit_Object) and sends the
 +// soldier on from the exit cell. Overlap_List drops the selection term in a
 +// lockstep match, so cell occupancy does not depend on which peer has the
@@ -5495,7 +5495,7 @@ index 9b527ac..69e3fb4 100644
              building->IsGoingToBlow = true;
 -            building->Clicked_As_Target(PlayerPtr->Class->House,
 +            /*
-+            **	CNC3D: the saboteur's own house rather than this machine's, for the reason
++            **	OpenCNC 3D: the saboteur's own house rather than this machine's, for the reason
 +            **	written out in BuildingClass::Sell_Back. This site never showed in a dump
 +            **	because the line after it immediately overwrites FlashCount with the same
 +            **	20 on every peer -- but FlashCountPerPlayer[] keeps whichever index it was
@@ -5511,7 +5511,7 @@ index 9b527ac..69e3fb4 100644
      */
      if (center && IsTethered) {
 +        /*
-+        **	CNC3D: a factory's rally point. BuildingClass::Exit_Object parks it in this
++        **	OpenCNC 3D: a factory's rally point. BuildingClass::Exit_Object parks it in this
 +        **	soldier's own ArchiveTarget (always a CELL target) and leaves the destination
 +        **	as the exit cell, so the soldier walks out through the door first. This is
 +        **	that cell: the tether is cut here and the walk to the rally begins from here,
@@ -5559,7 +5559,7 @@ index 9b527ac..69e3fb4 100644
      // return(Coord_Spillage_List(Coord, 24 + ((IsSelected || Doing > DO_WALK)?12:0)));
 -    return (Coord_Spillage_List(Coord, 24 + ((Doing > DO_WALK || Is_Selected_By_Player()) ? 12 : 0)));
 +    /*
-+    **	CNC3D lockstep: the selection term is dropped IN A MATCH ONLY.
++    **	OpenCNC 3D lockstep: the selection term is dropped IN A MATCH ONLY.
 +    **	Is_Selected_By_Player() reads the global PlayerPtr, so it answers differently on
 +    **	every peer, and this list is not advisory: MapClass::Place_Down / Pick_Up /
 +    **	Overlap_Down / Overlap_Up walk it into CellClass::Overlapper, and Overlap_Down ends
@@ -5584,7 +5584,7 @@ index f406235..f16082d 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds a compile-time static_assert under EIGHTPLAYERS that CONNECT_MAX is
 +// at least MAX_PLAYERS minus one, pinning the IPX connection slot count to
 +// the player count. No runtime code or values are changed.
@@ -5618,7 +5618,7 @@ index 72ed3e5..5c49597 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds a per-house invincibility switch: a static bitmask on ObjectClass, a
 +// setter and a query, with the query added as a fourth condition on the
 +// damage test in Take_Damage so objects owned by a flagged house take no
@@ -5638,7 +5638,7 @@ index 72ed3e5..5c49597 100644
  void const* ObjectTypeClass::PipShapes = 0;
  
 +/*
-+**	INVINCIBILITY (project CNC3D addition; not upstream). One bit per house, in the
++**	INVINCIBILITY (project OpenCNC 3D addition; not upstream). One bit per house, in the
 +**	HOUSEF_* shape. Zero means nobody, which is the value every scenario starts from
 +**	because Init() below resets it and Clear_Scenario() calls Init(). See object.h for
 +**	why the switch lives on ObjectClass rather than in the DLL layer.
@@ -5756,7 +5756,7 @@ index e822e3d..4d19a19 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Declares the new per-house invincibility members on ObjectClass (the
 +// static bitmask, the setter and the const query) with a comment explaining
 +// why the switch sits there rather than in the DLL layer, and widens the
@@ -5774,7 +5774,7 @@ index e822e3d..4d19a19 100644
      static void Init(void);
  
 +    /*
-+    **	INVINCIBILITY (project CNC3D addition; not upstream).
++    **	INVINCIBILITY (project OpenCNC 3D addition; not upstream).
 +    **
 +    **	WHY IT LIVES HERE. The exported debug interface already switches money
 +    **	(DEBUG_REQUEST_ADD_RESOURCES), instant build (DEBUG_REQUEST_END_PRODUCTION), the
@@ -5825,7 +5825,7 @@ index 425890b..b679f25 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Splits the savegame version constant into a named SAVEGAME_MAGIC that
 +// takes a different value under EIGHTPLAYERS, so a save file written by a
 +// six-player build no longer matches and is refused instead of being loaded
@@ -5863,7 +5863,7 @@ index 47f8b42..c1320b2 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Clear_Scenario resets the synchronised random stream in a lockstep match,
 +// so a second scenario in one process starts where a fresh process would.
 +// It DOES change the game simulation, in a lockstep match only.
@@ -5878,7 +5878,7 @@ index 47f8b42..c1320b2 100644
  void Clear_Scenario(void)
  {
 +    /*
-+    **	CNC3D lockstep: put the SYNCHRONISED simulation stream back where a freshly
++    **	OpenCNC 3D lockstep: put the SYNCHRONISED simulation stream back where a freshly
 +    **	launched process holds it, because nothing else in the DLL ever does.
 +    **
 +    **	Scen.RandomNumber is written in exactly two places, both inside Init_Random
@@ -5916,7 +5916,7 @@ index 0986712..3804c5b 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Under EIGHTPLAYERS raises MAX_PLAYERS from 6 to 8 and MAX_MPLAYER_COLORS
 +// from 6 to 8 in this header, with an added comment recording that no file
 +// in the Tiberian Dawn tree includes session.h and that the live copies of
@@ -5958,7 +5958,7 @@ index 78ad08f..97e7624 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// Adds one flag, IsShortGame, to SpecialClass: a house is finished when it
 +// has no structure left that could rebuild it. Read only by
 +// Check_Pertinent_Structures, and off unless set for the match.
@@ -5982,7 +5982,7 @@ index 78ad08f..97e7624 100644
      unsigned IsEarlyWin : 1;
  
 +    /*
-+    **  CNC3D: SHORT GAME. A house is finished when it has no structures left that
++    **  OpenCNC 3D: SHORT GAME. A house is finished when it has no structures left that
 +    **  could rebuild it, so defences and walls do not keep it alive. Read only by
 +    **  Check_Pertinent_Structures. Off unless the host ticks it in the lobby.
 +    */
@@ -6000,7 +6000,7 @@ index 8536cc9..c04a1e0 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds a single include of "cnc3d_compat.h", the project's small Win32
 +// compatibility shim, ahead of function.h so the file compiles with non-
 +// Windows toolchains. No other line of the file is changed.
@@ -6015,7 +6015,7 @@ index 8536cc9..c04a1e0 100644
   *   main -- Initial startup routine (preps library systems).                                  *
   * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
  
-+#include "cnc3d_compat.h"   // CNC3D: Win32 shims for non-Windows builds
++#include "cnc3d_compat.h"   // OpenCNC 3D: Win32 shims for non-Windows builds
  #include "function.h"
  #include "common/ini.h"
  #include "common/paths.h"
@@ -6028,7 +6028,7 @@ index 07b96eb..993251f 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Widens the return type of TechnoClass::Get_Ownable from unsigned char to
 +// unsigned short, so the ownable-house bit mask it returns is no longer
 +// truncated to its low 8 bits.
@@ -6049,7 +6049,7 @@ index 07b96eb..993251f 100644
 -    }
 -    // if (!IsDiscoveredByPlayer) return;
 +    /*
-+    **	CNC3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
++    **	OpenCNC 3D: the 2019 early-out that stood here read PlayerPtr's own bit and then
 +    **	cleared a mask every machine shares.
 +    **
 +    **	    if (!Is_Discovered_By_Player()) return;
@@ -6103,7 +6103,7 @@ index 7387269..b4378da 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Widens the declaration of the virtual TechnoClass::Get_Ownable from
 +// unsigned char to unsigned short, and adds a comment explaining that the
 +// ownable mask is 16 bits and that the narrow return truncated the higher
@@ -6136,7 +6136,7 @@ index c2cd33f..72e1822 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 +// Adds HOUSEF_MULTI7 and HOUSEF_MULTI8 to the OWNABLE house bit field of 18
 +// unit types (every unit except the four dinosaurs), so multiplayer houses 7
 +// and 8 may own and build them. No other unit statistic is touched.
@@ -6318,7 +6318,7 @@ index 0441431..20e7709 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for C&C 3D in September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC 3D in September 2026. This is not EA's original file.
 +// UnitClass::Overlap_List drops the selection term in a lockstep match, so
 +// the cells a vehicle overlaps do not depend on which peer has it selected.
 +// It DOES change the game simulation, in a lockstep match only.
@@ -6333,7 +6333,7 @@ index 0441431..20e7709 100644
      }
  
 +    /*
-+    **	CNC3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
++    **	OpenCNC 3D lockstep: see InfantryClass::Overlap_List. Same hole, same reason, and this is
 +    **	the bigger half. ICON_PIXEL_W * 2 is 48, and the _gigundo test is a strict greater
 +    **	than, so a selected vehicle took the by-hand branch at maxsize 24 and got the full
 +    **	3x3 ring. For a unit that is already IsFiring, IsGigundo, IsAnimAttached or Flagged

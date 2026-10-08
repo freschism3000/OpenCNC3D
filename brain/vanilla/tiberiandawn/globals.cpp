@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Under the EIGHTPLAYERS build switch, adds two more multiplayer colour
 // entries (grey and brown) to MPlayerGColors and MPlayerTColors, and raises
 // MPlayerMax from 6 to 8. With the switch off the file reads as upstream.

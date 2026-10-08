@@ -166,7 +166,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "playvqa: SDL_Init: %s\n", SDL_GetError());
             return 1;
         }
-        win = SDL_CreateWindow("Command & Conquer 3D -- movie", SDL_WINDOWPOS_CENTERED,
+        win = SDL_CreateWindow("OpenCNC 3D -- movie", SDL_WINDOWPOS_CENTERED,
                                SDL_WINDOWPOS_CENTERED, SCREEN_W * scale, SCREEN_H * scale,
                                SDL_WINDOW_OPENGL);
         ctx = SDL_GL_CreateContext(win);

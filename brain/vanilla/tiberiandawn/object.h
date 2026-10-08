@@ -13,7 +13,7 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 //
-// MODIFIED for C&C 3D in August 2026. This is not EA's original file.
+// MODIFIED for OpenCNC 3D in August 2026. This is not EA's original file.
 // Declares the new per-house invincibility members on ObjectClass (the
 // static bitmask, the setter and the const query) with a comment explaining
 // why the switch sits there rather than in the DLL layer, and widens the
@@ -160,7 +160,7 @@ public:
     static void Init(void);
 
     /*
-    **	INVINCIBILITY (project CNC3D addition; not upstream).
+    **	INVINCIBILITY (project OpenCNC 3D addition; not upstream).
     **
     **	WHY IT LIVES HERE. The exported debug interface already switches money
     **	(DEBUG_REQUEST_ADD_RESOURCES), instant build (DEBUG_REQUEST_END_PRODUCTION), the

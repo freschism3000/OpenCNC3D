@@ -959,7 +959,7 @@ int nm_lobby_host(unsigned short port, const NmSetup* setup, unsigned abi_hash,
     s_humans = humans;
     s_lobby_humans = humans;
     s_pass = nm_pass_hash(password);
-    snprintf(s_lobby_name, sizeof s_lobby_name, "%s", (name && *name) ? name : "CNC3D GAME");
+    snprintf(s_lobby_name, sizeof s_lobby_name, "%s", (name && *name) ? name : "OpenCNC 3D GAME");
     memset(s_have, 0, sizeof s_have);
     memset(s_ack, 0, sizeof s_ack);
     memset(s_ready, 0, sizeof s_ready);

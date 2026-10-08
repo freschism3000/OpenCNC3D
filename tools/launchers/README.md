@@ -21,7 +21,7 @@ package; it does not take whatever `READ-ME.txt` happens to be sitting in
 That arrangement exists because the old one failed in silence. Earlier
 the macOS package was made with `cp -RL playable`, so it shipped an untracked
 `READ-ME.txt` that nothing regenerated and nobody reviewed: it still opened
-"C&C 3D v0.3.1 (macOS build, )", still listed v0.3.1 as the news, and
+"OpenCNC 3D v0.3.1 (macOS build, )", still listed v0.3.1 as the news, and
 had ridden along in every release since. A file that exists only in a gitignored
 output folder ages out of sight.
 
@@ -37,7 +37,7 @@ art stays crisp) on the new HUD's own panel tone. Regenerate it with
 The Desktop shortcut is a symlink to the copy in `playable/`, so rebuilding the
 app in place keeps the shortcut working:
 ```
-ln -s "$(pwd)"/playable/"C&C3D.app" ~/Desktop/"C&C3D"
+ln -s "$(pwd)"/playable/"C&C3D.app" ~/Desktop/"OpenCNC 3D"
 ```
 
 This directory exists because three separate fixes were nearly lost to that

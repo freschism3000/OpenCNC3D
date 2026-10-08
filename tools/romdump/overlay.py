@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNC3D — recover per-overlay ROM->RAM deltas by joint constraint.
+OpenCNC 3D — recover per-overlay ROM->RAM deltas by joint constraint.
 
 WHY THIS EXISTS
 ---------------
