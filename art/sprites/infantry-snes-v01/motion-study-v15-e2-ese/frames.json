@@ -1,0 +1,530 @@
+{
+  "scope": "Revised E2 east and southeast run studies, native art awaiting visual acceptance",
+  "source_fps": 7.5,
+  "anchor": [
+    54,
+    40
+  ],
+  "source_start": {
+    "E": 52,
+    "SE": 46
+  },
+  "keys": [
+    {
+      "facing": "E",
+      "stage": 0,
+      "sha256": "f874ff22481d9e7f869c26c01463af193e63fdcb348e11984ffbf24fb1c236fb",
+      "phase": "A contact / B folded recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            8.493325909419154,
+            19.244994432064367
+          ],
+          "foot": [
+            4,
+            19
+          ],
+          "depth": "far",
+          "support": false
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            10.748359309805549,
+            18.56321780196007
+          ],
+          "foot": [
+            11.5,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "E",
+      "stage": 1,
+      "sha256": "2db852ec6efda63c083f68eb47b171b0f454abc11b5bf0927bb4939a5e18a853",
+      "phase": "A compression / B passing",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            16
+          ],
+          "knee": [
+            10.742300281599762,
+            18.49903753519997
+          ],
+          "foot": [
+            6.5,
+            20
+          ],
+          "depth": "far",
+          "support": false
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            16
+          ],
+          "knee": [
+            10.82842712474619,
+            19.5
+          ],
+          "foot": [
+            8,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "E",
+      "stage": 2,
+      "sha256": "42d054de03e65630f8808cd47ca21604ead48943390f0a9e5f989278a24ccaef",
+      "phase": "A trailing support / B forward recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            11.404362059117501,
+            15.922818970441249
+          ],
+          "foot": [
+            9.5,
+            20
+          ],
+          "depth": "far",
+          "support": false
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            7.248359309805549,
+            19.43678219803993
+          ],
+          "foot": [
+            4.5,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "E",
+      "stage": 3,
+      "sha256": "7fcc322317f34f28e1ae97290e8b08d424e54153c8ffdb9b4f78b3c5e9174ca0",
+      "phase": "B contact / A folded recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            9.748359309805549,
+            18.56321780196007
+          ],
+          "foot": [
+            10.5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.493325909419154,
+            19.244994432064367
+          ],
+          "foot": [
+            5,
+            19
+          ],
+          "depth": "near",
+          "support": false
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "E",
+      "stage": 4,
+      "sha256": "b6db3ed8caa1579d325a6ced2ed193e192ee156ea9d7ab17e2682b87aaa5116b",
+      "phase": "B compression / A passing",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            16
+          ],
+          "knee": [
+            9.82842712474619,
+            19.5
+          ],
+          "foot": [
+            7,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            16
+          ],
+          "knee": [
+            11.742300281599762,
+            18.49903753519997
+          ],
+          "foot": [
+            7.5,
+            20
+          ],
+          "depth": "near",
+          "support": false
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "E",
+      "stage": 5,
+      "sha256": "6149388cdca557d07fea25ae780f0961c956b8ef165dd80fc17ad29d2376412c",
+      "phase": "B trailing support / A forward recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.248359309805549,
+            19.43678219803993
+          ],
+          "foot": [
+            3.5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            12.404362059117501,
+            15.922818970441249
+          ],
+          "foot": [
+            10.5,
+            20
+          ],
+          "depth": "near",
+          "support": false
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "SE",
+      "stage": 0,
+      "sha256": "a136f489b525038ddf7fde47348ec35241810d1648b3fa71ab2431871d84aeef",
+      "phase": "A contact / B folded recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            6.5,
+            14
+          ],
+          "knee": [
+            7.545328136593407,
+            18.513793095759816
+          ],
+          "foot": [
+            4.4,
+            17.46
+          ],
+          "depth": "far",
+          "support": false
+        },
+        {
+          "limb": "A",
+          "hip": [
+            9,
+            14.5
+          ],
+          "knee": [
+            10.923851516863884,
+            18.55792247772507
+          ],
+          "foot": [
+            11.45,
+            23.13
+          ],
+          "depth": "near",
+          "support": true
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "SE",
+      "stage": 1,
+      "sha256": "b84ec94647b0e1c3af0a14148a8b43e3fdc6806df560abdaa6eeab0de8d9b03f",
+      "phase": "A compression / B passing",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            6.5,
+            15
+          ],
+          "knee": [
+            9.119610197119833,
+            18.172651585887927
+          ],
+          "foot": [
+            6.15,
+            18.91
+          ],
+          "depth": "far",
+          "support": false
+        },
+        {
+          "limb": "A",
+          "hip": [
+            9,
+            15.5
+          ],
+          "knee": [
+            10.979898987322333,
+            19.509116882454315
+          ],
+          "foot": [
+            9.0,
+            22.5
+          ],
+          "depth": "near",
+          "support": true
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "SE",
+      "stage": 2,
+      "sha256": "85631ad08ecf0fb9ba990e217c3cb97ff8749e8a18819d33d99a633f9f74bb06",
+      "phase": "A trailing support / B forward recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            6.5,
+            14
+          ],
+          "knee": [
+            9.583053441382251,
+            15.715604141082398
+          ],
+          "foot": [
+            8.25,
+            19.45
+          ],
+          "depth": "far",
+          "support": false
+        },
+        {
+          "limb": "A",
+          "hip": [
+            9,
+            14.5
+          ],
+          "knee": [
+            8.473851516863885,
+            18.801486873804926
+          ],
+          "foot": [
+            6.550000000000001,
+            21.87
+          ],
+          "depth": "near",
+          "support": true
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "SE",
+      "stage": 3,
+      "sha256": "0c73804ac963dc7897d1f8b41534c5bedf8a521926a2fe8eb156a989b11ace2f",
+      "phase": "B contact / A folded recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            6.5,
+            14
+          ],
+          "knee": [
+            8.423851516863884,
+            18.05792247772507
+          ],
+          "foot": [
+            8.95,
+            22.63
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            9,
+            14.5
+          ],
+          "knee": [
+            10.045328136593408,
+            19.013793095759816
+          ],
+          "foot": [
+            6.9,
+            17.96
+          ],
+          "depth": "near",
+          "support": false
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "SE",
+      "stage": 4,
+      "sha256": "78306248c1a55988ea7109a328e65d096a76b96db0e76d06287d185028a0326a",
+      "phase": "B compression / A passing",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            6.5,
+            15
+          ],
+          "knee": [
+            8.479898987322333,
+            19.009116882454315
+          ],
+          "foot": [
+            6.5,
+            22.0
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            9,
+            15.5
+          ],
+          "knee": [
+            11.619610197119833,
+            18.672651585887927
+          ],
+          "foot": [
+            8.65,
+            19.41
+          ],
+          "depth": "near",
+          "support": false
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "facing": "SE",
+      "stage": 5,
+      "sha256": "d1a28c43e7149cbd8f4c0d26e4717b42dc211178e7d7ab1662ab877b97f2f37f",
+      "phase": "B trailing support / A forward recovery",
+      "limbs": [
+        {
+          "limb": "B",
+          "hip": [
+            6.5,
+            14
+          ],
+          "knee": [
+            5.973851516863885,
+            18.301486873804926
+          ],
+          "foot": [
+            4.050000000000001,
+            21.37
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            9,
+            14.5
+          ],
+          "knee": [
+            12.083053441382251,
+            16.215604141082398
+          ],
+          "foot": [
+            10.75,
+            19.95
+          ],
+          "depth": "near",
+          "support": false
+        }
+      ],
+      "review": "UNREVIEWED"
+    }
+  ]
+}

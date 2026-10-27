@@ -1,0 +1,18 @@
+ENMENU|loaded|v06|assets=178
+ENMENU|cursor|approved CUR00|triangles=108
+Assertion failed: (red>1000), function main, file gate_enhanced_menu.cpp, line 435.
+ENMENU|feedback|main|hover/click, release, repeated motion, disabled/empty/field=PASS
+ENMENU|intro|greyed without the movies, live with them=PASS
+ENMENU|main-order|grouped labels, keyboard, controller actions and inert dividers=PASS
+ENMENU|overlay|1280x720|legal=1763|cursor=769|green=662|outside-seats=0
+ENMENU|overlay|1600x960|legal=7052|cursor=769|green=662|outside-seats=0
+ENMENU|overlay|2560x1440|legal=15867|cursor=3064|green=2661|outside-seats=0
+ENMENU|feedback|main|hover/click, release, repeated motion, disabled/empty/field=PASS
+ENMENU|feedback|main-spin|hover/click, release, repeated motion, disabled/empty/field=PASS
+ENMENU|main-spin|GDI=21462|Nod=18290|outside-seats=0
+ENMENU|feedback|database-0|hover/click, release, repeated motion, disabled/empty/field=PASS
+ENMENU|feedback|database-1|hover/click, release, repeated motion, disabled/empty/field=PASS
+ENMENU|feedback|database-2|hover/click, release, repeated motion, disabled/empty/field=PASS
+ENMENU|feedback|database-3|hover/click, release, repeated motion, disabled/empty/field=PASS
+ENMENU|database|fittings/text/model-well/hit-seats=PASS
+ENMENU|feedback|pause|hover/click, release, repeated motion, disabled/empty/field=PASS

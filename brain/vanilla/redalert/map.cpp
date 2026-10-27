@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Refreshes legitimate AI unit sight around regenerated Gap Generator fields.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -67,6 +68,7 @@
 
 #include "../tiberiandawn/opencnc3d_compat.h"
 #include "function.h"
+#include "fair_ai_ra.h"
 #include "lcwpipe.h"
 #include "lcwstraw.h"
 #include "common/endianness.h"
@@ -805,7 +807,7 @@ void MapClass::Jam_From(CELL cell, int jamrange, HouseClass* house)
 
         for (int i = 0; i < Session.Players.Count(); i++) {
             HouseClass* player_house = HouseClass::As_Pointer(Session.Players[i]->Player.ID);
-            if (player_house->IsHuman && player_house != house) {
+            if ((player_house->IsHuman || FairAI_RA_Enabled(player_house)) && player_house != house) {
                 Map.Constrained_Look(Cell_Coord(cell), Rule.GapShroudRadius * CELL_LEPTON_W, player_house);
             }
         }

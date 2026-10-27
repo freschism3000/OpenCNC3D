@@ -1,0 +1,1372 @@
+{
+  "scope": "East20-stage native throw inspected; art acceptance pending",
+  "anchor": [
+    54,
+    40
+  ],
+  "fps": 15,
+  "source_start": 184,
+  "release_stage": 14,
+  "keys": [
+    {
+      "stage": 0,
+      "phase": "prepare",
+      "sha256": "44e794e179b846698e1fa1e658abda102b6852c59849a2d2a0c18936b8da31b2",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.55,
+            18
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.45,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 0,
+          "phase": "prepare",
+          "wrist": [
+            12,
+            11
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 1,
+      "phase": "prepare",
+      "sha256": "74690bbbac6b296f2d7ac7198bba8fa70e0c012055ca7dad61fd013278929167",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.55,
+            18.5
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            3.5288099977187777,
+            3.542950747611375
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            8.45,
+            18.5
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            3.5288099977187777,
+            3.542950747611375
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 1,
+          "phase": "prepare",
+          "wrist": [
+            12,
+            12
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 1,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 2,
+      "phase": "prepare",
+      "sha256": "8c6cfea2779420d93a6ae9abdc7c1699632bb38aaaf3170d481777e6c0bcef74",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.55,
+            18
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.45,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 2,
+          "phase": "prepare",
+          "wrist": [
+            12,
+            10
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 3,
+      "phase": "prepare",
+      "sha256": "a594cae8cb9b93eafbf64c1768de48429f43c2616e6f10ba944131a69a9fce23",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.55,
+            18
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.45,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 3,
+          "phase": "prepare",
+          "wrist": [
+            12,
+            11
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 4,
+      "phase": "prepare",
+      "sha256": "8c6cfea2779420d93a6ae9abdc7c1699632bb38aaaf3170d481777e6c0bcef74",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.55,
+            18
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.45,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 4,
+          "phase": "prepare",
+          "wrist": [
+            12,
+            10
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 5,
+      "phase": "prepare",
+      "sha256": "8d4ab0b68ef8819765e1ca619fe84f2a9b568c4d8d5909e5308411f3de28a7c4",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.55,
+            18.5
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            3.5288099977187777,
+            3.542950747611375
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            8.45,
+            18.5
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            3.5288099977187777,
+            3.542950747611375
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 5,
+          "phase": "prepare",
+          "wrist": [
+            11,
+            11
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 1,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 6,
+      "phase": "prepare",
+      "sha256": "cd7fd972818152a696ee7027d67c48d32f649ec60e90b88d2a78b2d67dadd959",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.55,
+            18
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.45,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 6,
+          "phase": "prepare",
+          "wrist": [
+            11,
+            11
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 7,
+      "phase": "prepare",
+      "sha256": "801a665d80011150f9c29b9c1b269b017647cbf6b67eee7685fb338201ccc5c6",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.55,
+            18
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.45,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 7,
+          "phase": "prepare",
+          "wrist": [
+            11,
+            10
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 8,
+      "phase": "gather",
+      "sha256": "bec3da6b623058b604827d6dc6bf0202f255b531e6afac7adf6b3066f2333686",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.1,
+            18
+          ],
+          "ankle": [
+            5,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.1,
+            4.148493702538308
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.9,
+            18
+          ],
+          "ankle": [
+            10,
+            22
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            4.1,
+            4.148493702538308
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 8,
+          "phase": "gather",
+          "wrist": [
+            10,
+            10
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 9,
+      "phase": "step/load",
+      "sha256": "d62ab665669b74ef9a9e6a50bbf1c102d79b72369cc9628cf175dbf971ac2e30",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            5.65,
+            18.5
+          ],
+          "ankle": [
+            4,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            3.7513330963805385,
+            3.869431482789171
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.35,
+            18.5
+          ],
+          "ankle": [
+            11,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            3.7513330963805385,
+            3.869431482789171
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 9,
+          "phase": "step/load",
+          "wrist": [
+            9,
+            10
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 1,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 10,
+      "phase": "draw back",
+      "sha256": "83bb90d4a1dd85d42f41d15ed04b141b138e416f9dfe227ee6cb8411fd0c2ecc",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            5.2,
+            18.5
+          ],
+          "ankle": [
+            3,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            3.935733730830885,
+            4.1340053217188775
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.8,
+            18.5
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            3.9357337308308855,
+            4.1340053217188775
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 10,
+          "phase": "draw back",
+          "wrist": [
+            6,
+            7
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 1,
+          "lean": -1,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 11,
+      "phase": "cock",
+      "sha256": "79fcd2135daafbf57c7cb105380027bc83cc0f95b6a57111ab73c061f3e83c00",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            5.2,
+            18
+          ],
+          "ankle": [
+            3,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.386342439892261,
+            4.565084884205331
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            9.8,
+            18
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.386342439892262,
+            4.565084884205331
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 11,
+          "phase": "cock",
+          "wrist": [
+            0,
+            4
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": -1,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 12,
+      "phase": "cock",
+      "sha256": "1fdfa23b7b63c913952b688d74c001d24e144a0372320669d9b3774c1ab50326",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            5.2,
+            18
+          ],
+          "ankle": [
+            3,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.386342439892261,
+            4.565084884205331
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            9.8,
+            18
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.386342439892262,
+            4.565084884205331
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 12,
+          "phase": "cock",
+          "wrist": [
+            2,
+            1
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": -1,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 13,
+      "phase": "raise",
+      "sha256": "04f7891b2cf5990778b774f8c3fe89eaad09598c59db6a976ef029a6b7e0a9cf",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            5.2,
+            18
+          ],
+          "ankle": [
+            3,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.386342439892261,
+            4.565084884205331
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            9.8,
+            18
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.386342439892262,
+            4.565084884205331
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 13,
+          "phase": "raise",
+          "wrist": [
+            6,
+            -2
+          ],
+          "grenade_held": true,
+          "release": false,
+          "bob": 0,
+          "lean": -1,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 14,
+      "phase": "release",
+      "sha256": "4634628a9e7925c07317926c6ddb1207e2a9d93ef9c44d9b7275ef30aedade71",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            5.2,
+            18
+          ],
+          "ankle": [
+            3,
+            21
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.386342439892261,
+            3.720215047547655
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            9.8,
+            18
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.386342439892262,
+            4.565084884205331
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 14,
+          "phase": "release",
+          "wrist": [
+            11,
+            -2
+          ],
+          "grenade_held": false,
+          "release": true,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 15,
+      "phase": "extend",
+      "sha256": "36e03257460a1e7d63b478ef2e58b2f24daa17d5a520aee17413063549a79b61",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            5.2,
+            18.5
+          ],
+          "ankle": [
+            3,
+            21
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            3.935733730830885,
+            3.330165161069343
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.8,
+            18.5
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            3.9357337308308855,
+            4.1340053217188775
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 15,
+          "phase": "extend",
+          "wrist": [
+            16,
+            2
+          ],
+          "grenade_held": false,
+          "release": false,
+          "bob": 1,
+          "lean": 1,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 16,
+      "phase": "follow through",
+      "sha256": "5c2512440a0eaa81de8f9333115bb4b61046c3b0dc821ee991dbfc440b09dc1f",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            5.2,
+            18
+          ],
+          "ankle": [
+            3,
+            21
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.386342439892261,
+            3.720215047547655
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            9.8,
+            18
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.386342439892262,
+            4.565084884205331
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 16,
+          "phase": "follow through",
+          "wrist": [
+            17,
+            12
+          ],
+          "grenade_held": false,
+          "release": false,
+          "bob": 0,
+          "lean": 3,
+          "dip": 2,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 17,
+      "phase": "rise",
+      "sha256": "2b1549e552f4fc3e86805b765796d821f4494005f8622e6a63e6110c196fde9d",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            5.65,
+            18
+          ],
+          "ankle": [
+            4,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.221670285562339,
+            4.326950427263987
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            9.35,
+            18
+          ],
+          "ankle": [
+            11,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.221670285562339,
+            4.326950427263987
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 17,
+          "phase": "rise",
+          "wrist": [
+            13,
+            13
+          ],
+          "grenade_held": false,
+          "release": false,
+          "bob": 0,
+          "lean": 1,
+          "dip": 1,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 18,
+      "phase": "recover",
+      "sha256": "c7afe6a477696c428e9a966eac2d5fdcc699b1101f85760b00f90bee99b9d049",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.1,
+            18
+          ],
+          "ankle": [
+            5,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.1,
+            4.148493702538308
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.9,
+            18
+          ],
+          "ankle": [
+            10,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.1,
+            4.148493702538308
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 18,
+          "phase": "recover",
+          "wrist": [
+            10,
+            13
+          ],
+          "grenade_held": false,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    },
+    {
+      "stage": 19,
+      "phase": "ready",
+      "sha256": "28b70fe23e4c490beb1d41af4469b27b7c00d6cb15bdaf01cfe3932ca3925d7c",
+      "parts": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6.55,
+            18
+          ],
+          "ankle": [
+            6,
+            22
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            8.45,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.025232912515746,
+            4.037635446644484
+          ]
+        },
+        {
+          "part": "throw",
+          "stage": 19,
+          "phase": "ready",
+          "wrist": [
+            11,
+            11
+          ],
+          "grenade_held": false,
+          "release": false,
+          "bob": 0,
+          "lean": 0,
+          "dip": 0,
+          "actor_anchor": [
+            54,
+            40
+          ]
+        }
+      ],
+      "review": "inspected; acceptance pending"
+    }
+  ]
+}

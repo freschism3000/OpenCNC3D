@@ -1,0 +1,113 @@
+{
+  "report": "${EVIDENCE_ROOT}/backend/windows-backend-research.md",
+  "report_sha256": "3537353eb2185bff35f2596f790ca0c97cce3c38842fa8b6183872c7eb07bdaf",
+  "count": 15,
+  "sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/memory/memory-limits-for-windows-releases",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "32-bit large-address-aware process has 4GB user VA on 64-bit Windows"
+    },
+    {
+      "url": "https://github.com/GameTechDev/PresentMon",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "Official tool supportsOpenGL and documents RuntimeOther instrumentation limitations"
+    },
+    {
+      "url": "https://github.com/GameTechDev/PresentMon/blob/main/README-ConsoleApplication.md",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "ConsoleCSV includes CPUbusy/wait,GPUlatency/busy and displayed duration metrics"
+    },
+    {
+      "url": "https://wiki.libsdl.org/SDL2/SDL_GL_SetSwapInterval",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "Interval0 immediate,1 synchronized,-1 adaptive; adaptive after missed retrace may swap immediately and support can fail"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/winprog64/abstract-data-models",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "Windows LLP64 keeps integer/long32 and pointer64"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/winprog64/process-interoperability",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "64-bit process cannot load32-bit DLL or vice versa"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/memory/memory-performance-information",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "PrivateUsage, WorkingSetSize and virtual byte counters are distinct"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/memory/working-with-pages",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "VirtualQuery/Ex reports consecutive page regions with common committed/reserved/free state"
+    },
+    {
+      "url": "https://docs.vulkan.org/guide/latest/threading.html",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "Application owns synchronization and multithreaded command/descriptor pool handling"
+    },
+    {
+      "url": "https://docs.vulkan.org/samples/latest/samples/performance/command_buffer_usage/README.html",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "Avoid overly small commandbuffers; poolreuse/resets are preferable to allocation churn"
+    },
+    {
+      "url": "https://wiki.libsdl.org/SDL3/CategoryGPU",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "SDL3GPU backends,shader formats, D3D12 Windows10+GPUrequirements"
+    },
+    {
+      "url": "https://wiki.libsdl.org/SDL3/SDL_CreateGPUDevice",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "GPU backend selection Vulkan/D3D12/Metal sinceSDL3.2"
+    },
+    {
+      "url": "https://github.com/google/angle",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "ANGLE translatesOpenGLES to otherAPIs; notfull desktopGLcompatibility input"
+    },
+    {
+      "url": "https://docs.mesa3d.org/drivers/zink.html",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "MesaZink emitsVulkan fordesktopGL; Windows turnkey availabilitynotestablished bythispage"
+    },
+    {
+      "url": "https://docs.vulkan.org/guide/latest/depth.html",
+      "primary_source": true,
+      "read_via": "web.run open and relevant find/open returned text",
+      "read_date": "2026-10-13",
+      "supported_claim": "GL clipZ[-W,W],VK_EXT_depth_clip_control negativeOneToOne preservesGL convention"
+    }
+  ],
+  "note": "All15 URLs were opened through web.run in the original research and reopened in the correction audit; relevant text was read. Links were not guessed. No native Windows runs."
+}

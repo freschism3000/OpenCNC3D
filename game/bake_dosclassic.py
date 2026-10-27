@@ -4,6 +4,7 @@
 The source archives and decoder are already part of this repository. Names are
 resolved from the engine's asset tables, then looked up by their original MIX hash.
 Each shape is zlib-compressed as palette indices; no recolouring or resampling occurs.
+One record, TRANS, is the placement cursor's icon set rather than a SHP (placement_stamps).
 
 Format DOS2D003: magic, u32 shape count, the eight player remap bands (8 x 16), then
 TEMPERAT.PAL and DESERT.PAL as stored (768 bytes each, six bits a channel), then the
@@ -23,7 +24,7 @@ sys.path.insert(0, str(REPO / 'menu' / 'tools'))
 from mixshp import MixFile, Shape, ShpError
 
 TABLES = ('bdata', 'bbdata', 'udata', 'uadata', 'idata', 'aadata',
-          'adata', 'tdata', 'odata', 'animdata', 'bullet', 'smudge',
+          'adata', 'tdata', 'odata', 'animdata', 'bullet', 'smudge', 'sdata',
           'overlay', 'terrain', 'object', 'unit', 'infantry')
 EXTRA = ('WAKE', 'SMOKEY', 'DRAGON', 'RROTOR', 'LROTOR', 'SHADOW')
 REMAP_NAMES = ('Gold', 'LtBlue', 'Red', 'Green', 'Orange', 'Blue', 'Grey', 'Brown')
@@ -68,6 +69,30 @@ def theater_palettes(source):
     return out
 
 
+def placement_stamps(conquer):
+    """The placement cursor's hash stamps, DisplayClass::TransIconset.
+
+    TRANS.ICN is an icon set, not a SHP: CellClass::Draw_It (cell.cpp) stamps frame 0
+    (white hatching) on a pending building's clear cells and frame 2 (red) on blocked
+    ones. Tiberian Dawn's IControl_Type header is i16 Width, Height, Count, Allocated;
+    i32 Size, Icons, Palettes, Remaps, TransFlag, Map. All four frames are kept, as
+    24x24 palette indices in the map's order, so the record reads like any SHP's.
+    """
+    trans = conquer.read('TRANS.ICN')
+    if trans is None:
+        raise ValueError('CONQUER.MIX is missing the placement cursor TRANS.ICN')
+    width, height, count, _alloc, size, icons, _pal, _rem, _trans, imap = \
+        struct.unpack_from('<4h6i', trans)
+    if (width, height, count, size, icons) != (24, 24, 4, len(trans), 32):
+        raise ValueError('TRANS.ICN has an unexpected format')
+    frames = []
+    for icon in trans[imap:imap + count]:
+        if icon == 0xFF or icons + (icon + 1) * 576 > len(trans):
+            raise ValueError('TRANS.ICN has a missing placement frame')
+        frames.append(trans[icons + icon * 576:icons + (icon + 1) * 576])
+    return ('TRANS', 24, 24, count, zlib.compress(b''.join(frames), 9))
+
+
 def bake(out):
     source = REPO / 'data' / 'dosdata'
     mixes = [MixFile(str(source / n)) for n in ('CONQUER.MIX', 'GENERAL.MIX')]
@@ -89,6 +114,7 @@ def bake(out):
             print('skip', member, exc, file=sys.stderr)
             continue
         records.append((name, shp.width, shp.height, shp.frames, zlib.compress(raw, 9)))
+    records.append(placement_stamps(mixes[0]))
     # Theater-specific scenery is stored as SHP-format frames under .TEM/.DES names.
     # Keep separate T/ and D/ variants for shared type names.
     for prefix, ext, mix in theater:

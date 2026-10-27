@@ -111,6 +111,13 @@ typedef struct MB_Browse
 
 static MB_Browse s_b;
 
+/* A worker may not start until after the browser has been left and reopened.
+   Keep the generation reserved by its request, not the one current at its start. */
+typedef struct MB_FetchJob
+{
+    int generation;
+} MB_FetchJob;
+
 static void mb_browse_once(void)
 {
     if (!s_b.lock) {
@@ -171,16 +178,13 @@ static int mb_row_from_json(const LJ_Value *it, MB_Row *r)
     return 1;
 }
 
-static int mb_fetch_thread(void *unused)
+static int mb_fetch_thread(void *work)
 {
+    MB_FetchJob *job = (MB_FetchJob *)work;
     char url[512], err[256];
     char *body;
-    int mine;
-    (void)unused;
-
-    SDL_LockMutex(s_b.lock);
-    mine = s_b.generation;
-    SDL_UnlockMutex(s_b.lock);
+    const int mine = job->generation;
+    free(job);
 
     mb_url_copy(url, (int)sizeof url);
     err[0] = '\0';
@@ -260,6 +264,8 @@ static int mb_fetch_thread(void *unused)
 void mb_refresh(void)
 {
     SDL_Thread *t;
+    MB_FetchJob *job;
+    int mine;
     mb_browse_once();
 
     SDL_LockMutex(s_b.lock);
@@ -267,20 +273,28 @@ void mb_refresh(void)
         SDL_UnlockMutex(s_b.lock);
         return;
     }
-    s_b.generation++;
+    mine = ++s_b.generation;
     s_b.phase = MB_FETCHING;
     SDL_UnlockMutex(s_b.lock);
 
-    t = SDL_CreateThread(mb_fetch_thread, "opencnc3d-gamelist", NULL);
-    if (!t) {
-        SDL_LockMutex(s_b.lock);
+    job = (MB_FetchJob *)malloc(sizeof *job);
+    if (job) {
+        job->generation = mine;
+        t = SDL_CreateThread(mb_fetch_thread, "opencnc3d-gamelist", job);
+        if (t) {
+            /* The detached worker owns the job from this point, even if it has
+               already finished before SDL_CreateThread returns. */
+            SDL_DetachThread(t);
+            return;
+        }
+        free(job);
+    }
+    SDL_LockMutex(s_b.lock);
+    if (mine == s_b.generation) {
         snprintf(s_b.error, sizeof s_b.error, "COULD NOT LOOK FOR GAMES.");
         s_b.phase = MB_FAILED;
-        SDL_UnlockMutex(s_b.lock);
-        return;
     }
-    /* DETACHED, BECAUSE NOTHING IS EVER GOING TO WAIT FOR IT. */
-    SDL_DetachThread(t);
+    SDL_UnlockMutex(s_b.lock);
 }
 
 int mb_phase(void)

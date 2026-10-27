@@ -150,6 +150,9 @@ int cnc_audio_play_named_loop(CncAudio *au, const char *name, int bus, int gain,
  * lives in the same folder (LOCAL.MIX carries CONQUER.ENG, the 1995 string table),
  * and it is the audio engine that already knows the path. "" if there is none. */
 const char *cnc_audio_dosdata(const CncAudio *au);
+/* A language pack's folder (its SOUNDS.MIX and SPEECH.MIX searched first, the death sounds
+   still English), or NULL for English. Returns the archives mounted. */
+int cnc_audio_set_language(CncAudio *au, const char *dir);
 
 /* ------------------------------------------------------------------- music */
 

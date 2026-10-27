@@ -1,0 +1,232 @@
+/* Standalone production-cache tests: mocked pack/frame inputs, no GL or game. */
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <new>
+#include <vector>
+
+static long failAllocationAfter=-1;
+static unsigned allocationThrows=0;
+void* operator new(std::size_t size) {
+    if(failAllocationAfter>=0 && failAllocationAfter--==0) {
+        failAllocationAfter=-1;++allocationThrows;throw std::bad_alloc();
+    }
+    if(void* value=std::malloc(size?size:1))return value;
+    throw std::bad_alloc();
+}
+void* operator new[](std::size_t size) {return ::operator new(size);}
+void operator delete(void* value) noexcept {std::free(value);}
+void operator delete[](void* value) noexcept {std::free(value);}
+void operator delete(void* value,std::size_t) noexcept {std::free(value);}
+void operator delete[](void* value,std::size_t) noexcept {std::free(value);}
+
+enum {MODE_OPAQUE=0,MODE_CUTOUT=1};
+struct PackVert {float x=0,y=0,z=0;};
+struct PackTri {PackVert v[3];unsigned char mode=0;};
+struct PackMesh {
+    std::vector<PackTri> tris;
+    std::vector<unsigned char> sway;
+    std::vector<float> swayPh;
+    unsigned gpuPoseRevision=0;
+};
+static unsigned g_groundGen=1;
+static float MODEL_SCALE=1.0f/1024.0f,g_meshFillY=1.0e38f;
+static struct {float tree3d_wind_dir=183.21429f,tree3d_flutter=.07143f;} g_fx;
+static std::vector<float> g_meshGeometryUpload;
+static bool uniqueEnabled=true,uniqueAllocation=true,uniqueScratch=true,directAllocation=true;
+static bool mesh_perf_switch(const char* name) {
+    if(!strcmp(name,"OPENCNC3D_MESH_WIND_UNIQUE"))return uniqueEnabled;
+    if(!strcmp(name,"OPENCNC3D_MESH_WIND_UNIQUE_ALLOC_OK"))return uniqueAllocation;
+    if(!strcmp(name,"OPENCNC3D_MESH_WIND_UNIQUE_SCRATCH_OK"))return uniqueScratch;
+    if(!strcmp(name,"OPENCNC3D_MESH_WIND_DIRECT_ALLOC_OK"))return directAllocation;
+    std::fprintf(stderr,"Unexpected switch %s\n",name);std::abort();
+}
+
+@PRODUCTION_CODE@
+
+static unsigned checks=0;
+#define CHECK(expression) do {++checks;if(!(expression)) {std::fprintf(stderr,"line %d: %s\n",__LINE__,#expression);return false;}} while(0)
+static const float matrix[12]={1.13839f,.017f,0,0,0,1.28929f,0,0,0,-.028f,1.13839f,0};
+typedef bool (*PositionFunction)(const PackMesh&,size_t,size_t,int,size_t,float,float,float,float,float,float,
+    float,float,float,float,float,const float*,float*,float*);
+static bool invoke(PositionFunction fn,const PackMesh& mesh,size_t first,size_t last,int pass,size_t count,
+                   float* low,float* high,const float* transform=matrix,float placement=11.0f) {
+    return fn(mesh,first,last,pass,count,placement,-7.0f,.75f,.25f,8.0f,-4.0f,.5f,.6f,.7f,.8f,.9f,
+              transform,low,high);
+}
+static PackMesh model(size_t triangles=39) {
+    PackMesh mesh;mesh.tris.resize(triangles);mesh.sway.resize(triangles*6);mesh.swayPh.resize(triangles*12);
+    for(size_t i=0;i<triangles;++i) {
+        mesh.tris[i].mode=i%3?MODE_CUTOUT:MODE_OPAQUE;
+        for(size_t k=0;k<3;++k) {
+            const size_t at=(i*3+k)%13;
+            mesh.tris[i].v[k]={float(at)*37.0f,float(at)*73.0f,-float(at)*17.0f};
+            mesh.sway[i*6+k*2]=(unsigned char)(at*19);
+            mesh.sway[i*6+k*2+1]=(unsigned char)(at*3);
+            for(size_t q=0;q<4;++q)mesh.swayPh[i*12+k*4+q]=float(at+q)*.03125f;
+        }
+    }
+    return mesh;
+}
+static size_t corners(const PackMesh& mesh,size_t first,size_t last,int pass) {
+    size_t count=0;for(size_t i=first;i<last;++i)if(mesh.tris[i].mode==pass)count+=3;return count;
+}
+/* Seed both routes with identical output bytes. This also checks the untouched
+   tail and partial bounds when the caller supplies too many/few corners. */
+static bool same(PackMesh& mesh,size_t first,size_t last,int pass,size_t count,
+                 const float* transform=matrix,float placement=11.0f) {
+    const std::vector<float> seed(33,123.25f);
+    g_meshGeometryUpload=seed;
+    float a[3]={-1,-2,-3},b[3]={1,2,3},c[3]={-1,-2,-3},d[3]={1,2,3};
+    const bool expected=invoke(mesh_wind_direct_positions,mesh,first,last,pass,count,a,b,transform,placement);
+    const std::vector<float> output=g_meshGeometryUpload;
+    g_meshGeometryUpload=seed;
+    const bool actual=invoke(mesh_wind_positions_prepared,mesh,first,last,pass,count,c,d,transform,placement);
+    CHECK(expected==actual);CHECK(!memcmp(a,c,sizeof a)&&!memcmp(b,d,sizeof b));
+    CHECK(output.size()==g_meshGeometryUpload.size());
+    CHECK(output.empty()||!memcmp(output.data(),g_meshGeometryUpload.data(),output.size()*sizeof(float)));
+    return true;
+}
+static bool valid(PackMesh& mesh,size_t first,size_t last,int pass) {
+    return same(mesh,first,last,pass,corners(mesh,first,last,pass));
+}
+static bool miss(PackMesh& mesh,size_t first,size_t last,int pass) {
+    const auto before=g_meshWindUniqueBuilds;
+    CHECK(valid(mesh,first,last,pass));CHECK(g_meshWindUniqueBuilds==before+1);return true;
+}
+static bool budget() {
+    size_t bytes=0,entries=0;
+    for(const auto& entry:g_meshWindUniqueCache)if(entry.valid) {
+        ++entries;const size_t capacity=entry.prepared.unique.capacity()*sizeof(MeshWindUniqueInput)
+            +entry.prepared.corners.capacity()*sizeof(uint32_t);
+        CHECK(capacity==entry.bytes);CHECK(capacity<=8u*1024u*1024u);bytes+=capacity;
+    }
+    CHECK(bytes==g_meshWindUniqueBytes);CHECK(entries==g_meshWindUniqueEntries);
+    CHECK(bytes+sizeof g_meshWindUniqueCache<=16u*1024u*1024u);
+    CHECK(g_meshWindUniqueUpload.capacity()*sizeof(float)<=2796192u);return true;
+}
+static bool testKeys() {
+    mesh_wind_unique_clear();PackMesh mesh=model();
+    CHECK(miss(mesh,0,39,MODE_OPAQUE));const auto hits=g_meshWindUniqueHits,builds=g_meshWindUniqueBuilds;
+    CHECK(valid(mesh,0,39,MODE_OPAQUE));CHECK(g_meshWindUniqueHits==hits+1&&g_meshWindUniqueBuilds==builds);
+    /* Position changes in all current published mesh writers bump this revision. */
+    mesh.tris[0].v[0].x+=1;++mesh.gpuPoseRevision;CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    mesh.sway[0]^=1;++mesh.gpuPoseRevision;CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    mesh.swayPh[0]+=.25f;++mesh.gpuPoseRevision;CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    std::vector<PackTri>(mesh.tris).swap(mesh.tris);CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    std::vector<unsigned char>(mesh.sway).swap(mesh.sway);CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    std::vector<float>(mesh.swayPh).swap(mesh.swayPh);CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    mesh.tris.reserve(mesh.tris.capacity()+1);CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    const auto* triPointer=mesh.tris.data();mesh.tris.resize(40);CHECK(triPointer==mesh.tris.data());
+    CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    const auto* weightPointer=mesh.sway.data();mesh.sway.resize(mesh.sway.size()-6);
+    CHECK(weightPointer==mesh.sway.data());CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    const auto* phasePointer=mesh.swayPh.data();mesh.swayPh.pop_back();CHECK(phasePointer==mesh.swayPh.data());
+    CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    CHECK(miss(mesh,3,39,MODE_OPAQUE));CHECK(miss(mesh,3,36,MODE_OPAQUE));CHECK(miss(mesh,3,36,MODE_CUTOUT));
+    PackMesh copied=mesh;CHECK(miss(copied,0,39,MODE_OPAQUE));
+    /* Same source addresses, count and revision reused after a reload. */
+    const auto revision=mesh.gpuPoseRevision;triPointer=mesh.tris.data();
+    CHECK(valid(mesh,0,39,MODE_OPAQUE));mesh.tris[0].v[0].z+=100;++g_groundGen;
+    CHECK(triPointer==mesh.tris.data()&&revision==mesh.gpuPoseRevision);
+    CHECK(miss(mesh,0,39,MODE_OPAQUE));CHECK(g_meshWindUniqueEntries==1);
+    const auto before=g_meshWindUniqueHits;
+    MODEL_SCALE=-.002f;g_meshFillY=30;g_fx.tree3d_flutter=.2f;g_fx.tree3d_wind_dir=15;
+    CHECK(same(mesh,0,39,MODE_OPAQUE,corners(mesh,0,39,MODE_OPAQUE),nullptr,-25));
+    CHECK(g_meshWindUniqueHits==before+1); // Cached inputs, never transformed output.
+    MODEL_SCALE=1.0f/1024.0f;g_meshFillY=1.0e38f;g_fx.tree3d_flutter=.07143f;g_fx.tree3d_wind_dir=183.21429f;
+    return budget();
+}
+static bool testFallback() {
+    mesh_wind_unique_clear();PackMesh mesh=model();const size_t count=corners(mesh,0,39,MODE_OPAQUE);
+    for(size_t n:{size_t(0),size_t(1),count-1,count+1,count+3})CHECK(same(mesh,0,39,MODE_OPAQUE,n));
+    CHECK(same(mesh,0,39,97,3));CHECK(same(mesh,0,0,MODE_OPAQUE,3));
+    CHECK(!mesh_wind_unique_source(mesh,2,1,MODE_OPAQUE,3));
+    CHECK(!mesh_wind_unique_source(mesh,0,40,MODE_OPAQUE,3));
+    CHECK(!mesh_wind_unique_source(mesh,0,39,MODE_OPAQUE,8u*1024u*1024u/36u+1));
+    CHECK(!mesh_wind_unique_source(mesh,0,39,MODE_OPAQUE,std::numeric_limits<size_t>::max()));
+    g_meshWindUniqueActive=0;auto off=g_meshWindUniqueOff;CHECK(valid(mesh,0,39,MODE_OPAQUE));CHECK(g_meshWindUniqueOff==off+1);
+    uniqueEnabled=false;g_meshWindUniqueActive=-1;CHECK(!mesh_wind_unique_enabled());
+    uniqueEnabled=true;g_meshWindUniqueActive=-1;CHECK(mesh_wind_unique_enabled());
+    uniqueAllocation=false;auto failures=g_meshWindUniqueFallbacks;
+    CHECK(valid(mesh,0,39,MODE_OPAQUE));CHECK(g_meshWindUniqueFallbacks==failures+1);uniqueAllocation=true;
+    uniqueScratch=false;CHECK(valid(mesh,0,39,MODE_OPAQUE));uniqueScratch=true;
+    directAllocation=false;CHECK(valid(mesh,0,39,MODE_OPAQUE));directAllocation=true;
+    mesh.sway.push_back(0);const auto fast=g_meshWindUniqueFastCalls;
+    CHECK(valid(mesh,0,39,MODE_OPAQUE));CHECK(g_meshWindUniqueFastCalls==fast);
+    return true;
+}
+static bool testAllocation() {
+    PackMesh mesh=model();const size_t count=corners(mesh,0,39,MODE_OPAQUE);
+    for(long failure=0;failure<8;++failure) {
+        mesh_wind_unique_clear();std::vector<float>().swap(g_meshGeometryUpload);
+        float a[3]={-1,-2,-3},b[3]={1,2,3},c[3]={-1,-2,-3},d[3]={1,2,3};
+        CHECK(invoke(mesh_wind_direct_positions,mesh,0,39,MODE_OPAQUE,count,a,b));
+        const std::vector<float> output=g_meshGeometryUpload;
+        std::vector<float>().swap(g_meshGeometryUpload);failAllocationAfter=failure;
+        const bool actual=invoke(mesh_wind_positions_prepared,mesh,0,39,MODE_OPAQUE,count,c,d);
+        failAllocationAfter=-1;
+        CHECK(actual);CHECK(!memcmp(a,c,sizeof a)&&!memcmp(b,d,sizeof b));
+        CHECK(output.size()==g_meshGeometryUpload.size());
+        CHECK(!memcmp(output.data(),g_meshGeometryUpload.data(),output.size()*sizeof(float)));CHECK(budget());
+    }
+    CHECK(allocationThrows>=5);return true;
+}
+static size_t cachedSlot(const PackMesh& mesh) {
+    for(size_t i=0;i<128;++i)if(g_meshWindUniqueCache[i].valid
+        &&g_meshWindUniqueCache[i].key.value[0]==(uint64_t)(uintptr_t)&mesh
+        &&g_meshWindUniqueCache[i].key.value[11]==mesh.gpuPoseRevision)return i;
+    return 128;
+}
+static bool testCollision() {
+    mesh_wind_unique_clear();PackMesh mesh=model();std::vector<unsigned> collision;
+    /* Observe production set choice, then find five revision identities in it. */
+    for(unsigned revision=1;collision.size()<5&&revision<10000;++revision) {
+        mesh.gpuPoseRevision=revision;CHECK(mesh_wind_unique_source(mesh,0,39,MODE_OPAQUE,39)!=nullptr);
+        const size_t slot=cachedSlot(mesh);CHECK(slot<128);if(slot/4==0)collision.push_back(revision);
+    }
+    CHECK(collision.size()==5);mesh_wind_unique_clear();
+    for(size_t i=0;i<4;++i){mesh.gpuPoseRevision=collision[i];CHECK(miss(mesh,0,39,MODE_OPAQUE));}
+    mesh.gpuPoseRevision=collision[0];const auto hits=g_meshWindUniqueHits;CHECK(valid(mesh,0,39,MODE_OPAQUE));
+    CHECK(g_meshWindUniqueHits==hits+1);const auto evictions=g_meshWindUniqueEvictions;
+    mesh.gpuPoseRevision=collision[4];CHECK(miss(mesh,0,39,MODE_OPAQUE));CHECK(g_meshWindUniqueEvictions==evictions+1);
+    mesh.gpuPoseRevision=collision[0];CHECK(cachedSlot(mesh)<128);
+    mesh.gpuPoseRevision=collision[1];CHECK(cachedSlot(mesh)==128);CHECK(miss(mesh,0,39,MODE_OPAQUE));
+    return budget();
+}
+static bool testCapacity() {
+    mesh_wind_unique_clear();std::vector<PackMesh> models;models.reserve(48);
+    for(size_t i=0;i<48;++i){models.push_back(model(12000));models.back().gpuPoseRevision=(unsigned)i;}
+    const auto evictions=g_meshWindUniqueEvictions;
+    for(auto& mesh:models)for(int pass:{MODE_OPAQUE,MODE_CUTOUT}) {
+        CHECK(valid(mesh,0,mesh.tris.size(),pass));CHECK(budget());
+    }
+    CHECK(g_meshWindUniqueEvictions>evictions);CHECK(g_meshWindUniqueEntries>0);CHECK(g_meshWindUniqueBytes>0);
+    mesh_wind_unique_clear();CHECK(!g_meshWindUniqueBytes&&!g_meshWindUniqueEntries&&!g_meshWindUniqueUpload.capacity());
+    for(const auto& entry:g_meshWindUniqueCache)CHECK(!entry.valid&&!entry.prepared.unique.capacity()&&!entry.prepared.corners.capacity());
+    return true;
+}
+static bool testVerification() {
+    if(!mesh_wind_unique_verify_enabled())return true;
+    mesh_wind_unique_clear();PackMesh mesh=model();CHECK(valid(mesh,0,39,MODE_OPAQUE));
+    const size_t slot=cachedSlot(mesh);CHECK(slot<128);
+    /* Deliberately corrupt cached immutable input; verification must return the
+       original helper's exact result and record this one expected mismatch. */
+    g_meshWindUniqueCache[slot].prepared.unique[0].position[0]+=100.0f;
+    const auto bad=g_meshWindUniqueMismatches;
+    CHECK(valid(mesh,0,39,MODE_OPAQUE));CHECK(g_meshWindUniqueMismatches==bad+1);
+    mesh_wind_unique_clear();return true;
+}
+int main() {
+    if(!testKeys()||!testFallback()||!testAllocation()||!testCollision()||!testCapacity()||!testVerification())return 1;
+    const unsigned negativeControls=mesh_wind_unique_verify_enabled()?1:0;
+    if(g_meshWindUniqueMismatches!=negativeControls)return 2;
+    mesh_wind_unique_dump();
+    std::printf("{\"passed\":true,\"checks\":%u,\"verify\":%d,\"allocation_throws\":%u,\"mismatches\":%llu,\"expected_negative_controls\":%u}\n",
+        checks,mesh_wind_unique_verify_enabled()?1:0,allocationThrows,g_meshWindUniqueMismatches,negativeControls);
+    return 0;
+}

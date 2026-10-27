@@ -1,0 +1,265 @@
+{
+  "passed": true,
+  "period_ms": 16000,
+  "global_ticks": 960,
+  "global_maximum_rgb_delta": [
+    8,
+    32,
+    8
+  ],
+  "worst_adjacent_mean_rgb_delta": 0.05213698228759141,
+  "quadrants_with_motion_ticks": [
+    959,
+    955,
+    930,
+    959
+  ],
+  "pure_black_and_alpha_exact": true,
+  "motion_off_source_exact": true,
+  "all_hit_geometry_exact": true,
+  "loop_exact": true,
+  "visible_hover_pressed_click_and_idle": true,
+  "reaction_cases": [
+    {
+      "rect": [
+        100,
+        216,
+        186,
+        186
+      ],
+      "hot": 1,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 1867
+    },
+    {
+      "rect": [
+        100,
+        216,
+        186,
+        186
+      ],
+      "hot": 1,
+      "pressed": 1,
+      "age_ms": 4294967295,
+      "changed_pixels": 10141
+    },
+    {
+      "rect": [
+        100,
+        216,
+        186,
+        186
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 90,
+      "changed_pixels": 9065
+    },
+    {
+      "rect": [
+        100,
+        216,
+        186,
+        186
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 420,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        100,
+        216,
+        186,
+        186
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        88,
+        543,
+        192,
+        42
+      ],
+      "hot": 1,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 3920
+    },
+    {
+      "rect": [
+        88,
+        543,
+        192,
+        42
+      ],
+      "hot": 1,
+      "pressed": 1,
+      "age_ms": 4294967295,
+      "changed_pixels": 6705
+    },
+    {
+      "rect": [
+        88,
+        543,
+        192,
+        42
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 90,
+      "changed_pixels": 5768
+    },
+    {
+      "rect": [
+        88,
+        543,
+        192,
+        42
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 420,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        88,
+        543,
+        192,
+        42
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        -5,
+        -3,
+        25,
+        20
+      ],
+      "hot": 1,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 290
+    },
+    {
+      "rect": [
+        -5,
+        -3,
+        25,
+        20
+      ],
+      "hot": 1,
+      "pressed": 1,
+      "age_ms": 4294967295,
+      "changed_pixels": 298
+    },
+    {
+      "rect": [
+        -5,
+        -3,
+        25,
+        20
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 90,
+      "changed_pixels": 288
+    },
+    {
+      "rect": [
+        -5,
+        -3,
+        25,
+        20
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 420,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        -5,
+        -3,
+        25,
+        20
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        1015,
+        635,
+        8,
+        8
+      ],
+      "hot": 1,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        1015,
+        635,
+        8,
+        8
+      ],
+      "hot": 1,
+      "pressed": 1,
+      "age_ms": 4294967295,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        1015,
+        635,
+        8,
+        8
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 90,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        1015,
+        635,
+        8,
+        8
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 420,
+      "changed_pixels": 0
+    },
+    {
+      "rect": [
+        1015,
+        635,
+        8,
+        8
+      ],
+      "hot": 0,
+      "pressed": 0,
+      "age_ms": 4294967295,
+      "changed_pixels": 0
+    }
+  ],
+  "measurement_seconds": 24.63476862499374
+}

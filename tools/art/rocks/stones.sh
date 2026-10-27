@@ -32,7 +32,24 @@ painted)
             exit 1; }
         echo "$STAMP" > "$RKC/stamp"
     fi
-    cp "$RKC/rock3d_DESERT.pack" "$RKC/rock3d_TEMPERAT.pack" "$RKC/rock3d_WINTER.pack" "$DEST/"
+    # The original painted pack remains an immutable geometry/UV input. Desert
+    # alone receives the approved cliff material on those existing UVs, plus
+    # theater overrides for the seven placed rocks. Include every input in cache.
+    MATCH="$RKC/cliff-sandstone-material-v05"
+    MATCH_STAMP=$(cat "$HERE/match_desert_cliffs.py" "$REPO/tools/bakery/terrain_daylight.py" \
+        "$REPO/art/remaster/ROCKS/cliff_sandstone_v05/material.png" \
+        "$RKC/rock3d_DESERT.pack" "$REPO"/game/ebld/ROCK[1-7].ebld | cksum | cut -d' ' -f1)
+    if [ "$(cat "$MATCH/stamp" 2>/dev/null)" != "$MATCH_STAMP" ] \
+       || [ ! -s "$MATCH/rock3d_DESERT.pack" ] || [ ! -s "$MATCH/ROCK7_DES.ebld" ]; then
+        python3 "$HERE/match_desert_cliffs.py" --source "$REPO" \
+            --scatter "$RKC/rock3d_DESERT.pack" --output "$MATCH"
+        echo "$MATCH_STAMP" > "$MATCH/stamp"
+    fi
+    cp "$MATCH/rock3d_DESERT.pack" "$RKC/rock3d_TEMPERAT.pack" "$RKC/rock3d_WINTER.pack" "$DEST/"
+    mkdir -p "$DEST/ebld"
+    cp "$MATCH"/ROCK[1-7]_DES.ebld "$DEST/ebld/"
+    mkdir -p "$DEST/rock-materials/cliff-sandstone-v05"
+    cp "$MATCH"/*.png "$MATCH/manifest.json" "$DEST/rock-materials/cliff-sandstone-v05/"
     echo "   rocks: the painted stones, a pack per theater"
     ;;
 unity)

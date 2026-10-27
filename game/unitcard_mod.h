@@ -36,6 +36,8 @@
 #ifndef UNITCARD_MOD_H
 #define UNITCARD_MOD_H
 
+
+#include "ra_hud_card.h"
 static unsigned char g_ucBuf[H6_CARD_W * H6_CARD_H * 4];
 static GLuint        g_ucTex = 0;
 /* The selection keys behind the wells, filled at draw time and read by the click, so a
@@ -50,7 +52,7 @@ static bool g_ucShownNow = false;   /* what the last draw decided; the hit tests
    and only when the pack carries the card's art. */
 static bool uc_available(void)
 {
-    return codex_available() && !g_editOn && hud640_card_ok(g_h6Pack);
+    return codex_available() && !g_editOn && (rah_enabled() || hud640_card_ok(g_h6Pack));
 }
 
 static bool uc_shown(void)
@@ -83,6 +85,13 @@ static int uc_hit(float col, float row, int fbw, int fbh, int* idx)
     if (!g_ucShownNow) return UC_NONE;
     const UcLayout L = uc_layout(fbw, fbh);
     const float cx = (col - L.x0) / L.s, cy = (row - L.y0) / L.s;   /* card pixels */
+    if(rah_enabled()){
+        if(cx<0||cy<0||cx>=272||cy>=166)return UC_NONE;
+        if(cy>=130&&cy<149)for(int k=0;k<10;k++)if(cx>=33+21*k&&cx<52+21*k){if(idx)*idx=k;return UC_TAB;}
+        if(cx>=34&&cx<98&&cy>=40&&cy<88)return UC_MAIN;
+        if(cy>=82&&cy<94)for(int k=0;k<g_ucMiniN;k++)if(cx>=108+20*k&&cx<124+20*k){if(idx)*idx=k;return UC_MINI;}
+        return UC_BODY;
+    }
     if (cx < 0.0f || cy < 0.0f || cx >= (float)H6_CARD_W || cy >= (float)H6_CARD_H)
         return UC_NONE;
     if (cy >= (float)H6_CARD_BODY_H) {
@@ -147,7 +156,7 @@ static int uc_health_class(int str, int maxstr)
 static bool uc_groupable(const SimObject& o)
 {
     return o.id >= 0 && o.rideKey < 0 && !o.limbo && is_players(o) &&
-           (o.kind == K_UNIT || o.kind == K_INFANTRY || o.kind == K_AIRCRAFT);
+           (o.kind == K_UNIT || o.kind == K_INFANTRY || o.kind == K_AIRCRAFT || (g_sbRa && o.kind==K_VESSEL));
 }
 
 /* Fill the card from the world. Also decides the hover frames, from the pointer. */
@@ -173,7 +182,7 @@ static void uc_fill(H6_Card* c, int fbw, int fbh)
             g_ucMainKey = g_selected[0];
             snprintf(c->name, sizeof c->name, "%s", title ? title : o.type);
             snprintf(c->code, sizeof c->code, "%s", o.type);
-            c->cameo = h6_tdr_find(o.type);
+            c->cameo = rah_enabled()?rah_cameo_plain(o.type):h6_tdr_find(o.type);
             c->str = o.str;
             c->maxstr = o.maxstr;
             c->health_color = uc_health_class(o.str, o.maxstr);
@@ -189,7 +198,7 @@ static void uc_fill(H6_Card* c, int fbw, int fbh)
             if (c->overflow > 0 && m == slots - 1) break;   /* the +N well */
             const int oi = uc_object_for_key(g_selected[(size_t)m + 1]);
             g_ucMiniKey[m] = g_selected[(size_t)m + 1];
-            if (oi >= 0) c->mini[m].rgba = h6_tdr_find(g_objects[oi].type);
+            if (oi >= 0) c->mini[m].rgba = rah_enabled()?rah_cameo_plain(g_objects[oi].type):h6_tdr_find(g_objects[oi].type);
             c->mini[m].frame = (hoverWhat == UC_MINI && hoverIdx == m) ? 1 : 0;
         }
         g_ucMiniN = slots;
@@ -224,6 +233,11 @@ static void uc_draw(int fbw, int fbh)
     if (!g_ucShownNow) return;
     H6_Card c;
     uc_fill(&c, fbw, fbh);
+    if(rah_enabled()){
+        rah_card_pixels(c);const UcLayout L=uc_layout(fbw,fbh);
+        glPushAttrib(GL_ENABLE_BIT|GL_COLOR_BUFFER_BIT|GL_TEXTURE_BIT|GL_CURRENT_BIT);glDisable(GL_ALPHA_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glEnable(GL_TEXTURE_2D);glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);glColor4f(1,1,1,1);
+        h6_upload(&g_ucTex,g_rahCard,272,166);h6_tex_quad(g_ucTex,272,166,L.x0,L.y0,L.x0+272*L.s,L.y0+166*L.s);glPopAttrib();return;
+    }
     hud640_draw_card(g_ucBuf, g_h6Pack, &c);
     h6_upload(&g_ucTex, g_ucBuf, H6_CARD_W, H6_CARD_H);
     const UcLayout L = uc_layout(fbw, fbh);
@@ -302,7 +316,11 @@ static void uc_control_centre(int what, int idx, int fbw, int fbh, float* cx, fl
 {
     const UcLayout L = uc_layout(fbw, fbh);
     float x = 0.0f, y = 0.0f;
-    if (what == UC_TAB) {
+    if(rah_enabled()){
+        if(what==UC_TAB){x=33+21*idx+9.5f;y=139.5f;}
+        else if(what==UC_MINI){x=116+20*idx;y=88;}
+        else{x=66;y=64;}
+    }else if (what == UC_TAB) {
         x = (float)(idx * H6_CARD_TAB_W) + (float)H6_CARD_TAB_W * 0.5f;
         y = (float)H6_CARD_BODY_H + (float)H6_CARD_TAB_H * 0.5f;
     } else if (what == UC_MINI) {
@@ -335,7 +353,7 @@ static void uc_script_report(int fbw, int fbh)
            c.group_count[4], c.group_count[5], c.group_count[6], c.group_count[7],
            c.group_count[8], c.group_count[9]);
     printf("UNITCARD|rect|x=%.0f|y=%.0f|w=%.0f|h=%.0f|scale=%.2f\n",
-           L.x0, L.y0, (float)H6_CARD_W * L.s, (float)H6_CARD_H * L.s, L.s);
+           L.x0, L.y0, (float)(rah_enabled()?272:H6_CARD_W) * L.s, (float)H6_CARD_H * L.s, L.s);
     for (int g = 0; g < H6_CARD_TABS; g++) {
         float cx, cy;
         uc_control_centre(UC_TAB, g, fbw, fbh, &cx, &cy);

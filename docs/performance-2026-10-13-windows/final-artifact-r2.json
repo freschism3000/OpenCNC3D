@@ -1,0 +1,29 @@
+{
+  "file": "build/diagnostics/OpenCNC3D-Windows-Performance-Diagnostic-v0.8.4-60b0bb5-r2.zip",
+  "size": 28728931,
+  "sha256": "c51fdab0770e470012286bd49f3045f477b2a904ef9fc72f456cfda125ebf144",
+  "source_commit": "60b0bb5497d45b73f50131f9b1e374aba1af238a",
+  "member_count": 6,
+  "binaries": {
+    "opencnc3d-game.exe": {
+      "size": 40375042,
+      "sha256": "e41f7bf9177142e4d1391442dac3cbec88a50712214747dd37f852d72dd45b11",
+      "machine": "i386",
+      "large_address_aware": true,
+      "build_marks": [
+        "OPENCNC3D|build|v0.8.4+60b0bb5-dirty|cooked"
+      ]
+    },
+    "cnc_eyes.exe": {
+      "size": 39019673,
+      "sha256": "4f7f29ef093c1714c955c74fef643693d39f28d96635f8bbe7a8c8723f9bb193",
+      "machine": "i386",
+      "large_address_aware": true,
+      "build_marks": [
+        "OPENCNC3D|build|v0.8.4+60b0bb5-dirty|cooked"
+      ]
+    }
+  },
+  "launcher_revision": 2,
+  "game_executables_unchanged": true
+}

@@ -42,6 +42,7 @@
 #include "lnet.h"
 #include "lpath.h"
 #include "lzip.h"
+#include "lmodule.h"
 
 #include <SDL.h>
 
@@ -320,12 +321,45 @@ static void lu_take_asset(LU_Asset *a, const LJ_Value *item)
     snprintf(a->name, sizeof a->name, "%s", name ? name : "");
 }
 
+static int lu_release_has_full(const LJ_Value *release, const char *platform)
+{
+    const LJ_Value *item;
+    const char *tag = lj_str(release, "tag");
+    char expected[256];
+    if (!tag || !*tag)
+        return 0;
+    snprintf(expected, sizeof expected, "OpenCNC3D-%s-v%s.zip", platform,
+             tag[0] == 'v' ? tag + 1 : tag);
+    for (item = lj_first(lj_get(release, "assets")); item; item = lj_next(item)) {
+        const char *name = lj_str(item, "name");
+        if (name && !strcmp(name, expected) && lj_num(item, "id", -1) > 0)
+            return 1;
+    }
+    return 0;
+}
+
+/* The approved feed can lead with a preview for only one platform. Choose from
+ * that same feed, using the exact full-ZIP identity rather than its classifier. */
+static const LJ_Value *lu_platform_release(const LJ_Value *root, const char *platform)
+{
+    const LJ_Value *item, *best = lj_get(root, "latest");
+    if (!lu_release_has_full(best, platform))
+        best = NULL;
+    for (item = lj_first(lj_get(root, "releases")); item; item = lj_next(item)) {
+        if (lu_release_has_full(item, platform) &&
+            (!best || lu_newer(lj_str(item, "tag"), lj_str(best, "tag")) > 0))
+            best = item;
+    }
+    return best;
+}
+
 static int lu_read_builds(LU_State *u, const char *json, char *err, int errlen)
 {
     LJ_Value *root;
     const LJ_Value *latest, *assets, *item;
     const char *tag;
     char jerr[256];
+    char full_name[256], bins_name[256], legacy_bins_name[256], manifest_name[256];
     int found_full;
 
     root = lj_parse(json, jerr, sizeof jerr);
@@ -338,7 +372,9 @@ static int lu_read_builds(LU_State *u, const char *json, char *err, int errlen)
         lj_free(root);
         return 0;
     }
-    latest = lj_get(root, "latest");
+    latest = lu_platform_release(root, LU_PLATFORM);
+    if (!latest)
+        latest = lj_get(root, "latest");
     /* A PINNED BUILD IS TAKEN FROM THE LIST, never from `latest`. Setup of one version
      * installs that version: handed the newest instead, a setup cut before the site lists
      * it would install an OLDER game than itself, and one cut after a newer release would
@@ -377,29 +413,45 @@ static int lu_read_builds(LU_State *u, const char *json, char *err, int errlen)
     memset(&u->manifest, 0, sizeof u->manifest);
     u->full.id = u->bins.id = u->manifest.id = -1;
     u->latest_data[0] = '\0';
+    snprintf(full_name, sizeof full_name, "OpenCNC3D-" LU_PLATFORM "-v%s.zip", u->latest);
+    snprintf(bins_name, sizeof bins_name, "OpenCNC3DBinaries-" LU_PLATFORM "-v%s.zip", u->latest);
+    snprintf(legacy_bins_name, sizeof legacy_bins_name, "OpenCNC3D-" LU_PLATFORM "-v%s-bins.zip", u->latest);
+    snprintf(manifest_name, sizeof manifest_name, "OpenCNC3D-v%s-manifest.txt", u->latest);
 
     assets = lj_get(latest, "assets");
     for (item = lj_first(assets); item; item = lj_next(item)) {
-        const char *platform = lj_str(item, "platform");
-        const char *kind = lj_str(item, "kind");
         const char *name = lj_str(item, "name");
 
-        /* THE MANIFEST IS MATCHED BY NAME, not by platform or kind, because the
-         * site classifies assets from their filenames and a .txt is not a
-         * category it has. Whatever it decides to call the thing, the NAME is
-         * ours and it contains "manifest". */
-        if (name && strstr(name, "manifest")) {
+        /* Independently installed modules are not whole-install updates. The
+         * website's older classifier may call their platform ZIP a full build;
+         * never let its ordering replace Dawn's update with an RA module. */
+        if (name && (strstr(name, "-module-") || strstr(name, "-modules.") ||
+                     !strncmp(name, "RA3D", 4)))
+            continue;
+
+        /* Match this release's exact whole-install manifest; module catalogs
+         * and other text assets can never replace its checksums. */
+        if (name && !strcmp(name, manifest_name)) {
             lu_take_asset(&u->manifest, item);
             continue;
         }
-        if (!platform || strcmp(platform, LU_PLATFORM))
+        if (!name)
             continue;
-        if (kind && !strcmp(kind, "full"))
+        /* The stable filename contract also protects old website classifiers:
+         * a .pkg/.exe Complete installer is never an extractable full update,
+         * and a new TD binary ZIP must remain a binary update even if the site
+         * labels every platform ZIP "full". Prefer the new binary name when
+         * a legacy compatibility alias is listed too. */
+        if (!strcmp(name, full_name))
             lu_take_asset(&u->full, item);
-        else if (kind && !strcmp(kind, "binaries"))
+        else if (!strcmp(name, bins_name) ||
+                 (!strcmp(name, legacy_bins_name) && u->bins.id <= 0))
             lu_take_asset(&u->bins, item);
     }
-    found_full = u->full.id > 0;
+    /* An ordinary check of a current/newer installation needs no download.
+     * Pinned and fresh installs still require an actual matching full package. */
+    found_full = u->full.id > 0 ||
+                 (!u->fresh && !u->want[0] && lu_newer(u->latest, u->installed) <= 0);
     SDL_UnlockMutex(u->lock);
 
     lj_free(root);
@@ -792,11 +844,11 @@ static int lu_do_check(LU_State *u, char *err, int errlen)
         }
     }
 
-    /* The changelog, always, and for the newest build rather than for the one
-     * installed: the panel's job at this moment is to answer "what would I get".
+    /* Keep the local notes for an explicit private source build or an install
+     * newer than the approved feed. Otherwise show what the public update offers.
      * A changelog that will not load is not a failed check; the version numbers
      * are the answer and the notes are the courtesy. */
-    {
+    if (!lz_is_private_developer(u->dir) && lu_newer(u->installed, u->latest) <= 0) {
         char cerr[256];
         text = ln_get_text(lu_api("/api/changelog", url, sizeof url), LCFG_KEY,
                            LU_API_CAP, cerr, sizeof cerr);
@@ -876,6 +928,24 @@ static int lu_do_apply(LU_State *u, char *err, int errlen)
     LU_Asset *a;
     int strip, small;
     char msg[256];
+
+    if (lz_is_private_developer(u->dir)) {
+        snprintf(err, (size_t)errlen,
+                 "This private source build is updated from its source checkout, not public game packages.");
+        return 0;
+    }
+
+    /* The legacy full and binary archives both contain Dawn's executable and
+     * brain. Applying either to an empty/RA-only folder would choose a game
+     * the player never selected, even when an old TD data_id still matches.
+     * Refuse before taking/settling a lock or touching a download name. Explicit
+     * fresh TD installation and existing TD updates keep their original policy. */
+    if (!u->fresh && !lmod_td_present(u->dir)) {
+        snprintf(err, (size_t)errlen,
+                 "Tiberian Dawn is not installed here. Upgrade the launcher with the newer "
+                 "OpenCNC3D Installer; choose games in Add Game.");
+        return 0;
+    }
 
     /* Before a byte is downloaded into the folder: see lu_own_install. */
     switch (lu_own_install(u)) {
@@ -1054,7 +1124,9 @@ static int lu_thread(void *user)
         {
             int newer = lu_newer(u->latest, u->installed);
             char line[256];
-            if (newer > 0)
+            if (newer > 0 && !u->fresh && !lmod_td_present(u->dir))
+                snprintf(line, sizeof line, "v%s is available. Run OpenCNC3D Installer to upgrade the launcher.", u->latest);
+            else if (newer > 0)
                 snprintf(line, sizeof line, "v%s is available. Press Update.", u->latest);
             else
                 snprintf(line, sizeof line, "This is the newest build.");

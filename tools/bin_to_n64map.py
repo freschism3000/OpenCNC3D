@@ -102,9 +102,8 @@ def expand_sparse_bin(data, what):
     this expands it to the dense square the rest of this pipeline speaks.
     An EMPTY file is the valid all-clear map and expands to one: the format
     stores only NON-clear cells, so a freshly created big map with no terrain
-    painted on it is legitimately zero bytes. Refusing that told the project owner his own
-    128x128 map "is neither the engine's sparse record form nor a dense
-    square", and it was both correct and blank.
+    painted on it is legitimately zero bytes. An empty 128x128 map is a valid
+    sparse input and expands to a blank dense square.
 
     Returns None when the bytes are not that form (then the dense reader
     judges the length as before)."""

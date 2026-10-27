@@ -1,0 +1,22 @@
+{
+  "asset": "game/grassmask_TEMPERAT.pack",
+  "format": "opencnc3d-compressed-asset",
+  "gzip": {
+    "bytes": 1228974,
+    "sha256": "72e6a19acfb111c59e9ae74c1f605934ebc18ffe5282af26f757086d6b5b475f"
+  },
+  "previous_approved_raw": [],
+  "provenance": {
+    "approval": "Exact production daylight bake; byte-identical to the approved installed Temperate ground mask. Authored source images and masks remain under art/remaster/textures/unified_daylight_v01.",
+    "approved_date": "2026-10-25",
+    "encoding": "gzip level 9, empty filename, mtime 0; raw pack format is unchanged.",
+    "producer": "tools/bakery/terrain_daylight.py",
+    "update": "Rebake from reviewed authoring inputs, validate runtime, gzip with the same deterministic settings, update both identities, and list only prior released raw identities in previous_approved_raw. Never add an unreviewed local override."
+  },
+  "raw": {
+    "bytes": 96893180,
+    "sha256": "1161d0e48d636b288b03b0b67e0350c8cc1369950237d973ec119ba29f04ea55"
+  },
+  "source": "game/grassmask_TEMPERAT.pack.gz",
+  "version": 1
+}

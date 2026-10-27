@@ -1,0 +1,46 @@
+{
+  "preserved": {
+    "playable/gfx_g44_dark.cfg": "9b2e451eb580d925478c92bdae03b0ac3152da9b4a560831a9c4979d9f19a539",
+    "playable/gfx_g44_lit.cfg": "0f16e6ed109f050beac2607c066dc2a86e028dd0dda78f9772db121fef46a709",
+    "playable/gfx_g235.cfg": "ee630de9970903065750a95a6de77398e938c346bfd4ae665c2d3c6d578246ae",
+    "playable/zz_ref_g52_on.cfg": "cb2484e662b2cbcad28ff4a3e6e26574e71ca1818a0dcd6fea4a13adf2574fb6",
+    "playable/gfx_g52_hi_off.cfg": "4ee486993c7e7d7b01a3a2b374db0846978930f8c778eb578d31b116ecc3e121",
+    "playable/gfx_g44_blast.cfg": "888fa9f1c9d811b94b71449d1e60a98360c171708f0e946137cb1c876439cad2",
+    "playable/gfx_g44_muz.cfg": "3e676c75fe4729ce0011b8062a1e7afe02a60709e36c6e57a8837b8ad1391043",
+    "playable/gfx_g194.cfg": "ee630de9970903065750a95a6de77398e938c346bfd4ae665c2d3c6d578246ae",
+    "playable/gfx_g44_ctl.cfg": "b0b358890f4977810277604326483b4dfae598319754f3aa2ab7ef3eaca56c35",
+    "playable/cnc3d-clouds.cfg": "4bb88a1509e2d9dc70467bd9f1922373922898635e11c0f5022b0f45bd3781f6",
+    "playable/cnc3d-fx.cfg": "cb0bcbdb862806ba52e19c06c947f52729b7da8adf82f37d9887cf787c91e73e",
+    "playable/gfx_g52_hi.cfg": "2729f6eca1c0a7cfb53d73f2d92ed8112ace4bbc17da52945bee39fe5ce82d24",
+    "playable/C&C3D.app/Contents/Resources/AppIcon.icns": "0e229101ea329bcee563b6b373f33845e5cb28b578df95783662fb189cde88b5",
+    "playable/gfx_g250.cfg": "ee630de9970903065750a95a6de77398e938c346bfd4ae665c2d3c6d578246ae",
+    "playable/gfx_lowsun.cfg": "23f012db1ed26fbc95268f4e29b26ffc6a66ced9ec0a7feba55b24ef55eef345",
+    "playable/ra3d-fx.cfg": "cb0bcbdb862806ba52e19c06c947f52729b7da8adf82f37d9887cf787c91e73e",
+    "playable/gfx_g52_lo.cfg": "49871614c4c49efdf27da027f002a597b4e954fad08a9fe93852d2eebc43f0c0",
+    "playable/C&C3D.app/Contents/Info.plist": "e63e3f3b24962381075ed20194e9b53c03fd0fc804fcd4cf87cef982c946abe8",
+    "playable/gfx_g52_off.cfg": "78d918614af801403e1c43011f08540c0c107e7bb8cfdf4b9f1f241412ffcecf",
+    "playable/cnc3d-controls.cfg": "eae48b7772fce2a8db02ddad292b0568bc237e8f1c29ea5d371817efc1d801f9",
+    "playable/C&C3D.app/Contents/MacOS/cnc3d-launch": "9faf88243ca0f79633a349025932bfeedb0697734dd7b272af04bb2bbee3b8d5",
+    "playable/zz_ref_g52_off.cfg": "158570637ca77f72f9354ae834c3876ac34a4116a0219f186d6431a7904ca1b7",
+    "playable/gfx_g52_on.cfg": "b491290b639fc48ead117e4c75c2aad9ce0c7862d27bc093f64a732c652ba11e",
+    "playable/C&C3D.app/Contents/_CodeSignature/CodeResources": "810bdc32797a27ebe5380b40e1af2c6f99e4ddf698504c098b0ba7c73c67da6f",
+    "playable/gfx_g52_lo_off.cfg": "49dca814bf974200aeb47f332ac3595a32b77765e125d40e4401a6f42e384898",
+    "playable/opencnc3d-fx.cfg": "cb0bcbdb862806ba52e19c06c947f52729b7da8adf82f37d9887cf787c91e73e",
+    "playable/opencnc3d-controls.cfg": "eae48b7772fce2a8db02ddad292b0568bc237e8f1c29ea5d371817efc1d801f9"
+  },
+  "binaries": {
+    "app/opencnc3d": "ca0d85863854f99385a016a0e007d34ede15ee1189ddb6dabd48728efb1832b7",
+    "game/cnc_eyes": "724974bc6394797124cc9de58f69f9cbef26b7678555d4abb3dd3ba1930c894d",
+    "playable/cnc3d": "ca0d85863854f99385a016a0e007d34ede15ee1189ddb6dabd48728efb1832b7",
+    "playable/opencnc3d": "ca0d85863854f99385a016a0e007d34ede15ee1189ddb6dabd48728efb1832b7",
+    "playable/ra3d/cnc3d": "ca0d85863854f99385a016a0e007d34ede15ee1189ddb6dabd48728efb1832b7",
+    "playable/ra3d/opencnc3d": "ca0d85863854f99385a016a0e007d34ede15ee1189ddb6dabd48728efb1832b7",
+    "playable/cnc_eyes": "724974bc6394797124cc9de58f69f9cbef26b7678555d4abb3dd3ba1930c894d"
+  },
+  "source_files": {
+    "game/cnc_eyes.cpp": "db192f316feb1ab1da168f9e382749069b86eddd9bc2e20d22ebfb07a71dc0fc",
+    "game/codex_mod.h": "0d802132f0045873d309a39d81ea1b2ae2564fc977f46ded7cb268859c91f016",
+    "menu/enhanced_menu.cpp": "ee9b7a6bc654ecd7c38c7c3a3bb2ff4091fda98422522cc0ac2934573860c88f",
+    "menu/enhanced_menu.h": "13f6a6d09fdc72bdab5dc9260e455e3f42a46e928bab334017bdc6fe15950a2d"
+  }
+}

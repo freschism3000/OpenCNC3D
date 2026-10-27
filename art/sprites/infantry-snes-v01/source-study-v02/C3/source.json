@@ -1,0 +1,3404 @@
+{
+  "id": "C3",
+  "name": "Civilian 3",
+  "frames": 375,
+  "width": 50,
+  "height": 39,
+  "anchor": [
+    27,
+    20
+  ],
+  "table": "CivilianDos3",
+  "actions": [
+    {
+      "enum": 0,
+      "id": "stand_ready",
+      "start": 0,
+      "count": 1,
+      "jump": 1,
+      "applicable": true,
+      "rate": 0,
+      "fps": 0,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 1,
+      "id": "stand_guard",
+      "start": 0,
+      "count": 1,
+      "jump": 1,
+      "applicable": true,
+      "rate": 0,
+      "fps": 0,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 2,
+      "id": "prone",
+      "start": 0,
+      "count": 1,
+      "jump": 1,
+      "applicable": false,
+      "rate": 0,
+      "fps": 0
+    },
+    {
+      "enum": 3,
+      "id": "walk",
+      "start": 56,
+      "count": 6,
+      "jump": 6,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 4,
+      "id": "fire_weapon",
+      "start": 205,
+      "count": 4,
+      "jump": 4,
+      "applicable": true,
+      "rate": 1,
+      "fps": 15.0,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 5,
+      "id": "lie_down",
+      "start": 0,
+      "count": 1,
+      "jump": 1,
+      "applicable": false,
+      "rate": 2,
+      "fps": 7.5
+    },
+    {
+      "enum": 6,
+      "id": "crawl",
+      "start": 8,
+      "count": 6,
+      "jump": 6,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 7,
+      "id": "get_up",
+      "start": 0,
+      "count": 1,
+      "jump": 1,
+      "applicable": false,
+      "rate": 3,
+      "fps": 5.0
+    },
+    {
+      "enum": 8,
+      "id": "fire_prone",
+      "start": 205,
+      "count": 4,
+      "jump": 4,
+      "applicable": true,
+      "rate": 1,
+      "fps": 15.0,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 9,
+      "id": "idle1",
+      "start": 189,
+      "count": 10,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 10,
+      "id": "idle2",
+      "start": 199,
+      "count": 6,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 11,
+      "id": "on_guard",
+      "start": 104,
+      "count": 3,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 12,
+      "id": "fight_ready",
+      "start": 107,
+      "count": 7,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 13,
+      "id": "punch",
+      "start": 114,
+      "count": 2,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 14,
+      "id": "kick",
+      "start": 116,
+      "count": 6,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 15,
+      "id": "punch_hit1",
+      "start": 122,
+      "count": 2,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 16,
+      "id": "punch_hit2",
+      "start": 124,
+      "count": 4,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 17,
+      "id": "punch_death",
+      "start": 128,
+      "count": 4,
+      "jump": 0,
+      "applicable": true,
+      "rate": 1,
+      "fps": 15.0,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 18,
+      "id": "kick_hit1",
+      "start": 133,
+      "count": 2,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 19,
+      "id": "kick_hit2",
+      "start": 135,
+      "count": 4,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 20,
+      "id": "kick_death",
+      "start": 139,
+      "count": 5,
+      "jump": 0,
+      "applicable": true,
+      "rate": 1,
+      "fps": 15.0,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 21,
+      "id": "ready_weapon",
+      "start": 144,
+      "count": 3,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "boxing_camera_offset": 47,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 22,
+      "id": "gun_death",
+      "start": 329,
+      "count": 8,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 23,
+      "id": "explosion_death",
+      "start": 337,
+      "count": 8,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 24,
+      "id": "explosion2_death",
+      "start": 337,
+      "count": 8,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 25,
+      "id": "grenade_death",
+      "start": 345,
+      "count": 12,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 26,
+      "id": "fire_death",
+      "start": 357,
+      "count": 18,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 27,
+      "id": "gesture1",
+      "start": 0,
+      "count": 0,
+      "jump": 0,
+      "applicable": false,
+      "rate": 2,
+      "fps": 7.5
+    },
+    {
+      "enum": 28,
+      "id": "salute1",
+      "start": 0,
+      "count": 0,
+      "jump": 0,
+      "applicable": false,
+      "rate": 2,
+      "fps": 7.5
+    },
+    {
+      "enum": 29,
+      "id": "gesture2",
+      "start": 0,
+      "count": 0,
+      "jump": 0,
+      "applicable": false,
+      "rate": 2,
+      "fps": 7.5
+    },
+    {
+      "enum": 30,
+      "id": "salute2",
+      "start": 0,
+      "count": 0,
+      "jump": 0,
+      "applicable": false,
+      "rate": 2,
+      "fps": 7.5
+    },
+    {
+      "enum": 31,
+      "id": "pull_gun",
+      "start": 199,
+      "count": 6,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 32,
+      "id": "plead",
+      "start": 237,
+      "count": 40,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    },
+    {
+      "enum": 33,
+      "id": "plead_death",
+      "start": 277,
+      "count": 6,
+      "jump": 0,
+      "applicable": true,
+      "rate": 2,
+      "fps": 7.5,
+      "invalid_source_indices": []
+    }
+  ],
+  "source_boards": {
+    "stand_ready": [
+      "stand_ready-00.png"
+    ],
+    "stand_guard": [
+      "stand_guard-00.png"
+    ],
+    "walk": [
+      "walk-00.png",
+      "walk-01.png"
+    ],
+    "fire_weapon": [
+      "fire_weapon-00.png",
+      "fire_weapon-01.png"
+    ],
+    "crawl": [
+      "crawl-00.png",
+      "crawl-01.png"
+    ],
+    "fire_prone": [
+      "fire_prone-00.png",
+      "fire_prone-01.png"
+    ],
+    "idle1": [
+      "idle1-00.png"
+    ],
+    "idle2": [
+      "idle2-00.png"
+    ],
+    "on_guard": [
+      "on_guard-00.png"
+    ],
+    "fight_ready": [
+      "fight_ready-00.png"
+    ],
+    "punch": [
+      "punch-00.png"
+    ],
+    "kick": [
+      "kick-00.png"
+    ],
+    "punch_hit1": [
+      "punch_hit1-00.png"
+    ],
+    "punch_hit2": [
+      "punch_hit2-00.png"
+    ],
+    "punch_death": [
+      "punch_death-00.png"
+    ],
+    "kick_hit1": [
+      "kick_hit1-00.png"
+    ],
+    "kick_hit2": [
+      "kick_hit2-00.png"
+    ],
+    "kick_death": [
+      "kick_death-00.png"
+    ],
+    "ready_weapon": [
+      "ready_weapon-00.png"
+    ],
+    "gun_death": [
+      "gun_death-00.png"
+    ],
+    "explosion_death": [
+      "explosion_death-00.png"
+    ],
+    "explosion2_death": [
+      "explosion2_death-00.png"
+    ],
+    "grenade_death": [
+      "grenade_death-00.png"
+    ],
+    "fire_death": [
+      "fire_death-00.png"
+    ],
+    "pull_gun": [
+      "pull_gun-00.png"
+    ],
+    "plead": [
+      "plead-00.png",
+      "plead-01.png"
+    ],
+    "plead_death": [
+      "plead_death-00.png"
+    ]
+  },
+  "original_sha256": "04981c5bd5395a6120de889832743f29ba72102b6a16416498b7f0958f10ed36",
+  "references": {},
+  "contexts": {
+    "0": [
+      {
+        "action": "stand_ready",
+        "facing": "N",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "N",
+        "stage": 0
+      }
+    ],
+    "1": [
+      {
+        "action": "stand_ready",
+        "facing": "NW",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "NW",
+        "stage": 0
+      }
+    ],
+    "2": [
+      {
+        "action": "stand_ready",
+        "facing": "W",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "W",
+        "stage": 0
+      }
+    ],
+    "3": [
+      {
+        "action": "stand_ready",
+        "facing": "SW",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "SW",
+        "stage": 0
+      }
+    ],
+    "4": [
+      {
+        "action": "stand_ready",
+        "facing": "S",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "S",
+        "stage": 0
+      }
+    ],
+    "5": [
+      {
+        "action": "stand_ready",
+        "facing": "SE",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "SE",
+        "stage": 0
+      }
+    ],
+    "6": [
+      {
+        "action": "stand_ready",
+        "facing": "E",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "E",
+        "stage": 0
+      }
+    ],
+    "7": [
+      {
+        "action": "stand_ready",
+        "facing": "NE",
+        "stage": 0
+      },
+      {
+        "action": "stand_guard",
+        "facing": "NE",
+        "stage": 0
+      }
+    ],
+    "8": [
+      {
+        "action": "crawl",
+        "facing": "N",
+        "stage": 0
+      }
+    ],
+    "9": [
+      {
+        "action": "crawl",
+        "facing": "N",
+        "stage": 1
+      }
+    ],
+    "10": [
+      {
+        "action": "crawl",
+        "facing": "N",
+        "stage": 2
+      }
+    ],
+    "11": [
+      {
+        "action": "crawl",
+        "facing": "N",
+        "stage": 3
+      }
+    ],
+    "12": [
+      {
+        "action": "crawl",
+        "facing": "N",
+        "stage": 4
+      }
+    ],
+    "13": [
+      {
+        "action": "crawl",
+        "facing": "N",
+        "stage": 5
+      }
+    ],
+    "14": [
+      {
+        "action": "crawl",
+        "facing": "NW",
+        "stage": 0
+      }
+    ],
+    "15": [
+      {
+        "action": "crawl",
+        "facing": "NW",
+        "stage": 1
+      }
+    ],
+    "16": [
+      {
+        "action": "crawl",
+        "facing": "NW",
+        "stage": 2
+      }
+    ],
+    "17": [
+      {
+        "action": "crawl",
+        "facing": "NW",
+        "stage": 3
+      }
+    ],
+    "18": [
+      {
+        "action": "crawl",
+        "facing": "NW",
+        "stage": 4
+      }
+    ],
+    "19": [
+      {
+        "action": "crawl",
+        "facing": "NW",
+        "stage": 5
+      }
+    ],
+    "20": [
+      {
+        "action": "crawl",
+        "facing": "W",
+        "stage": 0
+      }
+    ],
+    "21": [
+      {
+        "action": "crawl",
+        "facing": "W",
+        "stage": 1
+      }
+    ],
+    "22": [
+      {
+        "action": "crawl",
+        "facing": "W",
+        "stage": 2
+      }
+    ],
+    "23": [
+      {
+        "action": "crawl",
+        "facing": "W",
+        "stage": 3
+      }
+    ],
+    "24": [
+      {
+        "action": "crawl",
+        "facing": "W",
+        "stage": 4
+      }
+    ],
+    "25": [
+      {
+        "action": "crawl",
+        "facing": "W",
+        "stage": 5
+      }
+    ],
+    "26": [
+      {
+        "action": "crawl",
+        "facing": "SW",
+        "stage": 0
+      }
+    ],
+    "27": [
+      {
+        "action": "crawl",
+        "facing": "SW",
+        "stage": 1
+      }
+    ],
+    "28": [
+      {
+        "action": "crawl",
+        "facing": "SW",
+        "stage": 2
+      }
+    ],
+    "29": [
+      {
+        "action": "crawl",
+        "facing": "SW",
+        "stage": 3
+      }
+    ],
+    "30": [
+      {
+        "action": "crawl",
+        "facing": "SW",
+        "stage": 4
+      }
+    ],
+    "31": [
+      {
+        "action": "crawl",
+        "facing": "SW",
+        "stage": 5
+      }
+    ],
+    "32": [
+      {
+        "action": "crawl",
+        "facing": "S",
+        "stage": 0
+      }
+    ],
+    "33": [
+      {
+        "action": "crawl",
+        "facing": "S",
+        "stage": 1
+      }
+    ],
+    "34": [
+      {
+        "action": "crawl",
+        "facing": "S",
+        "stage": 2
+      }
+    ],
+    "35": [
+      {
+        "action": "crawl",
+        "facing": "S",
+        "stage": 3
+      }
+    ],
+    "36": [
+      {
+        "action": "crawl",
+        "facing": "S",
+        "stage": 4
+      }
+    ],
+    "37": [
+      {
+        "action": "crawl",
+        "facing": "S",
+        "stage": 5
+      }
+    ],
+    "38": [
+      {
+        "action": "crawl",
+        "facing": "SE",
+        "stage": 0
+      }
+    ],
+    "39": [
+      {
+        "action": "crawl",
+        "facing": "SE",
+        "stage": 1
+      }
+    ],
+    "40": [
+      {
+        "action": "crawl",
+        "facing": "SE",
+        "stage": 2
+      }
+    ],
+    "41": [
+      {
+        "action": "crawl",
+        "facing": "SE",
+        "stage": 3
+      }
+    ],
+    "42": [
+      {
+        "action": "crawl",
+        "facing": "SE",
+        "stage": 4
+      }
+    ],
+    "43": [
+      {
+        "action": "crawl",
+        "facing": "SE",
+        "stage": 5
+      }
+    ],
+    "44": [
+      {
+        "action": "crawl",
+        "facing": "E",
+        "stage": 0
+      }
+    ],
+    "45": [
+      {
+        "action": "crawl",
+        "facing": "E",
+        "stage": 1
+      }
+    ],
+    "46": [
+      {
+        "action": "crawl",
+        "facing": "E",
+        "stage": 2
+      }
+    ],
+    "47": [
+      {
+        "action": "crawl",
+        "facing": "E",
+        "stage": 3
+      }
+    ],
+    "48": [
+      {
+        "action": "crawl",
+        "facing": "E",
+        "stage": 4
+      }
+    ],
+    "49": [
+      {
+        "action": "crawl",
+        "facing": "E",
+        "stage": 5
+      }
+    ],
+    "50": [
+      {
+        "action": "crawl",
+        "facing": "NE",
+        "stage": 0
+      }
+    ],
+    "51": [
+      {
+        "action": "crawl",
+        "facing": "NE",
+        "stage": 1
+      }
+    ],
+    "52": [
+      {
+        "action": "crawl",
+        "facing": "NE",
+        "stage": 2
+      }
+    ],
+    "53": [
+      {
+        "action": "crawl",
+        "facing": "NE",
+        "stage": 3
+      }
+    ],
+    "54": [
+      {
+        "action": "crawl",
+        "facing": "NE",
+        "stage": 4
+      }
+    ],
+    "55": [
+      {
+        "action": "crawl",
+        "facing": "NE",
+        "stage": 5
+      }
+    ],
+    "56": [
+      {
+        "action": "walk",
+        "facing": "N",
+        "stage": 0
+      }
+    ],
+    "57": [
+      {
+        "action": "walk",
+        "facing": "N",
+        "stage": 1
+      }
+    ],
+    "58": [
+      {
+        "action": "walk",
+        "facing": "N",
+        "stage": 2
+      }
+    ],
+    "59": [
+      {
+        "action": "walk",
+        "facing": "N",
+        "stage": 3
+      }
+    ],
+    "60": [
+      {
+        "action": "walk",
+        "facing": "N",
+        "stage": 4
+      }
+    ],
+    "61": [
+      {
+        "action": "walk",
+        "facing": "N",
+        "stage": 5
+      }
+    ],
+    "62": [
+      {
+        "action": "walk",
+        "facing": "NW",
+        "stage": 0
+      }
+    ],
+    "63": [
+      {
+        "action": "walk",
+        "facing": "NW",
+        "stage": 1
+      }
+    ],
+    "64": [
+      {
+        "action": "walk",
+        "facing": "NW",
+        "stage": 2
+      }
+    ],
+    "65": [
+      {
+        "action": "walk",
+        "facing": "NW",
+        "stage": 3
+      }
+    ],
+    "66": [
+      {
+        "action": "walk",
+        "facing": "NW",
+        "stage": 4
+      }
+    ],
+    "67": [
+      {
+        "action": "walk",
+        "facing": "NW",
+        "stage": 5
+      }
+    ],
+    "68": [
+      {
+        "action": "walk",
+        "facing": "W",
+        "stage": 0
+      }
+    ],
+    "69": [
+      {
+        "action": "walk",
+        "facing": "W",
+        "stage": 1
+      }
+    ],
+    "70": [
+      {
+        "action": "walk",
+        "facing": "W",
+        "stage": 2
+      }
+    ],
+    "71": [
+      {
+        "action": "walk",
+        "facing": "W",
+        "stage": 3
+      }
+    ],
+    "72": [
+      {
+        "action": "walk",
+        "facing": "W",
+        "stage": 4
+      }
+    ],
+    "73": [
+      {
+        "action": "walk",
+        "facing": "W",
+        "stage": 5
+      }
+    ],
+    "74": [
+      {
+        "action": "walk",
+        "facing": "SW",
+        "stage": 0
+      }
+    ],
+    "75": [
+      {
+        "action": "walk",
+        "facing": "SW",
+        "stage": 1
+      }
+    ],
+    "76": [
+      {
+        "action": "walk",
+        "facing": "SW",
+        "stage": 2
+      }
+    ],
+    "77": [
+      {
+        "action": "walk",
+        "facing": "SW",
+        "stage": 3
+      }
+    ],
+    "78": [
+      {
+        "action": "walk",
+        "facing": "SW",
+        "stage": 4
+      }
+    ],
+    "79": [
+      {
+        "action": "walk",
+        "facing": "SW",
+        "stage": 5
+      }
+    ],
+    "80": [
+      {
+        "action": "walk",
+        "facing": "S",
+        "stage": 0
+      }
+    ],
+    "81": [
+      {
+        "action": "walk",
+        "facing": "S",
+        "stage": 1
+      }
+    ],
+    "82": [
+      {
+        "action": "walk",
+        "facing": "S",
+        "stage": 2
+      }
+    ],
+    "83": [
+      {
+        "action": "walk",
+        "facing": "S",
+        "stage": 3
+      }
+    ],
+    "84": [
+      {
+        "action": "walk",
+        "facing": "S",
+        "stage": 4
+      }
+    ],
+    "85": [
+      {
+        "action": "walk",
+        "facing": "S",
+        "stage": 5
+      }
+    ],
+    "86": [
+      {
+        "action": "walk",
+        "facing": "SE",
+        "stage": 0
+      }
+    ],
+    "87": [
+      {
+        "action": "walk",
+        "facing": "SE",
+        "stage": 1
+      }
+    ],
+    "88": [
+      {
+        "action": "walk",
+        "facing": "SE",
+        "stage": 2
+      }
+    ],
+    "89": [
+      {
+        "action": "walk",
+        "facing": "SE",
+        "stage": 3
+      }
+    ],
+    "90": [
+      {
+        "action": "walk",
+        "facing": "SE",
+        "stage": 4
+      }
+    ],
+    "91": [
+      {
+        "action": "walk",
+        "facing": "SE",
+        "stage": 5
+      }
+    ],
+    "92": [
+      {
+        "action": "walk",
+        "facing": "E",
+        "stage": 0
+      }
+    ],
+    "93": [
+      {
+        "action": "walk",
+        "facing": "E",
+        "stage": 1
+      }
+    ],
+    "94": [
+      {
+        "action": "walk",
+        "facing": "E",
+        "stage": 2
+      }
+    ],
+    "95": [
+      {
+        "action": "walk",
+        "facing": "E",
+        "stage": 3
+      }
+    ],
+    "96": [
+      {
+        "action": "walk",
+        "facing": "E",
+        "stage": 4
+      }
+    ],
+    "97": [
+      {
+        "action": "walk",
+        "facing": "E",
+        "stage": 5
+      }
+    ],
+    "98": [
+      {
+        "action": "walk",
+        "facing": "NE",
+        "stage": 0
+      }
+    ],
+    "99": [
+      {
+        "action": "walk",
+        "facing": "NE",
+        "stage": 1
+      }
+    ],
+    "100": [
+      {
+        "action": "walk",
+        "facing": "NE",
+        "stage": 2
+      }
+    ],
+    "101": [
+      {
+        "action": "walk",
+        "facing": "NE",
+        "stage": 3
+      }
+    ],
+    "102": [
+      {
+        "action": "walk",
+        "facing": "NE",
+        "stage": 4
+      }
+    ],
+    "103": [
+      {
+        "action": "walk",
+        "facing": "NE",
+        "stage": 5
+      }
+    ],
+    "104": [
+      {
+        "action": "on_guard",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "105": [
+      {
+        "action": "on_guard",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "106": [
+      {
+        "action": "on_guard",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "107": [
+      {
+        "action": "fight_ready",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "108": [
+      {
+        "action": "fight_ready",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "109": [
+      {
+        "action": "fight_ready",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "110": [
+      {
+        "action": "fight_ready",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "111": [
+      {
+        "action": "fight_ready",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "112": [
+      {
+        "action": "fight_ready",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "113": [
+      {
+        "action": "fight_ready",
+        "facing": "fixed",
+        "stage": 6
+      }
+    ],
+    "114": [
+      {
+        "action": "punch",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "115": [
+      {
+        "action": "punch",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "116": [
+      {
+        "action": "kick",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "117": [
+      {
+        "action": "kick",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "118": [
+      {
+        "action": "kick",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "119": [
+      {
+        "action": "kick",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "120": [
+      {
+        "action": "kick",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "121": [
+      {
+        "action": "kick",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "122": [
+      {
+        "action": "punch_hit1",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "123": [
+      {
+        "action": "punch_hit1",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "124": [
+      {
+        "action": "punch_hit2",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "125": [
+      {
+        "action": "punch_hit2",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "126": [
+      {
+        "action": "punch_hit2",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "127": [
+      {
+        "action": "punch_hit2",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "128": [
+      {
+        "action": "punch_death",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "129": [
+      {
+        "action": "punch_death",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "130": [
+      {
+        "action": "punch_death",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "131": [
+      {
+        "action": "punch_death",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "132": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 132
+      }
+    ],
+    "133": [
+      {
+        "action": "kick_hit1",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "134": [
+      {
+        "action": "kick_hit1",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "135": [
+      {
+        "action": "kick_hit2",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "136": [
+      {
+        "action": "kick_hit2",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "137": [
+      {
+        "action": "kick_hit2",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "138": [
+      {
+        "action": "kick_hit2",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "139": [
+      {
+        "action": "kick_death",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "140": [
+      {
+        "action": "kick_death",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "141": [
+      {
+        "action": "kick_death",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "142": [
+      {
+        "action": "kick_death",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "143": [
+      {
+        "action": "kick_death",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "144": [
+      {
+        "action": "ready_weapon",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "145": [
+      {
+        "action": "ready_weapon",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "146": [
+      {
+        "action": "ready_weapon",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "147": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 147
+      }
+    ],
+    "148": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 148
+      }
+    ],
+    "149": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 149
+      }
+    ],
+    "150": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 150
+      }
+    ],
+    "151": [
+      {
+        "action": "on_guard",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "152": [
+      {
+        "action": "on_guard",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "153": [
+      {
+        "action": "on_guard",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "154": [
+      {
+        "action": "fight_ready",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "155": [
+      {
+        "action": "fight_ready",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "156": [
+      {
+        "action": "fight_ready",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "157": [
+      {
+        "action": "fight_ready",
+        "facing": "opposite boxing",
+        "stage": 3
+      }
+    ],
+    "158": [
+      {
+        "action": "fight_ready",
+        "facing": "opposite boxing",
+        "stage": 4
+      }
+    ],
+    "159": [
+      {
+        "action": "fight_ready",
+        "facing": "opposite boxing",
+        "stage": 5
+      }
+    ],
+    "160": [
+      {
+        "action": "fight_ready",
+        "facing": "opposite boxing",
+        "stage": 6
+      }
+    ],
+    "161": [
+      {
+        "action": "punch",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "162": [
+      {
+        "action": "punch",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "163": [
+      {
+        "action": "kick",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "164": [
+      {
+        "action": "kick",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "165": [
+      {
+        "action": "kick",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "166": [
+      {
+        "action": "kick",
+        "facing": "opposite boxing",
+        "stage": 3
+      }
+    ],
+    "167": [
+      {
+        "action": "kick",
+        "facing": "opposite boxing",
+        "stage": 4
+      }
+    ],
+    "168": [
+      {
+        "action": "kick",
+        "facing": "opposite boxing",
+        "stage": 5
+      }
+    ],
+    "169": [
+      {
+        "action": "punch_hit1",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "170": [
+      {
+        "action": "punch_hit1",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "171": [
+      {
+        "action": "punch_hit2",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "172": [
+      {
+        "action": "punch_hit2",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "173": [
+      {
+        "action": "punch_hit2",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "174": [
+      {
+        "action": "punch_hit2",
+        "facing": "opposite boxing",
+        "stage": 3
+      }
+    ],
+    "175": [
+      {
+        "action": "punch_death",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "176": [
+      {
+        "action": "punch_death",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "177": [
+      {
+        "action": "punch_death",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "178": [
+      {
+        "action": "punch_death",
+        "facing": "opposite boxing",
+        "stage": 3
+      }
+    ],
+    "179": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 179
+      }
+    ],
+    "180": [
+      {
+        "action": "kick_hit1",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "181": [
+      {
+        "action": "kick_hit1",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "182": [
+      {
+        "action": "kick_hit2",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "183": [
+      {
+        "action": "kick_hit2",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "184": [
+      {
+        "action": "kick_hit2",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "185": [
+      {
+        "action": "kick_hit2",
+        "facing": "opposite boxing",
+        "stage": 3
+      }
+    ],
+    "186": [
+      {
+        "action": "kick_death",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "187": [
+      {
+        "action": "kick_death",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "188": [
+      {
+        "action": "kick_death",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "189": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 0
+      },
+      {
+        "action": "kick_death",
+        "facing": "opposite boxing",
+        "stage": 3
+      }
+    ],
+    "190": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 1
+      },
+      {
+        "action": "kick_death",
+        "facing": "opposite boxing",
+        "stage": 4
+      }
+    ],
+    "191": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 2
+      },
+      {
+        "action": "ready_weapon",
+        "facing": "opposite boxing",
+        "stage": 0
+      }
+    ],
+    "192": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 3
+      },
+      {
+        "action": "ready_weapon",
+        "facing": "opposite boxing",
+        "stage": 1
+      }
+    ],
+    "193": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 4
+      },
+      {
+        "action": "ready_weapon",
+        "facing": "opposite boxing",
+        "stage": 2
+      }
+    ],
+    "194": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "195": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 6
+      }
+    ],
+    "196": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 7
+      }
+    ],
+    "197": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 8
+      }
+    ],
+    "198": [
+      {
+        "action": "idle1",
+        "facing": "fixed",
+        "stage": 9
+      }
+    ],
+    "199": [
+      {
+        "action": "idle2",
+        "facing": "fixed",
+        "stage": 0
+      },
+      {
+        "action": "pull_gun",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "200": [
+      {
+        "action": "idle2",
+        "facing": "fixed",
+        "stage": 1
+      },
+      {
+        "action": "pull_gun",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "201": [
+      {
+        "action": "idle2",
+        "facing": "fixed",
+        "stage": 2
+      },
+      {
+        "action": "pull_gun",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "202": [
+      {
+        "action": "idle2",
+        "facing": "fixed",
+        "stage": 3
+      },
+      {
+        "action": "pull_gun",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "203": [
+      {
+        "action": "idle2",
+        "facing": "fixed",
+        "stage": 4
+      },
+      {
+        "action": "pull_gun",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "204": [
+      {
+        "action": "idle2",
+        "facing": "fixed",
+        "stage": 5
+      },
+      {
+        "action": "pull_gun",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "205": [
+      {
+        "action": "fire_weapon",
+        "facing": "N",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "N",
+        "stage": 0
+      }
+    ],
+    "206": [
+      {
+        "action": "fire_weapon",
+        "facing": "N",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "N",
+        "stage": 1
+      }
+    ],
+    "207": [
+      {
+        "action": "fire_weapon",
+        "facing": "N",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "N",
+        "stage": 2
+      }
+    ],
+    "208": [
+      {
+        "action": "fire_weapon",
+        "facing": "N",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "N",
+        "stage": 3
+      }
+    ],
+    "209": [
+      {
+        "action": "fire_weapon",
+        "facing": "NW",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NW",
+        "stage": 0
+      }
+    ],
+    "210": [
+      {
+        "action": "fire_weapon",
+        "facing": "NW",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NW",
+        "stage": 1
+      }
+    ],
+    "211": [
+      {
+        "action": "fire_weapon",
+        "facing": "NW",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NW",
+        "stage": 2
+      }
+    ],
+    "212": [
+      {
+        "action": "fire_weapon",
+        "facing": "NW",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NW",
+        "stage": 3
+      }
+    ],
+    "213": [
+      {
+        "action": "fire_weapon",
+        "facing": "W",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "W",
+        "stage": 0
+      }
+    ],
+    "214": [
+      {
+        "action": "fire_weapon",
+        "facing": "W",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "W",
+        "stage": 1
+      }
+    ],
+    "215": [
+      {
+        "action": "fire_weapon",
+        "facing": "W",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "W",
+        "stage": 2
+      }
+    ],
+    "216": [
+      {
+        "action": "fire_weapon",
+        "facing": "W",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "W",
+        "stage": 3
+      }
+    ],
+    "217": [
+      {
+        "action": "fire_weapon",
+        "facing": "SW",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SW",
+        "stage": 0
+      }
+    ],
+    "218": [
+      {
+        "action": "fire_weapon",
+        "facing": "SW",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SW",
+        "stage": 1
+      }
+    ],
+    "219": [
+      {
+        "action": "fire_weapon",
+        "facing": "SW",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SW",
+        "stage": 2
+      }
+    ],
+    "220": [
+      {
+        "action": "fire_weapon",
+        "facing": "SW",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SW",
+        "stage": 3
+      }
+    ],
+    "221": [
+      {
+        "action": "fire_weapon",
+        "facing": "S",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "S",
+        "stage": 0
+      }
+    ],
+    "222": [
+      {
+        "action": "fire_weapon",
+        "facing": "S",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "S",
+        "stage": 1
+      }
+    ],
+    "223": [
+      {
+        "action": "fire_weapon",
+        "facing": "S",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "S",
+        "stage": 2
+      }
+    ],
+    "224": [
+      {
+        "action": "fire_weapon",
+        "facing": "S",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "S",
+        "stage": 3
+      }
+    ],
+    "225": [
+      {
+        "action": "fire_weapon",
+        "facing": "SE",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SE",
+        "stage": 0
+      }
+    ],
+    "226": [
+      {
+        "action": "fire_weapon",
+        "facing": "SE",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SE",
+        "stage": 1
+      }
+    ],
+    "227": [
+      {
+        "action": "fire_weapon",
+        "facing": "SE",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SE",
+        "stage": 2
+      }
+    ],
+    "228": [
+      {
+        "action": "fire_weapon",
+        "facing": "SE",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "SE",
+        "stage": 3
+      }
+    ],
+    "229": [
+      {
+        "action": "fire_weapon",
+        "facing": "E",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "E",
+        "stage": 0
+      }
+    ],
+    "230": [
+      {
+        "action": "fire_weapon",
+        "facing": "E",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "E",
+        "stage": 1
+      }
+    ],
+    "231": [
+      {
+        "action": "fire_weapon",
+        "facing": "E",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "E",
+        "stage": 2
+      }
+    ],
+    "232": [
+      {
+        "action": "fire_weapon",
+        "facing": "E",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "E",
+        "stage": 3
+      }
+    ],
+    "233": [
+      {
+        "action": "fire_weapon",
+        "facing": "NE",
+        "stage": 0
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NE",
+        "stage": 0
+      }
+    ],
+    "234": [
+      {
+        "action": "fire_weapon",
+        "facing": "NE",
+        "stage": 1
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NE",
+        "stage": 1
+      }
+    ],
+    "235": [
+      {
+        "action": "fire_weapon",
+        "facing": "NE",
+        "stage": 2
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NE",
+        "stage": 2
+      }
+    ],
+    "236": [
+      {
+        "action": "fire_weapon",
+        "facing": "NE",
+        "stage": 3
+      },
+      {
+        "action": "fire_prone",
+        "facing": "NE",
+        "stage": 3
+      }
+    ],
+    "237": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "238": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "239": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "240": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "241": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "242": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "243": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 6
+      }
+    ],
+    "244": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 7
+      }
+    ],
+    "245": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 8
+      }
+    ],
+    "246": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 9
+      }
+    ],
+    "247": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 10
+      }
+    ],
+    "248": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 11
+      }
+    ],
+    "249": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 12
+      }
+    ],
+    "250": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 13
+      }
+    ],
+    "251": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 14
+      }
+    ],
+    "252": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 15
+      }
+    ],
+    "253": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 16
+      }
+    ],
+    "254": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 17
+      }
+    ],
+    "255": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 18
+      }
+    ],
+    "256": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 19
+      }
+    ],
+    "257": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 20
+      }
+    ],
+    "258": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 21
+      }
+    ],
+    "259": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 22
+      }
+    ],
+    "260": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 23
+      }
+    ],
+    "261": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 24
+      }
+    ],
+    "262": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 25
+      }
+    ],
+    "263": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 26
+      }
+    ],
+    "264": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 27
+      }
+    ],
+    "265": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 28
+      }
+    ],
+    "266": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 29
+      }
+    ],
+    "267": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 30
+      }
+    ],
+    "268": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 31
+      }
+    ],
+    "269": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 32
+      }
+    ],
+    "270": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 33
+      }
+    ],
+    "271": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 34
+      }
+    ],
+    "272": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 35
+      }
+    ],
+    "273": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 36
+      }
+    ],
+    "274": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 37
+      }
+    ],
+    "275": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 38
+      }
+    ],
+    "276": [
+      {
+        "action": "plead",
+        "facing": "fixed",
+        "stage": 39
+      }
+    ],
+    "277": [
+      {
+        "action": "plead_death",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "278": [
+      {
+        "action": "plead_death",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "279": [
+      {
+        "action": "plead_death",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "280": [
+      {
+        "action": "plead_death",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "281": [
+      {
+        "action": "plead_death",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "282": [
+      {
+        "action": "plead_death",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "283": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 283
+      }
+    ],
+    "284": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 284
+      }
+    ],
+    "285": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 285
+      }
+    ],
+    "286": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 286
+      }
+    ],
+    "287": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 287
+      }
+    ],
+    "288": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 288
+      }
+    ],
+    "289": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 289
+      }
+    ],
+    "290": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 290
+      }
+    ],
+    "291": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 291
+      }
+    ],
+    "292": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 292
+      }
+    ],
+    "293": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 293
+      }
+    ],
+    "294": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 294
+      }
+    ],
+    "295": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 295
+      }
+    ],
+    "296": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 296
+      }
+    ],
+    "297": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 297
+      }
+    ],
+    "298": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 298
+      }
+    ],
+    "299": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 299
+      }
+    ],
+    "300": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 300
+      }
+    ],
+    "301": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 301
+      }
+    ],
+    "302": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 302
+      }
+    ],
+    "303": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 303
+      }
+    ],
+    "304": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 304
+      }
+    ],
+    "305": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 305
+      }
+    ],
+    "306": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 306
+      }
+    ],
+    "307": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 307
+      }
+    ],
+    "308": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 308
+      }
+    ],
+    "309": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 309
+      }
+    ],
+    "310": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 310
+      }
+    ],
+    "311": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 311
+      }
+    ],
+    "312": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 312
+      }
+    ],
+    "313": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 313
+      }
+    ],
+    "314": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 314
+      }
+    ],
+    "315": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 315
+      }
+    ],
+    "316": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 316
+      }
+    ],
+    "317": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 317
+      }
+    ],
+    "318": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 318
+      }
+    ],
+    "319": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 319
+      }
+    ],
+    "320": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 320
+      }
+    ],
+    "321": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 321
+      }
+    ],
+    "322": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 322
+      }
+    ],
+    "323": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 323
+      }
+    ],
+    "324": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 324
+      }
+    ],
+    "325": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 325
+      }
+    ],
+    "326": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 326
+      }
+    ],
+    "327": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 327
+      }
+    ],
+    "328": [
+      {
+        "action": "physical padding / unselected art",
+        "facing": "physical slot",
+        "stage": 328
+      }
+    ],
+    "329": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "330": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "331": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "332": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "333": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "334": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "335": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 6
+      }
+    ],
+    "336": [
+      {
+        "action": "gun_death",
+        "facing": "fixed",
+        "stage": 7
+      }
+    ],
+    "337": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 0
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "338": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 1
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "339": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 2
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "340": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 3
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "341": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 4
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "342": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 5
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "343": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 6
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 6
+      }
+    ],
+    "344": [
+      {
+        "action": "explosion_death",
+        "facing": "fixed",
+        "stage": 7
+      },
+      {
+        "action": "explosion2_death",
+        "facing": "fixed",
+        "stage": 7
+      }
+    ],
+    "345": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "346": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "347": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "348": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "349": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "350": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "351": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 6
+      }
+    ],
+    "352": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 7
+      }
+    ],
+    "353": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 8
+      }
+    ],
+    "354": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 9
+      }
+    ],
+    "355": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 10
+      }
+    ],
+    "356": [
+      {
+        "action": "grenade_death",
+        "facing": "fixed",
+        "stage": 11
+      }
+    ],
+    "357": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 0
+      }
+    ],
+    "358": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 1
+      }
+    ],
+    "359": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 2
+      }
+    ],
+    "360": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 3
+      }
+    ],
+    "361": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 4
+      }
+    ],
+    "362": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 5
+      }
+    ],
+    "363": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 6
+      }
+    ],
+    "364": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 7
+      }
+    ],
+    "365": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 8
+      }
+    ],
+    "366": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 9
+      }
+    ],
+    "367": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 10
+      }
+    ],
+    "368": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 11
+      }
+    ],
+    "369": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 12
+      }
+    ],
+    "370": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 13
+      }
+    ],
+    "371": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 14
+      }
+    ],
+    "372": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 15
+      }
+    ],
+    "373": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 16
+      }
+    ],
+    "374": [
+      {
+        "action": "fire_death",
+        "facing": "fixed",
+        "stage": 17
+      }
+    ]
+  }
+}

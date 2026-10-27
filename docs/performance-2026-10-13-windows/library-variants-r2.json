@@ -1,0 +1,61 @@
+{
+  "full": {
+    "archive": "/private/tmp/opencnc3d-release-v084-20261013/artifacts/OpenCNC3D-windows-v0.8.4.zip",
+    "archive_size": 1713111531,
+    "files": {
+      "TiberianDawn.dll": {
+        "path": "OpenCNC3D-windows-v0.8.4/TiberianDawn.dll",
+        "bytes": 21786119,
+        "sha256": "f2354af233b08c768b9d44ad5ddb582bb772a227edb4294c14ac9563227eab98",
+        "pe_timestamp": 1791910610,
+        "pe_timestamp_utc": "2026-10-13T16:56:50+00:00"
+      },
+      "opencnc3d-install.txt": {
+        "path": "OpenCNC3D-windows-v0.8.4/opencnc3d-install.txt",
+        "bytes": 128,
+        "sha256": "a6371848281b89e321891e532ce408cede6038c02d293077cd777ed31bb67fd8",
+        "text": "# written by tools/win/make-build-win.sh\nversion 0.8.4\ndata_id c7c6309eec3ffdd7b955990822962c22b3e9ca321eb03e308ea2c24bbf722e42\n"
+      },
+      "BUILD-ID.txt": {
+        "path": "OpenCNC3D-windows-v0.8.4/BUILD-ID.txt",
+        "bytes": 34,
+        "sha256": "5c1106300d8c1114779b9e3a20dfaa2575df562433c552b7aea176d6884723cc",
+        "text": "v0.8.4  windows  2026-10-13 18:57\n"
+      },
+      "SDL2.dll": {
+        "path": "OpenCNC3D-windows-v0.8.4/SDL2.dll",
+        "bytes": 1912320,
+        "sha256": "06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e",
+        "pe_timestamp": 1748906285,
+        "pe_timestamp_utc": "2025-06-02T23:18:05+00:00"
+      }
+    }
+  },
+  "bins": {
+    "archive": "/private/tmp/opencnc3d-release-v084-20261013/artifacts/OpenCNC3D-windows-v0.8.4-bins.zip",
+    "archive_size": 43030546,
+    "files": {
+      "TiberianDawn.dll": {
+        "path": "TiberianDawn.dll",
+        "bytes": 21786119,
+        "sha256": "db5f35c428aac460dbc25b57170e54ad4e32aaac772500437778d2b36a9ff019",
+        "pe_timestamp": 1791911336,
+        "pe_timestamp_utc": "2026-10-13T17:08:56+00:00"
+      },
+      "BUILD-ID.txt": {
+        "path": "BUILD-ID.txt",
+        "bytes": 34,
+        "sha256": "05557237c5975d439b203adee3c3f1ab4bce19c0de53c806f7c0f11590012a54",
+        "text": "v0.8.4  windows  2026-10-13 19:09\n"
+      },
+      "SDL2.dll": {
+        "path": "SDL2.dll",
+        "bytes": 1912320,
+        "sha256": "06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e",
+        "pe_timestamp": 1748906285,
+        "pe_timestamp_utc": "2025-06-02T23:18:05+00:00"
+      }
+    }
+  },
+  "fix": "Launcher revision 2 accepts both exact published engine fingerprints; SDL remains pinned to its shared published fingerprint."
+}

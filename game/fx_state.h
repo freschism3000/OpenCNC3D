@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "object_grade.h"
 
 /* Same spelling fx_filter.h uses, and defined here too because this header is included
    by translation units that never pull that one in. */
@@ -70,7 +71,7 @@ enum {
     FXR_TREES, FXR_TIB3D, FXR_TEXSET, FXR_INFSET, FXR_GAMMA, FXR_SS, FXR_SHADOWS, FXR_AO,
     FXR_LIGHT, FXR_BLOOM, FXR_GRADE, FXR_CRT, FXR_GRASS, FXR_FOLIAGE, FXR_ROCKS,
     FXR_SOLDIERS, FXR_MODELS, FXR_UVFX, FXR_PATCHES, FXR_RELIEF, FXR_POINTER,
-    FXR_NEWAUDIO, FXR_COUNT
+    FXR_NEWAUDIO, FXR_EINF, FXR_WATER_SWASH, FXR_COUNT
 };
 
 struct FxState {
@@ -144,6 +145,9 @@ struct FxState {
        fine everywhere it was first tested. ss_scale is the other FXP_STEP row and is a
        float for the same reason. */
     float texset;
+    float sand_brightness, sand_contrast; /* Enhanced Desert ground grade, 1 neutral */
+    float sand_saturation;           /* independent Enhanced Desert ground material colour */
+    float clear_saturation;          /* saturation of the Enhanced clear-ground family */
 
     /* 0c-3. WHICH INFANTRY ART DRAWS, the fifth thing here that is not a post pass.
           FX_INF_N64 is the cartridge's billboards and DETH strips; FX_INF_DOS is the 1995
@@ -226,6 +230,18 @@ struct FxState {
     float experimental_relief_mode;  /* 0 parallax occlusion mapping, 1 the 24x24 lattice */
     float experimental_relief_steps; /* the parallax march's steps through the height */
     int   new_audio;                 /* replacement sound effects from newaudio/ */
+    int unified_lighting;
+    float sun_energy, sky_energy, terrain_ambient;
+    float shadow_black_limit; /* Display toe for shaded detail; no additive world light. */
+    float object_shadow_fill; /* Lifts sun shadowing and AO on structures and trees. */
+    /* Independent albedo colour balance for the four exterior biome groups. */
+    float grass_terrain_warmth, grass_terrain_tint, grass_terrain_red, grass_terrain_green, grass_terrain_blue;
+    float desert_terrain_warmth, desert_terrain_tint, desert_terrain_red, desert_terrain_green, desert_terrain_blue;
+    float sand_terrain_warmth, sand_terrain_tint, sand_terrain_red, sand_terrain_green, sand_terrain_blue;
+    float snow_terrain_warmth, snow_terrain_tint, snow_terrain_red, snow_terrain_green, snow_terrain_blue;
+
+    int terrain_relief;
+    float terrain_relief_height;
     float sun_az, sun_el;             /* degrees: compass bearing, and height          */
     float shadow_strength;            /* 0 = invisible, 1 = full tint                  */
     float shadow_soft;                /* PCF radius in shadow-map texels               */
@@ -235,7 +251,9 @@ struct FxState {
     float shadow_res;                 /* shadow map edge, quantised to a power of two  */
     float shadow_r, shadow_g, shadow_b;/* what a shadowed pixel is multiplied BY       */
     int   shadow_terrain;             /* let the ground cast into itself (hills)       */
+    float desert_shadow_strength, sand_shadow_strength, snow_shadow_strength;
     float terrain_shadow_strength;   /* terrain casters only; object shadows retain their strength */
+    float snow_brightness, snow_contrast, snow_saturation; /* Enhanced Snow terrain multipliers, 1 neutral */
     float terrain_brightness, terrain_contrast; /* ground colour before lighting; 1 is neutral */
     /* 3c. THE GROUND, SMOOTHED. The light pass has no normal buffer; it
           rebuilt a FLAT per-triangle normal from depth, so the terminator, the bias and
@@ -375,6 +393,11 @@ struct FxState {
           binary. Every distance is in world cells, every speed in cells (or tile
           repeats) per second of engine time. */
     int   water_fx;
+    int   water_swash;                /* animated beach wash and cellular foam, Enhanced */
+    float water_swash_hold;           /* extra seconds at maximum beach run-up           */
+    float water_swash_opacity;        /* alpha of the swash film and foam together        */
+    float water_align_length;         /* full shore alignment distance, world cells      */
+    float water_align_blend;          /* additional fade to the offshore current, cells  */
     float water_flow;                 /* tile repeats the UV is pushed over a cycle      */
     float water_flow_rate;            /* cycles per second of that push                 */
     float water_current;              /* compass bearing the open sea drifts on         */
@@ -392,11 +415,9 @@ struct FxState {
     float water_river_width;          /* a body nowhere wider than twice this is a river  */
     float water_river_speed;          /* a river's run, as a multiple of the flow push     */
     float water_bump;                 /* the ripple normal's strength                      */
-    float water_reflect;              /* how much of the sky (and later the scene) shows   */
     float water_spec;                 /* the sun's glint                                   */
+    float water_reflection_yaw;       /* water-only highlight bearing offset, degrees      */
     float water_refract;              /* how far the ripple bends what is under the water  */
-    float water_fresnel;              /* reflection looking straight down; grazing is 1    */
-    int   water_reflect_scene;        /* mirror the world into the water, not just a sky   */
     float water_natural;              /* eases the cobalt toward a greyer, greener water   */
     float water_dark;                 /* plainly darker water, on top of the tint          */
     float water_wake;                 /* a moving boat's trail; 0 draws none               */
@@ -409,6 +430,8 @@ struct FxState {
 
     /* 4. Bloom, off the composited world only, never the sidebar. */
     int   bloom_on;
+    float muzzle_bloom, muzzle_flash_gain, muzzle_light_gain;
+    float explosion_bloom; /* luminous explosion-particle bloom gain only */
     float bloom_threshold, bloom_knee, bloom_intensity, bloom_radius;
     float bloom_passes;               /* blur ping-pongs, 1..6                         */
 
@@ -431,6 +454,23 @@ struct FxState {
        strength, tib_light_spread how many cells it reaches past the field's edge, and
        tib_light_height how far up a unit or a wall it climbs before it fades. */
     float tib_light, tib_light_spread, tib_light_height;
+    /* The remastered vehicles' own lamps (evhc_mod.h): every headlight, tail light,
+       marker and beacon an export's lights.json names, as a cone of light on what stands
+       in front of it, its lens glowing. vlight_head scales the headlights and
+       searchlights, vlight_tail every other lamp; vlight_cone and vlight_range scale
+       their cones and their reach; vlight_glow the lens's glow; vlight_shadows lets a
+       headlight be stopped by what stands between it and a surface (a short march
+       through the depth buffer, as the contact shadows take). Not one of the 24 slots:
+       the lamps have their own (FX_MAX_SPOTS). */
+    int   vlight_on, vlight_shadows;
+    float vlight_head, vlight_tail, vlight_cone, vlight_range, vlight_glow;
+    /* The remastered vehicles' specular maps (evhc_mod.h): a vehicle whose export carries
+       one (<TYPE>.spec) shines where its map says, a sun highlight that slides over the
+       hull as it turns and a faint sheen of the sky at grazing angles, both out of the
+       sun's shadow. vspec_sun scales the highlight, vspec_sky the sheen, vspec_gloss
+       tightens (above 1) or spreads (below) every highlight. */
+    int   vspec_on;
+    float vspec_sun, vspec_sky, vspec_gloss;
 
     /* 7. Colour grade. Sliders now; a LUT is the same shader with a texture lookup
           bolted on the end, and the day that is wanted this struct grows one path. */
@@ -582,12 +622,20 @@ struct FxState {
          tree3d_burn       how far the engine's own damage takes a tree toward char
          tree3d_lean       how far a tree may lean off vertical, radians */
     int   tree3d;
+    float etree_height, etree_width, etree_vary, etree_lean, etree_gain;
+    float etree_shadow_fill; /* Indirect canopy fill in the current remastered-tree path. */
     /* REMASTERED EFFECTS. efx_enh: draw the particle effects with the remastered art in
        efx_enh.pack (tools/art/remaster/fx) and add Enhanced mode's own emitters (muzzle
        flashes, the landing-zone flare, efx_enhanced.h). Off = the cartridge's art and
        nothing added, which is what Classic draws. Every particle still flies, grows and
        fades as the cartridge says. */
     int   efx_enh;
+    /* THE PARTICLES' OWN GRADE under Enhanced (effects_mod.h, efx_grade_*): brightness
+       multiplies, contrast is an S-curve that keeps black and white where they are (so an
+       additive particle's black stays clear), saturation mixes toward grey. Each at 1 is
+       exact: the particles draw as they always did, with no shader. */
+    float efx_bright, efx_contrast, efx_sat;
+    float efx_exposure, efx_gamma, efx_warmth, efx_tint, efx_red, efx_green, efx_blue;
     /* REMASTERED BUILDING APRONS (bibenh_mod.h). bib_enh: draw the dirt apron in front
        of a building from bibenh.pack, at twice the cartridge's texels, with a soft edge,
        multiplied into the ground under it. bib_enh_strength scales the whole apron, 0 = no
@@ -597,6 +645,10 @@ struct FxState {
        cartridge's aprons, which is what Classic draws. */
     int   bib_enh;
     float bib_enh_strength, bib_enh_cover;
+    /* REMASTERED CRATERS AND SCORCH MARKS (decalenh_mod.h). decal_enh: draw them from
+       decalenh.pack, the 1995 PC art painted again at the ground's 144 texels a cell. Off
+       = the cartridge's, which is what N64 draws. */
+    int   decal_enh;
     float tree3d_size, tree3d_wind, tree3d_wind_speed, tree3d_wind_dir;
     float tree3d_vary, tree3d_burn, tree3d_lean;
     /* the shading half, all of it read only by the tree's own GLSL program:
@@ -909,6 +961,10 @@ struct FxState {
                  the 1995 sprite and every pose the sprite has that the model's clips do
                  not (prone, crawling, dying) goes back to that sprite. */
     int   m3inf_on;
+    /* User-authored Minigunner pixel art in 3D; independent of experimental textures. */
+    int   new_sprites;
+    /* Palette tuning for the replacement sprites only; neutral preserves source bytes. */
+    float ns_bright, ns_contrast, ns_exposure, ns_gamma, ns_sat;
     /* einf_on   THE REMASTERED SOLDIERS (einf/<TYPE>.c3m, tools/art/remaster/infantry):
                  Enhanced's own animated infantry, drawn with experimental art OFF, as the
                  remastered buildings are. The experimental set's soldiers keep m3inf_on.
@@ -959,6 +1015,9 @@ struct FxState {
                      an offset, measured 0.012 of a cell a texel against the shared
                      0.017 at the closest zoom. Off puts him back in the shared map. */
     float m3inf_sun, m3inf_fill, m3inf_paint;
+    /* Shared by Enhanced and experimental 3D soldiers only; neutral preserves the art. */
+    float inf_bright, inf_contrast, inf_exposure, inf_gamma, inf_sat;
+    float inf_warmth, inf_tint, inf_red, inf_green, inf_blue;
     int   m3inf_shadow;
     /* m3inf_runrate  THE GAIT DIAL: a multiple of the speed the 3D soldiers' walk, trot
                       and run blend reads (m3inf_gait in cnc_eyes.cpp). At 1 the blend
@@ -1040,8 +1099,8 @@ struct FxState {
             scene-referred targets sixteen bit float and put a tonemap at the end, which
             is the whole difference between a picture that can be over-exposed on
             purpose and one that was flattened before anybody chose.
-         hdr_on    the switch. Off is the eight bit chain exactly as it shipped, which
-                   is the A/B and the thing every older gate still measures.
+         hdr_on    retired: the chain always draws in eight bits (fx_hdr_want in
+                   fx_post.h answers no), and a file saved with it on reads back off.
          tonemap   0 clips at white, which is what the eight bit chain did. 1 bends
                    what used to clip into the headroom instead. It is NOT a film curve
                    and must not become one while the world pass is still gamma encoded;
@@ -1109,6 +1168,10 @@ struct FxState {
          st_ao        the screen-space occlusion's darkening on a structure. */
     float st_gamma, st_bright, st_contrast, st_sat;
     float st_shade, st_sun, st_glow, st_ao;
+    /* 12q. Vehicle-only colour and lighting, in the same units as STRUCTURES.
+       Neutral at 1; a distinct object class excludes structures and soldiers. */
+    float vh_gamma, vh_bright, vh_contrast, vh_sat;
+    float vh_shade, vh_sun, vh_glow, vh_ao;
     /* debug  the DEBUG group's only row. When it is on and a debug pack was found beside
               the mission's, every type whose mesh differs between the two is drawn from
               the debug pack instead, so an updated model can be compared against the one
@@ -1187,6 +1250,8 @@ static const FxModeRow FX_MODE_ROWS[FXR_COUNT] = {
     { "experimental_relief", FXO(experimental_relief), 1 },
     { "curgreen_on",         FXO(curgreen_on),         1 },
     { "new_audio",           FXO(new_audio),           1 },
+    { "einf_on",             FXO(einf_on),             1 },
+    { "water_swash",         FXO(water_swash),         1 },
 };
 
 /* The names the saved preset writes the modes under: `mode.enhanced.bloom_on 1`. */
@@ -1386,7 +1451,7 @@ static const FxParam FX_PARAMS[] = {
 { FXP_STEP,  "res_w", "resolution width", FXO(res_w), 0,16384,1, "0 = the desktop's" },
 { FXP_STEP,  "res_h", "resolution height", FXO(res_h), 0,16384,1, "0 = the desktop's" },
 { FXP_FLOAT, "cursor_scale", "3D cursor size", FXO(cursor_scale), 0.4f, 1.5f, 0,
-  "the console's cursor meshes, Enhanced only; 1 = the console's size, 0.7 by request" },
+  "the console's cursor meshes, Enhanced only; 1 = the console's size, 0.4 as tuned" },
 { FXP_FLOAT, "inf_scale", "infantry size", FXO(inf_scale), 0.5f, 1.5f, 0,
   "all three infantry art sets, Enhanced only; 1 = each set's own size, 0.75 by request" },
 { FXP_FLOAT, "decal_soft", "soft decal edges", FXO(decal_soft), 0.0f, 1.0f, 0,
@@ -1428,7 +1493,19 @@ static const FxParam FX_PARAMS[] = {
 
 { FXP_GROUP, "",  "3  SUN AND SHADOWS", 0,0,0,0, "" },
 { FXP_BOOL,  "shadow_on", "sun shadows", FXO(shadow_on), 0,1,0,
-  "ON suppresses the cartridge's own baked shadows" },
+  "Real sun shadow maps. Unified daylight always suppresses cartridge shadow plates, including when this is off" },
+{ FXP_BOOL, "unified_lighting", "unified daylight", FXO(unified_lighting), 0,1,0,
+  "One sun and sky fill: shadows remove direct sunlight, while ambient fill remains; Enhanced only" },
+{ FXP_FLOAT, "sun_energy", "sun energy", FXO(sun_energy), 0.0f, 3.0f, 0.01f,
+  "Direct sunlight for terrain, models and foliage; 1 is neutral; needs unified daylight" },
+{ FXP_FLOAT, "sky_energy", "sky fill", FXO(sky_energy), 0.0f, 3.0f, 0.01f,
+  "Ambient sky and ground bounce for terrain, models and foliage; unaffected by cast sun shadows" },
+{ FXP_FLOAT, "shadow_black_limit", "shadow detail floor", FXO(shadow_black_limit), 0.0f, 0.15f, 0.001f,
+  "Protect low lit-surface detail from the colour grade's black clipping. 0 restores hard clipping; sky fill scales the toe. Does not light unexplored fog or a zero-energy scene" },
+{ FXP_FLOAT, "object_shadow_fill", "object shadow fill", FXO(object_shadow_fill), 0.0f, 1.0f, 0.01f,
+  "Indirect fill for shadows on structures and trees; higher values lift their dark self-shadowing without changing shadows cast onto terrain" },
+{ FXP_FLOAT, "terrain_ambient", "terrain sky fill", FXO(terrain_ambient), 0.0f, 1.5f, 0.01f,
+  "Terrain ambient fill before sun and visibility; keeps unlit slopes readable without painting a shadow" },
 { FXP_FLOAT, "sun_az", "sun bearing", FXO(sun_az), 0.0f, 360.0f, 0, "degrees" },
 { FXP_FLOAT, "sun_el", "sun height", FXO(sun_el), 8.0f, 88.0f, 0, "degrees above ground" },
 { FXP_FLOAT, "shadow_strength", "strength", FXO(shadow_strength), 0.0f, 1.0f, 0, "" },
@@ -1448,9 +1525,9 @@ static const FxParam FX_PARAMS[] = {
 { FXP_BOOL,  "terrain_normals", "smooth ground", FXO(terrain_normals), 0,1,0,
   "light the ground from the console's per-corner normal; off = the flat facet normal from depth" },
 { FXP_BOOL,  "sun_lambert", "one sun", FXO(sun_lambert), 0,1,0,
-  "the console's baked slope shade replaced by one per-pixel sun term on the ground (needs smooth ground)" },
+  "Legacy slope-lighting switch. Unified daylight always uses the common sun and sky; smooth ground chooses interpolated normals" },
 { FXP_FLOAT, "sun_floor", "shade floor", FXO(sun_floor), 0.0f,1.0f,0.01f,
-  "How dark ground turned away from the sun may go, against level ground. Higher is a\n"
+  "Legacy daylight only: how dark ground turned away from the sun may go. Unified daylight uses terrain sky fill.\n"
   "more subtle heightmap shade; 0.25 was the old hardcoded value and reads as black." },
 { FXP_BOOL,  "contact_on", "contact shadows", FXO(contact_on), 0,1,0,
   "a short march toward the sun through the depth buffer, which draws the darkness directly under a hull that the shadow map is too coarse and too biased to reach. Inside sun shadows: turning those off turns this off too" },
@@ -1482,12 +1559,91 @@ static const FxParam FX_PARAMS[] = {
   "cells of rise a cell needs before it casts; 0 = every cell casts" },
 
 { FXP_GROUP, "", "TERRAIN", 0,0,0,0, "" },
+{ FXP_BOOL, "terrain_relief", "geometric rock relief", FXO(terrain_relief), 0,1,0,
+  "Saved physical rock footprints add real terrain geometry to colour, normals, depth, reflections and sun shadows; unified daylight only" },
+{ FXP_FLOAT, "terrain_relief_height", "rock relief height", FXO(terrain_relief_height), 0.0f, 0.6f, 0.01f,
+  "Maximum extra rock height in world cells; native map elevations and building pads remain authoritative" },
+{ FXP_FLOAT, "clear_saturation", "grass texture saturation", FXO(clear_saturation), 0.0f, 1.5f, 0.01f,
+  "colour strength of the three temperate grass textures; 1 keeps the source colour" },
 { FXP_FLOAT, "terrain_shadow_strength", "terrain shadow strength", FXO(terrain_shadow_strength), 0.0f, 1.0f, 0,
-  "hills and cliffs: cast shadows, shaded slopes and baked cliff shade; 0 softens their darkness, 1 keeps the current strength; objects and clouds keep their own settings" },
+  "Terrain cast-shadow opacity; 0 clears terrain shadows, 1 is fully opaque. Legacy daylight also scales shaded slopes and painted shade. Object shadows keep their own setting" },
 { FXP_FLOAT, "terrain_brightness", "terrain brightness", FXO(terrain_brightness), 0.0f, 2.0f, 0,
   "ground colour before lighting; 1 is unchanged; buildings, units, water and the HUD keep their own brightness" },
 { FXP_FLOAT, "terrain_contrast", "terrain contrast", FXO(terrain_contrast), 0.0f, 2.0f, 0,
   "ground colour contrast around middle grey; 1 is unchanged; hidden terrain remains hidden" },
+
+{ FXP_GROUP, "", "GRASS TERRAIN", 0,0,0,0, "" },
+
+{ FXP_FLOAT, "grass_terrain_warmth", "warm / cool", FXO(grass_terrain_warmth), -1.0f, 1.0f, 0.01f,
+  "Warmth: negative cools, positive warms; 0 is neutral; Temperate ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "grass_terrain_tint", "green / magenta", FXO(grass_terrain_tint), -1.0f, 1.0f, 0.01f,
+  "Tint: positive green, negative magenta; 0 is neutral; Temperate ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "grass_terrain_red", "red balance", FXO(grass_terrain_red), 0.0f, 2.0f, 0.01f,
+  "Red reflectance multiplier; 1 is neutral; Temperate ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "grass_terrain_green", "green balance", FXO(grass_terrain_green), 0.0f, 2.0f, 0.01f,
+  "Green reflectance multiplier; 1 is neutral; Temperate ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "grass_terrain_blue", "blue balance", FXO(grass_terrain_blue), 0.0f, 2.0f, 0.01f,
+  "Blue reflectance multiplier; 1 is neutral; Temperate ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+
+{ FXP_GROUP, "", "DESERT TERRAIN", 0,0,0,0, "" },
+{ FXP_FLOAT, "desert_shadow_strength", "desert shadow strength", FXO(desert_shadow_strength), 0.0f, 1.0f, 0,
+  "Desert terrain cast-shadow opacity; independent of Sand, Snow, other terrain and object shadows" },
+{ FXP_FLOAT, "sand_brightness", "desert terrain brightness", FXO(sand_brightness), 0.0f, 2.0f, 0.01f,
+  "Enhanced Desert ground brightness, relative to Terrain brightness; buildings, units and water keep their own settings" },
+{ FXP_FLOAT, "sand_contrast", "desert terrain contrast", FXO(sand_contrast), 0.0f, 2.0f, 0.01f,
+  "Enhanced Desert ground contrast; 1 is neutral; only Desert maps respond" },
+{ FXP_FLOAT, "sand_saturation", "desert sand saturation", FXO(sand_saturation), 0.0f, 1.5f, 0.01f,
+  "Colour intensity of the Enhanced Desert CLEAR materials; independent of Temperate grass." },
+
+
+{ FXP_FLOAT, "desert_terrain_warmth", "warm / cool", FXO(desert_terrain_warmth), -1.0f, 1.0f, 0.01f,
+  "Warmth: negative cools, positive warms; 0 is neutral; Desert ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "desert_terrain_tint", "green / magenta", FXO(desert_terrain_tint), -1.0f, 1.0f, 0.01f,
+  "Tint: positive green, negative magenta; 0 is neutral; Desert ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "desert_terrain_red", "red balance", FXO(desert_terrain_red), 0.0f, 2.0f, 0.01f,
+  "Red reflectance multiplier; 1 is neutral; Desert ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "desert_terrain_green", "green balance", FXO(desert_terrain_green), 0.0f, 2.0f, 0.01f,
+  "Green reflectance multiplier; 1 is neutral; Desert ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "desert_terrain_blue", "blue balance", FXO(desert_terrain_blue), 0.0f, 2.0f, 0.01f,
+  "Blue reflectance multiplier; 1 is neutral; Desert ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+
+{ FXP_GROUP, "", "SAND TERRAIN", 0,0,0,0, "" },
+{ FXP_FLOAT, "sand_shadow_strength", "sand shadow strength", FXO(sand_shadow_strength), 0.0f, 1.0f, 0,
+  "SAND theater hills and cliffs only; independent of Desert, Snow, other terrain and object shadows" },
+
+
+{ FXP_FLOAT, "sand_terrain_warmth", "warm / cool", FXO(sand_terrain_warmth), -1.0f, 1.0f, 0.01f,
+  "Warmth: negative cools, positive warms; 0 is neutral; SAND ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "sand_terrain_tint", "green / magenta", FXO(sand_terrain_tint), -1.0f, 1.0f, 0.01f,
+  "Tint: positive green, negative magenta; 0 is neutral; SAND ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "sand_terrain_red", "red balance", FXO(sand_terrain_red), 0.0f, 2.0f, 0.01f,
+  "Red reflectance multiplier; 1 is neutral; SAND ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "sand_terrain_green", "green balance", FXO(sand_terrain_green), 0.0f, 2.0f, 0.01f,
+  "Green reflectance multiplier; 1 is neutral; SAND ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "sand_terrain_blue", "blue balance", FXO(sand_terrain_blue), 0.0f, 2.0f, 0.01f,
+  "Blue reflectance multiplier; 1 is neutral; SAND ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+
+{ FXP_GROUP, "", "SNOW TERRAIN", 0,0,0,0, "" },
+{ FXP_FLOAT, "snow_shadow_strength", "snow shadow strength", FXO(snow_shadow_strength), 0.0f, 1.0f, 0,
+  "Snow terrain cast-shadow opacity in both games; independent of Desert, Sand and other terrain" },
+{ FXP_FLOAT, "snow_brightness", "snow terrain brightness", FXO(snow_brightness), 0.0f, 2.0f, 0.01f,
+  "Enhanced Snow ground brightness, relative to Terrain brightness; 1 preserves your current look; objects and water keep their own settings" },
+{ FXP_FLOAT, "snow_contrast", "snow terrain contrast", FXO(snow_contrast), 0.0f, 2.0f, 0.01f,
+  "Enhanced Snow ground contrast; 1 is neutral; only Snow maps respond" },
+{ FXP_FLOAT, "snow_saturation", "snow terrain saturation", FXO(snow_saturation), 0.0f, 1.5f, 0.01f,
+  "Enhanced Snow ground colour strength; 0 is greyscale, 1 preserves the original colour" },
+
+
+{ FXP_FLOAT, "snow_terrain_warmth", "warm / cool", FXO(snow_terrain_warmth), -1.0f, 1.0f, 0.01f,
+  "Warmth: negative cools, positive warms; 0 is neutral; Snow/Winter ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "snow_terrain_tint", "green / magenta", FXO(snow_terrain_tint), -1.0f, 1.0f, 0.01f,
+  "Tint: positive green, negative magenta; 0 is neutral; Snow/Winter ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "snow_terrain_red", "red balance", FXO(snow_terrain_red), 0.0f, 2.0f, 0.01f,
+  "Red reflectance multiplier; 1 is neutral; Snow/Winter ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "snow_terrain_green", "green balance", FXO(snow_terrain_green), 0.0f, 2.0f, 0.01f,
+  "Green reflectance multiplier; 1 is neutral; Snow/Winter ground and cliffs only. Units, trees, water and HUD retain their own colour" },
+{ FXP_FLOAT, "snow_terrain_blue", "blue balance", FXO(snow_terrain_blue), 0.0f, 2.0f, 0.01f,
+  "Blue reflectance multiplier; 1 is neutral; Snow/Winter ground and cliffs only. Units, trees, water and HUD retain their own colour" },
 
 { FXP_GROUP, "",  "3b  CLOUD SHADOWS  (ours)", 0,0,0,0, "" },
 { FXP_BOOL,  "cloud_on", "cloud shadows", FXO(cloud_on), 0,1,0,
@@ -1528,6 +1684,16 @@ static const FxParam FX_PARAMS[] = {
 { FXP_GROUP, "",  "3c  WATER  (ours)", 0,0,0,0, "" },
 { FXP_BOOL,  "water_fx", "Water Shader", FXO(water_fx), 0,1,0,
   "the sea knows where its coast is: a soft shore, shallows, a flow, rivers that run; off is the cartridge's two-tile wash. On by default under Enhanced, never in Classic" },
+{ FXP_BOOL,  "water_swash", "shoreline swash", FXO(water_swash), 0,1,0,
+  "ocean waves wash up the beach with textured foam, then retreat; rivers are excluded; on by default in Enhanced, independent of the legacy foam amount" },
+{ FXP_FLOAT, "water_swash_hold", "swash hold (sec)", FXO(water_swash_hold), 0.0f, 10.0f, 0,
+  "seconds fully up the beach before retreat; zero reverses immediately, with no hidden easing pause; the shoreward current stays synchronized" },
+{ FXP_FLOAT, "water_swash_opacity", "swash opacity", FXO(water_swash_opacity), 0.0f, 1.0f, 0,
+  "opacity of the animated beach water film and textured foam together; zero hides swash without changing the ocean or its flow" },
+{ FXP_FLOAT, "water_align_length", "shore reach (cells)", FXO(water_align_length), 0.0f, 8.0f, 0,
+  "ocean waves fully face the shore within this distance; shore blend adds the transition back to the open-sea current" },
+{ FXP_FLOAT, "water_align_blend", "shore blend (cells)", FXO(water_align_blend), 0.05f, 8.0f, 0,
+  "width beyond shore reach over which aligned waves smoothly blend into the open ocean; independent of beach foam width" },
 { FXP_FLOAT, "water_flow", "flow", FXO(water_flow), 0.0f, 1.0f, 0,
   "how far the pattern is carried along the current; 0 slides as one sheet like the cartridge" },
 { FXP_FLOAT, "water_flow_rate", "flow rate", FXO(water_flow_rate), 0.02f, 1.0f, 0,
@@ -1562,16 +1728,12 @@ static const FxParam FX_PARAMS[] = {
   "how hard a river runs, as a multiple of the flow" },
 { FXP_FLOAT, "water_bump", "ripple", FXO(water_bump), 0.0f, 1.5f, 0,
   "the surface's ripple normal; 0 is a flat sheet" },
-{ FXP_FLOAT, "water_reflect", "reflection", FXO(water_reflect), 0.0f, 1.0f, 0,
-  "how much of what is above the water shows in it at a grazing angle" },
 { FXP_FLOAT, "water_spec", "sun glint", FXO(water_spec), 0.0f, 3.0f, 0,
   "the sun's sparkle on the ripples" },
+{ FXP_FLOAT, "water_reflection_yaw", "Reflection rotation", FXO(water_reflection_yaw), -180.0f, 180.0f, 0,
+  "degrees clockwise: rotates water reflection highlights independently of the sun; 0 follows the sun; terrain, shore and underwater lighting stay unchanged" },
 { FXP_FLOAT, "water_refract", "refraction", FXO(water_refract), 0.0f, 0.06f, 0,
   "how far the ripples bend the sea floor seen through the water, as a fraction of the screen" },
-{ FXP_FLOAT, "water_fresnel", "reflection floor", FXO(water_fresnel), 0.0f, 0.5f, 0,
-  "how reflective the water is looking straight down; grazing views are always fully reflective" },
-{ FXP_BOOL,  "water_reflect_scene", "mirror the world", FXO(water_reflect_scene), 0,1,0,
-  "cliffs, buildings and units reflected in the water, drawn once more from under it each frame; off reflects a plain sky" },
 { FXP_FLOAT, "water_natural", "natural colour", FXO(water_natural), 0.0f, 1.0f, 0,
   "eases the cartridge's cobalt toward a greyer, greener water; 0 is the console's colour" },
 { FXP_FLOAT, "water_dark", "darkness", FXO(water_dark), 0.0f, 0.5f, 0,
@@ -1698,6 +1860,14 @@ static const FxParam FX_PARAMS[] = {
 { FXP_FLOAT, "dfog_d_b", "desert: colour blue", FXO(dfog_d_b), 0.0f, 1.0f, 0, "" },
 
 { FXP_GROUP, "",  "4  BLOOM", 0,0,0,0, "" },
+{ FXP_FLOAT, "muzzle_bloom", "muzzle flash bloom", FXO(muzzle_bloom), 0.0f, 1.0f, 0,
+  "halo from cannon, machine gun and missile muzzle particles only" },
+{ FXP_FLOAT, "muzzle_flash_gain", "muzzle flash brightness", FXO(muzzle_flash_gain), 0.0f, 1.0f, 0,
+  "brightness of muzzle particles; timing, shape, smoke and other particles stay unchanged" },
+{ FXP_FLOAT, "muzzle_light_gain", "muzzle light spill", FXO(muzzle_light_gain), 0.0f, 1.0f, 0,
+  "light cast by cannon, machine gun and missile muzzle flashes; scene lights retain their settings" },
+{ FXP_FLOAT, "explosion_bloom", "explosion particle bloom", FXO(explosion_bloom), 0.0f, 1.0f, 0,
+  "bloom from luminous explosion particles only; scene highlights, lamps and muzzle flashes retain their bloom" },
 { FXP_BOOL,  "bloom_on", "bloom", FXO(bloom_on), 0,1,0, "" },
 { FXP_FLOAT, "bloom_threshold", "threshold", FXO(bloom_threshold), 0.0f, 1.0f, 0,
   "below this, nothing glows" },
@@ -1743,6 +1913,28 @@ static const FxParam FX_PARAMS[] = {
   "how far past the field's edge its light reaches" },
 { FXP_FLOAT, "tib_light_height", "tiberium climbs (cells)", FXO(tib_light_height), 0.1f, 3.0f, 0,
   "how far up a unit or a wall the glow climbs before it fades" },
+{ FXP_BOOL,  "vlight_on", "vehicle lamps", FXO(vlight_on), 0,1,0,
+  "the remastered vehicles' headlights, tail lights and beacons light what stands in front of them" },
+{ FXP_FLOAT, "vlight_head", "headlights", FXO(vlight_head), 0.0f, 3.0f, 0,
+  "strength of the headlights and searchlights" },
+{ FXP_FLOAT, "vlight_tail", "tail and marker lamps", FXO(vlight_tail), 0.0f, 3.0f, 0,
+  "strength of every other lamp: tail, reversing, marker, navigation, beacon" },
+{ FXP_FLOAT, "vlight_cone", "lamp cone", FXO(vlight_cone), 0.25f, 2.0f, 0,
+  "scales every lamp's cone" },
+{ FXP_FLOAT, "vlight_range", "lamp reach", FXO(vlight_range), 0.25f, 3.0f, 0,
+  "scales how far every lamp reaches" },
+{ FXP_BOOL,  "vlight_shadows", "headlight shadows", FXO(vlight_shadows), 0,1,0,
+  "a headlight is stopped by what stands between it and a surface" },
+{ FXP_FLOAT, "vlight_glow", "lens glow", FXO(vlight_glow), 0.0f, 3.0f, 0,
+  "how brightly a lamp's lens glows" },
+{ FXP_BOOL,  "vspec_on", "vehicle specular maps", FXO(vspec_on), 0,1,0,
+  "a remastered vehicle with a specular map shines where its steel, glass and paint would" },
+{ FXP_FLOAT, "vspec_sun", "sun highlight", FXO(vspec_sun), 0.0f, 4.0f, 0,
+  "strength of the sun's highlight on a vehicle's specular map" },
+{ FXP_FLOAT, "vspec_sky", "sky sheen", FXO(vspec_sky), 0.0f, 4.0f, 0,
+  "strength of the sky's sheen at grazing angles" },
+{ FXP_FLOAT, "vspec_gloss", "highlight tightness", FXO(vspec_gloss), 0.25f, 4.0f, 0,
+  "above 1 every highlight is smaller and sharper, below 1 broader" },
 
 { FXP_GROUP, "",  "7  COLOUR GRADE", 0,0,0,0, "" },
 { FXP_BOOL,  "grade_on", "grade", FXO(grade_on), 0,1,0, "" },
@@ -1844,12 +2036,34 @@ static const FxParam FX_PARAMS[] = {
 { FXP_GROUP, "",  "12d  EFFECTS  (remastered art)", 0,0,0,0, "" },
 { FXP_BOOL,  "efx_enh", "remastered effects", FXO(efx_enh), 0,1,0,
   "explosions, fire and smoke in new 1995-style art, with muzzle flashes and a landing-zone flare; off = the cartridge's art, which is what Classic draws" },
+{ FXP_FLOAT, "efx_bright", "effect brightness", FXO(efx_bright), 0.25f, 2.0f, 0,
+  "brightness of Enhanced explosions, fire, smoke, sparks, muzzle flashes and effect meshes; 1 = as painted" },
+{ FXP_FLOAT, "efx_contrast", "effect contrast", FXO(efx_contrast), 0.25f, 3.0f, 0,
+  "contrast of the particle art; black and white stay put, above 1 the mid tones spread apart, below 1 they draw together" },
+{ FXP_FLOAT, "efx_sat", "effect saturation", FXO(efx_sat), 0.0f, 2.0f, 0,
+  "colour of the particle art; 0 = grey, 1 = as painted, 2 = twice as vivid" },
+{ FXP_FLOAT, "efx_exposure", "effect exposure (EV)", FXO(efx_exposure), -3.00f, 3.00f, 0.01f,
+  "Effect light in stops: +1 doubles light, -1 halves it; scene exposure is independent" },
+{ FXP_FLOAT, "efx_gamma", "effect gamma", FXO(efx_gamma), 0.40f, 2.50f, 0.01f,
+  "Effect midtones; 1 preserves the authored picture" },
+{ FXP_FLOAT, "efx_warmth", "effect warm / cool", FXO(efx_warmth), -1.00f, 1.00f, 0.01f,
+  "Warm or cool the effects only; 0 is neutral" },
+{ FXP_FLOAT, "efx_tint", "effect green / magenta", FXO(efx_tint), -1.00f, 1.00f, 0.01f,
+  "Effect green versus magenta balance; 0 is neutral" },
+{ FXP_FLOAT, "efx_red", "effect red balance", FXO(efx_red), 0.00f, 2.00f, 0.01f,
+  "Red in effects only; 1 is neutral" },
+{ FXP_FLOAT, "efx_green", "effect green balance", FXO(efx_green), 0.00f, 2.00f, 0.01f,
+  "Green in effects only; 1 is neutral" },
+{ FXP_FLOAT, "efx_blue", "effect blue balance", FXO(efx_blue), 0.00f, 2.00f, 0.01f,
+  "Blue in effects only; 1 is neutral" },
 { FXP_BOOL,  "bib_enh", "remastered building aprons", FXO(bib_enh), 0,1,0,
   "the dirt in front of a building in the 1995 PC art redrawn at 1.5x the detail, soft-edged and multiplied into the ground; off = the cartridge's aprons, which is what Classic draws" },
 { FXP_FLOAT, "bib_enh_strength", "apron strength", FXO(bib_enh_strength), 0.0f, 1.0f, 0,
   "how strongly the remastered apron marks the ground; 0 = none, 1 = as painted" },
 { FXP_FLOAT, "bib_enh_cover", "apron cover", FXO(bib_enh_cover), 0.0f, 1.0f, 0,
   "how much painted dirt is laid over the ground before the multiply; 0 = a pure multiply, the ground's own colours showing through, 1 = the painted dirt" },
+{ FXP_BOOL,  "decal_enh", "remastered craters and scorch marks", FXO(decal_enh), 0,1,0,
+  "the 1995 PC craters and scorch marks painted again at the ground's resolution; off = the cartridge's, which is what N64 draws" },
 /* REMASTERED CURSORS. Every cartridge cursor in the remastered set's look. */
 { FXP_GROUP, "",  "12k  CURSORS  (remastered art)", 0,0,0,0, "" },
 { FXP_BOOL,  "ecur_on", "remastered cursors", FXO(ecur_on), 0,1,0,
@@ -1860,6 +2074,36 @@ static const FxParam FX_PARAMS[] = {
 { FXP_GROUP, "",  "12j  SOLDIERS  (remastered art)", 0,0,0,0, "" },
 { FXP_BOOL,  "einf_on", "remastered soldiers", FXO(einf_on), 0,1,0,
   "draw the remastered 3D soldier for any infantry type that has one, in Enhanced with experimental art off. Poses the model has no animation for yet are drawn with the 1995 sprite. Off puts every soldier back on the sprite" },
+{ FXP_FLOAT, "inf_bright", "soldier brightness", FXO(inf_bright), 0.00f, 2.00f, 0.01f,
+  "Brightness of 3D soldiers only; 1 preserves their authored colours" },
+{ FXP_FLOAT, "inf_contrast", "soldier contrast", FXO(inf_contrast), 0.25f, 3.00f, 0.01f,
+  "3D soldier contrast; black and white stay fixed; 1 is neutral" },
+{ FXP_FLOAT, "inf_exposure", "soldier exposure (EV)", FXO(inf_exposure), -3.00f, 3.00f, 0.01f,
+  "3D soldier light in stops; 0 is neutral; does not change scene exposure" },
+{ FXP_FLOAT, "inf_gamma", "soldier gamma", FXO(inf_gamma), 0.40f, 2.50f, 0.01f,
+  "3D soldier midtones; 1 is neutral" },
+{ FXP_FLOAT, "inf_sat", "soldier saturation", FXO(inf_sat), 0.00f, 2.00f, 0.01f,
+  "3D soldier colour intensity, including masked team paint; 0 is grey" },
+{ FXP_FLOAT, "inf_warmth", "soldier warm / cool", FXO(inf_warmth), -1.00f, 1.00f, 0.01f,
+  "3D soldier warm versus cool balance; 0 is neutral" },
+{ FXP_FLOAT, "inf_tint", "soldier green / magenta", FXO(inf_tint), -1.00f, 1.00f, 0.01f,
+  "3D soldier green versus magenta balance; 0 is neutral" },
+{ FXP_FLOAT, "inf_red", "soldier red balance", FXO(inf_red), 0.00f, 2.00f, 0.01f,
+  "3D soldier red balance; 1 is neutral" },
+{ FXP_FLOAT, "inf_green", "soldier green balance", FXO(inf_green), 0.00f, 2.00f, 0.01f,
+  "3D soldier green balance; 1 is neutral" },
+{ FXP_FLOAT, "inf_blue", "soldier blue balance", FXO(inf_blue), 0.00f, 2.00f, 0.01f,
+  "3D soldier blue balance; 1 is neutral" },
+{ FXP_FLOAT, "m3inf_sun", "3D soldier sun", FXO(m3inf_sun), 0.0f, 2.0f, 0,
+  "how hard the sun falls on the 3D soldiers, as a share of the authored models' sun strength, so that dial moves them too. Their uniforms are paler than a tank's paint, so at 1 the lit side washes out to white" },
+{ FXP_FLOAT, "m3inf_fill", "3D soldier fill", FXO(m3inf_fill), 0.0f, 2.0f, 0,
+  "the sky-and-bounce fill on the 3D soldiers, as a share of the authored models' fill strength. At 0 their shaded side is black" },
+{ FXP_FLOAT, "m3inf_paint", "3D soldier team paint", FXO(m3inf_paint), 0.2f, 1.0f, 0,
+  "how bright the team-coloured plates on a 3D soldier are (helmet, sleeves, thighs). 1 is the light grey the house colour is painted over, which reads as the house colour at a glance and glares in the sun" },
+{ FXP_BOOL,  "m3inf_shadow", "3D soldier sharp shadows", FXO(m3inf_shadow), 0,1,0,
+  "the 3D soldiers cast from a shadow map of their own, fitted to the screen and not softened, so the shadow on the ground has his arms, legs and rifle. Off puts them in the one shared with trees and buildings, whose soft edge is wider than a man's leg and draws a smudge" },
+{ FXP_FLOAT, "m3inf_runrate", "3D soldier gait speed", FXO(m3inf_runrate), 0.5f, 3.0f, 0,
+  "the 3D soldiers walk, jog or run by how fast they really move, blended between the three. This multiplies the speed that choice reads: at 1 their feet stay planted; above 1 they break into a jog or a run sooner and their legs move a little faster than the ground. They do not move any faster over the map" },
 { FXP_BOOL,  "einf_corpse_keep", "bodies stay", FXO(einf_corpse_keep), 0,1,0,
   "a soldier's body stays where he fell, darkened, instead of sinking away after a few seconds" },
 { FXP_FLOAT, "einf_corpse_max", "most bodies on a map", FXO(einf_corpse_max), 1.0f, 400.0f, 0,
@@ -1882,9 +2126,21 @@ static const FxParam FX_PARAMS[] = {
   "how tall the remastered soldiers stand; the default matches the DOS sprite on screen. The flat infantry cards keep 'infantry size'" },
 /* LEAFY TREES. Imported art again, and the group name says so: the geometry is rebuilt
    from a CC0 scan, and the cartridge's own tree model is what Classic keeps drawing. */
-{ FXP_GROUP, "",  "12c  LEAFY TREES  (imported)", 0,0,0,0, "" },
-{ FXP_BOOL,  "tree3d", "leafy trees", FXO(tree3d), 0,1,0,
-  "replace the cartridge's tree model with the rebuilt one; off = the console's tree, which is what Classic draws" },
+{ FXP_GROUP, "",  "12c  ENHANCED TREES", 0,0,0,0, "" },
+{ FXP_BOOL,  "tree3d", "Enhanced trees", FXO(tree3d), 0,1,0,
+  "use the accepted Enhanced tree models; off keeps the cartridge trees" },
+{ FXP_FLOAT, "etree_height", "tree height scale", FXO(etree_height), 0.50f, 1.80f, 0,
+  "height of the current Enhanced models; 1 keeps their authored height and roots stay planted" },
+{ FXP_FLOAT, "etree_width", "tree width scale", FXO(etree_width), 0.50f, 1.80f, 0,
+  "width of the current Enhanced trees and clumps; 1 keeps their authored width" },
+{ FXP_FLOAT, "etree_vary", "size variation", FXO(etree_vary), 0.0f, 0.40f, 0,
+  "stable per-placement size variation, shared by the tree, its shadow and its burning stages" },
+{ FXP_FLOAT, "etree_lean", "random lean", FXO(etree_lean), 0.0f, 0.20f, 0,
+  "stable per-tree lean; the root anchor never moves" },
+{ FXP_FLOAT, "etree_gain", "tree brightness", FXO(etree_gain), 0.50f, 1.50f, 0,
+  "brightness of the current Enhanced trees; 1 preserves their authored colours" },
+{ FXP_FLOAT, "etree_shadow_fill", "tree shadow fill", FXO(etree_shadow_fill), 0.0f, 1.0f, 0.01f,
+  "Indirect sky fill on shaded Enhanced trees and clumps. Raise to soften canopy self-shadows; 0 keeps the previous shading. Uses sky energy, preserves real sun shadows and does not affect terrain or units" },
 { FXP_FLOAT, "tree3d_size", "tree height", FXO(tree3d_size), 0.40f, 2.50f, 0,
   "how tall a tree stands, in cells" },
 { FXP_FLOAT, "tree3d_wind", "wind sway", FXO(tree3d_wind), 0.0f, 0.20f, 0,
@@ -2088,9 +2344,9 @@ static const FxParam FX_PARAMS[] = {
   "the light a relit surface gets where the sun does not reach it. At zero every shaded face is black" },
 { FXP_FLOAT, "relight_floor", "shade floor", FXO(relight_floor), 0.02f, 0.6f, 0,
   "the darkest baked shade that may be divided by when recovering the texture. The cartridge's own deep shadow approaches zero, and dividing by that turns its grain into a supernova" },
-{ FXP_GROUP, "",  "12h  HIGH DYNAMIC RANGE  (ours)", 0,0,0,0, "" },
-{ FXP_BOOL,  "hdr_on", "high dynamic range", FXO(hdr_on), 0,1,0,
-  "render the scene into a floating point buffer so light can be brighter than white, and map it back to a screen at the end. Off is the eight bit chain this shipped with, where a highlight was clipped flat before the bloom or the grade ever saw it" },
+{ FXP_GROUP, "",  "12h  HIGH DYNAMIC RANGE  (retired)", 0,0,0,0, "" },
+{ FXP_BOOL,  "hdr_on", "high dynamic range (retired)", FXO(hdr_on), 0,1,0,
+  "RETIRED: the chain always draws in eight bits and this switch does nothing; it stays so older settings files read cleanly. It was: render the scene into a floating point buffer so light can be brighter than white, and map it back to a screen at the end. Off is the eight bit chain this shipped with, where a highlight was clipped flat before the bloom or the grade ever saw it" },
 { FXP_STEP,  "tonemap", "highlight rolloff", FXO(tonemap), 0.0f, 1.0f, 1.0f,
   "0 clips at white, which is what the eight bit chain did. 1 bends what used to clip into the headroom above it. Deliberately not a film curve: the world pass is gamma encoded, so a film curve here would be a look chosen by eye rather than a transform" },
 { FXP_FLOAT, "tone_knee", "rolloff knee", FXO(tone_knee), 0.2f, 1.0f, 0,
@@ -2133,12 +2389,43 @@ static const FxParam FX_PARAMS[] = {
   "the remastered buildings' own lights: lamps, signal lights, molten pools, lit glass. 0 puts them out, above 1 they burn brighter and bloom more. A cartridge building carries no such surface. 1 = today" },
 { FXP_FLOAT, "st_ao", "occlusion", FXO(st_ao), 0.0f, 2.0f, 0.01f,
   "how much the ambient occlusion of group 5 darkens the creases and corners of a building or wall. 0 takes it off them, 2 doubles it. 1 = today" },
+/* VEHICLE VISUALS, Enhanced only. Every row is neutral at 1, and with all
+   of them there the picture is the one this group's absence drew, byte for byte. */
+{ FXP_GROUP, "",  "12q  VEHICLES  (ours)", 0,0,0,0, "" },
+{ FXP_FLOAT, "vh_gamma", "gamma", FXO(vh_gamma), 0.40f, 2.50f, 0.01f,
+  "a curve on vehicle and aircraft colour before lighting: above 1 lifts mid-tones, below 1 deepens them. Buildings, infantry and terrain keep their own settings. 1 = as drawn" },
+{ FXP_FLOAT, "vh_bright", "brightness", FXO(vh_bright), 0.0f, 2.0f, 0.01f,
+  "a gain on vehicle and aircraft colour before lighting. 1 = as drawn" },
+{ FXP_FLOAT, "vh_contrast", "contrast", FXO(vh_contrast), 0.0f, 2.0f, 0.01f,
+  "spreads vehicle and aircraft colour away from middle grey above 1, or draws it in below 1. 1 = as drawn" },
+{ FXP_FLOAT, "vh_sat", "saturation", FXO(vh_sat), 0.0f, 2.0f, 0.01f,
+  "vehicle and aircraft colour richness: 0 is grey, 2 twice as rich. 1 = as drawn" },
+{ FXP_FLOAT, "vh_shade", "shade depth", FXO(vh_shade), 0.0f, 2.0f, 0.01f,
+  "how dark vehicles and aircraft go in sun and cloud shadows. 0 leaves them unshaded, 2 twice as deep. 1 = as drawn" },
+{ FXP_FLOAT, "vh_sun", "sun strength", FXO(vh_sun), 0.0f, 2.0f, 0.01f,
+  "how much the sun lights vehicles and aircraft: 0 leaves the shadow colour, 2 lifts sunlit faces twice as far above it. 1 = as drawn" },
+{ FXP_FLOAT, "vh_glow", "self-lit glow", FXO(vh_glow), 0.0f, 3.0f, 0.01f,
+  "a gain on authored vehicle self-lit surfaces, when the model has them. 0 puts them out, above 1 increases their glow and bloom. Does not change headlight beams cast onto the world. 1 = as drawn" },
+{ FXP_FLOAT, "vh_ao", "occlusion", FXO(vh_ao), 0.0f, 2.0f, 0.01f,
+  "how much ambient occlusion darkens vehicle creases and corners. 0 removes that darkening, 2 doubles it. 1 = as drawn" },
 /* THE DEBUG GROUP, and it is last on purpose: it is a workshop control rather than a
    presentation one, and nothing above it should move when it is toggled. */
 { FXP_GROUP, "",  "13  DEBUG", 0,0,0,0, "" },
 { FXP_BOOL,  "debug", "debug: updated meshes", FXO(debug), 0,1,0,
   "draw every type that a debug.pack beside the mission's pack redefines; off, or with no debug pack, the mission's own art is drawn" },
 { FXP_GROUP, "", "EXPERIMENTAL", 0,0,0,0, "" },
+{ FXP_BOOL, "new_sprites", "New Sprites", FXO(new_sprites), 0,1,0,
+  "replace Tiberian Dawn Minigunners with the reviewed native pixel-art animation set. Off restores the selected original or 3D art. Classic and Red Alert retain their own sprites" },
+{ FXP_FLOAT, "ns_bright", "sprite brightness", FXO(ns_bright), 0.0f,2.0f,0.01f,
+  "brightness of New Sprites only. 1 preserves the approved palette; 0 is black. Terrain, other units and HUD are unchanged" },
+{ FXP_FLOAT, "ns_contrast", "sprite contrast", FXO(ns_contrast), 0.0f,2.0f,0.01f,
+  "contrast of New Sprites around mid-grey. 1 preserves the palette; higher separates highlights and shadows" },
+{ FXP_FLOAT, "ns_exposure", "sprite exposure (EV)", FXO(ns_exposure), -3.0f,3.0f,0.01f,
+  "exposure of New Sprites in linear-light stops. 0 is neutral; +1 doubles light, -1 halves it. Does not change the scene exposure" },
+{ FXP_FLOAT, "ns_gamma", "sprite gamma", FXO(ns_gamma), 0.40f,2.50f,0.01f,
+  "midtone brightness of New Sprites. 1 is neutral; higher lifts midtones while retaining black and white" },
+{ FXP_FLOAT, "ns_sat", "sprite saturation", FXO(ns_sat), 0.0f,2.0f,0.01f,
+  "colour intensity of New Sprites, including team paint. 1 is neutral, 0 is greyscale. All sprite controls apply live and save with this preset" },
 { FXP_BOOL, "experimental_relief", "terrain displacement", FXO(experimental_relief), 0,1,0,
   "move cliff and gravel road mesh vertices from height maps and light their surfaces with normals; gravel also uses a wetness-aware roughness map" },
 { FXP_STEP,  "experimental_relief_mode", "displacement method", FXO(experimental_relief_mode), 0.0f, 1.0f, 1.0f,
@@ -2151,16 +2438,6 @@ static const FxParam FX_PARAMS[] = {
   "draw an animated 3D soldier for any infantry type that has one installed, under experimental art only. Poses the model has no animation for, lying prone, crawling and dying, are drawn with the sprite. Off puts every soldier back on the sprite; the authored vehicles row does not affect it" },
 { FXP_FLOAT, "inf_scale_exp", "infantry size (experimental)", FXO(inf_scale_exp), 0.5f, 1.5f, 0,
   "how big infantry stand under experimental art, the 3D soldiers and any sprite soldier alike. Replaces MASTER > infantry size while experimental art is on; that row keeps the size everywhere else" },
-{ FXP_FLOAT, "m3inf_sun", "3D soldier sun", FXO(m3inf_sun), 0.0f, 2.0f, 0,
-  "how hard the sun falls on the 3D soldiers, as a share of the authored models' sun strength, so that dial moves them too. Their uniforms are paler than a tank's paint, so at 1 the lit side washes out to white" },
-{ FXP_FLOAT, "m3inf_fill", "3D soldier fill", FXO(m3inf_fill), 0.0f, 2.0f, 0,
-  "the sky-and-bounce fill on the 3D soldiers, as a share of the authored models' fill strength. At 0 their shaded side is black" },
-{ FXP_FLOAT, "m3inf_paint", "3D soldier team paint", FXO(m3inf_paint), 0.2f, 1.0f, 0,
-  "how bright the team-coloured plates on a 3D soldier are (helmet, sleeves, thighs). 1 is the light grey the house colour is painted over, which reads as the house colour at a glance and glares in the sun" },
-{ FXP_BOOL,  "m3inf_shadow", "3D soldier sharp shadows", FXO(m3inf_shadow), 0,1,0,
-  "the 3D soldiers cast from a shadow map of their own, fitted to the screen and not softened, so the shadow on the ground has his arms, legs and rifle. Off puts them in the one shared with trees and buildings, whose soft edge is wider than a man's leg and draws a smudge" },
-{ FXP_FLOAT, "m3inf_runrate", "3D soldier gait speed", FXO(m3inf_runrate), 0.5f, 3.0f, 0,
-  "the 3D soldiers walk, jog or run by how fast they really move, blended between the three. This multiplies the speed that choice reads: at 1 their feet stay planted; above 1 they break into a jog or a run sooner and their legs move a little faster than the ground. They do not move any faster over the map" },
 { FXP_BOOL,  "freeinf_on", "free infantry movement", FXO(freeinf_on), 0,1,0,
   "soldiers walk straight across open ground at any angle, cutting the corners of their path, instead of stepping from cell to cell in eight directions. This changes the game, not only the picture: the route, the cells a soldier passes through and everything they do to him are the original rules. Off in a multiplayer match whatever this says" },
 { FXP_BOOL,  "uvfx_on", "Unity explosions", FXO(uvfx_on), 0,1,0,
@@ -2181,7 +2458,7 @@ static const FxParam FX_PARAMS[] = {
   "how big the green pointer is. 1 is the cartridge pointer's own size; 0.7 matches the size the white pointer is drawn at. The other cursor shapes keep the 3D cursor size dial" },
 { FXP_GROUP, "",  "3D GRASS", 0,0,0,0, "" },
 { FXP_BOOL,  "grass", "real grass", FXO(grass), 0,1,0,
-  "stand grass on the ground instead of leaving it to the tile art alone; off is what Classic draws. Under experimental art, because the blades are tuned against the ground they stand on" },
+  "stand grass on the ground in Enhanced mode. Adjust its density, height and colour below" },
 { FXP_FLOAT, "grass_density", "blades a cell", FXO(grass_density), 0.0f, 128.0f, 0,
   "how many blades stand in one cell. This is the whole per-frame cost of the feature, and it only ever draws fewer blades out of a buffer that was already built" },
 { FXP_STEP,  "grass_density_max", "bake ceiling", FXO(grass_density_max), 1.0f, 128.0f, 1.0f,
@@ -2256,46 +2533,31 @@ static inline float* fx_fptr(FxState* s, const FxParam* p)
 static inline int* fx_iptr(FxState* s, const FxParam* p)
 { return (int*)((char*)s + p->off); }
 
+/* ---- Red Alert Enhanced feature defaults ------------------------------------------
+   Both games share the same saved Enhanced visual and theater tuning. This layer only
+   turns on the Red Alert module's Enhanced HUD, tree models and grass by default; saved
+   settings can still opt out. */
+static int g_fxRedAlert = 0;
+
+FX_STATE_MAYBE_UNUSED static void fx_red_alert_dials(int on) { g_fxRedAlert = on ? 1 : 0; }
+
+static void fx_red_alert_layer(FxState* s)
+{
+    /* Classic/N64 rows remain off; later saved Enhanced choices remain editable. */
+    s->new_hud = 1;
+    s->tree3d = 1;
+    s->grass = 1;
+}
+
 /* ---- Defaults --------------------------------------------------------------------
-   A STARTING POINT, not an answer. Every number below that is not the VI gamma is a
-   first guess made without the cartridge in front of it, which is exactly why the
-   panel exists. Tune, save, and the saved file becomes this block. */
+   Enhanced visual defaults are sourced from the dated F5 save included below.
+   Both games use that shared tuned picture; machine/display choices remain local. */
 static void fx_defaults(FxState* s)
 {
-    /* THESE ARE THE TUNED NUMBERS, chosen, and this block is a COPY of
-       docs/tuning/opencnc3d-fx.cfg rather than a set of taste judgements made here.
-       Until that evening the compiled defaults were the pre-tuning set (sun 315/52,
-       gamma 0.62, bloom 0.55, supersampling 2x) and the tuned picture existed only in a
-       cfg file that shipped on neither platform, which is why Windows and the Mac did
-       not agree, and why the Windows shadows fell in the wrong place.
-
-       THE WHOLE PICTURE COMES FROM A TUNING SESSION, not from this file. The settings a
-       tuned session was left sitting on were taken back dial for dial, which is what
-       docs/tuning/opencnc3d-fx.cfg now holds: 248 rows, and re-checked mechanically rather
-       than trusted, the saved file and this block agree on 246 of them. EXACTLY TWO ARE
-       NOT COPIED, and each is marked again where it is set:
-
-         enabled      the file says 1 because it was saved from a running Enhanced
-                      session. It stays 0 here because fx_defaults is what every gate in
-                      the project renders from, and the suite must measure the SHIPPED
-                      picture; the game turns the chain on for a player at boot, in
-                      game_visuals_default_enhanced. Baking 1 would switch the chain on
-                      inside every measuring instrument here.
-         smooth_anim  the file says 0. That is one machine's preference for how
-                      animation reads, not a decision about what the game ships as, and
-                      a preference belongs in a player's own settings file where it
-                      already is. It stays ON here, which is what a new player gets.
-
-       Anything else that ever stands off this block is drift, not a decision. If these
-       change again, change them HERE and re-copy the file; the two must not drift.
-
-       THE SAVED FILE CANNOT TELL YOU WHICH TWO THOSE ARE, so do not go looking there for
-       the list. fx_save writes its own header and that header explains one thing only:
-       that a trailing comment marks a row standing off the default it shipped with. Both
-       rows above carry such a marker, and so would any row somebody had simply nudged on
-       the panel before saving, which is the whole difficulty. The list is the two named
-       here, and each is marked again at the line that sets it. */
+    /* The include is generated from docs/tuning/opencnc3d-fx-2026-10-22-1351.cfg;
+       machine/display controls and per-mode rows remain outside the shared defaults. */
     memset(s, 0, sizeof *s);
+    s->ns_bright=s->ns_contrast=s->ns_gamma=s->ns_sat=1.0f;
     s->experimental_height = 0.42321f;
     s->experimental_relief_mode  = 0.0f;
     s->experimental_relief_steps = 15.78571f;
@@ -2307,8 +2569,13 @@ static void fx_defaults(FxState* s)
           only fx_filter_set moves it, so the bare renderer still samples point-wise
           and the pixel gates measure what they always did. */
     s->bilinear = 1;
-    /* VERTICAL SYNC ON, as it always shipped. */
-    s->vsync = 1.0f;
+    /* VERTICAL SYNC OFF BY DEFAULT. On, a frame that misses one refresh of a 60 Hz screen
+       waits for the next whole one, so a frame of 18 ms shows as 30 FPS; measured on
+       Windows players' machines, that cliff turned frames of 17 to 20 ms into a steady 28
+       to 30 FPS, which they reported as the game being slow. Off, the counter shows the
+       real rate and the picture may tear. On and adaptive (on while fast enough, off when
+       a frame is late) stay one click away in Options, Advanced. */
+    s->vsync = 0.0f;
 
     /* ON, deliberately. Note this is a DEFAULT and not a contract with
        the measuring instruments: the smoothing it enables is still gated behind the live
@@ -2332,6 +2599,23 @@ static void fx_defaults(FxState* s)
        fx_texset_on is the switch, and only the Enhanced path and the Visuals dialog move
        it. Classic keeps the 1995 art. */
     s->texset = (float)FX_TEX_ENH;
+    s->clear_saturation = 0.42857f;
+    s->sand_brightness = s->sand_contrast = 1.0f;
+    s->unified_lighting = 1;
+    s->sun_energy = s->sky_energy = 1.0f;
+    s->terrain_ambient = 0.55f;
+    s->shadow_black_limit = 0.035f;
+    s->object_shadow_fill = 0.30f;
+    s->etree_shadow_fill = 0.25f;
+    s->grass_terrain_red = s->grass_terrain_green = s->grass_terrain_blue = 1.0f;
+    s->desert_terrain_red = s->desert_terrain_green = s->desert_terrain_blue = 1.0f;
+    s->sand_terrain_red = s->sand_terrain_green = s->sand_terrain_blue = 1.0f;
+    s->snow_terrain_red = s->snow_terrain_green = s->snow_terrain_blue = 1.0f;
+
+    s->terrain_relief = 1;
+    s->terrain_relief_height = 0.32f;
+    s->sand_saturation = 0.84375f;
+    s->snow_brightness = s->snow_contrast = s->snow_saturation = 1.0f;
 
     /* The 1995 sprites, which is what this project has drawn since dosinfantry.pack
        landed. Changing the default would change every existing screenshot. */
@@ -2350,7 +2634,7 @@ static void fx_defaults(FxState* s)
        back: a 16-degree turn to the left, a fixed 53-degree tilt, a
        48-degree field and 1.1x the distance. The first picture was -45 / 0 / 50 / 1. */
     s->iso_yaw = 16.0f; s->iso_pitch = 53.0f; s->iso_fov = 48.0f; s->iso_dist = 1.10f;
-    s->cursor_scale = 0.7f;
+    s->cursor_scale = 0.4f;
     s->debug = 0.0f;            /* a workshop control: never on unless asked for */
     s->inf_scale_exp = 1.09821f;
     s->inf_scale = 0.76786f;      /* a quarter smaller, by request */
@@ -2396,33 +2680,33 @@ static void fx_defaults(FxState* s)
        ROM's own light is 45.0 / 35.264 and this is 20.12 degrees off it. Registered as a
        deliberate deviation as a known gap; do not "correct" it back. */
     s->shadow_on = 1;
-    s->sun_az = 67.50000f; s->sun_el = 28.71428f;
-    s->shadow_strength = 1.00000f;
-    s->shadow_soft = 0.64286f;
-    s->shadow_bias = 0.03043f;
-    s->shadow_span = 1.41429f;
+    s->sun_az = 67.50000f; s->sun_el = 27.28572f;
+    s->shadow_strength = 0.86607f;
+    s->shadow_soft = 1.35714f;
+    s->shadow_bias = 0.002f;
+    s->shadow_span = 1.45714f;
     s->shadow_ox = 11.57143f; s->shadow_oz = 7.71428f;
     s->shadow_res = 4096.0f;
     s->shadow_r = 0.49107f; s->shadow_g = 0.58000f; s->shadow_b = 0.68750f;
     s->shadow_terrain = 1;
-    s->terrain_shadow_strength = 0.69643f;
-    s->terrain_brightness = 1.0f; s->terrain_contrast = 1.01786f;
+    s->terrain_shadow_strength = 0.6875f;
+    s->terrain_brightness = 0.91071f; s->terrain_contrast = 1.03571f;
     /* THE SMOOTH GROUND, on: the per-corner normal, a 1.5-texel normal
        offset, a penumbra of 0.08 cells (about five texels at the default box), every
        cell still casting. Tuned on the SCB05EA cliff; docs/CHANGELOG.md has the why. */
     s->terrain_normals = 1;
     s->sun_lambert = 1;
-    s->sun_floor = 0.54464f;
+    s->sun_floor = 0.23214f;
     /* 0.30 of a cell is roughly the clearance under a tracked hull, which is the gap
        this exists to darken. Eight steps over that is a sample every four centimetres
        of world at the shipped cell size. The thickness is twice the reach, which is
        loose on purpose: too tight and a blocker seen at a grazing angle is missed. */
     s->contact_on       = 1;
-    s->contact_len      = 0.30f;
-    s->contact_steps    = 8.0f;
-    s->contact_thick    = 0.60f;
-    s->contact_bias     = 0.020f;
-    s->contact_strength = 1.0f;
+    s->contact_len      = 0.13705f;
+    s->contact_steps    = 3.0f;
+    s->contact_thick    = 0.33973f;
+    s->contact_bias     = 0.01786f;
+    s->contact_strength = 0.60714f;
     s->veh_slope = 1.0f;
     s->veh_slope_span = 0.40f;
     s->veh_slope_max = 32.0f;
@@ -2450,14 +2734,14 @@ static void fx_defaults(FxState* s)
        at. If it is ever wanted finer still, the range is what has to move, not this
        number; see the row in FX_PARAMS. */
     s->cloud_on = 1;
-    s->cloud_strength = 0.47321f;
+    s->cloud_strength = 0.30357f;
     s->cloud_cover = 0.34800f;
     s->cloud_sharp = 0.03600f;
     s->cloud_scale = 20.00000f;
-    s->cloud_speed = 0.42857f;
+    s->cloud_speed = 0.57100f;
     s->cloud_rot = 67.50000f;
     s->cloud_height = 12.00000f;
-    s->fog_fx = 1; s->sand_fx = 1;
+    s->fog_fx = 0; s->sand_fx = 1;
     s->fog_density = 0.05357f; s->fog_height = 1.46964f; s->fog_scale = 2.00000f;
     s->fog_speed = 0.57143f; s->fog_wind = 64.28571f; s->fog_light = 4.50000f;
     s->sand_density = 0.20536f; s->sand_height = 0.8f; s->sand_scale = 10.0f;
@@ -2465,35 +2749,38 @@ static void fx_defaults(FxState* s)
 
 
     /* The sea, tuned through the panel in play: deeper and darker open water, a wider
-       shore fade, a stronger fresnel and a little less mirror. On in Enhanced the way
-       the clouds are. */
+       shore fade and rippled refraction. On in Enhanced the way the clouds are.
+       Water reflections are retired; old preset values cannot restore them. */
     s->water_fx = 1;
+    s->water_swash = 1;
+    s->water_swash_hold = 0.0f;
+    s->water_swash_opacity = 1.0f;
+    s->water_align_length = 0.35f;
+    s->water_align_blend = 2.15f;
     s->water_flow = 0.35000f;
     s->water_flow_rate = 0.25000f;
     s->water_current = 67.50000f;
     s->water_foam = 0.00000f;
-    s->water_foam_width = 0.90000f;
+    s->water_foam_width = 0.35714f;
     s->water_wave_len = 0.50000f;
     s->water_wave_speed = 0.35000f;
-    s->water_shallow = 0.42857f;
-    s->water_deep = 0.66964f;
-    s->water_edge = 0.54464f;
-    s->water_fade = 0.72321f;
-    s->water_fade_width = 1.34464f;
-    s->water_foam_cross = 0.32143f;
+    s->water_shallow = 0.47321f;
+    s->water_deep = 0.39286f;
+    s->water_edge = 0.53571f;
+    s->water_fade = 0.28571f;
+    s->water_fade_width = 0.85268f;
+    s->water_foam_cross = 0.13393f;
     s->water_pan = 0.35000f;
     s->water_river_width = 3.00000f;
     s->water_river_speed = 1.50000f;
-    s->water_bump = 0.14732f;
-    s->water_reflect = 0.22321f;
-    s->water_spec = 0.85714f;
-    s->water_refract = 0.01232f;
-    s->water_fresnel = 0.50000f;
-    s->water_reflect_scene = 1;
-    s->water_natural = 0.90179f;
-    s->water_dark = 0.30804f;
+    s->water_bump = 0.26786f;
+    s->water_spec = 1.04464f;
+    s->water_reflection_yaw = 0.0f;
+    s->water_refract = 0.02036f;
+    s->water_natural = 0.84821f;
+    s->water_dark = 0.29464f;
     s->water_wake = 0.03571f;
-    s->water_wake_width = 1.20000f;
+    s->water_wake_width = 1.28214f;
     s->water_wake_sim = 1;
     s->water_wake_bump = 1.20000f;
     s->water_wake_ring = 0.12000f;
@@ -2501,10 +2788,12 @@ static void fx_defaults(FxState* s)
 
     s->bloom_on = 1;
     s->bloom_threshold = 0.68000f; s->bloom_knee = 0.15000f;
-    s->bloom_intensity = 0.92857f; s->bloom_radius = 1.93750f; s->bloom_passes = 4.0f;
+    s->bloom_intensity = 0.92857f;
+    s->explosion_bloom = 0.30f;
+    s->muzzle_bloom = 0.25f; s->muzzle_flash_gain = 0.60f; s->muzzle_light_gain = 0.35f; s->bloom_radius = 1.93750f; s->bloom_passes = 4.0f;
 
     s->ssao_on = 1;
-    s->ssao_radius = 0.20670f; s->ssao_intensity = 0.51786f;
+    s->ssao_radius = 0.20670f; s->ssao_intensity = 0.60714f;
     s->ssao_bias = 0.01384f;   s->ssao_power = 1.31250f; s->ssao_samples = 18.0f;
     s->ssao_ground = 0.5f;
     /* THE AUTHORED HULLS' OWN OCCLUSION STRENGTH, AND IT IS 1 BECAUSE THAT IS WHAT A
@@ -2519,7 +2808,7 @@ static void fx_defaults(FxState* s)
     /* ON BY DEFAULT again: the panel saved in play switched it back on once the
        Tiberium field's light was rebuilt as a map-wide glow, at the dials below. */
     s->lights_on = 1;
-    s->light_intensity = 0.53571f; s->light_radius = 2.87500f;
+    s->light_intensity = 0.96429f; s->light_radius = 2.87500f;
     s->light_falloff = 1.88393f;
     s->light_fade = 0.26786f;   /* 19 Aug: a real light does not stop, it fades */
     /* And a gun is not a fireball. the same evening: the muzzle lights 'linger a
@@ -2532,9 +2821,18 @@ static void fx_defaults(FxState* s)
     s->light_explosions = 1; s->light_muzzle = 1; s->light_fire = 1;
     s->light_tiberium = 1;   /* on, as the panel saved in play has it */
     s->tib_light = 0.21429f; s->tib_light_spread = 2.25223f; s->tib_light_height = 0.80f;
+    s->vlight_on = 1; s->vlight_shadows = 1;
+    /* THE LAMPS AS THE LAB DRAWS THEM: every dial at 1, the strength, colour and reach
+       being each lamp's own in its export (the lab's gain of 2.5 is carried in full). The
+       lamps were retuned in the lab for the game's light, so nothing is scaled again here;
+       the dials are for a player's taste. */
+    s->vlight_head = 1.0f; s->vlight_tail = 1.0f; s->vlight_cone = 1.0f; s->vlight_range = 1.0f;
+    s->vlight_glow = 1.0f;
+    /* the specular maps as tuned in play over the remastered vehicles and buildings */
+    s->vspec_on = 1; s->vspec_sun = 1.0f; s->vspec_sky = 1.0f; s->vspec_gloss = 1.0f;
 
     s->grade_on = 1;
-    s->exposure = -0.10714f; s->contrast = 1.22321f; s->saturation = 1.05357f;
+    s->exposure = -0.10714f; s->contrast = 1.22321f; s->saturation = 1.12500f;
     s->temperature = 0.08929f; s->tint = 0.0f; s->lift = -0.03571f; s->gain = 1.55804f;
 
     /* OFF, AND THE TUNED FILE AGREES, which makes the tube's own dials below whatever
@@ -2598,14 +2896,20 @@ static void fx_defaults(FxState* s)
     /* 12c. LEAFY TREES, OFF in the saved Enhanced tuning. The height is judged against a unit,
             the way the crystals are. The wind is deliberately gentle: a tree that waves
             is a tree nobody stops noticing. */
-    s->tree3d = 0;
-    /* 12d. REMASTERED EFFECTS, ON under Enhanced. */
+    s->tree3d = 1; /* accepted Enhanced tree models; imported tree pack retired */
+    s->etree_height=1.28929f;s->etree_width=1.13839f;s->etree_vary=0.09643f;s->etree_lean=0.0f;s->etree_gain=0.84821f;
+    /* 12d. REMASTERED EFFECTS, ON under Enhanced, graded as painted. */
     s->efx_enh = 1;
+    s->efx_bright = 1.0f; s->efx_contrast = 1.0f; s->efx_sat = 1.0f;
+    s->efx_gamma = s->efx_red = s->efx_green = s->efx_blue = 1.0f;
+    s->inf_bright = s->inf_contrast = s->inf_gamma = s->inf_sat = 1.0f;
+    s->inf_red = s->inf_green = s->inf_blue = 1.0f;
     /* 12d. REMASTERED BUILDING APRONS, ON under Enhanced. */
     s->bib_enh = 1;
     s->bib_enh_strength = 0.65f;
     s->bib_enh_cover = 0.35f;
-    s->tree3d_size = 1.7875f;
+    s->decal_enh = 1;
+    s->tree3d_size = 1.73125f;
     s->tree3d_wind = 0.04107f;
     s->tree3d_wind_speed = 0.12902f;
     s->tree3d_wind_dir = 183.21429f;
@@ -2614,8 +2918,8 @@ static void fx_defaults(FxState* s)
     s->tree3d_lean = 0.23929f;
     s->tree3d_ao = 0.82143f;
     s->tree3d_trans = 0.62946f;
-    s->tree3d_sheen = 0.88393f;
-    s->tree3d_ambient = 1.5f;
+    s->tree3d_sheen = 0.75893f;
+    s->tree3d_ambient = 1.27232f;
     s->tree3d_flutter = 0.07143f;
     s->tree3d_wrap = 1.23214f;
     s->tree3d_ao_floor = 0.63393f;
@@ -2713,30 +3017,30 @@ static void fx_defaults(FxState* s)
        saved from a session with the row ticked, and was not copied. It ships OFF so the
        ground a player meets first is the cartridge's; the tuning panel turns it on. Two
        legs of the grass gate set it by hand for the same reason. */
-    s->grass = 0;
-    s->grass_density = 91.42857f;
-    s->grass_density_max = 128.0f;
-    s->grass_height = 0.13366f;
+    s->grass = 1; /* On by default for Enhanced (the tuned file's); Classic/N64 mode rows remain off. */
+    s->grass_density = 121.14286f;
+    s->grass_density_max = 83.0f;
+    s->grass_height = 0.13607f;
     s->grass_width = 0.03286f;
     s->grass_taper = 0.33929f;
-    s->grass_vary = 0.45f;
-    s->grass_lean = 0.22f;
+    s->grass_vary = 0.36562f;
+    s->grass_lean = 0.20536f;
     s->grass_wind = 0.28f;
     s->grass_wind_rate = 1.00f;
-    s->grass_gust_len = 9.00f;
+    s->grass_gust_len = 9.2f;
     s->grass_arc = 0.90f;
     s->grass_shiver = 0.35f;
-    s->grass_tint = 0.44643f;
+    s->grass_tint = 0.57143f;
     s->grass_r = 0.42f; s->grass_g = 0.52f; s->grass_b = 0.24f;
-    s->grass_patch = 0.25f;
-    s->grass_patch_len = 7.00f;
+    s->grass_patch = 0.49286f;
+    s->grass_patch_len = 14.89286f;
     s->grass_root_fade = 0.22f;
     s->grass_root_alpha = 0.06f;
     s->grass_edge = 0.30f;
     s->grass_ao = 0.55f;
     s->grass_tip = 0.40714f;
-    s->grass_gain = 1.00f;
-    s->grass_fade = 26.0f;
+    s->grass_gain = 0.99821f;
+    s->grass_fade = 11.30357f;
     /* THE THEATRE GATE ADMITS TEMPERATE AND WINTER AND NOTHING ELSE, which is a
        decision about what the game should look like rather than a threshold. Measured
        green excess of each bank's CLEAR1 mean over neutral: TEMPERAT +0.1723, WINTER
@@ -2746,8 +3050,8 @@ static void fx_defaults(FxState* s)
        sand's own colour, because a blade is mostly the ground it grows out of, so
        admitting it draws a quarter of a million cards that change the picture by an
        average of six levels a pixel and read as texture rather than as grass. */
-    s->grass_theater_cut = 0.035f;
-    s->grass_colour_sd = 3.00f;
+    s->grass_theater_cut = 0.03929f;
+    s->grass_colour_sd = 1.0f;
     /* A NUDGE, NOT A BOW WAVE. The pointer is a hand passing over a field, so the tip
        moves about half the blade's height and the circle is a little under two cells,
        a shade wider than the 3D cursor's own footprint on the ground. */
@@ -2813,7 +3117,7 @@ static void fx_defaults(FxState* s)
     s->einf_on     = 1;
     s->einf_scale  = 0.96429f;
     s->einf_corpse_keep = 1;
-    s->einf_corpse_max  = 200.0f;
+    s->einf_corpse_max  = 200.00000f;
     s->einf_corpse_dark = 0.5f;
     s->einf_ragdoll = 1;
     s->einf_blood   = 1;
@@ -2895,11 +3199,11 @@ static void fx_defaults(FxState* s)
     s->rock_pulse    = 3.0f;
     s->rock_pulse_r  = 3.0f;
     s->mottle_on         = 1;
-    s->mottle_strength   = 0.41071f;
+    s->mottle_strength   = 0.09821f;
     /* Low, because a patch now covers up to sixteen cells rather than one and patches
        overlap on purpose. This is the share of cells that ANCHOR one, not the share of
        ground that ends up carrying any. */
-    s->mottle_density    = 0.06250f;
+    s->mottle_density    = 0.05357f;
     /* ON, and it does nothing at all without a sky pack installed: with none the shader
        takes the hemisphere branch, which is the picture this had before. */
     s->m3_env      = 1;
@@ -2933,25 +3237,48 @@ static void fx_defaults(FxState* s)
     s->relight_floor = 0.16f;
     s->relight_spec  = 0.35f;
     s->relight_clamp = 2.5f;
-    s->hdr_on      = 1;
+    s->hdr_on      = 0;
     s->tonemap     = 1.0f;
     /* 0.85, which leaves six sevenths of the range untouched. Measured on the test map:
        at this knee a frame whose brightest pixel is white comes out within one level of
        the eight bit chain's, so the switch buys headroom without buying a new look. */
     s->tone_knee   = 0.85f;
     s->bloom_clamp = 8.875f;
-    /* THE STRUCTURES GROUP, as tuned in the panel: a little darker, a touch deeper
-       in shade and a little less occlusion; the rest neutral. Neutral (every dial at 1)
-       is the old path: see fx_struct_active below. Gates that test the group's
-       mechanism set all eight to 1 first. */
-    s->st_gamma    = 1.0f;
-    s->st_bright   = 0.80357f;
+    /* THE STRUCTURES AND VEHICLES GROUPS, as tuned in the panel: structures a little
+       brighter, less saturated and less glowing, much deeper in shade and occlusion;
+       vehicles darker in the mid-tones, desaturated, less sunlit, more occluded. Neutral
+       (every dial at 1) is the old path: see fx_struct_active below. Gates that test a
+       group's mechanism set all eight to 1 first. */
+    /* F5 tuning accepted 19 Oct 2026: exact saved visual dials; display/debug
+       preferences remain per user. See docs/verification/2026-10-19-smooth-turns. */
+    s->st_gamma    = 0.94375f;
+    s->st_bright   = 0.92857f;
     s->st_contrast = 1.0f;
-    s->st_sat      = 1.0f;
-    s->st_shade    = 1.01786f;
-    s->st_sun      = 1.0f;
-    s->st_glow     = 1.0f;
-    s->st_ao       = 0.94643f;
+    s->st_sat      = 0.92857f;
+    s->st_shade    = 1.32143f;
+    s->st_sun      = 0.60714f;
+    s->st_glow     = 0.75f;
+    s->st_ao       = 1.60714f;
+    s->vh_gamma    = 0.85f;
+    s->vh_bright   = 0.76786f;
+    s->vh_contrast = 0.89286f;
+    s->vh_sat      = 0.83929f;
+    s->vh_shade    = 0.875f;
+    s->vh_sun      = 0.67857f;
+    s->vh_glow     = 0.83036f;
+    s->vh_ao       = 1.42857f;
+
+    /* Both games use the same saved Enhanced visual picture. User display and mode
+       preferences remain in their own settings files. */
+    #include "enhanced_defaults_20261022.inc"
+    #include "enhanced_defaults_20261025.inc"
+    #include "enhanced_defaults_20261026.inc"
+
+    /* Requested Enhanced defaults, including when importing an older tuning save. */
+    s->tree3d = s->tib3d = s->fol_on = s->rock_on = s->mottle_on = 1;
+
+    /* Red Alert feature toggles over the shared Enhanced picture. */
+    if (g_fxRedAlert) fx_red_alert_layer(s);
 
     /* LAST, because it copies the live fields set above into the modes' own entries. */
     fx_mode_defaults(s);
@@ -2960,17 +3287,40 @@ static void fx_defaults(FxState* s)
 static inline float fx_clampf(float v, float lo, float hi)
 { return v < lo ? lo : (v > hi ? hi : v); }
 
-/* IS ANY STRUCTURES DIAL OFF NEUTRAL? Only then does the light pass take its structures
-   path, and only then are the cartridge structures drawn into the normal target, so at
-   the neutral settings the frame is the one drawn before the group existed, byte for
-   byte, rather than a recomputation that is equal only to within rounding. A dial within
-   a ten-thousandth of 1 counts as neutral, which is finer than the panel shows. */
+FX_STATE_MAYBE_UNUSED static FxObjectGrade fx_effect_grade(const FxState* s)
+{
+    const FxObjectGrade g={s->efx_bright,s->efx_contrast,s->efx_exposure,s->efx_gamma,
+        s->efx_sat,s->efx_warmth,s->efx_tint,s->efx_red,s->efx_green,s->efx_blue};
+    return g;
+}
+FX_STATE_MAYBE_UNUSED static FxObjectGrade fx_infantry_grade(const FxState* s)
+{
+    const FxObjectGrade g={s->inf_bright,s->inf_contrast,s->inf_exposure,s->inf_gamma,
+        s->inf_sat,s->inf_warmth,s->inf_tint,s->inf_red,s->inf_green,s->inf_blue};
+    return g;
+}
+
+/* DOES THE LIGHT PASS NEED STRUCTURE CLASSIFICATION? Its eight grade/light dials use
+   neutral 1, and the independent self-shadow fill uses neutral 0. Only when one differs
+   are cartridge structures drawn into the normal target. */
 FX_STATE_MAYBE_UNUSED static int fx_struct_active(const FxState* s)
 {
     const float v[8] = { s->st_gamma, s->st_bright, s->st_contrast, s->st_sat,
                          s->st_shade, s->st_sun, s->st_glow, s->st_ao };
     int i;
+    /* The independent self-shadow control also needs the structure class mask. */
+    if (s->object_shadow_fill > 1e-4f) return 1;
     for (i = 0; i < 8; i++)
+        if (fabsf(v[i] - 1.0f) > 1e-4f) return 1;
+    return 0;
+}
+
+/* The vehicle path, including its fallback class redraw, costs nothing at neutral. */
+FX_STATE_MAYBE_UNUSED static int fx_vehicle_active(const FxState* s)
+{
+    const float v[8] = { s->vh_gamma, s->vh_bright, s->vh_contrast, s->vh_sat,
+                         s->vh_shade, s->vh_sun, s->vh_glow, s->vh_ao };
+    for (int i = 0; i < 8; i++)
         if (fabsf(v[i] - 1.0f) > 1e-4f) return 1;
     return 0;
 }
@@ -3010,7 +3360,8 @@ static int fx_save(const FxState* s, const char* path)
                "#\n");
     /* Written by every build that has the Enhanced textures: its absence marks a file
        saved when Enhanced's default terrain was the 1995 art (see fx_load). */
-    fprintf(f, "enh_textures       1\n");
+    fprintf(f, "enh_textures       1\nenh_tree_toggle    1\nenh_world_detail   1\n");
+    if (g_fxRedAlert) fprintf(f, "ra_enhanced_features 1\n");
 
     for (const FxParam* p = FX_PARAMS; p->kind != FXP_END; p++) {
         if (p->kind == FXP_GROUP) { fprintf(f, "\n# ---- %s\n", p->label); continue; }
@@ -3112,6 +3463,19 @@ FX_STATE_MAYBE_UNUSED static void fx_art_withdraw(float* row, int mode)
     if (inf) row[FXR_INFSET] = d.mode_row[mode][FXR_INFSET];
 }
 
+/* Saved presets and script probes can still name the retired water controls.
+   Accept plain names and mode.<name>.<key> aliases, but never map them to a field. */
+static int fx_retired_water_key(const char* key)
+{
+    if (!strncmp(key, "mode.", 5)) {
+        const char* dot = strchr(key + 5, '.');
+        if (!dot || dot == key + 5) return 0;
+        key = dot + 1;
+    }
+    return !strcmp(key, "water_reflect") || !strcmp(key, "water_fresnel") ||
+           !strcmp(key, "water_reflect_scene");
+}
+
 /* ---- Load ------------------------------------------------------------------------
    Unknown keys are REPORTED, not skipped in silence. A preset written against an older
    build and quietly half-applied is the same trap as a test that passes because
@@ -3122,17 +3486,37 @@ static int fx_load(FxState* s, const char* path)
     if (!f) return 0;
     char line[512];
     int applied = 0, unknown = 0;
-    int saw_n64 = 0, saw_old_classic = 0, saw_dos_classic = 0, saw_enh = 0;
+    int saw_n64 = 0, saw_old_classic = 0, saw_dos_classic = 0, saw_enh = 0, saw_tree_toggle = 0;
+    int vsync_untouched = 0, saw_einf_mode = 0, saw_swash_mode = 0, saw_ra_features = 0, saw_world_detail = 0;
+    int saw_desert_shadow = 0, saw_sand_shadow = 0, saw_snow_shadow = 0;
     fx_mode_rows_loaded = 0;
     while (fgets(line, sizeof line, f)) {
         char* h = strchr(line, '#'); if (h) *h = 0;
         char key[64], val[64];
         if (sscanf(line, "%63s %63s", key, val) != 2) continue;
+        /* fx_save marks every value off its default with "# was"; a bare "vsync 1" is the
+           old default written out unchanged, not a choice (see below) */
+        if (!strcmp(key, "vsync") && !h && atof(val) == 1.0) vsync_untouched = 1;
         if (!strncmp(key, "mode.n64.", 9)) saw_n64 = 1;
         if (!strncmp(key, "mode.classic.", 13)) saw_old_classic = 1;
         if (!strcmp(key, "dos_classic")) saw_dos_classic = 1;
         if (!strcmp(key, "experimental_textures")) { s->experimental_textures = 0; continue; }
         if (!strcmp(key, "enh_textures")) { saw_enh = 1; applied++; continue; }
+        if (!strcmp(key, "enh_tree_toggle")) { saw_tree_toggle = 1; applied++; continue; }
+        if (!strcmp(key, "enh_world_detail")) { saw_world_detail = 1; applied++; continue; }
+        if (!strcmp(key, "ra_enhanced_features")) { saw_ra_features = 1; applied++; continue; }
+        /* Retired deliberately: accept older saved presets without restoring either
+           a mirrored-world pass or the shader's sky reflection. New saves and the
+           panel no longer offer these controls. */
+        if (fx_retired_water_key(key)) {
+            fprintf(stderr, "FX|preset|retired key '%s' ignored (water reflections removed)\n", key);
+            continue;
+        }
+        if (!strcmp(key, "mode.enhanced.einf_on")) saw_einf_mode = 1;
+        if (!strcmp(key, "mode.enhanced.water_swash")) saw_swash_mode = 1;
+        if (!strcmp(key, "desert_shadow_strength")) saw_desert_shadow = 1;
+        if (!strcmp(key, "sand_shadow_strength")) saw_sand_shadow = 1;
+        if (!strcmp(key, "snow_shadow_strength")) saw_snow_shadow = 1;
         if (fx_mode_load_key(s, key, val)) continue;
         if (!strncmp(key, "mode.reengineered.", 18)) continue;
         const FxParam* hit = NULL;
@@ -3148,6 +3532,41 @@ static int fx_load(FxState* s, const char* path)
         applied++;
     }
     fclose(f);
+    /* Missing theater keys inherit the final legacy value, regardless of row order.
+       Save writes all three, so subsequent tuning remains independent. */
+    if (!saw_desert_shadow) s->desert_shadow_strength = s->terrain_shadow_strength;
+    if (!saw_sand_shadow) s->sand_shadow_strength = s->terrain_shadow_strength;
+    if (!saw_snow_shadow) s->snow_shadow_strength = s->terrain_shadow_strength;
+    /* VERTICAL SYNC WAS ON BY DEFAULT and every save wrote it out, so a file that says
+       "vsync 1" with no "# was" beside it holds the old default, not a choice: it takes
+       the new default (off), once. A player who turned it off, or who later chooses on or
+       adaptive against the new default, has the "# was" mark and keeps the choice. */
+    if (vsync_untouched) {
+        FxState defaults; fx_defaults(&defaults);
+        s->vsync = defaults.vsync;
+        fprintf(stderr, "FX|preset|%s carries the old vertical sync default: it takes the new one (off)\n", path);
+    }
+    /* Earlier files kept the production soldiers only as a global switch. Preserve
+       that exact Enhanced choice when adding its own per-mode row. */
+    if (!saw_einf_mode)
+        s->mode_row[FX_MODE_ENHANCED][FXR_EINF] = s->einf_on ? 1.0f : 0.0f;
+    /* An older preset has neither swash key and inherits the new on default.
+       A plain explicit key is also a choice; retain it when no mode row exists. */
+    if (!saw_swash_mode)
+        s->mode_row[FX_MODE_ENHANCED][FXR_WATER_SWASH] = s->water_swash ? 1.0f : 0.0f;
+    /* Old tree3d=0 disabled an unrelated imported pack, not the Enhanced models.
+       Migrate once; subsequent saved choices apply to the actual Enhanced trees. */
+    if (!saw_tree_toggle) {
+        s->tree3d = 1;
+        s->mode_row[FX_MODE_ENHANCED][FXR_TREES] = 1.0f;
+    }
+    s->ss_scale = 1.0f;
+    for (int m = 0; m < FX_MODE_COUNT; m++) s->mode_row[m][FXR_SS] = 1.0f;
+    /* High dynamic range is retired: a file saved while it shipped on reads, and comes
+       back off. */
+    s->hdr_on = 0;
+    s->ecur_on = 1;
+    s->efx_enh = 1;
     /* Presets from the retired fourth look may still carry its hidden switch. */
     s->experimental_textures = 0;
     if (s->dos_classic) s->enabled = 0;
@@ -3181,6 +3600,27 @@ static int fx_load(FxState* s, const char* path)
         fx_art_withdraw(live, fx_mode_of(s));
         fx_mode_set_live(s, FXR_TEXSET, live[FXR_TEXSET]);
         fx_mode_set_live(s, FXR_INFSET, live[FXR_INFSET]);
+    }
+    /* Before RA's Enhanced controls were connected, saves carried disabled features
+       and grass's old off default. Adopt the new defaults once, including the inactive
+       Enhanced profile. A subsequent save writes the marker and preserves opt-outs. */
+    if (g_fxRedAlert && !saw_ra_features) {
+        const int rows[] = { FXR_NEWHUD, FXR_TREES, FXR_GRASS };
+        for (int i = 0; i < 3; i++) {
+            s->mode_row[FX_MODE_ENHANCED][rows[i]] = 1.0f;
+            if (fx_mode_of(s) == FX_MODE_ENHANCED) fx_mode_set_live(s, rows[i], 1.0f);
+        }
+        fprintf(stderr, "FX|preset|RA Enhanced HUD, trees and grass defaults adopted once\n");
+    }
+    /* Older RA UI greyed these rows and reported visible ore as unchecked.
+       Adopt the requested defaults once. New saves preserve deliberate opt-outs. */
+    if (!saw_world_detail) {
+        const int rows[] = { FXR_TREES, FXR_TIB3D, FXR_FOLIAGE, FXR_ROCKS, FXR_PATCHES };
+        for (int i = 0; i < 5; i++) {
+            s->mode_row[FX_MODE_ENHANCED][rows[i]] = 1.0f;
+            if (fx_mode_of(s) == FX_MODE_ENHANCED) fx_mode_set_live(s, rows[i], 1.0f);
+        }
+        fprintf(stderr, "FX|preset|Enhanced trees, resources, bushes, rocks and patches defaults adopted once\n");
     }
     fprintf(stderr, "FX|preset|%s: %d applied, %d unknown\n", path, applied, unknown);
     return 1;

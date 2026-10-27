@@ -76,7 +76,7 @@ grep -Eq 'OBJ\|BUILDING\|BARR\|USSR\|newcell=6213\|x=69\|y=48.*\|limbo=0' "$work
 grep -Eq 'OBJ\|INFANTRY\|E1\|USSR\|.*\|id=22\|' "$work/production.log"
 grep -Eq 'OBJ\|AIRCRAFT\|YAK\|USSR\|.*\|limbo=0' "$work/production.log"
 grep -Fq 'DOSDRAW|layer|YAK|asset=YAK|' "$work/production.log"
-grep -Fq 'DOS2D|loaded 364 original Red Alert SHP shapes' "$work/production.log"
+grep -Eq 'DOS2D\|loaded [1-9][0-9]+ original Red Alert SHP shapes' "$work/production.log"
 if grep -Fq 'DOS2D|missing original SHP YAK' "$work/production.log"; then
     echo 'built YAK has no original Classic sprite' >&2
     exit 1

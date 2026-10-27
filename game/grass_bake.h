@@ -223,6 +223,23 @@ static GRPFNBUFFERDATA     gr_glBufferData;
 static GRPFNBUFFERSUBDATA  gr_glBufferSubData;
 static GRPFNGETBUFFERPARAMETERIV gr_glGetBufferParameteriv;
 
+/* Every GL_ARRAY_BUFFER bind in this renderer comes through gr_glBindBuffer, so the
+   binding is known without asking for it (gl_state_cache.h); a delete can unbind the
+   bound buffer, so it forgets. */
+static inline void gls_bind_buffer(GLenum t, GLuint b)
+{
+    if(t!=GL_ARRAY_BUFFER || !gls_reduce_calls() || !g_glsArrayKnown || g_glsArray!=b)
+        (gr_glBindBuffer)(t, b);
+    if (t == GL_ARRAY_BUFFER) { g_glsArray = b; g_glsArrayKnown = true; }
+}
+static inline void gls_delete_buffers(GLsizei n, const GLuint* b)
+{
+    (gr_glDeleteBuffers)(n, b);
+    g_glsArrayKnown = false;
+}
+#define gr_glBindBuffer(t, b)    gls_bind_buffer((t), (b))
+#define gr_glDeleteBuffers(n, b) gls_delete_buffers((n), (b))
+
 static int  g_grassBufReady = 0;
 static int  g_grassBufTried = 0;
 static char g_grassBufWhy[160];
@@ -433,6 +450,7 @@ static int   g_grassGridW = 0, g_grassGridH = 0;
 static int   g_grassRect[4] = { 0, 0, 0, 0 };
 static int   g_grassAtlas = -1;
 static GLuint g_grassAtlasGL = 0;
+static unsigned g_grassClearSignature = 0;
 static GrassBakeCfg g_grassCfg;
 static int   g_grassHave = 0;
 static int   g_grassRefused = 0;   /* the last attempt refused, and printed why */
@@ -692,8 +710,75 @@ static int grass_cell_land(const PackCell& c, int uw, int uh, const int* rev, in
 
 /* Build the per texel mask, the per cell coverage, and the per cell block flag.
    Returns false when this pack or this theater has no grass at all. */
+/* Enhanced uses the SAME saved Outline Check coverage as the terrain finish.
+   Cartridge edge-green texels are not grass on the remastered beach. RA uses its own
+   map cells, never the TD placeholder pack. Keep only 24x24 coverage on the CPU. */
+static bool grass_native_mask_wanted(void)
+{
+    return fx_texset_get()==FX_TEX_ENH && (!strcmp(g_pack.theater,"TEMPERAT")||!strcmp(g_pack.theater,"RATEMP"));
+}
+static bool g_grassNativeMask=false;
+static bool grass_mask_build_native(void)
+{
+    terrain_grass_masks_ensure();const TerrainGrassMasks& M=g_terrainGrassMasks;
+    if(M.coverage.empty())return false;
+    const bool ra=water_src_ra();const std::vector<PackCell>& cells=water_cells();
+    int n=0;const TtSlot* tt=tt_table(g_pack.theater,&n);
+    std::vector<int> reverse((size_t)n,-1);
+    if(!ra)for(int j=0;j<n;j++)if(tt[j].slot<n)reverse[tt[j].slot]=j;
+    g_grassMaskW=g_gridW*GRASS_MASK_RES;g_grassMaskH=g_gridH*GRASS_MASK_RES;
+    g_grassMask.assign(((size_t)g_grassMaskW*g_grassMaskH+7)/8,0);
+    g_grassCellCov.assign((size_t)g_gridW*g_gridH,0);g_grassBlock.assign((size_t)g_gridW*g_gridH,1);
+    long total=0,grassCells=0;
+    for(size_t i=0;i<cells.size();i++) {
+        const PackCell& c=cells[i];
+        if(c.x<g_mapX||c.y<g_mapY||c.x>=g_mapX+g_mapW||c.y>=g_mapY+g_mapH||c.x<0||c.y<0||c.x>=g_gridW||c.y>=g_gridH)continue;
+        int mask=-1;
+        if(ra) {if(i<g_waterRa.grassMasks.size())mask=g_waterRa.grassMasks[i];}
+        else {
+            const int slot=ts_slot_of_cell(c,n);
+            if(slot>=0&&reverse[slot]>=0) {
+                const TtSlot& t=tt[reverse[slot]];
+                mask=t.tmpl==0?0:terrain_grass_mask_td(t.tmpl,t.icon,enh_cell_variant(c,slot));
+            }
+        }
+        if(mask<0||((size_t)mask+1)*576>M.coverage.size())continue;
+        int keep=0;
+        for(int y=0;y<24;y++)for(int x=0;x<24;x++) {
+            if(M.coverage[((size_t)mask*24+y)*24+x]<192)continue;
+            grass_mask_set(c.x*24+x,c.y*24+y);keep++;
+        }
+        const size_t ci=(size_t)c.y*g_gridW+c.x;
+        g_grassCellCov[ci]=(unsigned char)(keep*255/576);
+        if(keep){g_grassBlock[ci]=0;grassCells++;total+=keep;}
+    }
+    /* The skirt's neighbourhood flag. A blade only has to measure its distance to a
+       silhouette edge when there is one within reach; everywhere else the distance
+       saturates and the test is one byte. */
+    g_grassNearBlock.assign((size_t)g_gridW * g_gridH, 0);
+    const int R = g_grassSdCells;
+    for (int y = 0; y < g_gridH; y++)
+        for (int x = 0; x < g_gridW; x++) {
+            if (g_grassBlock[(size_t)y * g_gridW + x]) continue;
+            int close = 0;
+            for (int dy = -R; dy <= R && !close; dy++)
+                for (int dx = -R; dx <= R; dx++) {
+                    const int nx = x + dx, ny = y + dy;
+                    if (nx < 0 || ny < 0 || nx >= g_gridW || ny >= g_gridH) { close = 1; break; }
+                    if (g_grassBlock[(size_t)ny * g_gridW + nx]) { close = 1; break; }
+                }
+            g_grassNearBlock[(size_t)y * g_gridW + x] = (unsigned char)close;
+        }
+
+    g_grassCut=0.0f;
+    fprintf(stderr,"GRASS|native-mask|game=%s|cells=%ld|texels=%ld|authored=1|cpu_bytes=%zu\n",ra?"RA":"TD",grassCells,total,M.coverage.size());
+    return grassCells>0;
+}
+
 static bool grass_mask_build(const GrassBakeCfg& cfg)
 {
+    g_grassNativeMask=grass_native_mask_wanted();
+    if(g_grassNativeMask)return grass_mask_build_native();
     if (g_pack.terrainCart.empty() || g_pack.terrainCartW <= 0 || g_pack.terrainCartH <= 0) {
         fprintf(stderr, "GRASS|off|the pack kept no cartridge atlas, so the mask has no source\n");
         return false;
@@ -1125,14 +1210,16 @@ static bool grass_colour_build(void)
     const int ai = terrain_atlas_index();
     std::vector<unsigned char> atl;
     int aw = 0, ah = 0, auw = 0, auh = 0;
-    const bool have = grass_atlas_readback(ai, atl, &aw, &ah, &auw, &auh);
+    const bool ra=water_src_ra();
+    const bool have=!ra && grass_atlas_readback(ai,atl,&aw,&ah,&auw,&auh);
 
     std::vector<unsigned char> px((size_t)g_gridW * g_gridH * 4, 0);
     std::vector<unsigned char> written((size_t)g_gridW * g_gridH, 0);
     long sr = 0, sg = 0, sb = 0, sn = 0;
 
-    for (size_t i = 0; i < g_pack.cell.size(); i++) {
-        const PackCell& c = g_pack.cell[i];
+    const std::vector<PackCell>& cells=water_cells();
+    for(size_t i=0;i<cells.size();i++) {
+        const PackCell& c=cells[i];
         if (c.x < 0 || c.y < 0 || c.x >= g_gridW || c.y >= g_gridH) continue;
         const size_t ci = (size_t)c.y * g_gridW + c.x;
         unsigned char* o = &px[ci * 4];
@@ -1145,6 +1232,7 @@ static bool grass_colour_build(void)
             const int ts = terrain_texset_drawn();
             const int ix = (ts >= 0 && ts < 4) ? ts : 0;
             o[0] = c.avg[ix][0]; o[1] = c.avg[ix][1]; o[2] = c.avg[ix][2];
+            if(ra)for(int channel=0;channel<3;channel++)o[channel]=(unsigned char)(g_clearBlend.means[0][channel]*255.0f);
             written[ci] = 1;
             continue;
         }
@@ -1193,6 +1281,11 @@ static bool grass_colour_build(void)
         }
     }
 
+    const unsigned clearSignature=fx_texset_get()==FX_TEX_ENH ? clear_blend_colour_signature() : 0;
+    if(clearSignature)for(int z=0;z<g_gridH;++z)for(int x=0;x<g_gridW;++x)
+        clear_blend_grass_colour(x,z,&px[((size_t)z*g_gridW+x)*4]);
+    g_grassClearSignature=clearSignature;
+
     /* Same contract as the readback above, and for the same reason: the colour build is
        the one thing here a texture set flip runs mid frame, so the upload of the field
        puts the caller's binding back instead of a bare 0. */
@@ -1210,8 +1303,8 @@ static bool grass_colour_build(void)
 
     g_grassAtlas = ai;
     g_grassAtlasGL = (ai >= 0 && ai < (int)g_pack.tex.size()) ? g_pack.tex[ai].gl : 0;
-    fprintf(stderr, "GRASS|colour|scen=%s|atlas=%d|readback=%s|field=%dx%d\n",
-            g_pack.scen, ai, have ? "gpu" : "cell averages", g_gridW, g_gridH);
+    fprintf(stderr, "GRASS|colour|scen=%s|atlas=%d|readback=%s|field=%dx%d|clearblend=%u\n",
+            g_pack.scen, ai, have ? "gpu" : "cell averages", g_gridW, g_gridH,g_grassClearSignature);
     return true;
 }
 
@@ -1237,7 +1330,7 @@ static void grass_free(void)
     g_grassBlades = g_grassBytes = 0;
     g_grassScen[0] = 0;
     g_grassGridW = g_grassGridH = 0;
-    g_grassAtlas = -1; g_grassAtlasGL = 0;
+    g_grassAtlas = -1; g_grassAtlasGL = 0;g_grassClearSignature=0;
     g_grassHave = 0;
     g_grassRefused = 0;
 }
@@ -1352,7 +1445,8 @@ static bool grass_bake_sync(const GrassBakeCfg& cfg)
 {
     /* What the last ATTEMPT read, whether it built or refused. */
     const bool changed =
-           strcmp(g_grassScen, g_pack.scen) != 0
+           g_grassNativeMask != grass_native_mask_wanted()
+        || strcmp(g_grassScen, g_pack.scen) != 0
         || g_grassGridW != g_gridW || g_grassGridH != g_gridH
         || g_grassRect[0] != g_mapX || g_grassRect[1] != g_mapY
         || g_grassRect[2] != g_mapW || g_grassRect[3] != g_mapH
@@ -1381,7 +1475,8 @@ static bool grass_bake_sync(const GrassBakeCfg& cfg)
     /* The GL NAME as well as the index, because terrain_remaster_ensure
        (cnc_eyes.cpp:6568) builds the Remaster atlas LAZILY, minutes into a session, and
        the index does not move when it does. water_mod.h:774 makes the same comparison. */
-    if (ai != g_grassAtlas || gl != g_grassAtlasGL)
+    if (ai != g_grassAtlas || gl != g_grassAtlasGL
+        || g_grassClearSignature != (fx_texset_get()==FX_TEX_ENH ? clear_blend_colour_signature() : 0))
         return grass_colour_build();
     return true;
 }

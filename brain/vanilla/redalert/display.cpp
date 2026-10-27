@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Keeps per-house AI discovery, allied/radar sharing and constrained sight.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -17,6 +18,10 @@
 // Lets asset-free headless scenarios use a zero palette and an omitted MapPack,
 // while retaining the original behavior whenever those assets are present.
 // It changes error handling but not Red Alert gameplay rules for complete content.
+// MODIFIED again in October 2026: the cheat menu's Build Anywhere. A per-house
+// bitmask on DisplayClass, cleared with the scenario in Init_Clear, lets
+// Passes_Proximity_Check pass for a flagged house without the base adjacency
+// rule; the ground must still take a foundation. Off unless the cheat is on.
 // The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
 // and NOTICE.md lists every modified file.
 
@@ -93,6 +98,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 
 extern bool OpenCNC3DHeadless;
 #include "vortex.h"
@@ -274,6 +280,12 @@ void DisplayClass::One_Time(void)
 void DisplayClass::Init_Clear(void)
 {
     MapClass::Init_Clear();
+
+    /*
+    ** OpenCNC3D: drop Build Anywhere with the scenario. Clear_Scenario() is on every path that
+    ** begins a scenario, so the switch cannot follow the player into the next one.
+    */
+    OpenCNC3D_BuildAnywhereHouses = 0;
 
     /*
     ** Clear any object being placed
@@ -688,6 +700,32 @@ void DisplayClass::Set_Cursor_Shape(short const* list)
  *   06/07/1994 JLB : Handles concrete check.                                                  *
  *   10/11/1994 BWG : Added IsProximate check for ore refineries                               *
  *=============================================================================================*/
+unsigned DisplayClass::OpenCNC3D_BuildAnywhereHouses = 0;
+
+/*
+** OpenCNC3D: sets or clears one house's Build Anywhere bit. While it is set, that house's
+** buildings no longer have to touch its existing base; nothing else is relaxed.
+*/
+void DisplayClass::OpenCNC3D_Set_Build_Anywhere(HousesType house, bool on)
+{
+    if (house == HOUSE_NONE || house >= HOUSE_COUNT) {
+        return;
+    }
+    if (on) {
+        OpenCNC3D_BuildAnywhereHouses |= (1u << house);
+    } else {
+        OpenCNC3D_BuildAnywhereHouses &= ~(1u << house);
+    }
+}
+
+bool DisplayClass::OpenCNC3D_Build_Anywhere(HousesType house)
+{
+    if (OpenCNC3D_BuildAnywhereHouses == 0 || house == HOUSE_NONE || house >= HOUSE_COUNT) {
+        return (false);
+    }
+    return ((OpenCNC3D_BuildAnywhereHouses & (1u << house)) != 0);
+}
+
 bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
                                           HousesType house,
                                           short const* list,
@@ -707,6 +745,19 @@ bool DisplayClass::Passes_Proximity_Check(ObjectTypeClass const* object,
     ** In editor mode, the proximity check always passes.
     */
     if (Debug_Map) {
+        return (true);
+    }
+
+    /*
+    ** OpenCNC3D: the cheat menu's "Build Anywhere", beside the editor exemption because it is the
+    ** same kind of thing. It lifts the ADJACENCY rule only: this routine is the whole of the
+    ** "must touch your base" test, and whether the ground will take a foundation is decided by
+    ** BuildingTypeClass::Legal_Placement and CellClass, which are not reached from here.
+    */
+    if (OpenCNC3D_Build_Anywhere(house)) {
+        if (house == PlayerPtr->Class->House) {
+            PassedProximity = true;
+        }
         return (true);
     }
 
@@ -1571,7 +1622,7 @@ bool DisplayClass::Map_Cell(CELL cell, HouseClass* house, bool check_radar_spied
     if (house == NULL || !In_Radar(cell))
         return (false);
 #ifdef REMASTER_BUILD
-    if (!house->IsHuman) {
+    if (!house->IsHuman && !FairAI_RA_Enabled(house)) {
         if (!ShareAllyVisibility || !and_for_allies && !check_radar_spied) {
             return false;
         }
@@ -1595,7 +1646,7 @@ bool DisplayClass::Map_Cell(CELL cell, HouseClass* house, bool check_radar_spied
 
             for (int i = 0; i < Session.Players.Count(); i++) {
                 HouseClass* player_ptr = HouseClass::As_Pointer(Session.Players[i]->Player.ID);
-                if (player_ptr->IsHuman) {
+                if (player_ptr->IsHuman || FairAI_RA_Enabled(player_ptr)) {
                     if (house->RadarSpied & (1 << (player_ptr->Class->House))) {
                         Map_Cell(cell, player_ptr, false, false);
                     }
@@ -1611,7 +1662,7 @@ bool DisplayClass::Map_Cell(CELL cell, HouseClass* house, bool check_radar_spied
 
         for (int i = 0; i < Session.Players.Count(); i++) {
             HouseClass* player_ptr = HouseClass::As_Pointer(Session.Players[i]->Player.ID);
-            if (player_ptr && player_ptr->IsActive && player_ptr->IsHuman) {
+            if (player_ptr && player_ptr->IsActive && (player_ptr->IsHuman || FairAI_RA_Enabled(player_ptr))) {
                 if (player_ptr != house && house->Is_Ally(player_ptr)) {
                     Map_Cell(cell, player_ptr, check_radar_spied, false);
                 }
@@ -4983,7 +5034,7 @@ void DisplayClass::Constrained_Look(COORDINATE center, LEPTON distance, HouseCla
                 }
             } else {
 
-                if (tech->House->IsHuman) {
+                if (tech->House->IsHuman || FairAI_RA_Enabled(tech->House)) {
 
                     if (tech->House == house) {
                         if (tech->Is_Discovered_By_Player(house)

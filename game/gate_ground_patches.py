@@ -20,7 +20,8 @@ a = p.parse_args()
 run, out = a.rundir.resolve(), a.output.resolve()
 out.mkdir(parents=True, exist_ok=True)
 cfg = run/'opencnc3d-fx.cfg'
-before = cfg.read_bytes()
+# A fresh installation has no tuning file. Absence is also player state.
+before = cfg.read_bytes() if cfg.exists() else None
 
 def shot(name):
     return f'shot {out/(name+".png")}\nmottledump\n'
@@ -78,5 +79,7 @@ for name, mode in [('classic','gfxmode 0\n'),('dos','gfx texset 1\n')]:
     assert np.array_equal(dry(name+'-on'),dry(name+'-off'))
     assert re.search(r'available=0\|drawn=0\|',log)
     print(f'PASS: {name} terrain has no ground patches',flush=True)
-assert cfg.read_bytes() == before, 'player CFG changed'
-print('PASS: player CFG preserved byte for byte',flush=True)
+after = cfg.read_bytes() if cfg.exists() else None
+assert after == before, 'player CFG changed'
+print('PASS: player CFG preserved byte for byte' if before is not None
+      else 'PASS: player CFG remains absent',flush=True)

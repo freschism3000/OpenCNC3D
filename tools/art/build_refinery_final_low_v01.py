@@ -204,7 +204,7 @@ scene['final_low_review_state']='FinalLow v01 pending explicit mesh approval; no
 scene['approved_high_sha256']=SHA
 scene['approved_finish']='generated_finish_v01/APPROVAL.md'
 scene['runtime_triangle_ceiling']=10000
-scene['foundation_contract']='High v04 rounded user-approved extended apron, exact outline retained'
+scene['foundation_contract']='High v04 rounded approved extended apron, exact outline retained'
 bpy.context.view_layer.update()
 counts=Counter()
 for r in records:

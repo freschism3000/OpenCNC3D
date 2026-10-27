@@ -1,0 +1,5 @@
+/build-device/
+/build-simulator/
+/build-device.log
+/build-simulator.log
+/__pycache__/

@@ -386,8 +386,10 @@ def check(logs, d):
              "%s: the old shatter did not take the civilians" % nm)
     # (8) TWO RUNS ARE ONE RUN
     ours = ("EBLD", "EBLDOBJ|", "EBLDCLIP|", "EBLDMOVE|", "EBLDEMIT|")
-    la = [l for l in A if l.startswith(ours)]
-    lb = [l for l in A2 if l.startswith(ours)]
+    # Preparation telemetry includes nondeterministic wall-clock durations and has
+    # independent performance tests. Retain every geometry/gameplay EBLD family here.
+    la = [l for l in A if l.startswith(ours) and not l.startswith("EBLDPREPARE|")]
+    lb = [l for l in A2 if l.startswith(ours) and not l.startswith("EBLDPREPARE|")]
     need(la == lb and la, "the two Enhanced runs printed different EBLD lines")
     same, tot = 0, 0
     for nm in sorted(os.listdir(logs)):

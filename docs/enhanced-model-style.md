@@ -2,7 +2,7 @@
 
 **Measured reference and starter kit.** The current production rules and stage
 order are consolidated in the
-[canonical 3D model recipe](3d-model-recipe.md#shared-look-across-the-mammoth-construction-yard-and-future-assets).
+canonical 3D model recipe.
 Use this page for the baseline samples, fixed engine comparison and kit tools.
 Its numeric swatches and thresholds are starting diagnostics, subject to the
 asset's approved look and the recipe's material-class checks.

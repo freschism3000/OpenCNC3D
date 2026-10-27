@@ -1,0 +1,39 @@
+dosdrawprobe
+gfxmode 2
+gfx show_stats 0
+cheatset fog 0
+tick 3
+cam 12 16
+dist 2700
+hurtcell 15 15
+hurtcell 15 15
+tick 80
+frames 5
+shot @OUT@/session-1.png
+renderdump @OUT@/session-1
+objdump
+ebldump
+ebldbodies
+physicsdump
+meshperfdump
+remission
+meshperfdump
+dosdrawprobe
+gfxmode 2
+gfx show_stats 0
+cheatset fog 0
+tick 3
+cam 12 16
+dist 2700
+hurtcell 15 15
+hurtcell 15 15
+tick 80
+frames 5
+shot @OUT@/session-2.png
+renderdump @OUT@/session-2
+objdump
+ebldump
+ebldbodies
+physicsdump
+meshperfdump
+quit

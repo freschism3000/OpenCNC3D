@@ -10,132 +10,133 @@
    question: Full_Name() returns a text id, and Text_String() reads a table
    the DLL front end never initialises. See bake_dosnames.py.
 
-   113 buildables, 5 chrome labels, 0 missing.
+   114 buildables, 5 chrome labels, 0 missing.
 */
 #ifndef DOSNAMES_H
 #define DOSNAMES_H
 
-struct DosName { const char* asset; const char* title; };
+struct DosName { const char* asset; const char* title; int txt; };
 
 static const DosName DOSNAMES[] = {
-    { "A10", "A10" },                    /* TXT_A10 */
-    { "AFLD", "Airstrip" },              /* TXT_AIRSTRIP */
-    { "APC", "APC" },                    /* TXT_APC */
-    { "ARCO", "Oil Tanker" },            /* TXT_TANKER */
-    { "ARTY", "Artillery" },             /* TXT_ARTY */
-    { "ATWR", "Advanced Guard Tower" },  /* TXT_AGUARD_TOWER */
-    { "BARB", "Barbwire Fence" },        /* TXT_BARBWIRE_WALL */
-    { "BGGY", "Nod Buggy" },             /* TXT_DUNE_BUGGY */
-    { "BIKE", "Recon Bike" },            /* TXT_BIKE */
-    { "BIO", "Bio-Research Laboratory" }, /* TXT_BIO_LAB */
-    { "BOAT", "Gun Boat" },              /* TXT_GUNBOAT */
-    { "BRIK", "Concrete Wall" },         /* TXT_BRICK_WALL */
-    { "C1", "Joe" },                     /* TXT_C1 */
-    { "C10", "Nikoomba" },               /* TXT_C10 */
-    { "C17", "C17" },                    /* TXT_C17 */
-    { "C2", "Bill" },                    /* TXT_C2 */
-    { "C3", "Shelly" },                  /* TXT_C3 */
-    { "C4", "Maria" },                   /* TXT_C4 */
-    { "C5", "Eydie" },                   /* TXT_C5 */
-    { "C6", "Dave" },                    /* TXT_C6 */
-    { "C7", "Phil" },                    /* TXT_C7 */
-    { "C8", "Dwight" },                  /* TXT_C8 */
-    { "C9", "Erik" },                    /* TXT_C9 */
-    { "CHAN", "Dr. Chan" },              /* TXT_CHAN */
-    { "CYCL", "Chain Link Fence" },      /* TXT_CYCLONE_WALL */
-    { "DELPHI", "Agent Delphi" },        /* TXT_DELPHI */
-    { "E1", "Minigunner" },              /* TXT_E1 */
-    { "E2", "Grenadier" },               /* TXT_E2 */
-    { "E3", "Bazooka" },                 /* TXT_E3 */
-    { "E4", "Flamethrower" },            /* TXT_E4 */
-    { "E5", "Chem-warrior" },            /* TXT_E5 */
-    { "E6", "Engineer" },                /* TXT_E7 */
-    { "EYE", "Advanced Com. Center" },   /* TXT_EYE */
-    { "FACT", "Construction Yard" },     /* TXT_CONST_YARD */
-    { "FIX", "Repair Bay" },             /* TXT_FIX_IT */
-    { "FTNK", "Flame Tank" },            /* TXT_FTANK */
-    { "GTWR", "Guard Tower" },           /* TXT_GUARD_TOWER */
-    { "GUN", "Gun Turret" },             /* TXT_TURRET */
-    { "HAND", "Hand of Nod" },           /* TXT_HAND */
-    { "HARV", "Harvester" },             /* TXT_HARVESTER */
-    { "HELI", "Attack Helicopter" },     /* TXT_HELI */
-    { "HOSP", "Hospital" },              /* TXT_HOSPITAL */
-    { "HPAD", "Helicopter Pad" },        /* TXT_HELIPAD */
-    { "HQ", "Communications Center" },   /* TXT_COMMAND */
-    { "HTNK", "Mammoth Tank" },          /* TXT_HTANK */
-    { "JEEP", "Hum-vee" },               /* TXT_JEEP */
-    { "LST", "Hovercraft" },             /* TXT_HOVER */
-    { "LTNK", "Light Tank" },            /* TXT_LTANK */
-    { "MCV", "Mobile Construction Yard" }, /* TXT_MCV */
-    { "MHQ", "Mobile HQ" },              /* TXT_MHQ */
-    { "MISS", "Technology Center" },     /* TXT_CIVMISS */
-    { "MLRS", "S.S.M. Launcher" },       /* TXT_MSAM */
-    { "MOEBIUS", "Dr. Moebius" },        /* TXT_MOEBIUS */
-    { "MSAM", "Rocket Launcher" },       /* TXT_MLRS */
-    { "MTNK", "Med. Tank" },             /* TXT_MTANK */
-    { "NUK2", "Advanced Power Plant" },  /* TXT_ADVANCED_POWER */
-    { "NUKE", "Power Plant" },           /* TXT_POWER */
-    { "OBLI", "Obelisk Guard Tower" },   /* TXT_OBELISK */
-    { "ORCA", "Orca" },                  /* TXT_ORCA */
-    { "PROC", "Tiberium Refinery" },     /* TXT_REFINERY */
-    { "PYLE", "Barracks" },              /* TXT_BARRACKS */
-    { "RAPT", "Velociraptor" },          /* TXT_RAPT */
-    { "RMBO", "Commando" },              /* TXT_RAMBO */
-    { "ROAD", "Road" },                  /* TXT_ROAD */
-    { "SAM", "SAM Site" },               /* TXT_SAM */
-    { "SBAG", "Sandbag Wall" },          /* TXT_SANDBAG_WALL */
-    { "SILO", "Tiberium Silo" },         /* TXT_STORAGE */
-    { "STEG", "Stegasaurus" },           /* TXT_STEG */
-    { "STNK", "Stealth Tank" },          /* TXT_STANK */
-    { "TMPL", "Temple of Nod" },         /* TXT_TEMPLE */
-    { "TRAN", "Transport Helicopter" },  /* TXT_TRANS */
-    { "TREX", "Tyrannosaurus Rex" },     /* TXT_TREX */
-    { "TRIC", "Triceratops" },           /* TXT_TRIC */
-    { "V01", "Church" },                 /* TXT_CIV1 */
-    { "V02", "Han's and Gretel's" },     /* TXT_CIV2 */
-    { "V03", "Hewitt's Manor" },         /* TXT_CIV3 */
-    { "V04", "Ricktor's House" },        /* TXT_CIV4 */
-    { "V05", "Gretchin's House" },       /* TXT_CIV5 */
-    { "V06", "The Barn" },               /* TXT_CIV6 */
-    { "V07", "Damon's pub" },            /* TXT_CIV7 */
-    { "V08", "Fran's House" },           /* TXT_CIV8 */
-    { "V09", "Music Factory" },          /* TXT_CIV9 */
-    { "V10", "Toymaker's" },             /* TXT_CIV10 */
-    { "V11", "Ludwig's House" },         /* TXT_CIV11 */
-    { "V12", "Haystacks" },              /* TXT_CIV12 */
-    { "V13", "Haystack" },               /* TXT_CIV13 */
-    { "V14", "Wheat Field" },            /* TXT_CIV14 */
-    { "V15", "Fallow Field" },           /* TXT_CIV15 */
-    { "V16", "Corn Field" },             /* TXT_CIV16 */
-    { "V17", "Celery Field" },           /* TXT_CIV17 */
-    { "V18", "Potato Field" },           /* TXT_CIV18 */
-    { "V19", "Oil Pump" },               /* TXT_PUMP */
-    { "V20", "Sala's House" },           /* TXT_CIV20 */
-    { "V21", "Abdul's House" },          /* TXT_CIV21 */
-    { "V22", "Pablo's Wicked Pub" },     /* TXT_CIV22 */
-    { "V23", "Village Well" },           /* TXT_CIV23 */
-    { "V24", "Camel Trader" },           /* TXT_CIV24 */
-    { "V25", "Church" },                 /* TXT_CIV25 */
-    { "V26", "Ali's House" },            /* TXT_CIV26 */
-    { "V27", "Trader Ted's" },           /* TXT_CIV27 */
-    { "V28", "Menelik's House" },        /* TXT_CIV28 */
-    { "V29", "Prestor John's House" },   /* TXT_CIV29 */
-    { "V30", "Village Well" },           /* TXT_CIV30 */
-    { "V31", "Witch Doctor's Hut" },     /* TXT_CIV31 */
-    { "V32", "Rikitikitembo's Hut" },    /* TXT_CIV32 */
-    { "V33", "Roarke's Hut" },           /* TXT_CIV33 */
-    { "V34", "Mubasa's Hut" },           /* TXT_CIV34 */
-    { "V35", "Aksum's Hut" },            /* TXT_CIV35 */
-    { "V36", "Mambo's Hut" },            /* TXT_CIV36 */
-    { "V37", "The Studio" },             /* TXT_CIV37 */
-    { "VICE", "Visceroid" },             /* TXT_VISCEROID */
-    { "WEAP", "Weapons Factory" },       /* TXT_WEAPON_FACTORY */
-    { "WOOD", "Wood Fence" },            /* TXT_WOOD_WALL */
-    { "SB_REPAIR", "Repair Structure" },   /* TXT_REPAIR, chrome */
-    { "SB_SELL", "Sell Structure" },   /* TXT_SELL, chrome */
-    { "SB_DEMOLISH", "Demolish Structure" },   /* TXT_DEMOLISH, chrome */
-    { "SB_MAP", "Map" },   /* TXT_MAP, chrome */
-    { "SB_OPTIONS", "Options" },   /* TXT_OPTIONS, chrome */
+    { "A10", "A10", 96 },                    /* TXT_A10 */
+    { "AFLD", "Airstrip", 114 },              /* TXT_AIRSTRIP */
+    { "APC", "APC", 110 },                    /* TXT_APC */
+    { "ARCO", "Oil Tanker", 165 },            /* TXT_TANKER */
+    { "ARTY", "Artillery", 99 },             /* TXT_ARTY */
+    { "ATWR", "Advanced Guard Tower", 172 },  /* TXT_AGUARD_TOWER */
+    { "BARB", "Barbwire Fence", 169 },        /* TXT_BARBWIRE_WALL */
+    { "BGGY", "Nod Buggy", 89 },             /* TXT_DUNE_BUGGY */
+    { "BIKE", "Recon Bike", 158 },            /* TXT_BIKE */
+    { "BIO", "Bio-Research Laboratory", 174 }, /* TXT_BIO_LAB */
+    { "BOAT", "Gun Boat", 156 },              /* TXT_GUNBOAT */
+    { "BRIK", "Concrete Wall", 168 },         /* TXT_BRICK_WALL */
+    { "C1", "Joe", 218 },                     /* TXT_C1 */
+    { "C10", "Nikoomba", 643 },               /* TXT_C10 */
+    { "C17", "C17", 97 },                    /* TXT_C17 */
+    { "C2", "Bill", 219 },                    /* TXT_C2 */
+    { "C3", "Shelly", 220 },                  /* TXT_C3 */
+    { "C4", "Maria", 221 },                   /* TXT_C4 */
+    { "C5", "Eydie", 222 },                   /* TXT_C5 */
+    { "C6", "Dave", 223 },                    /* TXT_C6 */
+    { "C7", "Phil", 224 },                    /* TXT_C7 */
+    { "C8", "Dwight", 225 },                  /* TXT_C8 */
+    { "C9", "Erik", 226 },                    /* TXT_C9 */
+    { "CHAN", "Dr. Chan", 672 },              /* TXT_CHAN */
+    { "CYCL", "Chain Link Fence", 167 },      /* TXT_CYCLONE_WALL */
+    { "DELPHI", "Agent Delphi", 655 },        /* TXT_DELPHI */
+    { "E1", "Minigunner", 101 },              /* TXT_E1 */
+    { "E1TR", "Minigunner", 101 },            /* TXT_E1 */
+    { "E2", "Grenadier", 102 },               /* TXT_E2 */
+    { "E3", "Bazooka", 103 },                 /* TXT_E3 */
+    { "E4", "Flamethrower", 104 },            /* TXT_E4 */
+    { "E5", "Chem-warrior", 105 },            /* TXT_E5 */
+    { "E6", "Engineer", 599 },                /* TXT_E7 */
+    { "EYE", "Advanced Com. Center", 91 },   /* TXT_EYE */
+    { "FACT", "Construction Yard", 116 },     /* TXT_CONST_YARD */
+    { "FIX", "Repair Bay", 177 },             /* TXT_FIX_IT */
+    { "FTNK", "Flame Tank", 84 },            /* TXT_FTANK */
+    { "GTWR", "Guard Tower", 111 },           /* TXT_GUARD_TOWER */
+    { "GUN", "Gun Turret", 155 },             /* TXT_TURRET */
+    { "HAND", "Hand of Nod", 175 },           /* TXT_HAND */
+    { "HARV", "Harvester", 98 },             /* TXT_HARVESTER */
+    { "HELI", "Attack Helicopter", 108 },     /* TXT_HELI */
+    { "HOSP", "Hospital", 161 },              /* TXT_HOSPITAL */
+    { "HPAD", "Helicopter Pad", 113 },        /* TXT_HELIPAD */
+    { "HQ", "Communications Center", 112 },   /* TXT_COMMAND */
+    { "HTNK", "Mammoth Tank", 88 },          /* TXT_HTANK */
+    { "JEEP", "Hum-vee", 94 },               /* TXT_JEEP */
+    { "LST", "Hovercraft", 107 },             /* TXT_HOVER */
+    { "LTNK", "Light Tank", 86 },            /* TXT_LTANK */
+    { "MCV", "Mobile Construction Yard", 157 }, /* TXT_MCV */
+    { "MHQ", "Mobile HQ", 93 },              /* TXT_MHQ */
+    { "MISS", "Technology Center", 154 },     /* TXT_CIVMISS */
+    { "MLRS", "S.S.M. Launcher", 100 },       /* TXT_MSAM */
+    { "MOEBIUS", "Dr. Moebius", 227 },        /* TXT_MOEBIUS */
+    { "MSAM", "Rocket Launcher", 92 },       /* TXT_MLRS */
+    { "MTNK", "Med. Tank", 87 },             /* TXT_MTANK */
+    { "NUK2", "Advanced Power Plant", 160 },  /* TXT_ADVANCED_POWER */
+    { "NUKE", "Power Plant", 159 },           /* TXT_POWER */
+    { "OBLI", "Obelisk Guard Tower", 173 },   /* TXT_OBELISK */
+    { "ORCA", "Orca", 109 },                  /* TXT_ORCA */
+    { "PROC", "Tiberium Refinery", 117 },     /* TXT_REFINERY */
+    { "PYLE", "Barracks", 162 },              /* TXT_BARRACKS */
+    { "RAPT", "Velociraptor", 236 },          /* TXT_RAPT */
+    { "RMBO", "Commando", 106 },              /* TXT_RAMBO */
+    { "ROAD", "Road", 47 },                  /* TXT_ROAD */
+    { "SAM", "SAM Site", 90 },               /* TXT_SAM */
+    { "SBAG", "Sandbag Wall", 166 },          /* TXT_SANDBAG_WALL */
+    { "SILO", "Tiberium Silo", 115 },         /* TXT_STORAGE */
+    { "STEG", "Stegasaurus", 237 },           /* TXT_STEG */
+    { "STNK", "Stealth Tank", 85 },          /* TXT_STANK */
+    { "TMPL", "Temple of Nod", 176 },         /* TXT_TEMPLE */
+    { "TRAN", "Transport Helicopter", 95 },  /* TXT_TRANS */
+    { "TREX", "Tyrannosaurus Rex", 234 },     /* TXT_TREX */
+    { "TRIC", "Triceratops", 235 },           /* TXT_TRIC */
+    { "V01", "Church", 118 },                 /* TXT_CIV1 */
+    { "V02", "Han's and Gretel's", 119 },     /* TXT_CIV2 */
+    { "V03", "Hewitt's Manor", 120 },         /* TXT_CIV3 */
+    { "V04", "Ricktor's House", 121 },        /* TXT_CIV4 */
+    { "V05", "Gretchin's House", 122 },       /* TXT_CIV5 */
+    { "V06", "The Barn", 123 },               /* TXT_CIV6 */
+    { "V07", "Damon's pub", 124 },            /* TXT_CIV7 */
+    { "V08", "Fran's House", 125 },           /* TXT_CIV8 */
+    { "V09", "Music Factory", 126 },          /* TXT_CIV9 */
+    { "V10", "Toymaker's", 127 },             /* TXT_CIV10 */
+    { "V11", "Ludwig's House", 128 },         /* TXT_CIV11 */
+    { "V12", "Haystacks", 129 },              /* TXT_CIV12 */
+    { "V13", "Haystack", 130 },               /* TXT_CIV13 */
+    { "V14", "Wheat Field", 131 },            /* TXT_CIV14 */
+    { "V15", "Fallow Field", 132 },           /* TXT_CIV15 */
+    { "V16", "Corn Field", 133 },             /* TXT_CIV16 */
+    { "V17", "Celery Field", 134 },           /* TXT_CIV17 */
+    { "V18", "Potato Field", 135 },           /* TXT_CIV18 */
+    { "V19", "Oil Pump", 164 },               /* TXT_PUMP */
+    { "V20", "Sala's House", 136 },           /* TXT_CIV20 */
+    { "V21", "Abdul's House", 137 },          /* TXT_CIV21 */
+    { "V22", "Pablo's Wicked Pub", 138 },     /* TXT_CIV22 */
+    { "V23", "Village Well", 139 },           /* TXT_CIV23 */
+    { "V24", "Camel Trader", 140 },           /* TXT_CIV24 */
+    { "V25", "Church", 141 },                 /* TXT_CIV25 */
+    { "V26", "Ali's House", 142 },            /* TXT_CIV26 */
+    { "V27", "Trader Ted's", 143 },           /* TXT_CIV27 */
+    { "V28", "Menelik's House", 144 },        /* TXT_CIV28 */
+    { "V29", "Prestor John's House", 145 },   /* TXT_CIV29 */
+    { "V30", "Village Well", 146 },           /* TXT_CIV30 */
+    { "V31", "Witch Doctor's Hut", 147 },     /* TXT_CIV31 */
+    { "V32", "Rikitikitembo's Hut", 148 },    /* TXT_CIV32 */
+    { "V33", "Roarke's Hut", 149 },           /* TXT_CIV33 */
+    { "V34", "Mubasa's Hut", 150 },           /* TXT_CIV34 */
+    { "V35", "Aksum's Hut", 151 },            /* TXT_CIV35 */
+    { "V36", "Mambo's Hut", 152 },            /* TXT_CIV36 */
+    { "V37", "The Studio", 153 },             /* TXT_CIV37 */
+    { "VICE", "Visceroid", 651 },             /* TXT_VISCEROID */
+    { "WEAP", "Weapons Factory", 171 },       /* TXT_WEAPON_FACTORY */
+    { "WOOD", "Wood Fence", 170 },            /* TXT_WOOD_WALL */
+    { "SB_REPAIR", "Repair Structure", 9 },   /* TXT_REPAIR, chrome */
+    { "SB_SELL", "Sell Structure", 6 },   /* TXT_SELL, chrome */
+    { "SB_DEMOLISH", "Demolish Structure", 7 },   /* TXT_DEMOLISH, chrome */
+    { "SB_MAP", "Map", 612 },   /* TXT_MAP, chrome */
+    { "SB_OPTIONS", "Options", 65 },   /* TXT_OPTIONS, chrome */
 };
 #define DOSNAMES_COUNT ((int)(sizeof(DOSNAMES)/sizeof(DOSNAMES[0])))
 

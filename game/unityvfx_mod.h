@@ -1502,6 +1502,7 @@ static const char* UVFX_FS_COMPOSITE =
     "uniform int uTaps;\n"
     "uniform int uBloomOn;\n"
     "uniform int uBlackBg;\n"
+    FX_OBJECT_GRADE_GLSL
     "vec3 dec(vec3 c) { c = clamp(c, 0.0, 1.0);\n"
     "    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
     "vec3 enc(vec3 c) { c = clamp(c, 0.0, 1.0);\n"
@@ -1565,7 +1566,11 @@ static const char* UVFX_FS_COMPOSITE =
     "        vec3 off = uBlackBg == 1 ? vec3(0.0) : dec(texture2D(uTex, uv + vec2(D.r / D.g)).rgb);\n"
     "        lin = mix(lin, off, clamp(D.g, 0.0, 1.0));\n"
     "    }\n"
-    "    vec3 o = lin * clamp(L.a, 0.0, 1.0) + aces(max(L.rgb, 0.0) + bl);\n"
+    "    vec3 effect = aces(max(L.rgb, 0.0) + bl);\n"
+    /* Grade only the effect's complete radiance signal, including additive glow.
+       Its independent transmittance stays untouched, with no coverage threshold. */
+    "    if (uObjectGrade1.w > 0.5) effect=objectDecode(objectGrade(objectEncode(effect)));\n"
+    "    vec3 o = lin * clamp(L.a, 0.0, 1.0) + effect;\n"
     "    gl_FragColor = vec4(enc(o), 1.0);\n"
     "}\n";
 
@@ -3415,6 +3420,13 @@ static void uvfx_after_resolve_run(void)
         fx_set1i(g_uvPComp, "uDist", 3);
         fx_set1i(g_uvPComp, "uBloomOn", bloomOn);
         fx_set1i(g_uvPComp, "uBlackBg", g_uvStage.on ? 1 : 0);
+        const FxObjectGrade grade=fx_effect_grade(&g_fx);
+        const float grade0[4]={grade.bright,grade.contrast,grade.exposure,grade.gamma};
+        const float grade1[4]={grade.sat,grade.warmth,grade.tint,
+            g_fx.enabled && fx_object_grade_active(grade) ? 1.0f : 0.0f};
+        fx_set4fv(g_uvPComp,"uObjectGrade0",1,grade0);
+        fx_set4fv(g_uvPComp,"uObjectGrade1",1,grade1);
+        fx_set3f(g_uvPComp,"uObjectGradeRGB",grade.red,grade.green,grade.blue);
         fx_set2f(g_uvPComp, "uDstTexel", 1.0f / (float)g_fxW, 1.0f / (float)g_fxH);
         int tap = (int)((float)lw / (float)g_fxW + 0.5f);
         if (tap < 1) tap = 1; if (tap > 4) tap = 4;

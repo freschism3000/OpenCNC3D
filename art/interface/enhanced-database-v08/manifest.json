@@ -1,0 +1,36 @@
+{
+  "version": "enhanced-database-v08",
+  "scope": "Existing Enhanced model importers, shared menu layout and website logos; no model asset changes",
+  "roster": 50,
+  "enhanced_available": 49,
+  "missing": [
+    "MLRS"
+  ],
+  "review": "Actual engine captures; technical checks do not confer artistic acceptance",
+  "files": {
+    "README.md": "13eef6e7f41aaf3c27392f506de43711b665306a54e1add35e1cb00041767538",
+    "both-factions.log": "e29c8bff92dffa88555dc0213581242bb2d3d5db05675ef0fb27e8b12bc51e42",
+    "browser-database.jpg": "af542e72c702656933aabe57b0d664a1b4089af1c0c840777dda8d31ff16d0ca",
+    "database-gdi.png": "28ebb2947789847137958f6c9b26abc021ee1530596aec0b34d6cfaf2018d109",
+    "database-infantry.png": "565d3afac67fc2f8350dcd3d5dafc22972ec11cb02edae0cfaa94cee4416ea82",
+    "database-matchups.png": "9030c997954336c24f66fa95c127b69b9cc2806dd282c579c14f16f2f49fb123",
+    "database-nod.png": "4f4a849c610133bddefd41f7de75d9d4a74f1f599d1616d10bf2b4ce70b96b27",
+    "database-tech.png": "9d4cbecc32a65f682b588f7a3ae924aecf59664fc48245ab81e844ada9a0bb83",
+    "fog-verdict.log": "85409c45d1bc7c46bfb59bbc1ead58c8dd695725c75a608c5618979dfcfa5d06",
+    "g147-verdict.log": "13580b815e8eec22156e04ff639a61bda7871d93d17ca707974d4a389901b491",
+    "hudq-verdict.log": "58c6dc03e9185c78f764691a18e63e671543f14b249c89f642dfe6acd8182e0a",
+    "input.log": "f505bd60dbcd832760800218eee8dc119652082b956aeeb5efde74a221fdd5da",
+    "installation.json": "0353b66c2a48e0a63632f0708e6b4567933ae2c80b34b9265d78fb2d898628dd",
+    "lab-faction-logos.mjs": "8c7c25ce11971835c1b3b3d319892bfde81313b8bdd68ad3c050adade7018c22",
+    "lab-flows.mjs": "1710cd86d90892619887a9c2c2782e3fa4edae61d6c4e236c320fd41d1e47264",
+    "lab-menus.mjs": "343ffb204303f32925cef858f63b3a0aed3616adfdf750125f9de5f08c66fe7f",
+    "layout-preflight.json": "318c9656fcfcb4563a459b3542bd13fcb8f14820b1484abb2c9a67180e5d59a9",
+    "main.png": "47a5618f074bdf3b70dd39a1ba37ef3bf6df2d258ef2721e49f09f8793220f41",
+    "model-fitting.json": "be736d505350b77b6fa90f32cf42aa84ace8952a872f377f207a8ca433cc5605",
+    "native.log": "c6731404e732122e480e34e44347459bc4b1566b5673cbf7a24fd5e0bb986f48",
+    "ra-roundtrip.log": "7551207e4a9d5c1ff1ff93cd39a0085eb74a47911cbec0ae9f16ced8df31b252",
+    "roster.json": "8b932bcc3f0e2d9e52ef8f511de778083fd4361f0626db7897761ec8e66c35e5",
+    "td-roundtrip.log": "d56416a4c29470b383fc9a08d67a6232cd273bad31f7e474551259df7ff729b8",
+    "tech.log": "4b56f373c181bb33e05ce7f2c9a2773e0b94e12ae51ef59b1365877c3e39d1f7"
+  }
+}

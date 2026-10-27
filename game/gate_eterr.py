@@ -20,12 +20,13 @@ a block of clear cells:
   SCG86EA  desert (SCB33EA's map): the seven rocks, a SPLIT3, both crates, and the map's
            own P04 cells (rock patches in its ground).
   SCG87EA  winter (SCW01EA's map): a SPLIT2 and a SPLIT3.
-And the remastered trees (TREE_FILE): in the temperate scene a T01 and a T16 drawn whole from
-T01_TEM (T16 through the engine's alias), a T02, a T05 and a T07 from their own _TEM files;
-the fir T06, the broadleaf trees and saplings T03, T10 to T15, T17 from their _TEM files; in the desert
-scene the cacti T04 and T09 and the acacias T08 and T18 from their _DES files and a T01 from
-no remastered file (the desert's own mesh); in the winter one a T16, a T02 and a T13 from
-none (no winter look yet). Every one drawn from its file carries its wind and drew with it on.
+And the remastered trees (TREE_FILE): in the temperate scene a T01, T16 (its own spruce), a
+T02, a T05 and a T07 drawn whole from their own _TEM files; the fir T06, the broadleaf trees
+and saplings T03, T10 to T15, T17 and T08's temperate look (a young conifer and a seedling)
+from their _TEM files; in the desert scene the cacti T04 and T09 and the acacias T08 and T18
+from their _DES files and a T01 from no remastered file (the desert's own mesh); in the
+winter one a T16, a T02 and a T13 from their winter looks (T16_WIN, T02_WIN, T13_WIN).
+Every one drawn from its file carries its wind and drew with it on.
 
 Every run dumps `eterrdump` (the cell decorations: which model each type draws with and
 where every remastered cell was put) and `ebldump` (EBLDART: which file each terrain type
@@ -36,16 +37,21 @@ import json
 import os
 import re
 import sys
+import struct
+from collections import deque
 
 TAIL = ["", "[SMUDGE]", "", "[Triggers]", "", "[CellTriggers]", "", "[Teams]", "",
         "[Waypoints]", "", "[Base]", "Count=0", ""]
 ROCKS = ["ROCK%d" % i for i in range(1, 8)]
-# the remastered trees: the type, the file it draws from and the one theater that file is
-TREE_FILE = {"T01": ("T01", "TEM"), "T16": ("T01", "TEM"), "T02": ("T02", "TEM"),
-             "T05": ("T05", "TEM"), "T07": ("T07", "TEM"), "T04": ("T04", "DES"),
-             "T09": ("T09", "DES"), "T08": ("T08", "DES"), "T18": ("T18", "DES")}
-TREE_FILE.update({t: (t, "TEM") for t in ("T03", "T06", "T10", "T11", "T12", "T13", "T14",
-                                          "T15", "T17")})
+# the remastered trees: the type, the file it draws from (per theater where that differs)
+# and the theaters that file has a look for (the temperate trees' winter looks, <T>_WIN,
+# painted onto the same models)
+TREE_FILE = {"T01": ("T01", ("TEM", "WIN")), "T16": ("T16", ("TEM", "WIN")),
+             "T02": ("T02", ("TEM", "WIN")), "T05": ("T05", ("TEM", "WIN")),
+             "T07": ("T07", ("TEM", "WIN")), "T04": ("T04", ("DES",)),
+             "T09": ("T09", ("DES",)), "T08": ("T08", ("TEM", "DES", "WIN")), "T18": ("T18", ("DES",))}
+TREE_FILE.update({t: (t, ("TEM", "WIN")) for t in ("T03", "T06", "T10", "T11", "T12", "T13",
+                                                    "T14", "T15", "T17")})
 FIELDS = ["V12", "V13", "V14", "V15", "V16", "V17", "V18"]
 
 # where each scene's block of clear cells starts (found once in the map's BIN: sixteen by
@@ -73,8 +79,10 @@ def layout(name):
         ov += [(x0 + 1 + i, y0 + 1, f) for i, f in enumerate(FIELDS)]
         ov += [(x0 + 10, y0 + 1, "WCRATE"), (x0 + 12, y0 + 1, "SCRATE")]
         te += [(x0 + 2, y0 + 4, "SPLIT2"), (x0 + 5, y0 + 4, "SPLIT3")]
-        # the remastered spruce, T01 and T16 drawn from its one file (T01_TEM)
+        # the remastered spruce T01, and T16's own spruce
         te += [(x0 + 11, y0 + 5, "T01"), (x0 + 12, y0 + 7, "T16")]
+        # T08's temperate look (two cells by one), clear of the trees and the crates
+        te += [(x0 + 10, y0 + 3, "T08")]
         # and the other remastered conifers, each its own temperate file
         te += [(x0 + 14, y0 + 2, "T02"), (x0 + 14, y0 + 5, "T05"), (x0 + 1, y0 + 7, "T07")]
         # the broadleaf trees and saplings along the block's foot and its top corner
@@ -110,6 +118,14 @@ def layout(name):
     return ov, te, un, crate, (x0 + 7.0, y0 + 3.5)
 
 
+# THE TREES AT THEIR MODELS' OWN SIZE, as the claims were measured. The pixel claim reads
+# the right eighth of the frame as the sidebar and allows no change there, but the
+# sidebar's cut corner shows the world through it, and under the shipped taller, wider
+# trees one of this map's trees reaches into that corner (16 pixels).
+TREES_AS_MEASURED = ["gfx etree_height 1", "gfx etree_width 1", "gfx etree_vary 0",
+                     "gfx etree_gain 1"]
+
+
 def maps(out):
     os.makedirs(out, exist_ok=True)
     plan = {}
@@ -138,7 +154,7 @@ def maps(out):
         open(os.path.join(out, name + ".BIN"), "wb").write(b)
         plan[name] = dict(overlay=ov, terrain=te, units=un, crate=crate, cam=cam,
                           pack=sc["src"], theater=sc["theater"], wreck=sc["wreck"])
-        s = ["tick 3", "cam %.1f %.1f" % cam, "zoom max", "tick 1",
+        s = TREES_AS_MEASURED + ["tick 3", "cam %.1f %.1f" % cam, "zoom max", "tick 1",
              "shot %s/%s_a.png" % (out, name), "eterrdump", "ebldump"]
         if sc["wreck"]:
             s += ["cam %.1f %.1f" % (sc["wreck"][0] + 0.5, sc["wreck"][1] + 0.5), "tick 1",
@@ -158,6 +174,8 @@ def maps(out):
                 s += ["tick 10", "cratedump"]
             s += ["cam %.1f %.1f" % cam, "tick 1", "shot %s/%s_b.png" % (out, name),
                   "eterrdump", "cratedump"]
+        head += 2 * sum(line.startswith("shot ") for line in s[:head])
+        s = [v for line in s for v in ([line, "sbplates", "sbslide"] if line.startswith("shot ") else [line])]
         s.append("quit")
         open(os.path.join(out, name + ".txt"), "w").write("\n".join(s) + "\n")
         # the same first frames with the remasters off (_n), in Classic (_c), and the
@@ -181,6 +199,44 @@ def kv(line):
     return dict(p.split("=", 1) for p in line.split("|") if "=" in p)
 
 
+def hud_outer_corner(w, h):
+    """Only the outer-connected transparent corner of the native housing's top band."""
+    from PIL import Image
+    assert (w, h) == (1280, 720), "G307 requires its measured native-scale viewport"
+    with open("hud640.pack", "rb") as f:
+        blob = f.read(64 * 1024 * 1024 + 1)
+    assert 16 <= len(blob) <= 64 * 1024 * 1024 and blob[:8] == b"CNCHUD01"
+    version, count = struct.unpack_from("<II", blob, 8)
+    assert version == 1 and 0 < count <= 64
+    pos, assets = 16, {}
+    for _ in range(count):
+        assert pos + 28 <= len(blob)
+        name, aw, ah, frames = struct.unpack_from("<16sIII", blob, pos)
+        name = name.rstrip(b"\0").decode("ascii"); pos += 28
+        size = aw * ah * frames * 4
+        assert name not in assets and 0 < size <= len(blob) - pos
+        assets[name] = (aw, ah, frames, blob[pos:pos + size]); pos += size
+    assert pos == len(blob) and assets["eh_body"][:3] == (184, 488, 1)
+    assert assets["eh_map"][:3] == (184, 187, 1) and assets["eh_wing"][:3] == (85, 159, 1)
+    aw, ah, _, rgba = assets["eh_body"]
+    clear = {i for i in range(aw * ah) if rgba[i * 4 + 3] == 0}
+    outer = {i for i in clear if i % aw in (0, aw - 1) or i // aw in (0, ah - 1)}
+    queue = deque(outer)
+    while queue:
+        i = queue.popleft(); x, y = i % aw, i // aw
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            j = ny * aw + nx
+            if 0 <= nx < aw and 0 <= ny < ah and j in clear and j not in outer:
+                outer.add(j); queue.append(j)
+    # hud_enhanced_impl.h preserves these top rows at every housing height:
+    # eh_body is blitted at EH_MAIN_X,205; the native 245-wide bar ends at w.
+    mask = Image.new("L", (w, h)); px = mask.load()
+    for i in outer:
+        if i // aw < 48:
+            px[w - aw + i % aw, 205 + i // aw] = 255
+    return mask
+
+
 def changed(a, b, box=None):
     """Pixels that differ between two shots (inside box), and those in the sidebar."""
     from PIL import Image, ImageChops
@@ -190,7 +246,8 @@ def changed(a, b, box=None):
         return -1, -1
     d = ImageChops.difference(A, B).convert("L").point(lambda v: 255 if v > 8 else 0)
     w, h = d.size
-    side = d.crop((int(w * 0.875), 0, w, h)).histogram()[255]
+    visible_hud = ImageChops.multiply(d, ImageChops.invert(hud_outer_corner(w, h)))
+    side = visible_hud.crop((int(w * 0.875), 0, w, h)).histogram()[255]
     if box:
         d = d.crop(box)
     return d.histogram()[255], side
@@ -292,6 +349,11 @@ def check(out):
                     why.append("%s: the P04 cell drew as %s" % (name, hit))
                 else:
                     n_ok += 1
+        # The corner mask is valid only for the unchanged native-scale, deployed HUD.
+        need_geometry = ("SBPLATE|zoom|full=2|half=1|whole=1|hud=640",
+                         "SBSLIDE|x=0|target=0|dbx0=1108")
+        if any(item not in lines(log, item) for item in need_geometry):
+            why.append("%s: native HUD scale or deployed housing geometry was not verified" % name)
         # (2) THE TERRAIN OBJECTS, each from its theater's own file and drawn whole: the
         #     first ebldump's EBLDART lines
         eds = dumps(log, "EBLD|")
@@ -302,8 +364,11 @@ def check(out):
         for x, y, t in P["terrain"]:
             if t in TREE_FILE:
                 # THE REMASTERED TREES: each drawn from its own theater's file (T16 through
-                # T01's alias), and from no file in any other theater
-                base, want_th = TREE_FILE[t]
+                # T01's alias), and from no file in a theater it has no look for
+                base, looks = TREE_FILE[t]
+                want_th = th if th in looks else looks[0]
+                if isinstance(base, dict):
+                    base = base.get(want_th, base[looks[0]])
                 want = "%s_%s" % (base, want_th)
                 a = arts.get(want) if th == want_th else None
                 drawn = int(a.get("drawn", "0")) if a else 0
@@ -326,7 +391,7 @@ def check(out):
                 else:
                     n_ok += 1
                 continue
-            name_ = t + (look[th] if t.startswith("SPLIT") else "")
+            name_ = t + ("_DES" if th == "DES" and t in ROCKS else look[th] if t.startswith("SPLIT") else "")
             a = arts.get(name_)
             if not a or int(a.get("drawn", "0")) <= 0:
                 why.append("%s: %s not drawn whole as %s" % (name, t, name_))

@@ -1,0 +1,14 @@
+{
+  "README.md": "0f8c19fd54c5992b95e866206aab4ad7b97d8d1999fa87e4a8f4a20c58dc4cb5",
+  "browser-review.json": "65887d8d5049805bab850e967fac77ed2f48b181149f1ca80aa09cd784cbfa76",
+  "index.html": "451ac7b520eae431c3b12fcc3dff333a4a1535bba3fb22e972294db406f08a0a",
+  "launcher-loop.mp4": "cf558716d0c003d07b3f62423f71488c5008875182164d9f3b0fb38602a9c1c9",
+  "launcher-loop.webp": "e4331d684da97089b5ef7bc2fd1a1102aa040e7a380236d3b522e0fa43a90c3c",
+  "launcher-still.png": "f7f1e65390260ff3d65abf024b086f881c79c05c01b557168b6c31b2a8b88a8b",
+  "preflight.json": "5bd2a39b8e77417d97a69bf391e950772d9ad94813319d6480d670aed29ad5f5",
+  "source/launcher.c": "b4f1a2b58d5cfba661b13a786ca6bb1aa8c070aa03a1084da2462de8647715b8",
+  "source/lsignal.c": "3818b0d42810587d2d023fa2f25dc8f83807e51ecaeed2de42bf3508443d389f",
+  "source/lsignal.h": "b7ff683ba621a43a24cd7fcd9b883e7bac6106f0c9cd45b21665ec5f601ce84d",
+  "source/sources.sh": "cfc734d371762a08b8996c1dd98fcd33928f502c227554abb2e17524bb05e6fa",
+  "verify-signal.py": "b0b2b576bef7924a0360c484534b08d6ddf5967346b9b03799228f142fd6bf4e"
+}

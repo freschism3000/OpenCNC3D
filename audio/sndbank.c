@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BANK_MAX_MIX 8
+#define BANK_MAX_MIX 12
 #define BANK_MAX_DIR 4
 #define BANK_MAX_MISS 256
 #define BANK_HASH 1024
@@ -30,6 +30,9 @@ struct SndBank
 {
     MixFile *mix[BANK_MAX_MIX];
     int nmix;
+    /* A LANGUAGE'S ARCHIVE (bank_add_language): searched before the English ones, except
+       for the death sounds, which stay English (bank_keep_english). */
+    unsigned char lang[BANK_MAX_MIX];
     char dir[BANK_MAX_DIR][512];
     int ndir;
 
@@ -83,6 +86,10 @@ SndBank *bank_create(long cache_budget_bytes)
     return b;
 }
 
+static void lru_unlink(SndBank *b, Clip *c);
+static void hash_unlink(SndBank *b, Clip *c);
+static int bank_keep_english(const char *name);
+
 static void clip_free(SndBank *b, Clip *c)
 {
     b->used -= c->bytes;
@@ -122,6 +129,52 @@ int bank_add_mix(SndBank *b, const char *path, char *err, int errlen)
         return 0;
     b->mix[b->nmix++] = mx;
     return 1;
+}
+
+/* Every clip not pinned, out of the cache: what it held may now come from another archive. */
+static void bank_forget(SndBank *b)
+{
+    Clip *c = b->lru_head;
+    while (c) {
+        Clip *n = c->lru_next;
+        if (!c->pinned) {
+            lru_unlink(b, c);
+            hash_unlink(b, c);
+            clip_free(b, c);
+        }
+        c = n;
+    }
+}
+
+int bank_add_language(SndBank *b, const char *path, char *err, int errlen)
+{
+    MixFile *mx;
+    int i;
+    if (b->nmix >= BANK_MAX_MIX) {
+        snprintf(err, (size_t)errlen, "too many archives");
+        return 0;
+    }
+    mx = mixfile_open(path, err, errlen);
+    if (!mx)
+        return 0;
+    for (i = b->nmix; i > 0; i--) { b->mix[i] = b->mix[i - 1]; b->lang[i] = b->lang[i - 1]; }
+    b->mix[0] = mx;
+    b->lang[0] = 1;
+    b->nmix++;
+    bank_forget(b);
+    return 1;
+}
+
+int bank_drop_languages(SndBank *b)
+{
+    int i, w = 0, dropped = 0;
+    for (i = 0; i < b->nmix; i++) {
+        if (b->lang[i]) { mixfile_close(b->mix[i]); dropped++; continue; }
+        b->mix[w] = b->mix[i]; b->lang[w] = 0; w++;
+    }
+    b->nmix = w;
+    if (dropped) bank_forget(b);
+    return dropped;
 }
 
 int bank_add_dir(SndBank *b, const char *path)
@@ -199,6 +252,8 @@ static AudStream *open_anywhere(SndBank *b, const char *name, char *err, int err
     }
     for (i = 0; i < b->nmix; i++) {
         long off, size;
+        if (b->lang[i] && bank_keep_english(name))
+            continue;
         if (mixfile_find(b->mix[i], name, &off, &size)) {
             a = aud_open_mix(b->mix[i], name, err, errlen);
             if (a)
@@ -223,7 +278,7 @@ int bank_has(SndBank *b, const char *name)
         }
     }
     for (i = 0; i < b->nmix; i++)
-        if (mixfile_find(b->mix[i], name, NULL, NULL))
+        if (!(b->lang[i] && bank_keep_english(name)) && mixfile_find(b->mix[i], name, NULL, NULL))
             return 1;
     return 0;
 }
@@ -273,6 +328,22 @@ static void hash_unlink(SndBank *b, Clip *c)
         }
         pp = &(*pp)->hnext;
     }
+}
+
+/* THE DEATH SOUNDS STAY ENGLISH. The German releases replaced every scream with a crunch
+   or a thud in the archive that also holds their unit voices; a language pack is taken
+   for its words, so these names are never answered from one. Tiberian Dawn's NUYELL1-12,
+   YELL1, RAMYELL1 and SQUISH2, Red Alert's DEDMAN1-10 and SQUISHY2. */
+static int bank_keep_english(const char *name)
+{
+    static const char *const deaths[] = { "NUYELL", "YELL", "RAMYELL", "SQUISH", "DEDMAN", 0 };
+    int i;
+    for (i = 0; deaths[i]; i++) {
+        const char *p = deaths[i], *q = name;
+        while (*p && *q && (*q == *p || *q == *p + 32)) { p++; q++; }
+        if (!*p) return 1;
+    }
+    return 0;
 }
 
 static void evict_to_budget(SndBank *b)

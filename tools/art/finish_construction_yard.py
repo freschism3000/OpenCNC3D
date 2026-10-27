@@ -1,7 +1,7 @@
 """Match the Yard to Mammoth reflectance under the SAME runtime lighting.
 
 Run in Blender after prepare_construction_yard.py, before blender_c3m.py.
-The approved authoring source is untouched. This is the user's requested runtime
+The approved authoring source is untouched. This is the requested runtime
 material correction, not an exposure override in the renderer.
 """
 import hashlib
@@ -61,7 +61,7 @@ sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 report = json.loads((root / 'bake_manifest.json').read_text())
 report['output_sha256'] = sha(root / report['output'])
 report['runtime_finish'] = {
-    'basis': 'User requested Mammoth-matched values and reduced shine after first engine preview',
+    'basis': 'The design review requested Mammoth-matched values and reduced shine after first engine preview',
     'linear_albedo_gain': '0.18 + 0.50 * metallic',
     'roughness': 'clamp(max(source + 0.06, 0.58 - 0.12 * metallic), 0, 0.98)',
     'lighting': 'Unchanged shared Mammoth renderer, exposure and environment',

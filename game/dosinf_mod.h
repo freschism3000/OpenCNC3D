@@ -1,7 +1,7 @@
 /* ================================================================================== *
  *  dosinf_mod.h -- the 1995 MS-DOS infantry sprites (dosinfantry.pack, "DOSINF01")
  *
- *  The user compared the N64 infantry billboards against the DOS art and chose DOS.
+ *  The design review compared the N64 infantry billboards against the DOS art and chose DOS.
  *  This module loads the pack baked by fb/infantry/bake_dosinfantry.py and gives the
  *  renderer everything it needs to draw a DOS infantryman instead of an N64 strip:
  *  textures, per-type anim slots, and the ENGINE's own facing math.
@@ -39,7 +39,7 @@ struct DosStrip {
        not built: a strip that is not a uniform never gets one, and neither does a colour
        no seat is wearing, so a campaign holds six zeroes here for every strip. Kept a
        plain array so DosStrip stays a POD and g_dosStrips.resize() still zeroes it. */
-    GLuint gl_extra[6];
+    GLuint gl_extra[7];
     int frames, facings, stages, fw, fh, cols, texw, texh;
     int src_stages;   /* the engine's DoInfoStruct Count; > stages when the strip
                          was evenly subsampled to fit the Voodoo 2 256x256 limit
@@ -325,7 +325,7 @@ static void dosinf_free(void)
         if (g_dosStrips[i].gl)
             glDeleteTextures(1, &g_dosStrips[i].gl);
         /* The team-colour sheets go back the same way and on the same context. */
-        for (int c = 0; c < 6; c++)
+        for (int c = 0; c < 7; c++)
             if (g_dosStrips[i].gl_extra[c])
                 glDeleteTextures(1, &g_dosStrips[i].gl_extra[c]);
     }

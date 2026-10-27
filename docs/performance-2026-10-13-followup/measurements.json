@@ -1,0 +1,1141 @@
+{
+  "source_commit": "67df3dea9468fa6c454195541c82768903373795",
+  "date": "2026-10-13",
+  "hardware": {
+    "hardware": {
+      "machine_name": "MacBook Pro",
+      "machine_model": "Mac17,6",
+      "chip_type": "Apple M5 Max",
+      "number_processors": "proc 18:6:0:12",
+      "physical_memory": "64 GB"
+    },
+    "host_machine_architecture": "arm64",
+    "macOS": "26.6",
+    "graphics": [
+      {
+        "sppci_model": "Apple M5 Max",
+        "spdisplays_vendor": "sppci_vendor_Apple",
+        "displays": [
+          {
+            "_name": "Color LCD",
+            "spdisplays_main": "spdisplays_yes"
+          }
+        ]
+      }
+    ],
+    "purpose": "Local release-test hardware and preparation for the authorized post-release Enhanced investigation; no performance experiments yet."
+  },
+  "preset": {
+    "source": "${REPO_ROOT}/docs/tuning/opencnc3d-fx.cfg",
+    "source_sha256": "f4dd9dfef3e153c24a9432608cc57c7d7e1b9d4ccf4423152481effda2e3439b",
+    "controlled_preset_sha256": "efa7bcdb5ea8e7c6f9dcc64433ea205206535e7e0c07fe3b6c088a9ef53e32da",
+    "changes": "Removed retired reflection controls (ignored by v0.8.4); benchmark script disables stats overlay; other quality settings unchanged"
+  },
+  "baseline": [
+    {
+      "case": "forest",
+      "resolution": "1280x720",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 10.96,
+      "p95_ms": 14.46,
+      "max_ms": 16.05
+    },
+    {
+      "case": "base",
+      "resolution": "1280x720",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 26.88,
+      "p95_ms": 31.46,
+      "max_ms": 34.04
+    },
+    {
+      "case": "blast",
+      "resolution": "1280x720",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 21.689999999999998,
+      "p95_ms": 25.72,
+      "max_ms": 27.03
+    },
+    {
+      "case": "bodies",
+      "resolution": "1280x720",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 3.915,
+      "p95_ms": 4.53,
+      "max_ms": 5.17
+    },
+    {
+      "case": "forest",
+      "resolution": "1920x1080",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 11.620000000000001,
+      "p95_ms": 13.26,
+      "max_ms": 14.59
+    },
+    {
+      "case": "base",
+      "resolution": "1920x1080",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 28.735,
+      "p95_ms": 31.55,
+      "max_ms": 33.65
+    },
+    {
+      "case": "blast",
+      "resolution": "1920x1080",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 22.494999999999997,
+      "p95_ms": 27.48,
+      "max_ms": 28.07
+    },
+    {
+      "case": "bodies",
+      "resolution": "1920x1080",
+      "repetition": 0,
+      "samples": 120,
+      "median_ms": 4.58,
+      "p95_ms": 4.92,
+      "max_ms": 5.15
+    },
+    {
+      "case": "forest",
+      "resolution": "1280x720",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 11.26,
+      "p95_ms": 12.83,
+      "max_ms": 13.38
+    },
+    {
+      "case": "base",
+      "resolution": "1280x720",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 26.735,
+      "p95_ms": 30.57,
+      "max_ms": 32.87
+    },
+    {
+      "case": "blast",
+      "resolution": "1280x720",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 21.94,
+      "p95_ms": 25.68,
+      "max_ms": 28.14
+    },
+    {
+      "case": "bodies",
+      "resolution": "1280x720",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 3.88,
+      "p95_ms": 4.29,
+      "max_ms": 4.64
+    },
+    {
+      "case": "forest",
+      "resolution": "1920x1080",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 11.725000000000001,
+      "p95_ms": 13.27,
+      "max_ms": 14.08
+    },
+    {
+      "case": "base",
+      "resolution": "1920x1080",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 28.805,
+      "p95_ms": 31.82,
+      "max_ms": 33.35
+    },
+    {
+      "case": "blast",
+      "resolution": "1920x1080",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 23.1,
+      "p95_ms": 28.16,
+      "max_ms": 31.82
+    },
+    {
+      "case": "bodies",
+      "resolution": "1920x1080",
+      "repetition": 1,
+      "samples": 120,
+      "median_ms": 5.0649999999999995,
+      "p95_ms": 8.23,
+      "max_ms": 9.14
+    }
+  ],
+  "paired_completed_render": {
+    "uniform": [
+      {
+        "case": "forest",
+        "off_medians_ms": [
+          12.215,
+          12.455
+        ],
+        "on_medians_ms": [
+          12.54,
+          12.67
+        ],
+        "saved_ms": -0.27,
+        "projected_delta_at_30fps": -0.241,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "asked": 161760,
+          "sent": 161760,
+          "skipped": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "asked": 161760,
+          "sent": 58960,
+          "skipped": 102800
+        },
+        "end_1": {}
+      },
+      {
+        "case": "base",
+        "off_medians_ms": [
+          29.445,
+          30.705
+        ],
+        "on_medians_ms": [
+          30.945,
+          31.735
+        ],
+        "saved_ms": -1.265,
+        "projected_delta_at_30fps": -1.0969,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "asked": 245733,
+          "sent": 245733,
+          "skipped": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "asked": 245733,
+          "sent": 90226,
+          "skipped": 155507
+        },
+        "end_1": {}
+      },
+      {
+        "case": "blast",
+        "off_medians_ms": [
+          29.695,
+          26.115000000000002
+        ],
+        "on_medians_ms": [
+          27.11,
+          25.035
+        ],
+        "saved_ms": 1.8325,
+        "projected_delta_at_30fps": 1.7452,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "asked": 91976,
+          "sent": 91976,
+          "skipped": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "asked": 91976,
+          "sent": 41902,
+          "skipped": 50074
+        },
+        "end_1": {}
+      },
+      {
+        "case": "bodies",
+        "off_medians_ms": [
+          4.5,
+          4.67
+        ],
+        "on_medians_ms": [
+          4.6,
+          4.345
+        ],
+        "saved_ms": 0.1125,
+        "projected_delta_at_30fps": 0.1016,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "asked": 264032,
+          "sent": 264032,
+          "skipped": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "asked": 264032,
+          "sent": 81166,
+          "skipped": 182866
+        },
+        "end_1": {}
+      }
+    ],
+    "coalesce": [
+      {
+        "case": "forest",
+        "off_medians_ms": [
+          12.23,
+          12.165
+        ],
+        "on_medians_ms": [
+          12.305,
+          12.075
+        ],
+        "saved_ms": 0.0075,
+        "projected_delta_at_30fps": 0.0068,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "logical_runs": 0,
+          "actual_runs": 0,
+          "merged": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "logical_runs": 0,
+          "actual_runs": 0,
+          "merged": 0
+        },
+        "end_1": {}
+      },
+      {
+        "case": "base",
+        "off_medians_ms": [
+          29.41,
+          29.22
+        ],
+        "on_medians_ms": [
+          30.085,
+          29.314999999999998
+        ],
+        "saved_ms": -0.385,
+        "projected_delta_at_30fps": -0.3425,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "logical_runs": 23680,
+          "actual_runs": 23680,
+          "merged": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "logical_runs": 23680,
+          "actual_runs": 22640,
+          "merged": 1040
+        },
+        "end_1": {}
+      },
+      {
+        "case": "blast",
+        "off_medians_ms": [
+          24.085,
+          25.235
+        ],
+        "on_medians_ms": [
+          24.85,
+          24.91
+        ],
+        "saved_ms": -0.22,
+        "projected_delta_at_30fps": -0.1967,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "logical_runs": 290016,
+          "actual_runs": 290016,
+          "merged": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "logical_runs": 290016,
+          "actual_runs": 252816,
+          "merged": 37200
+        },
+        "end_1": {}
+      },
+      {
+        "case": "bodies",
+        "off_medians_ms": [
+          4.505,
+          4.47
+        ],
+        "on_medians_ms": [
+          4.615,
+          4.45
+        ],
+        "saved_ms": -0.045,
+        "projected_delta_at_30fps": -0.0404,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "logical_runs": 0,
+          "actual_runs": 0,
+          "merged": 0
+        },
+        "end_0": {},
+        "counters_1": {
+          "logical_runs": 0,
+          "actual_runs": 0,
+          "merged": 0
+        },
+        "end_1": {}
+      }
+    ],
+    "range": [
+      {
+        "case": "forest",
+        "off_medians_ms": [
+          12.274999999999999,
+          11.85
+        ],
+        "on_medians_ms": [
+          11.69,
+          11.41
+        ],
+        "saved_ms": 0.5125,
+        "projected_delta_at_30fps": 0.4685,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "hits": 0,
+          "misses": 0,
+          "skipped": 0
+        },
+        "end_0": {
+          "cap": 8192,
+          "entries": 0
+        },
+        "counters_1": {
+          "hits": 256080,
+          "misses": 0,
+          "skipped": 135120
+        },
+        "end_1": {
+          "cap": 8192,
+          "entries": 360
+        }
+      },
+      {
+        "case": "base",
+        "off_medians_ms": [
+          29.985,
+          29.62
+        ],
+        "on_medians_ms": [
+          29.5,
+          28.875
+        ],
+        "saved_ms": 0.615,
+        "projected_delta_at_30fps": 0.5639,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "hits": 0,
+          "misses": 0,
+          "skipped": 0
+        },
+        "end_0": {
+          "cap": 8192,
+          "entries": 0
+        },
+        "counters_1": {
+          "hits": 528800,
+          "misses": 0,
+          "skipped": 269040
+        },
+        "end_1": {
+          "cap": 8192,
+          "entries": 861
+        }
+      },
+      {
+        "case": "blast",
+        "off_medians_ms": [
+          25.38,
+          25.585
+        ],
+        "on_medians_ms": [
+          22.595,
+          22.835
+        ],
+        "saved_ms": 2.7675,
+        "projected_delta_at_30fps": 2.7163,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "hits": 0,
+          "misses": 0,
+          "skipped": 0
+        },
+        "end_0": {
+          "cap": 8192,
+          "entries": 0
+        },
+        "counters_1": {
+          "hits": 848512,
+          "misses": 0,
+          "skipped": 432176
+        },
+        "end_1": {
+          "cap": 8192,
+          "entries": 1962
+        }
+      },
+      {
+        "case": "bodies",
+        "off_medians_ms": [
+          4.655,
+          4.775
+        ],
+        "on_medians_ms": [
+          4.7,
+          4.59
+        ],
+        "saved_ms": 0.07,
+        "projected_delta_at_30fps": 0.0631,
+        "repetitions": 4,
+        "frames_per_repetition": 80,
+        "counters_0": {
+          "hits": 0,
+          "misses": 0,
+          "skipped": 0
+        },
+        "end_0": {
+          "cap": 8192,
+          "entries": 0
+        },
+        "counters_1": {
+          "hits": 13440,
+          "misses": 0,
+          "skipped": 8240
+        },
+        "end_1": {
+          "cap": 8192,
+          "entries": 32
+        }
+      }
+    ]
+  },
+  "live": {
+    "v084": [
+      {
+        "case": "forest",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 567,
+        "fps": 94.5,
+        "mean_ms": 10.582010582010582,
+        "vsync": "0",
+        "switch": null
+      },
+      {
+        "case": "forest",
+        "leg": 1,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 573,
+        "fps": 95.4,
+        "mean_ms": 10.471204188481675,
+        "vsync": "0",
+        "switch": null
+      },
+      {
+        "case": "base",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 236,
+        "fps": 39.3,
+        "mean_ms": 25.423728813559322,
+        "vsync": "0",
+        "switch": null
+      },
+      {
+        "case": "base",
+        "leg": 1,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 237,
+        "fps": 39.4,
+        "mean_ms": 25.358649789029535,
+        "vsync": "0",
+        "switch": null
+      },
+      {
+        "case": "blast",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 308,
+        "fps": 51.3,
+        "mean_ms": 19.51298701298701,
+        "vsync": "0",
+        "switch": null
+      },
+      {
+        "case": "blast",
+        "leg": 1,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 305,
+        "fps": 50.8,
+        "mean_ms": 19.672131147540984,
+        "vsync": "0",
+        "switch": null
+      },
+      {
+        "case": "bodies",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 1386,
+        "fps": 230.9,
+        "mean_ms": 4.329004329004329,
+        "vsync": "0",
+        "switch": null
+      },
+      {
+        "case": "bodies",
+        "leg": 1,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 1410,
+        "fps": 234.8,
+        "mean_ms": 4.25531914893617,
+        "vsync": "0",
+        "switch": null
+      }
+    ],
+    "range": [
+      {
+        "case": "forest",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 560,
+        "fps": 93.2,
+        "mean_ms": 10.732142857142858,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "forest",
+        "leg": 1,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 595,
+        "fps": 99.1,
+        "mean_ms": 10.100840336134453,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "forest",
+        "leg": 2,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 595,
+        "fps": 99.0,
+        "mean_ms": 10.100840336134453,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "forest",
+        "leg": 3,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 538,
+        "fps": 89.7,
+        "mean_ms": 11.152416356877323,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "base",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 232,
+        "fps": 38.6,
+        "mean_ms": 25.905172413793103,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "base",
+        "leg": 1,
+        "value": 1,
+        "elapsed_s": 6.02,
+        "ticks": 108,
+        "frames": 239,
+        "fps": 39.7,
+        "mean_ms": 25.188284518828453,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "base",
+        "leg": 2,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 239,
+        "fps": 39.8,
+        "mean_ms": 25.14644351464435,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "base",
+        "leg": 3,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 232,
+        "fps": 38.7,
+        "mean_ms": 25.862068965517242,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "blast",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 292,
+        "fps": 48.6,
+        "mean_ms": 20.54794520547945,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "blast",
+        "leg": 1,
+        "value": 1,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 318,
+        "fps": 53.0,
+        "mean_ms": 18.867924528301888,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "blast",
+        "leg": 2,
+        "value": 1,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 334,
+        "fps": 55.6,
+        "mean_ms": 17.964071856287426,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      },
+      {
+        "case": "blast",
+        "leg": 3,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 299,
+        "fps": 49.8,
+        "mean_ms": 20.100334448160535,
+        "vsync": "0",
+        "switch": "OPENCNC3D_RANGE_MODES"
+      }
+    ],
+    "uniform": [
+      {
+        "case": "base",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 236,
+        "fps": 39.2,
+        "mean_ms": 25.466101694915253,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      },
+      {
+        "case": "base",
+        "leg": 1,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 234,
+        "fps": 38.9,
+        "mean_ms": 25.683760683760685,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      },
+      {
+        "case": "base",
+        "leg": 2,
+        "value": 1,
+        "elapsed_s": 6.02,
+        "ticks": 108,
+        "frames": 235,
+        "fps": 39.0,
+        "mean_ms": 25.617021276595743,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      },
+      {
+        "case": "base",
+        "leg": 3,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 234,
+        "fps": 39.0,
+        "mean_ms": 25.641025641025642,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      },
+      {
+        "case": "blast",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 308,
+        "fps": 51.3,
+        "mean_ms": 19.48051948051948,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      },
+      {
+        "case": "blast",
+        "leg": 1,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 305,
+        "fps": 50.7,
+        "mean_ms": 19.704918032786885,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      },
+      {
+        "case": "blast",
+        "leg": 2,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 311,
+        "fps": 51.7,
+        "mean_ms": 19.324758842443728,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      },
+      {
+        "case": "blast",
+        "leg": 3,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 308,
+        "fps": 51.2,
+        "mean_ms": 19.51298701298701,
+        "vsync": "0",
+        "switch": "OPENCNC3D_UNIFORM_VALUES"
+      }
+    ],
+    "coalesce": [
+      {
+        "case": "base",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 234,
+        "fps": 39.0,
+        "mean_ms": 25.641025641025642,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      },
+      {
+        "case": "base",
+        "leg": 1,
+        "value": 1,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 234,
+        "fps": 39.0,
+        "mean_ms": 25.641025641025642,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      },
+      {
+        "case": "base",
+        "leg": 2,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 236,
+        "fps": 39.2,
+        "mean_ms": 25.466101694915253,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      },
+      {
+        "case": "base",
+        "leg": 3,
+        "value": 0,
+        "elapsed_s": 6.02,
+        "ticks": 108,
+        "frames": 233,
+        "fps": 38.7,
+        "mean_ms": 25.836909871244636,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      },
+      {
+        "case": "blast",
+        "leg": 0,
+        "value": 0,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 308,
+        "fps": 51.3,
+        "mean_ms": 19.48051948051948,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      },
+      {
+        "case": "blast",
+        "leg": 1,
+        "value": 1,
+        "elapsed_s": 6.0,
+        "ticks": 108,
+        "frames": 305,
+        "fps": 50.8,
+        "mean_ms": 19.672131147540984,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      },
+      {
+        "case": "blast",
+        "leg": 2,
+        "value": 1,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 301,
+        "fps": 50.1,
+        "mean_ms": 19.966777408637874,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      },
+      {
+        "case": "blast",
+        "leg": 3,
+        "value": 0,
+        "elapsed_s": 6.01,
+        "ticks": 108,
+        "frames": 310,
+        "fps": 51.6,
+        "mean_ms": 19.387096774193548,
+        "vsync": "0",
+        "switch": "OPENCNC3D_FRAGMENT_COALESCE"
+      }
+    ]
+  },
+  "visual": {
+    "uniform": {
+      "cases": [
+        "forest",
+        "base",
+        "flag-coast",
+        "explosion",
+        "bodies",
+        "vehicle-wreck",
+        "modes"
+      ],
+      "frames": 54,
+      "targets": 72,
+      "changed_pixels": 0,
+      "maximum_delta": 0,
+      "target_mismatches": 0,
+      "physics_equal": true,
+      "passed": true
+    },
+    "coalesce": {
+      "cases": [
+        "forest",
+        "base",
+        "flag-coast",
+        "explosion",
+        "bodies",
+        "vehicle-wreck",
+        "modes"
+      ],
+      "frames": 54,
+      "targets": 72,
+      "changed_pixels": 0,
+      "maximum_delta": 0,
+      "target_mismatches": 0,
+      "physics_equal": true,
+      "passed": true
+    },
+    "range": {
+      "cases": [
+        "forest",
+        "base",
+        "flag-coast",
+        "explosion",
+        "bodies",
+        "vehicle-wreck"
+      ],
+      "frames": 49,
+      "targets": 72,
+      "changed_pixels": 1,
+      "maximum_delta": 2,
+      "target_mismatches": 0,
+      "physics_equal": true,
+      "passed": false
+    },
+    "range-repeat": {
+      "cases": [
+        "forest",
+        "base",
+        "flag-coast",
+        "explosion",
+        "bodies",
+        "vehicle-wreck",
+        "modes"
+      ],
+      "frames": 54,
+      "targets": 72,
+      "changed_pixels": 0,
+      "maximum_delta": 0,
+      "target_mismatches": 0,
+      "physics_equal": true,
+      "passed": true
+    },
+    "original-repeat": {
+      "cases": [
+        "vehicle-wreck",
+        "modes"
+      ],
+      "frames": 11,
+      "targets": 12,
+      "changed_pixels": 0,
+      "maximum_delta": 0,
+      "target_mismatches": 0,
+      "physics_equal": true,
+      "passed": true
+    },
+    "range-controls": {
+      "cases": [
+        "vehicle-wreck",
+        "modes"
+      ],
+      "frames": 11,
+      "targets": 12,
+      "changed_pixels": 0,
+      "maximum_delta": 0,
+      "target_mismatches": 0,
+      "physics_equal": true,
+      "passed": true
+    }
+  },
+  "crowded_infantry": [
+    {
+      "leg": 0,
+      "name": "baseline",
+      "value": null,
+      "samples": 120,
+      "median_ms": 2.91,
+      "p95_ms": 3.81,
+      "max_ms": 8.29
+    },
+    {
+      "leg": 1,
+      "name": "baseline",
+      "value": null,
+      "samples": 120,
+      "median_ms": 3.2350000000000003,
+      "p95_ms": 4.73,
+      "max_ms": 5.46
+    },
+    {
+      "leg": 2,
+      "name": "uniform",
+      "value": 0,
+      "samples": 120,
+      "median_ms": 2.85,
+      "p95_ms": 3.91,
+      "max_ms": 6.98
+    },
+    {
+      "leg": 3,
+      "name": "uniform",
+      "value": 1,
+      "samples": 120,
+      "median_ms": 3.13,
+      "p95_ms": 4.1,
+      "max_ms": 4.42
+    },
+    {
+      "leg": 4,
+      "name": "uniform",
+      "value": 1,
+      "samples": 120,
+      "median_ms": 2.825,
+      "p95_ms": 3.58,
+      "max_ms": 4.05
+    },
+    {
+      "leg": 5,
+      "name": "uniform",
+      "value": 0,
+      "samples": 120,
+      "median_ms": 3.135,
+      "p95_ms": 3.97,
+      "max_ms": 4.33
+    }
+  ],
+  "timed_completed_render_frames_including_crowd": 6480,
+  "dock_after_research": {
+    "protected_files": 1970,
+    "user_files": 6,
+    "new_changes": 0,
+    "runtime": "v0.8.4",
+    "renderer_sha256": "7411b2cc1b4db142584ed68bd4b03679c6fa69287e0cd0b2a8f377b5f687c14d"
+  }
+}

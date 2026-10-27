@@ -1,0 +1,183 @@
+--- a/game/water_mod.h
++++ b/game/water_mod.h
+@@ -268,7 +268,22 @@
+     for (size_t i = 0; i < (size_t)N * N; i++) {
+         px[i * 4 + 0] = (unsigned char)(a[i] * 255.0f + 0.5f);
+         px[i * 4 + 1] = (unsigned char)(b[i] * 255.0f + 0.5f);
+-        px[i * 4 + 2] = 0; px[i * 4 + 3] = 255;
++        
++        const int x=(int)(i%N),y=(int)(i/N),period=16;
++        const float u=(x+.5f)*period/N,v=(y+.5f)*period/N;
++        const int ix=(int)floorf(u),iy=(int)floorf(v);
++        float d1=100,d2=100;
++        for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++) {
++            const int gx=ix+dx,gy=iy+dz,tx=(gx+period)%period,ty=(gy+period)%period;
++            unsigned h=(unsigned)(tx+ty*period)*747796405u+2891336453u;
++            h=((h>>((h>>28u)+4u))^h)*277803737u;h=(h>>22u)^h;
++            const float jx=.15f+.70f*(h&65535u)/65535.f;
++            const float jy=.15f+.70f*((h>>16u)&65535u)/65535.f;
++            const float ax=gx+jx-u,ay=gy+jy-v,d=sqrtf(ax*ax+ay*ay);
++            if(d<d1){d2=d1;d1=d;}else if(d<d2)d2=d;
++        }
++        const float edge=expf(-powf((d2-d1)/.075f,2.f));
++        px[i*4+2]=(unsigned char)(255.f*edge+.5f);px[i*4+3]=255;
+     }
+     /* and a grey copy of the broad octave for the fixed pipe to modulate with: the
+        RGBA sheet carries two different fields in R and G and nothing in B, so a quad
+@@ -1002,18 +1017,18 @@
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, &px[0]);
+     glBindTexture(GL_TEXTURE_2D, 0);
+-    /* The cells the shore pass re-draws: holed, or touching a holed cell. */
+-    g_waterCoastCell.assign((size_t)g_gridW * g_gridH, 0);
+-    for (size_t i = 0; i < cells.size(); i++) {
+-        const PackCell& c = cells[i];
+-        if (!water_cell_wet(c) || c.x < 0 || c.y < 0 || c.x >= g_gridW || c.y >= g_gridH) continue;
+-        for (int dy = -1; dy <= 1; dy++)
+-            for (int dx = -1; dx <= 1; dx++) {
+-                const int x = c.x + dx, y = c.y + dy;
+-                if (x < 0 || y < 0 || x >= g_gridW || y >= g_gridH) continue;
+-                g_waterCoastCell[(size_t)y * g_gridW + x] = 1;
+-            }
++    /* Study v08: all cells crossed by the continuous shore-distance band. */
++    g_waterCoastCell.assign((size_t)g_gridW*g_gridH,0);
++    int shoreBandCells=0;
++    for(int cy=0;cy<g_gridH;cy++)for(int cx=0;cx<g_gridW;cx++) {
++        bool band=false;
++        for(int sy=0;sy<res&&!band;sy++)for(int sx=0;sx<res;sx++) {
++            const float d=sd[(size_t)(cy*res+sy)*w+cx*res+sx];
++            if(d>-.80f&&d<.45f){band=true;break;}
++        }
++        g_waterCoastCell[(size_t)cy*g_gridW+cx]=band;shoreBandCells+=band;
+     }
++    fprintf(stderr,"SHORESTUDY|distance-band-cells|%d\n",shoreBandCells);
+     /* 5. THE LAND UNDER THE WATER, for the atlas on screen now. The arrays it reads are
+        kept (water_land_make says why), so another atlas later costs only this step. */
+     // Template identity, not connected-component width, defines acoustic rivers.
+@@ -1960,9 +1975,9 @@
+ 
+ static const char* SHORE_VS =
+     "#version 120\n"
+-    "varying vec3 vWorld; varying vec4 vCol;\n"
++    "varying vec3 vWorld; varying vec4 vCol; varying float vLift;\n"
+     "void main() {\n"
+-    "    vWorld = gl_Vertex.xyz;\n"
++    "    vWorld = gl_Vertex.xyz; vLift=gl_MultiTexCoord6.x;\n"
+     "    vCol = gl_Color;\n"                       /* rgb = shroud, a = terrain light */
+     "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+     "}\n";
+@@ -1970,9 +1985,9 @@
+    shore can read the ground's own cut (SHORE_FS, WATER_RA_BASE). */
+ static const char* SHORE_VS_RA =
+     "#version 120\n"
+-    "varying vec3 vWorld; varying vec4 vCol; varying vec2 vSheet;\n"
++    "varying vec3 vWorld; varying vec4 vCol; varying float vLift; varying vec2 vSheet;\n"
+     "void main() {\n"
+-    "    vWorld = gl_Vertex.xyz;\n"
++    "    vWorld = gl_Vertex.xyz; vLift=gl_MultiTexCoord6.x;\n"
+     "    vCol = gl_Color;\n"
+     "    vSheet = gl_MultiTexCoord5.xy;\n"
+     "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+@@ -1995,7 +2010,7 @@
+     "#ifdef WATER_PAINTED_BASE\n"
+     "uniform float uBaseRepeat; uniform float uBaseGain; uniform float uReferenceLook;\n"
+     "#endif\n"
+-    "varying vec3 vWorld; varying vec4 vCol;\n"
++    "varying vec3 vWorld; varying vec4 vCol; varying float vLift;\n"
+     "uniform float uCoastAudit; uniform float uCoastAuditRotation;\n"
+     "float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n"
+     WATER_COAST_FLOW_GLSL
+@@ -2004,7 +2019,7 @@
+     "void main() {\n"
+     "    vec4 f = texture2D(uField, vWorld.xz * uFieldScale);\n"
+     "    float sd = (f.r - 0.5) * 2.0 * uRange;\n"
+-    "    if (sd <= -uFoamCross || sd >= uFoamWidth) discard;\n"
++    "    if (sd <= -max(uFoamCross,0.12)*2.65 || sd >= max(uFoamWidth,0.40)) discard;\n"
+     /* Red Alert: the painting's own blueness here, as WATER_FS measures its floor */
+     "#ifdef WATER_RA_BASE\n"
+     "    vec2 stx = vec2(dFdx(vSheet.x), dFdy(vSheet.y));\n"
+@@ -2134,6 +2149,42 @@
+     "        foam *= ground.a;\n"
+     "    }\n"
+     "#endif\n"
++    /* Study v08: full coast geometry, granular cellular foam and irregular backwash. */
++    "    if(uFoam>0.5) {\n"
++    "        float phase=fract(uTime/6.0+clk.x/6.2831853*0.20);\n"
++    "        float surge=phase<0.28?smoothstep(0.0,0.28,phase):1.0-smoothstep(0.28,1.0,phase);\n"
++    "        vec2 stable=vWorld.xz*0.62;\n"
++    "        float grain=texture2D(uFoamTex,stable).r;\n"
++    "        float fine=texture2D(uFoamTex,stable*2.3+vec2(0.17,0.39)).g;\n"
++    "        float span=max(uFoamCross,0.12)*mix(2.30,0.85,river);\n"
++    "        float front=mix(0.10,-span,surge)+(grain-0.5)*0.075;\n"
++    "        float film=smoothstep(front-0.025,front+0.055,sd);\n"
++    "        float coastBand=(1.0-smoothstep(0.13,0.32,sd))*smoothstep(-span-0.09,-span+0.015,sd);\n"
++    "        float retreat=smoothstep(0.28,0.72,phase)*(1.0-smoothstep(0.78,1.0,phase));\n"
++    "        float memory=smoothstep(-span-0.04,-span+0.05,sd)*retreat;\n"
++    "        vec3 tile=mix(texture2D(uW1,base-uPanV).rgb*texture2D(uW2,base-uPanV*0.6).rgb,coastTile,coast.z);\n"
++    "        vec4 shoreGround=vec4(texture2D(uLand,vWorld.xz*uFieldScale).rgb,1.0);\n"
++    "#ifdef WATER_PAINTED_BASE\n"
++    "        shoreGround=texture2D(uSheet,vSheet);\n"
++    "#endif\n"
++    "        vec3 land=shoreGround.rgb*vCol.a;\n"
++    "        float ripple=clamp(luma(tile)/max(uProductMean,0.02),0.65,1.25);\n"
++    "        vec3 clearWater=mix(vec3(0.19,0.28,0.29),vec3(luma(tile))*vec3(0.72,0.90,0.94),0.25);\n"
++    "        vec3 wetSand=land*mix(0.85,0.73,memory);\n"
++    "        float lowBank=1.0-smoothstep(0.045,0.16,vLift);\n"
++    "        wash=mix(wetSand,clearWater,0.30+0.18*film)*mix(0.96,1.04,ripple-0.65);\n"
++    "        washA=coastBand*max(film*0.64,memory*0.26)*max(uFade,0.65)*shoreGround.a*lowBank;\n"
++    "        vec2 fpX=coastX*1.35+vec2(grain,fine)*0.055;\n"
++    "        vec2 fpZ=coastZ*1.35+vec2(grain,fine)*0.055;\n"
++    "        float bubbles=mix(texture2D(uFoamTex,fpZ).b,texture2D(uFoamTex,fpX).b,coastWeight);\n"
++    "        float micro=mix(texture2D(uFoamTex,fpZ*1.91+vec2(.29,.61)).b,texture2D(uFoamTex,fpX*1.91+vec2(.29,.61)).b,coastWeight);\n"
++    "        float cellular=clamp(bubbles*0.85+micro*0.40,0.0,1.0);\n"
++    "        float lace=mix(0.40,1.0,smoothstep(0.22,0.75,grain*.42+fine*.58));\n"
++    "        float crest=exp(-pow((sd-front)/0.075,2.0));\n"
++    "        float trailing=exp(-pow((sd-front-0.085)/0.14,2.0));\n"
++    "        float crestLife=0.35+0.65*smoothstep(.01,.10,phase)*(1.0-smoothstep(.62,.94,phase));\n"
++    "        foam=coastBand*clamp(crest*.55+trailing*.32,0.0,1.0)*cellular*lace*crestLife*mix(.84,.40,river)*max(.40,shoreGround.a)*lowBank;\n"
++    "    }\n"
+     "    vec3 foamCol = vec3(0.86, 0.92, 0.98);\n"
+     "    float A = washA + foam * (1.0 - washA);\n"
+     "    if (A < 0.002) discard;\n"
+@@ -2501,23 +2552,27 @@
+ 
+     const std::vector<PackCell>& cells = water_cells();
+     glBegin(GL_TRIANGLES);
+-    for (size_t i = 0; i < cells.size(); i++) {
+-        const PackCell& c = cells[i];
+-        if (c.x < 0 || c.y < 0 || c.x >= g_gridW || c.y >= g_gridH) continue;
+-        if (!g_waterCoastCell[(size_t)c.y * g_gridW + c.x]) continue;
+-        if (!cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y)) continue;
+-        const int cxs[6] = { c.x, c.x, c.x + 1, c.x + 1, c.x, c.x + 1 };
+-        const int czs[6] = { c.y, c.y + 1, c.y, c.y, c.y + 1, c.y + 1 };
+-        for (int k = 0; k < 6; k++) {
+-            float light, vis, tint[3];
+-            water_terrain_corner(cxs[k], czs[k], false, oneSun, &light, &vis, tint);
++    const int steps=8,ox[6]={0,0,1,1,0,1},oz[6]={0,1,0,0,1,1};
++    for(size_t i=0;i<cells.size();i++) {
++        const PackCell& c=cells[i];
++        if(c.x<0||c.y<0||c.x>=g_gridW||c.y>=g_gridH)continue;
++        if(!g_waterCoastCell[(size_t)c.y*g_gridW+c.x])continue;
++        if(!cell_shown(c.x,c.y)||!cell_in_view(c.x,c.y))continue;
++        float lights[4],visible[4],tint[3];const int cx[4]={c.x,c.x+1,c.x,c.x+1},cz[4]={c.y,c.y,c.y+1,c.y+1};
++        for(int q=0;q<4;q++)water_terrain_corner(cx[q],cz[q],false,oneSun,&lights[q],&visible[q],tint);
++        for(int z=0;z<steps;z++)for(int x=0;x<steps;x++)for(int k=0;k<6;k++) {
++            const float fx=(x+ox[k])/(float)steps,fz=(z+oz[k])/(float)steps,wx=c.x+fx,wz=c.y+fz;
++            const float light=(lights[0]*(1-fx)+lights[1]*fx)*(1-fz)+(lights[2]*(1-fx)+lights[3]*fx)*fz;
++            const float vis=(visible[0]*(1-fx)+visible[1]*fx)*(1-fz)+(visible[2]*(1-fx)+visible[3]*fx)*fz;
++            const float lift=terrain_surface_height(wx,wz);
+             if(water_painted_base()) {
+                 const PackTex& at=water_atlas(water_atlas_index());
+-                glMultiTexCoord2f(GL_TEXTURE5,(cxs[k]==c.x?c.u0:c.u1)*(ra?1.0f:(float)at.uw/at.w),
+-                    (czs[k]==c.y?c.v0:c.v1)*(ra?1.0f:(float)at.uh/at.h));
++                glMultiTexCoord2f(GL_TEXTURE5,(c.u0+(c.u1-c.u0)*fx)*(ra?1.f:(float)at.uw/at.w),
++                    (c.v0+(c.v1-c.v0)*fz)*(ra?1.f:(float)at.uh/at.h));
+             }
+-            glColor4f(vis, vis, vis, light);      /* rgb the shroud, a the terrain's light */
+-            glVertex3f((float)cxs[k], terrain_corner_y(cxs[k], czs[k]), (float)czs[k]);
++            glMultiTexCoord2f(GL_TEXTURE6,lift,0);
++            glColor4f(vis,vis,vis,light);
++            glVertex3f(wx,terrain_y_base(wx,wz)+lift,wz);
+         }
+     }
+     glEnd();

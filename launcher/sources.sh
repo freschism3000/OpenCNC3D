@@ -16,6 +16,6 @@
 # needs the network, and the list it holds is a decision, so it is source rather than
 # a build product.
 
-LAUNCHER_SOURCES="launcher.c lui.c lpath.c lnet.c ljson.c lzip.c lupdate.c \
-                  lmedia.c lmedia_manifest.c lsetup_cli.c \
+LAUNCHER_SOURCES="launcher.c lui.c lskin.c lsignal.c llogo.c lpath.c lcmdline.c lnet.c ljson.c lzip.c lupdate.c \
+                  lmedia.c lmedia_manifest.c lmodule.c lsetup_cli.c \
                   ../game/dosbar.c ../menu/dosmenu.c ../video/pngwrite.c"

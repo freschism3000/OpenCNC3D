@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Applies the existing optional shroud regrowth rule to fair AI houses.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -36,6 +37,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 #include "factory.h"
 #include "logic.h"
 #include "vortex.h"
@@ -317,7 +319,7 @@ void LogicClass::AI(void)
         } else {
             for (int i = 0; i < Session.Players.Count(); i++) {
                 HouseClass* player_ptr = HouseClass::As_Pointer(Session.Players[i]->Player.ID);
-                if (player_ptr && player_ptr->IsHuman) {
+                if (player_ptr && (player_ptr->IsHuman || FairAI_RA_Enabled(player_ptr))) {
                     Map.Encroach_Shadow(player_ptr);
                 }
             }

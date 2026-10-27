@@ -8,6 +8,11 @@ static InfantryAudioClip g_infantryClips[INFANTRY_AUDIO_VARIANTS] = {};
 static std::map<int, InfantryAudioStep> g_infantrySteps;
 static std::vector<InfantryAudioVoice> g_infantryVoices;
 static unsigned g_infantryRng = 0, g_infantryPlays = 0;
+/* The crowd limit's account (infantry_audio_math.h): steps it held back since boot, and
+   this tick's walkers in earshot, their level and how many steps it started. */
+static unsigned g_infantryHeld = 0;
+static int g_infantryWalkers = 0, g_infantryStarted = 0;
+static float g_infantryCrowd = 1.0f;
 static int g_infantryFrame = -1;
 static float g_infantryZoom = 0;
 
@@ -72,9 +77,12 @@ static void infantry_audio_update(int fbw,int fbh,bool running)
     if (g_infantryFrame==g_engineFrame) return;  // render/probe calls never duplicate steps
     g_infantryFrame=g_engineFrame;
     std::map<int,InfantryAudioStep> next;
+    struct Candidate { int id, variant, pitch, volume, pan; float distance, x, z; };
+    std::vector<Candidate> due;
+    int walkers=0;
     for (size_t i=0;i<g_objects.size();++i) {
         const SimObject& o=g_objects[i];
-        if (o.kind!=K_INFANTRY || o.id<0 || o.str<=0 || o.limbo || !visible(o) || !infantry_audio_is_soldier(o.type)) continue;
+        if (o.kind!=K_INFANTRY || o.id<0 || o.str<=0 || o.limbo || !visible(o) || !infantry_audio_walks(o.type, g_raModule)) continue;
         std::map<int,AnimState>::const_iterator anim=g_anim.find(o.id);
         if (anim==g_anim.end()) continue;
         const AnimState& a=anim->second;
@@ -83,29 +91,57 @@ static void infantry_audio_update(int fbw,int fbh,bool running)
         const float phase=m3inf_gait_stride(o,a.spd)>1e-4f ? a.gph : a.dist/0.6f;
         const int beat=(int)floorf(phase*2);
         next[o.id]=InfantryAudioStep{beat,phase};
-        if (a.slot!=M3INF_RUN || a.step<=0 || a.step>1.5f) continue;
-        std::map<int,InfantryAudioStep>::const_iterator previous=g_infantrySteps.find(o.id);
-        if (previous!=g_infantrySteps.end() && (beat<=previous->second.beat || phase-previous->second.phase>2)) continue;
+        /* Red Alert's dog gallops on its CRAWL clip (DO_CRAWL is how its brain moves it);
+           a crawling soldier still makes no step */
+        const bool striding=a.slot==M3INF_RUN || (a.slot==M3INF_CRAWL && infantry_audio_is_paw(o.type));
+        if (!striding || a.step<=0 || a.step>1.5f) continue;
         float col,row;
         if (!project_point(o.ex,terrain_y(o.ex,o.ez),o.ez,fbw,fbh,&col,&row)) continue;
         const float dx=o.ex<vx0?vx0-o.ex:o.ex>vx1?o.ex-vx1:0;
         const float dz=o.ez<vz0?vz0-o.ez:o.ez>vz1?o.ez-vz1:0;
         const float distance=ambience_attenuation(sqrtf(dx*dx+dz*dz));
         if (distance<=0) continue;
+        ++walkers;   // in earshot and walking, whether or not his foot lands this tick
+        std::map<int,InfantryAudioStep>::const_iterator previous=g_infantrySteps.find(o.id);
+        if (previous!=g_infantrySteps.end() && (beat<=previous->second.beat || phase-previous->second.phase>2)) continue;
         if (!g_infantryRng) g_infantryRng=vehicle_audio_seed()^0x9e3779b9u;
-        const int variant=(int)vehicle_audio_random_offset(g_infantryRng,INFANTRY_AUDIO_VARIANTS);
-        const int pitch=900+(int)vehicle_audio_random_offset(g_infantryRng,201);
-        const int volume=900+(int)vehicle_audio_random_offset(g_infantryRng,201);
-        const int gain=infantry_audio_gain(g_infantryZoom,distance,volume);
-        InfantryAudioClip* clip=infantry_audio_clip(variant);
+        Candidate c;
+        c.id=o.id;
+        c.variant=(int)vehicle_audio_random_offset(g_infantryRng,INFANTRY_AUDIO_VARIANTS);
+        c.pitch=900+(int)vehicle_audio_random_offset(g_infantryRng,201);
+        c.volume=900+(int)vehicle_audio_random_offset(g_infantryRng,201);
+        /* the dog: the mixer's highest pitch (it allows ten per cent either way) at 60% */
+        if (infantry_audio_is_paw(o.type)) { c.pitch=1100; c.volume=c.volume*6/10; }
+        c.pan=vehicle_audio_screen_pan(col,(float)fbw);
+        c.distance=distance; c.x=o.ex; c.z=o.ez;
+        due.push_back(c);
+    }
+    // THE CROWD LIMIT (infantry_audio_math.h): the crowd sets every step's level, the
+    // steps still ringing set how many may start, and the loudest of this tick's go first.
+    g_infantryWalkers=walkers;
+    g_infantryCrowd=infantry_audio_crowd_gain(walkers);
+    std::vector<int> gains(due.size()), ids(due.size()), order(due.size());
+    for (size_t i=0;i<due.size();++i) {
+        due[i].volume=(int)(due[i].volume*g_infantryCrowd+0.5f);
+        gains[i]=infantry_audio_gain(g_infantryZoom,due[i].distance,due[i].volume);
+        ids[i]=due[i].id;
+    }
+    const int chosen=due.empty() ? 0 :
+        infantry_audio_pick(&gains[0],&ids[0],(int)due.size(),
+                            infantry_audio_budget((int)g_infantryVoices.size()),&order[0]);
+    g_infantryHeld+=(unsigned)(due.size()-chosen);
+    g_infantryStarted=0;
+    for (int k=0;k<chosen;++k) {
+        const Candidate& c=due[order[k]];
+        InfantryAudioClip* clip=infantry_audio_clip(c.variant);
         if (!clip) continue;
-        const int pan=vehicle_audio_screen_pan(col,(float)fbw);
         audio_backend_lock();
-        const int handle=mixer_play_foley_pitched(mix,(short*)clip->pcm,clip->bytes/4,pan,pitch);
+        const int handle=mixer_play_foley_pitched(mix,(short*)clip->pcm,clip->bytes/4,c.pan,c.pitch);
         if (handle>=0) {
-            mixer_voice_fade(mix,handle,gain,pan,6);
-            g_infantryVoices.push_back(InfantryAudioVoice{handle,o.id,gain,pan,variant,pitch,volume,o.ex,o.ez});
+            mixer_voice_fade(mix,handle,gains[order[k]],c.pan,6);
+            g_infantryVoices.push_back(InfantryAudioVoice{handle,c.id,gains[order[k]],c.pan,c.variant,c.pitch,c.volume,c.x,c.z});
             ++g_infantryPlays;
+            ++g_infantryStarted;
         }
         audio_backend_unlock();
     }
@@ -115,6 +151,9 @@ static void infantry_audio_dump(void)
 {
     printf("INFANTRYAUDIO|state|zoom=%.4f|zoomgain=%.4f|plays=%u|voices=%zu\n",
         g_infantryZoom,infantry_audio_zoom_gain(g_infantryZoom),g_infantryPlays,g_infantryVoices.size());
+    printf("INFANTRYAUDIO|limit|walkers=%d|crowd=%.4f|started=%d|held=%u|maxvoices=%d|pertick=%d\n",
+        g_infantryWalkers,g_infantryCrowd,g_infantryStarted,g_infantryHeld,
+        (int)INFANTRY_AUDIO_MAX_VOICES,(int)INFANTRY_AUDIO_STARTS_PER_TICK);
     for (size_t i=0;i<g_infantryVoices.size();++i) {
         const InfantryAudioVoice& v=g_infantryVoices[i];
         printf("INFANTRYAUDIO|voice|id=%d|gain=%d|pan=%d|variant=%d|pitch=%d|volume=%d\n",v.id,v.gain,v.pan,v.variant+1,v.pitch,v.volume);

@@ -95,9 +95,15 @@ static const char* rt_override_path(const char* env_name,
                                     const char* repo_run)
 {
     const char* path = getenv(env_name);
+    static char parent_packaged[512];
     if (path && (!strcmp(path, "off") || !strcmp(path, "none"))) return NULL;
     if (path && *path) return path;
     if (rt_override_exists(packaged)) return packaged;
+    /* RA3D runs from playable/ra3d but shares OpenCNC3D's authored terrain packs,
+       which game/make-build.sh places in the parent playable/ folder. */
+    if (packaged && snprintf(parent_packaged, sizeof parent_packaged, "../%s", packaged)
+        < (int)sizeof parent_packaged && rt_override_exists(parent_packaged))
+        return parent_packaged;
     if (rt_override_exists(repo_root)) return repo_root;
     if (rt_override_exists(repo_run)) return repo_run;
     return NULL;

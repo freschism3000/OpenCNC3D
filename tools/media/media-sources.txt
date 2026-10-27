@@ -9,8 +9,9 @@
 #
 #   source <DISC> iso|zip <url>
 #
-# DISC is GDI, NOD or COVERT. Order is preference: the launcher tries mirrors in the
-# order the manifest lists them, which is this order minus the dropped ones.
+# DISC is GDI, NOD, COVERT, RA_ALLIED or RA_SOVIET. Order is preference: the launcher
+# tries mirrors in the order the manifest lists them, which is this order minus the
+# dropped ones.
 #
 # GDI and NOD are the two discs of the freeware C&C Gold release that Electronic Arts
 # made available at no charge. The archive.org copies in items gdi-95 and
@@ -34,3 +35,13 @@ source NOD iso https://archive.org/download/cn-c-gdi-95/CnC_NOD95.iso
 
 source COVERT iso https://archive.org/download/cc_worldwide_warfare/COVERT.iso
 source COVERT zip https://files.cncnz.com/cc1_tiberian_dawn/full_game/CovertOps_ISO.zip
+
+# RA_ALLIED and RA_SOVIET are the two discs of the 1996 Red Alert release that Electronic
+# Arts made freeware in 2008, for the Red Alert module's movies and score: the Allied disc
+# holds MOVIES1.MIX and the Soviet disc MOVIES2.MIX, each inside its MAIN.MIX, and both
+# hold the same SCORES.MIX. The archive.org item cnc-red-alert carries both images with
+# MD5 13e213c788890e5172c766ed0059ea22 (Allied) and b6eddcf8daefcd633ea804f9813e25b7
+# (Soviet), the images data/radata was extracted from. One mirror each so far.
+
+source RA_ALLIED iso https://archive.org/download/cnc-red-alert/redalert_allied.iso
+source RA_SOVIET iso https://archive.org/download/cnc-red-alert/redalert_soviets.iso

@@ -2,12 +2,13 @@
 #define OPENCNC3D_CINEMATIC_AUDIO_H
 #include "cinematic_audio_math.h"
 struct CinematicClip { Uint8* pcm; Uint32 bytes; bool tried; };
-struct CinematicEvent { int kind; float x,z,mass; };
+struct CinematicEvent { int kind; float x,z,mass; bool splash; };
 struct CinematicVoice { int handle,kind,gain,pan; float x,z; };
 static CinematicClip g_cinematicClips[CIN_COUNT]={};
 static std::vector<CinematicEvent> g_cinematicEvents;
 static std::vector<CinematicVoice> g_cinematicVoices;
 static unsigned g_cinematicPlays[CIN_COUNT]={};
+static unsigned g_cinematicSplashes=0;   /* placement impacts played as the water splash */
 static int g_cinematicLast[CIN_COUNT]={-1000,-1000,-1000,-1000,-1000};
 static int g_cinematicRumble=-1, g_cinematicGain=0;
 static long g_cinematicAt[CIN_COUNT]={-1,-1,-1,-1,-1};  /* output frame each kind last started */
@@ -35,16 +36,22 @@ static CinematicClip* cinematic_audio_clip(int kind)
     }
     fprintf(stderr,"CINEMATICAUDIO|missing/invalid|%s\n",g_cinematicNames[kind]);return NULL;
 }
-static void cinematic_audio_note(int kind,float x,float z,float mass)
+// `splash`: a placement impact played as Red Alert's water splash (VOC_SPLASH, SPLASH9) in
+// place of placement_impact, at the same gain and with the same duck: a building in the sea.
+static void cinematic_audio_note_as(int kind,float x,float z,float mass,bool splash)
 {
     if (!g_au || !g_fx.enabled || g_editOn || kind<0 || kind>=CIN_RUMBLE || !cell_shown((int)x,(int)z) || shroud_cell_hidden((int)x,(int)z)) return;
     // Keep the strongest of same-kind simultaneous impacts, avoiding coherent stacking.
     for(size_t i=0;i<g_cinematicEvents.size();++i)
         if (g_cinematicEvents[i].kind==kind) {
-            if (mass>g_cinematicEvents[i].mass) g_cinematicEvents[i]=CinematicEvent{kind,x,z,mass};
+            if (mass>g_cinematicEvents[i].mass) g_cinematicEvents[i]=CinematicEvent{kind,x,z,mass,splash};
             return;
         }
-    g_cinematicEvents.push_back(CinematicEvent{kind,x,z,mass});
+    g_cinematicEvents.push_back(CinematicEvent{kind,x,z,mass,splash});
+}
+static void cinematic_audio_note(int kind,float x,float z,float mass)
+{
+    cinematic_audio_note_as(kind,x,z,mass,false);
 }
 static void cinematic_audio_stop(void)
 {
@@ -91,8 +98,20 @@ static void cinematic_audio_update(int fbw,int fbh,bool running)
         const CinematicEvent& e=g_cinematicEvents[i];int pan;
         const float distance=cinematic_audio_place(e.x,e.z,fbw,fbh,x0,x1,z0,z1,&pan);
         if (distance<=0 || g_engineFrame-g_cinematicLast[e.kind]<3) continue;
-        CinematicClip* c=cinematic_audio_clip(e.kind);if (!c) continue;
         const int gain=cinematic_audio_impact_gain(e.kind==CIN_PLACE,e.mass);
+        if (e.splash) {
+            // the 1996 clip from the sound bank, which pins it while it plays (and locks the
+            // backend itself); a disc without it is silent here, as the bank's other misses are
+            int h=cnc_audio_play_named(g_au,"SPLASH9.AUD",MIX_BUS_FX,0,pan,200);
+            if (h<0) continue;
+            audio_backend_lock();
+            mixer_voice_fade(mix,h,(int)(gain*distance),pan,4);g_cinematicVoices.push_back(CinematicVoice{h,e.kind,gain,pan,e.x,e.z});
+            ++g_cinematicPlays[e.kind];++g_cinematicSplashes;g_cinematicLast[e.kind]=g_engineFrame;g_cinematicAt[e.kind]=mixer_frames_rendered(mix);
+            mixer_duck(mix,cinematic_audio_duck_depth(CIN_IMPACT_DUCK,gain*distance/1000.0f,mixer_bus_gain_get(mix,MIX_BUS_FX)),12,230,1100);
+            audio_backend_unlock();
+            continue;
+        }
+        CinematicClip* c=cinematic_audio_clip(e.kind);if (!c) continue;
         audio_backend_lock();int h=mixer_play_cinematic(mix,(short*)c->pcm,c->bytes/4,pan,0);
         if (h>=0) {
             mixer_voice_fade(mix,h,(int)(gain*distance),pan,4);g_cinematicVoices.push_back(CinematicVoice{h,e.kind,gain,pan,e.x,e.z});
@@ -136,7 +155,7 @@ static void cinematic_audio_update(int fbw,int fbh,bool running)
 }
 static void cinematic_audio_dump(void)
 {
-    printf("CINEMATICAUDIO|state|place=%u|collapse=%u|vehicle=%u|damage=%u|rumble=%u|rumblegain=%d|voices=%zu|pending=%zu|duck=%d|placeat=%ld|rumbleat=%ld\n",g_cinematicPlays[0],g_cinematicPlays[1],g_cinematicPlays[2],g_cinematicPlays[3],g_cinematicPlays[4],g_cinematicGain,g_cinematicVoices.size(),g_cinematicEvents.size(),
-           g_au?mixer_duck_get(cnc_audio_mixer(g_au)):1000,g_cinematicAt[CIN_PLACE],g_cinematicAt[CIN_RUMBLE]);
+    printf("CINEMATICAUDIO|state|place=%u|collapse=%u|vehicle=%u|damage=%u|rumble=%u|rumblegain=%d|voices=%zu|pending=%zu|duck=%d|placeat=%ld|rumbleat=%ld|splash=%u\n",g_cinematicPlays[0],g_cinematicPlays[1],g_cinematicPlays[2],g_cinematicPlays[3],g_cinematicPlays[4],g_cinematicGain,g_cinematicVoices.size(),g_cinematicEvents.size(),
+           g_au?mixer_duck_get(cnc_audio_mixer(g_au)):1000,g_cinematicAt[CIN_PLACE],g_cinematicAt[CIN_RUMBLE],g_cinematicSplashes);
 }
 #endif

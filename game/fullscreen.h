@@ -49,6 +49,23 @@ FS_MAYBE_UNUSED static int fs_background_only(void)
     return e && e[0] == '1';
 }
 
+enum { FS_MODE_WINDOWED = 0, FS_MODE_BORDERLESS = 1, FS_MODE_FULLSCREEN = 2 };
+
+/* The owning application can remember mode changes from any screen sharing its
+   window. Window data avoids a renderer dependency in standalone menu/movie previews. */
+typedef void (*FS_DisplayChanged)(SDL_Window*, int);
+FS_MAYBE_UNUSED static void fs_set_change_handler(SDL_Window* window, FS_DisplayChanged handler)
+{
+    static FS_DisplayChanged registered;
+    registered = handler;
+    if (window) SDL_SetWindowData(window, "opencnc3d-display-changed", &registered);
+}
+FS_MAYBE_UNUSED static void fs_report_mode_changed(SDL_Window* window, int mode)
+{
+    FS_DisplayChanged* handler = (FS_DisplayChanged*)SDL_GetWindowData(window, "opencnc3d-display-changed");
+    if (handler && *handler) (*handler)(window, mode);
+}
+
 /* Set by --fullscreen, read by whoever creates the window. */
 static int fs_start_fullscreen FS_MAYBE_UNUSED = 0;
 
@@ -81,11 +98,14 @@ FS_MAYBE_UNUSED static int fs_handle_event(const SDL_Event *e)
         return 1;
 
     flags = SDL_GetWindowFlags(w);
+    if (fs_background_only() || (flags & SDL_WINDOW_HIDDEN))
+        return 1;
     on = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : 1;
     if (SDL_SetWindowFullscreen(w, on ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) != 0) {
         fprintf(stderr, "FULLSCREEN|failed|%s\n", SDL_GetError());
         return 1;
     }
+    fs_report_mode_changed(w, on ? FS_MODE_BORDERLESS : FS_MODE_WINDOWED);
     fprintf(stderr, "FULLSCREEN|%s\n", on ? "on" : "off");
     return 1;
 }
@@ -102,13 +122,22 @@ FS_MAYBE_UNUSED static int fs_handle_event(const SDL_Event *e)
                 res_h. It can leave the desktop in that mode if the program dies while it
                 is on, which is the reason borderless was chosen in the first place and
                 the reason it stays the default. */
-enum { FS_MODE_WINDOWED = 0, FS_MODE_BORDERLESS = 1, FS_MODE_FULLSCREEN = 2 };
-
 FS_MAYBE_UNUSED static Uint32 fs_initial_flags(int mode)
 {
-    if (mode == FS_MODE_FULLSCREEN) return SDL_WINDOW_FULLSCREEN | SDL_WINDOW_RESIZABLE;
+    if (fs_background_only()) return SDL_WINDOW_RESIZABLE;
+    /* Exclusive mode is applied after creation, once its exact display mode is set.
+       Entering it here would first switch to the constructor's window size. */
+    if (mode == FS_MODE_FULLSCREEN) return SDL_WINDOW_RESIZABLE;
     if (mode == FS_MODE_BORDERLESS) return SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_RESIZABLE;
     return SDL_WINDOW_RESIZABLE;
+}
+
+FS_MAYBE_UNUSED static int fs_window_mode(SDL_Window *w)
+{
+    const Uint32 flags = w ? SDL_GetWindowFlags(w) : 0;
+    if ((flags & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP)
+        return FS_MODE_BORDERLESS;
+    return (flags & SDL_WINDOW_FULLSCREEN) ? FS_MODE_FULLSCREEN : FS_MODE_WINDOWED;
 }
 
 /* THE DISPLAY A WINDOW IS ON. SDL numbers displays from 0 and a window on the second
@@ -160,10 +189,22 @@ FS_MAYBE_UNUSED static int fs_clamp_windowed(int display, int *w, int *h)
     return 1;
 }
 
+/* Best-effort rollback after a driver rejects part of an exclusive transition. */
+FS_MAYBE_UNUSED static int fs_restore_display(SDL_Window* w, const SDL_DisplayMode* previous,
+                                             Uint32 fullscreenFlags)
+{
+    if (!w || fs_background_only() || (SDL_GetWindowFlags(w) & SDL_WINDOW_HIDDEN)) return 0;
+    int restored = 1;
+    if (SDL_SetWindowFullscreen(w, 0) != 0) restored = 0;
+    if (SDL_SetWindowDisplayMode(w, previous) != 0) restored = 0;
+    if (SDL_SetWindowFullscreen(w, fullscreenFlags) != 0) restored = 0;
+    return restored;
+}
+
 FS_MAYBE_UNUSED static int fs_apply_mode(SDL_Window *w, int mode, int rw, int rh)
 {
     const int display = fs_window_display(w);
-    if (!w)
+    if (!w || fs_background_only() || (SDL_GetWindowFlags(w) & SDL_WINDOW_HIDDEN))
         return 0;
     if (mode == FS_MODE_BORDERLESS) {
         if (SDL_SetWindowFullscreen(w, SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
@@ -173,13 +214,33 @@ FS_MAYBE_UNUSED static int fs_apply_mode(SDL_Window *w, int mode, int rw, int rh
     } else if (mode == FS_MODE_FULLSCREEN) {
         SDL_DisplayMode want, got;
         SDL_zero(want);
-        want.w = rw;
-        want.h = rh;
-        SDL_SetWindowFullscreen(w, 0);
-        if (rw > 0 && rh > 0 && SDL_GetClosestDisplayMode(display, &want, &got))
-            SDL_SetWindowDisplayMode(w, &got);
-        if (SDL_SetWindowFullscreen(w, SDL_WINDOW_FULLSCREEN) != 0) {
-            fprintf(stderr, "DISPLAY|failed|fullscreen|%s\n", SDL_GetError());
+        /* 0x0 means the desktop mode itself. Leaving SDL's preferred mode unset (or
+           passing NULL) reuses the window's dimensions, normally 1280x720. */
+        if (rw <= 0 || rh <= 0) {
+            if (SDL_GetDesktopDisplayMode(display, &got) != 0) {
+                fprintf(stderr, "DISPLAY|failed|desktop mode|%s\n", SDL_GetError());
+                return 0;
+            }
+        } else {
+            want.w = rw;
+            want.h = rh;
+            if (!SDL_GetClosestDisplayMode(display, &want, &got)) {
+                fprintf(stderr, "DISPLAY|failed|display mode|%s\n", SDL_GetError());
+                return 0;
+            }
+        }
+        SDL_DisplayMode previous;
+        const Uint32 previousFlags = SDL_GetWindowFlags(w) & SDL_WINDOW_FULLSCREEN_DESKTOP;
+        if (SDL_GetWindowDisplayMode(w, &previous) != 0) {
+            fprintf(stderr, "DISPLAY|failed|read previous mode|%s\n", SDL_GetError());
+            return 0;
+        }
+        if (SDL_SetWindowFullscreen(w, 0) != 0
+            || SDL_SetWindowDisplayMode(w, &got) != 0
+            || SDL_SetWindowFullscreen(w, SDL_WINDOW_FULLSCREEN) != 0) {
+            fprintf(stderr, "DISPLAY|failed|set fullscreen mode|%s\n", SDL_GetError());
+            const int restored = fs_restore_display(w, &previous, previousFlags);
+            fprintf(stderr, "DISPLAY|restore|%s\n", restored ? "previous mode" : "failed; using actual window mode");
             return 0;
         }
     } else {
@@ -188,7 +249,10 @@ FS_MAYBE_UNUSED static int fs_apply_mode(SDL_Window *w, int mode, int rw, int rh
            promises. Anything larger than that room is clamped to it. */
         if (rw <= 0 || rh <= 0)
             fs_usable_size(display, &rw, &rh);
-        SDL_SetWindowFullscreen(w, 0);
+        if (SDL_SetWindowFullscreen(w, 0) != 0) {
+            fprintf(stderr, "DISPLAY|failed|windowed|%s\n", SDL_GetError());
+            return 0;
+        }
         SDL_SetWindowBordered(w, SDL_TRUE);
         SDL_SetWindowResizable(w, SDL_TRUE);
         if (rw > 0 && rh > 0) {

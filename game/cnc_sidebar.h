@@ -132,6 +132,8 @@ static int g_sbUiDiv = 1;
 #include "hud640.h"
 #include "hud_enhanced.h"
 #include "hud_enhanced_catalog.h"
+#include "ra_hud_pixels.h"
+#include "sidebar_build_potential.h"
 
 /* ---- the engine's cell stride, which is NOT a constant ------------------------------
  *
@@ -185,6 +187,7 @@ struct SbRosterRow {
 struct SbHooks {
     float (*EffectTime)(void);
     bool (*OwnedBuilding)(const char*);
+    int (*BuildPotential)(uint64, OpenCNC3D_BuildPotentialEntry*, int);
     /* the brain, already dlsym'd by the host */
     bool (*GetState)(GameStateRequestEnum, uint64, unsigned char*, unsigned int);
     void (*SidebarReq)(SidebarRequestEnum, uint64, int, int, short, short);
@@ -484,6 +487,7 @@ struct SbState {
     int powerProduced, powerDrained;
     bool repairEnabled, sellEnabled, radarActive;
     std::vector<SbEntry> entry;
+    std::vector<std::string> potential;
 };
 
 static SbHooks g_sb;
@@ -541,6 +545,13 @@ static bool codex_holds_the_world(void);
 /* -1 = nobody has asked, so the OPENCNC3D_HUD environment variable still decides. 0/1 = the
    Visuals dialog or the Enhanced path has an opinion and it wins. */
 static int        g_hudNewWish = -1;
+/* Each module's validated HUD pack is independent. RA never needs TD chrome
+   merely to enter the shared layout, radar and input controllers. */
+static bool sb_hud_active(void)
+{
+    return g_hudNewWish == 1 &&
+           (g_sbRa ? (g_raHudPack && g_fx.enabled) : g_h6Pack != NULL);
+}
 /* OPENCNC3D_HUD IS A STARTING VALUE, NOT A VETO, and this was got wrong once in the obvious
    direction. When G53 went red on the day the New HUD dial landed, the env var was made a
    HARD override so the gate could pin the HUD it wanted. That broke the feature outright
@@ -564,13 +575,13 @@ static void sb_set_ui_scale(int div)
 static void sb_set_hud_new(int on)
 {
     g_hudNewWish = on ? 1 : 0;
-    g_hudNew = (!g_sbRa && g_h6Pack && g_hudNewWish == 1);
+    g_hudNew = sb_hud_active();
 }
 
 /* WHICH SIDEBAR IS ACTUALLY ON SCREEN, as opposed to which one was asked for. The two can
    disagree when hud640.pack is missing, and the whole point of reporting both is that a
    gate asserting only the checkbox would have passed through the week the dial was inert. */
-static int sb_hud_is_new(void) { return g_hudNew ? 1 : 0; }
+static int sb_hud_is_new(void) { return sb_hud_active() ? 1 : 0; }
 /* Sized for the TALLEST bar, not the authored one: the number of build rows follows the
    screen height now (hud640.h, "MORE ROWS ON A TALLER SCREEN"). g_h6Rows is what it came
    out at this frame and every reader below asks it rather than assuming H6_ROWS. */
@@ -581,7 +592,7 @@ static int g_h6Rows = H6_ROWS;
    hud640_layout.h. Leaving this at the well size overruns each slot into the next by
    1308 bytes and the last one past the end of the array. */
 static unsigned char g_h6Cameo[H6_COLUMNS * H6_MAX_ROWS][H6_CAMEO_W * H6_CAMEO_H * 4];
-static unsigned char g_h6Radar[EH_RADAR_W * EH_RADAR_H * 4];
+static unsigned char g_h6Radar[160 * 160 * 4];
 
 /* THE TRUE-COLOUR CAMEOS. 64x48 RGBA, one per buildable, baked by
    tools/sidebar_redesign/cameos_tdr.py from the 128x96 source art in art/cameos-tdr.
@@ -633,7 +644,7 @@ static void h6_tdr_load(const char* path)
 }
 
 /* THIS SET IS NOT THE CARTRIDGE'S, and that has to be said at the point of substitution.
-   art/cameos-tdr is 54 generated 128x96 PNGs, 49 of them made by an image model from the
+   art/cameos-tdr is 54 generated 128x96 PNGs, 49 of them made from the
    1995 manual renders (tools/sidebar_redesign/cameos_tdr.py), and the measured drift is recorded
    from the source art. It is used for these four tiles because the alternative is a
    captioned rectangle, not because it is faithful. On the WALL page that puts two soft
@@ -726,7 +737,7 @@ static float g_h6Scale = 1.5f;
 static unsigned char g_h6Tab[H6_BAR_W * H6_TAB_H * 4];
 static GLuint     g_h6TexBar = 0, g_h6TexCred = 0, g_h6TexOpt = 0, g_h6TexSide = 0;
 static GLuint     g_h6TexDb = 0;   /* the DATABASE plate */
-#define H6_POT_W 256
+#define H6_POT_W 512 /* RA selection card is272px; UVs/uploads share this allocation. */
 /* 1024, not 512: a twelve-row bar is 816 tall. The power-of-two upload is one texture
    for every bar height, so the atlas is sized once for the maximum and the quad's v
    range does the rest. */
@@ -861,11 +872,14 @@ static int g_sbDrawnDosPower = -2, g_sbDrawnDosIndex = -1;
 static int g_sbDrawnHudPower = -2;
 static int g_sbDrawnHudCount[3] = { 0, 0, 0 };
 
+static void sb_super_settle(void);   /* the armed special, read against this poll */
+
 static void sb_poll(void)
 {
     if (g_sbBuf.size() < (1u << 20)) g_sbBuf.resize(1u << 20);
     g_sbState.valid = false;
     g_sbState.entry.clear();
+    g_sbState.potential.clear();
     memset(&g_sbBuf[0], 0, 4096);
     if (!g_sb.GetState || !g_sb.GetState(GAME_STATE_SIDEBAR, 0, &g_sbBuf[0],
                                          (unsigned)g_sbBuf.size()))
@@ -897,6 +911,14 @@ static void sb_poll(void)
            shroud is already lifted for the same reason. */
         g_sbState.radarActive = 1;
         return;
+    }
+    if (g_sb.BuildPotential) {
+        OpenCNC3D_BuildPotentialEntry potential[OPENCNC3D_BUILD_POTENTIAL_MAX];
+        const int count = g_sb.BuildPotential(0, potential, OPENCNC3D_BUILD_POTENTIAL_MAX);
+        for (int i = 0; i < count && i < OPENCNC3D_BUILD_POTENTIAL_MAX; ++i) {
+            potential[i].name[sizeof potential[i].name - 1] = 0;
+            g_sbState.potential.push_back(potential[i].name);
+        }
     }
     int n = s->EntryCount[0] + s->EntryCount[1];
     for (int i = 0; i < n; i++) {
@@ -961,6 +983,7 @@ static void sb_poll(void)
                   g_sbPlaceBId   = g_sbState.entry[i].bid; break; }
     }
     g_sbReady = true;
+    sb_super_settle();
 }
 
 static int sb_find(const char* name)
@@ -1025,8 +1048,21 @@ static const char* sb_art_name(const char* n)
  *  that launches nothing while the log still claims a launch. The buildable type and id
  *  below are the engine's own identifiers for the special and survive any rebuild. */
 static bool g_sbSuperOn = false;
+/* The last special the player fired, and a count of them (a structure's model plays its own
+   part of it: the Iron Curtain's sphere, ebld_mod.h RA_DRIVE) */
+static char g_sbSuperFiredName[16] = {0};
+static int  g_sbSuperFiredSerial = 0;
 static char g_sbSuperName[16] = {0};
 static int  g_sbSuperBType = 0, g_sbSuperBId = 0;
+/* Red Alert's Chronosphere and Iron Curtain can miss and stay armed after a click; see
+   sb_super_engine_arm below for the whole of it. */
+static bool g_sbSuperPending = false;   /* a held shot went out; its verdict is not in yet */
+
+static bool sb_super_can_miss(void)
+{
+    /* SPC_CHRONOSPHERE 2 and SPC_IRON_CURTAIN 6 (redalert/defines.h) */
+    return g_sbRa && (g_sbSuperBId == 2 || g_sbSuperBId == 6);
+}
 
 static bool sb_super_armed(void) { return g_sbSuperOn; }
 
@@ -1044,6 +1080,7 @@ static void sb_super_disarm(const char* why)
 {
     if (!g_sbSuperOn) return;
     g_sbSuperOn = false;
+    g_sbSuperPending = false;
     printf("SUPER|disarm|%s|%s\n", g_sbSuperName, why ? why : "");
     fflush(stdout);
 }
@@ -1055,6 +1092,7 @@ static void sb_super_disarm(const char* why)
 static void sb_super_arm(const SbEntry& e)
 {
     g_sbSuperOn = true;
+    g_sbSuperPending = false;
     memset(g_sbSuperName, 0, sizeof(g_sbSuperName));
     strncpy(g_sbSuperName, e.name, sizeof(g_sbSuperName) - 1);
     g_sbSuperBType = e.btype;
@@ -1080,8 +1118,73 @@ static bool sb_super_fire(int px, int py)
                         g_sbSuperBType, g_sbSuperBId, px, py);
     printf("SUPER|fire|%s|id=%d|enginepx=%d,%d\n", g_sbSuperName, g_sbSuperBId, px, py);
     fflush(stdout);
+    if (sb_super_can_miss()) {
+        /* Still armed: the engine's verdict decides (sb_super_settle, sb_super_engine_arm). */
+        g_sbSuperPending = true;
+        return true;
+    }
+    snprintf(g_sbSuperFiredName, sizeof g_sbSuperFiredName, "%s", g_sbSuperName);
+    g_sbSuperFiredSerial++;
     g_sbSuperOn = false;           /* one shot arms one launch */
     return true;
+}
+
+/* ---- RED ALERT'S TWO-CLICK CHRONOSPHERE, AND THE SPECIALS THAT CAN MISS --------------
+ *  The Chronosphere is fired twice. The first shot names a unit: the engine's
+ *  Place_Special_Blast (house.cpp, SPC_CHRONOSPHERE) looks for one of the player's own
+ *  units, infantry or ships on the clicked cell, and when it finds one it remembers it as
+ *  UnitToTeleport, switches its targeting mode to SPC_CHRONO2 and raises
+ *  CALLBACK_EVENT_SPECIAL_WEAPON_TARGETTING, because in this DLL the targeting state lives
+ *  on the front end's side. The second shot is SPC_CHRONO2 at the destination cell, which
+ *  is what moves the unit and spends the charge. A host that ignores the event therefore
+ *  never sends the second shot: the click after the first lands as an ordinary click, the
+ *  unit stays where it was and the Chronosphere stays charged. sb_super_engine_arm is the
+ *  host's half of that event. The Chrono Tank's own jump (unit.cpp, UNIT_CHRONOTANK)
+ *  raises the same event and is answered the same way.
+ *
+ *  THE FIRST SHOT CAN MISS, AND SO CAN THE IRON CURTAIN. Clicked on bare ground, an
+ *  enemy or (for the curtain) a soldier, Place_Special_Blast finds nothing to act on and
+ *  leaves the targeting mode as it was, so in the 1996 game the cursor stays up and the
+ *  next click tries again; the mode is only cleared by a shot that worked. The other
+ *  Red Alert specials act on any cell and never miss, so they keep the one-shot rule.
+ *  For these two the click leaves the special armed and the engine's answer settles it:
+ *  the targeting event (the Chronosphere found its unit), or the sidebar entry no longer
+ *  ready (the Iron Curtain was spent). Tiberian Dawn's three always fire and are never
+ *  held. */
+/* The engine has entered a targeting mode on its own and wants the next click aimed. No
+   selection clear and no "select target": the 1996 game says nothing between the
+   Chronosphere's two clicks, and its selection is already empty, because arming the
+   first one cleared it. Called from the event callback, inside the engine's tick, so it
+   only sets state; nothing here calls back into the engine. */
+static void sb_super_engine_arm(const char* name, int btype, int bid)
+{
+    g_sbSuperOn = true;
+    g_sbSuperPending = false;
+    memset(g_sbSuperName, 0, sizeof(g_sbSuperName));
+    strncpy(g_sbSuperName, name, sizeof(g_sbSuperName) - 1);
+    g_sbSuperBType = btype;
+    g_sbSuperBId = bid;
+    printf("SUPER|arm|%s|id=%d|by=engine\n", g_sbSuperName, g_sbSuperBId);
+    fflush(stdout);
+}
+
+/* Read once per sidebar poll. A held special is disarmed when its sidebar entry is no
+   longer ready (the shot spent it, which is when the Iron Curtain's sphere plays) or is
+   gone (the building that gives it was lost, which also ends the 1996 targeting mode,
+   house.cpp Super_Weapon_Handler). SW_Chrono2 has no sidebar entry of its own, and the
+   Chrono Tank raises it with no Chronosphere at all, so it is left to its one shot. */
+static void sb_super_settle(void)
+{
+    if (!g_sbRa || !g_sbSuperOn || !sb_super_can_miss()) return;
+    const int i = sb_find(g_sbSuperName);
+    const char* why = i < 0 ? "gone" : (!g_sbState.entry[i].completed ? "spent" : NULL);
+    if (!why) return;
+    if (g_sbSuperPending && i >= 0) {
+        snprintf(g_sbSuperFiredName, sizeof g_sbSuperFiredName, "%s", g_sbSuperName);
+        g_sbSuperFiredSerial++;
+    }
+    g_sbSuperPending = false;
+    sb_super_disarm(why);
 }
 
 static void sb_request(SidebarRequestEnum r, int idx, short cx, short cy)
@@ -1255,7 +1358,7 @@ static bool sb_queueable(const SbEntry& e)
        its factory (sidebar.cpp:1704-1709 has no PLACE event for RTTI_BUILDING), so it
        sits completed and busy until a human places it. A building queue needs a "hold the
        next one until this one is placed" rung and deserves its own decision. */
-    return e.type == INFANTRY_TYPE || e.type == UNIT_TYPE || e.type == AIRCRAFT_TYPE;
+    return e.type == INFANTRY_TYPE || e.type == UNIT_TYPE || e.type == AIRCRAFT_TYPE || (g_sbRa && e.type == VESSEL_TYPE);
 }
 
 static int sb_queued(const SbEntry& e)
@@ -1459,6 +1562,8 @@ static bool eh_enabled(void);
 static int eh_travel(void);
 static void sb_layout(int fbw, int fbh)
 {
+    /* Scene fallback and mode switching can change Enabled between draws. Never show TD art in RA. */
+    if(g_sbRa)g_hudNew=sb_hud_active();
     if (g_sb.Layout) g_sb.Layout(fbw, fbh);
     /* The magnification is WHOLE-NUMBER for both HUDs, for the same reason: anything else
        resamples pixel art. The two differ only in how tall one native screen is, 200 rows
@@ -1477,7 +1582,7 @@ static void sb_layout(int fbw, int fbh)
        The cost of insisting on whole numbers is letterboxing: 720 rows now draw the bar
        at 1x and centre it. Run the window at a multiple of 480 - 960 is 2x - to fill the
        height AND stay pixel-exact. The launchers do that. */
-    if (g_hudNew && g_h6Pack) {
+    if (sb_hud_active()) {
         int s = fbh / (eh_enabled()?EH_MAX_H:H6_BAR_H);
         if (s < 1) s = 1;
         while (s > 1 && H6_BAR_W * s * 3 > fbw) s--;
@@ -1501,7 +1606,10 @@ static void sb_layout(int fbw, int fbh)
         g_h6Rows = hud640_rows_for(fbh / s);
         g_dbW = (float)H6_BAR_W * g_h6Scale;
         g_dbH = (float)hud640_bar_h(g_h6Rows) * g_h6Scale;
-        if(eh_enabled()) {
+        if(rah_enabled()) {
+            while(s>1 && (216+320)*s>fbw)s--;
+            g_h6Scale=(float)s;g_dbScale=s;g_h6Rows=std::max(2,std::min(6,(fbh/s-309)/64));g_dbW=RAH_W*s;g_dbH=rah_height(g_h6Rows)*s;
+        }else if(eh_enabled()) {
             g_h6Rows=(fbh/s-309)/48;
             if(g_h6Rows<3)g_h6Rows=3;if(g_h6Rows>8)g_h6Rows=8;
             g_dbW=172.0f*s;g_dbH=(float)hud_enhanced_height(g_h6Rows)*s;
@@ -1543,13 +1651,13 @@ static void sb_layout(int fbw, int fbh)
               ? (float)g_ra95Height * g_ra95UiScale : (float)DB_SCREEN_H * s;
     }
     g_dbX0 = (float)fbw - g_dbW;
-    if (g_fx.dos_classic && !(g_hudNew && g_h6Pack) && !g_sbRa)
+    if (g_fx.dos_classic && !(sb_hud_active()) && !g_sbRa)
         g_dbX0 = floorf(((float)fbw - 320.0f * g_dbScale) * 0.5f) + 240.0f * g_dbScale;
     /* THE DRAWER OFFSET, applied in exactly ONE place so the hit test, the item rects,
        the minimap hotspot, the wheel and the edge-scroll suppression all follow for free
        -- every one of them reads g_dbX0. Gated on the new HUD: the DOS bar shares g_dbX0
        and is not part of this. */
-    if (g_hudNew && g_h6Pack)
+    if (sb_hud_active())
         g_dbX0 += (float)g_h6SlideX * g_h6Scale;
     /* Enhanced chrome starts at the viewport top. Any spare height stays below
        the panel; drawing and hit tests share this origin. */
@@ -1567,7 +1675,7 @@ static int sb_scale(void) { return g_dbScale; }
    recomputes rather than caching, because the UI scale is a live video setting. */
 static float sb_chrome_bottom(void)
 {
-    return (g_hudNew && g_h6Pack) ? g_dbY0 + (float)H6_TAB_H * g_h6Scale : 0.0f;
+    return (sb_hud_active()) ? g_dbY0 + (float)H6_TAB_H * g_h6Scale : 0.0f;
 }
 
 /* HOW BIG ONE DOS PIXEL IS ON SCREEN.
@@ -1603,7 +1711,7 @@ static float sb_dos_px(void)
     /* The same predicate sb_layout, sb_item_rect and the 640 hit test branch on, so a
        plate can never pick a scale the geometry around it disagrees with. Both values are
        written by sb_layout, which the draw path runs before either of these overlays. */
-    if (g_hudNew && g_h6Pack) return g_h6Scale * SB_HUD640_DOS_ZOOM;
+    if (sb_hud_active()) return g_h6Scale * SB_HUD640_DOS_ZOOM;
     if (g_sbRa && g_fx.dos_classic) return 2.0f * g_ra95UiScale;
     return (float)g_dbScale;
 }
@@ -1659,7 +1767,7 @@ static float sb_tactical_right(int fbw, int fbh)
 {
     if (!g_sbOn) return (float)fbw;
     sb_layout(fbw, fbh);
-    const float edge=g_dbX0-(eh_enabled()?12*g_h6Scale:0);
+    const float edge=g_dbX0-(!rah_enabled()&&eh_enabled()?12*g_h6Scale:0);
     return edge < (float)fbw ? edge : (float)fbw;
 }
 
@@ -1700,10 +1808,19 @@ static void sb_screen_to_h6(float col, float row, int* hx, int* hy)
    pinned to the window edge while the bar slides out from under them. */
 static SbHit sb_chrome_hit(float col, float row, int fbw, int fbh)
 {
-    if (!g_sbOn || !g_hudNew || !g_h6Pack) return SBH_NONE;
+    if (!g_sbOn || !sb_hud_active()) return SBH_NONE;
     sb_layout(fbw, fbh);
     {
         const float th = (float)H6_TAB_H * g_h6Scale;
+        if(rah_enabled()){
+            if(row<0||row>=th)return SBH_NONE;
+            const int left=fbw<696*g_h6Scale?132:160;
+            if(col>=0&&col<left*g_h6Scale)return SBH_OPTIONS;
+            if(codex_available()&&col>=left*g_h6Scale&&col<2*left*g_h6Scale)return SBH_DATABASE;
+            if(col>=fbw-376*g_h6Scale&&col<fbw-216*g_h6Scale)return SBH_CREDITS;
+            if(col>=fbw-216*g_h6Scale&&col<fbw)return SBH_SIDEBAR;
+            return SBH_NONE;
+        }
         if(eh_enabled()) {
             float w=(fbw<664*g_h6Scale?148:160)*g_h6Scale,side=184*g_h6Scale;
             if(row<g_dbY0||row>=g_dbY0+th)return SBH_NONE;
@@ -1726,6 +1843,13 @@ static bool sb_over_panel(float col, float row, int fbw, int fbh)
 {
     if (!g_sbOn) return false;
     sb_layout(fbw, fbh);
+    if(rah_enabled()){
+        if(sb_chrome_hit(col,row,fbw,fbh)!=SBH_NONE)return true;
+        int x,y;sb_screen_to_h6(col,row,&x,&y);
+        if(x>=0&&x<216&&y>=18&&y<rah_height(g_h6Rows))return true;
+        if(x>=-63&&x<0&&y>=27&&y<192){const H6_Asset *a=hud640_asset(g_raHudPack,"wing");return a&&a->rgba[((y-27)*85+x+63)*4+3]!=0;}
+        return false;
+    }
     if(eh_enabled()) {
         int x,y;sb_screen_to_h6(col,row,&x,&y);
         if(sb_chrome_hit(col,row,fbw,fbh)!=SBH_NONE)return true;
@@ -1751,23 +1875,37 @@ static bool sb_over_panel(float col, float row, int fbw, int fbh)
 
 static int sb_col_base(int column);
 /* Enhanced tabs map display slots to unchanged engine identities. */
-static int g_ehCategory=0, g_ehTop[4]={0,0,0,0};
+static int g_ehCategory=0, g_ehTop[5]={0,0,0,0,0};
 struct EH_Display { int engine; const EH_Catalog *catalog; const char *name; };
 static std::vector<EH_Display> g_ehItems;
-static bool eh_enabled(void) { return g_hudNew && g_h6Pack && hud_enhanced_ok(g_h6Pack); }
-static int eh_travel(void) { return eh_enabled()?EH_TRAVEL:H6_BAR_W; }
+static bool rah_enabled(void) { return g_sbRa && sb_hud_active(); }
+static bool eh_enabled(void) { return rah_enabled() || (!g_sbRa && sb_hud_active() && hud_enhanced_ok(g_h6Pack)); }
+static int eh_travel(void) { return rah_enabled()?279:eh_enabled()?EH_TRAVEL:H6_BAR_W; }
 static int eh_category(const SbEntry& e) {
-    return e.type==INFANTRY_TYPE?1:e.type==UNIT_TYPE?2:e.type==AIRCRAFT_TYPE?3:0;
+    return g_sbRa&&e.type==VESSEL_TYPE?4:e.type==INFANTRY_TYPE?1:e.type==UNIT_TYPE?2:e.type==AIRCRAFT_TYPE?3:0;
+}
+static bool eh_potential(const char* name) {
+    for (size_t i=0;i<g_sbState.potential.size();++i)
+        if (!strcasecmp(name,g_sbState.potential[i].c_str())) return true;
+    return false;
 }
 static void eh_refresh(void) {
     g_ehItems.clear();
     if(g_sbSpectator) return;
-    for(size_t k=0;k<sizeof(eh_catalog)/sizeof(eh_catalog[0]);k++) {
-        const EH_Catalog& a=eh_catalog[k];
-        if(a.faction!=g_sb.nod || a.category!=g_ehCategory) continue;
+    for(int pass=0;pass<2;++pass)
+    for(size_t k=0;k<(g_sbRa?sizeof(rah_catalog)/sizeof(rah_catalog[0]):sizeof(eh_catalog)/sizeof(eh_catalog[0]));k++) {
+        const EH_Catalog& a=g_sbRa?rah_catalog[k]:eh_catalog[k];
+        if(a.category!=g_ehCategory || (a.faction==g_sb.nod ? 0 : 1)!=pass) continue;
         EH_Display d={-1,&a,a.name};
         for(size_t i=0;i<g_sbState.entry.size();i++) if(!strcasecmp(a.name,g_sbState.entry[i].name)) {d.engine=(int)i;break;}
-        g_ehItems.push_back(d);
+        /* Live entries remain authoritative, including captured-faction builds.
+           Locked entries need the brain's mission/match potential, not a guessed
+           comparison with the catalog's multiplayer tech level. */
+        if (a.faction!=g_sb.nod && (d.engine>=0 || !eh_potential(a.name))) continue;
+        if (d.engine<0 && !eh_potential(a.name)) continue;
+        bool duplicate=false;
+        for(size_t i=0;i<g_ehItems.size();++i) if(!strcasecmp(a.name,g_ehItems[i].name)) duplicate=true;
+        if(!duplicate)g_ehItems.push_back(d);
     }
     for(size_t i=0;i<g_sbState.entry.size();i++) {
         const SbEntry& e=g_sbState.entry[i];if(eh_category(e)!=g_ehCategory)continue;
@@ -1778,6 +1916,7 @@ static void eh_refresh(void) {
     if(g_ehTop[g_ehCategory]>maximum)g_ehTop[g_ehCategory]=maximum;
     if(g_ehTop[g_ehCategory]<0)g_ehTop[g_ehCategory]=0;
 }
+
 static const EH_Display* eh_display(int c,int row) {
     eh_refresh();int i=2*(g_ehTop[g_ehCategory]+row)+c;
     return c>=0 && row>=0 && i>=0 && i<(int)g_ehItems.size()?&g_ehItems[i]:0;
@@ -1818,7 +1957,7 @@ static int sb_col_count(int column)
    on-screen test both have to ask, or the last row of the new HUD scrolls off by one. */
 static int sb_visible_rows(void)
 {
-    return (g_hudNew && g_h6Pack) ? g_h6Rows
+    return (sb_hud_active()) ? g_h6Rows
          : (g_sbRa && g_fx.dos_classic && g_ra95Pack)
          ? DB_MAX_VISIBLE + g_ra95ExtraRows : DB_MAX_VISIBLE;
 }
@@ -1838,7 +1977,7 @@ static void sb_clamp_top(void)
    resolves are one description, exactly as sb_item_rect does it for the cameos. */
 static void sb_map_button_centre(float* col, float* row)
 {
-    if (g_hudNew && g_h6Pack) {
+    if (sb_hud_active()) {
         *col = g_dbX0 + ((float)H6_BTN_MAP_X + (float)H6_BTN_MAP_W * 0.5f) * g_h6Scale;
         *row = g_dbY0 + ((float)H6_BTN_MAP_Y + (float)H6_BTN_MAP_H * 0.5f) * g_h6Scale;
         return;
@@ -1858,6 +1997,7 @@ static bool sb_item_rect(int idx, float* x0, float* y0, float* x1, float* y1)
         for(size_t k=0;k<g_ehItems.size();k++)if(g_ehItems[k].engine==idx){at=(int)k;break;}
         int r=at/2-g_ehTop[g_ehCategory];
         if(at<0||r<0||r>=g_h6Rows)return false;
+        if(rah_enabled()){*x0=g_dbX0+(RAH_GRID_X+(at%2)*RAH_DX)*g_h6Scale;*y0=g_dbY0+(RAH_GRID_Y+r*RAH_DY)*g_h6Scale;*x1=*x0+RAH_CW*g_h6Scale;*y1=*y0+RAH_CH*g_h6Scale;return true;}
         *x0=g_dbX0+H6_COL_X[at%2]*g_h6Scale;
         *y0=g_dbY0+(hud640_row_y(r)+66)*g_h6Scale;
         *x1=*x0+61*g_h6Scale;*y1=*y0+45*g_h6Scale;return true;
@@ -1865,7 +2005,7 @@ static bool sb_item_rect(int idx, float* x0, float* y0, float* x1, float* y1)
     sb_clamp_top();
     int rowInCol = idx - sb_col_base(e.column) - g_sbTop[e.column];
     if (rowInCol < 0 || rowInCol >= sb_visible_rows()) return false;
-    if (g_hudNew && g_h6Pack) {
+    if (sb_hud_active()) {
         /* the same rectangles sb_hit_h6 tests, so what sbitem reports and what a click
            lands on are one description, not two */
         *x0 = g_dbX0 + (float)H6_COL_X[e.column] * g_h6Scale;
@@ -2013,11 +2153,11 @@ static void sb_roster_draw(DB_Surface* s, const DB_Pack* p, int ox, int oy, int 
    and resolved once at the end, for the reason the radar states in its own note: one
    description of the picture rather than two that drift. DB_BLACK is the OPAQUE black,
    so the box under the names is the same black the DOS hole gets. */
-static unsigned char g_sbRosterPx[H6_RADAR_W * H6_RADAR_H];
+static unsigned char g_sbRosterPx[160 * 160];
 static void sb_roster_rgba(unsigned char* rgba, int w, int h, const DB_Pack* p)
 {
     DB_Surface s;
-    if (!rgba || !p || w != H6_RADAR_W || h != H6_RADAR_H) return;
+    if (!rgba || !p || w<=0 || h<=0 || w>160 || h>160) return;
     memset(g_sbRosterPx, DB_BLACK, sizeof g_sbRosterPx);
     db_surface_init(&s, w, h, g_sbRosterPx);
     db_clip_reset(&s);
@@ -2271,7 +2411,7 @@ static void sb_draw_panel_ra95(int fbw, int fbh)
 static void sb_draw_panel(int fbw, int fbh)
 {
     if (!g_sbOn) return;
-    if (g_hudNew && g_h6Pack) { sb_draw_panel_640(fbw, fbh); return; }
+    if (sb_hud_active()) { sb_draw_panel_640(fbw, fbh); return; }
     if (g_sbRa && g_ra95Pack && g_fx.dos_classic) {
         sb_draw_panel_ra95(fbw, fbh);
         return;
@@ -2402,8 +2542,13 @@ static void sb_draw_panel(int fbw, int fbh)
    step of 1 makes the bar 160 wide, NARROWER on screen than the 240 the DOS bar gets at
    3x. That is a consequence of the art being native at the Tier 1 size, not a bug, but
    it is a real look change and is flagged in engineering notes. */
+static bool mesh_perf_switch(const char* name);
+struct H6UploadMirror { GLuint name=0; int w=0,h=0; std::vector<unsigned char> pixels; };
+static std::map<GLuint*,H6UploadMirror> g_h6UploadMirror;
+static unsigned long g_h6Uploads=0, g_h6UploadSkips=0, g_h6UploadBytes=0;
 static void h6_upload(GLuint* tex, const unsigned char* rgba, int w, int h)
 {
+    const bool fresh=!*tex;
     if (!*tex) {
         std::vector<unsigned char> zero((size_t)H6_POT_W * H6_POT_H * 4, 0);
         glGenTextures(1, tex);
@@ -2417,7 +2562,22 @@ static void h6_upload(GLuint* tex, const unsigned char* rgba, int w, int h)
                      GL_RGBA, GL_UNSIGNED_BYTE, &zero[0]);
     }
     glBindTexture(GL_TEXTURE_2D, *tex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    int first=0,last=h;
+    const size_t row=(size_t)w*4, bytes=row*(size_t)h;
+    if (w>0 && h>0 && bytes<=4u*1024u*1024u && g_h6UploadMirror.size()<64
+        && mesh_perf_switch("OPENCNC3D_HUD_DIRTY")) {
+        H6UploadMirror& m=g_h6UploadMirror[tex];
+        if (!fresh && m.name==*tex && m.w==w && m.h==h && m.pixels.size()==bytes) {
+            if (!memcmp(m.pixels.data(),rgba,bytes)) { g_h6UploadSkips++; return; }
+            while (first<h && !memcmp(m.pixels.data()+(size_t)first*row,rgba+(size_t)first*row,row)) first++;
+            while (last>first && !memcmp(m.pixels.data()+(size_t)(last-1)*row,rgba+(size_t)(last-1)*row,row)) last--;
+        }
+        m.name=*tex; m.w=w; m.h=h; m.pixels.assign(rgba,rgba+bytes);
+    }
+    /* Whole rows remain tightly packed, preserving the original unpack contract. */
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, first, w, last-first, GL_RGBA, GL_UNSIGNED_BYTE,
+                   rgba+(size_t)first*row);
+    g_h6Uploads++; g_h6UploadBytes+=(unsigned long)(row*(size_t)(last-first));
 }
 
 static void h6_tex_quad(GLuint tex, int tw, int th, float x0, float y0, float x1, float y1)
@@ -2490,10 +2650,10 @@ static void h6_fill_state(H6_State* st)
            sb_fill_dos_state just above -- Draw_Names' unconditional ACTIVATED bezel,
            radar.cpp:1871-1873 -- so hud640_draw_bar blits these pixels instead of the
            faction emblem (hud640.c:345-353) with or without a radar. */
-        sb_roster_rgba(g_h6Radar, eh_enabled()?160:H6_RADAR_W, eh_enabled()?144:H6_RADAR_H, g_dbPack);
+        sb_roster_rgba(g_h6Radar, rah_enabled()?156:eh_enabled()?160:H6_RADAR_W, rah_enabled()?151:eh_enabled()?144:H6_RADAR_H, g_dbPack);
         st->radar_rgba = g_h6Radar;
     } else if (st->radar_active && g_sb.RadarPlotRGBA && g_dbPack) {
-        g_sb.RadarPlotRGBA(g_h6Radar, eh_enabled()?160:H6_RADAR_W, eh_enabled()?144:H6_RADAR_H, g_dbPack, 1);
+        g_sb.RadarPlotRGBA(g_h6Radar, rah_enabled()?156:eh_enabled()?160:H6_RADAR_W, rah_enabled()?151:eh_enabled()?144:H6_RADAR_H, g_dbPack, 1);
         st->radar_rgba = g_h6Radar;
     }
     st->nod          = g_dbState.nod;
@@ -2717,7 +2877,7 @@ static void sb_slide_step(void)
  *      LOCAL.MIX and pairs it to the idents through the TXT_ ids on the type
  *      constructors. Every string is the game's, not typed from memory.
  *
- *  OURS, and said out loud: the four CHROME tooltips (Repair / Sell or Demolish / Map /
+ *  OURS, and said out loud: the four CHROME tooltips (Repair / Sell / Map /
  *  Options). 1995 has the strings and even the calls, but they sit behind #ifdef NEVER at
  *  sidebar.cpp:902-923, so showing them is our decision.
  *
@@ -2747,9 +2907,15 @@ static float g_tipDrawZoom = 0.0f;
 
 static const char* sb_title_for(const char* asset)
 {
+    if(g_sbRa&&asset)for(size_t k=0;k<sizeof(rah_titles)/sizeof(rah_titles[0]);k++)if(!strcmp(asset,rah_titles[k].id))return rah_titles[k].title;
     if (!asset || !*asset) return 0;
     for (int i = 0; i < DOSNAMES_COUNT; i++)
-        if (!strcmp(DOSNAMES[i].asset, asset)) return DOSNAMES[i].title;
+        if (!strcmp(DOSNAMES[i].asset, asset)) {
+            /* in a language pack's words where one is chosen (the same string number in
+               its own table, lang_mod.h), the 1995 English name otherwise */
+            const char* t = lang_txt(DOSNAMES[i].txt);
+            return t && *t ? t : DOSNAMES[i].title;
+        }
     return 0;
 }
 
@@ -2758,8 +2924,8 @@ static const char* sb_title_for(const char* asset)
 static const char* sb_hover_subject(int* cost)
 {
     *cost = -1;
-    if (g_sbHover == SBH_REPAIR)  return g_sb.nod ? "SB_DEMOLISH" : "SB_REPAIR";
-    if (g_sbHover == SBH_SELL)    return g_sb.nod ? "SB_DEMOLISH" : "SB_SELL";
+    if (g_sbHover == SBH_REPAIR)  return "SB_REPAIR";
+    if (g_sbHover == SBH_SELL)    return "SB_SELL";
     if (g_sbHover == SBH_MAP)     return "SB_MAP";
     if (g_sbHover == SBH_OPTIONS)  return "SB_OPTIONS";
     if (g_sbHover == SBH_DATABASE) return "SB_DATABASE";
@@ -2785,7 +2951,7 @@ static bool sb_tip_resolve(void)
     g_tipName[0] = 0; g_tipRequires[0]=0; g_tipCost = -1;
     if(g_sbTips&&eh_enabled()&&(g_sbHover==SBH_LOCKED||g_sbHover==SBH_POWER||g_sbHover==SBH_CATEGORY)){
         if(g_sbHover==SBH_POWER){snprintf(g_tipName,sizeof g_tipName,"SWITCH BUILDING POWER");return true;}
-        if(g_sbHover==SBH_CATEGORY){static const char *n[]={"STRUCTURES","INFANTRY","VEHICLES","AIRCRAFT"};if(g_sbHoverCol>=0&&g_sbHoverCol<4)snprintf(g_tipName,sizeof g_tipName,"%s",n[g_sbHoverCol]);return g_tipName[0]!=0;}
+        if(g_sbHover==SBH_CATEGORY){static const char *n[]={"STRUCTURES","INFANTRY","VEHICLES","AIRCRAFT","SHIPS"};if(g_sbHoverCol>=0&&g_sbHoverCol<(g_sbRa?5:4))snprintf(g_tipName,sizeof g_tipName,"%s",n[g_sbHoverCol]);return g_tipName[0]!=0;}
         const EH_Display *d=eh_display(g_sbHoverCol,g_sbHoverSlot);if(!d)return false;
         const char *title=sb_title_for(d->name);snprintf(g_tipName,sizeof g_tipName,"%s",title?title:d->name);
         g_tipCost=d->catalog?d->catalog->cost:-1;
@@ -3000,16 +3166,18 @@ static void sb_draw_queue_digits(int fbw, int fbh)
 }
 
 #include "cnc_sidebar_enhanced.h"
+#include "cnc_sidebar_ra_enhanced.h"
 
 static void sb_draw_panel_640(int fbw, int fbh)
 {
     H6_State st;
-    if (!g_h6Pack) return;
+    if (!sb_hud_active()) return;
     sb_slide_step();
     sb_layout(fbw, fbh);
     sb_pointer_refresh(fbw, fbh);
     sb_fill_dos_state();
     h6_fill_state(&st);
+    if(rah_enabled()){rah_draw_panel(st,fbw,fbh);return;}
     if(eh_enabled()){eh_draw_panel(st,fbw,fbh);return;}
 
     hud640_draw_bar(g_h6Bar, g_h6Pack, &st);
@@ -3317,8 +3485,10 @@ static int sb_place_wall_kind(void)
 {
     if (!g_sbPlacing || g_sbPlaceIdx < 0
         || g_sbPlaceIdx >= (int)g_sbState.entry.size()) return -1;
-    static const char* const K[5] = { "SBAG", "CYCL", "BRIK", "BARB", "WOOD" };
-    for (int k = 0; k < 5; k++)
+    /* (the wall cells' own kinds: Red Alert's barbed-wire fence FENC is its sixth,
+       ra3d_sprites_mod.h, and its engine lays a FENC line as it does the others) */
+    static const char* const K[6] = { "SBAG", "CYCL", "BRIK", "BARB", "WOOD", "FENC" };
+    for (int k = 0; k < 6; k++)
         if (!strcmp(g_sbState.entry[g_sbPlaceIdx].name, K[k])) return k;
     return -1;
 }
@@ -3964,6 +4134,15 @@ static SbHit sb_hit_h6(int hx, int hy, int* column, int* slot)
     *column = -1;
     *slot = -1;
 
+    if(rah_enabled()){
+        if(hx>=-42&&hx< -7)for(i=0;i<3;i++)if(hy>=50+i*42&&hy<85+i*42)return g_sbSpectator||(i==0&&!g_sbState.repairEnabled)||(i==1&&!g_sbState.sellEnabled)?SBH_NONE:i==0?SBH_REPAIR:i==1?SBH_SELL:SBH_POWER;
+        if(hy>=229&&hy<259)for(i=0;i<5;i++)if(hx>=32+31*i&&hx<60+31*i){*column=i;return SBH_CATEGORY;}
+        if(hx>=30&&hx<186&&hy>=34&&hy<185)return SBH_RADAR;
+        eh_refresh();int maxTop=std::max(0,((int)g_ehItems.size()+1)/2-g_h6Rows);
+        if(hy>=rah_height(g_h6Rows)-33&&hy<rah_height(g_h6Rows)-17&&maxTop>0){*column=0;if(hx>=152&&hx<170&&g_ehTop[g_ehCategory]>0)return SBH_UP;if(hx>=176&&hx<194&&g_ehTop[g_ehCategory]<maxTop)return SBH_DOWN;}
+        for(c=0;c<2;c++)if(hx>=RAH_GRID_X+c*RAH_DX&&hx<RAH_GRID_X+c*RAH_DX+RAH_CW)for(r=0;r<g_h6Rows;r++)if(hy>=RAH_GRID_Y+r*RAH_DY&&hy<RAH_GRID_Y+r*RAH_DY+RAH_CH){*column=c;*slot=r;const EH_Display *d=eh_display(c,r);return d?(d->engine<0?SBH_LOCKED:SBH_ITEM):SBH_NONE;}
+        return SBH_NONE;
+    }
     if(eh_enabled()) {
         static const int tx[4]={7,44,81,118};
         if(hx>=-54&&hx< -19)for(i=0;i<3;i++)if(hy>=52+i*42&&hy<87+i*42)return i==0?SBH_REPAIR:i==1?SBH_SELL:SBH_POWER;
@@ -4020,7 +4199,7 @@ static SbHit sb_hit_at(float col, float row, int* c, int* slot)
         const SbHit ch = sb_chrome_hit(col, row, g_dbFbw, g_dbFbh);
         if (ch != SBH_NONE) { if (c) *c = -1; if (slot) *slot = -1; return ch; }
     }
-    if (g_hudNew && g_h6Pack) {
+    if (sb_hud_active()) {
         sb_screen_to_h6(col, row, &ax, &ay);
         return sb_hit_h6(ax, ay, c, slot);
     }
@@ -4153,6 +4332,7 @@ static bool sb_click(float col, float row, int fbw, int fbh, bool right)
 
     if (hit == SBH_UP || hit == SBH_DOWN) {
         /* sidebar.cpp:1521-1541 Scroll: one row per press, clamped at both ends. */
+        if(rah_enabled()){int before=g_ehTop[g_ehCategory];g_ehTop[g_ehCategory]+=(hit==SBH_UP?-1:1);eh_refresh();printf("SIDEBAR-INPUT|scroll|category=%d|top=%d->%d\n",g_ehCategory,before,g_ehTop[g_ehCategory]);return true;}
         const int before = g_sbTop[c];
         g_sbTop[c] += (hit == SBH_UP) ? -1 : 1;
         sb_clamp_top();
@@ -4451,7 +4631,7 @@ static int g_sbFails = 0;
 static bool sb_script_verb(const char* v, const char* a1, const char* a2, const char* a3,
                            SbTickFn tick, int fbw, int fbh)
 {
-    if(!strcasecmp(v,"sbcategory")){if(a1){static const char *names[]={"structures","infantry","vehicles","aircraft"};for(int i=0;i<4;i++)if(!strcasecmp(a1,names[i]))g_ehCategory=i;}eh_refresh();printf("EHUD|category=%d|items=%d|rows=%d|top=%d\n",g_ehCategory,(int)g_ehItems.size(),g_h6Rows,g_ehTop[g_ehCategory]);return true;}
+    if(!strcasecmp(v,"sbcategory")){if(a1){static const char *names[]={"structures","infantry","vehicles","aircraft","ships"};for(int i=0;i<(g_sbRa?5:4);i++)if(!strcasecmp(a1,names[i]))g_ehCategory=i;}eh_refresh();printf("EHUD|category=%d|items=%d|rows=%d|top=%d\n",g_ehCategory,(int)g_ehItems.size(),g_h6Rows,g_ehTop[g_ehCategory]);return true;}
     /* The production queue strip: hudqlog 1 prints a HUDQ line every drawn frame,
        hudqdump prints the last one, hudqstep S sets the automated clock's seconds per
        drawn frame. */
@@ -4467,6 +4647,14 @@ static bool sb_script_verb(const char* v, const char* a1, const char* a2, const 
         return true;
     }
     if (!strcasecmp(v, "placemap")) { sb_poll(); sb_placemap(); return true; }
+    if (!strcasecmp(v, "aidump")) {
+        char diagnostics[16384] = {};
+        if (BrainAIDiagnostics) {
+            BrainAIDiagnostics(diagnostics, sizeof diagnostics);
+            printf("%s", diagnostics);
+        } else { printf("FAIRAI|unavailable\n"); g_sbFails++; }
+        return true;
+    }
     if (!strcasecmp(v, "objdump")) {
         /* The brain's own art-free enumerator, straight to stdout. This is the evidence
            a placement really happened: the new building shows up with limbo=0 at the
@@ -4689,7 +4877,7 @@ static bool sb_script_verb(const char* v, const char* a1, const char* a2, const 
         sb_layout(fbw, fbh);
         const float full = sb_dos_px(), half = sb_dos_px_half();
         printf("SBPLATE|zoom|full=%.0f|half=%.0f|whole=%d|hud=%s\n", full, half,
-               half == floorf(half) ? 1 : 0, (g_hudNew && g_h6Pack) ? "640" : "dos");
+               half == floorf(half) ? 1 : 0, (sb_hud_active()) ? "640" : "dos");
         printf("SBPLATE|tip|dos=%dx%d|zoom=%.0f|px=%dx%d\n",
                g_tipDrawW, g_tipDrawH, g_tipDrawZoom,
                (int)(g_tipDrawW * g_tipDrawZoom), (int)(g_tipDrawH * g_tipDrawZoom));
@@ -4708,7 +4896,16 @@ static bool sb_script_verb(const char* v, const char* a1, const char* a2, const 
         int i = sb_find(a1);
         if(eh_enabled()&&i>=0&&eh_category(g_sbState.entry[i])!=g_ehCategory){
             const int category=eh_category(g_sbState.entry[i]);static const int tx[]={7,44,81,118};
-            sb_click(g_dbX0+(tx[category]+17.5f)*g_h6Scale,g_dbY0+246.5f*g_h6Scale,fbw,fbh,false);sb_pointer_up();
+            sb_click(g_dbX0+(rah_enabled()?32+31*category+14:tx[category]+17.5f)*g_h6Scale,g_dbY0+(rah_enabled()?244:246.5f)*g_h6Scale,fbw,fbh,false);sb_pointer_up();
+        }
+        /* (and its row scrolled into view, as the wheel would: a special weapon sits at
+           the end of a long structures list) */
+        if(eh_enabled()&&i>=0){
+            eh_refresh();int at=-1;
+            for(size_t k=0;k<g_ehItems.size();k++)if(g_ehItems[k].engine==i){at=(int)k;break;}
+            if(at>=0&&(at/2<g_ehTop[g_ehCategory]||at/2>=g_ehTop[g_ehCategory]+g_h6Rows)){
+                g_ehTop[g_ehCategory]=at/2;eh_refresh();
+            }
         }
         float x0, y0, x1, y1;
         if (i < 0 || !sb_item_rect(i, &x0, &y0, &x1, &y1)) {
@@ -4834,13 +5031,13 @@ static bool sb_init(const SbHooks& h, const char* cameopack, const char* dospack
                  + "hud640.pack";
         g_h6Pack = hud640_load(h6path.c_str(), h6err, sizeof h6err);
         if (!g_h6Pack)
-            fprintf(stderr, "sidebar: 640x480 HUD unavailable (%s); using the DOS bar\n", h6err);
+            fprintf(stderr, "sidebar: optional TD 640x480 HUD unavailable (%s)\n", h6err);
         else
             fprintf(stderr, "sidebar: 640x480 HUD loaded, %d assets\n", g_h6Pack->nassets);
         /* The dial, if anything has set one; otherwise the environment; otherwise off. */
         if (g_hudNewWish < 0 && want && *want)
             g_hudNewWish = (strcmp(want, "new") == 0) ? 1 : 0;
-        g_hudNew = (g_h6Pack && g_hudNewWish == 1);
+        g_hudNew = sb_hud_active();
         if (g_hudNew)
             fprintf(stderr, "sidebar: drawing the 640x480 HUD\n");
         /* the project owner's true-colour cameos, beside the HUD pack. Absent is not an error: every
@@ -4874,7 +5071,13 @@ static bool sb_init(const SbHooks& h, const char* cameopack, const char* dospack
         return false;
     }
     g_sbRa = db_shape(g_dbPack, "SIDE1NA") != NULL;
-    if (g_sbRa) g_hudNew = false; /* TD's Enhanced HUD has no Red Alert art. */
+    if(g_sbRa){
+        std::string dir(dospack);size_t slash=dir.find_last_of("/\\");dir=slash==std::string::npos?"":dir.substr(0,slash+1);
+        g_raHudPack=hud640_load((dir+"enhanced-hud.pack").c_str(),err,sizeof err);
+        if(g_raHudPack&&!rah_pack_ok(g_raHudPack)){hud640_free(g_raHudPack);g_raHudPack=0;}
+        sb_set_hud_new(g_hudNewWish==1);
+        fprintf(stderr,"RAHUD|loaded|approved-v06|pack=%d|enhanced=%d|rows=6|cameo=80x60|categories=5\n",g_raHudPack?1:0,g_hudNew?1:0);
+    }
     if (g_sbRa) {
         std::string path(dospack);
         const size_t suffix = path.rfind(".pack");
@@ -4907,6 +5110,8 @@ static bool sb_init(const SbHooks& h, const char* cameopack, const char* dospack
    cur_free() must run BEFORE this: the cursor holds pointers into g_dbPack. */
 static void sb_free(void)
 {
+    g_h6UploadMirror.clear();
+    g_sbQueue.clear(); g_sbQueueOpen.clear();
     for (size_t i = 0; i < g_sbCameo.size(); i++)
         if (g_sbCameo[i].gl)
             glDeleteTextures(1, &g_sbCameo[i].gl);
@@ -4927,6 +5132,7 @@ static void sb_free(void)
     if (g_ra95Pack)
         db_pack_free(g_ra95Pack);
     g_ra95Pack = NULL;
+    rah_free();
     g_sbRa = false;
     db_state_clear(&g_dbState);
 
@@ -4936,7 +5142,7 @@ static void sb_free(void)
        allocated a fresh copy of the other two and dropped the previous one on the floor.
        Measured over six boot/shutdown cycles in one process: 950 KB a cycle for the HUD
        pack and 524 KB a cycle for the cameo pack, both climbing with no ceiling.
-       g_hudNew is derived from g_h6Pack, so it has to go false with it; g_hudNewWish is
+       g_hudNew follows the module's own pack, so it has to go false with it; g_hudNewWish is
        the PLAYER'S dial and is deliberately left alone, exactly like the tuning dials
        fx_shutdown keeps. */
     if (g_h6Pack)
@@ -4950,6 +5156,7 @@ static void sb_free(void)
     memset(&g_sb, 0, sizeof(g_sb));
     g_sbState.valid = false;
     g_sbState.entry.clear();
+    g_sbState.potential.clear();
     g_sbReady = false;
     g_sbPlacing = false;
     g_sbPlaceIdx = -1;
@@ -4958,7 +5165,7 @@ static void sb_free(void)
     g_sbHoverX = g_sbHoverY = -1;
     g_sbTop[0] = g_sbTop[1] = 0;
     g_sbRepairOn = g_sbSellOn = g_sbPowerOn = false;
-    g_ehCategory=0;for(int k=0;k<4;k++)g_ehTop[k]=0;g_ehItems.clear();g_ehProgress.clear();g_ehqCards.clear();
+    g_ehCategory=0;for(int k=0;k<5;k++)g_ehTop[k]=0;g_ehItems.clear();g_ehProgress.clear();g_ehqCards.clear();
     g_sbRadarShown = true;
     g_sbRadarForce = false;      /* see the declaration: faithful by default */
     g_sbRoster = false;          /* a mission latch like the two above */
@@ -4972,6 +5179,7 @@ static void sb_free(void)
        whole map, and its first left click is eaten and fired at the clicked cell
        carrying the PREVIOUS mission's building type and id. */
     g_sbSuperOn = false;
+    g_sbSuperPending = false;
     memset(g_sbSuperName, 0, sizeof(g_sbSuperName));
     g_sbSuperBType = g_sbSuperBId = 0;
 }

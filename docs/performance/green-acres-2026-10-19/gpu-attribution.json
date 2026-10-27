@@ -1,0 +1,53 @@
+{
+  "method": "glFinish at each CPU profile marker: serialized CPU+GPU diagnostic; not live frame timings",
+  "rows": [
+    {
+      "case": "baseline",
+      "median_ms": 28.75,
+      "p90_ms": 36.73,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=65.31|worst=1472.3|sun shadow map=21.96|seabed=0.59|water=0.67|terrain=10.26|shore=0.00|mottle=1.23|tiberium=0.00|tiberium ground=0.99|tread marks=0.36|smudges=0.71|crystals: before=0.00|crystals: field merge=0.01|crystals: layout=0.38|crystals: update=0.24|crystals: glow=0.11|tiberium crystals=1.21|objects (opaque)=1.92|trees + foliage=3.19|cutout + translucent=0.82|infantry=0.00|effects=1.18|rain + shroud draw=0.47|markers + bars=0.47|post: ground normals=3.39|post: specular=0.92|post: light=10.58|post: atmosphere=0.00|post chain=1.49|hud + present=1.63|panels=0.03|prep + shroud corners=0.46|gpu finish=0.00"
+    },
+    {
+      "case": "shadow",
+      "median_ms": 23.52,
+      "p90_ms": 33.35,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=27.36|worst=125.4|sun shadow map=0.04|seabed=0.29|water=0.23|terrain=4.67|shore=0.00|mottle=0.73|tiberium=0.00|tiberium ground=0.57|tread marks=0.23|smudges=0.37|crystals: before=0.00|crystals: field merge=0.01|crystals: layout=0.08|crystals: update=0.08|crystals: glow=0.06|tiberium crystals=0.72|objects (opaque)=2.74|trees + foliage=4.79|cutout + translucent=0.49|infantry=0.25|effects=0.43|rain + shroud draw=0.26|markers + bars=0.25|post: ground normals=1.99|post: specular=0.53|post: light=5.40|post: atmosphere=0.00|post chain=0.85|hud + present=0.98|panels=0.00|prep + shroud corners=0.29|gpu finish=0.00"
+    },
+    {
+      "case": "AO",
+      "median_ms": 22.32,
+      "p90_ms": 30.46,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=27.22|worst=163.2|sun shadow map=6.06|seabed=0.33|water=0.24|terrain=4.81|shore=0.00|mottle=0.72|tiberium=0.00|tiberium ground=0.54|tread marks=0.22|smudges=0.34|crystals: before=0.00|crystals: field merge=0.00|crystals: layout=0.07|crystals: update=0.07|crystals: glow=0.05|tiberium crystals=0.69|objects (opaque)=0.91|trees + foliage=1.78|cutout + translucent=0.45|infantry=0.00|effects=0.41|rain + shroud draw=0.26|markers + bars=0.26|post: ground normals=1.84|post: specular=0.52|post: light=4.50|post: atmosphere=0.00|post chain=0.87|hud + present=0.95|panels=0.00|prep + shroud corners=0.30|gpu finish=0.00"
+    },
+    {
+      "case": "contact",
+      "median_ms": 25.03,
+      "p90_ms": 36.3,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=29.63|worst=162.9|sun shadow map=6.20|seabed=0.35|water=0.25|terrain=4.80|shore=0.00|mottle=0.73|tiberium=0.00|tiberium ground=0.56|tread marks=0.22|smudges=0.37|crystals: before=0.00|crystals: field merge=0.01|crystals: layout=0.09|crystals: update=0.09|crystals: glow=0.06|tiberium crystals=0.72|objects (opaque)=0.99|trees + foliage=1.88|cutout + translucent=0.48|infantry=0.00|effects=0.44|rain + shroud draw=0.27|markers + bars=0.25|post: ground normals=1.94|post: specular=0.55|post: light=6.27|post: atmosphere=0.00|post chain=0.85|hud + present=0.98|panels=0.00|prep + shroud corners=0.28|gpu finish=0.00"
+    },
+    {
+      "case": "tibfog",
+      "median_ms": 28.44,
+      "p90_ms": 35.26,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=32.20|worst=159.1|sun shadow map=6.77|seabed=0.38|water=0.28|terrain=5.46|shore=0.00|mottle=0.84|tiberium=0.00|tiberium ground=0.61|tread marks=0.35|smudges=0.42|crystals: before=0.00|crystals: field merge=0.01|crystals: layout=0.09|crystals: update=0.09|crystals: glow=0.06|tiberium crystals=0.87|objects (opaque)=1.06|trees + foliage=2.06|cutout + translucent=0.57|infantry=0.00|effects=0.50|rain + shroud draw=0.28|markers + bars=0.29|post: ground normals=2.30|post: specular=0.65|post: light=5.89|post: atmosphere=0.00|post chain=0.98|hud + present=1.09|panels=0.00|prep + shroud corners=0.30|gpu finish=0.00"
+    },
+    {
+      "case": "bloom",
+      "median_ms": 28.61,
+      "p90_ms": 36.33,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=33.36|worst=180.6|sun shadow map=6.84|seabed=0.37|water=0.26|terrain=5.45|shore=0.00|mottle=0.81|tiberium=0.00|tiberium ground=0.61|tread marks=0.24|smudges=0.41|crystals: before=0.00|crystals: field merge=0.00|crystals: layout=0.09|crystals: update=0.09|crystals: glow=0.06|tiberium crystals=0.81|objects (opaque)=1.08|trees + foliage=2.10|cutout + translucent=0.52|infantry=0.00|effects=0.49|rain + shroud draw=0.29|markers + bars=0.28|post: ground normals=2.18|post: specular=0.59|post: light=7.87|post: atmosphere=0.00|post chain=0.47|hud + present=1.10|panels=0.00|prep + shroud corners=0.32|gpu finish=0.00"
+    },
+    {
+      "case": "trees",
+      "median_ms": 14.76,
+      "p90_ms": 25.6,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=19.59|worst=152.4|sun shadow map=1.64|seabed=0.30|water=0.23|terrain=3.26|shore=0.00|mottle=0.65|tiberium=0.00|tiberium ground=0.54|tread marks=0.22|smudges=0.34|crystals: before=0.00|crystals: field merge=0.01|crystals: layout=0.08|crystals: update=0.08|crystals: glow=0.06|tiberium crystals=0.58|objects (opaque)=0.55|trees + foliage=1.69|cutout + translucent=0.35|infantry=0.00|effects=0.38|rain + shroud draw=0.25|markers + bars=0.25|post: ground normals=1.12|post: specular=0.47|post: light=4.57|post: atmosphere=0.00|post chain=0.73|hud + present=0.96|panels=0.01|prep + shroud corners=0.28|gpu finish=0.00"
+    },
+    {
+      "case": "baseline-return",
+      "median_ms": 28.57,
+      "p90_ms": 38.39,
+      "serialized_profile": "FRAMEPROF|frames=40|mean=32.25|worst=143.7|sun shadow map=7.66|seabed=0.43|water=0.34|terrain=4.20|shore=0.00|mottle=0.82|tiberium=0.00|tiberium ground=0.65|tread marks=0.28|smudges=0.48|crystals: before=0.00|crystals: field merge=0.00|crystals: layout=0.10|crystals: update=0.09|crystals: glow=0.07|tiberium crystals=0.75|objects (opaque)=1.15|trees + foliage=2.05|cutout + translucent=0.57|infantry=0.00|effects=0.52|rain + shroud draw=0.31|markers + bars=0.31|post: ground normals=2.31|post: specular=0.63|post: light=5.96|post: atmosphere=0.00|post chain=0.91|hud + present=1.27|panels=0.00|prep + shroud corners=0.37|gpu finish=0.00"
+    }
+  ]
+}

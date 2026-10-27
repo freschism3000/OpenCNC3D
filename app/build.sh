@@ -18,6 +18,10 @@
 #    on purpose; on the Voodoo 2 target it is the only thing there is.
 set -e
 cd "$(dirname "$0")"
+python3 ../tools/ra3d/bake-enhanced-hud.py ../game/ra-enhanced-hud.pack --header ../game/ra_hud_layout.h >/dev/null
+
+# A current executable also needs the calibrated approved building bibs.
+python3 ../tools/art/remaster/bib/bake_bibenh.py --pack ../game/bibenh.pack >/dev/null
 
 # THE OLDEST macOS THIS BINARY RUNS ON. Without it clang stamps LC_BUILD_VERSION minos
 # with whatever SDK it finds (whatever is installed), and dyld refuses a Mach-O whose minos
@@ -36,6 +40,12 @@ opencnc3d_need_mac_sdl
 if [ -z "$OPENCNC3D_SKIP_VERSION_HEADER" ]; then
     sh "../tools/version.sh" --header "../game/opencnc3d_build.h"
 fi
+
+# Freeze this build's identity. Another current-main build can regenerate the
+# shared header between translation units or architectures; never mix its stamp.
+BUILD_STAMP=$(mktemp "${TMPDIR:-/tmp}/cnc3d-build-stamp.XXXXXX")
+cp "../game/opencnc3d_build.h" "$BUILD_STAMP"
+trap 'rm -f "$BUILD_STAMP"' 0
 
 # The old ROOT pointed at a temporary folder that the OS cleans; the checkout now
 # lives in the repo (brain/vanilla, gitignored).
@@ -97,20 +107,22 @@ cc $OPENCNC3D_ARCH -std=gnu89 -O2 -g -c ../net/netmatch.c -o netmatch.o
 # netbeacon.c is LAN discovery, which the multiplayer screen's server browser reads.
 cc $OPENCNC3D_ARCH -std=gnu89 -O2 -g -c ../net/netbeacon.c -o netbeacon.o
 
+clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g -DGL_SILENCE_DEPRECATION $CDEFS $INC $(sdl2-config --cflags) -c ../menu/enhanced_menu.cpp -o enhanced_menu.o
+
 # The C++ half: the tactical renderer as a library, plus the state machine.
 clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g \
     -fms-extensions -fdeclspec -D__int64="long long" -DOPENCNC3D_NO_MAIN $CDEFS \
-    -c ../game/cnc_eyes.cpp -o cnc_eyes.o \
+    -include "$BUILD_STAMP" -c ../game/cnc_eyes.cpp -o cnc_eyes.o \
     -I"$HDR" $INC $(sdl2-config --cflags)
 
-clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g -c opencnc3d.cpp -o opencnc3d.o $CDEFS -I"$HDR" $INC $(sdl2-config --cflags)
+clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g -include "$BUILD_STAMP" -c opencnc3d.cpp -o opencnc3d.o $CDEFS -I"$HDR" $INC $(sdl2-config --cflags)
 
 # -headerpad_max_install_names: reserve room in the Mach-O header so the dylib paths can
 # be rewritten afterwards without relinking. Today's rewrite happens to shrink the string
 # (a 50 character Homebrew path becomes a 36 character @executable_path one) so it would
 # fit anyway, but that is luck, not a property, and it stops being true the moment the
 # library or the prefix is renamed.
-clang++ $OPENCNC3D_ARCH -o opencnc3d opencnc3d.o cnc_eyes.o dosbar.o hud640.o dosopt.o dossave.o dosmenu.o dosops.o doslobby.o dosmp.o dosmenu_shell.o \
+clang++ $OPENCNC3D_ARCH -o opencnc3d opencnc3d.o cnc_eyes.o dosbar.o hud640.o dosopt.o dossave.o dosmenu.o dosops.o doslobby.o dosmp.o dosmenu_shell.o enhanced_menu.o \
     vqaplay.o movieplay.o moviesnd.o pngwrite.o campaign.o logo3d.o lockstep.o net_udp.o netmatch.o netbeacon.o roomcode.o \
     mpbrowse.o lnet.o ljson.o $AUDIO_OBJ \
     $(sdl2-config --libs) -Wl,-headerpad_max_install_names -framework OpenGL -lz -lcurl
@@ -130,7 +142,7 @@ sh ../tools/bundle-sdl.sh . opencnc3d
 # sources, and it has caught exactly this twice, both times because the copy was a
 # separate step somebody had to remember. It is not a separate step now.
 if [ -d ../playable ]; then
-    cp opencnc3d ../playable/opencnc3d
+    python3 ../tools/mac/stage-runtime.py ../playable opencnc3d
     echo "built ./opencnc3d  (and staged to ../playable/)"
 else
     echo "built ./opencnc3d"

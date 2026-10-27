@@ -174,6 +174,7 @@ typedef struct
     unsigned char MPlayerAftermathUnits;
     unsigned char CaptureTheFlag;
     unsigned char DestroyStructures;
+    unsigned char ShortGame;
     unsigned char ModernBalance;
 } CNCMultiplayerOptionsStruct;
 
@@ -193,6 +194,8 @@ typedef int(CNC_CALL* fn_Dump)(void);
 typedef void(CNC_CALL* fn_SetLockstep)(int);
 typedef int(CNC_CALL* fn_GetLockstep)(void);
 typedef int(CNC_CALL* fn_EventABI)(unsigned int*, int);
+typedef void(CNC_CALL* fn_SetAILevels)(const unsigned char*, int);
+typedef unsigned(CNC_CALL* fn_AIHash)(void);
 typedef int(CNC_CALL* fn_SetMP)(int, CNCMultiplayerOptionsStruct*, int, CNCPlayerInfoStruct*, int);
 typedef int(CNC_CALL* fn_Drain)(void*, int, int);
 typedef int(CNC_CALL* fn_Post)(const void*);
@@ -219,6 +222,9 @@ typedef struct
     fn_SetLockstep SetLockstep;
     fn_GetLockstep GetLockstep;
     fn_EventABI EventABI;
+    fn_SetAILevels SetAILevels;
+    fn_AIHash AIPolicy;
+    fn_AIHash AIState;
     fn_SetMP SetMP;
     fn_Drain Drain;
     fn_Post Post;
@@ -278,6 +284,7 @@ static char* capture_dump(Brain* b, size_t* len_out)
     fflush(NULL);
     dup2(tmpfd, 1);
     b->Dump();
+    printf("FAIRAI_STATE|policy=%08x|state=%08x\n", b->AIPolicy(), b->AIState());
     fflush(NULL);
     dup2(saved, 1);
     close(saved);
@@ -396,6 +403,9 @@ static int load_brain(Brain* b, const char* src, const char* copy_path, const ch
     SYM(SetLockstep, "OpenCNC3D_Set_Lockstep")
     SYM(GetLockstep, "OpenCNC3D_Get_Lockstep")
     SYM(EventABI, "OpenCNC3D_Event_ABI")
+    SYM(SetAILevels, "OpenCNC3D_Set_AI_Difficulties")
+    SYM(AIPolicy, "OpenCNC3D_AI_Policy")
+    SYM(AIState, "OpenCNC3D_AI_State_Hash")
     SYM(SetMP, "CNC_Set_Multiplayer_Data")
     SYM(Drain, "OpenCNC3D_Drain_Events")
     SYM(Post, "OpenCNC3D_Post_Event")
@@ -459,7 +469,7 @@ static int arm_multiplayer(Brain* b, int seats)
     opt.MPlayerGoodies = 0;
     opt.MPlayerGhosts = 0;
     opt.MPlayerSolo = 1;
-    opt.MPlayerUnitCount = 10;
+    opt.MPlayerUnitCount = getenv("OPENCNC3D_TEST_AI_SEATS") ? 0 : 10;
 
     for (i = 0; i < seats; i++) {
         snprintf(roster[i].Name, sizeof(roster[i].Name), "seat%d", i);
@@ -474,10 +484,22 @@ static int arm_multiplayer(Brain* b, int seats)
            With one human and one AI the order leg's beacon is silently refused and the
            drain comes back empty, which reads as "the drain is broken". Two humans is
            also simply what a lockstep match IS. */
-        roster[i].IsAI = 0;
+        roster[i].IsAI = (getenv("OPENCNC3D_TEST_AI_SEATS") && i >= 2) ? 1 : 0;
         roster[i].AllyFlags = 0;
     }
 
+    {
+        unsigned char levels[8] = {1,1,1,1,1,1,1,1};
+        const char* selected = getenv("OPENCNC3D_TEST_AI_LEVELS");
+        int seat = 0;
+        while (selected && *selected && seat < 8) {
+            int level = atoi(selected);
+            levels[seat++] = (unsigned char)(level >= 0 && level <= 3 ? level : 1);
+            while (*selected && *selected != ',') ++selected;
+            if (*selected == ',') ++selected;
+        }
+        b->SetAILevels(levels, seats);
+    }
     ok = b->SetMP(0, &opt, seats, roster, seats);
     free(roster);
     return (ok);
@@ -1264,7 +1286,9 @@ int main(int argc, char** argv)
     /* SCM* is this project's multiplayer map naming. A multiplayer map means the order leg
        can run, because the pump that executes a posted order is on the multiplayer arm. */
     int want_order_leg = (strncmp(scenario, "SCM", 3) == 0);
-    int seats = 2;
+    int computers = getenv("OPENCNC3D_TEST_AI_SEATS") ? atoi(getenv("OPENCNC3D_TEST_AI_SEATS")) : 0;
+    if (computers < 0 || computers > 6) return 2;
+    int seats = 2 + computers;
     if (want_order_leg) {
         if (!arm_multiplayer(&A, seats) || !arm_multiplayer(&B, seats)) {
             printf("FAILED: could not arm a %d seat match on both instances\n", seats);
@@ -1273,8 +1297,8 @@ int main(int argc, char** argv)
         printf("  armed a %d seat match on both instances\n", seats);
     }
 
-    int okA = A.Start(content, scendir, scenario, 1, want_order_leg);
-    int okB = B.Start(content, scendir, scenario, 1, want_order_leg);
+    int okA = A.Start(content, scendir, scenario, computers ? 7 : 1, want_order_leg);
+    int okB = B.Start(content, scendir, scenario, computers ? 7 : 1, want_order_leg);
     if (!okA || !okB) {
         printf("FAILED: scenario did not start (A=%d B=%d)\n", okA, okB);
         return (1);

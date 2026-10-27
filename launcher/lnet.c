@@ -16,6 +16,13 @@
 #define LN_AGENT "OpenCNC3D-Launcher/1.0"
 #define LN_KEY_HEADER "X-OpenCNC3D-Key: "
 
+static void ln_connection_err(char *err, int errlen, int resolve)
+{
+    snprintf(err, (size_t)errlen, "%s Check your connection and try again.",
+             resolve ? "The server address could not be resolved."
+                     : "Could not connect to the server.");
+}
+
 /* A download lands here first and is renamed on success. Anything that dies
  * halfway leaves a .part behind, which is obviously not a finished file, rather
  * than a truncated zip that unpacks into half a game. */
@@ -170,11 +177,12 @@ static void ln_win_timeouts(HINTERNET h)
 static int ln_win_classify(DWORD code);
 
 static HINTERNET ln_open(HINTERNET *session, const char *url, const char *key,
-                         long long *length, int *unreached, char *err, int errlen)
+                         long long *length, int retry, int *unreached, char *err, int errlen)
 {
     char headers[512];
     HINTERNET req;
-    DWORD status = 0, len = sizeof status, idx = 0;
+    DWORD status = 0, len = sizeof status, idx = 0, code = 0;
+    int attempt;
     DWORD flags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE
                   | INTERNET_FLAG_NO_UI | INTERNET_FLAG_KEEP_CONNECTION;
 
@@ -190,12 +198,26 @@ static HINTERNET ln_open(HINTERNET *session, const char *url, const char *key,
     if (key && *key)
         snprintf(headers, sizeof headers, LN_KEY_HEADER "%s\r\n", key);
 
-    req = InternetOpenUrlA(*session, url, headers[0] ? headers : NULL,
-                           headers[0] ? (DWORD)strlen(headers) : 0, flags, 0);
+    for (attempt = 0; attempt < (retry ? 2 : 1); attempt++) {
+        req = InternetOpenUrlA(*session, url, headers[0] ? headers : NULL,
+                               headers[0] ? (DWORD)strlen(headers) : 0, flags, 0);
+        if (req)
+            break;
+        code = GetLastError();
+        if (code != ERROR_INTERNET_NAME_NOT_RESOLVED && code != ERROR_INTERNET_CANNOT_CONNECT)
+            break;
+        fprintf(stderr, "network: WinINet error %lu, connection attempt %d/%d\n",
+                (unsigned long)code, attempt + 1, retry ? 2 : 1);
+    }
     if (!req) {
         if (unreached)
-            *unreached = ln_win_classify(GetLastError()) == LN_RANGE_NOCONNECT;
-        ln_win_err(err, errlen, "could not reach the update server");
+            *unreached = ln_win_classify(code) == LN_RANGE_NOCONNECT;
+        if (code == ERROR_INTERNET_NAME_NOT_RESOLVED || code == ERROR_INTERNET_CANNOT_CONNECT)
+            ln_connection_err(err, errlen, code == ERROR_INTERNET_NAME_NOT_RESOLVED);
+        else {
+            SetLastError(code);
+            ln_win_err(err, errlen, "could not reach the update server");
+        }
         InternetCloseHandle(*session);
         *session = NULL;
         return NULL;
@@ -249,7 +271,7 @@ char *ln_get_text_reach(const char *url, const char *key, long cap, int *unreach
 
     if (unreached)
         *unreached = 0;
-    req = ln_open(&session, url, key, &length, unreached, err, errlen);
+    req = ln_open(&session, url, key, &length, 1, unreached, err, errlen);
     if (!req)
         return NULL;
     if (length > cap) {
@@ -424,7 +446,7 @@ int ln_get_file(const char *url, const char *key, const char *path, LN_Progress 
     FILE *f;
     char chunk[64 * 1024];
 
-    req = ln_open(&session, url, key, &length, NULL, err, errlen);
+    req = ln_open(&session, url, key, &length, 0, NULL, err, errlen);
     if (!req)
         return 0;
 
@@ -859,6 +881,13 @@ static struct curl_slist *ln_headers(const char *key)
 static void ln_curl_err(char *err, int errlen, CURLcode rc, long status,
                         const char *detail)
 {
+    if (rc == CURLE_COULDNT_RESOLVE_HOST || rc == CURLE_COULDNT_RESOLVE_PROXY ||
+        rc == CURLE_COULDNT_CONNECT) {
+        fprintf(stderr, "network: libcurl error %d (%s): %s\n", (int)rc,
+                curl_easy_strerror(rc), detail && *detail ? detail : curl_easy_strerror(rc));
+        ln_connection_err(err, errlen, rc != CURLE_COULDNT_CONNECT);
+        return;
+    }
     if (rc == CURLE_PARTIAL_FILE) {
         /* The server said N bytes and sent fewer. curl's own words for this are
          * "transfer closed with 15862 bytes remaining to read", which is exactly
@@ -907,6 +936,7 @@ char *ln_get_text_reach(const char *url, const char *key, long cap, int *unreach
     char detail[CURL_ERROR_SIZE];
     CURLcode rc;
     long status = 0;
+    int attempt;
 
     if (unreached)
         *unreached = 0;
@@ -936,7 +966,16 @@ char *ln_get_text_reach(const char *url, const char *key, long cap, int *unreach
         curl_easy_setopt(c, CURLOPT_HTTPHEADER, hdrs);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, ln_sink);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &sink);
-    rc = curl_easy_perform(c);
+    for (attempt = 0; attempt < 2; attempt++) {
+        rc = curl_easy_perform(c);
+        if (attempt || (rc != CURLE_COULDNT_RESOLVE_HOST && rc != CURLE_COULDNT_RESOLVE_PROXY &&
+                        rc != CURLE_COULDNT_CONNECT))
+            break;
+        fprintf(stderr, "network: libcurl error %d (%s): %s; retrying once\n", (int)rc,
+                curl_easy_strerror(rc), detail[0] ? detail : curl_easy_strerror(rc));
+        sink.got = 0;
+        detail[0] = '\0';
+    }
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &status);
     if (unreached && rc != CURLE_OK) {
         double ct = 0;

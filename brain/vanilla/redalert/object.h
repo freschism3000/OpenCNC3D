@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Declares the per-house invincibility switch on ObjectClass (the static
+// bitmask, the setter and the const query), read by Take_Damage in
+// object.cpp.
+// The declarations do not change the game simulation; object.cpp does.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/OBJECT.H 1     3/03/97 10:25a Joe_bostic $ */
 /***********************************************************************************************
@@ -157,6 +166,17 @@ public:
     **	Object selection control.
     */
     static void Init(void);
+
+    /*
+    **	INVINCIBILITY (project OpenCNC3D addition; not upstream), for the cheat menu. One bit per
+    **	house in the HOUSEF_* shape. It sits where damage is applied, Take_Damage, because the
+    **	exported debug interface has no switch for damage. Static, so no saved object grows a
+    **	member; cleared by Init(), which Clear_Scenario() calls, so it cannot survive into the
+    **	next scenario. Default is OFF.
+    */
+    static unsigned OpenCNC3D_InvincibleHouses;
+    static void OpenCNC3D_Set_Invincible(HousesType house, bool on);
+    bool OpenCNC3D_Is_Invincible(void) const;
 
     /*
     **	Query functions.

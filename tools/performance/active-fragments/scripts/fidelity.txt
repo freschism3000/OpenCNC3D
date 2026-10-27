@@ -1,0 +1,305 @@
+dosdrawprobe
+gfxmode 2
+gfx show_stats 0
+cheatset fog 0
+tick 3
+cam 12 16
+dist 2700
+echo REUSESTATE|intact
+shot @OUT@/intact.png
+renderdump @OUT@/intact
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+hurtcell 15 15
+hurtcell 15 15
+tick 1
+echo REUSESTATE|hit-cold
+shot @OUT@/hit-cold.png
+renderdump @OUT@/hit-cold
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tick 1
+tickalpha 0
+echo REUSESTATE|t002-a0
+shot @OUT@/t002-a0.png
+renderdump @OUT@/t002-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t002-warm
+shot @OUT@/t002-warm.png
+renderdump @OUT@/t002-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tick 6
+tickalpha 0
+echo REUSESTATE|t008-a0
+shot @OUT@/t008-a0.png
+renderdump @OUT@/t008-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t008-warm
+shot @OUT@/t008-warm.png
+renderdump @OUT@/t008-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.25
+echo REUSESTATE|t008-a0.25
+shot @OUT@/t008-a0.25.png
+renderdump @OUT@/t008-a0.25
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.75
+echo REUSESTATE|t008-a0.75
+shot @OUT@/t008-a0.75.png
+renderdump @OUT@/t008-a0.75
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0
+tick 12
+tickalpha 0
+echo REUSESTATE|t020-a0
+shot @OUT@/t020-a0.png
+renderdump @OUT@/t020-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t020-warm
+shot @OUT@/t020-warm.png
+renderdump @OUT@/t020-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tick 20
+tickalpha 0
+echo REUSESTATE|t040-a0
+shot @OUT@/t040-a0.png
+renderdump @OUT@/t040-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t040-warm
+shot @OUT@/t040-warm.png
+renderdump @OUT@/t040-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.25
+echo REUSESTATE|t040-a0.25
+shot @OUT@/t040-a0.25.png
+renderdump @OUT@/t040-a0.25
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.75
+echo REUSESTATE|t040-a0.75
+shot @OUT@/t040-a0.75.png
+renderdump @OUT@/t040-a0.75
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0
+cam 17 15
+dist 1800
+echo REUSESTATE|camera-moved
+shot @OUT@/camera-moved.png
+renderdump @OUT@/camera-moved
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+cam 12 16
+dist 2700
+cheatset fog 1
+echo REUSESTATE|fog-on
+shot @OUT@/fog-on.png
+renderdump @OUT@/fog-on
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+cheatset fog 0
+tick 20
+tickalpha 0
+echo REUSESTATE|t060-a0
+shot @OUT@/t060-a0.png
+renderdump @OUT@/t060-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t060-warm
+shot @OUT@/t060-warm.png
+renderdump @OUT@/t060-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.25
+echo REUSESTATE|t060-a0.25
+shot @OUT@/t060-a0.25.png
+renderdump @OUT@/t060-a0.25
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.75
+echo REUSESTATE|t060-a0.75
+shot @OUT@/t060-a0.75.png
+renderdump @OUT@/t060-a0.75
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0
+tick 20
+tickalpha 0
+echo REUSESTATE|t080-a0
+shot @OUT@/t080-a0.png
+renderdump @OUT@/t080-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t080-warm
+shot @OUT@/t080-warm.png
+renderdump @OUT@/t080-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.25
+echo REUSESTATE|t080-a0.25
+shot @OUT@/t080-a0.25.png
+renderdump @OUT@/t080-a0.25
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0.75
+echo REUSESTATE|t080-a0.75
+shot @OUT@/t080-a0.75.png
+renderdump @OUT@/t080-a0.75
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tickalpha 0
+tick 30
+tickalpha 0
+echo REUSESTATE|t110-a0
+shot @OUT@/t110-a0.png
+renderdump @OUT@/t110-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t110-warm
+shot @OUT@/t110-warm.png
+renderdump @OUT@/t110-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+tick 40
+tickalpha 0
+echo REUSESTATE|t150-a0
+shot @OUT@/t150-a0.png
+renderdump @OUT@/t150-a0
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+frames 5
+echo REUSESTATE|t150-warm
+shot @OUT@/t150-warm.png
+renderdump @OUT@/t150-warm
+objdump
+ebldump
+ebldbodies
+physicsdump
+efxdump
+meshperfdump
+quit

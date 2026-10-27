@@ -301,6 +301,8 @@ static void camp_xor(unsigned char *dst, long dlen, const unsigned char *src, lo
 #define TXT_SCORE_NEUT 585
 #define TXT_SCORE_GDI 586
 #define TXT_SCORE_BUIL 587
+#define TXT_SCORE_BUIL1 588       /* Nod plate: BUILDINGS */
+#define TXT_SCORE_BUIL2 589       /* Nod plate: LOST: */
 #define TXT_SCORE_TOP 590         /* conquer.h:607 "TOP SCORES" */
 #define TXT_SCORE_ENDCRED 591
 #define TXT_SCORE_TIMEFORMAT1 592 /* "%dh %dm" */
@@ -2118,8 +2120,14 @@ int camp_score(Camp *c, const CampScore *s, int side, int scenario)
         camp_ctx_type(&k, TXT_SCORE_BUIL, 144, 126, camp_sc_greenpal);
         if (!camp_ctx_delay(&k, 9)) goto closed;
     } else {
-        camp_ctx_type(&k, TXT_SCORE_BUIL, 146, 128, camp_sc_greenpal);
+        /* Nod's plate has a narrow heading column beside the faction totals.
+           Use its two disc strings, as score.cpp:862-866 does, so the heading
+           cannot overwrite GDI and the civilian total has its own label. */
+        camp_ctx_type(&k, TXT_SCORE_BUIL1, 146, 128, camp_sc_greenpal);
+        camp_ctx_type(&k, TXT_SCORE_BUIL2, 146, 136, camp_sc_greenpal);
         if (!camp_ctx_delay(&k, 9)) goto closed;
+        camp_ctx_type(&k, TXT_SCORE_NEUT, 200, 152, camp_sc_greenpal);
+        if (!camp_ctx_delay(&k, 4)) goto closed;
     }
     camp_ctx_type(&k, TXT_SCORE_GDI, gditxx[house], bldggy[house], camp_sc_greenpal);
     camp_ctx_type(&k, TXT_SCORE_NOD, gditxx[house], bldgny[house], camp_sc_greenpal);

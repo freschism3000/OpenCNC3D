@@ -36,7 +36,8 @@ static const struct {
     {"Abort Mission", 0},
     {"Exit Game", 0},
     {"Resume Mission", 0},
-    {"Restate", 0}         /* live when the mission has a briefing: dopt_item_disabled */
+    {"Restate", 0},        /* live when the mission has a briefing: dopt_item_disabled */
+    {"Audio", 0}           /* ours: the jukebox and the volumes, under Gameplay */
 };
 
 /* The slot dialog's caption and its action button, by mode: TXT_LOAD_MISSION 53,
@@ -91,7 +92,7 @@ static const char *const dopt_vis_elem[DOPT_VE_COUNT] = {
     "Colour grade",
     "CRT",
     "New audio",
-    "3D grass",
+    "3D Grass",
     "Bushes",
     "Rocks",
     "3D soldiers",
@@ -112,9 +113,10 @@ static const int dopt_rows_n64[] = {
 };
 static const int dopt_rows_enhanced[] = {
     DOPT_VE_UISCALE, DOPT_VE_PERSPECTIVE, DOPT_VE_SMOOTH, DOPT_VE_NEWHUD, DOPT_VE_BILINEAR,
-    DOPT_VE_WATER, DOPT_VE_TREES, DOPT_VE_TIB3D, DOPT_VE_TEXSET, DOPT_VE_INFSET,
-    DOPT_VE_GAMMA, DOPT_VE_SUPERSAMPLE, DOPT_VE_SHADOWS, DOPT_VE_OCCLUSION, DOPT_VE_LIGHT,
-    DOPT_VE_BLOOM, DOPT_VE_GRADE, DOPT_VE_CRT
+    DOPT_VE_WATER, DOPT_VE_TREES, DOPT_VE_GRASS, DOPT_VE_TIB3D, DOPT_VE_TEXSET, DOPT_VE_INFSET,
+    DOPT_VE_GAMMA, DOPT_VE_SHADOWS, DOPT_VE_OCCLUSION, DOPT_VE_LIGHT,
+    DOPT_VE_BLOOM, DOPT_VE_GRADE, DOPT_VE_CRT,
+    DOPT_VE_FOLIAGE, DOPT_VE_ROCKS, DOPT_VE_PATCHES
 };
 
 int dopt_vis_mode_rows(int mode, int *out)
@@ -177,7 +179,7 @@ static const char *const dopt_texset_name[DOPT_TEX_COUNT] = {
     "N64 Textures", "DOS Textures", "", "Enhanced Textures"
 };
 static const char *const dopt_infset_name[DOPT_INF_COUNT] = {
-    "N64 Sprites", "DOS Sprites"
+    "N64 Sprites", "DOS Sprites", "", "Enhanced 3D"
 };
 
 /* The Gameplay page's labels. All three are ours. Measured against GRAD6FNT: 104, 116
@@ -202,7 +204,7 @@ const char *dopt_vis_elem_label(int elem)
 }
 
 static const char *const dopt_ctrl_label[DOPT_C_COUNT] = {
-    "Game Speed:", "Scroll Rate:", "Music Volume:", "Sound Volume:", "Speech Volume:",
+    "Game Speed:", "Scroll Rate:", "Music Volume:", "Sound Volume:", "Voices Volume:",
     "Sound Controls", /* TXT_SOUND_CONTROLS conquer.h:198 */
     "Options Menu"
 };
@@ -213,8 +215,8 @@ static const char *const dopt_ctrl_label[DOPT_C_COUNT] = {
  * carry a name: dopt_item_label is what the harness's `optclick LABEL` looks up, so a
  * nameless button is a button no gate can press. */
 static const char *const dopt_snd_label[DOPT_S_COUNT] = {
-    "Music Volume:", "Sound Volume:", "Ambience:", "Track List", "Stop", "Play",
-    "Off", "Off", "Options Menu"
+    "Music Volume:", "Sound Volume:", "Voices Volume:", "Ambience:", "Track List", "Stop",
+    "Play", "Off", "Off", "Options Menu"
 };
 
 /* ONE PLACE THAT KNOWS HOW LONG EACH PAGE IS. Every page test in this file used to be a
@@ -298,7 +300,9 @@ int dopt_item_disabled(const DOPT_State *st, int item)
 {
     switch (st->page) {
     case DOPT_PAGE_CONTROLS:
-        return 0;
+        /* THE VOLUMES AND SOUND CONTROLS LEFT GAME CONTROLS for the pause menu's own Audio
+           page; their items stay numbered, and are dead here and drawn nowhere */
+        return item >= DOPT_C_MUSIC && item <= DOPT_C_SOUNDCTRL;
     case DOPT_PAGE_VISUALS:
         /* Red Alert has no N64 presentation. Keep the row visible in the shared menu,
            but let the ordinary disabled draw, hit test and keyboard walk refuse it. */
@@ -333,7 +337,7 @@ int dopt_item_disabled(const DOPT_State *st, int item)
            item, so the mouse and the keyboard walk go dead together and no index moves.
            The draw skips it outright instead of greying it: a dead third button is a
            question the player has to read and dismiss. */
-        if (item == DOPT_CF_RESTART) return (st && (st->match || st->cfkind == 1)) ? 1 : 0;
+        if (item == DOPT_CF_RESTART) return (st && (st->match || st->cfkind != 0)) ? 1 : 0;
         return 0;
     case DOPT_PAGE_SOUND:
         /* Play does nothing with an empty list, and 1995 draws a dead gadget rather
@@ -780,6 +784,20 @@ const char *dopt_brief_line(const DOPT_State *st, int i)
     return st->brwrap + st->brline[i];
 }
 
+void dopt_open_page_notice(DOPT_State *st, const char *caption, const char *text)
+{
+    if (!st) return;
+    st->nprev = st->selected;
+    memcpy(st->nbrief, st->brief, sizeof st->nbrief);
+    st->nvideo = st->rvideo;
+    dopt_set_briefing(st, text, 0);
+    snprintf(st->ncaption, sizeof st->ncaption, "%s", caption ? caption : "");
+    st->nback = 1;
+    st->page = DOPT_PAGE_NOTICE;
+    st->selected = DOPT_R_LEFT;
+    st->pressed = -1;
+}
+
 void dopt_open_notice(DOPT_State *st, const DB_Pack *p, const char *caption,
                       const char *text)
 {
@@ -1177,6 +1195,7 @@ const char *dopt_abort_label(const DOPT_State *st)
 /* The confirmation's question and the button that answers it, chosen the same way. */
 const char *dopt_confirm_msg(const DOPT_State *st)
 {
+    if (st && st->cfkind == 2) return "Exit OpenCNC3D?";
     if (st && st->cfkind == 1) return DOPT_SL_DELQ_S;   /* loaddlg.cpp:450 */
     if (!st || !st->match) return DOPT_CF_MSG;
     return st->surrendered ? DOPT_CF_MSG_LEAVE : DOPT_CF_MSG_SURR;
@@ -1184,6 +1203,7 @@ const char *dopt_confirm_msg(const DOPT_State *st)
 
 const char *dopt_confirm_yes(const DOPT_State *st)
 {
+    if (st && st->cfkind == 2) return "Exit Game";
     if (st && st->cfkind == 1) return DOPT_CF_YES_S;    /* TXT_YES, loaddlg.cpp:450 */
     if (!st || !st->match) return DOPT_CF_ABORT_S;
     /* The question already names the deed ("Do you want to surrender?"), so the button
@@ -1196,7 +1216,7 @@ const char *dopt_confirm_yes(const DOPT_State *st)
    second line cannot be sized on one and drawn on two. */
 const char *dopt_confirm_msg2(const DOPT_State *st)
 {
-    if (!st || !st->match || st->cfkind == 1) return 0;
+    if (!st || !st->match || st->cfkind != 0) return 0;
     return st->surrendered ? DOPT_CF_MSG_LEAVE2 : 0;
 }
 
@@ -1326,31 +1346,14 @@ int dopt_item_rect(const DOPT_State *st, int item, int *x, int *y, int *w, int *
         case DOPT_C_MUSIC:
         case DOPT_C_SOUND:
         case DOPT_C_SPEECH:
-            *x = DOPT_GC_VOL_X;
-            *y = DOPT_GC_VOL_Y + DOPT_GC_VOL_STEP * (item - DOPT_C_MUSIC);
-            *w = DOPT_GC_VOL_W; *h = DOPT_GC_VOL_H;
-            return 1;
         case DOPT_C_SOUNDCTRL:
-            /* The LEFT half of the bottom row's centred pair. It used to be a hard 64
-               wide at DOPT_GC_X + 6, which is 26 pixels narrower than its own label
-               needs, and db_print does not truncate: the text printed outside the box
-               and off the dialog onto the battlefield. Width, gap and x are all derived
-               at DOPT_GC_ROW_BTN_W in dosopt.h, which carries a project request and the
-               1995/cartridge comparison. */
-            *w = DOPT_GC_ROW_BTN_W;
-            *h = DOPT_GC_OK_H;
-            *x = DOPT_GC_SOUNDCTRL_X;
-            *y = DOPT_GC_OK_Y;
-            return 1;
+            return 0;                      /* on the pause menu's Audio page now */
         default:
-            /* DOPT_C_OK: the RIGHT half of that same pair. This is the one arm that
-               leaves gamedlg.cpp:151's screen-centred OK behind. DOPT_V_OK, DOPT_A_OK
-               and DOPT_S_OK have their own branches below and are untouched, so the
-               Visuals, Advanced and jukebox pages still place OK exactly as 1995 did,
-               and st->okw is still live for them: do not delete it. */
+            /* DOPT_C_OK, alone on the bottom row and centred in the dialog, as
+               gamedlg.cpp:151 placed it, now that Sound Controls is not beside it */
             *w = DOPT_GC_ROW_BTN_W;
             *h = DOPT_GC_OK_H;
-            *x = DOPT_GC_ROW_OK_X;
+            *x = DOPT_GC_X + (DOPT_GC_W - DOPT_GC_ROW_BTN_W) / 2;
             *y = DOPT_GC_OK_Y;
             return 1;
         }
@@ -1368,6 +1371,9 @@ int dopt_item_rect(const DOPT_State *st, int item, int *x, int *y, int *w, int *
             *w = DOPT_SND_VOL_W;  *h = DOPT_SND_VOL_H;  return 1;
         case DOPT_S_AMBIENCE:
             *x = DOPT_SND_MVOL_X; *y = DOPT_SND_AMBVOL_Y;
+            *w = DOPT_SND_VOL_W; *h = DOPT_SND_VOL_H; return 1;
+        case DOPT_S_SPEECH:
+            *x = DOPT_SND_MVOL_X; *y = DOPT_SND_SPVOL_Y;
             *w = DOPT_SND_VOL_W; *h = DOPT_SND_VOL_H; return 1;
         case DOPT_S_LIST:
             *x = DOPT_SND_LIST_X; *y = DOPT_SND_LIST_Y;
@@ -1545,10 +1551,13 @@ int dopt_item_rect(const DOPT_State *st, int item, int *x, int *y, int *w, int *
         return 0;
     *w = st->btnw ? st->btnw : DOPT_MIN_BTN_W;
     *h = DOPT_BTN_H;
-    if (item <= DOPT_EXIT) {
-        /* The stack. goptions.cpp:130, walking down in OButtonHeight + 2 steps. */
+    if (item <= DOPT_EXIT || item == DOPT_AUDIO) {
+        /* The stack. goptions.cpp:130, walking down in OButtonHeight + 2 steps. Audio
+           takes the row under Gameplay, and Abort and Exit move one row down for it. */
+        const int row = item == DOPT_AUDIO ? DOPT_GAMEPLAY + 1
+                      : item > DOPT_GAMEPLAY ? item + 1 : item;
         *x = DOPT_X + (DOPT_W - *w) / 2;
-        *y = DOPT_STACK_TOP + DOPT_STACK_STEP * item;
+        *y = DOPT_STACK_TOP + DOPT_STACK_STEP * row;
         return 1;
     }
     /* goptions.cpp:163-170: Resume pinned left, Restate pinned right, both 90 wide. */
@@ -1613,6 +1622,25 @@ int dopt_next_item(const DOPT_State *st, int item, int delta)
         }
         return item;
     }
+    if (st->page == DOPT_PAGE_OPTIONS) {
+        /* THE PAUSE PAGE'S WALK, as it is drawn: Audio sits under Gameplay */
+        static const int walk[DOPT_ITEM_COUNT] = { DOPT_LOAD, DOPT_SAVE, DOPT_DELETE, DOPT_GAME,
+            DOPT_VISUALS, DOPT_GAMEPLAY, DOPT_AUDIO, DOPT_ABORT, DOPT_EXIT, DOPT_RESUME,
+            DOPT_RESTATE };
+        int at = -1;
+        for (i = 0; i < DOPT_ITEM_COUNT; i++)
+            if (walk[i] == item) at = i;
+        if (at < 0)
+            at = (delta > 0) ? -1 : DOPT_ITEM_COUNT;
+        for (i = 0; i < DOPT_ITEM_COUNT; i++) {
+            at += (delta > 0) ? 1 : -1;
+            if (at >= DOPT_ITEM_COUNT) at = 0;
+            if (at < 0) at = DOPT_ITEM_COUNT - 1;
+            if (!dopt_item_disabled(st, walk[at]))
+                return walk[at];
+        }
+        return item;
+    }
     k = item;
     for (i = 0; i < n; i++) {
         k += (delta > 0) ? 1 : -1;
@@ -1663,6 +1691,7 @@ static int *dopt_ctrl_slot(DOPT_State *st, int ctrl)
         if (ctrl == DOPT_S_MUSIC) return &st->set.music;
         if (ctrl == DOPT_S_SOUND) return &st->set.sound;
         if (ctrl == DOPT_S_AMBIENCE) return &st->set.ambience;
+        if (ctrl == DOPT_S_SPEECH) return &st->set.speech;
         return 0;
     }
     switch (ctrl) {
@@ -1815,7 +1844,7 @@ int dopt_press(DOPT_State *st, int mx, int my)
     }
 
     if ((st->page == DOPT_PAGE_CONTROLS && hit < DOPT_C_SOUNDCTRL) ||
-        (st->page == DOPT_PAGE_SOUND && hit <= DOPT_S_AMBIENCE)) {
+        (st->page == DOPT_PAGE_SOUND && hit < DOPT_S_LIST)) {
         /* gauge.cpp:288-316: clicking ON the thumb drags it from where it was
            grabbed; clicking anywhere else jumps the value to the pointer. */
         int cur = *dopt_ctrl_slot(st, hit);
@@ -1867,6 +1896,7 @@ static void dopt_vis_apply(DOPT_State *st)
 {
     if (st->bind.applyvis)
         st->bind.applyvis(st->bind.user, &st->vis);
+    st->vis.resolution_changed = 0;
 }
 
 static int dopt_activate(DOPT_State *st, int item)
@@ -1877,6 +1907,13 @@ static int dopt_activate(DOPT_State *st, int item)
     /* THE NOTICE has one answer and it is "close me", whichever way it was given. */
     if (st->page == DOPT_PAGE_NOTICE) {
         st->pressed = -1;
+        if (st->nback) {
+            st->nback = 0;
+            dopt_set_briefing(st, st->nbrief, st->nvideo);
+            st->page = DOPT_PAGE_OPTIONS;
+            st->selected = st->nprev;
+            return DOPT_ACT_NONE;
+        }
         return DOPT_ACT_RESUME;
     }
     if (st->page == DOPT_PAGE_RESTATE) {
@@ -1893,6 +1930,10 @@ static int dopt_activate(DOPT_State *st, int item)
        pause page back exactly as it was, which is what msgbox.cpp's caller does when
        Process returns the cancel value (goptions.cpp:425-440 simply falls through). */
     if (st->page == DOPT_PAGE_CONFIRM) {
+        if (st->cfkind == 2) {
+            st->cfkind = 0; st->page = DOPT_PAGE_OPTIONS; st->selected = st->cfprev; st->pressed = -1;
+            return item == DOPT_CF_ABORT ? DOPT_ACT_EXIT : DOPT_ACT_NONE;
+        }
         if (st->cfkind == 1) {
             /* "Delete this file?" Yes names the row for the host and goes back to the
                slot list, which the host then reloads (loaddlg.cpp:450-458). */
@@ -2038,10 +2079,11 @@ static int dopt_activate(DOPT_State *st, int item)
             dopt_vis_apply(st);
             return DOPT_ACT_NONE;
         }
-        /* VERTICAL SYNC: off goes to 0 and on to 1. An adaptive 2 set on the tuning panel
-           reads as on and stays 2 until the box is clicked. */
+        /* VERTICAL SYNC: each click goes off (0), on (1), adaptive (2), back to off. The box
+           is ticked for on and adaptive, and adaptive prints its own name in the row
+           (dopt_draw_advanced), so the three are told apart without a wider control. */
         if (item == DOPT_VE_VSYNC) {
-            st->vis.vsync = st->vis.vsync ? 0 : 1;
+            st->vis.vsync = (st->vis.vsync + 1) % 3;
             dopt_vis_apply(st);
             return DOPT_ACT_NONE;
         }
@@ -2111,6 +2153,8 @@ static int dopt_activate(DOPT_State *st, int item)
         if (item >= DOPT_VE_GLOBAL_COUNT && item < DOPT_VE_COUNT) {
             DOPT_Profile *pr = dopt_tabprof(st);
             pr->elem[item] = !pr->elem[item];
+            if (item == DOPT_VE_SOLDIERS)
+                pr->model_soldiers = pr->elem[item];
             dopt_vis_apply(st);
         }
         return DOPT_ACT_NONE;
@@ -2119,10 +2163,10 @@ static int dopt_activate(DOPT_State *st, int item)
     if (st->page == DOPT_PAGE_SOUND) {
         switch (item) {
         case DOPT_S_OK:
-            /* sounddlg.cpp's "Options Menu" button steps back to Game Controls, which
-               is where gamedlg.cpp:433 opened this from. */
-            st->page = DOPT_PAGE_CONTROLS;
-            st->selected = DOPT_C_SOUNDCTRL;
+            /* back to the pause menu, where its Audio button opened it (1995 opened it
+               from Game Controls, gamedlg.cpp:433) */
+            st->page = DOPT_PAGE_OPTIONS;
+            st->selected = DOPT_AUDIO;
             st->pressed = -1;
             return DOPT_ACT_NONE;
         case DOPT_S_STOP:
@@ -2189,7 +2233,7 @@ static int dopt_activate(DOPT_State *st, int item)
     switch (item) {
     case DOPT_GAME:
         st->page = DOPT_PAGE_CONTROLS;
-        st->selected = DOPT_C_MUSIC;
+        st->selected = DOPT_C_SPEED;
         st->pressed = -1;
         return DOPT_ACT_NONE;
     case DOPT_VISUALS:
@@ -2200,6 +2244,12 @@ static int dopt_activate(DOPT_State *st, int item)
     case DOPT_GAMEPLAY:
         st->page = DOPT_PAGE_GAMEPLAY;
         st->selected = DOPT_G_SWAPBTN;
+        st->pressed = -1;
+        return DOPT_ACT_NONE;
+    case DOPT_AUDIO:
+        /* THE AUDIO PAGE: the jukebox with every volume, the voices among them */
+        st->page = DOPT_PAGE_SOUND;
+        st->selected = st->ntracks > 0 ? DOPT_S_LIST : DOPT_S_OK;
         st->pressed = -1;
         return DOPT_ACT_NONE;
     case DOPT_SAVE:
@@ -2313,7 +2363,7 @@ int dopt_key(DOPT_State *st, int key)
            handling of its own; this is the obvious keyboard equivalent of dragging
            and it is ours, which is why the step is a plain eighth of travel. */
         if ((st->page == DOPT_PAGE_CONTROLS && st->selected < DOPT_C_SOUNDCTRL) ||
-            (st->page == DOPT_PAGE_SOUND && st->selected <= DOPT_S_AMBIENCE)) {
+            (st->page == DOPT_PAGE_SOUND && st->selected < DOPT_S_LIST)) {
             int *slot = dopt_ctrl_slot(st, st->selected);
             int max = dopt_ctrl_max(st, st->selected);
             int step = max > 16 ? max / 8 : 1;
@@ -2728,7 +2778,9 @@ static int dopt_is_droprow(int item)
 static int dopt_drop_value(const DOPT_State *st, int item)
 {
     const DOPT_Profile *pr = dopt_tabprof_c(st);
-    if (item == DOPT_VE_INFSET) return pr->infset;
+    if (item == DOPT_VE_INFSET)
+        return st->advTab == DOPT_MODE_ENHANCED && pr->elem[DOPT_VE_SOLDIERS]
+             ? DOPT_INF_ENHANCED : pr->infset;
     if (item == DOPT_VE_RESOLUTION) return st->vis.residx;
     if (item == DOPT_VE_UISCALE) return pr->uiscale;
     if (item == DOPT_VE_PERSPECTIVE) return pr->perspective;
@@ -2738,8 +2790,16 @@ static int dopt_drop_value(const DOPT_State *st, int item)
 static void dopt_drop_set(DOPT_State *st, int item, int v)
 {
     DOPT_Profile *pr = dopt_tabprof(st);
-    if (item == DOPT_VE_INFSET)          pr->infset = v;
-    else if (item == DOPT_VE_RESOLUTION) st->vis.residx = v;
+    if (item == DOPT_VE_INFSET) {
+        if (v == DOPT_INF_ENHANCED) {
+            pr->elem[DOPT_VE_SOLDIERS] = pr->model_soldiers = 1;
+        } else {
+            pr->infset = v; /* Preserve this fallback when models are later enabled. */
+            if (st->advTab == DOPT_MODE_ENHANCED)
+                pr->elem[DOPT_VE_SOLDIERS] = pr->model_soldiers = 0;
+        }
+    }
+    else if (item == DOPT_VE_RESOLUTION) { st->vis.residx = v; st->vis.resolution_changed = 1; }
     else if (item == DOPT_VE_UISCALE)    pr->uiscale = v;
     else if (item == DOPT_VE_PERSPECTIVE) pr->perspective = v;
     else                                 pr->texset = v;
@@ -2750,7 +2810,7 @@ int dopt_drop_count(const DOPT_State *st, int item)
     if (item == DOPT_VE_RESOLUTION) return (st && st->vis.nres > 0) ? st->vis.nres : 0;
     if (item == DOPT_VE_UISCALE) return DOPT_UI_COUNT;
     if (item == DOPT_VE_PERSPECTIVE) return DOPT_PERSP_COUNT;
-    if (item == DOPT_VE_INFSET) return DOPT_INF_COUNT;
+    if (item == DOPT_VE_INFSET) return st && st->advTab == DOPT_MODE_ENHANCED ? DOPT_INF_COUNT : 2;
     return DOPT_TEX_COUNT;
 }
 
@@ -3202,7 +3262,10 @@ static void dopt_draw_advanced(DB_Surface *s, const DB_Pack *p, const DOPT_State
         db_font_palette_grad(fp, dopt_item_disabled(st, i) ? DOPT_TEXT_DISABLED
                                : (st->selected == i) ? DOPT_TEXT_BRIGHT
                                                      : DOPT_TEXT_MEDIUM, DB_TBLACK);
-        db_print(s, f, dopt_vis_elem[i], x + DOPT_A_BOX + 6, y - 1, fp, DB_FONT6_XSPACING);
+        /* adaptive sync names itself; the row's name for scripts and the layout stays
+           "Vertical sync" (dopt_item_label), and the two print the same length */
+        db_print(s, f, (i == DOPT_VE_VSYNC && st->vis.vsync == 2) ? "Adaptive sync" : dopt_vis_elem[i],
+                 x + DOPT_A_BOX + 6, y - 1, fp, DB_FONT6_XSPACING);
     }
     for (i = 0; i < DOPT_MODE_COUNT; i++)
         dopt_draw_button(s, f, st, DOPT_A_TAB0 + i, dopt_tab_label[i]);
@@ -3369,12 +3432,13 @@ static void dopt_draw_sound(DB_Surface *s, const DB_Pack *p, const DOPT_State *s
     int i, row, y;
 
     dopt_style_dialog(s, DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W, DOPT_SND_H);
-    dopt_style_caption(s, p, "Sound Controls", DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W);
+    dopt_style_caption(s, p, "Audio", DOPT_SND_X, DOPT_SND_Y, DOPT_SND_W);
 
     /* sounddlg.cpp:332-343, the two volume rows: caption right-aligned at (x-5, y-2). */
     dopt_draw_slider(s, st, DOPT_S_MUSIC, st->set.music);
     dopt_draw_slider(s, st, DOPT_S_SOUND, st->set.sound);
     dopt_draw_slider(s, st, DOPT_S_AMBIENCE, st->set.ambience);
+    dopt_draw_slider(s, st, DOPT_S_SPEECH, st->set.speech);
     if (f) {
         db_font_palette_grad(fp, DOPT_TEXT_MEDIUM, DB_TBLACK);
         db_print(s, f, "Music Volume:",
@@ -3385,6 +3449,10 @@ static void dopt_draw_sound(DB_Surface *s, const DB_Pack *p, const DOPT_State *s
                  DOPT_SND_MVOL_X - 5
                      - db_string_width(f, "Sound Volume:", DB_FONT6_XSPACING),
                  DOPT_SND_FXVOL_Y - 2, fp, DB_FONT6_XSPACING);
+        db_print(s, f, "Voices Volume:",
+                 DOPT_SND_MVOL_X - 5
+                     - db_string_width(f, "Voices Volume:", DB_FONT6_XSPACING),
+                 DOPT_SND_SPVOL_Y - 2, fp, DB_FONT6_XSPACING);
         db_print(s, f, "Ambience:",
                  DOPT_SND_MVOL_X - 5 - db_string_width(f, "Ambience:", DB_FONT6_XSPACING),
                  DOPT_SND_AMBVOL_Y - 2, fp, DB_FONT6_XSPACING);
@@ -3563,7 +3631,7 @@ static void dopt_draw_confirm(DB_Surface *s, const DB_Pack *p, const DOPT_State 
     for (i = 0; i < DOPT_CF_COUNT; i++) {
         /* See dopt_item_disabled: in a match, and under the delete question, this box
            is a plain Yes and No. */
-        if ((st->match || st->cfkind == 1) && i == DOPT_CF_RESTART)
+        if ((st->match || st->cfkind != 0) && i == DOPT_CF_RESTART)
             continue;
         dopt_draw_button(s, f, st, i, dopt_item_label(st, i));
     }
@@ -3642,18 +3710,11 @@ void dopt_draw(DB_Surface *s, const DB_Pack *p, const DOPT_State *st)
     if (st->page == DOPT_PAGE_CONTROLS) {
         dopt_style_dialog(s, DOPT_GC_X, DOPT_GC_Y, DOPT_GC_W, DOPT_GC_H);
         dopt_style_caption(s, p, "Game Controls", DOPT_GC_X, DOPT_GC_Y, DOPT_GC_W);
-        for (i = 0; i < DOPT_C_SOUNDCTRL; i++) {
-            dopt_draw_slider_label(s, f, st, i);
-            switch (i) {
-            case DOPT_C_SPEED:  dopt_draw_slider(s, st, i, st->set.speed); break;
-            case DOPT_C_SCROLL: dopt_draw_slider(s, st, i, st->set.scrollrate); break;
-            case DOPT_C_MUSIC:  dopt_draw_slider(s, st, i, st->set.music); break;
-            case DOPT_C_SOUND:  dopt_draw_slider(s, st, i, st->set.sound); break;
-            default:            dopt_draw_slider(s, st, i, st->set.speech); break;
-            }
-        }
-        dopt_draw_button(s, f, st, DOPT_C_SOUNDCTRL,
-                         dopt_ctrl_label[DOPT_C_SOUNDCTRL]);
+        /* the speed and the scroll rate: the volumes are on the pause menu's Audio page */
+        dopt_draw_slider_label(s, f, st, DOPT_C_SPEED);
+        dopt_draw_slider(s, st, DOPT_C_SPEED, st->set.speed);
+        dopt_draw_slider_label(s, f, st, DOPT_C_SCROLL);
+        dopt_draw_slider(s, st, DOPT_C_SCROLL, st->set.scrollrate);
         dopt_draw_button(s, f, st, DOPT_C_OK, dopt_ctrl_label[DOPT_C_OK]);
         return;
     }
@@ -3687,4 +3748,124 @@ void dopt_draw_cursor(DB_Surface *s, const DB_Pack *p, int mx, int my)
     const DB_Shape *sh = db_shape(p, "MOUSE");
     if (sh)
         db_draw_shape(s, sh, 0, mx, my);
+}
+
+/* Enhanced geometry invokes the same validated controller as the DOS gadgets. */
+int dopt_enh_action(DOPT_State *st, int item)
+{
+    if (!st || item < 0 || item >= dopt_page_count(st)) return DOPT_ACT_NONE;
+    if (st->page == DOPT_PAGE_ADVANCED && item < DOPT_VE_COUNT) dopt_adv_reveal(st, item);
+    if (dopt_item_disabled(st, item)) return DOPT_ACT_NONE;
+    st->selected = item; st->pressed = -1;
+    /* Enhanced combines the old Visuals and Advanced pages into one screen.
+       Finish at the original Visuals return target instead of reopening it. */
+    if (st->page == DOPT_PAGE_ADVANCED && item == DOPT_A_OK) {
+        st->page = DOPT_PAGE_VISUALS;
+        st->texdrop = st->texhot = -1;
+        return dopt_activate(st, DOPT_V_OK);
+    }
+    return dopt_activate(st, item);
+}
+/* THE GAME SPEED BY NAME, for the sliders that show it: Normal is the shipped setting
+   (DOPT_DEFAULT_SPEED), the rest say which way and how far from it. */
+const char *dopt_speed_name(int speed)
+{
+    static const char *const names[DOPT_MAX_SPEED] = {
+        "Slowest", "Slower", "Slow", "Steady", "Normal", "Fast", "Fastest" };
+    if (speed < 0) speed = 0;
+    if (speed >= DOPT_MAX_SPEED) speed = DOPT_MAX_SPEED - 1;
+    return names[speed];
+}
+
+/* THE SETTINGS SCREEN'S GAMEPLAY AND AUDIO TABS (menu/enhanced_menu.cpp). They write the
+   same block the pause menu's Game Controls and Sound Controls write (st->set, applied
+   through st->bind.apply and remembered in the controls file), and the same input
+   switches its Gameplay page toggles (st->gp, st->bind.applygp), without leaving the page
+   the screen is on, so its OK, Back and Escape stay the ones it already has. */
+static int *dopt_enh_setting_slot(DOPT_State *st, int which)
+{
+    switch (which) {
+    case DOPT_ES_SPEED:    return &st->set.speed;
+    case DOPT_ES_SCROLL:   return &st->set.scrollrate;
+    case DOPT_ES_MUSIC:    return &st->set.music;
+    case DOPT_ES_SOUND:    return &st->set.sound;
+    case DOPT_ES_VOICES:   return &st->set.speech;
+    case DOPT_ES_AMBIENCE: return &st->set.ambience;
+    default:               return 0;
+    }
+}
+int dopt_enh_setting_max(int which)
+{
+    if (which == DOPT_ES_SPEED) return DOPT_MAX_SPEED - 1;
+    if (which == DOPT_ES_SCROLL) return DOPT_MAX_SCROLL - 1;
+    return DOPT_VOL_TOP;
+}
+int dopt_enh_setting_value(DOPT_State *st, int which)
+{
+    const int *slot = st ? dopt_enh_setting_slot(st, which) : 0;
+    return slot ? *slot : 0;
+}
+void dopt_enh_setting(DOPT_State *st, int which, int value)
+{
+    int *slot = st ? dopt_enh_setting_slot(st, which) : 0;
+    const int max = dopt_enh_setting_max(which);
+    if (!slot) return;
+    if (value < 0) value = 0;
+    if (value > max) value = max;
+    if (*slot == value) return;
+    *slot = value;
+    if (st->bind.apply)
+        st->bind.apply(st->bind.user, &st->set);
+}
+void dopt_enh_gameplay_toggle(DOPT_State *st, int which)
+{
+    if (!st || which < 0 || which >= DOPT_G_TOGGLES) return;
+    st->gp.on[which] = !st->gp.on[which];
+    if (st->bind.applygp)
+        st->bind.applygp(st->bind.user, &st->gp);
+}
+
+void dopt_enh_control(DOPT_State *st, int item, int value)
+{
+    if (st && ((st->page == DOPT_PAGE_CONTROLS && item < DOPT_C_SOUNDCTRL) ||
+               (st->page == DOPT_PAGE_SOUND && item < DOPT_S_LIST)))
+        dopt_set_value(st, item, value);
+}
+void dopt_enh_mode(DOPT_State *st, int mode)
+{
+    if (!st || mode < 0 || mode >= DOPT_MODE_COUNT || (mode == DOPT_MODE_N64 && st->n64_unavailable)) return;
+    st->vis.mode = mode; st->advTab = mode; st->advTop = 0;
+    st->texdrop = st->texhot = -1; dopt_vis_apply(st);
+}
+int dopt_enh_drop_value(const DOPT_State *st, int item) { return dopt_drop_value(st, item); }
+int dopt_enh_drop_allowed(DOPT_State *st, int item, int value)
+{
+    int old, allowed;
+    if (!st || !dopt_is_droprow(item) || dopt_item_disabled(st, item) ||
+        value < 0 || value >= dopt_drop_count(st, item) || !dopt_drop_listed(item, value)) return 0;
+    old = st->texdrop; st->texdrop = item; allowed = dopt_texset_pickable(st, value); st->texdrop = old;
+    return allowed;
+}
+void dopt_enh_choose(DOPT_State *st, int item, int value)
+{
+    if (!dopt_enh_drop_allowed(st, item, value)) return;
+    dopt_drop_set(st, item, value); st->texdrop = st->texhot = -1; dopt_vis_apply(st);
+}
+
+void dopt_enh_row(DOPT_State *st, int ix)
+{
+    if (!st) return;
+    if (st->page == DOPT_PAGE_SLOTS && ix >= 0 && ix < st->sl.nrows) {
+        st->sl.sel = ix; st->selected = DOPT_SL_LIST; dopt_sl_take_descr(st);
+    } else if (st->page == DOPT_PAGE_SOUND && ix >= 0 && ix < st->ntracks) {
+        st->lastmy = DOPT_SND_LIST_Y + (ix - st->trkTop) * DOPT_SND_ROW_H + 1;
+        dopt_activate(st, DOPT_S_LIST);
+    }
+}
+
+void dopt_enh_confirm_exit(DOPT_State *st)
+{
+    if (!st || st->page != DOPT_PAGE_OPTIONS) return;
+    st->cfkind = 2; st->cfprev = DOPT_EXIT; dopt_confirm_layout(st);
+    st->page = DOPT_PAGE_CONFIRM; st->selected = DOPT_CF_CANCEL; st->pressed = -1;
 }

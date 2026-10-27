@@ -53,6 +53,11 @@ void bank_destroy(SndBank *b);
 
 int bank_add_mix(SndBank *b, const char *path, char *err, int errlen);
 int bank_add_dir(SndBank *b, const char *path); /* loose .AUD files, searched first */
+/* A language pack's archive, searched before every English one, its death sounds never
+   used; the cache is emptied so no English clip outlives the switch. Returns 1 on success. */
+int bank_add_language(SndBank *b, const char *path, char *err, int errlen);
+/* Back to English: every language archive closed, the cache emptied. Returns how many. */
+int bank_drop_languages(SndBank *b);
 
 /* Is the name resolvable at all, without decoding it. */
 int bank_has(SndBank *b, const char *name);

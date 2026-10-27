@@ -1,0 +1,1980 @@
+{
+  "inputs": {
+    "${EVIDENCE_ROOT}/final-build/cnc_eyes": "f0f2a5eb61a31b711cbd44a6ccc79e579e29f0e82a5f16c30821935426decd4e",
+    "${EVIDENCE_ROOT}/actual-baseline/ra3d-fx.cfg": "2c103354d7aec78c0b82ddb1d7c450bbd6dc23c01e2da7e3ddf492a0e9a47e1d",
+    "${EVIDENCE_ROOT}/actual-baseline/opencnc3d-fx.cfg": "a6e7656ae6bf6a3b0b732eecccb747962895ac27b3830459e81637204ab47e41",
+    "${DOCK_RUNTIME}/opencnc3d-fx.cfg": "a6e7656ae6bf6a3b0b732eecccb747962895ac27b3830459e81637204ab47e41",
+    "${DOCK_RUNTIME}/ra3d-fx.cfg": "2c103354d7aec78c0b82ddb1d7c450bbd6dc23c01e2da7e3ddf492a0e9a47e1d"
+  },
+  "runtime": "${DOCK_RUNTIME}",
+  "cases": {
+    "ra": {
+      "arms": {
+        "off": {
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 386064
+          },
+          "timings": [
+            {
+              "phase": "view-0",
+              "samples": 4,
+              "median_ms": 53.8,
+              "p90_ms": 60.75
+            },
+            {
+              "phase": "view-1",
+              "samples": 4,
+              "median_ms": 42.25,
+              "p90_ms": 48.21
+            },
+            {
+              "phase": "view-2",
+              "samples": 4,
+              "median_ms": 57.35,
+              "p90_ms": 57.96
+            },
+            {
+              "phase": "scale-a",
+              "samples": 4,
+              "median_ms": 46.0,
+              "p90_ms": 49.42
+            },
+            {
+              "phase": "scale-b",
+              "samples": 4,
+              "median_ms": 46.39,
+              "p90_ms": 50.29
+            },
+            {
+              "phase": "scale-a-return",
+              "samples": 4,
+              "median_ms": 44.8,
+              "p90_ms": 47.28
+            },
+            {
+              "phase": "authored-return",
+              "samples": 4,
+              "median_ms": 39.95,
+              "p90_ms": 45.44
+            },
+            {
+              "phase": "fog",
+              "samples": 4,
+              "median_ms": 9.34,
+              "p90_ms": 9.8
+            },
+            {
+              "phase": "reveal-return",
+              "samples": 4,
+              "median_ms": 46.41,
+              "p90_ms": 49.17
+            }
+          ],
+          "raw_targets_checked": true,
+          "passed": true,
+          "elapsed_seconds": 19.82098474999657
+        },
+        "on": {
+          "counters": {
+            "draws": 3394,
+            "vertices": 32547648,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 386064
+          },
+          "timings": [
+            {
+              "phase": "view-0",
+              "samples": 4,
+              "median_ms": 28.48,
+              "p90_ms": 37.69
+            },
+            {
+              "phase": "view-1",
+              "samples": 4,
+              "median_ms": 25.61,
+              "p90_ms": 27.27
+            },
+            {
+              "phase": "view-2",
+              "samples": 4,
+              "median_ms": 28.6,
+              "p90_ms": 34.05
+            },
+            {
+              "phase": "scale-a",
+              "samples": 4,
+              "median_ms": 26.06,
+              "p90_ms": 30.47
+            },
+            {
+              "phase": "scale-b",
+              "samples": 4,
+              "median_ms": 21.19,
+              "p90_ms": 23.74
+            },
+            {
+              "phase": "scale-a-return",
+              "samples": 4,
+              "median_ms": 23.2,
+              "p90_ms": 24.71
+            },
+            {
+              "phase": "authored-return",
+              "samples": 4,
+              "median_ms": 24.13,
+              "p90_ms": 24.91
+            },
+            {
+              "phase": "fog",
+              "samples": 4,
+              "median_ms": 12.9,
+              "p90_ms": 13.56
+            },
+            {
+              "phase": "reveal-return",
+              "samples": 4,
+              "median_ms": 26.22,
+              "p90_ms": 28.28
+            }
+          ],
+          "raw_targets_checked": true,
+          "passed": true,
+          "elapsed_seconds": 17.312236791010946
+        },
+        "verify": {
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 3394,
+            "mismatches": 0,
+            "scratch_bytes": 386064
+          },
+          "timings": [
+            {
+              "phase": "view-0",
+              "samples": 4,
+              "median_ms": 51.34,
+              "p90_ms": 51.63
+            },
+            {
+              "phase": "view-1",
+              "samples": 4,
+              "median_ms": 44.29,
+              "p90_ms": 48.87
+            },
+            {
+              "phase": "view-2",
+              "samples": 4,
+              "median_ms": 47.73,
+              "p90_ms": 48.61
+            },
+            {
+              "phase": "scale-a",
+              "samples": 4,
+              "median_ms": 44.29,
+              "p90_ms": 49.03
+            },
+            {
+              "phase": "scale-b",
+              "samples": 4,
+              "median_ms": 45.79,
+              "p90_ms": 49.54
+            },
+            {
+              "phase": "scale-a-return",
+              "samples": 4,
+              "median_ms": 39.83,
+              "p90_ms": 44.18
+            },
+            {
+              "phase": "authored-return",
+              "samples": 4,
+              "median_ms": 41.17,
+              "p90_ms": 45.14
+            },
+            {
+              "phase": "fog",
+              "samples": 4,
+              "median_ms": 4.39,
+              "p90_ms": 8.12
+            },
+            {
+              "phase": "reveal-return",
+              "samples": 4,
+              "median_ms": 43.11,
+              "p90_ms": 44.19
+            }
+          ],
+          "raw_targets_checked": true,
+          "passed": true,
+          "elapsed_seconds": 18.08973549999064
+        }
+      },
+      "comparisons": {
+        "on": {
+          "passed": true,
+          "state_exact": true,
+          "state_records": 2963,
+          "targets": [
+            {
+              "file": "authored-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2",
+              "candidate_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2"
+            },
+            {
+              "file": "authored-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "authored-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105",
+              "candidate_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105"
+            },
+            {
+              "file": "authored-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64",
+              "candidate_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64"
+            },
+            {
+              "file": "authored-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529",
+              "candidate_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529"
+            },
+            {
+              "file": "authored-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "authored-return.png",
+              "exact": true,
+              "reference_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372",
+              "candidate_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372"
+            },
+            {
+              "file": "fog-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a",
+              "candidate_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a"
+            },
+            {
+              "file": "fog-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "fog-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10",
+              "candidate_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10"
+            },
+            {
+              "file": "fog-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+              "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+            },
+            {
+              "file": "fog-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "fog-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "fog.png",
+              "exact": true,
+              "reference_sha256": "27125b4aa630db90ed7bab44bed639b74b4f59e2f13f37490aea72385f5ce838",
+              "candidate_sha256": "27125b4aa630db90ed7bab44bed639b74b4f59e2f13f37490aea72385f5ce838"
+            },
+            {
+              "file": "reveal-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2",
+              "candidate_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2"
+            },
+            {
+              "file": "reveal-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "reveal-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105",
+              "candidate_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105"
+            },
+            {
+              "file": "reveal-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64",
+              "candidate_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64"
+            },
+            {
+              "file": "reveal-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529",
+              "candidate_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529"
+            },
+            {
+              "file": "reveal-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "reveal-return.png",
+              "exact": true,
+              "reference_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372",
+              "candidate_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372"
+            },
+            {
+              "file": "scale-a-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7",
+              "candidate_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7"
+            },
+            {
+              "file": "scale-a-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "scale-a-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d",
+              "candidate_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d"
+            },
+            {
+              "file": "scale-a-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7",
+              "candidate_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7"
+            },
+            {
+              "file": "scale-a-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "scale-a-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d",
+              "candidate_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d"
+            },
+            {
+              "file": "scale-a-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b",
+              "candidate_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b"
+            },
+            {
+              "file": "scale-a-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7",
+              "candidate_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7"
+            },
+            {
+              "file": "scale-a-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "scale-a-return.png",
+              "exact": true,
+              "reference_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133",
+              "candidate_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133"
+            },
+            {
+              "file": "scale-a-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b",
+              "candidate_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b"
+            },
+            {
+              "file": "scale-a-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7",
+              "candidate_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7"
+            },
+            {
+              "file": "scale-a-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "scale-a.png",
+              "exact": true,
+              "reference_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133",
+              "candidate_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133"
+            },
+            {
+              "file": "scale-b-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "4c53402979f4851f40935bb4c55b9db1f113e10571b2958bd8ce5751521425a3",
+              "candidate_sha256": "4c53402979f4851f40935bb4c55b9db1f113e10571b2958bd8ce5751521425a3"
+            },
+            {
+              "file": "scale-b-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "scale-b-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "3b413065a5ef78c1bd2cfcf9d3a6129a41d70218a9976809376262ed1ca4b565",
+              "candidate_sha256": "3b413065a5ef78c1bd2cfcf9d3a6129a41d70218a9976809376262ed1ca4b565"
+            },
+            {
+              "file": "scale-b-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "bcec0521ecdc0e2394ab5e0552c5a9b443a51eb53d2ef7fce52a1ee4b171ea62",
+              "candidate_sha256": "bcec0521ecdc0e2394ab5e0552c5a9b443a51eb53d2ef7fce52a1ee4b171ea62"
+            },
+            {
+              "file": "scale-b-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "63c8139af0d809d9df28deb629a2975d41a72910a11bdbf5f4477db8d71d5c22",
+              "candidate_sha256": "63c8139af0d809d9df28deb629a2975d41a72910a11bdbf5f4477db8d71d5c22"
+            },
+            {
+              "file": "scale-b-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "scale-b.png",
+              "exact": true,
+              "reference_sha256": "6b2c477b23b83a8bffb5e1890b6b61b62729cfb64cfa203e799b8ea8c962e1c0",
+              "candidate_sha256": "6b2c477b23b83a8bffb5e1890b6b61b62729cfb64cfa203e799b8ea8c962e1c0"
+            },
+            {
+              "file": "view-0-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "b46f7f0a1f99a7c5c288d1e181de26a54e6ffa7d2167ce416a63437fdc00d061",
+              "candidate_sha256": "b46f7f0a1f99a7c5c288d1e181de26a54e6ffa7d2167ce416a63437fdc00d061"
+            },
+            {
+              "file": "view-0-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "view-0-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "66847fd4683e40a779609cda148b8375d96006ff1317780138b65afc39daf817",
+              "candidate_sha256": "66847fd4683e40a779609cda148b8375d96006ff1317780138b65afc39daf817"
+            },
+            {
+              "file": "view-0-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "5c4d3128be5ca39a802a57d7979c7722dceca9376cc16e6873e07ad1e643bfa3",
+              "candidate_sha256": "5c4d3128be5ca39a802a57d7979c7722dceca9376cc16e6873e07ad1e643bfa3"
+            },
+            {
+              "file": "view-0-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "c0c3087bea6ef669b4968a84e99ef38ebc7fb749b67adc5f210c5201513a3175",
+              "candidate_sha256": "c0c3087bea6ef669b4968a84e99ef38ebc7fb749b67adc5f210c5201513a3175"
+            },
+            {
+              "file": "view-0-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7",
+              "candidate_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7"
+            },
+            {
+              "file": "view-0.png",
+              "exact": true,
+              "reference_sha256": "8240e743d81324efaa584a2f2cf53f62f441dd0c8947a6679bb730e6b635918d",
+              "candidate_sha256": "8240e743d81324efaa584a2f2cf53f62f441dd0c8947a6679bb730e6b635918d"
+            },
+            {
+              "file": "view-1-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "85a9c3dc0f737ef9ec5aada8752028f456488f5b13c779e1ce793a1ea34828d6",
+              "candidate_sha256": "85a9c3dc0f737ef9ec5aada8752028f456488f5b13c779e1ce793a1ea34828d6"
+            },
+            {
+              "file": "view-1-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "view-1-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "b493382f0056a5fb1fa96a9d588491b8697193b8336c6c85822e12547362a047",
+              "candidate_sha256": "b493382f0056a5fb1fa96a9d588491b8697193b8336c6c85822e12547362a047"
+            },
+            {
+              "file": "view-1-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "e43d6910c36e2f5ae5c79783f0c101dd239212f12ffa65bb459dcc566f37864b",
+              "candidate_sha256": "e43d6910c36e2f5ae5c79783f0c101dd239212f12ffa65bb459dcc566f37864b"
+            },
+            {
+              "file": "view-1-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "326ea962f6285e8f671b72d8edcf4bf55595bd5c4f4937897d7f5757d8127548",
+              "candidate_sha256": "326ea962f6285e8f671b72d8edcf4bf55595bd5c4f4937897d7f5757d8127548"
+            },
+            {
+              "file": "view-1-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "view-1.png",
+              "exact": true,
+              "reference_sha256": "0a0adf9baa9632496406788369e1b0a57ddebb30be27a28d805ba44951bff6cf",
+              "candidate_sha256": "0a0adf9baa9632496406788369e1b0a57ddebb30be27a28d805ba44951bff6cf"
+            },
+            {
+              "file": "view-2-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "d9b465122ad0c80f47e823acf68760e24afc7848bee220cb2a55d8f5151b508a",
+              "candidate_sha256": "d9b465122ad0c80f47e823acf68760e24afc7848bee220cb2a55d8f5151b508a"
+            },
+            {
+              "file": "view-2-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "view-2-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "907cdae007a6c15a5fb1ad4f9846602b36bbd22fd158e3c90e85efc669173c55",
+              "candidate_sha256": "907cdae007a6c15a5fb1ad4f9846602b36bbd22fd158e3c90e85efc669173c55"
+            },
+            {
+              "file": "view-2-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "8314f727a3edbd515ebe18544f1ba1b4c53fb0b7fc8412c706f7d8f31eaae7ed",
+              "candidate_sha256": "8314f727a3edbd515ebe18544f1ba1b4c53fb0b7fc8412c706f7d8f31eaae7ed"
+            },
+            {
+              "file": "view-2-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "9e7a87a919d31364bc17b7b7613044b68565c1e171d5da04c60dafe96acbf581",
+              "candidate_sha256": "9e7a87a919d31364bc17b7b7613044b68565c1e171d5da04c60dafe96acbf581"
+            },
+            {
+              "file": "view-2-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a",
+              "candidate_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a"
+            },
+            {
+              "file": "view-2.png",
+              "exact": true,
+              "reference_sha256": "061d09ec9bf481360af2e7141c550fc78878d44b35774143bbc4c1eba7669047",
+              "candidate_sha256": "061d09ec9bf481360af2e7141c550fc78878d44b35774143bbc4c1eba7669047"
+            }
+          ]
+        },
+        "verify": {
+          "passed": true,
+          "state_exact": true,
+          "state_records": 2963,
+          "targets": [
+            {
+              "file": "authored-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2",
+              "candidate_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2"
+            },
+            {
+              "file": "authored-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "authored-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105",
+              "candidate_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105"
+            },
+            {
+              "file": "authored-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64",
+              "candidate_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64"
+            },
+            {
+              "file": "authored-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529",
+              "candidate_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529"
+            },
+            {
+              "file": "authored-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "authored-return.png",
+              "exact": true,
+              "reference_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372",
+              "candidate_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372"
+            },
+            {
+              "file": "fog-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a",
+              "candidate_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a"
+            },
+            {
+              "file": "fog-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "fog-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10",
+              "candidate_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10"
+            },
+            {
+              "file": "fog-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+              "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+            },
+            {
+              "file": "fog-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "fog-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "fog.png",
+              "exact": true,
+              "reference_sha256": "27125b4aa630db90ed7bab44bed639b74b4f59e2f13f37490aea72385f5ce838",
+              "candidate_sha256": "27125b4aa630db90ed7bab44bed639b74b4f59e2f13f37490aea72385f5ce838"
+            },
+            {
+              "file": "reveal-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2",
+              "candidate_sha256": "6f5060ac7455b6b211f3a5a278c1a410aaf4eb893ac855b7b4e6819dbf0af9b2"
+            },
+            {
+              "file": "reveal-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "reveal-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105",
+              "candidate_sha256": "fd2c424221d06cb58e92ddfb8fb58f7b848473d261b9d5cd535f6f4d5c1a0105"
+            },
+            {
+              "file": "reveal-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64",
+              "candidate_sha256": "77cd54acbe5c2e7df683c8df2498ee5556ef215ed1c15e168f324997a7b0ca64"
+            },
+            {
+              "file": "reveal-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529",
+              "candidate_sha256": "a2cbe399b751296f0e020c93c52726a6aaef5339ba7f432187a20801d3244529"
+            },
+            {
+              "file": "reveal-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "reveal-return.png",
+              "exact": true,
+              "reference_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372",
+              "candidate_sha256": "054387120e8a375407659a09bb18c9baa9bbfb94c87f4552167d374494940372"
+            },
+            {
+              "file": "scale-a-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7",
+              "candidate_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7"
+            },
+            {
+              "file": "scale-a-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "scale-a-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d",
+              "candidate_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d"
+            },
+            {
+              "file": "scale-a-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7",
+              "candidate_sha256": "f9f36389508655e3f79215606059e5167c9f46371ebe82e6b95c0e335a5847d7"
+            },
+            {
+              "file": "scale-a-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "scale-a-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d",
+              "candidate_sha256": "b4452228e370cb3b43d17d530df9699b00ec9d49c28d874dac89c89d68c0533d"
+            },
+            {
+              "file": "scale-a-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b",
+              "candidate_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b"
+            },
+            {
+              "file": "scale-a-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7",
+              "candidate_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7"
+            },
+            {
+              "file": "scale-a-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "scale-a-return.png",
+              "exact": true,
+              "reference_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133",
+              "candidate_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133"
+            },
+            {
+              "file": "scale-a-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b",
+              "candidate_sha256": "b5ccb7cc88880e85961ead3125bdeee014b4396a197994afce8bd2bc898aa73b"
+            },
+            {
+              "file": "scale-a-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7",
+              "candidate_sha256": "dedb6486fd7516637304292eda334d4de00b4c89b646c35c0f46b2932d99a1a7"
+            },
+            {
+              "file": "scale-a-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "scale-a.png",
+              "exact": true,
+              "reference_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133",
+              "candidate_sha256": "82f5f16ed0a32d500aa86a2b4b3fde554e9bba1cd0be186eaacd6478dbed8133"
+            },
+            {
+              "file": "scale-b-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "4c53402979f4851f40935bb4c55b9db1f113e10571b2958bd8ce5751521425a3",
+              "candidate_sha256": "4c53402979f4851f40935bb4c55b9db1f113e10571b2958bd8ce5751521425a3"
+            },
+            {
+              "file": "scale-b-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "scale-b-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "3b413065a5ef78c1bd2cfcf9d3a6129a41d70218a9976809376262ed1ca4b565",
+              "candidate_sha256": "3b413065a5ef78c1bd2cfcf9d3a6129a41d70218a9976809376262ed1ca4b565"
+            },
+            {
+              "file": "scale-b-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "bcec0521ecdc0e2394ab5e0552c5a9b443a51eb53d2ef7fce52a1ee4b171ea62",
+              "candidate_sha256": "bcec0521ecdc0e2394ab5e0552c5a9b443a51eb53d2ef7fce52a1ee4b171ea62"
+            },
+            {
+              "file": "scale-b-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "63c8139af0d809d9df28deb629a2975d41a72910a11bdbf5f4477db8d71d5c22",
+              "candidate_sha256": "63c8139af0d809d9df28deb629a2975d41a72910a11bdbf5f4477db8d71d5c22"
+            },
+            {
+              "file": "scale-b-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "scale-b.png",
+              "exact": true,
+              "reference_sha256": "6b2c477b23b83a8bffb5e1890b6b61b62729cfb64cfa203e799b8ea8c962e1c0",
+              "candidate_sha256": "6b2c477b23b83a8bffb5e1890b6b61b62729cfb64cfa203e799b8ea8c962e1c0"
+            },
+            {
+              "file": "view-0-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "b46f7f0a1f99a7c5c288d1e181de26a54e6ffa7d2167ce416a63437fdc00d061",
+              "candidate_sha256": "b46f7f0a1f99a7c5c288d1e181de26a54e6ffa7d2167ce416a63437fdc00d061"
+            },
+            {
+              "file": "view-0-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "view-0-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "66847fd4683e40a779609cda148b8375d96006ff1317780138b65afc39daf817",
+              "candidate_sha256": "66847fd4683e40a779609cda148b8375d96006ff1317780138b65afc39daf817"
+            },
+            {
+              "file": "view-0-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "5c4d3128be5ca39a802a57d7979c7722dceca9376cc16e6873e07ad1e643bfa3",
+              "candidate_sha256": "5c4d3128be5ca39a802a57d7979c7722dceca9376cc16e6873e07ad1e643bfa3"
+            },
+            {
+              "file": "view-0-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "c0c3087bea6ef669b4968a84e99ef38ebc7fb749b67adc5f210c5201513a3175",
+              "candidate_sha256": "c0c3087bea6ef669b4968a84e99ef38ebc7fb749b67adc5f210c5201513a3175"
+            },
+            {
+              "file": "view-0-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7",
+              "candidate_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7"
+            },
+            {
+              "file": "view-0.png",
+              "exact": true,
+              "reference_sha256": "8240e743d81324efaa584a2f2cf53f62f441dd0c8947a6679bb730e6b635918d",
+              "candidate_sha256": "8240e743d81324efaa584a2f2cf53f62f441dd0c8947a6679bb730e6b635918d"
+            },
+            {
+              "file": "view-1-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "85a9c3dc0f737ef9ec5aada8752028f456488f5b13c779e1ce793a1ea34828d6",
+              "candidate_sha256": "85a9c3dc0f737ef9ec5aada8752028f456488f5b13c779e1ce793a1ea34828d6"
+            },
+            {
+              "file": "view-1-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "view-1-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "b493382f0056a5fb1fa96a9d588491b8697193b8336c6c85822e12547362a047",
+              "candidate_sha256": "b493382f0056a5fb1fa96a9d588491b8697193b8336c6c85822e12547362a047"
+            },
+            {
+              "file": "view-1-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "e43d6910c36e2f5ae5c79783f0c101dd239212f12ffa65bb459dcc566f37864b",
+              "candidate_sha256": "e43d6910c36e2f5ae5c79783f0c101dd239212f12ffa65bb459dcc566f37864b"
+            },
+            {
+              "file": "view-1-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "326ea962f6285e8f671b72d8edcf4bf55595bd5c4f4937897d7f5757d8127548",
+              "candidate_sha256": "326ea962f6285e8f671b72d8edcf4bf55595bd5c4f4937897d7f5757d8127548"
+            },
+            {
+              "file": "view-1-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+              "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+            },
+            {
+              "file": "view-1.png",
+              "exact": true,
+              "reference_sha256": "0a0adf9baa9632496406788369e1b0a57ddebb30be27a28d805ba44951bff6cf",
+              "candidate_sha256": "0a0adf9baa9632496406788369e1b0a57ddebb30be27a28d805ba44951bff6cf"
+            },
+            {
+              "file": "view-2-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "d9b465122ad0c80f47e823acf68760e24afc7848bee220cb2a55d8f5151b508a",
+              "candidate_sha256": "d9b465122ad0c80f47e823acf68760e24afc7848bee220cb2a55d8f5151b508a"
+            },
+            {
+              "file": "view-2-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+              "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+            },
+            {
+              "file": "view-2-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "907cdae007a6c15a5fb1ad4f9846602b36bbd22fd158e3c90e85efc669173c55",
+              "candidate_sha256": "907cdae007a6c15a5fb1ad4f9846602b36bbd22fd158e3c90e85efc669173c55"
+            },
+            {
+              "file": "view-2-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "8314f727a3edbd515ebe18544f1ba1b4c53fb0b7fc8412c706f7d8f31eaae7ed",
+              "candidate_sha256": "8314f727a3edbd515ebe18544f1ba1b4c53fb0b7fc8412c706f7d8f31eaae7ed"
+            },
+            {
+              "file": "view-2-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "9e7a87a919d31364bc17b7b7613044b68565c1e171d5da04c60dafe96acbf581",
+              "candidate_sha256": "9e7a87a919d31364bc17b7b7613044b68565c1e171d5da04c60dafe96acbf581"
+            },
+            {
+              "file": "view-2-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a",
+              "candidate_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a"
+            },
+            {
+              "file": "view-2.png",
+              "exact": true,
+              "reference_sha256": "061d09ec9bf481360af2e7141c550fc78878d44b35774143bbc4c1eba7669047",
+              "candidate_sha256": "061d09ec9bf481360af2e7141c550fc78878d44b35774143bbc4c1eba7669047"
+            }
+          ]
+        }
+      }
+    },
+    "td": {
+      "arms": {
+        "off": {
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 273888
+          },
+          "timings": [
+            {
+              "phase": "view-0",
+              "samples": 4,
+              "median_ms": 21.66,
+              "p90_ms": 26.73
+            },
+            {
+              "phase": "view-1",
+              "samples": 4,
+              "median_ms": 56.46,
+              "p90_ms": 59.52
+            },
+            {
+              "phase": "view-2",
+              "samples": 4,
+              "median_ms": 25.7,
+              "p90_ms": 30.7
+            },
+            {
+              "phase": "scale-a",
+              "samples": 4,
+              "median_ms": 67.32,
+              "p90_ms": 73.98
+            },
+            {
+              "phase": "scale-b",
+              "samples": 4,
+              "median_ms": 53.35,
+              "p90_ms": 53.58
+            },
+            {
+              "phase": "scale-a-return",
+              "samples": 4,
+              "median_ms": 62.74,
+              "p90_ms": 64.8
+            },
+            {
+              "phase": "authored-return",
+              "samples": 4,
+              "median_ms": 55.92,
+              "p90_ms": 60.36
+            },
+            {
+              "phase": "fog",
+              "samples": 4,
+              "median_ms": 14.64,
+              "p90_ms": 16.3
+            },
+            {
+              "phase": "reveal-return",
+              "samples": 4,
+              "median_ms": 64.92,
+              "p90_ms": 64.95
+            }
+          ],
+          "raw_targets_checked": true,
+          "passed": true,
+          "elapsed_seconds": 17.36198341700947
+        },
+        "on": {
+          "counters": {
+            "draws": 2854,
+            "vertices": 19586736,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 273888
+          },
+          "timings": [
+            {
+              "phase": "view-0",
+              "samples": 4,
+              "median_ms": 15.89,
+              "p90_ms": 16.81
+            },
+            {
+              "phase": "view-1",
+              "samples": 4,
+              "median_ms": 31.59,
+              "p90_ms": 33.91
+            },
+            {
+              "phase": "view-2",
+              "samples": 4,
+              "median_ms": 14.79,
+              "p90_ms": 20.91
+            },
+            {
+              "phase": "scale-a",
+              "samples": 4,
+              "median_ms": 27.06,
+              "p90_ms": 29.62
+            },
+            {
+              "phase": "scale-b",
+              "samples": 4,
+              "median_ms": 34.33,
+              "p90_ms": 34.91
+            },
+            {
+              "phase": "scale-a-return",
+              "samples": 4,
+              "median_ms": 33.58,
+              "p90_ms": 34.36
+            },
+            {
+              "phase": "authored-return",
+              "samples": 4,
+              "median_ms": 34.23,
+              "p90_ms": 35.21
+            },
+            {
+              "phase": "fog",
+              "samples": 4,
+              "median_ms": 12.05,
+              "p90_ms": 12.41
+            },
+            {
+              "phase": "reveal-return",
+              "samples": 4,
+              "median_ms": 34.43,
+              "p90_ms": 34.8
+            }
+          ],
+          "raw_targets_checked": true,
+          "passed": true,
+          "elapsed_seconds": 14.698389208002482
+        },
+        "verify": {
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 2854,
+            "mismatches": 0,
+            "scratch_bytes": 273888
+          },
+          "timings": [
+            {
+              "phase": "view-0",
+              "samples": 4,
+              "median_ms": 18.53,
+              "p90_ms": 21.85
+            },
+            {
+              "phase": "view-1",
+              "samples": 4,
+              "median_ms": 50.61,
+              "p90_ms": 51.16
+            },
+            {
+              "phase": "view-2",
+              "samples": 4,
+              "median_ms": 17.2,
+              "p90_ms": 18.51
+            },
+            {
+              "phase": "scale-a",
+              "samples": 4,
+              "median_ms": 47.93,
+              "p90_ms": 52.54
+            },
+            {
+              "phase": "scale-b",
+              "samples": 4,
+              "median_ms": 49.59,
+              "p90_ms": 51.97
+            },
+            {
+              "phase": "scale-a-return",
+              "samples": 4,
+              "median_ms": 47.95,
+              "p90_ms": 52.76
+            },
+            {
+              "phase": "authored-return",
+              "samples": 4,
+              "median_ms": 50.41,
+              "p90_ms": 50.68
+            },
+            {
+              "phase": "fog",
+              "samples": 4,
+              "median_ms": 9.22,
+              "p90_ms": 9.7
+            },
+            {
+              "phase": "reveal-return",
+              "samples": 4,
+              "median_ms": 48.92,
+              "p90_ms": 50.98
+            }
+          ],
+          "raw_targets_checked": true,
+          "passed": true,
+          "elapsed_seconds": 16.44163329101866
+        }
+      },
+      "comparisons": {
+        "on": {
+          "passed": true,
+          "state_exact": true,
+          "state_records": 9162,
+          "targets": [
+            {
+              "file": "authored-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4",
+              "candidate_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4"
+            },
+            {
+              "file": "authored-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "authored-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d",
+              "candidate_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d"
+            },
+            {
+              "file": "authored-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767",
+              "candidate_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767"
+            },
+            {
+              "file": "authored-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85",
+              "candidate_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85"
+            },
+            {
+              "file": "authored-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "authored-return.png",
+              "exact": true,
+              "reference_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23",
+              "candidate_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23"
+            },
+            {
+              "file": "fog-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "5ec2305314251a73621a873110205e674f93d632896f0ba72fcb12073ca9969c",
+              "candidate_sha256": "5ec2305314251a73621a873110205e674f93d632896f0ba72fcb12073ca9969c"
+            },
+            {
+              "file": "fog-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "2675d5a81741d01a38f808161d464f6ec72497eeefe849786ffde591b0dfc887",
+              "candidate_sha256": "2675d5a81741d01a38f808161d464f6ec72497eeefe849786ffde591b0dfc887"
+            },
+            {
+              "file": "fog-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "a4d576eb00110112c55b17efdf896c02df80a85a1f161278c241f97ff2435719",
+              "candidate_sha256": "a4d576eb00110112c55b17efdf896c02df80a85a1f161278c241f97ff2435719"
+            },
+            {
+              "file": "fog-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+              "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+            },
+            {
+              "file": "fog-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "b0e2718f11748455c36fdce860502c432264c533ce336b050bb3ad960453bd61",
+              "candidate_sha256": "b0e2718f11748455c36fdce860502c432264c533ce336b050bb3ad960453bd61"
+            },
+            {
+              "file": "fog-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "fog.png",
+              "exact": true,
+              "reference_sha256": "ac145545efaae6a555d279abbde8e1a3c73eb6ba73a35c700827f2a88d408207",
+              "candidate_sha256": "ac145545efaae6a555d279abbde8e1a3c73eb6ba73a35c700827f2a88d408207"
+            },
+            {
+              "file": "reveal-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4",
+              "candidate_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4"
+            },
+            {
+              "file": "reveal-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "reveal-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d",
+              "candidate_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d"
+            },
+            {
+              "file": "reveal-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767",
+              "candidate_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767"
+            },
+            {
+              "file": "reveal-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85",
+              "candidate_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85"
+            },
+            {
+              "file": "reveal-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "reveal-return.png",
+              "exact": true,
+              "reference_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23",
+              "candidate_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23"
+            },
+            {
+              "file": "scale-a-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8",
+              "candidate_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8"
+            },
+            {
+              "file": "scale-a-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "scale-a-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961",
+              "candidate_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961"
+            },
+            {
+              "file": "scale-a-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8",
+              "candidate_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8"
+            },
+            {
+              "file": "scale-a-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "scale-a-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961",
+              "candidate_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961"
+            },
+            {
+              "file": "scale-a-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7",
+              "candidate_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7"
+            },
+            {
+              "file": "scale-a-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565",
+              "candidate_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565"
+            },
+            {
+              "file": "scale-a-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "scale-a-return.png",
+              "exact": true,
+              "reference_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411",
+              "candidate_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411"
+            },
+            {
+              "file": "scale-a-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7",
+              "candidate_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7"
+            },
+            {
+              "file": "scale-a-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565",
+              "candidate_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565"
+            },
+            {
+              "file": "scale-a-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "scale-a.png",
+              "exact": true,
+              "reference_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411",
+              "candidate_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411"
+            },
+            {
+              "file": "scale-b-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "0c12765f0476c161a2bc3bfe13ef3de267603c1bf7323b7b3e0fa7397ea513c9",
+              "candidate_sha256": "0c12765f0476c161a2bc3bfe13ef3de267603c1bf7323b7b3e0fa7397ea513c9"
+            },
+            {
+              "file": "scale-b-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "scale-b-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "1186da56a85955eb362980ddc7ef3aee35d4b1e1bb77074acc3f3c153f8ad1b5",
+              "candidate_sha256": "1186da56a85955eb362980ddc7ef3aee35d4b1e1bb77074acc3f3c153f8ad1b5"
+            },
+            {
+              "file": "scale-b-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "f08fc53281335ceeae02ffb0dd593be86362f5e07690ac2898eddb7d1ecdf06a",
+              "candidate_sha256": "f08fc53281335ceeae02ffb0dd593be86362f5e07690ac2898eddb7d1ecdf06a"
+            },
+            {
+              "file": "scale-b-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "0398b3c25a43107d2ae9f64f67a369c1bb6b5d6a8e012e9950e8ae7545797604",
+              "candidate_sha256": "0398b3c25a43107d2ae9f64f67a369c1bb6b5d6a8e012e9950e8ae7545797604"
+            },
+            {
+              "file": "scale-b-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "scale-b.png",
+              "exact": true,
+              "reference_sha256": "bfbbc6c137ea70b75aeef75cd63e46f117c3ddf577427c3e8dff2f14aa71522f",
+              "candidate_sha256": "bfbbc6c137ea70b75aeef75cd63e46f117c3ddf577427c3e8dff2f14aa71522f"
+            },
+            {
+              "file": "view-0-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "4e934461f754d65b658038c170e8f0b1cc067576b6a38f74f5192db8272b30fe",
+              "candidate_sha256": "4e934461f754d65b658038c170e8f0b1cc067576b6a38f74f5192db8272b30fe"
+            },
+            {
+              "file": "view-0-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "5441ac3758395caed444cb14822299348b313194c7db274d4d9983aae413e538",
+              "candidate_sha256": "5441ac3758395caed444cb14822299348b313194c7db274d4d9983aae413e538"
+            },
+            {
+              "file": "view-0-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "6fbb8024e52a6fd4f1a37f3098e8458dd3861853325bab2181965ac63a36a8c2",
+              "candidate_sha256": "6fbb8024e52a6fd4f1a37f3098e8458dd3861853325bab2181965ac63a36a8c2"
+            },
+            {
+              "file": "view-0-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "f4b550eb70161e1f2b65d7714b513c7a8dd91432cf694dd76fcc23ebf8427495",
+              "candidate_sha256": "f4b550eb70161e1f2b65d7714b513c7a8dd91432cf694dd76fcc23ebf8427495"
+            },
+            {
+              "file": "view-0-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "9bc6f79462002583d01abade459d642b9888316932ff0a72e2846fbd27d7aa04",
+              "candidate_sha256": "9bc6f79462002583d01abade459d642b9888316932ff0a72e2846fbd27d7aa04"
+            },
+            {
+              "file": "view-0-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "f58a863ce29c2fb1a01eab20bbc63026d0c6dac948b619048f94a7a2a14c4080",
+              "candidate_sha256": "f58a863ce29c2fb1a01eab20bbc63026d0c6dac948b619048f94a7a2a14c4080"
+            },
+            {
+              "file": "view-0.png",
+              "exact": true,
+              "reference_sha256": "f0bf7f2c304e50951f0b57aed4a4d19e19a0860e448c74b2b8bbe266aef89b1c",
+              "candidate_sha256": "f0bf7f2c304e50951f0b57aed4a4d19e19a0860e448c74b2b8bbe266aef89b1c"
+            },
+            {
+              "file": "view-1-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "28da9e4d09fb3d5c34676414243b77fb3b1db6139c32e438d5cf04adaccb2ebb",
+              "candidate_sha256": "28da9e4d09fb3d5c34676414243b77fb3b1db6139c32e438d5cf04adaccb2ebb"
+            },
+            {
+              "file": "view-1-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "a5b0c53f186935ef624ee7f974f70cabd422c08ca23deb67a73060b12054e22a",
+              "candidate_sha256": "a5b0c53f186935ef624ee7f974f70cabd422c08ca23deb67a73060b12054e22a"
+            },
+            {
+              "file": "view-1-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "86e98f1cc894cb00c78e24ea64afcb6da40377b0045940f6bb771f526e8fba5d",
+              "candidate_sha256": "86e98f1cc894cb00c78e24ea64afcb6da40377b0045940f6bb771f526e8fba5d"
+            },
+            {
+              "file": "view-1-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "f1615f45e29db8fd47597af8a236ef1716a36d86a71a363f6d71b9fa111dea36",
+              "candidate_sha256": "f1615f45e29db8fd47597af8a236ef1716a36d86a71a363f6d71b9fa111dea36"
+            },
+            {
+              "file": "view-1-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "3af878f1e35e6b46f1563b997ee655cd33b7e91bbc9b76dec34a4e6f4e4eb098",
+              "candidate_sha256": "3af878f1e35e6b46f1563b997ee655cd33b7e91bbc9b76dec34a4e6f4e4eb098"
+            },
+            {
+              "file": "view-1-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "view-1.png",
+              "exact": true,
+              "reference_sha256": "23adce23937d93183f405057bc88969fc543943240ccbdecd3cc300ad57fd4db",
+              "candidate_sha256": "23adce23937d93183f405057bc88969fc543943240ccbdecd3cc300ad57fd4db"
+            },
+            {
+              "file": "view-2-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "995ced20c90a5b5147c27d30f5463e18af2e96a700a5b6e389b5c1b652a7c0fb",
+              "candidate_sha256": "995ced20c90a5b5147c27d30f5463e18af2e96a700a5b6e389b5c1b652a7c0fb"
+            },
+            {
+              "file": "view-2-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49317e45fb094da9d1649af86626f24b0f62f4c0ee31d3abc615f62ccb221817",
+              "candidate_sha256": "49317e45fb094da9d1649af86626f24b0f62f4c0ee31d3abc615f62ccb221817"
+            },
+            {
+              "file": "view-2-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "2ed28acf9dd341983e2bf9090fc666ec51b7dfcbad71a01966d1dfa1bd378bb1",
+              "candidate_sha256": "2ed28acf9dd341983e2bf9090fc666ec51b7dfcbad71a01966d1dfa1bd378bb1"
+            },
+            {
+              "file": "view-2-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "e99198f0e6c4da3216597ff5a40d6d3eb228ca4640444b5c39dc8531e853dce7",
+              "candidate_sha256": "e99198f0e6c4da3216597ff5a40d6d3eb228ca4640444b5c39dc8531e853dce7"
+            },
+            {
+              "file": "view-2-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "63b173155c48ee3eceb816383ec0538096521dfa31218b4d51d386a9e328c74d",
+              "candidate_sha256": "63b173155c48ee3eceb816383ec0538096521dfa31218b4d51d386a9e328c74d"
+            },
+            {
+              "file": "view-2-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "2bb23bf2529a0f384a9fd1cb1e020052992f5522db557f196c49e885f27a596f",
+              "candidate_sha256": "2bb23bf2529a0f384a9fd1cb1e020052992f5522db557f196c49e885f27a596f"
+            },
+            {
+              "file": "view-2.png",
+              "exact": true,
+              "reference_sha256": "6d3ba4700a1a21125b698a2c021dcbdf8aeac276b1765389abdf50cd84b697a5",
+              "candidate_sha256": "6d3ba4700a1a21125b698a2c021dcbdf8aeac276b1765389abdf50cd84b697a5"
+            }
+          ]
+        },
+        "verify": {
+          "passed": true,
+          "state_exact": true,
+          "state_records": 9162,
+          "targets": [
+            {
+              "file": "authored-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4",
+              "candidate_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4"
+            },
+            {
+              "file": "authored-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "authored-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d",
+              "candidate_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d"
+            },
+            {
+              "file": "authored-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767",
+              "candidate_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767"
+            },
+            {
+              "file": "authored-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85",
+              "candidate_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85"
+            },
+            {
+              "file": "authored-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "authored-return.png",
+              "exact": true,
+              "reference_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23",
+              "candidate_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23"
+            },
+            {
+              "file": "fog-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "5ec2305314251a73621a873110205e674f93d632896f0ba72fcb12073ca9969c",
+              "candidate_sha256": "5ec2305314251a73621a873110205e674f93d632896f0ba72fcb12073ca9969c"
+            },
+            {
+              "file": "fog-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "2675d5a81741d01a38f808161d464f6ec72497eeefe849786ffde591b0dfc887",
+              "candidate_sha256": "2675d5a81741d01a38f808161d464f6ec72497eeefe849786ffde591b0dfc887"
+            },
+            {
+              "file": "fog-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "a4d576eb00110112c55b17efdf896c02df80a85a1f161278c241f97ff2435719",
+              "candidate_sha256": "a4d576eb00110112c55b17efdf896c02df80a85a1f161278c241f97ff2435719"
+            },
+            {
+              "file": "fog-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+              "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+            },
+            {
+              "file": "fog-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "b0e2718f11748455c36fdce860502c432264c533ce336b050bb3ad960453bd61",
+              "candidate_sha256": "b0e2718f11748455c36fdce860502c432264c533ce336b050bb3ad960453bd61"
+            },
+            {
+              "file": "fog-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "fog.png",
+              "exact": true,
+              "reference_sha256": "ac145545efaae6a555d279abbde8e1a3c73eb6ba73a35c700827f2a88d408207",
+              "candidate_sha256": "ac145545efaae6a555d279abbde8e1a3c73eb6ba73a35c700827f2a88d408207"
+            },
+            {
+              "file": "reveal-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4",
+              "candidate_sha256": "054025ea316e237aa6338ad490d25b032c8f116fc0dc998846a9064c4fe4efe4"
+            },
+            {
+              "file": "reveal-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "reveal-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d",
+              "candidate_sha256": "90d038b0e930afb90929f70c939d9b7df777867382bef8e6203e21d0f1e4129d"
+            },
+            {
+              "file": "reveal-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767",
+              "candidate_sha256": "ad754c2a0a8ab5ad1a745c252f4335ad5b4fe9060e2343e22594ed1172ad9767"
+            },
+            {
+              "file": "reveal-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85",
+              "candidate_sha256": "0e15d414fe284ef7c7413b66b9d94a831ca21d4a0f3c3de74d5a05c2563ebf85"
+            },
+            {
+              "file": "reveal-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "reveal-return.png",
+              "exact": true,
+              "reference_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23",
+              "candidate_sha256": "dba404c493d1c5a1c1a0e9bd6d2adaf32e7c12e1a6b67b1eb85bc7795b5f0a23"
+            },
+            {
+              "file": "scale-a-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8",
+              "candidate_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8"
+            },
+            {
+              "file": "scale-a-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "scale-a-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961",
+              "candidate_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961"
+            },
+            {
+              "file": "scale-a-return-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8",
+              "candidate_sha256": "a23171d81be5bb027c8b564192afe070b8ce4938aa0e2a9422b14f393655a6d8"
+            },
+            {
+              "file": "scale-a-return-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "scale-a-return-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961",
+              "candidate_sha256": "6e5c1e71b862c4149cf060266fd68358e340b55f944caf5c43aa0bb1a32dc961"
+            },
+            {
+              "file": "scale-a-return-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7",
+              "candidate_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7"
+            },
+            {
+              "file": "scale-a-return-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565",
+              "candidate_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565"
+            },
+            {
+              "file": "scale-a-return-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "scale-a-return.png",
+              "exact": true,
+              "reference_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411",
+              "candidate_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411"
+            },
+            {
+              "file": "scale-a-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7",
+              "candidate_sha256": "cc7bec0b60a9391d8b21c96608e73bd2e8c95b10a271b025303973117c30abd7"
+            },
+            {
+              "file": "scale-a-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565",
+              "candidate_sha256": "d4ca91ea807255436247831e8a042e07087ec9274e8dcb99994778255b158565"
+            },
+            {
+              "file": "scale-a-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "scale-a.png",
+              "exact": true,
+              "reference_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411",
+              "candidate_sha256": "d7092c4f80daf00e05b20a42872b6c44da34f583deaa87629b9e1c3c967f9411"
+            },
+            {
+              "file": "scale-b-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "0c12765f0476c161a2bc3bfe13ef3de267603c1bf7323b7b3e0fa7397ea513c9",
+              "candidate_sha256": "0c12765f0476c161a2bc3bfe13ef3de267603c1bf7323b7b3e0fa7397ea513c9"
+            },
+            {
+              "file": "scale-b-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611",
+              "candidate_sha256": "1137b94c4240778b784deac8fe554f14cb02dc755b6ffb8f6a95a68bdd46e611"
+            },
+            {
+              "file": "scale-b-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "1186da56a85955eb362980ddc7ef3aee35d4b1e1bb77074acc3f3c153f8ad1b5",
+              "candidate_sha256": "1186da56a85955eb362980ddc7ef3aee35d4b1e1bb77074acc3f3c153f8ad1b5"
+            },
+            {
+              "file": "scale-b-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "f08fc53281335ceeae02ffb0dd593be86362f5e07690ac2898eddb7d1ecdf06a",
+              "candidate_sha256": "f08fc53281335ceeae02ffb0dd593be86362f5e07690ac2898eddb7d1ecdf06a"
+            },
+            {
+              "file": "scale-b-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "0398b3c25a43107d2ae9f64f67a369c1bb6b5d6a8e012e9950e8ae7545797604",
+              "candidate_sha256": "0398b3c25a43107d2ae9f64f67a369c1bb6b5d6a8e012e9950e8ae7545797604"
+            },
+            {
+              "file": "scale-b-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "scale-b.png",
+              "exact": true,
+              "reference_sha256": "bfbbc6c137ea70b75aeef75cd63e46f117c3ddf577427c3e8dff2f14aa71522f",
+              "candidate_sha256": "bfbbc6c137ea70b75aeef75cd63e46f117c3ddf577427c3e8dff2f14aa71522f"
+            },
+            {
+              "file": "view-0-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "4e934461f754d65b658038c170e8f0b1cc067576b6a38f74f5192db8272b30fe",
+              "candidate_sha256": "4e934461f754d65b658038c170e8f0b1cc067576b6a38f74f5192db8272b30fe"
+            },
+            {
+              "file": "view-0-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "5441ac3758395caed444cb14822299348b313194c7db274d4d9983aae413e538",
+              "candidate_sha256": "5441ac3758395caed444cb14822299348b313194c7db274d4d9983aae413e538"
+            },
+            {
+              "file": "view-0-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "6fbb8024e52a6fd4f1a37f3098e8458dd3861853325bab2181965ac63a36a8c2",
+              "candidate_sha256": "6fbb8024e52a6fd4f1a37f3098e8458dd3861853325bab2181965ac63a36a8c2"
+            },
+            {
+              "file": "view-0-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "f4b550eb70161e1f2b65d7714b513c7a8dd91432cf694dd76fcc23ebf8427495",
+              "candidate_sha256": "f4b550eb70161e1f2b65d7714b513c7a8dd91432cf694dd76fcc23ebf8427495"
+            },
+            {
+              "file": "view-0-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "9bc6f79462002583d01abade459d642b9888316932ff0a72e2846fbd27d7aa04",
+              "candidate_sha256": "9bc6f79462002583d01abade459d642b9888316932ff0a72e2846fbd27d7aa04"
+            },
+            {
+              "file": "view-0-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "f58a863ce29c2fb1a01eab20bbc63026d0c6dac948b619048f94a7a2a14c4080",
+              "candidate_sha256": "f58a863ce29c2fb1a01eab20bbc63026d0c6dac948b619048f94a7a2a14c4080"
+            },
+            {
+              "file": "view-0.png",
+              "exact": true,
+              "reference_sha256": "f0bf7f2c304e50951f0b57aed4a4d19e19a0860e448c74b2b8bbe266aef89b1c",
+              "candidate_sha256": "f0bf7f2c304e50951f0b57aed4a4d19e19a0860e448c74b2b8bbe266aef89b1c"
+            },
+            {
+              "file": "view-1-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "28da9e4d09fb3d5c34676414243b77fb3b1db6139c32e438d5cf04adaccb2ebb",
+              "candidate_sha256": "28da9e4d09fb3d5c34676414243b77fb3b1db6139c32e438d5cf04adaccb2ebb"
+            },
+            {
+              "file": "view-1-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "a5b0c53f186935ef624ee7f974f70cabd422c08ca23deb67a73060b12054e22a",
+              "candidate_sha256": "a5b0c53f186935ef624ee7f974f70cabd422c08ca23deb67a73060b12054e22a"
+            },
+            {
+              "file": "view-1-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "86e98f1cc894cb00c78e24ea64afcb6da40377b0045940f6bb771f526e8fba5d",
+              "candidate_sha256": "86e98f1cc894cb00c78e24ea64afcb6da40377b0045940f6bb771f526e8fba5d"
+            },
+            {
+              "file": "view-1-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "f1615f45e29db8fd47597af8a236ef1716a36d86a71a363f6d71b9fa111dea36",
+              "candidate_sha256": "f1615f45e29db8fd47597af8a236ef1716a36d86a71a363f6d71b9fa111dea36"
+            },
+            {
+              "file": "view-1-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "3af878f1e35e6b46f1563b997ee655cd33b7e91bbc9b76dec34a4e6f4e4eb098",
+              "candidate_sha256": "3af878f1e35e6b46f1563b997ee655cd33b7e91bbc9b76dec34a4e6f4e4eb098"
+            },
+            {
+              "file": "view-1-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c",
+              "candidate_sha256": "49791b08f9bdbb6e175027620b8a43e972c9fdafaf3b69f69f8dede7ddc5ff8c"
+            },
+            {
+              "file": "view-1.png",
+              "exact": true,
+              "reference_sha256": "23adce23937d93183f405057bc88969fc543943240ccbdecd3cc300ad57fd4db",
+              "candidate_sha256": "23adce23937d93183f405057bc88969fc543943240ccbdecd3cc300ad57fd4db"
+            },
+            {
+              "file": "view-2-depth.bin.gz",
+              "exact": true,
+              "reference_sha256": "995ced20c90a5b5147c27d30f5463e18af2e96a700a5b6e389b5c1b652a7c0fb",
+              "candidate_sha256": "995ced20c90a5b5147c27d30f5463e18af2e96a700a5b6e389b5c1b652a7c0fb"
+            },
+            {
+              "file": "view-2-infantry-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "49317e45fb094da9d1649af86626f24b0f62f4c0ee31d3abc615f62ccb221817",
+              "candidate_sha256": "49317e45fb094da9d1649af86626f24b0f62f4c0ee31d3abc615f62ccb221817"
+            },
+            {
+              "file": "view-2-normals.bin.gz",
+              "exact": true,
+              "reference_sha256": "2ed28acf9dd341983e2bf9090fc666ec51b7dfcbad71a01966d1dfa1bd378bb1",
+              "candidate_sha256": "2ed28acf9dd341983e2bf9090fc666ec51b7dfcbad71a01966d1dfa1bd378bb1"
+            },
+            {
+              "file": "view-2-scene.bin.gz",
+              "exact": true,
+              "reference_sha256": "e99198f0e6c4da3216597ff5a40d6d3eb228ca4640444b5c39dc8531e853dce7",
+              "candidate_sha256": "e99198f0e6c4da3216597ff5a40d6d3eb228ca4640444b5c39dc8531e853dce7"
+            },
+            {
+              "file": "view-2-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "63b173155c48ee3eceb816383ec0538096521dfa31218b4d51d386a9e328c74d",
+              "candidate_sha256": "63b173155c48ee3eceb816383ec0538096521dfa31218b4d51d386a9e328c74d"
+            },
+            {
+              "file": "view-2-terrain-sun.bin.gz",
+              "exact": true,
+              "reference_sha256": "2bb23bf2529a0f384a9fd1cb1e020052992f5522db557f196c49e885f27a596f",
+              "candidate_sha256": "2bb23bf2529a0f384a9fd1cb1e020052992f5522db557f196c49e885f27a596f"
+            },
+            {
+              "file": "view-2.png",
+              "exact": true,
+              "reference_sha256": "6d3ba4700a1a21125b698a2c021dcbdf8aeac276b1765389abdf50cd84b697a5",
+              "candidate_sha256": "6d3ba4700a1a21125b698a2c021dcbdf8aeac276b1765389abdf50cd84b697a5"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "generated_only": false,
+  "passed": true
+}

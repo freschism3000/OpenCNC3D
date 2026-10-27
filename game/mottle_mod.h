@@ -159,6 +159,12 @@ static void mottle_free(void)
 static void mottle_mark_clear(void)
 {
     g_mottleClear.assign((size_t)g_gridW * g_gridH, 0);
+    if(g_raModule) {
+        for(int y=0;y<g_gridH;y++) for(int x=0;x<g_gridW;x++) {
+            int slot=-1;g_mottleClear[(size_t)y*g_gridW+x]=(ra3d_detail_cell(x,y,&slot)&1)?1:0;
+        }
+        return;
+    }
     /* Desert has 31 atlas rows, Temperate 24. A fixed 24-row lookup can
        mistake the Desert second row for clear ground. */
     int nslots = 0;
@@ -186,10 +192,10 @@ static float mottle_ground_texels(void);
    were the experimental art's, and they did not go when that look was retired. */
 static bool mottle_available(void)
 {
-    return g_mottleReady && g_fxActive && g_fx.enabled && !g_raModule   /* placeholder ground */
+    return g_mottleReady && g_fxActive && g_fx.enabled
            && g_fx.mottle_on && g_fx.mottle_strength > 0.0f
-           && (!strcmp(g_pack.theater, "TEMPERAT") || !strcmp(g_pack.theater, "DESERT")
-               || !strcmp(g_pack.theater, "SAND")) && mottle_ground_texels() > 0.0f;
+           && (g_raModule ? ra3d_detail_plants() : (!strcmp(g_pack.theater, "TEMPERAT") || !strcmp(g_pack.theater, "DESERT")
+               || !strcmp(g_pack.theater, "SAND"))) && mottle_ground_texels() > 0.0f;
 }
 
 /* ------------------------------------------------------------------------------ *
@@ -237,6 +243,7 @@ static float mottle_patch_texels(void);
 
 static float mottle_ground_texels(void)
 {
+    if(g_raModule)return ra3d_detail_texels();
     const int ai = terrain_atlas_index();
     if (ai < 0 || ai >= (int)g_pack.tex.size()) return 0.0f;
     const int k = g_pack.tex[ai].uw / (TT_COLS * TT_PITCH);

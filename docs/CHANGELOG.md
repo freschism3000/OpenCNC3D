@@ -1,5 +1,73 @@
 # Changelog
 
+## OpenCNC3D v0.9.0 Alpha "Red Alert Arrives" (2026-10-26)
+
+### New features
+
+- **Red Alert arrives as RA3D.** Play Red Alert in 3D as a separate downloadable game, alongside Tiberian Dawn under its new Dawn3D launcher name.
+- **New Skirmish AI for both games.** Choose Easy, Normal, Hard or Expert for each computer player in Classic and Enhanced lobbies. Normal is the default.
+- **AI that builds and fights.** Computers deploy their MCV, build an economy and technology, scout, defend, counter observed forces, coordinate attacks and retreat damaged units. Higher levels plan more often and coordinate stronger attacks.
+- **Fair AI difficulty.** All levels use normal income, production, combat and visibility rules, including shroud and cloaking. No free money, free units, faster harvesting, hidden enemy information or difficulty-based stat bonuses.
+- **Persistent AI settings.** Mix difficulties in one match, synchronize host choices in multiplayer, and preserve AI decisions and random state in saves. Campaign AI and scripts retain their existing behavior.
+- **Red Alert campaigns.** Allied and Soviet mission routes include difficulty selection, briefings, saves, campaign scores, map screens and ending movies, using Red Alert's own engine and rules.
+- **Red Alert Skirmish.** Play all 24 multiplayer maps with previews, up to seven computer opponents, eight countries and their colors, technology levels up to 10 and selectable starting credits.
+- **Red Alert multiplayer.** Host and join through the game list and relay routes. Matches synchronize the host's seed, reject mismatched engines or map data, and end on RA's TOP SCORES screen.
+- **Red Alert Enhanced HUD.** A faction-neutral steel interface adds live radar, fog, production controls, the Database and information panels, including installations containing only RA3D.
+- **Game modules in the launcher.** Add Dawn3D or RA3D, manage each game's optional content, and remove or reinstall modules while keeping saves and settings.
+- **Independent water reflection rotation.** Turn the water highlight separately from sunlight with the new WATER control in the developer F5 menu.
+- **Animated graphics-mode transitions.** Map tiles tear and turn when switching modes, accompanied by rumble and camera shake.
+- **Optional language packs.** Dawn3D supports German; RA3D supports German and French. Movies and music can be chosen separately for each game.
+
+### Improvements
+
+- **Remastered Red Alert artwork.** Approved buildings, vehicles, aircraft and ships join the shared OpenCNC3D models, with Red Alert's own Enhanced menu artwork, animated emblems and action cursors.
+- **Animated RA buildings.** Placement, damage and destruction stages follow actual game state, including factory doors, the Tesla Coil, Iron Curtain and Ore Silo. Naval debris splashes and sinks.
+- **Animated RA vehicles.** Ore Trucks scoop, carry and unload ore; V2 launchers raise and fire arcing rockets; Transports deploy ramps. Aircraft have landing gear and propellers, ships turn their weapons, Cruisers use both turrets and Submarines dive.
+- **RA scenery and effects.** Approved ore, gems, mines, barrels, crates, fences, ice floes and other props gain 3D artwork, alongside RA's atomic blast, crate rewards, flags and parachutes.
+- **Shared vehicle redesigns.** The approved Mammoth, Harvester and turbine Orca include their materials and wrecks. Vehicles, aircraft and wrecks use smoother normals and smoother hull and turret turning.
+- **Moving lights and working machinery.** Lamps follow moving parts, cast soft light and respect intervening geometry. The Harvester's working parts and sprung chassis follow movement and refinery unloading.
+- **Winter and Desert scenery.** Winter villages, frosted broadleaf trees and snowy conifers appear on Dawn3D Winter and RA3D Snow maps. Desert scenery uses source-placed bushes and fitted rocks.
+- **Updated visual defaults.** Both games use the approved saved visual preset, consistent daylight and materials, smoother terrain transitions, paired stone normal and roughness data, Desert sandstone treatment and corrected Snow brightness.
+- **Coastal depth and water movement.** Shoreline-aligned waves, pulsed swash, river flow and lake direction improve water presentation. Native bank contact and shader depth replace generated bank geometry.
+- **Softer Desert decals.** Craters and scorch marks blend more naturally into the ground, with more consistent construction and ground marks.
+- **Organized settings.** Title and pause settings use Game Controls, Gameplay and Audio groups. Dropdowns, navigation, music selection and backdrop fitting have been improved.
+- **Separate voice volume.** A Voices slider joins the audio controls. Soldier and vehicle sounds, tracks, footsteps and temperate ambience follow the correct game events.
+- **Game speed and camera.** The fastest Game Speed is twice Normal. Missions start at the wider shared camera distance in both games.
+- **RA match options.** Configure ore and shroud regrowth, crates, capture the flag, short game and AI takeover. RA's New AI default applies to newly added computers without changing configured seats.
+- **Clearer multiplayer settings.** Hosts choose AI levels, joiners see synchronized choices, and changing a setting clears READY. AI policy and state participate in compatibility and synchronization checks.
+- **Optional media controls.** Downloads show progress, each game uses its own media, and leaving Movies or Music unchecked preserves content already installed.
+
+### Performance
+
+- Reuse terrain rays, prepared textures, animated poses and model lookups across rendering passes; retain RA ground in GPU buffers and skip irrelevant or off-screen work.
+- Update nearby terrain and foliage after construction instead of rebuilding the whole map.
+- Prepare required resources during loading and prioritize textures for visible buildings.
+- Reduce the frame-rate drop during building placement animations while preserving the intended artwork.
+
+### Platforms and builds
+
+- **Windows and universal macOS packages.** Both platforms offer OpenCNC3D Installer, OpenCNC3D Complete with Dawn3D, RA3D Complete, OpenCNC3D Binaries and RA3D Binaries.
+- **Empty launcher installer.** Install the launcher, then choose a game in the Module Browser with separate Movies and Music checkboxes.
+- **Complete installers.** Start with the selected game already installed and choose optional Movies and Music during setup. RA3D Complete uses its own wizard graphics.
+- **Separate RA3D downloads.** RA3D has its own Complete, Binaries and module packages, keeping Red Alert content out of ordinary Dawn3D packages.
+- **Verified installation and updates.** Modules and optional content are verified before use. Updates choose platform-compatible assets and keep RA-only installations separate from the Dawn3D updater.
+- **Bundled changelogs.** Each game module carries release notes, and newer local builds retain their bundled notes when the approved public release is older.
+
+### Bugs fixed
+
+- Fresh RA3D installations now start in Enhanced mode with the approved menu and terrain blending; an existing saved Classic choice is preserved.
+- Fixed hard terrain joins, square water patches, low-bank coverage, black ford gaps, bridge water levels, river crossings, detached stones and Snow road contacts.
+- Corrected Allied infantry colors and faction color mapping.
+- Fixed independent RA HUD loading, rendered-pose picking, Classic tree anchors, damaged building slabs, placement jumps and Windows snapshots.
+- Corrected RA Load Mission and User Maps routing, and campaign ending-movie and match debrief routes.
+- Improved module and optional-media recovery while preserving saves and settings.
+- Fixed the Windows Complete installer's large solid-compression data-stream failure while preserving extracted files and installation choices.
+- Private development builds keep Launch available for installed games and prevent public updates from replacing the local runtime.
+
+---
+
+---
+
 ## OpenCNC3D v0.8.0 "From The Ground Up" (2026-10-10)
 
 ### New features

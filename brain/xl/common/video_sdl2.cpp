@@ -315,7 +315,7 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
              SDL_GetPixelFormatName(requested_pixel_format));
 
     /*
-    ** Pick the first pixel format or the user requested one. It better be RGB.
+    ** Pick the first pixel format or the design review requested one. It better be RGB.
     */
     pixel_format = SDL_PIXELFORMAT_UNKNOWN;
     for (int i = 0; i < info.num_texture_formats; i++) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The sizes Setup prints beside its Movies and Music boxes, read from the media manifest.
 
-    media-sizes.py <manifest> [--exe OpenCNC3D.exe]
+    media-sizes.py <manifest> [--exe OpenCNC3D.exe] [--module ra3d]
 
 <manifest> is either launcher/lmedia_manifest.c, the generated C file that compiles the
 manifest into the launcher, or the manifest as plain text. Prints shell assignments
@@ -20,10 +20,17 @@ The size format is the launcher's (lm_format_size): binary megabytes and gigabyt
 one decimal, labelled MB and GB, which is also how NSIS itself counts the disk space it
 reports on the directory page, so the three figures agree.
 
+A MODULE'S MOVIES AND SCORE ARE COUNTED ONLY WITH --module. The launcher fetches the
+files under a `module` line's folder only where that module is installed, so the figure
+beside each box is the game's own files plus those of every module the package Setup
+installs carries, which tools/win/make-installer-win.sh knows from the staged package and
+passes as --module.
+
 Manifest records, one per line, '#' starting a comment:
     OCMEDIA 1
     mirror <DISC> <url> <base>
-    file <component> <relpath> <size> <sha256hex> <DISC> <offset>
+    module <folder>
+    file <component> <relpath> <size> <sha256hex> <DISC> <offset> [<head hex>]
     legacy <component> <relpath>
 """
 import ast
@@ -31,7 +38,9 @@ import re
 import sys
 
 COMPONENTS = ("movies", "music")
-DISCS = ("GDI", "NOD", "COVERT")
+DISCS = ("GDI", "NOD", "COVERT", "RA_ALLIED", "RA_SOVIET")
+MODULES = ("ra3d",)
+USAGE = "usage: media-sizes.py <manifest .c or .txt> [--exe OpenCNC3D.exe] [--module ra3d]"
 
 
 def die(msg):
@@ -77,13 +86,19 @@ def fmt_size(n):
 
 def main(argv):
     if len(argv) < 2:
-        die("usage: media-sizes.py <manifest .c or .txt> [--exe OpenCNC3D.exe]")
+        die(USAGE)
     path = argv[1]
     exe = None
-    if len(argv) == 4 and argv[2] == "--exe":
-        exe = argv[3]
-    elif len(argv) != 2:
-        die("usage: media-sizes.py <manifest .c or .txt> [--exe OpenCNC3D.exe]")
+    with_modules = set()
+    rest = argv[2:]
+    while rest:
+        if len(rest) >= 2 and rest[0] == "--exe":
+            exe = rest[1]
+        elif len(rest) >= 2 and rest[0] == "--module" and rest[1] in MODULES:
+            with_modules.add(rest[1])
+        else:
+            die(USAGE)
+        rest = rest[2:]
 
     try:
         with open(path, "rb") as f:
@@ -106,6 +121,8 @@ def main(argv):
     count = dict((c, 0) for c in COMPONENTS)
     seen = set()
     used_discs = set()
+    modules = set()
+    files = []
     for ln in lines[1:]:
         f = ln.split()
         kind = f[0]
@@ -113,10 +130,16 @@ def main(argv):
             if len(f) != 4 or f[1] not in DISCS or not f[3].isdigit():
                 die("bad mirror record: %s" % ln)
             mirrors.add(f[1])
+        elif kind == "module":
+            if len(f) != 2 or f[1] not in MODULES:
+                die("bad module record: %s" % ln)
+            modules.add(f[1])
         elif kind == "file":
-            if len(f) != 7:
-                die("a file record needs 7 fields: %s" % ln)
-            _, comp, rel, size, sha, disc, off = f
+            if len(f) not in (7, 8):
+                die("a file record needs 7 fields, or 8 with a head: %s" % ln)
+            _, comp, rel, size, sha, disc, off = f[:7]
+            if len(f) == 8 and not re.fullmatch(r"(?:[0-9a-f]{2})+", f[7]):
+                die("bad head: %s" % ln)
             if comp not in COMPONENTS:
                 die("unknown component '%s': %s" % (comp, ln))
             if not size.isdigit() or int(size) <= 0 or not off.isdigit():
@@ -129,14 +152,24 @@ def main(argv):
                 die("%s is listed twice" % rel)
             seen.add(rel.lower())
             used_discs.add(disc)
-            total[comp] += int(size)
-            count[comp] += 1
+            files.append((comp, rel, int(size)))
         elif kind == "legacy":
             if len(f) != 3 or f[1] not in COMPONENTS:
                 die("bad legacy record: %s" % ln)
         else:
             die("unknown record '%s'" % kind)
 
+    for m in with_modules - modules:
+        die("--module %s, and the manifest has no module line for it" % m)
+    for comp, rel, size in files:
+        top = rel.split("/", 1)[0] if "/" in rel else ""
+        if top in MODULES and top not in modules:
+            die("%s is in the %s folder and the manifest names no module line for it"
+                % (rel, top))
+        if top in modules and top not in with_modules:
+            continue
+        total[comp] += size
+        count[comp] += 1
     for c in COMPONENTS:
         if count[c] == 0:
             die("the manifest lists no %s files" % c)

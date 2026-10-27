@@ -1,0 +1,19 @@
+# G328's script: the remastered craters and scorch marks (claims in gate_decalenh.py).
+# gates.sh writes TAG and VIEW per theater. One frame, no tick between the shots: the
+# remaster on, off, and the same two in N64, where the dial must change nothing.
+tick 5
+cam VIEW
+zoom max
+decalenh 1
+shot shots/g328_TAG_on.png
+decaldump
+decalenh 0
+shot shots/g328_TAG_off.png
+decaldump
+gfxmode 1
+decalenh 1
+shot shots/g328_TAG_n64on.png
+decaldump
+decalenh 0
+shot shots/g328_TAG_n64off.png
+quit

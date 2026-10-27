@@ -1,5 +1,6 @@
 # G268: initialize the rocks, throw four, then check rest at 31 and 41 seconds.
 gfx fol_on 0
+gfx rock_amt 0.66964
 tick 20
 cam 50 51
 zoom max

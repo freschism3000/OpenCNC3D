@@ -1,0 +1,3522 @@
+{
+ "what": "Red Alert's props for Enhanced: the barrels, the mines, the crate stacks, the ice floes, the water crate, the flag location and the barbed-wire fence, baked by tools/ra3d/bake-props.py from the Red Alert lab's approved exports",
+ "models": {
+  "BARL": {
+   "file": "BARL.ebld",
+   "bytes": 1219744,
+   "sha256": "410117196008864b188b9171769f9d22519759aa39b26946279e76135ada4e78",
+   "export": "build-native/remaster-ra/civil/BARL/viewer",
+   "sources": {
+    "BARL_rm_0.png": "0219318042294c704de8d23e420688c33896ab154fefbd1ff2e2d9513daf7400",
+    "BARL_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "BARL_rm_broken_emit.png": "02756b74c49992dc3267a4926ba96ec7491f87282d73dd162bd93cee2a30403f",
+    "BARL_rm_dmg_0.png": "32e1ba271f99a9c6265a333428339830ed5257444fea1a91acbb284c86c69f5f",
+    "BARL_rm_dmg_emit_0.png": "d6e1c2d2ad6273e657081679a75481e8ec202673ef2d7050fc9616a8c64d1075",
+    "BARL_rm_dmg_house_0.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "BARL_rm_dmg_nod_0.png": "32e1ba271f99a9c6265a333428339830ed5257444fea1a91acbb284c86c69f5f",
+    "BARL_rm_house_0.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "BARL_rm_nod_0.png": "0219318042294c704de8d23e420688c33896ab154fefbd1ff2e2d9513daf7400",
+    "destroy.json": "97daab44f137f823b80771b7dc83c5b37f80156b9104d60901c51f80cff1b467",
+    "destroyed.json": "0fcbdf7b02c561c2e4caae022b593d9b5c62e4cf052be4eb6bb93f026f17f64f",
+    "fx.json": "1ca7dd7dd7675723b47edce19860023aa39185c35e5f09df8e928a705e6d4f57",
+    "fx/scorch.png": "bfe90d15bdea82da6afccd19270965fb29117e4683f82dbe599bcb1bdd9557ec",
+    "remaster.json": "0f4927c485094b1d72f78691461e2edf45c81300901d88c91d696581cda10d95"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 820
+    },
+    "CUT": {
+     "pieces": 1,
+     "triangles": 820
+    },
+    "DESTROYED": {
+     "pieces": 7,
+     "triangles": 3072
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "building",
+   "moving": [],
+   "flags": [
+    "rest"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.0666666666666667,
+    "scorch_seconds": 20.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 6.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BARL_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "BARL_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "BARL_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 3,
+     "name": "BARL_rm_dmg_0_over.png",
+     "role": "overlay",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 4,
+     "name": "BARL_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 5,
+     "name": "BARL_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 6,
+     "name": "fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BARL_rm_0.png: its mask BARL_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "BARL_rm_dmg_0.png: its mask BARL_rm_dmg_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "DESTROYED: 7 pieces break from no CUT piece and start at their rest pose: lid_drum, shell_drum#0, shell_drum#1, shell_drum#2, shell_drum#3, shell_drum#4, shell_drum#5",
+    "fx/scorch.png is 96x96: padded to 128x128, scorch_size 0.8 -> 1.067 cells"
+   ],
+   "explosion": {
+    "recipe": "FBALL1",
+    "slots": 7,
+    "played": 7,
+    "dur": 18,
+    "until": 25,
+    "shake_cells": 1.0,
+    "sha256": "f5efab9a50a7262e20fbe6d45c13562a681768a75bd94f1dd1dd07f344d7a24c"
+   },
+   "commit": "948368580a8e5e032145b4e980436738540d6351",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "approved",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 22:42",
+    "stages_approved": "2026-10-19 22:42"
+   }
+  },
+  "BOXES01": {
+   "file": "BOXES01.ebld",
+   "bytes": 363721,
+   "sha256": "acde6596655ef947a22249a27b66282ad6a2bc8ba744537acd6143ba2621c3e1",
+   "export": "build-native/remaster-ra/civil/BOXES01/viewer",
+   "sources": {
+    "BOXES01_rm_0.png": "d89b8ef12b4e6f839220768567539ddcc20b9a2b17bbc653ed7f23491d24c2cb",
+    "BOXES01_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES01_rm_nod_0.png": "d89b8ef12b4e6f839220768567539ddcc20b9a2b17bbc653ed7f23491d24c2cb",
+    "remaster.json": "f1014875bfe09c8eca2c5d582b98c041d739c279ca31f9d9a4fc86e016e292fc"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 486
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES01_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES01_rm_0.png: its mask BOXES01_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "c5d1563aa6118d250df99092aed721d7692d2e34",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 21:17"
+   }
+  },
+  "BOXES02": {
+   "file": "BOXES02.ebld",
+   "bytes": 344572,
+   "sha256": "732659fbb23f9ba1a4fc86949e6ff2d7caf053abcee575d9d23bb89d298656ce",
+   "export": "build-native/remaster-ra/civil/BOXES02/viewer",
+   "sources": {
+    "BOXES02_rm_0.png": "aa9e3516998f7c5cec7bb7c94714ee5aac6b21bd11d4c1585391c4f1477020f9",
+    "BOXES02_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES02_rm_nod_0.png": "aa9e3516998f7c5cec7bb7c94714ee5aac6b21bd11d4c1585391c4f1477020f9",
+    "remaster.json": "b135325cf498d48a622bb54615d74bc2828cb04111641f306c44d79b95de9a33"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 390
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES02_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES02_rm_0.png: its mask BOXES02_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "BOXES03": {
+   "file": "BOXES03.ebld",
+   "bytes": 341934,
+   "sha256": "6bb02ad1a6a962b5fa15036621f15d1d87c5c49544bae17254ec9410d7c09cd2",
+   "export": "build-native/remaster-ra/civil/BOXES03/viewer",
+   "sources": {
+    "BOXES03_rm_0.png": "275f84326fa453f1a18e23e615a3efb05e74cb732846fd133dfc81f970fc969c",
+    "BOXES03_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES03_rm_nod_0.png": "275f84326fa453f1a18e23e615a3efb05e74cb732846fd133dfc81f970fc969c",
+    "remaster.json": "617957b1d137fa0ea72ffe0872478ff5032666b393bc38c5f9680d948d0864e2"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 390
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES03_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES03_rm_0.png: its mask BOXES03_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "BOXES04": {
+   "file": "BOXES04.ebld",
+   "bytes": 421287,
+   "sha256": "6f5c094f003f67bff3133b8fc4d30cf6529c7289ff1a1cfe6554b89b738fe788",
+   "export": "build-native/remaster-ra/civil/BOXES04/viewer",
+   "sources": {
+    "BOXES04_rm_0.png": "fd45621b4dea60e046dae2d7720c2ae796c1563a5153cfb099418b6c5f42eb32",
+    "BOXES04_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES04_rm_nod_0.png": "fd45621b4dea60e046dae2d7720c2ae796c1563a5153cfb099418b6c5f42eb32",
+    "remaster.json": "e7909672c1a14632f57955bd1e6b223d6133506f4f0b52cf1097f2d9ddfc4904"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 520
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES04_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES04_rm_0.png: its mask BOXES04_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "BOXES05": {
+   "file": "BOXES05.ebld",
+   "bytes": 434374,
+   "sha256": "0f07d6706e92fd06a577284ca6e86eb6c8c92265bbdb1631ba2c837d1917bb39",
+   "export": "build-native/remaster-ra/civil/BOXES05/viewer",
+   "sources": {
+    "BOXES05_rm_0.png": "1fb1daf23ab99ac7a701a8e4b997e1f682aea7b720f04f632cf8f3cabe96fcce",
+    "BOXES05_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES05_rm_nod_0.png": "1fb1daf23ab99ac7a701a8e4b997e1f682aea7b720f04f632cf8f3cabe96fcce",
+    "remaster.json": "71cd2f9e4c408ef0b07e5a9568de94532e6d889dc456b55a9a165e6638d22860"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 486
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES05_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES05_rm_0.png: its mask BOXES05_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "c5d1563aa6118d250df99092aed721d7692d2e34",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 21:17"
+   }
+  },
+  "BOXES06": {
+   "file": "BOXES06.ebld",
+   "bytes": 435427,
+   "sha256": "8d399eabfbe84ef82bc8b012c3749d8fb1a07c91fd74ed5cd29dda3706665327",
+   "export": "build-native/remaster-ra/civil/BOXES06/viewer",
+   "sources": {
+    "BOXES06_rm_0.png": "6611c48ac16e24e55b073b27bf243c18e4a6cf09f5659780f4ad9b48c4183236",
+    "BOXES06_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES06_rm_nod_0.png": "6611c48ac16e24e55b073b27bf243c18e4a6cf09f5659780f4ad9b48c4183236",
+    "remaster.json": "4b36041f7c6fbf07b56dad05fa028f78d2f79216f923bdc78c89ab1a0ae37626"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 486
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES06_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES06_rm_0.png: its mask BOXES06_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "c5d1563aa6118d250df99092aed721d7692d2e34",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 21:17"
+   }
+  },
+  "BOXES07": {
+   "file": "BOXES07.ebld",
+   "bytes": 351799,
+   "sha256": "f8d2c854a045ccb182ff9d8a9cb87c6db8235037e73ae5a8b85f0d9477262bef",
+   "export": "build-native/remaster-ra/civil/BOXES07/viewer",
+   "sources": {
+    "BOXES07_rm_0.png": "93c45a23745b8bc0d774bd6def6246b90ac92fe0e75c373e24b181160d1ab6e8",
+    "BOXES07_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES07_rm_nod_0.png": "93c45a23745b8bc0d774bd6def6246b90ac92fe0e75c373e24b181160d1ab6e8",
+    "remaster.json": "266f554b257e60f7b6958a7569987f2a58d07fe945fccf706f04c2662c7c2597"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 356
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES07_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES07_rm_0.png: its mask BOXES07_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "c5d1563aa6118d250df99092aed721d7692d2e34",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 21:17"
+   }
+  },
+  "BOXES08": {
+   "file": "BOXES08.ebld",
+   "bytes": 492466,
+   "sha256": "a6fef4450c0c3f30f30ae3482647d7c49b56a0fa2f3ce4b8b7ca7d7c6f367cba",
+   "export": "build-native/remaster-ra/civil/BOXES08/viewer",
+   "sources": {
+    "BOXES08_rm_0.png": "335d000f31c0aa1644f07d7b5e63aaba9b60df0610142ca36a6914a51a1f5396",
+    "BOXES08_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES08_rm_nod_0.png": "335d000f31c0aa1644f07d7b5e63aaba9b60df0610142ca36a6914a51a1f5396",
+    "remaster.json": "dfe3b1a47d54828a73565cf9916d10efc54b98763c464d0d4d09a869a7d4c69e"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 520
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES08_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES08_rm_0.png: its mask BOXES08_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "BOXES09": {
+   "file": "BOXES09.ebld",
+   "bytes": 414559,
+   "sha256": "0574341956390e056a96bb5297b07507c2c19e5b48a48f85cac3cce33acecc4f",
+   "export": "build-native/remaster-ra/civil/BOXES09/viewer",
+   "sources": {
+    "BOXES09_rm_0.png": "9b355237241e41129e01c2b0d4b06815bb526f4780bac034c1ec3620ee39a76e",
+    "BOXES09_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "BOXES09_rm_nod_0.png": "9b355237241e41129e01c2b0d4b06815bb526f4780bac034c1ec3620ee39a76e",
+    "remaster.json": "490ccb28fba17c31be4944c2e2fa1965c1945c7b5aff2e306b2316eb39c1c619"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 390
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BOXES09_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BOXES09_rm_0.png: its mask BOXES09_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "BRL3": {
+   "file": "BRL3.ebld",
+   "bytes": 2945597,
+   "sha256": "684272f601d6d38b96f994f4801dd235d5d6cddecf10e92b2ed2d29074b1b6f2",
+   "export": "build-native/remaster-ra/civil/BRL3/viewer",
+   "sources": {
+    "BRL3_rm_0.png": "4fddc94964a0d9c99e883fa59b320efa04f2a7f70f11724e91b9b2e761e3e0b6",
+    "BRL3_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "BRL3_rm_broken_emit.png": "95cbd66fad8e8e25cb747073c50a021d09c95ca1c9f06548fc5bf29a34f600f2",
+    "BRL3_rm_dmg_0.png": "9c575e81192b968213ffaf1eaa4ff926c14389c1de20ea51cae84e3deb0475f2",
+    "BRL3_rm_dmg_emit_0.png": "67dbbf61b1838e69d7b09b18d196a1c186cabec26839e052154bdba36075baf4",
+    "BRL3_rm_dmg_house_0.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "BRL3_rm_dmg_nod_0.png": "9c575e81192b968213ffaf1eaa4ff926c14389c1de20ea51cae84e3deb0475f2",
+    "BRL3_rm_house_0.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "BRL3_rm_nod_0.png": "4fddc94964a0d9c99e883fa59b320efa04f2a7f70f11724e91b9b2e761e3e0b6",
+    "destroy.json": "df1f1a4b169c6d5470381fa9217ba3feec23924b4a48e0e8ad676437c1117732",
+    "destroyed.json": "8ec12145d9b619b23576d43d368c41c01bf8e7a31ef807cf0322c3492a06994a",
+    "fx.json": "1ca7dd7dd7675723b47edce19860023aa39185c35e5f09df8e928a705e6d4f57",
+    "fx/scorch.png": "bfe90d15bdea82da6afccd19270965fb29117e4683f82dbe599bcb1bdd9557ec",
+    "remaster.json": "ca14f7aaf6f85c0c3b467cfb358e4980f1991a9c0f35fb893b81da929827e85a"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 2460
+    },
+    "CUT": {
+     "pieces": 1,
+     "triangles": 2460
+    },
+    "DESTROYED": {
+     "pieces": 21,
+     "triangles": 9098
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "building",
+   "moving": [],
+   "flags": [
+    "rest"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.0666666666666667,
+    "scorch_seconds": 20.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 6.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BRL3_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "BRL3_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "BRL3_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 3,
+     "name": "BRL3_rm_dmg_0_over.png",
+     "role": "overlay",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 4,
+     "name": "BRL3_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 5,
+     "name": "BRL3_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 6,
+     "name": "fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "BRL3_rm_0.png: its mask BRL3_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "BRL3_rm_dmg_0.png: its mask BRL3_rm_dmg_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "DESTROYED: 21 pieces break from no CUT piece and start at their rest pose: lid_drum_n, lid_drum_s, lid_drum_w, shell_drum_n#0, shell_drum_n#1, shell_drum_n#2, shell_drum_n#3, shell_drum_n#4, shell_drum_n#5, shell_drum_s#0, shell_drum_s#1, shell_drum_s#2, shell_drum_s#3, shell_drum_s#4, shell_drum_s#5, shell_drum_w#0, shell_drum_w#1, shell_drum_w#2, shell_drum_w#3, shell_drum_w#4, shell_drum_w#5",
+    "fx/scorch.png is 96x96: padded to 128x128, scorch_size 0.8 -> 1.067 cells"
+   ],
+   "explosion": {
+    "recipe": "FBALL1",
+    "slots": 7,
+    "played": 7,
+    "dur": 18,
+    "until": 25,
+    "shake_cells": 1.0,
+    "sha256": "f5efab9a50a7262e20fbe6d45c13562a681768a75bd94f1dd1dd07f344d7a24c"
+   },
+   "commit": "948368580a8e5e032145b4e980436738540d6351",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "approved",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 22:42",
+    "stages_approved": "2026-10-19 22:42"
+   }
+  },
+  "FENC": {
+   "file": "FENC.ebld",
+   "bytes": 1919559,
+   "sha256": "dd15478e7cfed2f64e919b78c98c3056a9778b89cc42111017b2d319f1926c11",
+   "export": "build-native/remaster-ra/civil/FENC/viewer",
+   "sources": {
+    "FENC_rm_0.png": "ff0a73ee7054918b706e49bd9cd2a26ef8e0474cce8cacdd950c42ef1e1964ca",
+    "FENC_rm_broken.png": "813ba5093a86261ec9e8ac12a10f0c2c9e7addd2fee8bf70ccb1d0dd3bdcce25",
+    "FENC_rm_broken_emit.png": "dbd8e6235a1dba90a6d5e5199db421b6e9f037d56643d2ddec01b18afb7ae64a",
+    "FENC_rm_dmg_0.png": "af0f956896f213e3d074be60efb796f617b440922e478ccea48e278f0ae58108",
+    "FENC_rm_dmg_emit_0.png": "3dc0a97bc7229b12612c18e3727c1cfc558bddcb1bdb044daf4e5ec16c0718c9",
+    "destroy.json": "586973b73f652f57ca245bc36f1bedc6fb7021746796c18d7caab65a34fe315c",
+    "destroyed.json": "f2174b55154701f11e0bee5902cfc975d70521d2fede43482f8175844b22a9c5",
+    "fx.json": "f5c917ec9c023a363cfd66f66d8debff42e1d729f215183ea7645d3f5219b8f3",
+    "pieces.json": "9bb09f2e2b4adcc76a351ce7c8b35d628559e17e6fffae4a5442b5c48e8690c4"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 16,
+     "triangles": 1472
+    },
+    "CUT": {
+     "pieces": 80,
+     "triangles": 2208
+    },
+    "DESTROYED": {
+     "pieces": 128,
+     "triangles": 4736
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [
+    "0:stakeB",
+    "0:win",
+    "1:stakeB",
+    "1:win",
+    "1:wnsB",
+    "2:stakeB",
+    "2:wewB",
+    "2:win",
+    "3:stakeB",
+    "3:wewB",
+    "3:win",
+    "3:wnsB",
+    "4:stakeB",
+    "4:win",
+    "5:stakeB",
+    "5:win",
+    "5:wnsB",
+    "6:stakeB",
+    "6:wewB",
+    "6:win",
+    "7:stakeB",
+    "7:wewB",
+    "7:win",
+    "7:wnsB",
+    "8:stakeB",
+    "8:win",
+    "9:stakeB",
+    "9:win",
+    "9:wnsB",
+    "a:stakeB",
+    "a:wewB",
+    "a:win",
+    "b:stakeB",
+    "b:wewB",
+    "b:win",
+    "b:wnsB",
+    "c:stakeB",
+    "c:win",
+    "d:stakeB",
+    "d:win",
+    "d:wnsB",
+    "e:stakeB",
+    "e:wewB",
+    "e:win",
+    "f:stakeB",
+    "f:wewB",
+    "f:win",
+    "f:wnsB"
+   ],
+   "emitters": [
+    {
+     "name": "0:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 3,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "0:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 3,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "0:snap_sparks_c6_5",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "0:splinters_c6_5",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "0:snap_dust_c6_5",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "0:stake_landing_c6_5",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "0:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "0:collapse_dust_c6_5",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "0:collapse_grit_c6_5",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "1:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "1:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "1:snap_sparks_c6_0",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "1:splinters_c6_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "1:snap_dust_c6_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "1:stake_landing_c6_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "1:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "1:collapse_dust_c6_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "1:collapse_grit_c6_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "2:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "2:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "2:snap_sparks_c0_6",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "2:splinters_c0_6",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "2:snap_dust_c0_6",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "2:stake_landing_c0_6",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "2:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "2:collapse_dust_c0_6",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "2:collapse_grit_c0_6",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "3:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "3:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "3:snap_sparks_c0_0",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "3:splinters_c0_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "3:snap_dust_c0_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "3:stake_landing_c0_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "3:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "3:collapse_dust_c0_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "3:collapse_grit_c0_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "4:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "4:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "4:snap_sparks_c6_1",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "4:splinters_c6_1",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "4:snap_dust_c6_1",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "4:stake_landing_c6_1",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "4:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "4:collapse_dust_c6_1",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "4:collapse_grit_c6_1",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "5:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 5,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "5:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 5,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "5:snap_sparks_c0_1",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "5:splinters_c0_1",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "5:snap_dust_c0_1",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "5:stake_landing_c0_1",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "5:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "5:collapse_dust_c0_1",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "5:collapse_grit_c0_1",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "6:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "6:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "6:snap_sparks_c0_4",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "6:splinters_c0_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "6:snap_dust_c0_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "6:stake_landing_c0_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "6:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "6:collapse_dust_c0_4",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "6:collapse_grit_c0_4",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "7:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "7:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "7:snap_sparks_c0_2",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "7:splinters_c0_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "7:snap_dust_c0_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "7:stake_landing_c0_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "7:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "7:collapse_dust_c0_2",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "7:collapse_grit_c0_2",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "8:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "8:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "8:snap_sparks_c4_6",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "8:splinters_c4_6",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "8:snap_dust_c4_6",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "8:stake_landing_c4_6",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "8:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "8:collapse_dust_c4_6",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "8:collapse_grit_c4_6",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "9:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "9:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "9:snap_sparks_c4_0",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "9:splinters_c4_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "9:snap_dust_c4_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "9:stake_landing_c4_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "9:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "9:collapse_dust_c4_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "9:collapse_grit_c4_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "a:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "a:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "a:snap_sparks_c1_0",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "a:splinters_c1_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "a:snap_dust_c1_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "a:stake_landing_c1_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "a:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "a:collapse_dust_c1_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "a:collapse_grit_c1_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "b:snap_sparks_c2_0",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "b:splinters_c2_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "b:snap_dust_c2_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "b:stake_landing_c2_0",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "b:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "b:collapse_dust_c2_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "b:collapse_grit_c2_0",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "c:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "c:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "c:snap_sparks_c4_4",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "c:splinters_c4_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "c:snap_dust_c4_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "c:stake_landing_c4_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "c:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "c:collapse_dust_c4_4",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "c:collapse_grit_c4_4",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "d:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "d:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "d:snap_sparks_c4_2",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "d:splinters_c4_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "d:snap_dust_c4_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "d:stake_landing_c4_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "d:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "d:collapse_dust_c4_2",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "d:collapse_grit_c4_2",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "e:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "e:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 2,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "e:snap_sparks_c2_4",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "e:splinters_c2_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "e:snap_dust_c2_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "e:stake_landing_c2_4",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "e:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "e:collapse_dust_c2_4",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "e:collapse_grit_c2_4",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "f:embers",
+     "state": "damaged",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "f:smoke",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "f:snap_sparks_c2_2",
+     "state": "damaged",
+     "source": "sparks",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "burst",
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "f:splinters_c2_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    },
+    {
+     "name": "f:snap_dust_c2_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "f:stake_landing_c2_2",
+     "state": "damaged",
+     "source": "smoke",
+     "piece": "f:stakeB",
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "f:collapse_dust_c2_2",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "f:collapse_grit_c2_2",
+     "state": "destroyed",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "gravity",
+      "until"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "wall",
+   "moving": [],
+   "flags": [
+    "wall",
+    "rest"
+   ],
+   "liquids": [],
+   "cut_pieces": {
+    "0:stakeB": [
+     "push"
+    ],
+    "0:win": [
+     "bend"
+    ],
+    "1:stakeB": [
+     "push"
+    ],
+    "1:win": [
+     "bend"
+    ],
+    "1:wnsB": [
+     "bend"
+    ],
+    "2:stakeB": [
+     "push"
+    ],
+    "2:wewB": [
+     "bend"
+    ],
+    "2:win": [
+     "bend"
+    ],
+    "3:stakeB": [
+     "push"
+    ],
+    "3:wewB": [
+     "bend"
+    ],
+    "3:win": [
+     "bend"
+    ],
+    "3:wnsB": [
+     "bend"
+    ],
+    "4:stakeB": [
+     "push"
+    ],
+    "4:win": [
+     "bend"
+    ],
+    "5:stakeB": [
+     "push"
+    ],
+    "5:win": [
+     "bend"
+    ],
+    "5:wnsB": [
+     "bend"
+    ],
+    "6:stakeB": [
+     "push"
+    ],
+    "6:wewB": [
+     "bend"
+    ],
+    "6:win": [
+     "bend"
+    ],
+    "7:stakeB": [
+     "push"
+    ],
+    "7:wewB": [
+     "bend"
+    ],
+    "7:win": [
+     "bend"
+    ],
+    "7:wnsB": [
+     "bend"
+    ],
+    "8:stakeB": [
+     "push"
+    ],
+    "8:win": [
+     "bend"
+    ],
+    "9:stakeB": [
+     "push"
+    ],
+    "9:win": [
+     "bend"
+    ],
+    "9:wnsB": [
+     "bend"
+    ],
+    "a:stakeB": [
+     "push"
+    ],
+    "a:wewB": [
+     "bend"
+    ],
+    "a:win": [
+     "bend"
+    ],
+    "b:stakeB": [
+     "push"
+    ],
+    "b:wewB": [
+     "bend"
+    ],
+    "b:win": [
+     "bend"
+    ],
+    "b:wnsB": [
+     "bend"
+    ],
+    "c:stakeB": [
+     "push"
+    ],
+    "c:win": [
+     "bend"
+    ],
+    "d:stakeB": [
+     "push"
+    ],
+    "d:win": [
+     "bend"
+    ],
+    "d:wnsB": [
+     "bend"
+    ],
+    "e:stakeB": [
+     "push"
+    ],
+    "e:wewB": [
+     "bend"
+    ],
+    "e:win": [
+     "bend"
+    ],
+    "f:stakeB": [
+     "push"
+    ],
+    "f:wewB": [
+     "bend"
+    ],
+    "f:win": [
+     "bend"
+    ],
+    "f:wnsB": [
+     "bend"
+    ]
+   },
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "FENC_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "FENC_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "FENC_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 3,
+     "name": "FENC_rm_dmg_0_over.png",
+     "role": "overlay",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 4,
+     "name": "FENC_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "FENC_rm_broken_emit.png is black everywhere: no glow drawn from it",
+    "wall: the masks' cells 0:c6_5 1:c6_0 2:c0_6 3:c0_0 4:c6_1 5:c0_1 6:c0_4 7:c0_2 8:c4_6 9:c4_0 10:c1_0 11:c2_0 12:c4_4 13:c4_2 14:c2_4 15:c2_2",
+    "DESTROYED: parents found by name prefix: x_c0_0_stakeB -> c0_0_stakeB, x_c0_1_stakeB -> c0_1_stakeB, x_c0_2_stakeB -> c0_2_stakeB, x_c0_3_stakeB -> c0_3_stakeB, x_c0_4_stakeB -> c0_4_stakeB, x_c0_6_stakeB -> c0_6_stakeB, x_c1_0_stakeB -> c1_0_stakeB, x_c1_2_stakeB -> c1_2_stakeB, x_c1_4_stakeB -> c1_4_stakeB, x_c1_6_stakeB -> c1_6_stakeB, x_c2_0_stakeB -> c2_0_stakeB, x_c2_1_stakeB -> c2_1_stakeB, x_c2_2_stakeB -> c2_2_stakeB, x_c2_3_stakeB -> c2_3_stakeB, x_c2_4_stakeB -> c2_4_stakeB, x_c2_6_stakeB -> c2_6_stakeB, x_c3_0_stakeB -> c3_0_stakeB, x_c3_2_stakeB -> c3_2_stakeB, x_c3_4_stakeB -> c3_4_stakeB, x_c3_6_stakeB -> c3_6_stakeB, x_c4_0_stakeB -> c4_0_stakeB, x_c4_1_stakeB -> c4_1_stakeB, x_c4_2_stakeB -> c4_2_stakeB, x_c4_3_stakeB -> c4_3_stakeB, x_c4_4_stakeB -> c4_4_stakeB, x_c4_6_stakeB -> c4_6_stakeB, x_c6_0_stakeB -> c6_0_stakeB, x_c6_1_stakeB -> c6_1_stakeB, x_c6_3_stakeB -> c6_3_stakeB, x_c6_5_stakeB -> c6_5_stakeB, x_c7_3_stakeB -> c7_3_stakeB"
+   ],
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "approved",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12",
+    "stages_approved": "2026-10-19 13:12"
+   },
+   "placement": {
+    "file": "FENC.eplc",
+    "bytes": 81104,
+    "sha256": "e66679449ef8b59084c8b99986a9f4934ee4c2ef8f1c2dc756ab9ff173cda059",
+    "export": "build-native/remaster/FENC/viewer",
+    "sources": {
+     "FENC/viewer/pieces.json": "9bb09f2e2b4adcc7",
+     "FENC/viewer/place_FENC.json": "67c1abf683cb67f1",
+     "FENC/viewer/remaster.json": "42c901c4203a12f2"
+    },
+    "rigs": 16,
+    "triangles": 1472,
+    "seconds": 1.02,
+    "companion": 0,
+    "templates": 6,
+    "ring": null,
+    "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+    "baker": "tools/art/remaster/bake_eplc.py",
+    "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4"
+   }
+  },
+  "FPLS": {
+   "file": "FPLS.ebld",
+   "bytes": 387529,
+   "sha256": "3f130982aba44e10d58427aaa23c6a7121b8d54f1abfb4d32befe94e70e4d3e5",
+   "export": "build-native/remaster-ra/civil/FPLS/viewer",
+   "sources": {
+    "FPLS_glow.png": "f5cfa44bc1bcf6a47c2bd0e3eb4fbf4f2ee20ef0a33a8e4980e59c2f09fbb1b7",
+    "FPLS_rm_0.png": "f042e00a126136b78e51fb67bcffa6bb16e04290bff396250ed02c9710ee4b63",
+    "remaster.json": "3261ad9f2334373a05f0584f01f744fa50d17aead6b5e737802b896c3d42dba4"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 10,
+     "triangles": 1920
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "cell",
+   "moving": [
+    {
+     "piece": "part1",
+     "kind": "clip",
+     "values": [
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part2",
+     "kind": "clip",
+     "values": [
+      0.0,
+      2.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part3",
+     "kind": "clip",
+     "values": [
+      0.0,
+      3.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part4",
+     "kind": "clip",
+     "values": [
+      0.0,
+      4.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part5",
+     "kind": "clip",
+     "values": [
+      0.0,
+      5.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part6",
+     "kind": "clip",
+     "values": [
+      0.0,
+      6.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part7",
+     "kind": "clip",
+     "values": [
+      0.0,
+      7.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part8",
+     "kind": "clip",
+     "values": [
+      0.0,
+      8.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "part9",
+     "kind": "clip",
+     "values": [
+      0.0,
+      9.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "FPLS_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 256,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "FPLS_glow.png",
+     "role": "base",
+     "w": 256,
+     "h": 256,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "anim: an idle clip of 12 frames at 7.5 fps, parts moving: 1 out1, 2 out2, 3 out3, 4 mid1, 5 mid2, 6 mid3, 7 in1, 8 in2, 9 in3",
+    "FPLS_glow.png: resampled from 192x192 to 256x256"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "ICE01": {
+   "file": "ICE01.ebld",
+   "bytes": 813015,
+   "sha256": "333d223bc54aca1197a99d2fd92b57a6472d2da0548d800c21a6246a33b792c3",
+   "export": "build-native/remaster-ra/civil/ICE01/viewer",
+   "sources": {
+    "ICE01_rm_0.png": "f4b76a8e2f487dd168ff2b1c593dfa20f1c6466917fc0b5b02accb3dc3e48649",
+    "remaster.json": "17fcaca4180d582d2c3953a1cc1c3d5e6fcf3dcbd0cdd1011d34bf3fb3788e69"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 3441
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "ICE01_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "ICE02": {
+   "file": "ICE02.ebld",
+   "bytes": 428236,
+   "sha256": "5f4eb1c72edc5e8f315e1745e9309d289bd616be9799094c02934b6077c7c3cc",
+   "export": "build-native/remaster-ra/civil/ICE02/viewer",
+   "sources": {
+    "ICE02_rm_0.png": "e61aba9149fde5e0fbaeb9a89d2572cd76f146bfbf7c43a55b02c7b88961e87a",
+    "remaster.json": "e7de2d6f6ca3935f22c07e954caecd93ac5eb14d136e5fa453ee35be4ad3190a"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 1881
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "ICE02_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "ICE03": {
+   "file": "ICE03.ebld",
+   "bytes": 384623,
+   "sha256": "43b88bbd125caddcaae2ce395760d838aa4eb8fc6c72f6f050a08ae72ada141e",
+   "export": "build-native/remaster-ra/civil/ICE03/viewer",
+   "sources": {
+    "ICE03_rm_0.png": "e956ef56a9e770e67b1c56a6a08c1a0d752aea81a643e384534d2bbf8d74c41c",
+    "remaster.json": "c3ac227e0f41c80d76af71aa5ee52f95c2760e633a44d9453b2b573f4416dd18"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 1767
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "ICE03_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "ICE04": {
+   "file": "ICE04.ebld",
+   "bytes": 236603,
+   "sha256": "e349bb56ff89b497e87cbf6d124e05fd304eba54ce4eb3b2a8f315978a7f4e8b",
+   "export": "build-native/remaster-ra/civil/ICE04/viewer",
+   "sources": {
+    "ICE04_rm_0.png": "c40741254001955f23d991bebdd637399240b8537f152ad8a40f2e56275cd2b5",
+    "remaster.json": "23cd20b1e254644c1c7422f88dd5324c76d372fb5803ca98c60d81416cfb1854"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 1083
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "ICE04_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "ICE05": {
+   "file": "ICE05.ebld",
+   "bytes": 216992,
+   "sha256": "2bc956eeb06fa056eebad5fac3c9af9381bbc1624315ac6d4136a2bb23b89c8c",
+   "export": "build-native/remaster-ra/civil/ICE05/viewer",
+   "sources": {
+    "ICE05_rm_0.png": "da79014800fb92c32ebd66f3b2c39c5d56b882f36cc71b366177c3b2c3980310",
+    "remaster.json": "195ef4d09a1f8d830b08ea8dfb7d9aaba1d1335327a1e55a9c76c8f4db26aa58"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 931
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "terrain",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "ICE05_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "MINP": {
+   "file": "MINP.ebld",
+   "bytes": 132895,
+   "sha256": "dffbc8d8a570dd79fba425add567b939593e5db9faf8fd429fcb7c0f928b8d54",
+   "export": "build-native/remaster-ra/civil/MINP/viewer",
+   "sources": {
+    "MINP_rm_0.png": "64c0b91add4a897ff498fdd611ce5d17171914698ab9d4e395bf2ac77fb4d5a7",
+    "MINP_rm_house_0.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "MINP_rm_nod_0.png": "64c0b91add4a897ff498fdd611ce5d17171914698ab9d4e395bf2ac77fb4d5a7",
+    "remaster.json": "2af2a4e87eb2ded1ed2b89460fbd93cb3b189550e3e885df5430cffb35a04115"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 430
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "mine",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "MINP_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "MINP_rm_0.png: its mask MINP_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "MINV": {
+   "file": "MINV.ebld",
+   "bytes": 275167,
+   "sha256": "e4898be5e099030cfe7ad2216bb51b5778f4429e81aa0f7596b6c14d2a5f7638",
+   "export": "build-native/remaster-ra/civil/MINV/viewer",
+   "sources": {
+    "MINV_rm_0.png": "5a14b8f72e3e391d45c86553b07e82f7b1853bd216b9d36a7e2e41b5d1820a2c",
+    "MINV_rm_house_0.png": "977470c76275be9feeff370b5616e238bbcff8534cc0bcccee5f23ee0f8d886a",
+    "MINV_rm_nod_0.png": "d50a26c911f8eadc4298f43fa83f41bbb4da4f5046fc52325c45383fff5a56d7",
+    "remaster.json": "3c8e7c11f3aea886834572c77ef886b723390ad59bdf5da0676ad02c534f44b4"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 794
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "mine",
+   "moving": [],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "MINV_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0,
+     "nod": "MINV_rm_nod_0.png",
+     "mask": "MINV_rm_house_0.png"
+    }
+   ],
+   "notes": [],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "3ad9838ab5250e1116abbd207d3bb93d1f1dd251",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 13:12"
+   }
+  },
+  "WWCRATE": {
+   "file": "WWCRATE.ebld",
+   "bytes": 124881,
+   "sha256": "6e7245f4611086b133a08c9deb3b96865a4e18cc9d3d4f5a766e2a5f4f4ca5d0",
+   "export": "build-native/remaster-ra/civil/WWCRATE/viewer",
+   "sources": {
+    "WWCRATE_rm_0.png": "828c59ea2e8a4811878866de213b92502ac4b4b7eecdcd94fb06a81f96a0da3f",
+    "WWCRATE_rm_house_0.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "WWCRATE_rm_nod_0.png": "828c59ea2e8a4811878866de213b92502ac4b4b7eecdcd94fb06a81f96a0da3f",
+    "remaster.json": "b2aadd796407a4a3fb8c4ba06e1563a5e9c97260958423bdda93528063b96daf"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 130
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "cell",
+   "moving": [
+    {
+     "piece": "part1",
+     "kind": "clip",
+     "values": [
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flags": [],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 0.0,
+    "scorch_seconds": 0.0,
+    "scorch_fade": 0.0,
+    "scorch_tex": -1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 1.0,
+    "footprint_h": 1.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "WWCRATE_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "anim: an idle clip of 24 frames at 12 fps, parts moving: 1 crate",
+    "WWCRATE_rm_0.png: its mask WWCRATE_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "stage": "intact",
+   "later_stages": "original engine",
+   "commit": "c5d1563aa6118d250df99092aed721d7692d2e34",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "8bdc7efd5ad0152b29b958880868230673092f05",
+   "baker_modified": false,
+   "stages": "intact only",
+   "approval": {
+    "state": "approved",
+    "phase": "model",
+    "remaster_approved": "2026-10-19 21:17"
+   }
+  }
+ }
+}

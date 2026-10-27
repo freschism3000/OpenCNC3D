@@ -48,6 +48,12 @@ enum {
     MOUSE_CAN_ATTACK, MOUSE_SELL_BACK, MOUSE_SELL_UNIT, MOUSE_REPAIR,
     MOUSE_NO_REPAIR, MOUSE_NO_SELL_BACK, MOUSE_RADAR_CURSOR, MOUSE_ION_CANNON,
     MOUSE_NUCLEAR_BOMB, MOUSE_AIR_STRIKE, MOUSE_DEMOLITIONS, MOUSE_AREA_GUARD,
+    /* RED ALERT'S OWN STATES, after Tiberian Dawn's so none of those moves (Red Alert's
+       defines.h:2578 orders them differently and has no ion cannon; this is the host's
+       enum, and RA_CUR_CONTROL below maps each to Red Alert's own frames). Tiberian Dawn
+       never sets them. */
+    MOUSE_HEAL, MOUSE_DAMAGE, MOUSE_GREPAIR, MOUSE_STAY_ATTACK, MOUSE_NO_DEPLOY,
+    MOUSE_NO_ENTER, MOUSE_NO_GREPAIR, MOUSE_CHRONO_SELECT, MOUSE_CHRONO_DEST,
     MOUSE_TYPE_COUNT
 };
 
@@ -60,6 +66,18 @@ enum {
     CUR_ACTION_NO_REPAIR, CUR_ACTION_SABOTAGE, CUR_ACTION_ION,
     CUR_ACTION_NUKE_BOMB, CUR_ACTION_AIR_STRIKE, CUR_ACTION_GUARD_AREA,
     CUR_ACTION_TOGGLE_PRIMARY, CUR_ACTION_NO_DEPLOY
+};
+
+/* ---- Red Alert's ActionType, redalert/defines.h:1019. The same as Tiberian Dawn's up to
+   SABOTAGE (15), then its own: the probe answers in these when the Red Alert brain is
+   loaded, and Tiberian Dawn's numbers past 15 would read them as other actions. ------ */
+enum {
+    RA_ACTION_SABOTAGE = 15, RA_ACTION_PARA_BOMB, RA_ACTION_PARA_INFANTRY,
+    RA_ACTION_PARA_SABOTEUR, RA_ACTION_NUKE_BOMB, RA_ACTION_AIR_STRIKE,
+    RA_ACTION_CHRONOSPHERE, RA_ACTION_CHRONO2, RA_ACTION_IRON_CURTAIN,
+    RA_ACTION_SPY_MISSION, RA_ACTION_GUARD_AREA, RA_ACTION_HEAL, RA_ACTION_DAMAGE,
+    RA_ACTION_GREPAIR, RA_ACTION_NO_DEPLOY, RA_ACTION_NO_ENTER, RA_ACTION_NO_GREPAIR,
+    RA_ACTION_TOGGLE_PRIMARY
 };
 
 /* ---- MouseClass::MouseControl, mouse.cpp:304, transcribed number for number ------- *
@@ -106,6 +124,16 @@ static const CurControl CUR_CONTROL[MOUSE_TYPE_COUNT] = {
     {88,  8,  2, -1,  15, 12, "airstrike"},    /* MOUSE_AIR_STRIKE   */
     {122, 3,  4, 127, 15, 12, "demolitions"},  /* MOUSE_DEMOLITIONS  */
     {153, 1,  0, 152, 15, 12, "guard"},        /* MOUSE_AREA_GUARD   */
+    /* Red Alert's own states, which Tiberian Dawn never sets: the plain arrow */
+    {0,   1,  0, 86,  0,  0,  "heal-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "damage-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "grepair-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "stay-attack-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "no-deploy-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "no-enter-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "no-grepair-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "chrono-select-unavailable"},
+    {0,   1,  0, 86,  0,  0,  "chrono-dest-unavailable"},
 };
 
 /* Red Alert mouse.cpp:332-389. Its MOUSE.SHP has 222 frames and reassigns nearly
@@ -139,6 +167,16 @@ static const CurControl RA_CUR_CONTROL[MOUSE_TYPE_COUNT] = {
     {82, 8, 2, 213, 14, 11, "airstrike"},
     {116, 3, 4, 121, 14, 11, "demolitions"},
     {147, 1, 0, 146, 14, 11, "guard"},
+    /* mouse.cpp:376-387, Red Alert's own */
+    {160, 4, 4, 194, 14, 11, "heal"},
+    {164, 3, 4, 167, 14, 11, "damage"},
+    {170, 24, 2, -1, 14, 11, "grepair"},
+    {195, 8, 4, 203, 14, 11, "stay-attack"},
+    {211, 1, 0, -1, 14, 11, "no-deploy"},
+    {212, 1, 0, -1, 14, 11, "no-enter"},
+    {213, 1, 0, -1, 14, 11, "no-grepair"},
+    {97, 8, 3, -1, 14, 11, "chrono-select"},
+    {105, 8, 2, -1, 14, 11, "chrono-dest"},
 };
 
 static DB_Pack* g_raCurPack = NULL;
@@ -185,6 +223,67 @@ static int cur_mouse_for_action(int action)
     }
 }
 
+/* Red Alert's: DisplayClass::Mouse_Left_Up, redalert/display.cpp:3657-3760, the
+   unshrouded branch, case for case. Two cases cannot be told apart through the probe:
+   ACTION_ATTACK turns into MOUSE_STAY_ATTACK there when one unit is selected and the
+   target is already in its range, and the probe answers the action alone, so the attack
+   cursor is shown for both (under Enhanced the two are the same approved model). */
+static int cur_mouse_for_action_ra(int action)
+{
+    switch (action) {
+    case RA_ACTION_NO_DEPLOY:       return MOUSE_NO_DEPLOY;
+    case RA_ACTION_NO_ENTER:        return MOUSE_NO_ENTER;
+    case RA_ACTION_NO_GREPAIR:      return MOUSE_NO_GREPAIR;
+    case RA_ACTION_DAMAGE:          return MOUSE_DAMAGE;
+    case RA_ACTION_GREPAIR:         return MOUSE_GREPAIR;
+    case CUR_ACTION_TOGGLE_SELECT:
+    case CUR_ACTION_SELECT:         return MOUSE_CAN_SELECT;
+    case CUR_ACTION_MOVE:           return MOUSE_CAN_MOVE;
+    case RA_ACTION_GUARD_AREA:      return MOUSE_AREA_GUARD;
+    case CUR_ACTION_ATTACK:
+    case CUR_ACTION_HARVEST:        return MOUSE_CAN_ATTACK;
+    case CUR_ACTION_SABOTAGE:       return MOUSE_DEMOLITIONS;
+    case CUR_ACTION_ENTER:
+    case CUR_ACTION_CAPTURE:        return MOUSE_ENTER;
+    case CUR_ACTION_NOMOVE:         return MOUSE_NO_MOVE;
+    case CUR_ACTION_NO_SELL:        return MOUSE_NO_SELL_BACK;
+    case CUR_ACTION_NO_REPAIR:      return MOUSE_NO_REPAIR;
+    case CUR_ACTION_SELF:           return MOUSE_DEPLOY;
+    case CUR_ACTION_REPAIR:         return MOUSE_REPAIR;
+    case CUR_ACTION_SELL_UNIT:      return MOUSE_SELL_UNIT;
+    case CUR_ACTION_SELL:           return MOUSE_SELL_BACK;
+    case RA_ACTION_NUKE_BOMB:       return MOUSE_NUCLEAR_BOMB;
+    case RA_ACTION_AIR_STRIKE:
+    case RA_ACTION_PARA_BOMB:
+    case RA_ACTION_PARA_INFANTRY:
+    case RA_ACTION_SPY_MISSION:
+    case RA_ACTION_IRON_CURTAIN:    return MOUSE_AIR_STRIKE;
+    case RA_ACTION_CHRONOSPHERE:    return MOUSE_CHRONO_SELECT;
+    case RA_ACTION_CHRONO2:         return MOUSE_CHRONO_DEST;
+    case RA_ACTION_HEAL:            return MOUSE_HEAL;
+    case RA_ACTION_TOGGLE_PRIMARY:  return MOUSE_DEPLOY;
+    default:                        return MOUSE_NORMAL;
+    }
+}
+
+/* An armed Red Alert special's cursor, by its SpecialWeaponType (redalert/defines.h:753):
+   the targeting arm of display.cpp:3229-3277 run through Mouse_Left_Up. The sonar pulse
+   and the GPS satellite are never aimed. 8 is SPC_CHRONO2, the chronosphere's second
+   click. */
+static int cur_mouse_for_special_ra(int spc)
+{
+    switch (spc) {
+    case 1:  return MOUSE_NUCLEAR_BOMB;            /* SPC_NUCLEAR_BOMB  */
+    case 2:  return MOUSE_CHRONO_SELECT;           /* SPC_CHRONOSPHERE  */
+    case 3:                                        /* SPC_PARA_BOMB     */
+    case 4:                                        /* SPC_PARA_INFANTRY */
+    case 5:                                        /* SPC_SPY_MISSION   */
+    case 6:  return MOUSE_AIR_STRIKE;              /* SPC_IRON_CURTAIN  */
+    case 8:  return MOUSE_CHRONO_DEST;             /* SPC_CHRONO2       */
+    default: return MOUSE_NORMAL;
+    }
+}
+
 /* ---- state ------------------------------------------------------------------------ */
 
 #define CUR_TEX_POT 32   /* one 30x24 frame lives in a 32x32 POT texture */
@@ -217,6 +316,13 @@ static bool cur_init(const DB_Pack* pack, char* err, int errlen, int ra_theater 
 {
     g_curRa = ra_theater != 0;
     if (g_curRa) {
+        /* a pack a title screen loaded before the mission (cur_dialog_pointer) goes first */
+        if (g_raCurPack) {
+            g_curShape = NULL;
+            g_curUploaded = -1;
+            db_pack_free(g_raCurPack);
+            g_raCurPack = NULL;
+        }
         g_raCurPack = db_pack_load(ra_theater == 1 ? "ra3d/cursor-snow.pack"
                                  : ra_theater == 3 ? "ra3d/cursor-interior.pack"
                                                    : "ra3d/cursor-temperat.pack", err, errlen);

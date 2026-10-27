@@ -46,8 +46,10 @@
  * length (the Power Plant's is 58 ticks against 58.2). The approved timings are kept rather
  * than stretched to the engine's: a placement longer than the build-up carries on past it
  * (the building already works in the engine), and one shorter holds at rest for what is
- * left. A hit while it plays ends it at once, the building standing at rest, as the lab's
- * Damage switch does.
+ * left. A hit while it plays does not stop it: the 1995 engine's build-up runs on when the
+ * building is damaged (BuildingClass::Take_Damage never touches the build state), so the
+ * placement plays to its end and the damaged stage shows after it. Only the building's
+ * destruction ends a placement early.
  *
  * SELLING plays the placement backwards on the engine's own deconstruction clock (the
  * build-up fraction of a building being sold runs from 1 to 0), so the parts fold away and
@@ -64,10 +66,14 @@
  * wall, the fence's kerb, posts, mesh and rail growing along the run), started per cell at
  * the moment the wall line's stagger (cnc_eyes.cpp, wall_rise_note_tick) gives it.
  *
- * THE DRAW is fixed function: a draw_mesh call per run of triangles with a 3x4 extra
- * matrix, as ebld_mod.h draws its pieces, and user clip planes (glClipPlane, planes 1 to 5;
- * plane 0 is the water reflection's) for the cuts. A part that grows along a path, or
- * bends (morph), has its vertices moved on the CPU in a scratch copy of its triangles.
+ * THE DRAW is fixed function: a draw_mesh call per run of triangles, in the model's own
+ * order, and user clip planes (glClipPlane, planes 1 to 5; plane 0 is the water
+ * reflection's) for the cuts. A run whose motion is rigid is drawn at rest, kept on the card
+ * as a standing building's pieces are, with its motion on the modelview stack
+ * (eplc_draw_run below); every other run has its motion applied on the CPU through
+ * draw_mesh's 3x4 extra matrix, as ebld_mod.h draws its pieces. A part that grows along a
+ * path, or bends (morph), has its vertices moved on the CPU in a scratch copy of its
+ * triangles.
  *
  * TIER 1. Enhanced does not exist on the Win98 build, so neither does this. Every motion
  * is a matrix or a vertex move and the dust ordinary particles; the clip planes have no
@@ -95,7 +101,12 @@ enum { EPLC_VERSION_MIN = 1, EPLC_VERSION = 2 };
    take that position's offset (the baker's MORPH_TOL; the bake's own check proves every
    vertex finds one at 0 error) */
 static const float EPLC_MORPH_TOL = 0.25f;
-enum { EPX_WALL = 1, EPX_COMP = 2 };
+/* SPLASH: the placement's impact, and its sale's, is Red Alert's water splash (VOC_SPLASH)
+   in place of the cinematic placement impact: a building that stands in the sea */
+enum { EPX_WALL = 1, EPX_COMP = 2, EPX_SPLASH = 4 };
+/* the sheet a template's particles wear: the smoke sheet (every file before the field), the
+   steam sheet, the glow specks */
+enum { EPS_SMOKE = 0, EPS_STEAM, EPS_GLOW };
 enum { EPT_SLAB = 0, EPT_EMERGE, EPT_PUFF };
 enum { EPTF_BURST = 1, EPTF_GRAVITY = 2, EPTF_UNTIL = 4, EPTF_RAMP = 8, EPTF_DELAY = 16 };
 /* an emitter template's fields, in the file's order */
@@ -142,7 +153,7 @@ struct EplcRig {
     std::vector<EplcActor> actor;
     std::vector<EplcTriRec> tri;
 };
-struct EplcTmpl { int role, flags; float f[EPF_N]; };
+struct EplcTmpl { int role, flags, sheet; float f[EPF_N]; };
 /* ONE DRAW RUN: triangles [a, b) of the remastered building's intact mesh (grow < 0) or of
    this model's grow mesh, all of one actor, one moving part and one flipbook. */
 struct EplcRun { int grow, a, b, actor, move, flip; };
@@ -192,6 +203,7 @@ struct EplcModel {
     int growMesh, ringTex, ringMesh;
     bool ringUp;
     long drawn;                               /* placement draws since the last dump */
+    long normalDrawn, companionNormalDrawn;     /* actual surface-lighting pass coverage */
 };
 static std::vector<EplcModel> g_eplc;
 static bool g_eplcLoaded = false;
@@ -207,7 +219,8 @@ struct EplcBld {
     float wx, wz;
     int fw, fh;
     bool mine;                                /* the player's own: the camera feels it */
-    bool cut;                                 /* a hit ended it */
+    bool cut;                                 /* the building's destruction ended it */
+    bool struck;                              /* hit while it plays (it plays on) */
     bool seen, jolted, ended;
     int endTick;
     std::vector<float> acc;                   /* per (actor or footprint) emitter */
@@ -315,9 +328,9 @@ static bool eplc_read_one(const char* path, EplcModel& m)
     for (unsigned i = 0; i < nt; i++) {
         m.tmpl[i].role = (int)in.u8();
         m.tmpl[i].flags = (int)in.u8();
-        in.u16();
+        m.tmpl[i].sheet = (int)in.u16();
         for (int k = 0; k < EPF_N; k++) m.tmpl[i].f[k] = in.f32();
-        if (m.tmpl[i].role > EPT_PUFF) in.bad = true;
+        if (m.tmpl[i].role > EPT_PUFF || m.tmpl[i].sheet > EPS_GLOW) in.bad = true;
     }
     for (int i = 0; i < 4; i++) m.foot[i] = in.f32();
     const unsigned nh = in.u32();
@@ -382,7 +395,7 @@ static bool eplc_read_one(const char* path, EplcModel& m)
                 if (M.type == EPM_EXTEND) {
                     if (A.extend < 0) A.extend = (int)k;
                     const unsigned np = in.u32();
-                    if (np == 0 || np > 64) { in.bad = true; break; }
+                    if (np == 0 || np > 256) { in.bad = true; break; }   /* (a grown net of ribbons: up to 256) */
                     M.path.resize(np);
                     for (unsigned p = 0; p < np && !in.bad; p++) {
                         const unsigned npt = in.u32();
@@ -432,24 +445,37 @@ static bool eplc_read_one(const char* path, EplcModel& m)
     m.ringUp = false;
     m.matched = m.unmatched = 0;
     m.morphed = m.unmorphed = 0;
-    m.drawn = 0;
+    m.drawn = m.normalDrawn = m.companionNormalDrawn = 0;
     return true;
 }
 
-/* Once per process, beside the remastered buildings' own files. */
+/* Once per process, beside the remastered buildings' own files: OpenCNC3D's from eplc/, and
+   under Red Alert's module its own from ra3d/eplc/ (tools/ra3d/bake-placements.py, staged by
+   tools/ra3d/stage-structures.py), named by Red Alert's types, never OpenCNC3D's files: a
+   type both games name (the Construction Yard) is a different building in each. */
 static void eplc_load(const char* dir)
 {
     if (g_eplcLoaded) return;
     g_eplcLoaded = true;
-    static const char* const TYPES[] = {
+    static const char* const TYPES_TD[] = {
         "AFLD", "ATWR", "BIO", "EYE", "FACT", "FIX", "GTWR", "GUN", "HAND", "HOSP",
         "HPAD", "HQ", "MISS", "NUK2", "NUKE", "OBLI", "PROC", "PYLE", "SAM", "SILO",
-        "TMPL", "WEAP", "SBAG", "CYCL", "BRIK"
+        "TMPL", "WEAP", "SBAG", "CYCL", "BRIK", NULL
     };
+    static const char* const TYPES_RA[] = {
+        "FACT", "POWR", "APWR", "BARR", "TENT", "DOME", "ATEK", "STEK", "PBOX", "HBOX",
+        "KENN", "GAP", "IRON", "PDOX", "MSLO", "FCOM", "SYRD", "SPEN", "TSLA", "FTUR",
+        "AGUN", "PROC", "SILO", "HPAD", "AFLD", "FIX", "HOSP", "WEAP", "SAM", "GUN",
+        "MISS", "BIO", "SBAG", "CYCL", "BRIK", "BARB",
+        /* (Red Alert's own barbed-wire fence, built by the Soviets: tools/ra3d/bake-props.py) */
+        "FENC", NULL
+    };
+    const char* const* TYPES = g_raModule ? TYPES_RA : TYPES_TD;
     std::string names;
-    for (size_t i = 0; i < sizeof TYPES / sizeof TYPES[0]; i++) {
+    for (size_t i = 0; TYPES[i]; i++) {
         char path[512];
-        snprintf(path, sizeof path, "%seplc/%s.eplc", dir && *dir ? dir : "", TYPES[i]);
+        snprintf(path, sizeof path, "%s%s/%s.eplc", dir && *dir ? dir : "",
+                 g_raModule ? "ra3d/eplc" : "eplc", TYPES[i]);
         EplcModel m;
         if (!eplc_read_one(path, m)) continue;
         if (m.type != TYPES[i]) {
@@ -671,14 +697,17 @@ static int eplc_wall_piece(const EbldSet& S, int k)
 /* After every pack load, after ebld_attach and evhc_attach: each placement finds its
    building's intact mesh, matches its triangles, makes its runs, its grow mesh and its
    ring. A type whose building did not attach, or whose triangles do not match, is left
-   unattached and goes up by the cartridge's reveal. */
-static void eplc_attach(void)
+   unattached and goes up by the cartridge's reveal. `fresh` false: only the placements not
+   attached yet are tried again, the others kept as they are (a building whose file is read at
+   first sight, eplc_attach_late). */
+static void eplc_attach(bool fresh = true)
 {
     g_eplcSerial = g_ebldPackSerial;
     if (g_eplc.empty()) return;
     int attached = 0;
     for (size_t e = 0; e < g_eplc.size(); e++) {
         EplcModel& P = g_eplc[e];
+        if (!fresh && P.attached) { attached++; continue; }
         P.attached = false;
         P.ebld = P.evhc = -1;
         P.run.clear(); P.grow.clear(); P.moveRoot.clear(); P.compRun.clear();
@@ -715,13 +744,28 @@ static void eplc_attach(void)
                 a = rg[(size_t)k * EBR + EBR_A]; b = rg[(size_t)k * EBR + EBR_B];
             }
             base[r] = a;
-            const int miss = eplc_match(g_pack.mesh[(size_t)imi], a, b, R.tri, G, actOf[r]);
+            int miss = eplc_match(g_pack.mesh[(size_t)imi], a, b, R.tri, G, actOf[r]);
+            /* A WAVING CLOTH'S TRIANGLES (a flag) are posed in the mesh itself by every draw
+               (ebld_wave), so a placement attached after the building was first drawn (Red
+               Alert's, read at first sight) finds them blown out of their rest: they go with
+               the nearest triangle found, as a sliver does, and are not counted against it */
+            if (miss && !wall && !M.waveMesh[EBM_INTACT].empty()) {
+                for (size_t e = 0; e < M.waveMesh[EBM_INTACT].size(); e++) {
+                    const int t = M.waveMesh[EBM_INTACT][e].first;
+                    if (t >= a && t < b && actOf[r][(size_t)(t - a)] < 0) {
+                        actOf[r][(size_t)(t - a)] = -2;
+                        miss--;
+                    }
+                }
+                for (size_t i = 0; i < actOf[r].size(); i++)
+                    if (actOf[r][i] == -2) actOf[r][i] = -1;
+            }
             P.unmatched += miss;
             P.matched += (b - a) - miss;
             /* A FEW MISSING TRIANGLES (a sliver the lab rounded differently) go with the
                nearest one found; more than one in two hundred is a different model. */
             if (miss * 200 > (b - a)) refuse = true;
-            for (int i = 0; i < b - a && miss && !refuse; i++) {
+            for (int i = 0; i < b - a && !refuse; i++) {
                 if (actOf[r][(size_t)i] >= 0) continue;
                 for (int d = 1; d < b - a; d++) {
                     if (i - d >= 0 && actOf[r][(size_t)(i - d)] >= 0) { actOf[r][(size_t)i] = actOf[r][(size_t)(i - d)]; break; }
@@ -741,6 +785,7 @@ static void eplc_attach(void)
            draw order), split wherever the actor, the moving part or the flipbook changes.
            A growing actor's triangles go to the grow mesh instead, copied. */
         PackMesh gm;
+        gm.gpuDeformed = true;  /* grow/morph vertices are rewritten at each pose */
         memset(gm.name, 0, sizeof gm.name);
         snprintf(gm.name, sizeof gm.name, "eplc:%s:grow", P.type.c_str());
         const PackMesh& im = g_pack.mesh[(size_t)imi];
@@ -844,7 +889,7 @@ static void eplc_attach(void)
             pt.w = pt.uw = P.ringW;
             pt.h = pt.uh = P.ringH;
             pt.gl = pt.gl_gdi = 0;
-            for (int q = 0; q < 6; q++) pt.gl_extra[q] = 0;
+            for (int q = 0; q < 7; q++) pt.gl_extra[q] = 0;
             g_pack.tex.push_back(pt);
             P.ringTex = (int)g_pack.tex.size() - 1;
             PackMesh rm;
@@ -931,6 +976,15 @@ static void eplc_attach(void)
 
 static bool eplc_rule_now(void) { return g_eplcOn && ebld_rule_now(); }
 
+/* Whether the play folder has a placement for this type, attached yet or not (Red Alert's are
+   attached the first time a building of the type goes up or is sold, eplc_attach_late). */
+static bool eplc_has_type(const char* type)
+{
+    if (!eplc_rule_now()) return false;
+    for (size_t i = 0; i < g_eplc.size(); i++)
+        if (g_eplc[i].type == type) return true;
+    return false;
+}
 static int eplc_model_of(const char* type)
 {
     if (!eplc_rule_now()) return -1;
@@ -1186,6 +1240,8 @@ static void eplc_grow_write(EplcModel& P, EplcGrow& G, float k)
     if (P.growMesh < 0 || G.k == k) return;
     G.k = k;
     PackMesh& gm = g_pack.mesh[(size_t)P.growMesh];
+    gm.gpuPoseRevision++;
+    gm.xzReach = -1.0f;
     struct Tip { float s, at[3]; int j; };
     std::vector<Tip> tip(G.P.size());
     for (size_t p = 0; p < G.P.size(); p++) {
@@ -1243,6 +1299,8 @@ static void eplc_morph_write(EplcModel& P, EplcGrow& G, float k)
     if (P.growMesh < 0 || G.k == k) return;
     G.k = k;
     PackMesh& gm = g_pack.mesh[(size_t)P.growMesh];
+    gm.gpuPoseRevision++;
+    gm.xzReach = -1.0f;
     const float w = k >= 1.0f ? 0.0f : 1.0f - k;
     for (int t = G.t0; t < G.t1; t++)
         for (int q = 0; q < 3; q++) {
@@ -1315,20 +1373,158 @@ static bool eplc_owns_jolt(const char* type)
     return m >= 0 && g_eplc[(size_t)m].jolt > 0.0f;
 }
 
+/* Whether a type's placement lands with a splash (EPX_SPLASH) rather than the cinematic
+   impact. */
+static bool eplc_splashes(const char* type)
+{
+    const int m = eplc_model_of(type);
+    return m >= 0 && (g_eplc[(size_t)m].flags & EPX_SPLASH) != 0;
+}
+
 /* ---- the draw -------------------------------------------------------------------------- */
+/* THE CARD MOVES THE RIGID PIECES. draw_mesh rebuilds a run on the CPU and uploads it again
+   whenever the extra matrix it is handed changes, in every pass that draws it, and while a
+   placement plays every part's matrix changes every frame: hundreds of uploads a frame for
+   as long as a structure rose. A run whose motion is RIGID (a turn and a shift, no scale) is
+   drawn AT REST instead, which the batch keeps on the card after its first frame exactly as
+   it keeps a standing building's still pieces, and its motion goes on the modelview stack:
+   the world-space matrix that carries it from where it stands at rest to where the
+   placement has it now. The cuts are set before the push, in eye space, so they stay where
+   the lab put them; the cull reads the pushed matrices; and the normal and specular
+   targets, which read the normal attribute as the batch built it (at rest), turn it by the
+   same motion in their vertex shader (uPose, ebld_mod.h).
+   THE RUNS KEEP THE MODEL'S OWN ORDER. Parts of a model meet in faces that lie in one
+   plane (the Temple of Nod's spine sliding along its ridge over the roof blades): where two
+   such faces overlap, the one drawn last shows, so drawing the parts in another order
+   changes the picture.
+   EVERYTHING ELSE KEEPS THE CPU PATH, which is the arithmetic the approved placements were
+   judged with: the vehicle a yard deploys from (its parts fold and are squashed flat onto
+   one another, the Red Alert yard's gantry onto the MCV's bed, where the GPU's rounding
+   decides a different face than the CPU's did), a part a motion scales, the grown and bent
+   parts, whose vertices move every frame anyway, a fill, and a run collected into a
+   fragment scope (a wreck's pieces), whose draws are replayed after the matrix would have
+   been popped. OPENCNC3D_EPLC_CARD=0 puts every run on the CPU path, the A/B for this. */
+struct EplcCard { float W[16]; };
+static void eplc_card_matrix(const EbXf& X, float cx, float cz, float baseY, int face,
+                             EplcCard& C)
+{
+    /* draw_mesh places a corner v at anchor + S F (X v): F the facing, S the model scale.
+       At rest it stands at anchor + S F v, so the motion in world space is the turn
+       F R F' about the anchor and the shift S F t. */
+    float rs, rc;
+    facing_rot((float)face, &rs, &rc);
+    const float F[9] = { rc, 0.0f, rs,  0.0f, 1.0f, 0.0f,  -rs, 0.0f, rc };
+    float FR[9], T[9];
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) {
+            float s = 0.0f;
+            for (int k = 0; k < 3; k++) s += F[i * 3 + k] * X.R[k * 3 + j];
+            FR[i * 3 + j] = s;
+        }
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) {
+            float s = 0.0f;
+            for (int k = 0; k < 3; k++) s += FR[i * 3 + k] * F[j * 3 + k];
+            T[i * 3 + j] = s;
+        }
+    const float anchor[3] = { cx, baseY, cz };
+    for (int col = 0; col < 3; col++) {
+        for (int row = 0; row < 3; row++) C.W[col * 4 + row] = T[row * 3 + col];
+        C.W[col * 4 + 3] = 0.0f;
+    }
+    for (int i = 0; i < 3; i++) {
+        const float ft = F[i * 3] * X.t[0] + F[i * 3 + 1] * X.t[1] + F[i * 3 + 2] * X.t[2];
+        C.W[12 + i] = anchor[i] + ft * MODEL_SCALE
+                    - (T[i * 3] * anchor[0] + T[i * 3 + 1] * anchor[1] + T[i * 3 + 2] * anchor[2]);
+    }
+    C.W[15] = 1.0f;
+}
+/* Whether a motion is a turn and a shift and nothing else: its 3x3 orthonormal, not a mirror. */
+static bool eplc_rigid(const EbXf& X)
+{
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) {
+            float s = 0.0f;
+            for (int k = 0; k < 3; k++) s += X.R[i * 3 + k] * X.R[j * 3 + k];
+            if (fabsf(s - (i == j ? 1.0f : 0.0f)) > 1.0e-4f) return false;
+        }
+    const float* r = X.R;
+    return r[0] * (r[4] * r[8] - r[5] * r[7]) - r[1] * (r[3] * r[8] - r[5] * r[6])
+         + r[2] * (r[3] * r[7] - r[4] * r[6]) > 0.0f;
+}
+/* The turn for the normals, on the program drawing the normal or specular target. */
+static void eplc_pose_uniform(GLuint prog, const float* m)
+{
+    static GLuint forProg = 0;
+    static GLint loc = -1;
+    if (prog != forProg) { forProg = prog; loc = fx_glGetUniformLocation(prog, "uPose"); }
+    if (loc >= 0) fx_glUniformMatrix4fv(loc, 1, GL_FALSE, m);
+}
+/* Runs drawn each way since the last dump (eplcdump): the card's and the CPU's. */
+static long g_eplcCardRuns = 0, g_eplcCpuRuns = 0;
+/* One run: at rest on the card with its motion pushed (card), or with its motion applied on
+   the CPU through draw_mesh's extra matrix. */
+static void eplc_draw_run(int mesh, const EbXf& X, bool card, float cx, float cz, float base,
+                          int face, int pass, int house, float lift, int a, int b, GLint prog)
+{
+    if (!card || g_meshFragmentCollect || !mesh_perf_switch("OPENCNC3D_EPLC_CARD")) {
+        float Mx[12];
+        ebxf_mat(X, Mx);
+        draw_mesh(mesh, cx, cz, face, pass, 0, 0.0f, house, 1.0f, lift, false,
+                  WOBBLE_NONE, -1.0f, Mx, (size_t)a, (size_t)b);
+        g_eplcCpuRuns++;
+        return;
+    }
+    EplcCard C;
+    eplc_card_matrix(X, cx, cz, base, face, C);
+    const GlsClipRestore clipWas;
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glMultMatrixf(C.W);
+    if (g_meshNrmOut && prog) eplc_pose_uniform((GLuint)prog, C.W);
+    draw_mesh(mesh, cx, cz, face, pass, 0, 0.0f, house, 1.0f, lift, false,
+              WOBBLE_NONE, -1.0f, NULL, (size_t)a, (size_t)b);
+    if (g_meshNrmOut && prog) eplc_pose_uniform((GLuint)prog, EBLD_POSE_IDENTITY);
+    glPopMatrix();
+    clipWas.restored();
+    g_eplcCardRuns++;
+}
 static long g_eplcDrawRuns = 0;
+/* Whether two runs are cut by the same planes, to the bit. */
+static bool eplc_planes_same(const EplcPlanes& a, const EplcPlanes& b)
+{
+    return a.n == b.n && !memcmp(a.eq, b.eq, sizeof(a.eq[0]) * (size_t)a.n);
+}
+/* THE RUNS, ONE DRAW FOR A STRETCH THAT MOVES AS ONE. In the model's own order a part's
+   triangles lie in many short runs between other parts' (the Power Plant's fourteen parts are
+   284 runs), and each run is a draw in every pass. Consecutive runs of the model drawn the same
+   way (both on the card or both on the CPU), with transforms equal to the bit and the same
+   cuts, are drawn as one stretch: the same triangles in the same order through the same
+   matrix, so the same picture, in one draw. Parts that have arrived at rest are the common
+   case. A flipbook's run, a fill's and a grown or bent part's are drawn alone, as before. */
 static void eplc_draw_runs(EplcModel& P, int ri, const EplcPose& Q, const SimObject* o,
                            int pass, float cx, float cz, int face, int house, bool clip,
-                           float base, float lift)
+                           float base, float lift, GLint prog)
 {
     const EbldModel& M = g_ebld[(size_t)P.ebld];
     const EplcRig& R = P.rig[(size_t)ri];
     const int imi = M.mesh[EBM_INTACT];
     int planesFor = -2;
     EplcPlanes pl;
+    pl.n = 0;
+    /* the stretch waiting to be drawn */
+    struct Pend { bool on, card; int a, b; EbXf X; EplcPlanes pl; } pend;
+    pend.on = false;
+    const auto flush = [&]() {
+        if (!pend.on) return;
+        if (clip) eplc_planes_set(&pend.pl);
+        eplc_draw_run(imi, pend.X, pend.card, cx, cz, base, face, pass, house, lift, pend.a, pend.b, prog);
+        pend.on = false;
+    };
     for (size_t i = 0; i < P.run[(size_t)ri].size(); i++) {
         const EplcRun& q = P.run[(size_t)ri][i];
         int mesh = imi;
+        if (q.grow >= 0) flush();             /* (a grown part's write comes after what precedes it) */
         if (q.grow >= 0 && P.grow[(size_t)ri][(size_t)q.grow].kind == EPG_MORPH) {
             /* a bent part: drawn from its copy at the morph's progress, start to end */
             EplcGrow& G = P.grow[(size_t)ri][(size_t)q.grow];
@@ -1364,19 +1560,31 @@ static void eplc_draw_runs(EplcModel& P, int ri, const EplcPose& Q, const SimObj
         }
         if (clip && planesFor != q.actor) {
             eplc_planes(P, ri, Q, q.actor, cx, cz, base, pl);
-            eplc_planes_set(&pl);
             planesFor = q.actor;
         }
-        float Mx[12];
-        ebxf_mat(X, Mx);
+        if (g_meshNrmOut) P.normalDrawn++;
+        g_eplcDrawRuns++;
+        /* (the fill level clamps a corner before its motion: a fill keeps the CPU path) */
+        const bool card = q.grow < 0 && fillY >= 1.0e38f && eplc_rigid(X);
+        if (q.grow < 0 && q.flip < 0 && fillY >= 1.0e38f) {
+            if (pend.on && q.a == pend.b && card == pend.card && !memcmp(&X, &pend.X, sizeof X)
+                && (!clip || eplc_planes_same(pl, pend.pl))) {
+                pend.b = q.b;
+                continue;
+            }
+            flush();
+            pend.on = true; pend.card = card; pend.a = q.a; pend.b = q.b; pend.X = X; pend.pl = pl;
+            continue;
+        }
+        flush();
+        if (clip) eplc_planes_set(&pl);
         if (q.flip >= 0) eplc_uv_at(M, q.flip, Q.t >= R.length ? engine_time() : Q.spinTick);
         g_meshFillY = fillY;
-        draw_mesh(mesh, cx, cz, face, pass, 0, 0.0f, house, 1.0f, lift, false,
-                  WOBBLE_NONE, -1.0f, Mx, (size_t)q.a, (size_t)q.b);
+        eplc_draw_run(mesh, X, card, cx, cz, base, face, pass, house, lift, q.a, q.b, prog);
         g_meshFillY = 3.0e38f;
         if (q.flip >= 0) ebld_uv_clear();
-        g_eplcDrawRuns++;
     }
+    flush();
 }
 
 /* Whether the placement draws this building this frame (going up, being sold, or its
@@ -1424,23 +1632,27 @@ static bool eplc_draw_object(int mi, const SimObject& o, int pass)
     /* the cuts while it moves; at rest it is the model as it stands, uncut */
     const bool atRest = !sell && t >= R.length;
     GLint prog = 0;
-    if (!atRest) glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
-    const bool clip = !atRest && prog == 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    const bool clip = !atRest && (prog == 0 || g_meshNrmOut);
     if (pass == MODE_OPAQUE && !ebld_aux_pass()) P.drawn++;
     g_meshFlash = g_flashOn && o.blush != 0;
+    MeshArrayScope arrays;    /* the runs share the client arrays, as a standing building's pieces do */
     if (pass == MODE_SHADOW) {
         /* the cartridge's ground-shadow plate, with the slab */
-        float Mx[12];
-        ebxf_mat(Q.W[(size_t)R.slab], Mx);
         if (clip) { EplcPlanes pl; eplc_planes(P, 0, Q, R.slab, cx, cz, base, pl); eplc_planes_set(&pl); }
-        draw_mesh(M.mesh[EBM_INTACT], cx, cz, face, pass, 0, 0.0f, house, 1.0f, alt_lift(o),
-                  false, WOBBLE_NONE, -1.0f, Mx, (size_t)M.shadow0, (size_t)M.shadow1);
+        const EbXf& S = Q.W[(size_t)R.slab];
+        eplc_draw_run(M.mesh[EBM_INTACT], S, eplc_rigid(S), cx, cz, base, face, pass, house,
+                      alt_lift(o), M.shadow0, M.shadow1, prog);
     } else {
-        eplc_draw_runs(P, 0, Q, &o, pass, cx, cz, face, house, clip, base, alt_lift(o));
+        eplc_draw_runs(P, 0, Q, &o, pass, cx, cz, face, house, clip, base, alt_lift(o), prog);
         /* the vehicle it deploys from, while it plays */
         if (!atRest && P.evhc >= 0 && P.evhc < (int)g_evhc.size()) {
             EvhcModel& V = g_evhc[(size_t)P.evhc];
             if (evhc_resident(V, false)) {
+                if (g_meshNrmOut) {
+                    fx_set1f((GLuint)prog, "uClass", fx_vehicle_active(&g_fx) ? 0.34f : EVHC_NORMAL_CLASS);
+                    fx_set1f((GLuint)prog, "uEmitClass", fx_vehicle_active(&g_fx) ? 0.22f : EBLD_SELFLIT_CLASS);
+                }
                 EbXf St;
                 const float zero[3] = { 0.0f, 0.0f, 0.0f }, up[3] = { 0.0f, 1.0f, 0.0f };
                 ebxf_turn(St, zero, up, P.compYaw * (EBLD_PI / 180.0f));
@@ -1454,15 +1666,19 @@ static bool eplc_draw_object(int mi, const SimObject& o, int pass)
                         eplc_planes_set(&pl);
                         planesFor = q.actor;
                     }
-                    float Mx[12];
-                    ebxf_mat(ebxf_mul(Q.W[(size_t)q.actor], St), Mx);
-                    draw_mesh(V.m.mesh[EBM_INTACT], cx, cz, face, pass, 0, 0.0f, house, 1.0f,
-                              alt_lift(o), false, WOBBLE_NONE, -1.0f, Mx, (size_t)q.a, (size_t)q.b);
+                    if (g_meshNrmOut) P.companionNormalDrawn++;
+                    /* (always the CPU path: THE CARD MOVES THE RIGID PIECES says why) */
+                    eplc_draw_run(V.m.mesh[EBM_INTACT], ebxf_mul(Q.W[(size_t)q.actor], St), false,
+                                  cx, cz, base, face, pass, house, alt_lift(o), q.a, q.b, prog);
                 }
             }
         }
     }
     eplc_planes_set(NULL);
+    if (g_meshNrmOut) {
+        fx_set1f((GLuint)prog, "uClass", EBLD_NORMAL_CLASS);
+        fx_set1f((GLuint)prog, "uEmitClass", EBLD_SELFLIT_CLASS);
+    }
     g_meshFlash = false;
     return true;
 }
@@ -1472,7 +1688,10 @@ static bool eplc_draw_object(int mi, const SimObject& o, int pass)
    piece's own rig at t and answers true while that plays. */
 static bool eplc_wall_draw(int kind, int icon, float cx, float cz, int pass, float t)
 {
-    if (t < 0.0f || kind < 0 || kind > 2 || icon < 0 || icon > 15 || g_eplc.empty()) return false;
+    /* (the three walls a player builds; under Red Alert its fence too, kind 5, which the
+       Soviets build cell by cell) */
+    if (t < 0.0f || kind < 0 || (kind > 2 && !(g_raModule && kind == 5)) || icon < 0 || icon > 15
+        || g_eplc.empty()) return false;
     const int pm = eplc_model_of(EBLD_WALLS[kind]);
     if (pm < 0) return false;
     EplcModel& P = g_eplc[(size_t)pm];
@@ -1488,8 +1707,9 @@ static bool eplc_wall_draw(int kind, int icon, float cx, float cz, int pass, flo
     if (pass == MODE_OPAQUE && !ebld_aux_pass()) P.drawn++;
     /* (draw_walls draws its pieces with the ground per vertex: so does this, and the cuts
        are at the cell centre's ground) */
+    MeshArrayScope arrays;
     const EbldWallCull cs = ebld_wall_cull_begin();   /* one-sided, as the whole wall */
-    eplc_draw_runs(P, icon, Q, NULL, pass, cx, cz, -1, 0, prog == 0, terrain_y(cx, cz), 0.0f);
+    eplc_draw_runs(P, icon, Q, NULL, pass, cx, cz, -1, 0, (prog == 0 || g_meshNrmOut), terrain_y(cx, cz), 0.0f, prog);
     ebld_wall_cull_end(cs);
     eplc_planes_set(NULL);
     return true;
@@ -1588,6 +1808,14 @@ static void eplc_particle(const EplcTmpl& T, float scale, float x, float y, floa
     p.grow = 0.5f * (f[EPF_SIZE1] - f[EPF_SIZE0]) * scale / (float)lt;
     p.life = (short)lt;
     p.sys = 6;                                   /* the smoke system: the SMOKE sheet */
+    if (T.sheet == EPS_STEAM) {
+        /* the steam sheet, drawn as the landing-zone smoke is; without it (Enhanced effects
+           off) the smoke sheet in the template's own colour */
+        const unsigned char sh = efx_src_sheet("LandingSmoke");
+        if (sh) { p.sys = 1; p.sheet = sh; }
+    } else if (T.sheet == EPS_GLOW) {
+        p.sys = 0;                               /* the glow system's own sheet */
+    }
     const float al = f[EPF_ALPHA] < 0.0f ? 0.0f : (f[EPF_ALPHA] > 1.0f ? 1.0f : f[EPF_ALPHA]);
     const unsigned char a = (unsigned char)(al * 255.0f + 0.5f);
     const float fd = f[EPF_FADE] > 0.01f ? f[EPF_FADE] : 0.2f;
@@ -1790,7 +2018,7 @@ static std::map<int, std::vector<float> > g_eplcWallAcc, g_eplcWallNext;
 static bool eplc_wall_dust(int kind, int icon, int cellKey, float cx, float cz,
                            float t, int frame)
 {
-    if (kind < 0 || kind > 2) return false;
+    if (kind < 0 || (kind > 2 && !(g_raModule && kind == 5))) return false;
     const int pm = eplc_model_of(EBLD_WALLS[kind]);
     if (!g_efxPoolLive) return pm >= 0;
     if (pm < 0 || icon < 0 || icon > 15) return false;
@@ -1810,10 +2038,46 @@ static bool eplc_wall_dust(int kind, int icon, int cellKey, float cx, float cz,
 /* On the tick edge, just before ebld_step: note every building going up or being sold of a
    type with a placement, end the ones that are over or hit, fire the late jolt, and raise
    the dust. */
+/* A BUILDING READ AT FIRST SIGHT (Red Alert's: ebld_type_lazy) has no model when the pack is
+   loaded, so its placement cannot attach then. The tick it first goes up, its file is read
+   (ebld_model_of reads it) and the placement tried again, before its start is looked for,
+   so the placement owns it from its first frame. -1: none for the type. */
+static int eplc_attach_late(const char* type)
+{
+    bool waiting = false;
+    for (size_t i = 0; i < g_eplc.size() && !waiting; i++)
+        waiting = !g_eplc[i].attached && g_eplc[i].type == type;
+    if (!waiting || ebld_model_of(type) < 0) return -1;
+    eplc_attach(false);
+    return eplc_model_of(type);
+}
+
+/* RED ALERT'S WALLS are read when its map first shows them (ebld_wall_models), after the pack
+   was loaded: a wall placement waiting for its wall's model attaches once that model is read,
+   tried once per pack. */
+static void eplc_attach_walls_ra(void)
+{
+    static int serial = -1;
+    static std::set<std::string> tried;
+    if (serial != g_ebldPackSerial) { serial = g_ebldPackSerial; tried.clear(); }
+    bool need = false;
+    for (size_t i = 0; i < g_eplc.size(); i++) {
+        const EplcModel& P = g_eplc[i];
+        if (P.attached || !(P.flags & EPX_WALL) || tried.count(P.type)) continue;
+        for (size_t m = 0; m < g_ebld.size() && !need; m++)
+            if (g_ebld[m].attached && g_ebld[m].type == P.type && (g_ebld[m].flags & EBX_WALL)) {
+                need = true;
+                tried.insert(P.type);
+            }
+    }
+    if (need) eplc_attach(false);
+}
+
 static void eplc_step(int frame)
 {
     if (g_eplc.empty()) return;
     if (frame == g_eplcLastTick) return;
+    if (g_raModule && eplc_rule_now()) eplc_attach_walls_ra();
     if (frame < g_eplcLastTick) g_eplcBld.clear();
     g_eplcLastTick = frame;
     for (std::map<long long, EplcBld>::iterator it = g_eplcBld.begin(); it != g_eplcBld.end(); ++it)
@@ -1828,7 +2092,9 @@ static void eplc_step(int frame)
             const EplcBld& E = it->second;
             if (strcmp(E.type, o.type) || E.cx != o.cx || E.cy != o.cy) { g_eplcBld.erase(it); it = g_eplcBld.end(); }
         }
-        const int pm = rule ? eplc_model_of(o.type) : -1;
+        int pm = rule ? eplc_model_of(o.type) : -1;
+        if (pm < 0 && rule && g_raModule && building_constructing(o) && it == g_eplcBld.end())
+            pm = eplc_attach_late(o.type);
         if (pm < 0 || (g_eplc[(size_t)pm].flags & EPX_WALL) || o.str <= 0) {
             if (it != g_eplcBld.end()) g_eplcBld.erase(it);
             continue;
@@ -1862,11 +2128,21 @@ static void eplc_step(int frame)
             E.lastT = -1.0f;
             printf("EPLC|end|key=%lld|why=sold|frame=%d\n", key, frame);
         }
+        /* A SALE OF A BUILDING IN THE SEA splashes as its placement did (the player's own,
+           once, as it starts going down); every other sale is silent here as before */
+        if (E.mode == EPS_SELL && !E.jolted && E.mine && (P.flags & EPX_SPLASH)) {
+            E.jolted = true;
+            cinematic_audio_note_as(CIN_PLACE, E.wx, E.wz, (float)(E.fw > E.fh ? E.fw : E.fh), true);
+        }
         const float t = (float)(frame - E.start) / 15.0f;
-        if (E.mode == EPS_PLACE && !E.cut && o.str < E.str0) {
+        if (E.mode == EPS_PLACE && !E.cut && !E.struck && o.str < E.str0) {
+            E.struck = true;
+            printf("EPLC|hit|key=%lld|frame=%d|t=%.2f|str=%d/%d\n", key, frame, t, o.str, E.str0);
+        }
+        if (E.mode == EPS_PLACE && !E.cut && o.str <= 0) {
             E.cut = true;
             E.endTick = frame;
-            printf("EPLC|end|key=%lld|why=hit|frame=%d|t=%.2f\n", key, frame, t);
+            printf("EPLC|end|key=%lld|why=destroyed|frame=%d|t=%.2f\n", key, frame, t);
         }
         if (E.mode == EPS_PLACE && !E.cut && !E.ended && t >= R.length) {
             E.ended = true;
@@ -1878,7 +2154,8 @@ static void eplc_step(int frame)
             && t >= P.jolt) {
             E.jolted = true;
             shake_tap(P.cam[0] * (float)(E.fw > E.fh ? E.fw : E.fh));
-            cinematic_audio_note(CIN_PLACE, E.wx, E.wz, (float)(E.fw > E.fh ? E.fw : E.fh));
+            cinematic_audio_note_as(CIN_PLACE, E.wx, E.wz, (float)(E.fw > E.fh ? E.fw : E.fh),
+                                    (P.flags & EPX_SPLASH) != 0);
         }
         /* the dust, while it plays */
         if (!g_efxPoolLive) continue;
@@ -1919,7 +2196,10 @@ static void eplc_step(int frame)
    the game's jolt at the press is given here as the placement would get it. */
 static bool eplc_force(const SimObject& o)
 {
-    const int pm = eplc_model_of(o.type);
+    int pm = eplc_model_of(o.type);
+    /* (a Red Alert type's placement attaches the first time one goes up: a standing one asked
+       to play it attaches it here) */
+    if (pm < 0 && g_raModule && o.kind == K_BUILDING) pm = eplc_attach_late(o.type);
     if (pm < 0 || (g_eplc[(size_t)pm].flags & EPX_WALL) || o.kind != K_BUILDING || o.id < 0)
         return false;
     const long long key = (long long)smooth_key(o);
@@ -1939,7 +2219,8 @@ static bool eplc_force(const SimObject& o)
     g_eplcBld[key] = E;
     if (E.mine && !(g_eplc[(size_t)pm].jolt > 0.0f)) {
         shake_tap(g_eplc[(size_t)pm].cam[0] * (float)(E.fw > E.fh ? E.fw : E.fh));
-        cinematic_audio_note(CIN_PLACE, E.wx, E.wz, (float)(E.fw > E.fh ? E.fw : E.fh));
+        cinematic_audio_note_as(CIN_PLACE, E.wx, E.wz, (float)(E.fw > E.fh ? E.fw : E.fh),
+                                (g_eplc[(size_t)pm].flags & EPX_SPLASH) != 0);
     }
     printf("EPLC|start|key=%lld|type=%s|mode=replay|frame=%d|seconds=%.2f\n", key, o.type,
            g_engineFrame, g_eplc[(size_t)pm].rig[0].length);
@@ -1998,6 +2279,9 @@ static void eplc_dump(void)
     for (size_t i = 0; i < g_eplc.size(); i++) if (g_eplc[i].attached) att++;
     printf("EPLC|loaded=%d|attached=%d|on=%d|enhanced=%d\n", (int)g_eplc.size(), att,
            eplc_rule_now() ? 1 : 0, g_fx.enabled ? 1 : 0);
+    /* (the draws since the last dump, each way: eplc_draw_run) */
+    printf("EPLCRUNS|card=%ld|cpu=%ld\n", g_eplcCardRuns, g_eplcCpuRuns);
+    g_eplcCardRuns = g_eplcCpuRuns = 0;
     for (size_t i = 0; i < g_eplc.size(); i++) {
         const EplcModel& P = g_eplc[i];
         int na = 0, nr = 0, ng = 0;
@@ -2007,10 +2291,10 @@ static void eplc_dump(void)
         float len = 0.0f;
         for (size_t r = 0; r < P.rig.size(); r++) len = fmaxf(len, P.rig[r].length);
         printf("EPLCMODEL|%s|attached=%d|rigs=%d|actors=%d|matched=%d|unmatched=%d|runs=%d|"
-               "grow=%d|companion=%d|seconds=%.3f|drawn=%ld\n", P.type.c_str(),
+               "grow=%d|companion=%d|seconds=%.3f|drawn=%ld|normal_runs=%ld|companion_normal_runs=%ld\n", P.type.c_str(),
                P.attached ? 1 : 0, (int)P.rig.size(), na, P.matched, P.unmatched, nr, ng,
-               (int)P.compRun.size(), len, P.drawn);
-        g_eplc[i].drawn = 0;
+               (int)P.compRun.size(), len, P.drawn, P.normalDrawn, P.companionNormalDrawn);
+        g_eplc[i].drawn = g_eplc[i].normalDrawn = g_eplc[i].companionNormalDrawn = 0;
         /* (version 2: a bent part's vertices found in its morph) */
         if (P.morphed || P.unmorphed)
             printf("EPLCMORPH|%s|found=%d|missing=%d\n", P.type.c_str(), P.morphed, P.unmorphed);

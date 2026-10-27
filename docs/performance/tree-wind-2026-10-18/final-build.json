@@ -1,0 +1,11 @@
+{
+  "main": "f100f58820934d2c4e76437468ea80d659991b11",
+  "files": {
+    "${SOURCE_ROOT}/game/cnc_eyes.cpp": "643bc761fb42b5a7d0b9258b2503230de3900ab37fae693a8b57f9bee3effbcc",
+    "${SOURCE_ROOT}/game/opencnc3d_build.h": "88e1aad9eb275df3a7a9546a9414c38575301506a55e9c4092c8b776c65b3105",
+    "${EVIDENCE_ROOT}/final-build/cnc_eyes": "f0f2a5eb61a31b711cbd44a6ccc79e579e29f0e82a5f16c30821935426decd4e",
+    "${EVIDENCE_ROOT}/final-build/libSDL2-2.0.0.dylib": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+    "${EVIDENCE_ROOT}/final-build/opencnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${EVIDENCE_ROOT}/final-build/libSDL3.dylib": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+  }
+}

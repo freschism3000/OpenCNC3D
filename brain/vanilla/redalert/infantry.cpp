@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Two changes in Per_Cell_Process. The sabotage arm records the saboteur's own
+// house rather than this machine's player in a lockstep match. The tether cut
+// at a factory's exit cell reads a rally point (an OpenCNC3D addition, carried in
+// the soldier's own ArchiveTarget by BuildingClass::Exit_Object) and sends the
+// soldier on from there.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/INFANTRY.CPP 2     3/03/97 10:35p Joe_bostic $ */
 /***********************************************************************************************
@@ -918,7 +929,11 @@ void InfantryClass::Per_Cell_Process(PCPType why)
             if (building != NULL && building->As_Target() == NavCom) {
                 if (!building->IronCurtainCountDown && building->Mission != MISSION_DECONSTRUCTION) {
                     building->IsGoingToBlow = true;
-                    building->Clicked_As_Target(PlayerPtr->Class->House,
+                    /*
+                    **	OpenCNC3D lockstep: the saboteur's own house rather than this machine's
+                    **	player, for the reason written out in BuildingClass::Repair.
+                    */
+                    building->Clicked_As_Target(OpenCNC3D_Lockstep ? Owner() : PlayerPtr->Class->House,
                                                 (Rule.C4Delay * TICKS_PER_MINUTE)
                                                     / 2); // 2019/09/20 JAS - Added record of who clicked on the object
                     building->Clicked_As_Target(building->Owner(), (Rule.C4Delay * TICKS_PER_MINUTE) / 2);
@@ -962,7 +977,38 @@ void InfantryClass::Per_Cell_Process(PCPType why)
         **	unit might actually be a building.
         */
         if (IsTethered) {
+            /*
+            **	OpenCNC3D: a factory's rally point. BuildingClass::Exit_Object parks it in this
+            **	soldier's own ArchiveTarget (always a CELL target) and leaves the destination
+            **	as the exit cell, so the soldier walks out through the door first. This is that
+            **	cell: the tether is cut here and the walk to the rally point begins here.
+            **
+            **	The contact is read BEFORE the transmit, which is what breaks it. The last term
+            **	keeps a player's own order: an order given between the spawn and the door is
+            **	honoured with the tether still on, and only while this cell is still the
+            **	soldier's destination is the exit walk the one ending here. A computer house
+            **	is excluded, because its guard-area assignment writes the same field.
+            **
+            **	And when a human soldier leaves a factory WITHOUT the walk to the rally point,
+            **	because the player gave it an order at the door, the carried CELL is dropped
+            **	rather than left behind, since a later guard-area order would centre on it. A
+            **	guard-area order given in that window has written its own centre there and is
+            **	left alone, and so is an OBJECT archive, which this hook never wrote.
+            */
+            TechnoClass const* opencnc3d_from = Contact_With_Whom();
+            const bool opencnc3d_factory = opencnc3d_from != NULL && opencnc3d_from->What_Am_I() == RTTI_BUILDING
+                                           && ((BuildingClass const*)opencnc3d_from)->Class->Is_Factory()
+                                           && House->IsHuman && House->IQ < Rule.IQGuardArea;
+            const bool opencnc3d_rally = opencnc3d_factory && Mission == MISSION_MOVE && Target_Legal(ArchiveTarget)
+                                         && Is_Target_Cell(ArchiveTarget) && Target_Legal(NavCom)
+                                         && Coord_Cell(Coord) == As_Cell(NavCom);
             Transmit_Message(RADIO_UNLOADED);
+            if (opencnc3d_rally) {
+                Assign_Destination(ArchiveTarget);
+                ArchiveTarget = TARGET_NONE;
+            } else if (opencnc3d_factory && Mission != MISSION_GUARD_AREA && Is_Target_Cell(ArchiveTarget)) {
+                ArchiveTarget = TARGET_NONE;
+            }
             if (House->ActLike == HOUSE_USSR || House->ActLike == HOUSE_UKRAINE) {
                 Do_Action(DO_GESTURE1);
             } else {

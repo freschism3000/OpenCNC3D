@@ -94,7 +94,7 @@ LOAD|slot=0|frame=300|scen=SCG05EA|objects=131
 448 dump lines (OBJ|/TIB|/WALL|/HOUSE|/SMUDGE|) identical pre-save vs post-load
 ```
 
-Note `known-gap notes:1614`: **never hash the payload**. Two runs of the identical deterministic sim differ by ~272 bytes because vtable pointers are written raw and move with ASLR. Assert the state, not the file.
+**Never hash the payload**. Two runs of the identical deterministic sim differ by ~272 bytes because vtable pointers are written raw and move with ASLR. Assert the state, not the file.
 
 **Two refusals to know about:** save and load are both refused outright during a skirmish (`cnc_eyes.cpp:16825-16833` and `:16891-16897`), because `CNC_Save_Load` takes the game mode as an argument and *sets* it. And `game_load_slot` refuses a slot whose scenario differs from `g_bootScen` (`:16912-16919`).
 
@@ -225,7 +225,7 @@ That is the right shape for the actual question a mission author asks ("does `at
 
 ### Option E: a second sim process or a second brain instance. Not viable.
 
-The dylib is `dlopen`'d once behind a `g_brainLoaded` latch (`cnc_eyes.cpp:13414`, `:13431-13468`) and the engine is all file-scope globals (`brain/vanilla/tiberiandawn/globals.cpp`). Two worlds in one process would need a second physical copy of `TiberianDawn.dylib` under a different filename, and the project owner's stated requirement (`docs/design-map-editor.md` section 0e) is one window, one application. Rule it out and say so.
+The dylib is `dlopen`'d once behind a `g_brainLoaded` latch (`cnc_eyes.cpp:13414`, `:13431-13468`) and the engine is all file-scope globals (`brain/vanilla/tiberiandawn/globals.cpp`). Two worlds in one process would need a second physical copy of `TiberianDawn.dylib` under a different filename, and the supported design uses one window and one application. Rule it out and say so.
 
 ### Suggested order
 
@@ -233,6 +233,6 @@ The dylib is `dlopen`'d once behind a `g_brainLoaded` latch (`cnc_eyes.cpp:13414
 2. **B**: tick-0 keyframe on entering play, `game_load_slot` on Ctrl+P back. Small, uses only built and gated machinery, and turns "rewind" from a 2.2 s file reload into an exact snap-back.
 3. **The brain dump extension** (`TRIG|`, `TEAM|`, `TEAMTYPE|`). Fifteen to forty lines in `OpenCNC3D_Dump_Objects`, one accessor on `TeamClass`, one two-platform brain rebuild. This is what turns watching into understanding, and it is the only item that needs approval first.
 4. **D** on top of 3: a fast-forward-and-report button, since the trigger clock makes real-time watching impractical.
-5. **C** last, once it is clear the project owner wants the sim inside the editor chrome rather than a report plus the existing Ctrl+P.
+5. **C** last, if the simulation is to run inside the editor chrome rather than a report plus the existing Ctrl+P.
 
 Also worth fixing alongside, since it will bite anyone testing a scripted mission: the `house|type|cell` prior-key at `edit_mod.h:4388` detaches an object's trigger the moment you move it.

@@ -66,6 +66,9 @@ def pack_set(set_json, out):
                 entries.append((row["tid"], variant_icon(r["icon"], var["n"], w, h), r["side"], r.get("kind"),
                                  meta["cell"], img))
     write(out, entries)
+    if meta["cell"] == 144:
+        from terrain_daylight import apply
+        apply(out, set_json.parent.name, "terrainseam")
 
 
 def pack_build(src, out):

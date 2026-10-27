@@ -41,10 +41,12 @@
  *  THE REMASTERED TREES (T01, drawn for T16 too: tools/art/remaster/foliage) go the same
  *  way, and two things more are needed for them. The rebuilt photogrammetry tree of
  *  tree3d_mod.h claims every tree under Enhanced, so it stands down for a type with a
- *  remaster (eterr_tree_claims, asked by tree3d_claims); and the tree clumps TC01..TC05,
- *  composed of single trees on their cells (--clumptrees), draw a cell whose pick is a
- *  remastered type from its model too (eterr_tree_draw), so a wood is never half one look
- *  and half the other. A tree's crown is alpha-cut spray cards (MODE_CUTOUT, two-sided,
+ *  remaster (eterr_tree_claims, asked by tree3d_claims); and the tree clumps TC01..TC05
+ *  are drawn whole from a model of their own where they have one (eterr_clump_whole: the
+ *  approved trees composed as the 1995 art pastes them, at the clump's centre coordinate),
+ *  and otherwise composed of single trees on their cells (--clumptrees), a cell whose
+ *  pick is a remastered type drawn from its model too (eterr_tree_draw), so a wood is
+ *  never half one look and half the other. A tree's crown is alpha-cut spray cards (MODE_CUTOUT, two-sided,
  *  their coverage-held mip chain, the light of where each hangs as its vertex colour),
  *  drawn in the cutout passes the object loops already run for the cartridge's own leaf
  *  cards; its trunk and limbs are opaque. Its wind is the file's weights, played by
@@ -169,14 +171,14 @@ static bool eterr_object_off(const SimObject& o)
         || o.wz - r > g_cullZ1;
 }
 
-/* A TREE WHOSE TYPE HAS A REMASTER, under Enhanced's rule: drawn whole from it, and
-   never by the rebuilt tree (tree3d_claims asks this). Rocks and the blossom trees are
-   not trees here: tree3d never claimed them. */
+/* Accepted Enhanced trees, controlled by Visuals / 3D Trees, the tree clumps TC01 to TC05
+   among them. Rocks and blossom trees retain their separate settings. Unavailable tree
+   types keep the cartridge. */
 static bool eterr_tree_claims(const SimObject& o)
 {
-    if (o.kind != K_TERRAIN || o.type[0] != 'T' || o.type[1] < '0' || o.type[1] > '9')
-        return false;
-    if (g_ebld.empty() || !ebld_rule_now()) return false;
+    if (o.kind != K_TERRAIN || o.type[0] != 'T') return false;
+    if ((o.type[1] < '0' || o.type[1] > '9') && !ebld_packless_type(o.type)) return false;
+    if (!g_fx.tree3d || g_ebld.empty() || !ebld_rule_now()) return false;
     const int m = ebld_model_of(o.type);
     return m >= 0 && g_ebld[(size_t)m].nset == 1;
 }
@@ -189,6 +191,44 @@ static bool eterr_tree_draw(const SimObject& o, int pass)
     if (!eterr_tree_claims(o)) return false;
     if (eterr_object_off(o)) return true;
     return ebld_draw_object(mesh_for(o), o, pass);
+}
+
+/* A TREE CLUMP WITH A MODEL OF ITS OWN (TC01 to TC05: the approved trees composed as the
+   1995 art pastes them, tools/art/remaster/foliage/compose_clump.py) is drawn whole, that
+   one model at the clump's centre coordinate (the engine's point for it, the model's own
+   origin), in every pass: no cell of it is composed of single trees (clump_part). False
+   for a clump without one, which the callers compose as before. */
+static bool eterr_clump_whole(const SimObject& o)
+{
+    return o.kind == K_TERRAIN && ebld_packless_type(o.type) && eterr_tree_claims(o);
+}
+/* The clump's intact mesh, for its pick box; -1 for a clump drawn otherwise. */
+static int eterr_clump_mesh(const SimObject& o)
+{
+    if (!eterr_clump_whole(o)) return -1;
+    const int m = ebld_model_of(o.type);
+    return m >= 0 ? g_ebld[(size_t)m].mesh[EBM_INTACT] : -1;
+}
+/* The clump drawn whole in this pass while any of its blocked cells is drawn (each cell of
+   the composition was drawn on the same test); true when the clump is this system's.
+   g_clumpWholeDrawn says whether the lit pass really drew its model (not off the
+   picture), for the witness line (clump_whole_log; the flag is cnc_eyes.cpp's). */
+static bool clump_draw_whole(const SimObject& o, int pass)
+{
+    g_clumpWholeDrawn = false;
+    if (!eterr_clump_whole(o)) return false;
+    const ClumpDef* cd = clump_def(o.type);
+    bool shown = false;
+    for (int c = 0; cd && c < clump_def_count(cd) && !shown; c++) {
+        const SimObject part = clump_part_n(o, cd, c);
+        shown = clump_cell_drawn(part.cx, part.cy);
+    }
+    if (!shown) return true;
+    const int m = ebld_model_of(o.type);
+    const long before = m >= 0 ? (long)g_ebld[(size_t)m].drawn : 0;
+    eterr_tree_draw(o, pass);
+    g_clumpWholeDrawn = m >= 0 && (long)g_ebld[(size_t)m].drawn > before;
+    return true;
 }
 
 static void eterr_frame_begin(void)
@@ -233,7 +273,7 @@ static void eterr_draw_normals(void)
     glGetIntegerv(GL_CURRENT_PROGRAM, &was);
     fx_glUseProgram(prog);
     fx_set1i(prog, "uTex", 0);
-    fx_set1f(prog, "uClass", EBLD_NORMAL_CLASS);
+    fx_set1f(prog, "uClass", fx_unified_lighting()?0.36f:EBLD_NORMAL_CLASS);
     fx_set1f(prog, "uEmitClass", EBLD_SELFLIT_CLASS);
     fx_set1i(prog, "uCut", 0);
     const int was3 = g_m3NormalPass;
@@ -254,13 +294,28 @@ static void eterr_draw_normals(void)
        spray cards too, in a cutout pass alpha-tested in the program (uCut), with the
        composed clumps' remastered cells. The rocks and the blossom trees have no cutout
        triangle, so that pass draws nothing of theirs. */
+    /* uClass's location, looked up once for the walk rather than by name for every
+       object (OPENCNC3D_PROGRAM_SHADOW=0 looks it up by name again). */
+    const bool knownLocation = gls_program_shadow();
+    const GLint locClass = knownLocation ? fx_glGetUniformLocation(prog, "uClass") : -1;
     for (int pi = 0; pi < 2; pi++) {
         const int pass = pi ? MODE_CUTOUT : MODE_OPAQUE;
         fx_set1i(prog, "uCut", pi);
         for (size_t i = 0; i < g_objects.size(); i++) {
             const SimObject& o = g_objects[i];
             if (o.kind != K_TERRAIN || !visible(o)) continue;
+            if(fx_unified_lighting()) {
+                // These placed stones now emit neutral albedo at the terrain's
+                // reference exposure, so the common terrain BRDF owns their sun.
+                const bool stone=fx_texset_get()==FX_TEX_ENH && ebld_pack_theater()==1 && !strncmp(o.type,"ROCK",4);
+                if(!knownLocation)fx_set1f(prog,"uClass",stone?.875f:o.type[0]=='T'?.50f:.36f);
+                else if(locClass>=0)fx_glUniform1f(locClass,stone?.875f:o.type[0]=='T'?.50f:.36f);
+            }
             if (mesh_for(o) < 0) {
+                if (g_clumpTrees && clump_draw_whole(o, pass)) {
+                    if (!pi) g_eterrAux[2]++;
+                    continue;
+                }
                 const ClumpDef* cd = g_clumpTrees ? clump_def(o.type) : NULL;
                 for (int c = 0; cd && c < clump_def_count(cd); c++) {
                     const SimObject part = clump_part_n(o, cd, c);

@@ -1,0 +1,12 @@
+{"case": "modules", "passed": true, "errors": []}
+{"case": "changelog", "passed": true, "errors": []}
+{"case": "browser", "passed": true, "errors": []}
+{"case": "settings", "passed": true, "errors": []}
+{"case": "setup", "passed": true, "errors": []}
+{"case": "setup-progress", "passed": true, "errors": []}
+{"case": "setup-failed-long", "passed": true, "errors": []}
+{"case": "setup-movies-only", "passed": true, "errors": []}
+{"case": "settings-none", "passed": true, "errors": []}
+{"case": "settings-tick-music", "passed": true, "errors": []}
+{"case": "classic-fallback", "passed": true, "errors": []}
+{"passed": true, "cases": 11, "protected_files_changed": [], "evidence": "$REPO/art/interface/ra3d-title-cleanup-v01/evidence/launcher-screens"}

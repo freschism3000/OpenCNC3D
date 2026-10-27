@@ -1,0 +1,136 @@
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <vector>
+
+enum { MODE_OPAQUE=0,MODE_CUTOUT=1,MODE_SHADOW=2,MODE_XLU=3 };
+struct PackVert { float x,y,z; };
+struct PackTri { PackVert v[3]; int mode; };
+struct PackMesh { std::vector<PackTri> tris; unsigned gpuPoseRevision=0; };
+static struct { std::vector<PackMesh> mesh; } g_pack;
+struct WorldBox { float x0,x1,z0,z1,y0,y1; bool ok; };
+static unsigned g_groundGen=1;
+static float MODEL_SCALE=1.0f/1024.0f;
+static float testGround=0;
+static unsigned long long groundCalls=0;
+static float terrain_y(float,float) { ++groundCalls; return testGround; }
+static const char* testMode="1";
+static bool testVerify=false;
+static const char* test_getenv(const char* name) {
+    if (!strcmp(name,"OPENCNC3D_MESH_PICK_BOUNDS")) return testMode;
+    if (!strcmp(name,"OPENCNC3D_MESH_PICK_BOUNDS_VERIFY")) return testVerify ? "1" : "0";
+    return NULL;
+}
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+#define getenv test_getenv
+@PRODUCTION_CODE@
+#undef getenv
+static unsigned long long checks=0;
+static void require(bool value,const char* name) {
+    ++checks;
+    if(!value){fprintf(stderr,"FAIL|%s\n",name);exit(1);}
+}
+static uint32_t randomState=0x12345678u;
+static uint32_t random_bits() {
+    randomState^=randomState<<13;randomState^=randomState>>17;randomState^=randomState<<5;
+    return randomState;
+}
+static float random_float(float scale) {return ((int)(random_bits()%20001)-10000)*scale/10000;}
+static WorldBox exact(int mi,float x,float z,int face) {
+    const WorldBox reference=mesh_world_box_uncached(mi,x,z,face);
+    const WorldBox cached=mesh_world_box(mi,x,z,face);
+    require(mesh_pick_bounds_equal(reference,cached),"exact six float fields and ok");
+    return cached;
+}
+int main(int argc,char**) {
+    testVerify=argc>1;
+    g_pack.mesh.resize(32);
+    for(size_t m=0;m<g_pack.mesh.size();m++) {
+        PackMesh& mesh=g_pack.mesh[m];mesh.tris.resize(m*3);
+        for(PackTri& triangle:mesh.tris) {
+            triangle.mode=m==1?MODE_SHADOW:(int)(random_bits()%4);
+            for(PackVert& v:triangle.v) {
+                v.x=random_float(4096);v.y=random_float(4096);v.z=random_float(4096);
+                if(m%5==0)v.x=-0.0f;
+                if(m%7==0)v.y=0.0f;
+            }
+        }
+    }
+    // Both invalid index sides and all-shadow/empty meshes preserve sentinels.
+    for(int mi: {-1,0,1,32}) {
+        WorldBox b=exact(mi,0,0,-1);
+        require(!b.ok && b.x0==1e9f && b.x1==-1e9f,"invalid/empty sentinel");
+    }
+    for(int trial=0;trial<4000;trial++) {
+        const int mi=2+(int)(random_bits()%30);
+        const float x=trial%13==0?-0.0f:random_float(512);
+        const float z=trial%17==0?0.0f:random_float(512);
+        const int face=trial%3==0?-1:(int)(random_bits()%1024)-256;
+        testGround=trial%7==0?-0.0f:random_float(64);
+        MODEL_SCALE=trial%4==0?0.0f:trial%4==1?-1.0f:trial%4==2?1.0f:1.0f/1024.0f;
+        exact(mi,x,z,face);
+        const auto hits=g_meshPickBoundsHits;
+        exact(mi,x,z,face);
+        require(g_meshPickBoundsHits==hits+1,"repeat hits");
+        const auto misses=g_meshPickBoundsMisses;
+        g_pack.mesh[mi].tris[0].v[0].x+=17.0f;
+        ++g_pack.mesh[mi].gpuPoseRevision;
+        exact(mi,x,z,face);
+        require(g_meshPickBoundsMisses==misses+1,"pose revision invalidates");
+    }
+    // Each transform/terrain/scale input independently invalidates, bitwise ±0.
+    MODEL_SCALE=1.0f/1024.0f;testGround=0;exact(2,0,0,-1);
+    auto misses=g_meshPickBoundsMisses;
+    exact(2,-0.0f,0,-1);require(g_meshPickBoundsMisses==++misses,"x signed zero key");
+    exact(2,-0.0f,-0.0f,-1);require(g_meshPickBoundsMisses==++misses,"z signed zero key");
+    testGround=-0.0f;exact(2,-0.0f,-0.0f,-1);require(g_meshPickBoundsMisses==++misses,"ground signed zero key");
+    MODEL_SCALE=-0.0f;exact(2,-0.0f,-0.0f,-1);require(g_meshPickBoundsMisses==++misses,"scale key");
+    exact(2,-0.0f,-0.0f,0);require(g_meshPickBoundsMisses==++misses,"face key");
+    ++g_groundGen;exact(2,-0.0f,-0.0f,0);require(g_meshPickBoundsMisses==++misses,"generation clear");
+    g_pack.mesh[2].tris.push_back(g_pack.mesh[2].tris[0]);
+    exact(2,-0.0f,-0.0f,0);require(g_meshPickBoundsMisses==++misses,"triangle count key");
+    std::vector<PackTri> replacement=g_pack.mesh[2].tris;
+    replacement[0].v[0].x+=1000;
+    replacement.swap(g_pack.mesh[2].tris);
+    exact(2,-0.0f,-0.0f,0);require(g_meshPickBoundsMisses==++misses,"triangle identity key");
+    // Reusing mesh index/storage under a new pack generation cannot revive entries.
+    ++g_groundGen;g_pack.mesh[2].gpuPoseRevision=0;
+    exact(2,-0.0f,-0.0f,0);require(g_meshPickBoundsMisses==++misses,"new pack epoch");
+    // Nonfinite arithmetic follows the original scan; key does not compare floats.
+    for(float special: {std::numeric_limits<float>::quiet_NaN(),
+                        std::numeric_limits<float>::infinity(),-std::numeric_limits<float>::infinity(),
+                        1.0e30f,-1.0e30f}) {
+        MODEL_SCALE=1.0f/1024.0f;testGround=special;
+        exact(2,0,0,-1);exact(2,0,0,-1);
+        testGround=0;exact(2,special,0,0);exact(2,special,0,0);
+        g_pack.mesh[2].tris[0].v[0].y=special;++g_pack.mesh[2].gpuPoseRevision;
+        exact(2,0,0,23);exact(2,0,0,23);
+    }
+    // More distinct keys than fixed slots exercises collision replacement exactly.
+    MODEL_SCALE=1.0f/1024.0f;testGround=0;
+    for(int x=0;x<6000;x++)exact(3,(float)x,0,-1);
+    for(int x=0;x<6000;x++)exact(3,(float)x,0,-1);
+    require(g_meshPickBoundsBad==0,"no unexpected mismatches");
+    const auto off=g_meshPickBoundsOff;
+    g_meshPickBoundsActive=-1;testMode="0";
+    exact(3,44,36,-1);require(g_meshPickBoundsOff==off+1,"env zero reference route");
+    g_meshPickBoundsActive=-1;testMode=NULL;
+    exact(3,44,36,-1);require(mesh_pick_bounds_enabled(),"default enabled");
+    if(testVerify) {
+        // Deliberately corrupt one cached value: verifier must flag and repair it.
+        ++g_groundGen;exact(3,44,36,-1);
+        for(auto& entry:g_meshPickBoundsCache)if(entry.valid)entry.bounds.x0+=1.0f;
+        exact(3,44,36,-1);
+        require(g_meshPickBoundsBad==1,"negative control mismatch detected and repaired");
+        require(g_meshPickBoundsChecks>0,"verification executed");
+    } else require(g_meshPickBoundsChecks==0,"verification excluded from timing route");
+    printf("{\"passed\":true,\"checks\":%llu,\"hits\":%llu,\"misses\":%llu,\"verify\":%d,"
+           "\"verification_checks\":%llu,\"expected_negative_controls\":%llu}\n",
+           checks,g_meshPickBoundsHits,g_meshPickBoundsMisses,testVerify?1:0,
+           g_meshPickBoundsChecks,g_meshPickBoundsBad);
+}

@@ -1,0 +1,5 @@
+bundle-sdl: copied $HOME/.cnc3d-macsdk/lib/libSDL2-2.0.0.dylib
+bundle-sdl: copied $HOME/.cnc3d-macsdk/lib/libSDL3.0.dylib -> libSDL3.dylib (sdl2-compat dlopens it)
+bundle-sdl: gate-game-content -> @executable_path/libSDL2-2.0.0.dylib
+bundle-sdl: $SCRATCH is self-contained (libSDL2-2.0.0.dylib + libSDL3.dylib)
+GAME-CONTENT|PASS|per-game presence/records, exact pack removal, re-download, mixed queue, confirmation, keyboard, catalog headers, other game/languages/saves preserved

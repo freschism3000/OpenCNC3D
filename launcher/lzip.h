@@ -83,6 +83,10 @@ int lz_sha256_file(const char *path, char *hex65, char *err, int errlen);
  * to try something). Reads only. */
 int lz_is_install(const char *dir);
 
+/* Read-only opt-out recorded by a private source build. Public runtime installers
+ * must not replace that build; optional media and transaction recovery still work. */
+int lz_is_private_developer(const char *dir);
+
 /* ONE PROCESS AT A TIME PER INSTALL. lz_extract and lz_settle both move files
  * another run may be relying on, so the caller takes this lock on the folder
  * first and holds it for as long as it might call either, and both take the
@@ -164,6 +168,23 @@ typedef struct
  * to start if it cannot. */
 int lz_extract(const LZ_Lock *install, const char *zip, int strip, const char *const *last,
                const LZ_File *extra, LZ_Progress cb, void *user, char *err, int errlen);
+
+/* Restore a local module package under the lock this process already owns.
+ * Preflight every entry against the exact ownership list, reject duplicates and
+ * require every required path before journalled extraction begins. */
+int lz_install_owned(const char *dir, const char *zip, const char *const *owned,
+                     const char *const *required, int nrequired,
+                     LZ_Progress cb, void *user, char *err, int errlen);
+
+/* Read one bounded text member without changing any files. CRC/size, duplicate names
+ * and embedded NULs are checked. The caller frees the returned buffer. */
+char *lz_read_text(const char *zip, const char *name, long cap, char *err, int errlen);
+/* Exact preflight as above, but commit caller-owned bookkeeping last in the same
+ * rollback journal. Used only by verified public module installation. */
+int lz_install_owned_extra(const char *dir, const char *zip, const char *const *owned,
+                           const char *const *required, int nrequired,
+                           const char *const *last, const LZ_File *extra,
+                           LZ_Progress cb, void *user, char *err, int errlen);
 
 /* 1 when every entry of the archive sits under ONE top-level folder, which makes
  * 1 the right `strip` for lz_extract; 0 for a flat archive or an unreadable one.

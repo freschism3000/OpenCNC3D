@@ -77,6 +77,11 @@ jobs:
             grep -q "|$field=%d" dllinterface.cpp \
               || { echo "brain checkout is stale: no $field= in the OBJ dump"; exit 1; }
           done
+          cd ../redalert
+          for field in dimw status flash pips maxpips cloak cstage repairing wrench poweroff harv rotating navset driving primary flashme act; do
+            grep -q "|$field=%d" dllinterface.cpp \
+              || { echo "Red Alert brain checkout is stale: no $field= in the OBJ dump"; exit 1; }
+          done
           echo "brain exports present"
 
       # One recipe per binary, as above: no cmake line here.
@@ -105,6 +110,15 @@ jobs:
             brain/vanilla/build-native/redalert/RedAlert.dylib \
             build/ra3d/ra-mission-macos.txt
 
+      # Two independent copies of the Red Alert brain in one process, advanced under different
+      # local players from one match setup, compared after every tick on the 1996 multiplayer
+      # maps. The property a Red Alert network match is built on; headless, no art.
+      - name: "Gate: two Red Alert brains agree in lockstep on macOS"
+        run: |
+          tools/ra3d/gate-ra-lockstep.sh \
+            brain/vanilla/build-native/redalert/RedAlert.dylib \
+            build/ra3d/ra-lockstep-macos.txt
+
       - name: Build the renderer (game/build.sh -> cnc_eyes)
         run: cd game && ./build.sh
 
@@ -119,6 +133,30 @@ jobs:
       # existed; this is the same guarantee for the other half.
       - name: Build the launcher (launcher/build.sh -> opencnc3d-launcher)
         run: cd launcher && ./build.sh
+
+      # EVERY ARGUMENT AFTER "--" REACHES THE GAME. The launcher kept them in a list of 16
+      # that stopped copying when it filled, so a seventeenth argument handed the game a
+      # flag without its value and nothing said so. The check starts a stand-in game, not
+      # this one, and builds the Windows command line without running it, so it needs no
+      # play folder; game/gates.sh runs it again against the real game (G336).
+      - name: "Launcher: every argument after -- reaches the game (tools/launcher/forward-check.sh)"
+        run: tools/launcher/forward-check.sh launcher/opencnc3d-launcher
+
+      # RED ALERT'S TILE ASKS FOR NOTHING A PACKAGE LEAVES OUT. The launcher's test for an
+      # installed Red Alert once wanted its movies and its score, which no package carries,
+      # so the module vanished from any folder without them. With no play folder the check
+      # reads the test's file list against tools/media/media-paths.txt; game/gates.sh runs
+      # it again against a package-shaped folder and the real game (G337).
+      - name: "Launcher: Red Alert's test asks for nothing a package leaves out (tools/launcher/module-check.sh)"
+        run: tools/launcher/module-check.sh launcher/opencnc3d-launcher
+
+      # RED ALERT'S MOVIES AND SCORE ARE FETCHED ONLY WHERE ITS MODULE IS. They share the
+      # movies and music boxes with Tiberian Dawn's and come to about 724 MB, so a manifest
+      # or a launcher that lost the module rule would hand every Tiberian Dawn player that
+      # much more to download. The check serves disc images it makes itself from 127.0.0.1;
+      # it needs no play folder and touches no real mirror (G340 runs it again).
+      - name: "Launcher: Red Alert's movies and score download only with its module (tools/launcher/media-module-check.sh)"
+        run: tools/launcher/media-module-check.sh launcher/opencnc3d-launcher
 
       - name: "Sanity: both binaries start and report usage"
         run: |
@@ -220,7 +258,7 @@ jobs:
         run: |
           df -h / | tail -1
           sudo apt-get update
-          sudo apt-get install -y mingw-w64 cmake zip
+          sudo apt-get install -y mingw-w64 cmake zip rsync
 
       - name: Fetch SDL2 and zlib for mingw
         run: tools/win/setup-toolchain.sh
@@ -243,10 +281,18 @@ jobs:
             grep -q "|$field=%d" dllinterface.cpp \
               || { echo "brain checkout is stale: no $field= in the OBJ dump"; exit 1; }
           done
+          cd ../redalert
+          for field in dimw status flash pips maxpips cloak cstage repairing wrench poweroff harv rotating navset driving primary flashme act; do
+            grep -q "|$field=%d" dllinterface.cpp \
+              || { echo "Red Alert brain checkout is stale: no $field= in the OBJ dump"; exit 1; }
+          done
           echo "brain exports present"
 
       - name: "Guard: the Windows build compiles the same sources as the Mac build"
         run: tools/win/check-sources.sh
+
+      - name: "Gate: full and binaries-only Windows diagnostic packages"
+        run: python3 tools/win/test-diagnostic-packages.py --repo . --output build/windows-package-tests
 
       - name: Build for Windows (tools/win/build-win.sh -> build/win/)
         run: tools/win/build-win.sh
@@ -279,6 +325,7 @@ jobs:
           # purpose is networking, which makes it the one where a stray link is most
           # likely and least excusable.
           for binary in build/win/opencnc3d-game.exe build/win/cnc_eyes.exe build/win/netcheck.exe \
+                        build/win/OpenCNC3D-Diagnostics.exe \
                         build/win/ra_bootstrap.exe build/win/TiberianDawn.dll \
                         build/win/RedAlert.dll; do
             # msvcrt.dll is on this list because it IS a Windows system DLL, present on
@@ -306,6 +353,7 @@ jobs:
                     | grep -viE "api-ms-win-crt|msvcrt|KERNEL32|USER32|SHELL32|OPENGL32|WINMM|OLEAUT32|ADVAPI32|GDI32|WS2_32|WININET|SDL2" || true)
             [ -z "$extra" ] || { echo "$binary needs a DLL that Windows 11 does not ship:"; echo "$extra"; exit 1; }
           done
+          python3 tools/win/check-diagnostics.py build/win
           echo "PE32 i686, brain exports present, SDL2.dll is the only extra dependency"
 
       # The Win98 audio backend is not linked into anything yet: the renderer's Win98 and
@@ -323,6 +371,7 @@ jobs:
           name: opencnc3d-windows-${{ github.sha }}
           path: |
             build/win/opencnc3d-game.exe
+            build/win/OpenCNC3D-Diagnostics.exe
             build/win/cnc_eyes.exe
             build/win/SDL2.dll
             build/win/TiberianDawn.dll

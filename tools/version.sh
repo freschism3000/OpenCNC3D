@@ -10,6 +10,8 @@
 #   tools/version.sh --next       -> what the next PATCH build number will be, e.g. 0.5.2
 #   tools/version.sh --next-minor -> the next MINOR one, e.g. 0.6.0 (see below)
 #   tools/version.sh --header P   -> write a C header defining OPENCNC3D_BUILD to P
+#   tools/version.sh --developer-header P -> force the source SHA, even at a release tag,
+#                                    for a private developer build with F5 enabled
 #   tools/version.sh --release-header P -> the same header with the bare release string,
 #                                    which is what tools/release.sh stamps a release with
 #
@@ -58,13 +60,13 @@ if git -C "$here" rev-parse --git-dir >/dev/null 2>&1; then
     tagged=$(git -C "$here" tag --points-at HEAD 2>/dev/null | grep -x "v$base" || true)
     dirty=""
     git -C "$here" diff --quiet HEAD 2>/dev/null || dirty="-dirty"
-    if [ -z "$tagged" ] || [ -n "$dirty" ]; then
+    if [ -z "$tagged" ] || [ -n "$dirty" ] || [ "$1" = "--developer-header" ]; then
         sha=$(git -C "$here" rev-parse --short=7 HEAD 2>/dev/null || echo unknown)
         stamp="v$base+$sha$dirty"
     fi
 fi
 
-if [ "$1" = "--header" ] || [ "$1" = "--release-header" ]; then
+if [ "$1" = "--header" ] || [ "$1" = "--developer-header" ] || [ "$1" = "--release-header" ]; then
     out="$2"
     [ -n "$out" ] || { echo "$1 needs a path" >&2; exit 1; }
     [ "$1" = "--release-header" ] && stamp="v$base"

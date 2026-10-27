@@ -1,5 +1,6 @@
 tick 4
 gfxmode 2
+gfx bloom_on 0
 cam VIEW
 tick 1
 bibhue 1

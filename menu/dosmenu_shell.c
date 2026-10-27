@@ -22,6 +22,7 @@
  */
 
 #include "dosmenu_shell.h"
+#include "enhanced_menu.h"
 #include "dosops.h"
 #include "doslobby.h"
 #include "dosmp.h"
@@ -153,14 +154,49 @@ static void dms_layout(DMS *s)
             sc = h / s->surf.h;
         s->scale = sc < 1 ? 1 : sc;
     }
+    /* RED ALERT'S TITLE IS 640x400 and its Special Ops list and lobby are 320x200
+       (dms_redraw). Each picked its own whole-number scale, so going from the title to
+       one of them grew the picture (at 1920x1080 from 1280x800 to 1600x1000) and coming
+       back shrank it. The 320x200 screens take exactly twice the title's scale, so the
+       backdrop keeps its size on every screen. */
+    if (s->st.red_alert && s->surf.w * 2 == 640 && s->surf.h * 2 == 400
+        && w >= 640 && h >= 400) {
+        sc = w / 640;
+        if (h / 400 < sc)
+            sc = h / 400;
+        s->scale = 2 * sc;
+    }
     s->vpx = (w - s->surf.w * s->scale) / 2;
     s->vpy = (h - s->surf.h * s->scale) / 2;
+}
+
+/* Each game draws its own Enhanced kit: Red Alert's title (cfg.red_alert) uses the Enhanced
+   screens only when this process loaded Red Alert's kit, never Tiberian Dawn's. */
+static int dms_enhanced(const DMS *s)
+{ return (!s->cfg.red_alert || em_red_alert()) && game_enhanced_menu_enabled() && em_available(); }
+
+int dms_enhanced_menu(const DMS *s) { return dms_enhanced(s); }
+
+static void dms_enh_scene(const DMS *s)
+{
+    if (s->browser) em_browser(s->browser);
+    else if (s->ops) em_ops(s->ops);
+    else if (s->lobby) em_lobby(s->lobby, s->pack);
+    else em_main(&s->st);
 }
 
 /* In window POINTS, which is the space SDL mouse events live in. */
 void dms_item_window_rect(const DMS *s, int item, int *x, int *y, int *w, int *h)
 {
     int rx = 0, ry = 0, rw = 0, rh = 0;
+    if (dms_enhanced(s)) {
+        int dw, dh; SDL_GL_GetDrawableSize(s->win, &dw, &dh);
+        dms_enh_scene(s); em_viewport(dw, dh);
+        if (em_item_rect(item, &rx, &ry, &rw, &rh)) {
+            *x=(int)(rx/s->px); *y=(int)(ry/s->py);
+            *w=(int)(rw/s->px); *h=(int)(rh/s->py); return;
+        }
+    }
     dm_item_rect(&s->st, item, &rx, &ry, &rw, &rh);
     *x = (int)((s->vpx + rx * s->scale) / s->px);
     *y = (int)((s->vpy + ry * s->scale) / s->py);
@@ -173,6 +209,7 @@ void dms_item_window_rect(const DMS *s, int item, int *x, int *y, int *w, int *h
 static void dms_to_menu(const DMS *s, int wx, int wy, int *mx, int *my)
 {
     int fx = (int)(wx * s->px), fy = (int)(wy * s->py);
+    if (dms_enhanced(s)) { em_to_legacy(fx, fy, mx, my); return; }
     *mx = (fx - s->vpx) / s->scale;
     *my = (fy - s->vpy) / s->scale;
     if (fx < s->vpx || fy < s->vpy)
@@ -242,6 +279,21 @@ void dms_draw(DMS *s)
 
     dms_layout(s);
     SDL_GL_GetDrawableSize(s->win, &w, &h);
+
+    if (dms_enhanced(s)) {
+        int mx = -1000, my = -1000, dx, dy;
+        dms_enh_scene(s); em_viewport(w, h);
+        /* A new layout needs the current pointer position, not a cached seat
+           from the previous screen. Hidden/unfocused windows have no hover. */
+        if (!fs_background_only() && !(SDL_GetWindowFlags(s->win) & SDL_WINDOW_HIDDEN)
+            && (SDL_GetWindowFlags(s->win) & SDL_WINDOW_MOUSE_FOCUS)) {
+            SDL_GetMouseState(&mx, &my);
+            mx = (int)(mx * s->px); my = (int)(my * s->py);
+        }
+        em_to_legacy(mx, my, &dx, &dy);
+        em_menu_overlay(s->pack, mx, my);
+        dms_enh_scene(s); em_draw(w, h, 1); SDL_ShowCursor(SDL_DISABLE); return;
+    }
 
     /* 1. the whole window goes black, including the letterbox bars. glClear obeys
      *    the scissor box, not the viewport, so the viewport is opened up first and
@@ -500,6 +552,50 @@ static int dms_movie_then_menu(DMS *s, const char *path)
 int dms_logo(DMS *s) { return dms_movie_then_menu(s, s->cfg.logo); }
 int dms_intro(DMS *s) { return dms_movie_then_menu(s, s->cfg.intro); }
 
+/* Enhanced layout only; actions still return to the app's campaign/movie state machine. */
+int dms_enh_choice(DMS *s, int which)
+{
+    int selected = which == 0 ? 0 : 1, pressed = -1;
+    for (;;) {
+        SDL_Event e; int w,h;
+        SDL_GL_GetDrawableSize(s->win,&w,&h); dms_layout(s);
+        em_choice(which,selected,pressed); em_viewport(w,h);
+        while (SDL_PollEvent(&e)) {
+            if (dms_enhanced(s)) em_sound_event(&e, s->win);
+            if (fs_handle_event(&e)) continue;
+            if (e.type == SDL_QUIT) return DMS_QUIT;
+            if (e.type == SDL_MOUSEMOTION) {
+                int hit=em_pick((int)(e.motion.x*s->px),(int)(e.motion.y*s->py));
+                if (hit>=0) selected=hit;
+            }
+            if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
+                pressed=em_pick((int)(e.button.x*s->px),(int)(e.button.y*s->py));
+            if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+                int hit=em_pick((int)(e.button.x*s->px),(int)(e.button.y*s->py));
+                if (hit>=0 && hit==pressed) return hit;
+                pressed=-1;
+            }
+            if (e.type == SDL_KEYDOWN) {
+                SDL_Keycode k=e.key.keysym.sym;
+                if (k==SDLK_ESCAPE) return 0;
+                if (k==SDLK_LEFT || k==SDLK_UP) game_enhanced_menu_sound(0), selected=(selected+(which==2?2:1))%(which==2?3:2);
+                if (k==SDLK_RIGHT || k==SDLK_DOWN || k==SDLK_TAB) game_enhanced_menu_sound(0), selected=(selected+1)%(which==2?3:2);
+                if (k==SDLK_RETURN || k==SDLK_KP_ENTER) {game_enhanced_menu_sound(1);return selected;}
+            }
+        }
+        {
+            int mx=-1000,my=-1000;
+            if (!fs_background_only() && !(SDL_GetWindowFlags(s->win)&SDL_WINDOW_HIDDEN)
+                && (SDL_GetWindowFlags(s->win)&SDL_WINDOW_MOUSE_FOCUS)) {
+                SDL_GetMouseState(&mx,&my);mx=(int)(mx*s->px);my=(int)(my*s->py);
+            }
+            em_menu_overlay(s->pack,mx,my);
+        }
+        em_choice(which,selected,pressed); em_draw(w,h,1); SDL_ShowCursor(SDL_DISABLE);
+        dms_pump_audio(s, DM_FRAME_MS); SDL_GL_SwapWindow(s->win); SDL_Delay(16);
+    }
+}
+
 int dms_run(DMS *s)
 {
     int chosen = DMS_NONE;
@@ -526,6 +622,7 @@ int dms_run(DMS *s)
         int dirty = 0;
 
         while (SDL_PollEvent(&e)) {
+            if (dms_enhanced(s)) em_sound_event(&e, s->win);
             if (fs_handle_event(&e)) { dirty = 1; continue; }
             switch (e.type) {
             case SDL_QUIT:
@@ -533,14 +630,21 @@ int dms_run(DMS *s)
 
             case SDL_KEYDOWN:
                 /* menus.cpp:902-940: the arrows walk curbutton, return activates. */
-                if (e.key.keysym.sym == SDLK_ESCAPE)
-                    return DM_EXIT;
-                else if (e.key.keysym.sym == SDLK_UP)
-                    s->st.selected = dm_next_item(&s->st, s->st.selected, -1), dirty = 1;
-                else if (e.key.keysym.sym == SDLK_DOWN)
-                    s->st.selected = dm_next_item(&s->st, s->st.selected, 1), dirty = 1;
-                else if (e.key.keysym.sym == SDLK_RETURN)
+                if (e.key.keysym.sym == SDLK_ESCAPE) {
+                    if (dms_enhanced(s)) chosen=DM_EXIT; else return DM_EXIT;
+                }
+                else if (e.key.keysym.sym == SDLK_UP || e.key.keysym.sym == SDLK_DOWN ||
+                         (dms_enhanced(s) && e.key.keysym.sym == SDLK_TAB)) {
+                    int before = s->st.selected;
+                    int delta = e.key.keysym.sym == SDLK_UP ||
+                        (e.key.keysym.sym == SDLK_TAB && (e.key.keysym.mod & KMOD_SHIFT)) ? -1 : 1;
+                    s->st.selected = dms_enhanced(s) ? em_main_next(&s->st, before, delta) : dm_next_item(&s->st, before, delta);
+                    if (dms_enhanced(s) && s->st.selected != before) game_enhanced_menu_sound(0);
+                    dirty = 1;
+                } else if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
                     chosen = s->st.selected;
+                    if (dms_enhanced(s) && !dm_state_item_disabled(&s->st, chosen)) game_enhanced_menu_sound(1);
+                }
                 break;
 
             case SDL_MOUSEMOTION:
@@ -594,7 +698,20 @@ int dms_run(DMS *s)
             fflush(stdout);
             /* init.cpp:1199 SEL_INTRO -> Play_Intro(). Handled here because it never
              * leaves the menu; every other item is the caller's business. */
+            if (chosen == DM_EXIT && dms_enhanced(s)) {
+                int answer=dms_enh_choice(s,0);
+                if (answer==DMS_QUIT) return DMS_QUIT;
+                if (answer!=1) { chosen=-1; dms_redraw(s); continue; }
+            }
             if (chosen == DM_INTRO) {
+                if (dms_enhanced(s)) {
+                    int answer;
+                    while ((answer=dms_enh_choice(s,1))==1) {
+                        if (!dms_intro(s)) return DMS_QUIT;
+                    }
+                    if (answer==DMS_QUIT) return DMS_QUIT;
+                    chosen=-1; dms_redraw(s); continue;
+                }
                 s->st.pressed = -1;
                 if (!dms_intro(s))
                     return DMS_QUIT;
@@ -635,6 +752,140 @@ static void dms_ra_difficulty_redraw(DMS *s, int selected, int pressed)
     dms_upload(s, s->rgba);
 }
 
+/* RED ALERT'S SIDE CHOICE UNDER ENHANCED: one box with both emblems, Allies / Soviet, the
+   difficulty and Start, where the 1996 game asks a difficulty slider and then a message
+   box. The automated runs press it the way a hand would: the side's button, then Start. */
+static void dms_enh_push_click(DMS *s, int item)
+{
+    int x, y, w, h;
+    SDL_Event e;
+    if (!em_item_rect(item, &x, &y, &w, &h)) return;
+    memset(&e, 0, sizeof e);
+    e.type = SDL_MOUSEMOTION;
+    e.motion.x = (int)((x + w / 2) / s->px); e.motion.y = (int)((y + h / 2) / s->py);
+    SDL_PushEvent(&e);
+    memset(&e, 0, sizeof e);
+    e.type = SDL_MOUSEBUTTONDOWN; e.button.button = SDL_BUTTON_LEFT;
+    e.button.x = (int)((x + w / 2) / s->px); e.button.y = (int)((y + h / 2) / s->py);
+    SDL_PushEvent(&e);
+    e.type = SDL_MOUSEBUTTONUP;
+    SDL_PushEvent(&e);
+}
+
+int dms_ra_enh_side(DMS *s, int auto_side, int auto_difficulty, const char *shot, int *difficulty)
+{
+    int side = 0, diff = auto_difficulty >= 0 && auto_difficulty <= 2 ? auto_difficulty : 1;
+    int pressed = -1, first = 1;
+    SDL_ShowCursor(SDL_DISABLE);
+    for (;;) {
+        SDL_Event e;
+        int w, h, mx = -1000, my = -1000;
+        SDL_GL_GetDrawableSize(s->win, &w, &h); dms_layout(s);
+        em_side_choice(side, diff, pressed); em_viewport(w, h);
+        if (first) {
+            first = 0;
+            em_menu_overlay(s->pack, -1000, -1000);
+            if (shot && *shot && em_write_shot(shot, w, h))
+                printf("SHOT|%s|%dx%d\n", shot, w, h);
+            if (auto_side == 0 || auto_side == 1) {
+                dms_enh_push_click(s, auto_side ? EM_SIDE_SOVIET : EM_SIDE_ALLIES);
+                dms_enh_push_click(s, EM_SIDE_START);
+                printf("RASIDE|auto|side=%d|difficulty=%d\n", auto_side, diff);
+            }
+            fflush(stdout);
+        }
+        while (SDL_PollEvent(&e)) {
+            int hit;
+            em_sound_event(&e, s->win);
+            if (fs_handle_event(&e)) continue;
+            if (e.type == SDL_QUIT) return DMS_QUIT;
+            if (e.type == SDL_MOUSEMOTION)
+                em_pick((int)(e.motion.x * s->px), (int)(e.motion.y * s->py));
+            if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
+                pressed = em_pick((int)(e.button.x * s->px), (int)(e.button.y * s->py));
+            if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+                hit = em_pick((int)(e.button.x * s->px), (int)(e.button.y * s->py));
+                if (hit >= 0 && hit == pressed) {
+                    if (hit == EM_SIDE_ALLIES || hit == EM_SIDE_SOVIET) side = hit == EM_SIDE_SOVIET;
+                    else if (hit >= EM_SIDE_EASY && hit <= EM_SIDE_HARD) diff = hit - EM_SIDE_EASY;
+                    else if (hit == EM_SIDE_BACK) return DMS_CANCEL;
+                    else if (hit == EM_SIDE_START) {
+                        if (difficulty) *difficulty = diff;
+                        printf("RASIDE|start|side=%s|difficulty=%d\n", side ? "Soviet" : "Allies", diff);
+                        fflush(stdout);
+                        return side;
+                    }
+                }
+                pressed = -1;
+            }
+            if (e.type == SDL_KEYDOWN) {
+                SDL_Keycode k = e.key.keysym.sym;
+                if (k == SDLK_ESCAPE) return DMS_CANCEL;
+                if (k == SDLK_LEFT || k == SDLK_RIGHT || k == SDLK_TAB) { side = 1 - side; game_enhanced_menu_sound(0); }
+                if (k == SDLK_UP && diff > 0) { diff--; game_enhanced_menu_sound(0); }
+                if (k == SDLK_DOWN && diff < 2) { diff++; game_enhanced_menu_sound(0); }
+                if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE) {
+                    game_enhanced_menu_sound(1);
+                    if (difficulty) *difficulty = diff;
+                    return side;
+                }
+            }
+        }
+        if (!fs_background_only() && !(SDL_GetWindowFlags(s->win) & SDL_WINDOW_HIDDEN)
+            && (SDL_GetWindowFlags(s->win) & SDL_WINDOW_MOUSE_FOCUS)) {
+            SDL_GetMouseState(&mx, &my); mx = (int)(mx * s->px); my = (int)(my * s->py);
+            em_pick(mx, my);
+        }
+        em_menu_overlay(s->pack, mx, my);
+        em_side_choice(side, diff, pressed); em_draw(w, h, 1); SDL_ShowCursor(SDL_DISABLE);
+        dms_pump_audio(s, DM_FRAME_MS); SDL_GL_SwapWindow(s->win); SDL_Delay(16);
+    }
+}
+
+int dms_ra_debrief(DMS *s, const struct EM_Debrief *d, const char *shot, int nowait)
+{
+    int pressed = -1, first = 1;
+    SDL_ShowCursor(SDL_DISABLE);
+    for (;;) {
+        SDL_Event e;
+        int w, h, mx = -1000, my = -1000;
+        SDL_GL_GetDrawableSize(s->win, &w, &h); dms_layout(s);
+        em_ra_debrief(d, pressed); em_viewport(w, h);
+        if (first) {
+            first = 0;
+            em_menu_overlay(s->pack, -1000, -1000);
+            if (shot && *shot && em_write_shot(shot, w, h))
+                printf("SHOT|%s|%dx%d\n", shot, w, h);
+            printf("RADEBRIEF|shown|%s\n", nowait ? "once" : "until pressed");
+            fflush(stdout);
+            if (nowait) return 1;
+        }
+        while (SDL_PollEvent(&e)) {
+            em_sound_event(&e, s->win);
+            if (fs_handle_event(&e)) continue;
+            if (e.type == SDL_QUIT) return DMS_QUIT;
+            if (e.type == SDL_MOUSEMOTION)
+                em_pick((int)(e.motion.x * s->px), (int)(e.motion.y * s->py));
+            if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
+                pressed = em_pick((int)(e.button.x * s->px), (int)(e.button.y * s->py));
+            /* ANY CLICK OR KEY CONTINUES, as on the 1996 screen; Continue is where a
+               hand looks for it */
+            if (e.type == SDL_MOUSEBUTTONUP || e.type == SDL_KEYDOWN) {
+                game_enhanced_menu_sound(1);
+                return 1;
+            }
+        }
+        if (!fs_background_only() && !(SDL_GetWindowFlags(s->win) & SDL_WINDOW_HIDDEN)
+            && (SDL_GetWindowFlags(s->win) & SDL_WINDOW_MOUSE_FOCUS)) {
+            SDL_GetMouseState(&mx, &my); mx = (int)(mx * s->px); my = (int)(my * s->py);
+            em_pick(mx, my);
+        }
+        em_menu_overlay(s->pack, mx, my);
+        em_ra_debrief(d, pressed); em_draw(w, h, 1); SDL_ShowCursor(SDL_DISABLE);
+        dms_pump_audio(s, DM_FRAME_MS); SDL_GL_SwapWindow(s->win); SDL_Delay(16);
+    }
+}
+
 int dms_ra_choose_difficulty(DMS *s, int auto_difficulty, const char *shot)
 {
     int selected = 1, pressed = -1;
@@ -651,6 +902,7 @@ int dms_ra_choose_difficulty(DMS *s, int auto_difficulty, const char *shot)
     for (;;) {
         int dirty = 0;
         while (SDL_PollEvent(&e)) {
+            if (dms_enhanced(s)) em_sound_event(&e, s->win);
             int x, y, hit;
             if (fs_handle_event(&e)) { dirty = 1; continue; }
             switch (e.type) {
@@ -727,6 +979,7 @@ int dms_ra_choose_side(DMS *s, int auto_side, const char *shot)
     for (;;) {
         int dirty = 0;
         while (SDL_PollEvent(&e)) {
+            if (dms_enhanced(s)) em_sound_event(&e, s->win);
             int x, y, hit;
             if (fs_handle_event(&e)) { dirty = 1; continue; }
             switch (e.type) {
@@ -801,6 +1054,7 @@ int dms_special(DMS *s, const struct DO_Mission *list, int count)
         int dirty = 0, done = 0;
 
         while (SDL_PollEvent(&e)) {
+            if (dms_enhanced(s)) em_sound_event(&e, s->win);
             if (fs_handle_event(&e)) { dirty = 1; continue; }
             switch (e.type) {
             case SDL_QUIT:
@@ -810,18 +1064,20 @@ int dms_special(DMS *s, const struct DO_Mission *list, int count)
             case SDL_KEYDOWN:
                 if (e.key.keysym.sym == SDLK_ESCAPE) {
                     result = DMS_CANCEL; done = 1;   /* back to the menu, NOT exit */
+                } else if (dms_enhanced(s) && (e.key.keysym.sym == SDLK_LEFT || e.key.keysym.sym == SDLK_RIGHT)) {
+                    em_ops_filter(&ops, e.key.keysym.sym == SDLK_RIGHT); dirty = 1;
                 } else if (e.key.keysym.sym == SDLK_UP) {
-                    do_move(&ops, -1); dirty = 1;
+                    if (dms_enhanced(s)) em_ops_move(&ops, -1); else do_move(&ops, -1); dirty = 1;
                 } else if (e.key.keysym.sym == SDLK_DOWN) {
-                    do_move(&ops, 1); dirty = 1;
+                    if (dms_enhanced(s)) em_ops_move(&ops, 1); else do_move(&ops, 1); dirty = 1;
                 } else if (e.key.keysym.sym == SDLK_PAGEUP) {
-                    do_move(&ops, -DO_ROWS); dirty = 1;
+                    if (dms_enhanced(s)) em_ops_move(&ops, -DO_ROWS); else do_move(&ops, -DO_ROWS); dirty = 1;
                 } else if (e.key.keysym.sym == SDLK_PAGEDOWN) {
-                    do_move(&ops, DO_ROWS); dirty = 1;
+                    if (dms_enhanced(s)) em_ops_move(&ops, DO_ROWS); else do_move(&ops, DO_ROWS); dirty = 1;
                 } else if (e.key.keysym.sym == SDLK_HOME) {
-                    do_move_home(&ops); dirty = 1;
+                    if (dms_enhanced(s)) em_ops_move(&ops, -10000); else do_move_home(&ops); dirty = 1;
                 } else if (e.key.keysym.sym == SDLK_END) {
-                    do_move_end(&ops); dirty = 1;
+                    if (dms_enhanced(s)) em_ops_move(&ops, 10000); else do_move_end(&ops); dirty = 1;
                 } else if (e.key.keysym.sym == SDLK_RETURN ||
                            e.key.keysym.sym == SDLK_KP_ENTER) {
                     if (do_row_playable(&ops, ops.selected)) {
@@ -836,7 +1092,7 @@ int dms_special(DMS *s, const struct DO_Mission *list, int count)
                 break;
 
             case SDL_MOUSEWHEEL:
-                do_scroll(&ops, -e.wheel.y);
+                if (dms_enhanced(s)) em_scroll(-e.wheel.y); else do_scroll(&ops, -e.wheel.y);
                 dirty = 1;
                 break;
 
@@ -845,7 +1101,7 @@ int dms_special(DMS *s, const struct DO_Mission *list, int count)
                     int cx, cy, hit;
                     dms_to_menu(s, e.button.x, e.button.y, &cx, &cy);
                     s->mx = cx; s->my = cy;
-                    hit = do_hit_test(&ops, cx, cy);
+                    hit = em_ops_hit(&ops, cx, cy);
                     if (hit >= 0) {
                         ops.selected = hit;
                         ops.pressed = DO_HIT_NONE;
@@ -863,13 +1119,14 @@ int dms_special(DMS *s, const struct DO_Mission *list, int count)
                 if (e.button.button == SDL_BUTTON_LEFT) {
                     int cx, cy, hit;
                     dms_to_menu(s, e.button.x, e.button.y, &cx, &cy);
-                    hit = do_hit_test(&ops, cx, cy);
+                    hit = em_ops_hit(&ops, cx, cy);
                     if (hit == ops.pressed && hit == DO_HIT_PLAY
                         && do_row_playable(&ops, ops.selected)) {
                         result = ops.selected; done = 1;
                     } else if (hit == ops.pressed && hit == DO_HIT_CANCEL) {
                         result = DMS_CANCEL; done = 1;   /* back to the menu, NOT exit */
                     }
+                    if (hit == ops.pressed && hit <= -1000) em_ops_action(&ops, hit);
                     ops.pressed = DO_HIT_NONE;
                     dirty = 1;
                 }
@@ -932,6 +1189,8 @@ int dms_write_shot(DMS *s, const char *path)
     const int bw = s->surf.w * scale, bh = s->surf.h * scale;
     int ok;
     if (!s || !path || !*path) return 0;
+    if (dms_enhanced(s)) { int dw,dh; SDL_GL_GetDrawableSize(s->win,&dw,&dh);
+        dms_enh_scene(s); return em_write_shot(path,dw,dh); }
     db_surface_to_rgba(&s->surf, s->pack->pal8, s->rgba, 0);
     big = (unsigned char *)malloc((size_t)bw * bh * 4);
     if (!big) return 0;
@@ -955,6 +1214,10 @@ static void dms_lobby_shot(DMS *s, const char *dir, int n)
 
     if (!dir || !*dir)
         return;
+    if (dms_enhanced(s)) {
+        snprintf(path, sizeof path, "%s/lobby%02d.png", dir, n);
+        dms_write_shot(s, path); return;
+    }
     big = (unsigned char *)malloc((size_t)bw * bh * 4);
     if (!big)
         return;
@@ -984,6 +1247,21 @@ static void dms_lobby_step(DMS *s, const SK_State *st, const DMS_LobbyStep *step
         fflush(stdout);
         return;
     }
+    if (dms_enhanced(s)) {
+        /* BOTH ENHANCED LOBBIES use the visible control's rectangle, pressed where a
+           hand would press it, rather than the Classic rectangle underneath. */
+        int dw = 0, dh = 0;
+        SDL_GL_GetDrawableSize(s->win, &dw, &dh);
+        dms_enh_scene(s); em_viewport(dw, dh);
+        if (!em_item_rect(step->item, &rx, &ry, &rw, &rh)) {
+            printf("LOBBY|skip|%s|no Enhanced seat\n", sk_item_label(st, step->item));
+            fflush(stdout);
+            return;
+        }
+        mx = rx + (rw - 1) * step->fx / 1000;
+        my = ry + (rh - 1) * step->fy / 1000;
+        wx = (int)(mx / s->px); wy = (int)(my / s->py);
+    } else {
     if (!sk_item_rect(st, step->item, &rx, &ry, &rw, &rh)) {
         /* SAID, NOT SWALLOWED: a step whose control has no rectangle used to vanish
            without a line, and a script that did less than it claimed passed on a lower
@@ -995,6 +1273,7 @@ static void dms_lobby_step(DMS *s, const SK_State *st, const DMS_LobbyStep *step
     mx = rx + (rw - 1) * step->fx / 1000;
     my = ry + (rh - 1) * step->fy / 1000;
     dms_menu_to_window(s, mx, my, &wx, &wy);
+    }
     printf("LOBBY|click|%s|menu %d,%d|window %d,%d\n", sk_item_label(st, step->item), mx,
            my, wx, wy);
     fflush(stdout);
@@ -1066,6 +1345,7 @@ static void dms_lobby_net_push(const SK_State *lob, const struct SK_Map *maps)
        times a second, so the host's slider snapped to the left and would not move while
        Credits and Unit Count worked. The wire has carried it since version 4. */
     ns.build = r.build;
+    ns.ai_difficulty = r.ai_difficulty;
     /* THE NAMES ARE THE WIRE'S, NOT THE SCREEN'S. This struct is memset and rebuilt from
        the lobby every dirty frame; the handles were learned from each joiner's HELLO and
        live only in the setup, so rebuilding without carrying them across wiped all eight
@@ -1076,7 +1356,17 @@ static void dms_lobby_net_push(const SK_State *lob, const struct SK_Map *maps)
             int k;
             for (k = 0; k < NM_MAX_SEATS; k++)
                 snprintf(ns.name[k], sizeof ns.name[k], "%s", cur->name[k]);
+            /* A RED ALERT ROOM'S SEED is the room's own, drawn once when it opened, and
+               goes out unchanged with every push. */
+            if (lob->countries) ns.seed = cur->seed;
         }
+    }
+    /* A RED ALERT ROOM says so, and carries Red Alert's own rules. */
+    if (lob->countries) {
+        ns.game = 1;
+        ns.shroud = (unsigned char)(r.shroud ? 1 : 0);
+        ns.ctf = (unsigned char)(r.ctf ? 1 : 0);
+        ns.ai_difficulty = r.ai_difficulty;
     }
     /* THE MATCH'S TICK RATE, pushed on every dirty frame like every other rule on this
        screen. There is no speed row for a player to move yet, so what goes out is the
@@ -1092,10 +1382,12 @@ static void dms_lobby_net_push(const SK_State *lob, const struct SK_Map *maps)
     ns.seats = lob->net_seats > 0 ? lob->net_seats : sk_players(lob);
     ns.humans = 0;
     for (i = 0; i < NM_MAX_SEATS && i < SK_ROSTER_ROWS; i++) {
-        ns.house[i] = (unsigned char)(r.house[i] ? 1 : 0);
+        /* a Red Alert room's house is the seat's COUNTRY, Tiberian Dawn's the side */
+        ns.house[i] = (unsigned char)(lob->countries ? r.country[i] : (r.house[i] ? 1 : 0));
         ns.colour[i] = (unsigned char)((r.colour[i] < 0 || r.colour[i] > 7) ? (i & 7)
                                                                            : r.colour[i]);
         ns.team[i] = (unsigned char)r.team[i];
+        ns.ai_levels[i] = r.ai_levels[i];
         /* UNPICKED IS RANDOM, not "seat i": the brain deals the seat a start out of
            what is left, from the synchronised stream, so every peer deals the same one. */
         ns.start[i] = (unsigned char)((r.start_wp[i] >= 0) ? r.start_wp[i] : SK_START_RANDOM);
@@ -1183,7 +1475,8 @@ static void lobby_flush_my_seat(SK_State *lob)
     if (!lob || lob->net != 2 || !s_mySeatValid) return;
     me = lob->net_seat;
     if (me < 0 || me >= SK_ROSTER_ROWS) return;
-    hs = sk_row_house(lob, me);
+    /* a Red Alert joiner asks for its COUNTRY, which carries the side with it */
+    hs = lob->countries ? sk_row_country(lob, me) : sk_row_house(lob, me);
     tm = sk_row_team(lob, me);
     cl = sk_row_colour(lob, me);
     stt = sk_row_start(lob, me);
@@ -1290,7 +1583,17 @@ static void dms_lobby_net_sync(SK_State *lob, const struct SK_Map *maps, int cou
         lob->aitake  = ns->aitake ? 1 : 0;
         lob->shortgame = ns->shortgame ? 1 : 0;
         lob->units   = ns->unit_count;
+        lob->ai_difficulty = ns->ai_difficulty;
+        memcpy(lob->ai_levels, ns->ai_levels, sizeof lob->ai_levels);
         lob->side = ns->house[0] ? 1 : 0;
+        /* A RED ALERT ROOM: its houses are countries (the side follows from each), and
+           its own rules come with it. */
+        if (lob->countries && ns->game) {
+            lob->side = (ns->house[0] == 2 || ns->house[0] == 4);
+            lob->shroud = ns->shroud ? 1 : 0;
+            lob->ctf = ns->ctf ? 1 : 0;
+            lob->ai_difficulty = ns->ai_difficulty;
+        }
         for (i = 0; i < SK_ROSTER_ROWS && i < NM_MAX_SEATS; i++) {
             const int st_wire = (ns->start[i] == SK_START_RANDOM) ? -1 : ns->start[i];
             /* MY OWN ROW, WHILE MY PICK IS IN FLIGHT, IS MINE. Everything else on this
@@ -1310,7 +1613,9 @@ static void dms_lobby_net_sync(SK_State *lob, const struct SK_Map *maps, int cou
                lost) -- and then the host's answer stands, which is what makes a refusal
                visible instead of a screen that argues with the room. */
             if (lob->net == 2 && i == lob->net_seat && s_prefPending) {
-                const int agreed = ((ns->house[i] ? 1 : 0) == s_prefHouse
+                const int wire_house = (lob->countries && ns->game) ? ns->house[i]
+                                                                    : (ns->house[i] ? 1 : 0);
+                const int agreed = (wire_house == s_prefHouse
                                     && ns->team[i] == s_prefTeam
                                     && ns->colour[i] == s_prefColour
                                     && st_wire == s_prefStart);
@@ -1318,7 +1623,11 @@ static void dms_lobby_net_sync(SK_State *lob, const struct SK_Map *maps, int cou
                     continue;
                 s_prefPending = 0;
             }
-            lob->house[i]     = ns->house[i] ? 1 : 0;
+            if (lob->countries && ns->game && ns->house[i] < 8) {
+                lob->country[i] = ns->house[i];
+                lob->house[i]   = (ns->house[i] == 2 || ns->house[i] == 4);
+            } else
+                lob->house[i]     = ns->house[i] ? 1 : 0;
             lob->house_set[i] = 1;
             lob->team[i]      = ns->team[i];
             lob->colour[i]    = ns->colour[i];
@@ -1333,7 +1642,8 @@ static void dms_lobby_net_sync(SK_State *lob, const struct SK_Map *maps, int cou
            refused pick turns into two peers sending it back and forth. */
         if (lob->net == 2 && lob->net_seat >= 0 && lob->net_seat < SK_ROSTER_ROWS
             && !s_prefPending) {
-            s_myHouse  = sk_row_house(lob, lob->net_seat);
+            s_myHouse  = lob->countries ? sk_row_country(lob, lob->net_seat)
+                                        : sk_row_house(lob, lob->net_seat);
             s_myTeam   = sk_row_team(lob, lob->net_seat);
             s_myColour = sk_row_colour(lob, lob->net_seat);
             s_myStart  = sk_row_start(lob, lob->net_seat);
@@ -1360,6 +1670,8 @@ int dms_lobby_net(DMS *s, const struct SK_Map *maps, int count, const struct SK_
     int shots = 0, stepi = 0;
 
     sk_init(&lob, maps, count, prev);
+    /* Red Alert's seats are its countries, its tech runs to 10 */
+    if (s->cfg.red_alert) sk_set_red_alert(&lob);
     lob.net = net;
     lob.net_seat = -1;
     /* A JOINER'S ROWS ARE EMPTY UNTIL THE HOST'S ROOM ARRIVES. sk_init seats a human in
@@ -1392,6 +1704,7 @@ int dms_lobby_net(DMS *s, const struct SK_Map *maps, int count, const struct SK_
         int dirty = 0, done = 0, act = SK_ACT_NONE;
 
         while (SDL_PollEvent(&e)) {
+            if (dms_enhanced(s)) em_sound_event(&e, s->win);
             if (fs_handle_event(&e)) { dirty = 1; continue; }
             switch (e.type) {
             case SDL_QUIT:
@@ -1417,12 +1730,12 @@ int dms_lobby_net(DMS *s, const struct SK_Map *maps, int count, const struct SK_
 
             case SDL_MOUSEMOTION:
                 dms_to_menu(s, e.motion.x, e.motion.y, &s->mx, &s->my);
-                sk_motion(&lob, s->mx, s->my);
+                em_sk_motion(&lob, s->mx, s->my);
                 dirty = 1;
                 break;
 
             case SDL_MOUSEWHEEL:
-                sk_scroll(&lob, -e.wheel.y);
+                if (dms_enhanced(s)) em_scroll(-e.wheel.y); else sk_scroll(&lob, -e.wheel.y);
                 dirty = 1;
                 break;
 
@@ -1432,7 +1745,7 @@ int dms_lobby_net(DMS *s, const struct SK_Map *maps, int count, const struct SK_
                     dms_to_menu(s, e.button.x, e.button.y, &cx, &cy);
                     s->mx = cx;
                     s->my = cy;
-                    sk_press(&lob, cx, cy);
+                    em_sk_press(&lob, cx, cy);
                     /* A DOUBLE CLICK ON A ROW IN THE MAP PICKER IS OK: the 1995 list
                        shortcut (list.cpp:196, ListClass::Action), confined to the window
                        that has a list. The shell is the thing that knows what a double
@@ -1449,7 +1762,7 @@ int dms_lobby_net(DMS *s, const struct SK_Map *maps, int count, const struct SK_
                 if (e.button.button == SDL_BUTTON_LEFT) {
                     int cx, cy, a;
                     dms_to_menu(s, e.button.x, e.button.y, &cx, &cy);
-                    a = sk_release(&lob, cx, cy);
+                    a = em_sk_release(&lob, cx, cy);
                     if (a != SK_ACT_NONE)
                         act = a;
                     dirty = 1;
@@ -2405,6 +2718,7 @@ int dms_multiplayer(DMS *s, struct MP_State *stv, const struct NmSetup *setup,
     int was_pinging = 0;
 
     s->legal_active = 0;
+    s->browser = st;
     s_mp_ran = 0;
     SDL_ShowCursor(SDL_DISABLE);
     SDL_StartTextInput();          /* the two typed fields; stopped on every exit below */
@@ -2436,6 +2750,7 @@ int dms_multiplayer(DMS *s, struct MP_State *stv, const struct NmSetup *setup,
         const unsigned now = SDL_GetTicks();
 
         while (SDL_PollEvent(&e)) {
+            if (dms_enhanced(s)) em_sound_event(&e, s->win);
             if (fs_handle_event(&e)) { dirty = 1; continue; }
             switch (e.type) {
             case SDL_QUIT:
@@ -2454,11 +2769,11 @@ int dms_multiplayer(DMS *s, struct MP_State *stv, const struct NmSetup *setup,
             }
             case SDL_MOUSEMOTION:
                 dms_to_menu(s, e.motion.x, e.motion.y, &s->mx, &s->my);
-                mp_motion(st, s->mx, s->my);
+                em_mp_motion(st, s->mx, s->my);
                 dirty = 1;
                 break;
             case SDL_MOUSEWHEEL:
-                mp_scroll(st, -e.wheel.y);
+                if (dms_enhanced(s)) em_scroll(-e.wheel.y); else mp_scroll(st, -e.wheel.y);
                 dirty = 1;
                 break;
             case SDL_MOUSEBUTTONDOWN:
@@ -2468,14 +2783,14 @@ int dms_multiplayer(DMS *s, struct MP_State *stv, const struct NmSetup *setup,
                     s->mx = cx; s->my = cy;
                     /* A press on a row is a selection made now, even of the row that was
                        already highlighted. */
-                    if (mp_row_at(st, cx, cy) >= 0) {
+                    if (em_mp_row_at(st, cx, cy) >= 0) {
                         s_ping_carried[0] = '\0';
                         row_pressed = 1;
                     }
-                    act = mp_press(st, cx, cy);
+                    act = em_mp_press(st, cx, cy);
                     /* A double click on a row joins it, the shortcut every list in this
                        program gives and the one a browser most obviously wants. */
-                    if (e.button.clicks >= 2 && mp_row_at(st, cx, cy) >= 0
+                    if (e.button.clicks >= 2 && em_mp_row_at(st, cx, cy) >= 0
                         && !mp_item_disabled(st, MP_I_JOIN)) {
                         act = MP_ACT_JOIN;
                     }
@@ -2489,6 +2804,8 @@ int dms_multiplayer(DMS *s, struct MP_State *stv, const struct NmSetup *setup,
                 break;
             }
         }
+
+        if (act == DMS_MP_SETUP) { result = DMS_MP_SETUP; goto done; }
 
         /* ---- what the press asked for ---- */
         switch (act) {
@@ -2860,6 +3177,7 @@ int dms_multiplayer(DMS *s, struct MP_State *stv, const struct NmSetup *setup,
     }
 
 done:
+    s->browser = NULL;
     SDL_StopTextInput();
     /* A YOUR NAME BOX STILL OPEN IS SHUT UNANSWERED, and a held thumb is let go, whichever
        way the screen was left: neither belongs to the next visit. Before the write below,

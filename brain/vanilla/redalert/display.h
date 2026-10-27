@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Declares the cheat menu's Build Anywhere on DisplayClass: the static
+// per-house bitmask OpenCNC3D_BuildAnywhereHouses and its setter and query.
+// A set bit lifts the base adjacency rule only; display.cpp reads it.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/DISPLAY.H 1     3/03/97 10:24a Joe_bostic $ */
 /***********************************************************************************************
@@ -196,6 +205,15 @@ public:
                          MZoneType mzone = MZONE_NORMAL) const;
     bool In_View(register CELL cell) const;
     bool Passes_Proximity_Check(ObjectTypeClass const* object, HousesType house, short const* list, CELL trycell) const;
+
+    /*
+    ** OpenCNC3D: the cheat menu's "Build Anywhere". A house bit here lifts the base ADJACENCY
+    ** rule for that house and nothing else: whether the ground takes a foundation is decided
+    ** in CellClass, which this does not touch.
+    */
+    static unsigned OpenCNC3D_BuildAnywhereHouses;
+    static void OpenCNC3D_Set_Build_Anywhere(HousesType house, bool on);
+    static bool OpenCNC3D_Build_Anywhere(HousesType house);
     ObjectClass* Cell_Object(CELL cell, int x = 0, int y = 0) const;
     ObjectClass* Next_Object(ObjectClass* object) const;
     ObjectClass* Prev_Object(ObjectClass* object) const;

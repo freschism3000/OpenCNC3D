@@ -518,6 +518,8 @@ public:
     bool Can_Build(UnitType unit, HousesType) const;
     bool Can_Build(AircraftType aircraft, HousesType house) const;
     bool Can_Build(TechnoTypeClass const* type, HousesType house) const;
+    bool Can_Build_With_Prerequisites(TechnoTypeClass const* type, HousesType house,
+                                      unsigned int prerequisites) const;
     unsigned char const* Remap_Table(bool blushing = false, bool unit = false) const;
 
     TechnoTypeClass const* Suggest_New_Object(RTTIType objectype) const;

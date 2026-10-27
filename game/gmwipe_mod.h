@@ -1,19 +1,20 @@
 /* ====================================================================================
- *  gmwipe_mod.h -- SPACE cycles the graphics mode, live, behind an energy line.
+ *  gmwipe_mod.h -- SPACE cycles the graphics mode, live, by tearing the picture up.
  *
  *  WHAT A PLAYER SEES. SPACE takes the game to the next graphics mode (Classic, then
  *  N64, then Enhanced, then Classic again; where N64 is not offered, as in Red Alert,
- *  Classic and Enhanced in turn). A bright line of energy sweeps
- *  across the screen from left to right, easing in and out; everything left of it is
- *  already the new mode and everything right of it is still the old one. The new mode's
- *  name comes up large at the top of the screen, holds, and fades.
+ *  Classic and Enhanced in turn). The old picture is torn up cell by cell from left to
+ *  right, each piece turning over and flying off to the right like a carpet of tiles
+ *  ripped up from one end, with the new mode already there beneath; the ground shakes
+ *  and a low rumble goes with it (THE TILE RIP, below). The new mode's name comes up
+ *  large at the top of the screen, holds, and fades.
  *
  *  HOW. The old mode's last finished frame is copied into a texture (a snapshot), the
  *  mode is switched through the same apply the Visuals screen uses (so the choice is
- *  saved like any other), and while the line travels each new frame is drawn normally
- *  with the snapshot laid back over the part of the screen the line has not reached.
- *  Nothing is rendered twice: the right half is a still picture for the half second the
- *  line takes, which is what makes the switch free of cost while it happens.
+ *  saved like any other), and while the rip runs each new frame is drawn normally with
+ *  the snapshot's pieces drawn back over it, flat where the front has not reached them.
+ *  Nothing is rendered twice: the pieces are a still picture for the second and a half
+ *  the rip takes, which is what makes the switch free of cost while it happens.
  *
  *  WHERE IN THE FRAME. After fx_present, when the finished picture (post chain, sidebar
  *  and all) is on the real framebuffer, and before the pointer: while a snapshot is due
@@ -45,10 +46,17 @@
 #define GL_GENERATE_MIPMAP 0x8191
 #endif
 
-static const float GMW_WIPE_S     = 0.55f;  /* the line's crossing, eased in and out   */
 static const float GMW_TITLE_IN   = 0.15f;  /* the title's fade in                     */
 static const float GMW_TITLE_HOLD = 3.00f;  /* how long it stands before fading        */
 static const float GMW_TITLE_FADE = 0.60f;  /* its fade out                            */
+
+/* THE TILE RIP (its own section below): the front's crossing and one tile's own time. */
+static const float GMW_RIP_S  = 0.95f;   /* the tear front's crossing, eased in and out    */
+static const float GMW_TILE_S = 0.50f;   /* one tile, first lift to gone                   */
+static const float GMW_RIP_SHAKE = 0.07f; /* the camera's jolt while it runs, in cells    */
+/* The whole wipe: the crossing, and the last tile's own time after it. */
+static float gmw_wipe_total(void) { return GMW_RIP_S + GMW_TILE_S; }
+static void gmw_rumble_build(short** out, int* outN);
 
 enum { GMW_IDLE = 0, GMW_CAPTURE = 1, GMW_WIPE = 2 };
 
@@ -273,139 +281,17 @@ static void gmw_text(const char* s, float cx, float top, float caps, float track
 }
 
 /* ================================================================================== *
- *  THE LINE
+ *  THE SOUND
+ *
+ *  The rumble of the rip (built in THE RUMBLE, below), SYNTHESISED once at boot like the
+ *  rain (rain_audio.h): no clip on either disc is this, so there is no asset to license
+ *  and the same bytes on every machine. It is played on the effects bus, so the Sound
+ *  volume slider is its volume, and panned left to right with the tear front while it
+ *  plays (gmw_frame). Nothing about the game's own sound changes.
  * ================================================================================== */
-
-/* A vertical band of light centred on x, `half` wide either side, falling off roughly as
-   a gaussian (four steps), its brightness breathing along its length. */
-static void gmw_band(float x, float half, float h, float r, float g, float b, float peak,
-                     float t, float flow)
-{
-    static const float off[4] = { 0.0f, 0.22f, 0.52f, 1.0f };
-    static const float amp[4] = { 1.0f, 0.62f, 0.22f, 0.0f };
-    const int SEG = 40;
-    for (int side = -1; side <= 1; side += 2)
-        for (int k = 0; k < 3; k++) {
-            glBegin(GL_QUAD_STRIP);
-            for (int s = 0; s <= SEG; s++) {
-                const float y = h * (float)s / SEG;
-                const float yn = (float)s / SEG;
-                const float pulse = 1.0f - flow + flow * (0.5f + 0.5f * sinf(yn * 23.0f - t * 19.0f)
-                                                               * sinf(yn * 7.0f + t * 11.0f));
-                glColor4f(r, g, b, peak * amp[k] * pulse);
-                glVertex2f(x + side * off[k] * half, y);
-                glColor4f(r, g, b, peak * amp[k + 1] * pulse);
-                glVertex2f(x + side * off[k + 1] * half, y);
-            }
-            glEnd();
-        }
-}
-
-static void gmw_draw_line(float x, int fbw, int fbh, float p)
-{
-    float r, g, b;
-    gmw_mode_rgb(g_gmwTarget, &r, &g, &b);
-    const float H = (float)fbh, u = (float)fbh / 800.0f;
-    const float t = g_gmwT;
-    /* Brightest in the middle of the crossing, never dark at either end. */
-    const float swell = 0.75f + 0.25f * sinf(p * 3.14159f);
-
-    glDisable(GL_TEXTURE_2D);
-    glEnable(GL_BLEND);
-    glShadeModel(GL_SMOOTH);
-
-    /* The old picture darkens where the line is about to burn through it. */
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glBegin(GL_QUADS);
-    glColor4f(0.0f, 0.0f, 0.0f, 0.55f); glVertex2f(x, 0); glVertex2f(x, H);
-    glColor4f(0.0f, 0.0f, 0.0f, 0.0f);  glVertex2f(x + 70.0f * u, H); glVertex2f(x + 70.0f * u, 0);
-    glEnd();
-
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    /* A wash over the freshly revealed picture that the line leaves behind it. */
-    glBegin(GL_QUADS);
-    glColor4f(r, g, b, 0.0f);          glVertex2f(x - 260.0f * u, 0); glVertex2f(x - 260.0f * u, H);
-    glColor4f(r, g, b, 0.16f * swell); glVertex2f(x, H); glVertex2f(x, 0);
-    glEnd();
-    gmw_band(x, 90.0f * u, H, r, g, b, 0.32f * swell, t, 0.35f);          /* the halo   */
-    gmw_band(x, 22.0f * u, H, r * 0.7f + 0.3f, g * 0.7f + 0.3f, b * 0.7f + 0.3f,
-             0.85f * swell, t, 0.55f);                                     /* the body   */
-    gmw_band(x, 3.2f * u + 1.0f, H, 1.0f, 1.0f, 1.0f, 1.0f, t, 0.15f);    /* the core   */
-
-    /* ARCS: three jagged threads of current wrapped round the core, re-struck every
-       35 ms, so the line crackles rather than glows. */
-    {
-        const unsigned strike = (unsigned)(t / 0.035f);
-        const int N = 36;
-        glLineWidth(1.0f + 1.2f * u);
-        for (int a = 0; a < 3; a++) {
-            glBegin(GL_LINE_STRIP);
-            for (int s = 0; s <= N; s++) {
-                const float y = H * (float)s / N;
-                const float j = (gmw_rand(strike * 7u + a, (unsigned)s) - 0.5f) * 2.0f;
-                const float amp = (10.0f + 16.0f * gmw_rand(strike, 100u + a)) * u;
-                const float al = 0.35f + 0.55f * gmw_rand(strike * 3u + a, 500u + s);
-                glColor4f(r * 0.5f + 0.5f, g * 0.5f + 0.5f, b * 0.5f + 0.5f, al * swell);
-                glVertex2f(x + j * amp, y);
-            }
-            glEnd();
-        }
-        glLineWidth(1.0f);
-    }
-
-    /* SPARKS thrown back off the line into the new picture: each has a birth time on a
-       fixed schedule and a deterministic path, so no state is kept between frames. */
-    {
-        const int PER_S = 320;
-        const float LIFE = 0.30f;
-        const int first = (int)((t - LIFE) * PER_S), last = (int)(t * PER_S);
-        glBegin(GL_LINES);
-        for (int i = first < 0 ? 0 : first; i <= last; i++) {
-            const float born = (float)i / PER_S;
-            const float age = t - born;
-            if (age < 0.0f || age > LIFE) continue;
-            if (born > GMW_WIPE_S * 0.92f) continue;   /* none once the line has gone */
-            /* where the line was when the spark left it */
-            const float pb = born / GMW_WIPE_S;
-            const float pad = 120.0f * u;
-            const float bx = -pad + ((float)fbw + 2.0f * pad) * gmw_ease(pb);
-            const float by = H * gmw_rand((unsigned)i, 11u);
-            const float sp = (140.0f + 360.0f * gmw_rand((unsigned)i, 12u)) * u;
-            const float vy = (gmw_rand((unsigned)i, 13u) - 0.5f) * 260.0f * u;
-            const float px = bx - sp * age, py = by + vy * age + 380.0f * u * age * age;
-            const float k = 1.0f - age / LIFE;
-            const float tail = 0.035f;
-            glColor4f(1.0f, 1.0f, 1.0f, k);
-            glVertex2f(px, py);
-            glColor4f(r, g, b, 0.0f);
-            glVertex2f(px + sp * tail, py - (vy + 760.0f * u * age) * tail);
-        }
-        glEnd();
-    }
-}
-
-/* ================================================================================== *
- *  THE WHOOSH
- *
- *  The sound of the line going by, SYNTHESISED once at boot like the rain (rain_audio.h):
- *  no clip on either disc is this, so there is no asset to license and the same bytes on
- *  every machine. Built to the line's own motion rather than laid over it:
- *
- *    THE BODY   noise through a resonant band pass whose centre follows the line's SPEED,
- *               the derivative of the same cubic ease the picture uses, so the pitch and
- *               the loudness swell as the line accelerates and fall as it slows. A little
- *               higher on the way in than on the way out, which is how a pass-by sounds.
- *    THE AIR    the noise above the band, quieter, for the rush.
- *    THE SPARK  sparse clicks of a few samples, high, riding the envelope: the arcs.
- *
- *  It is played on the effects bus, so the Sound volume slider is its volume, and panned
- *  left to right with the line while it plays (gmw_frame). Nothing about the game's own
- *  sound changes.
- * ================================================================================== */
-static const float GMW_WHOOSH_S = 0.75f;   /* the clip: the crossing and a short tail   */
-static short* g_gmwWhoosh = NULL;
-static int    g_gmwWhooshN = 0;
-static int    g_gmwWhooshVoice = -1;
+static short* g_gmwRumble = NULL;
+static int    g_gmwRumbleN = 0;
+static int    g_gmwRumbleVoice = -1;
 
 static float gmw_speed(float p)            /* the ease's slope, 0..1, peak at p = 0.5 */
 {
@@ -414,102 +300,54 @@ static float gmw_speed(float p)            /* the ease's slope, 0..1, peak at p 
     return d / 3.0f;
 }
 
-/* Where the whoosh sits, -1000 left to +1000 right, when the line is `p` of the way across:
-   the line's own eased position, kept a little in from the edges. One function for play
-   and for the WAV, so the gate hears what the player hears. */
-static int gmw_whoosh_pan(float p)
+/* Where the sound sits, -1000 left to +1000 right, when the front is `p` of the way
+   across: the front's own eased position, kept a little in from the edges. One function
+   for play and for the WAV, so the gate hears what the player hears. */
+static int gmw_rumble_pan(float p)
 {
     return (int)(-700.0f + 1400.0f * gmw_ease(p));
 }
 
-static void gmw_whoosh_build(void)
+static void gmw_rumble_build(void)
 {
-    if (g_gmwWhoosh) return;
-    const int N = (int)(MIX_RATE * GMW_WHOOSH_S);
-    float* b = (float*)malloc(sizeof(float) * (size_t)N);
-    short* pcm = (short*)malloc(sizeof(short) * (size_t)N);
-    if (!b || !pcm) { free(b); free(pcm); return; }
-    unsigned lcg = 0x2468ACE1u;               /* a fixed generator: the same bytes every run */
-    float low = 0.0f, band = 0.0f, env = 0.0f, spark = 0.0f, sparkHp = 0.0f, peak = 0.0f;
-    float air = 0.0f, sparkLp = 0.0f;
-    const float fs = (float)MIX_RATE;
-    for (int i = 0; i < N; i++) {
-        const float t = (float)i / fs;
-        const float p = t / GMW_WIPE_S;
-        lcg = lcg * 1664525u + 1013904223u;
-        const float x = (float)(int)(lcg >> 8) * (1.0f / 8388608.0f) - 1.0f;
-        /* the envelope chases the line's speed: quick to rise, slower to let go */
-        const float target = powf(gmw_speed(p), 0.75f);
-        env += (target - env) * (target > env ? 0.0020f : 0.00035f) * (44100.0f / fs);
-        /* the band's centre: up with the speed, a touch lower once past the middle */
-        const float sp = gmw_speed(p);
-        const float fc = (320.0f + 2600.0f * sp) * (p < 0.5f ? 1.10f : 0.85f);
-        const float f = 2.0f * sinf(3.14159265f * (fc < fs * 0.2f ? fc : fs * 0.2f) / fs);
-        const float q = 0.30f;   /* resonant: a pitched rush, not flat noise */
-        low += f * band;
-        const float high = x - low - q * band;
-        band += f * high;
-        /* sparse sparks: a click now and then, more of them where the line is fastest */
-        lcg = lcg * 1664525u + 1013904223u;
-        if ((float)(lcg >> 8) * (1.0f / 16777216.0f) < 0.0009f * env) spark += 1.0f;
-        spark *= 0.80f;
-        const float sparkH = spark - sparkHp;   /* a one-pole high pass: only the click */
-        sparkHp += 0.25f * (spark - sparkHp);
-        sparkLp += 0.35f * (sparkH - sparkLp);  /* and not above ~3.5 kHz: a crackle, not a tick */
-        air += 0.18f * (high - air);            /* the rush above the band, rounded off */
-        const float v = env * (band * 1.00f + low * 0.15f + air * 0.12f) + sparkLp * 0.30f * env;
-        b[i] = v;
-        if (fabsf(v) > peak) peak = fabsf(v);
-    }
-    /* to a fixed peak, with 3 ms either end faded so the clip starts and stops on zero */
-    const float sc = peak > 1e-6f ? 21000.0f / peak : 0.0f;
-    const int ramp = (int)(fs * 0.003f);
-    for (int i = 0; i < N; i++) {
-        float v = b[i] * sc;
-        if (i < ramp) v *= (float)i / ramp;
-        if (i > N - 1 - ramp) v *= (float)(N - 1 - i) / ramp;
-        pcm[i] = (short)(v > 32767.0f ? 32767 : v < -32768.0f ? -32768 : (int)v);
-    }
-    free(b);
-    g_gmwWhoosh = pcm;
-    g_gmwWhooshN = N;
-    fprintf(stderr, "GFXWIPE|whoosh built: %d samples at %d Hz\n", N, MIX_RATE);
+    if (g_gmwRumble) return;
+    gmw_rumble_build(&g_gmwRumble, &g_gmwRumbleN);
 }
 
-static void gmw_whoosh_play(void)
+static void gmw_rumble_play(void)
 {
     if (!g_au) return;
-    gmw_whoosh_build();
-    if (!g_gmwWhoosh) return;
+    gmw_rumble_build();
+    if (!g_gmwRumble) return;
     Mixer* m = cnc_audio_mixer(g_au);
-    if (g_gmwWhooshVoice >= 0 && mixer_voice_active(m, g_gmwWhooshVoice))
-        mixer_voice_stop(m, g_gmwWhooshVoice);
+    if (g_gmwRumbleVoice >= 0 && mixer_voice_active(m, g_gmwRumbleVoice))
+        mixer_voice_stop(m, g_gmwRumbleVoice);
     /* priority 200: above the battle's ordinary effects, so a busy fight cannot steal
        the one sound that says the picture just changed */
-    g_gmwWhooshVoice = mixer_play(m, MIX_BUS_FX, g_gmwWhoosh, g_gmwWhooshN, 800, gmw_whoosh_pan(0.0f), 200);
-    printf("GFXWIPE|whoosh|%s\n", g_gmwWhooshVoice >= 0 ? "playing" : "REFUSED");
+    g_gmwRumbleVoice = mixer_play(m, MIX_BUS_FX, g_gmwRumble, g_gmwRumbleN, 800, gmw_rumble_pan(0.0f), 200);
+    printf("GFXWIPE|rumble|%s\n", g_gmwRumbleVoice >= 0 ? "playing" : "REFUSED");
     fflush(stdout);
 }
 
-/* THE WHOOSH ON ITS OWN, rendered through a fresh copy of the game's mixer with the same
-   left-to-right pan steps gmw_whoosh_follow gives it at 60 frames a second, and written
+/* THE RUMBLE ON ITS OWN, rendered through a fresh copy of the game's mixer with the same
+   left-to-right pan steps gmw_rumble_follow gives it at 60 frames a second, and written
    as a stereo WAV. For a gate, and for a listener who is not at the machine: the headless
    recorder only advances with engine ticks, so a switch between ticks never reaches it. */
-static int gmw_whoosh_wav(const char* path)
+static int gmw_rumble_wav(const char* path)
 {
-    gmw_whoosh_build();
-    if (!g_gmwWhoosh) return 0;
+    gmw_rumble_build();
+    if (!g_gmwRumble) return 0;
     Mixer* m = mixer_create();
     WavOut* w = m ? wav_open(path, MIX_RATE, 2) : NULL;
     if (!w) { if (m) mixer_destroy(m); return 0; }
-    const int v = mixer_play(m, MIX_BUS_FX, g_gmwWhoosh, g_gmwWhooshN, 800, gmw_whoosh_pan(0.0f), 200);
+    const int v = mixer_play(m, MIX_BUS_FX, g_gmwRumble, g_gmwRumbleN, 800, gmw_rumble_pan(0.0f), 200);
     const int frame = MIX_RATE / 60;                 /* one display frame of samples */
     std::vector<short> buf((size_t)frame * 2);
-    const long total = (long)g_gmwWhooshN + MIX_RATE / 4;
+    const long total = (long)g_gmwRumbleN + MIX_RATE / 4;
     for (long at = 0; at < total; at += frame) {
-        const float p = (float)at / (float)MIX_RATE / GMW_WIPE_S;
+        const float p = (float)at / (float)MIX_RATE / GMW_RIP_S;
         if (v >= 0 && mixer_voice_active(m, v))
-            mixer_voice_gain(m, v, 800, gmw_whoosh_pan(p));
+            mixer_voice_gain(m, v, 800, gmw_rumble_pan(p));
         mixer_render(m, &buf[0], frame);
         wav_write(w, &buf[0], (long)frame * 2);
     }
@@ -517,18 +355,422 @@ static int gmw_whoosh_wav(const char* path)
     const double rms = wav_rms(w);
     wav_close(w);
     mixer_destroy(m);
-    printf("GFXWIPE|whoosh wav|%s|peak=%d|rms=%.0f\n", path, pk, rms);
+    printf("GFXWIPE|rumble wav|%s|peak=%d|rms=%.0f\n", path, pk, rms);
     fflush(stdout);
     return 1;
 }
 
-/* Left to right with the line, while it plays. */
-static void gmw_whoosh_follow(float p)
+/* Left to right with the front, while it plays. */
+static void gmw_rumble_follow(float p)
 {
-    if (!g_au || g_gmwWhooshVoice < 0) return;
+    if (!g_au || g_gmwRumbleVoice < 0) return;
     Mixer* m = cnc_audio_mixer(g_au);
-    if (!mixer_voice_active(m, g_gmwWhooshVoice)) { g_gmwWhooshVoice = -1; return; }
-    mixer_voice_gain(m, g_gmwWhooshVoice, 800, gmw_whoosh_pan(p));
+    if (!mixer_voice_active(m, g_gmwRumbleVoice)) { g_gmwRumbleVoice = -1; return; }
+    mixer_voice_gain(m, g_gmwRumbleVoice, 800, gmw_rumble_pan(p));
+}
+
+/* ================================================================================== *
+ *  THE TILE RIP
+ *
+ *  WHAT A PLAYER SEES. The old picture is not wiped by a line: it is torn up, cell by
+ *  cell, from left to right. A ragged front crosses the screen; as it passes a map cell
+ *  the cell's piece of the old picture comes up on its left side, turns over towards the
+ *  right and flies off that way, as a carpet of tiles would if it were ripped up from
+ *  the left, and the new mode is already there beneath it. The ground shakes while it
+ *  runs, and a low rumble goes with it. Units, buildings and shroud go up with the ground they stood on, like a
+ *  carpet lifted with everything on it. Rows start a little apart so the front tears
+ *  rather than marches. The sidebar comes up last, in one piece.
+ *
+ *  HOW. At the snapshot the four corners of every map cell are projected through the old
+ *  mode's own camera (Classic's flat window or the console camera with the heightmap),
+ *  which gives each cell a quadrilateral on the screen and the same quadrilateral in the
+ *  snapshot. A tile at rest is that quadrilateral drawn flat, which is the old picture
+ *  exactly; a lifted one is the same four corners rotated about its hinge in a small 3D
+ *  overlay whose z = 0 plane is the screen in pixels. The depth buffer sorts the pieces.
+ *  Cells that would stray under the sidebar are held in by a scissor to the map's
+ *  rectangle. Fixed function throughout: one copied texture, quads, blending.
+ *
+ *  THE CLOCK. The front's crossing takes GMW_RIP_S, eased in and out, and a tile sets
+ *  off at the moment the front reaches it (the ease inverted, so a frozen
+ *  clock placed by hand gives the same picture every run); each tile then takes
+ *  GMW_TILE_S from its first lift to gone. Everything is a function of the one clock and
+ *  the per-wipe seed: no state is kept between frames.
+ * ================================================================================== */
+
+struct GmwTile {
+    float x[4], y[4];      /* rest corners on the screen, pixel space, y down             */
+    float u[4], v[4];      /* the same corners in the snapshot                            */
+    float trig;            /* the screen x at which the front sets it off                 */
+    float size;            /* its width on the screen, the reach of its lift              */
+    int   hud;             /* 1: a piece of the HUD, outside the map's scissor            */
+    unsigned id;           /* its own number, for its own scatter and axis                */
+};
+static std::vector<GmwTile> g_gmwTiles;
+static float g_gmwMapRect[4] = { 0, 0, 0, 0 };   /* x0 y0 x1 y1 of the map at the snapshot */
+static int   g_gmwMapRectOn = 0;
+
+/* The cubic ease run backwards: at what fraction of the crossing is the front at `y`. */
+static float gmw_ease_inv(float y)
+{
+    if (y <= 0.0f) return 0.0f;
+    if (y >= 1.0f) return 1.0f;
+    return y < 0.5f ? cbrtf(y * 0.25f) : 1.0f - 0.5f * cbrtf(2.0f * (1.0f - y));
+}
+
+static void gmw_tile_push(const float* x, const float* y, int fbw, int fbh, int hud, float jitter)
+{
+    GmwTile t;
+    float minx = 1e9f, maxx = -1e9f;
+    for (int i = 0; i < 4; i++) {
+        t.x[i] = x[i]; t.y[i] = y[i];
+        t.u[i] = x[i] / (float)fbw;
+        t.v[i] = 1.0f - y[i] / (float)fbh;
+        if (x[i] < minx) minx = x[i];
+        if (x[i] > maxx) maxx = x[i];
+    }
+    t.size = maxx - minx;
+    t.trig = minx + jitter * t.size;
+    t.hud  = hud;
+    t.id   = (unsigned)g_gmwTiles.size() * 7919u + 17u;
+    g_gmwTiles.push_back(t);
+}
+
+static void gmw_rect_push(float x0, float y0, float x1, float y1, int fbw, int fbh, int hud,
+                          float jitter)
+{
+    if (x1 - x0 < 0.5f || y1 - y0 < 0.5f) return;
+    const float x[4] = { x0, x1, x1, x0 }, y[4] = { y0, y0, y1, y1 };
+    gmw_tile_push(x, y, fbw, fbh, hud, jitter);
+}
+
+/* A strip of the screen outside the map (the bar above a letterboxed Classic view, say),
+   cut into pieces a cell wide so it tears with the ground rather than lifting whole. */
+static void gmw_strip_push(float x0, float y0, float x1, float y1, float step, int fbw, int fbh,
+                           unsigned salt)
+{
+    if (y1 - y0 < 0.5f) return;
+    if (step < 8.0f) step = 8.0f;
+    int k = 0;
+    for (float x = x0; x < x1 - 0.5f; x += step, k++)
+        gmw_rect_push(x, y0, fminf(x + step, x1), y1, fbw, fbh, 1,
+                      (gmw_rand(salt, (unsigned)k) - 0.5f) * 0.9f);
+}
+
+/* Called at the snapshot, while the OLD mode's camera and layout are still the ones on
+   screen: every cell's corners through that camera. */
+static void gmw_rip_capture(int fbw, int fbh)
+{
+    g_gmwTiles.clear();
+    g_gmwMapRectOn = 0;
+    const float W = (float)fbw, H = (float)fbh;
+    sb_layout(fbw, fbh);
+    const bool flat = g_fx.dos_classic;
+    float mx0 = 0.0f, my0 = 0.0f, mx1 = W, my1 = H;     /* the map's screen rectangle */
+    float cellPx = H / 8.0f;
+    float panelX = g_dbW > 0.0f ? sb_panel_x(fbw) : W;
+    if (flat) {
+        const float scale = g_dos2dRa ? (float)g_ra95WorldScale : (float)g_dbScale;
+        const int viewW = g_dos2dRa ? g_ra95ViewW : 240;
+        const int viewH = g_dos2dRa ? g_ra95ViewH : 200;
+        mx0 = g_dbX0 - (float)viewW * scale; mx1 = g_dbX0;
+        my0 = g_dbY0;                        my1 = g_dbY0 + (float)viewH * scale;
+        cellPx = 24.0f * scale;
+        panelX = g_dbX0;
+    } else {
+        mx1 = panelX;
+    }
+    if (mx0 < 0.0f) mx0 = 0.0f;
+    if (my0 < 0.0f) my0 = 0.0f;
+    if (mx1 > W) mx1 = W;
+    if (my1 > H) my1 = H;
+    g_gmwMapRect[0] = mx0; g_gmwMapRect[1] = my0; g_gmwMapRect[2] = mx1; g_gmwMapRect[3] = my1;
+    g_gmwMapRectOn = 1;
+
+    static const int OX[4] = { 0, 1, 1, 0 }, OZ[4] = { 0, 0, 1, 1 };
+    int cells = 0;
+    for (int cz = 0; cz < g_gridH; cz++) {
+        for (int cx = 0; cx < g_gridW; cx++) {
+            float x[4], y[4];
+            bool ok = true;
+            for (int i = 0; i < 4 && ok; i++) {
+                const float wx = (float)(cx + OX[i]), wz = (float)(cz + OZ[i]);
+                const float wy = flat ? 0.0f : terrain_corner_y(cx + OX[i], cz + OZ[i]);
+                ok = project_point(wx, wy, wz, fbw, fbh, &x[i], &y[i]);
+            }
+            if (!ok) continue;                        /* a corner behind the camera */
+            float minx = x[0], maxx = x[0], miny = y[0], maxy = y[0];
+            for (int i = 1; i < 4; i++) {
+                if (x[i] < minx) minx = x[i]; if (x[i] > maxx) maxx = x[i];
+                if (y[i] < miny) miny = y[i]; if (y[i] > maxy) maxy = y[i];
+            }
+            if (maxx <= mx0 || minx >= mx1 || maxy <= my0 || miny >= my1) continue;
+            if (maxx - minx > W || maxy - miny > H) continue;   /* a cell on the eye's own plane */
+            if (maxy - miny < 1.5f && maxx - minx < 1.5f) continue;   /* a sliver at the horizon */
+            if (flat) {
+                /* Classic's cells are rectangles: clip the ones at the window's edge, so the
+                   piece is the part that was on screen and nothing of the sidebar. */
+                for (int i = 0; i < 4; i++) {
+                    x[i] = x[i] < mx0 ? mx0 : x[i] > mx1 ? mx1 : x[i];
+                    y[i] = y[i] < my0 ? my0 : y[i] > my1 ? my1 : y[i];
+                }
+            }
+            gmw_tile_push(x, y, fbw, fbh, 0, (gmw_rand((unsigned)cx, (unsigned)cz) - 0.5f) * 1.6f);
+            cells++;
+        }
+    }
+    /* What is left of the screen: strips round the map, and the sidebar in one piece. */
+    gmw_strip_push(0.0f, 0.0f, panelX, my0, cellPx, fbw, fbh, 901u);
+    gmw_strip_push(0.0f, my1, panelX, H, cellPx, fbw, fbh, 902u);
+    gmw_strip_push(0.0f, my0, mx0, my1, cellPx, fbw, fbh, 903u);
+    gmw_rect_push(panelX, 0.0f, W, H, fbw, fbh, 1, 0.0f);
+    fprintf(stderr, "GFXWIPE|rip: %d cells, %d pieces, map %.0f,%.0f-%.0f,%.0f, panel at %.0f\n",
+            cells, (int)g_gmwTiles.size(), mx0, my0, mx1, my1, panelX);
+}
+
+/* One tile at `q` of its own time (0 at rest, 1 gone): where its corners are in the
+   overlay's space, and which way it faces. */
+static void gmw_tile_place(const GmwTile* t, float q, float W, float H, float D,
+                           float* px, float* py, float* pz, int* front, float* shade)
+{
+    /* THE HINGE is through the middle of the tile's RIGHTMOST edge on the screen: the
+       carpet is ripped up from the left, so each tile's left side is what comes up, and
+       it turns over towards the right. Each tile's axis is tilted a little from that
+       edge, its own way, so a column of tiles does not come up as one slat. */
+    int ha = 1, hb = 2;
+    {
+        float best = -1e9f;
+        for (int e = 0; e < 4; e++) {
+            const int a = e, b = (e + 1) & 3;
+            const float mid = 0.5f * (t->x[a] + t->x[b]);
+            if (mid > best) { best = mid; ha = a; hb = b; }
+        }
+    }
+    const float ax = 0.5f * (t->x[ha] + t->x[hb]), ay = 0.5f * (t->y[ha] + t->y[hb]);
+    float dx = t->x[hb] - t->x[ha], dy = t->y[hb] - t->y[ha];
+    {
+        const float l = sqrtf(dx * dx + dy * dy);
+        if (l > 1e-4f) { dx /= l; dy /= l; } else { dx = 0.0f; dy = 1.0f; }
+        const float tilt = (gmw_rand(t->id, 3u) - 0.5f) * 0.42f;    /* about +-12 degrees */
+        const float ct = cosf(tilt), st = sinf(tilt);
+        const float rx = dx * ct - dy * st, ry = dx * st + dy * ct;
+        dx = rx; dy = ry;
+    }
+    /* e: the in-plane direction from the hinge towards the tile's lifting side. */
+    float ex = -dy, ey = dx;
+    {
+        float side = 0.0f;
+        for (int i = 0; i < 4; i++) side += (t->x[i] - ax) * ex + (t->y[i] - ay) * ey;
+        if (side < 0.0f) { ex = -ex; ey = -ey; }
+    }
+    /* THE MOTION. The turn: the left side comes up towards the eye and over to the
+       right, past upright, in the first six tenths, as a carpet's edge does when it is
+       pulled up and thrown over. The flight: from a third in the tile lets go, keeps
+       turning, and flies to the right and a little up before it drops, fading in its
+       last four tenths. Its own number gives it its own spin, reach and height. */
+    const float turn  = gmw_smooth(0.0f, 0.60f, q);
+    const float fly   = gmw_smooth(0.33f, 1.0f, q);
+    const float theta = 2.6f * turn + (0.8f + 0.8f * gmw_rand(t->id, 5u)) * fly;
+    const float hx = ax + (3.0f + 2.5f * gmw_rand(t->id, 6u)) * t->size * powf(fly, 1.5f);
+    const float hy = ay - (0.8f + 0.8f * gmw_rand(t->id, 7u)) * t->size * fly
+                   + 1.6f * t->size * fly * fly;
+    const float hz = 0.45f * t->size * turn + 0.5f * t->size * fly;
+    const float c = cosf(theta), sn = sinf(theta);
+    float cx = 0.0f, cy = 0.0f, cz = 0.0f;
+    for (int i = 0; i < 4; i++) {
+        const float vx = t->x[i] - ax, vy = t->y[i] - ay;
+        const float along = vx * dx + vy * dy;
+        const float out   = vx * ex + vy * ey;
+        px[i] = hx + along * dx + out * c * ex;
+        py[i] = hy + along * dy + out * c * ey;
+        pz[i] = hz + out * sn;
+        cx += px[i] * 0.25f; cy += py[i] * 0.25f; cz += pz[i] * 0.25f;
+    }
+    /* The face the eye sees: the tile's normal against the line to the eye. */
+    const float nx = -sn * ex, ny = -sn * ey, nz = c;
+    const float vx = W * 0.5f - cx, vy = H * 0.5f - cy, vz = D - cz;
+    *front = (nx * vx + ny * vy + nz * vz) > 0.0f ? 1 : 0;
+    /* Lit the same on either face: full as it lies, a little darker as it tilts, so the
+       peel has a shadow side; the underside shows the same picture as the top. */
+    *shade = 0.65f + 0.35f * fabsf(c);
+}
+
+static void gmw_draw_rip(int fbw, int fbh)
+{
+    const float W = (float)fbw, H = (float)fbh;
+    const float t = g_gmwT;
+    const float p = t / GMW_RIP_S;
+    const float u = H / 800.0f;
+    const float front = W * gmw_ease(p);
+    float r, g, b;
+    gmw_mode_rgb(g_gmwTarget, &r, &g, &b);
+
+    /* THE OVERLAY'S SPACE: a perspective whose z = 0 plane is the screen in pixels, y
+       down, the eye at (W/2, H/2, D) looking straight at it. A tile at rest is drawn
+       exactly where the snapshot had it; a lifted one comes towards the eye. */
+    const double D = 1.5 * (double)fbh, n = D * 0.05, f = D * 8.0;
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glFrustum(-0.5 * W * n / D, 0.5 * W * n / D, 0.5 * H * n / D, -0.5 * H * n / D, n, f);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    glTranslated(-0.5 * W, -0.5 * H, -D);
+    {   /* The pieces jolt with the ground beneath them: the camera shake the rip holds
+           (gmw_frame), turned into pixels at the look-at depth, so the old picture and
+           the new one shake as one surface. */
+        float sx, sz;
+        shake_offset(&sx, &sz);
+        const float ppc = g_fx.dos_classic ? 24.0f * (float)g_dbScale : W / 24.6f;
+        glTranslatef(-sx * ppc, -sz * ppc * 0.7f, 0.0f);
+    }
+
+    glDepthMask(GL_TRUE);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, g_gmwSnap);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    const int N = (int)g_gmwTiles.size();
+    for (int pass = 0; pass < 2; pass++) {
+        /* Pass 0: the map's pieces, held inside the map's rectangle so a lifting cell
+           never shows from under the sidebar. Pass 1: the HUD's pieces, unclipped. */
+        if (pass == 0 && g_gmwMapRectOn) {
+            const float x0 = g_gmwMapRect[0], y0 = g_gmwMapRect[1];
+            const float x1 = g_gmwMapRect[2], y1 = g_gmwMapRect[3];
+            glScissor(g_vpOffX + (int)x0, g_vpOffY + (int)(H - y1), (int)(x1 - x0), (int)(y1 - y0));
+            glEnable(GL_SCISSOR_TEST);
+        } else {
+            cnc_screen_viewport(fbw, fbh);   /* its own scissor, or none */
+        }
+        /* Every piece in one textured batch: both faces carry the picture. */
+        glEnable(GL_TEXTURE_2D);
+        glBegin(GL_QUADS);
+        for (int i = 0; i < N; i++) {
+            const GmwTile* tl = &g_gmwTiles[i];
+            if (tl->hud != pass) continue;
+            const float t0 = GMW_RIP_S * gmw_ease_inv(tl->trig / W);
+            const float q = (t - t0) / GMW_TILE_S;
+            if (q >= 1.0f) continue;
+            if (q <= 0.0f) {
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                for (int k = 0; k < 4; k++) {
+                    glTexCoord2f(tl->u[k], tl->v[k]);
+                    glVertex3f(tl->x[k], tl->y[k], 0.0f);
+                }
+                continue;
+            }
+            float px[4], py[4], pz[4], shade;
+            int fr;
+            gmw_tile_place(tl, q, W, H, (float)D, px, py, pz, &fr, &shade);
+            const float a = 1.0f - gmw_smooth(0.60f, 1.0f, q);
+            (void)fr;
+            /* A touch of the arriving mode's colour on the lit face as it swings, the way
+               the line's wash coloured what it uncovered. */
+            const float warm = 0.18f * gmw_smooth(0.0f, 0.5f, q) * (1.0f - gmw_smooth(0.5f, 1.0f, q));
+            glColor4f(shade + warm * r, shade + warm * g, shade + warm * b, a);
+            for (int k = 0; k < 4; k++) {
+                glTexCoord2f(tl->u[k], tl->v[k]);
+                glVertex3f(px[k], py[k], pz[k]);
+            }
+        }
+        glEnd();
+    }
+    cnc_screen_viewport(fbw, fbh);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+
+    /* THE FRONT ITSELF, in the flat overlay: the old picture darkens where it is about to
+       be torn, as a carpet does where it is pulled, and the new picture behind the front
+       carries a faint wash of the arriving mode's colour (gmw_mode_rgb). */
+    if (front > -200.0f * u && front < W + 200.0f * u) {
+        glShadeModel(GL_SMOOTH);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBegin(GL_QUADS);
+        glColor4f(0.0f, 0.0f, 0.0f, 0.30f); glVertex2f(front, 0); glVertex2f(front, H);
+        glColor4f(0.0f, 0.0f, 0.0f, 0.0f);  glVertex2f(front + 90.0f * u, H); glVertex2f(front + 90.0f * u, 0);
+        glEnd();
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glBegin(GL_QUADS);
+        glColor4f(r, g, b, 0.0f);   glVertex2f(front - 220.0f * u, 0); glVertex2f(front - 220.0f * u, H);
+        glColor4f(r, g, b, 0.10f);  glVertex2f(front, H); glVertex2f(front, 0);
+        glEnd();
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+}
+
+/* ================================================================================== *
+ *  THE RUMBLE
+ *
+ *  The rip's sound, SYNTHESISED once at boot like the rain (rain_audio.h), to
+ *  the front's own motion: a low rumble, the ground coming up.
+ *
+ *    THE BODY    noise through a resonant low pass near 65 Hz: the weight. (A random
+ *                walk was tried first and put nearly all the energy below 40 Hz, where
+ *                most speakers have nothing to say.)
+ *    THE ROLL    noise through a second resonance near 95 Hz: the movement in it.
+ *    THE GRIND   a band in the low mids, for the pieces against each other.
+ *
+ *  Measured on the rendered clip: about a third of the energy below 40 Hz, two fifths
+ *  between 40 and 80, a fifth between 80 and 160, centroid near 110 Hz.
+ *
+ *  The loudness follows the front's speed, rising quickly and letting go slowly, and it
+ *  runs on past the crossing for the last pieces' flight before it fades.
+ * ================================================================================== */
+static void gmw_rumble_build(short** out, int* outN)
+{
+    const float total = GMW_RIP_S + GMW_TILE_S + 0.45f;
+    const int N = (int)(MIX_RATE * total);
+    float* b = (float*)malloc(sizeof(float) * (size_t)N);
+    short* pcm = (short*)malloc(sizeof(short) * (size_t)N);
+    if (!b || !pcm) { free(b); free(pcm); return; }
+    unsigned lcg = 0x13579BDFu;               /* a fixed generator: the same bytes every run */
+    const float fs = (float)MIX_RATE;
+    const float f1 = 2.0f * sinf(3.14159265f * 65.0f / fs);
+    const float f2 = 2.0f * sinf(3.14159265f * 95.0f / fs);
+    const float fg = 2.0f * sinf(3.14159265f * 230.0f / fs);
+    float l1 = 0.0f, b1 = 0.0f, l2 = 0.0f, b2 = 0.0f, lg = 0.0f, bg = 0.0f;
+    float env = 0.0f, peak = 0.0f;
+    for (int i = 0; i < N; i++) {
+        const float t = (float)i / fs;
+        const float p = t / GMW_RIP_S;
+        const float sp = gmw_speed(p);                        /* the front's speed, 0..1 */
+        lcg = lcg * 1664525u + 1013904223u;
+        const float x = (float)(int)(lcg >> 8) * (1.0f / 8388608.0f) - 1.0f;
+        /* the loudness: with the front, quick to rise, slow to let go; after the crossing
+           it holds for the last pieces, then goes */
+        const float target = p <= 1.0f ? 0.30f + 0.70f * powf(sp, 0.6f)
+                           : (t < GMW_RIP_S + GMW_TILE_S * 0.6f ? 0.30f : 0.0f);
+        env += (target - env) * (target > env ? 0.0009f : 0.00010f) * (44100.0f / fs);
+        l1 += f1 * b1; { const float h = x - l1 - 0.50f * b1; b1 += f1 * h; }
+        l2 += f2 * b2; { const float h = x - l2 - 0.45f * b2; b2 += f2 * h; }
+        lg += fg * bg; { const float h = x - lg - 0.70f * bg; bg += fg * h; }
+        const float v = env * (l1 * 1.00f + l2 * 0.60f + bg * 0.30f);
+        b[i] = v;
+        if (fabsf(v) > peak) peak = fabsf(v);
+    }
+    const float sc = peak > 1e-6f ? 21000.0f / peak : 0.0f;
+    const int ramp = (int)(fs * 0.010f);
+    for (int i = 0; i < N; i++) {
+        float v = b[i] * sc;
+        if (i < ramp) v *= (float)i / ramp;
+        if (i > N - 1 - ramp) v *= (float)(N - 1 - i) / ramp;
+        pcm[i] = (short)(v > 32767.0f ? 32767 : v < -32768.0f ? -32768 : (int)v);
+    }
+    free(b);
+    *out = pcm;
+    *outN = N;
+    fprintf(stderr, "GFXWIPE|rumble built: %d samples at %d Hz\n", N, MIX_RATE);
 }
 
 /* ================================================================================== *
@@ -689,7 +931,7 @@ static void gmw_prewarm(void)
 static void gmw_frame(int fbw, int fbh)
 {
     gmw_font_build();   /* once, on the first frame, so the first press has no build in it */
-    if (g_au) gmw_whoosh_build();
+    if (g_au) gmw_rumble_build();
     /* And everything the other two modes build the first time they are drawn. */
     terrain_remaster_prebuild_tick();
     gmw_prewarm();
@@ -752,6 +994,7 @@ static void gmw_frame(int fbw, int fbh)
         /* This frame is the old mode's last, already on the glass: keep it, switch, and
            the line sets off on the next one. */
         gmw_capture(fbw, fbh);
+        gmw_rip_capture(fbw, fbh);
         {
             const Uint64 a = SDL_GetPerformanceCounter();
             gmw_switch(g_gmwTarget);
@@ -762,10 +1005,12 @@ static void gmw_frame(int fbw, int fbh)
         g_gmwState = GMW_WIPE;
         g_gmwT = 0.0f;
         g_gmwTitleT = 0.0f;
-        gmw_whoosh_play();
+        gmw_rumble_play();
+        printf("GFXWIPE|rip|pieces=%d|shake=%.3f|shake_on=%d\n", (int)g_gmwTiles.size(),
+               GMW_RIP_SHAKE, g_fx.shake_on ? 1 : 0);
         g_gmwTitleMode = g_gmwTarget;
         g_gmwSeed = g_gmwSeed * 1664525u + 1013904223u;
-    } else if (g_gmwState == GMW_WIPE && g_gmwT >= GMW_WIPE_S && !g_gmwFrozen) {
+    } else if (g_gmwState == GMW_WIPE && g_gmwT >= gmw_wipe_total() && !g_gmwFrozen) {
         g_gmwState = GMW_IDLE;
         if (g_gmwQueued) { g_gmwQueued = 0; gmw_request(); }
     }
@@ -779,7 +1024,12 @@ static void gmw_frame(int fbw, int fbh)
         g_gmwSwitchAt = 0;
     }
     const bool wiping = (g_gmwState == GMW_WIPE);
-    if (wiping) gmw_whoosh_follow(g_gmwT / GMW_WIPE_S);
+    if (wiping) gmw_rumble_follow(g_gmwT / GMW_RIP_S);
+    /* THE SHAKE: held at one strength for as long as the rip runs (a note of equal
+       strength restarts the jolt every frame, so its decay never gets going), then it
+       dies away by the game's own decay once the last piece is gone. Engine-tick driven
+       like every other shake, so a scripted shot is the same picture every run. */
+    if (wiping) shake_note(GMW_RIP_SHAKE);
     const bool title = g_gmwTitleT >= 0.0f && g_gmwTitleT < GMW_TITLE_HOLD + GMW_TITLE_FADE;
     if (!wiping && !title) {
         if (g_gmwTitleT >= GMW_TITLE_HOLD + GMW_TITLE_FADE) g_gmwTitleT = -1.0f;
@@ -789,30 +1039,7 @@ static void gmw_frame(int fbw, int fbh)
 
     begin_overlay(fbw, fbh);
     glDisable(GL_CULL_FACE);
-    if (wiping) {
-        const float u = (float)fbh / 800.0f;
-        const float p = g_gmwT / GMW_WIPE_S;
-        const float pad = 120.0f * u;
-        const float x = -pad + ((float)fbw + 2.0f * pad) * gmw_ease(p);
-        /* The old picture, right of the line. */
-        if (x < (float)fbw && g_gmwSnap) {
-            const float x0 = x < 0.0f ? 0.0f : x;
-            const float u0 = x0 / (float)fbw;
-            glDisable(GL_BLEND);
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, g_gmwSnap);
-            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-            glBegin(GL_QUADS);
-            glTexCoord2f(u0, 1.0f);   glVertex2f(x0, 0.0f);
-            glTexCoord2f(1.0f, 1.0f); glVertex2f((float)fbw, 0.0f);
-            glTexCoord2f(1.0f, 0.0f); glVertex2f((float)fbw, (float)fbh);
-            glTexCoord2f(u0, 0.0f);   glVertex2f(x0, (float)fbh);
-            glEnd();
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glDisable(GL_TEXTURE_2D);
-        }
-        gmw_draw_line(x, fbw, fbh, p);
-    }
+    if (wiping) gmw_draw_rip(fbw, fbh);
     if (title && g_gmwFontTex) {
         const float tt = g_gmwTitleT;
         const float a = gmw_smooth(0.0f, GMW_TITLE_IN, tt)

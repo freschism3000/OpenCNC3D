@@ -22,11 +22,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, os.path.join(REPO, "menu", "tools"))
 import mixlib  # noqa: E402  (the TD filename hash, the same one the game uses)
+sys.path.insert(0, os.path.join(REPO, "tools", "ra3d"))
+import ramix  # noqa: E402  (Red Alert's encrypted MIX headers, keyed from the engine source)
 
 USER_AGENT = "OpenCNC3D-media-tools/1"
 ISO_BLOCK = 2048
 ISO_PVD = 16 * ISO_BLOCK  # the primary volume descriptor is sector 16
-DISCS = ("GDI", "NOD", "COVERT")
+DISCS = ("GDI", "NOD", "COVERT", "RA_ALLIED", "RA_SOVIET")
+# The folders whose files belong to a module rather than to the game: the launcher fetches
+# them only where that module is installed (`module` lines in the manifest).
+MODULES = ("ra3d",)
 
 
 def mix_id(name):
@@ -374,6 +379,83 @@ class MixIndex:
         return self.start + self.data_start + e[0], e[1]
 
 
+class RaMixIndex:
+    """A Red Alert MIX file's index, read by range: out of a disc image, or out of another
+    MIX the way MAIN.MIX holds MOVIES1.MIX and SCORES.MIX.
+
+    A Red Alert archive may begin with a u16 zero and a flag word, 0x0002 meaning its
+    index is encrypted: an 80-byte RSA block holding a Blowfish key, then the
+    Blowfish-encrypted count, size and index in whole 8-byte blocks. The file BODIES are
+    never encrypted, so every entry is still one contiguous run of the image's bytes, and
+    only the index has to be decrypted to find it (tools/ra3d/ramix.py, keyed from the
+    engine's own source). `order` keeps the entries in the order the index lists them,
+    which is the order a plain header rewritten from it must keep.
+    """
+
+    def __init__(self, img, start, fsize, label):
+        self.label = label
+        self.start = start  # offset of the MIX inside the disc image
+        self.fsize = fsize
+        h = img.read(start, 4)
+        first, flags = struct.unpack_from("<hH", h, 0)
+        self.encrypted = False
+        if first == 0:
+            p = 4
+            if flags & 2:
+                self.encrypted = True
+                key, keylen = ramix._rsa_key(img.read(start + p, 80))
+                p += keylen
+                bf = ramix.Blowfish(key)
+                head = bf.decrypt(img.read(start + p, 8))
+                count, size = struct.unpack_from("<HI", head, 0)
+                hlen = 6 + 12 * count
+                padded = (hlen + 7) // 8 * 8
+                head = bf.decrypt(img.read(start + p, padded))
+                p += padded
+                index = head[6:hlen]
+            else:
+                count, size = struct.unpack_from("<HI", img.read(start + p, 6), 0)
+                index = img.read(start + p + 6, 12 * count)
+                p += 6 + 12 * count
+        else:
+            count, size = struct.unpack_from("<HI", img.read(start, 6), 0)
+            index = img.read(start + 6, 12 * count)
+            p = 6 + 12 * count
+        if count <= 0 or count > 20000 or p + size > fsize:
+            raise FetchError("%s: implausible index (%d entries, %d bytes of data in a "
+                             "%d-byte file)" % (label, count, size, fsize))
+        self.count, self.datasize, self.data_start = count, size, p
+        self.order = []
+        self.entries = {}
+        for k in range(count):
+            eid, off, sz = struct.unpack_from("<III", index, 12 * k)
+            if off + sz > size:
+                raise FetchError("%s: entry 0x%08X runs past the data" % (label, eid))
+            self.order.append(eid)
+            self.entries[eid] = (off, sz)
+
+    def find_id(self, eid):
+        """(offset inside the disc image, size) of an entry by its MIX ID, or None."""
+        e = self.entries.get(eid)
+        if not e:
+            return None
+        return self.start + self.data_start + e[0], e[1]
+
+    def find(self, name):
+        return self.find_id(mix_id(name))
+
+    def plain_header(self):
+        """The Tiberian Dawn layout of this index, the one audio/mixfile.c reads: u16
+        count, u32 size, then id, offset, size for each entry in the index's order.
+        Followed by the data block unchanged, it is the archive the game's audio reads
+        (tools/ra3d/stage-audio.py writes the same bytes from the disc's file)."""
+        out = bytearray(struct.pack("<HI", self.count, self.datasize))
+        for eid in self.order:
+            off, sz = self.entries[eid]
+            out += struct.pack("<III", eid, off, sz)
+        return bytes(out)
+
+
 # ------------------------------------------------------------------ local files
 
 def sha256_file(path):
@@ -402,11 +484,13 @@ def head_tail(path_or_bytes, size, window=65536):
 # ------------------------------------------------------------------ the manifest
 
 class Manifest:
-    """The OCMEDIA 1 text: mirrors, files and legacy paths. See tools/media/README.md."""
+    """The OCMEDIA 1 text: mirrors, modules, files and legacy paths. See
+    tools/media/README.md."""
 
     def __init__(self, text):
         self.mirrors = []   # (disc, url, base) in preference order
-        self.files = []     # dicts: component relpath size sha256 disc offset
+        self.modules = []   # folders whose files only a module's install fetches
+        self.files = []     # dicts: component relpath size sha256 disc offset head
         self.legacy = []    # (component, relpath)
         lines = [ln.strip() for ln in text.splitlines()]
         body = [ln for ln in lines if ln and not ln.startswith("#")]
@@ -416,13 +500,26 @@ class Manifest:
             f = ln.split()
             if f[0] == "mirror" and len(f) == 4:
                 self.mirrors.append((f[1], f[2], int(f[3])))
-            elif f[0] == "file" and len(f) == 7:
+            elif f[0] == "module" and len(f) == 2 and f[1] in MODULES:
+                self.modules.append(f[1])
+            elif f[0] == "file" and len(f) in (7, 8):
+                head = bytes.fromhex(f[7]) if len(f) == 8 else b""
+                if len(head) >= int(f[3]):
+                    raise ValueError("a file's head is not shorter than the file: %s" % ln)
                 self.files.append({"component": f[1], "relpath": f[2], "size": int(f[3]),
-                                   "sha256": f[4], "disc": f[5], "offset": int(f[6])})
+                                   "sha256": f[4], "disc": f[5], "offset": int(f[6]),
+                                   "head": head})
             elif f[0] == "legacy" and len(f) == 3:
                 self.legacy.append((f[1], f[2]))
             else:
                 raise ValueError("unreadable manifest line: %s" % ln)
+
+    def module_of(self, relpath):
+        """The module folder a file belongs to, or None for the game's own."""
+        for m in self.modules:
+            if relpath.lower().startswith(m.lower() + "/"):
+                return m
+        return None
 
     @staticmethod
     def load(path):

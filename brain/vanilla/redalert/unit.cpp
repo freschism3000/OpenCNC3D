@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Runs mobile Gap Generator shroud as simulation logic, including AI visibility.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -98,6 +99,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 #include "keyframe.h"
 #include "common/miscasm.h"
 
@@ -5246,7 +5248,8 @@ void UnitClass::Shroud_Regen(void)
         int centerx, centery;
         CELL trycell;
 
-        if (Session.Type != GAME_GLYPHX_MULTIPLAYER || Is_Legacy_Render_Enabled()) {
+        {
+            // Mobile gaps are simulation rules even when the remaster renderer is hidden.
             // Only restore under the shroud if it's a valid field.
             if (ShroudBits != (unsigned)-1L) {
                 centerx = Cell_X(ShroudCenter);
@@ -5292,10 +5295,10 @@ void UnitClass::Shroud_Regen(void)
 
         } else {
 
-            if (Is_Legacy_Render_Enabled()) {
+            {
                 for (int i = 0; i < Session.Players.Count(); i++) {
                     HouseClass* player_house = HouseClass::As_Pointer(Session.Players[i]->Player.ID);
-                    if (player_house->IsHuman && player_house != House) {
+                    if ((player_house->IsHuman || FairAI_RA_Enabled(player_house)) && player_house != House) {
                         Map.Constrained_Look(Coord, 5 * CELL_LEPTON_W, player_house);
                     }
                 }

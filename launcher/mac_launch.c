@@ -53,11 +53,13 @@ static int has_named(const char* d, const char* name, int exec)
     return 0;
 }
 
-/* A folder is "the game" only if it carries the binary AND two things only the real
-   package has. Testing for opencnc3d alone would let a stray copy of the binary win. */
+/* The platform can be empty or hold only RA. Its native launcher and bootstrap
+   art identify it before a game exists; old full-Dawn folders remain supported.
+   has_named retains the interrupted-update .old recovery route for both cases. */
 static int is_game_dir(const char* d)
 {
     if (!d || !*d) return 0;
+    if (has_named(d, "opencnc3d-launcher", 1) && has_named(d, "dosmenu.pack", 0)) return 1;
     return has_named(d, "opencnc3d", 1) && has_named(d, "TiberianDawn.dylib", 0)
         && has_named(d, "dosmenu.pack", 0);
 }
@@ -180,7 +182,7 @@ int main(void)
         if (!ask_choose(msg)) return 1;
         if (!pick_folder(dir, sizeof dir) || !is_game_dir(dir)) {
             alert("That folder does not contain the game.\n\n"
-                  "Look for the folder holding opencnc3d, TiberianDawn.dylib and the .pack files. "
+                  "Look for the folder holding opencnc3d-launcher and the .pack files. "
                   "It is the folder the download unzipped into.");
             return 1;
         }
@@ -188,7 +190,11 @@ int main(void)
 
     if (chdir(dir) != 0) { alert("Could not open the game folder."); return 1; }
 
-    for (size_t i = 0; i < sizeof NEED / sizeof NEED[0]; i++) {
+    /* A launcher-only/RA-only platform has no Dawn sidebar or cameo pack. The
+       launcher draws from dosmenu.pack; the full list is only the legacy direct
+       Dawn fallback used when no launcher exists. */
+    for (size_t i = 0; !has_named(".", "opencnc3d-launcher", 1)
+                         && i < sizeof NEED / sizeof NEED[0]; i++) {
         if (!has_named(".", NEED[i], 0)) {
             char m[512];
             snprintf(m, sizeof m, "Missing %s in %s.", NEED[i], dir);

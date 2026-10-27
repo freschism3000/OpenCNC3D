@@ -24,6 +24,10 @@
 // and NOTICE.md lists every modified file.
 //
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Rejects hidden enemy object destinations for fair skirmish vehicles.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\drive.cpv   2.17   16 Oct 1995 16:51:16   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -1657,7 +1661,7 @@ int DriveClass::Offload_Tiberium_Bail(void)
 {
     if (Tiberium) {
         Tiberium--;
-        if (House->IsHuman) {
+        if (House->IsHuman || GameToPlay != GAME_NORMAL) {
             return (UnitTypeClass::FULL_LOAD_CREDITS / UnitTypeClass::STEP_COUNT); // 25 in debugger
         }
 
@@ -1912,6 +1916,47 @@ DriveClass::TrackType const DriveClass::Track12[] = {{0xFF550060L, DIR_SW_X2},
 /*
 **	Drive out of weapon's factory.
 */
+// Private cinematic capture only: native rail normal to WEAP's measured doorway.
+// No environment flag in a normal launch: the original track below remains authoritative.
+bool OpenCNC3D_FilmStraightFactory = getenv("OPENCNC3D_FILM_STRAIGHT_FACTORY")
+    && !strcmp(getenv("OPENCNC3D_FILM_STRAIGHT_FACTORY"), "1");
+// End at a native cell centre, preserving a straight doorway-to-ground rail.
+// A subcell endpoint makes the next stock path track snap to the centre.
+DriveClass::TrackType const DriveClass::FilmFactoryTrack[] = {
+    {XY_Coord(106, -480), (DirType)137},
+    {XY_Coord(103, -465), (DirType)137},
+    {XY_Coord(99, -449), (DirType)137},
+    {XY_Coord(96, -434), (DirType)137},
+    {XY_Coord(92, -418), (DirType)137},
+    {XY_Coord(89, -403), (DirType)137},
+    {XY_Coord(85, -387), (DirType)137},
+    {XY_Coord(82, -372), (DirType)137},
+    {XY_Coord(79, -356), (DirType)137},
+    {XY_Coord(75, -341), (DirType)137},
+    {XY_Coord(72, -325), (DirType)137},
+    {XY_Coord(68, -310), (DirType)137},
+    {XY_Coord(65, -294), (DirType)137},
+    {XY_Coord(62, -279), (DirType)137},
+    {XY_Coord(58, -263), (DirType)137},
+    {XY_Coord(55, -248), (DirType)137},
+    {XY_Coord(51, -232), (DirType)137},
+    {XY_Coord(48, -217), (DirType)137},
+    {XY_Coord(44, -201), (DirType)137},
+    {XY_Coord(41, -186), (DirType)137},
+    {XY_Coord(38, -170), (DirType)137},
+    {XY_Coord(34, -155), (DirType)137},
+    {XY_Coord(31, -139), (DirType)137},
+    {XY_Coord(27, -124), (DirType)137},
+    {XY_Coord(24, -108), (DirType)137},
+    {XY_Coord(21, -93), (DirType)137},
+    {XY_Coord(17, -77), (DirType)137},
+    {XY_Coord(14, -62), (DirType)137},
+    {XY_Coord(10, -46), (DirType)137},
+    {XY_Coord(7, -31), (DirType)137},
+    {XY_Coord(3, -15), (DirType)137},
+    {XY_Coord(0, 0), (DirType)137}
+};
+
 DriveClass::TrackType const DriveClass::Track13[] = {{XYP_COORD(10, -21), (DirType)(DIR_SW - 10)},
                                                      {XYP_COORD(10, -21), (DirType)(DIR_SW - 10)},
                                                      {XYP_COORD(10, -20), (DirType)(DIR_SW - 10)},
@@ -1955,7 +2000,7 @@ DriveClass::RawTrackType const DriveClass::RawTracks[13] = {{Track1, -1, 0, -1},
                                                             {Track10, -1, 0, -1},
                                                             {Track11, -1, 0, -1},
                                                             {Track12, -1, 0, -1},
-                                                            {Track13, -1, 0, -1}};
+                                                            {OpenCNC3D_FilmStraightFactory ? FilmFactoryTrack : Track13, -1, 0, -1}};
 
 /***************************************************************************
 **	Smooth turning control table. Given two directions in a path list, this

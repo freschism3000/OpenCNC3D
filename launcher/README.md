@@ -107,25 +107,40 @@ line for the gear, all in the picture's own pixels, and every `LBTN|` line now s
 whether that slot is `hidden` on the screen pictured. `LSTATUS|text=` is the status line
 as drawn, and on Setup, Settings and Install `LAPPLY|movies|music|asks|game|enabled`
 says what the first button would hand to lmedia, and whether the removal question
-would come first.
+would come first. An `LMOD|` line per module tile gives its `name`, whether it is
+`installed` and `selected`, its rectangle, and `drawn=1` when the picture is the module
+grid; for Red Alert's slot, `missing=` says why it is empty.
 
 ## The modules
 
-A module is another game built on this engine, started from this launcher and able to play
-across to the others. OpenCNC3D is the first one, and the grid of four tiles is where the next
-one goes.
+A module is another game built on this engine, started from the shared OpenCNC3D
+launcher. The Tiberian Dawn entry is **Dawn3D**; Red Alert is **RA3D**. The card,
+browser, install/details, Settings and removal views share each module display
+name. OpenCNC3D keeps its platform branding, accepted artwork, package product
+names and filenames. Technical module IDs and save/settings locations are unchanged.
 
 The filled tile carries the C&C emblem, scaled out of the title plate the launcher is
 already standing on rather than baked into the pack as a second copy, so an install made
-before the grid existed still draws it. The three empty ones are drawn in the engine's own
+before the grid existed still draws it. An empty tile is drawn in the engine's own
 disabled colourway with a plus and the word "Coming soon", and pressing one opens the
 module browser.
 
-**The browser lists nothing, and will until there is a second module.** Nothing in the grid
-is read off the disk: there is no module format, no install path and no cross play
-handshake yet. The browser is a real screen with a real empty list rather than a button
-that does nothing, because the day a second module exists the only change is what the list
-reads from.
+**Red Alert 3D is the second tile when its module is in the folder,** under `ra3d/`, and
+`--module ra3d` starts it. What makes it installed is a fixed list in `lmodule.c`
+(`lmod_ra_needs`): its game, its brain, its menu pack, its first map, the sound archives
+and the mission files, which are all things a package carries. Its movies and its score
+are not on that list and must never be: no package carries them, and the game plays
+without them. A slot without its module is drawn empty, and `--module ra3d --play`
+refuses, naming the first file missing. The movies and music ask the same test before
+they fetch Red Alert's own movies and score, so they are downloaded exactly where the
+tile is live. `tools/launcher/module-check.sh` (gate G337) builds a folder
+shaped like a package from the play folder and proves the tile is live there and the game
+starts.
+
+**The browser lists nothing, and will until there is a module to fetch.** There is no
+module format, no download and no cross play handshake yet. The browser is a real screen
+with a real empty list rather than a button that does nothing, because the day a module
+can be fetched the only change is what the list reads from.
 
 The keyboard walks both rows: Up and Down move between the tiles and the buttons, Left and
 Right walk the row you are in, Return presses, and Escape leaves the screen you are on and
@@ -136,11 +151,12 @@ launcher/build.sh                     macOS  -> launcher/opencnc3d-launcher
 tools/win/build-launcher-win.sh       Windows -> build/win/OpenCNC3D.exe
 tools/win/make-installer-win.sh       Windows -> ~/Desktop/OpenCNC3D-Setup-vX.Y.Z.exe
 tools/launcher/selftest.sh            prove the whole update path, end to end
+tools/launcher/module-check.sh        prove a package-shaped folder shows and starts Red Alert
 ```
 
 You do not normally run any of these by hand. `game/make-build.sh` builds the macOS
 launcher into `playable/`, `tools/win/make-build-win.sh` builds the Windows one into the
-package, and `tools/release.sh` does the lot (repository rules rule 9).
+package, and `tools/release.sh` does the lot.
 
 ## Why it is not a new UI toolkit
 
@@ -165,6 +181,7 @@ targets. The only Tier 2 dependency is SDL2, exactly as the game has.
 | `lmedia_manifest.c` | **generated**, committed: which file sits where on which disc image, with its size and SHA-256 |
 | `lsetup_cli.c` | the headless `--media-install`, `--install-game` and `--fetch-menu-art` modes the Windows setup program runs |
 | `lpath.c/h` | where am I: `_NSGetExecutablePath` / `GetModuleFileName`, not `SDL_GetBasePath` |
+| `lcmdline.c/h` | the game's command line: how many arguments after `--` are carried (a longer list is refused, never cut), and the quoting of each one into the single string Windows' CreateProcess takes |
 | `lnet.c/h` | one HTTP GET following redirects, and a ranged GET with resume that a Stop interrupts at once. libcurl on macOS, WinINet on Windows |
 | `ljson.c/h` | just enough JSON to read the site's two API routes, and refuse anything else |
 | `lzip.c/h` | SHA-256, and a zip extractor that refuses hostile paths and Zip64 |
@@ -375,11 +392,11 @@ script can tell the three apart without reading the text.
 
 The `--` passthrough is how the macOS bundle keeps handing the game `--w 1600 --h 960`.
 That is not a number the launcher should know: the sidebar magnifies by whole numbers
-only, so the window height has to be a multiple of 480 (`known-gap notes`).
+only, so the window height has to be a multiple of 480.
 
 ## What is not done
 
-Registered in `known-gap notes` rather than left to be rediscovered:
+Known limitations:
 
 1. **Neither the Windows launcher nor the installer has been RUN on Windows.** Both cross
    compile clean and the installer counts the files it embedded, but that is packaging

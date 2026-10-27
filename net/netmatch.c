@@ -78,7 +78,7 @@ static unsigned nm_now_ms(void)
    3 since the match became a star of up to eight: WELCOME now names the seat the host
    assigned, START carries the final roster once everyone is in, and SYNC names the seat
    it came from so a hash can be attributed. A v2 peer would take a seat nobody gave it. */
-#define NM_VERSION 12  /* 4: the tech level travels; 5: a per-seat mode does too;
+#define NM_VERSION 14  /* 4: the tech level travels; 5: a per-seat mode does too;
                           6: AI takeover and short game; 7: player names, so the
                           HELLO carries a handle and the setup carries eight;
                           8: the start waits for every seat's round trip.
@@ -113,7 +113,14 @@ static unsigned nm_now_ms(void)
                           Refused by name instead.
 
                           12 includes the engine-owned building power-off state in the
-                          world hash and the POWER_SWITCH order in the brain ABI. */
+                          world hash and the POWER_SWITCH order in the brain ABI.
+
+                          13: the setup says which engine the room plays and carries the
+                          match seed and Red Alert's own rules (shroud regrowth, capture the
+                          flag, the computers' difficulty); a seat's house may be a Red
+                          Alert country. A 12 would play a Red Alert room on its own seed
+                          and without those rules, so it is refused by name. A Tiberian
+                          Dawn room's new bytes are all zero. */
 #define NM_JOIN_TIMEOUT_MS 10000u   /* HELLOs unanswered this long is failed, by name */
 /* HOW LONG A PRESSED START WAITS FOR A SEAT THAT HAS NOT ANSWERED A PING, and how often
    that seat is asked while it does. About a dozen asks, fewer when the caller polls more
@@ -291,6 +298,7 @@ static void lobby_normalise(void)
         else if (m == NM_SEAT_HUMAN) m = NM_SEAT_OPEN;
         else if (m != NM_SEAT_BOT && m != NM_SEAT_BLOCK) m = NM_SEAT_OPEN;
         s_setup.mode[i] = m;
+        if (s_setup.ai_levels[i] > 3) s_setup.ai_levels[i] = 1;
         /* THE NAME FOLLOWS THE MODE, in the one place the room is folded together. A
            computer is called COMPUTER, which is the word 1995 uses for a non-human
            house; an empty seat has no name. Seat 0 is always HUMAN and keeps its own. */
@@ -497,9 +505,10 @@ static unsigned get_u32(const unsigned char* p)
 
 /* ---------------------------------------------------------------- setup on the wire -- */
 /* Fixed layout, little endian, one byte per roster field. 16 + 8*4 + 5*8 = 88 bytes, plus
-   the tech level at 32 since version 4, plus the seat modes at 88..95 since version 5.
+   the tech level at 32 since version 4, plus the seat modes at 88..95 since version 5,
+   plus the engine, the seed and Red Alert's rules at 39..46 since version 13.
    The roster still starts at 48. */
-#define NM_SETUP_BYTES 192   /* 96 of rules and roster, then eight names of twelve */
+#define NM_SETUP_BYTES 200   /* 96 rules/roster + 96 names + 8 per-seat AI levels (v14) */
 
 static int setup_pack(const NmSetup* s, unsigned char* p)
 {
@@ -515,12 +524,19 @@ static int setup_pack(const NmSetup* s, unsigned char* p)
     p[36] = (unsigned char)s->aitake;
     p[37] = (unsigned char)s->shortgame;
     p[38] = (unsigned char)s->ahead;   /* v8 */
+    /* v13, the rest of the reserved hole before the roster */
+    p[39] = (unsigned char)s->shroud;
+    put_u32(p + 40, s->seed);
+    p[44] = (unsigned char)s->ctf;
+    p[45] = (unsigned char)s->ai_difficulty;
+    p[46] = (unsigned char)s->game;
     put_u32(p + 24, (unsigned)s->unit_count);
     p[28] = (unsigned char)s->speed;
     p[29] = (unsigned char)s->seats;
     p[30] = (unsigned char)s->humans;
     put_u32(p + 32, (unsigned)s->build);   /* v4; the gap at 32..47 was already reserved */
     for (i = 0; i < NM_MAX_SEATS; i++) {
+        p[192 + i] = s->ai_levels[i] <= 3 ? s->ai_levels[i] : 1;
         p[48 + i] = s->house[i];
         p[56 + i] = s->colour[i];
         p[64 + i] = s->team[i];
@@ -546,12 +562,18 @@ static void setup_unpack(NmSetup* s, const unsigned char* p)
     s->aitake = p[36];
     s->shortgame = p[37];
     s->ahead = p[38];   /* v8; 0 from a peer that does not send it */
+    s->shroud = p[39];          /* v13 */
+    s->seed = get_u32(p + 40);
+    s->ctf = p[44];
+    s->ai_difficulty = p[45] <= 3 ? p[45] : 1;
+    s->game = p[46];
     s->unit_count = (int)get_u32(p + 24);
     s->speed = p[28];
     s->seats = p[29];
     s->humans = p[30];
     s->build = (int)get_u32(p + 32);   /* v4 */
     for (i = 0; i < NM_MAX_SEATS; i++) {
+        s->ai_levels[i] = p[192 + i] <= 3 ? p[192 + i] : 1;
         s->house[i] = p[48 + i];
         s->colour[i] = p[56 + i];
         s->team[i] = p[64 + i];
@@ -610,7 +632,13 @@ static int lobby_offer_changed(const NmSetup* a, const NmSetup* b)
         || a->bases        != b->bases
         || a->unit_count   != b->unit_count
         || a->build        != b->build
-        || a->speed        != b->speed;
+        || a->speed        != b->speed
+        || a->game         != b->game
+        || a->shroud       != b->shroud
+        || a->ctf          != b->ctf
+        || a->ai_difficulty != b->ai_difficulty
+        || a->seed         != b->seed
+        || memcmp(a->ai_levels, b->ai_levels, NM_MAX_SEATS) != 0;
 }
 
 static NmMapHashFn s_maphash_fn = NULL;
@@ -1171,7 +1199,8 @@ static void lobby_apply_seat(int seat, int house, int team, int colour, int star
        different machines from its first frame. The request is not queued for later: there
        is no later, because the next thing that room does is play. */
     if (s_starting) return;
-    if (house == 0 || house == 1) s_setup.house[seat] = (unsigned char)house;
+    /* A side in a Tiberian Dawn room, a country (0..7) in a Red Alert one. */
+    if (house >= 0 && house <= (s_setup.game ? 7 : 1)) s_setup.house[seat] = (unsigned char)house;
     if (team >= 0 && team < NM_MAX_SEATS) s_setup.team[seat] = (unsigned char)team;
     if (colour >= 0 && colour < NM_MAX_SEATS) {
         /* TAKING A COLOUR MOVES WHOEVER HAD IT, which is what the screen has always
@@ -1219,7 +1248,8 @@ void nm_lobby_set_my_seat(int house, int team, int colour, int start)
         unsigned char p[24];
         put_u32(p, NM_SEATPREF);
         put_u32(p + 4, (unsigned)s_seat);
-        put_u32(p + 8, (unsigned)(house ? 1 : 0));
+        /* The host keeps it to what its room allows (lobby_apply_seat). */
+        put_u32(p + 8, (unsigned)(house < 0 ? 0 : house));
         put_u32(p + 12, (unsigned)(team < 0 ? 0 : team));
         put_u32(p + 16, (unsigned)(colour < 0 ? 0 : colour));
         put_u32(p + 20, (unsigned)(start < 0 ? 0xFFFFFFFFu : (unsigned)start));

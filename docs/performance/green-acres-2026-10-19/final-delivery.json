@@ -1,0 +1,2924 @@
+{
+  "schema": 1,
+  "generated_utc": "2026-10-19T20:54:37.828133+00:00",
+  "passed": true,
+  "path_aliases": {
+    "${SOURCE_ROOT}": "canonical combined main checkout",
+    "${DOCK_RUNTIME}": "existing Dock play folder",
+    "${EVIDENCE_ROOT}": "retained private benchmark output"
+  },
+  "input_receipts": {
+    "candidate": {
+      "path": "${EVIDENCE_ROOT}/final-build/private-universal/provenance.json",
+      "sha256": "b3e2ac48f778444471c7e24387b9a95cc808ce650ff2231eccd6a6216200db8b"
+    },
+    "control": {
+      "path": "${EVIDENCE_ROOT}/final-build/private-universal/control-arm64/provenance.json",
+      "sha256": "b3149bfa1144a4fd4b9463a0dfefdec3b87a54d346ab8be285fba5cdbeacb723"
+    },
+    "benchmark": {
+      "path": "${EVIDENCE_ROOT}/final-comparison/summary.json",
+      "sha256": "1d5db756eb9b018ae42c60717692b83355d7d37fc23924e4ead7b5bdc6723422"
+    },
+    "fidelity": {
+      "path": "${EVIDENCE_ROOT}/final-fidelity/summary.json",
+      "sha256": "021444dff4aea8807af8da144de8a632970d7fbdc41c07d8a9ac97d309779e8a"
+    },
+    "deployment": {
+      "path": "${EVIDENCE_ROOT}/deployment.json",
+      "sha256": "5d1e8a91b6f0cb3456af97089bbec65bd6c13de7fd34db0351026ca6d1b35490"
+    },
+    "smoke": {
+      "path": "${EVIDENCE_ROOT}/dock-smoke/summary.json",
+      "sha256": "b08122be730c27785885ce3f045d0fb71b164fbe04a364ce7912caaae2d99651"
+    },
+    "ore": {
+      "path": "${EVIDENCE_ROOT}/ore-deployment.json",
+      "sha256": "bbb85bc1e6058da3af145b773b1c1e4b2d36d75a4b6ca8400b5386ce8f7d7e5b"
+    },
+    "live": {
+      "path": "${EVIDENCE_ROOT}/final-live/summary.json",
+      "sha256": "978a81c9a53b8b5ee7940dd6ccf21c24224e0615ce636a0095d0786f52bcf132"
+    },
+    "preservation_review": {
+      "path": "${EVIDENCE_ROOT}/preservation-review.json",
+      "sha256": "9b25422435d32fb63ac12d45e24d1c292dfd6c1b50c9193253f95d0e5a6abecd"
+    },
+    "current_preset_smoke": {
+      "path": "${EVIDENCE_ROOT}/current-preset-smoke/summary.json",
+      "sha256": "ed419227ddc6a3b64a013acab01034fceac64e5d5221da6b2addcf231f23c894"
+    }
+  },
+  "build": {
+    "source_head": "396eaf98c81b320cd57c0c80d3fe2e1868d12051",
+    "version": "v0.8.7+396eaf9-dirty",
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "macos_min": "14.0",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "source_count": 225,
+    "source_manifest_sha256": "1f32c9925a2c512f872c2fbf08a07739bacdbea9829af82d03ae847d27da8ec5",
+    "renderer_source_sha256": "c144015b7b6a86666e915a7687e109287ced7615855c0d054b0114b70619ce78",
+    "mesh_batch_source_sha256": "317409b71bb638623c5b07b386dd7d6fea7079f8e360bf141d41720e6472780f",
+    "pinned_header_sha256": "f62fe76dac3aad98713eb0f4030624e114a65ba375b2e013ae4c8aee9976db37",
+    "outputs": {
+      "opencnc3d": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d",
+      "cnc_eyes": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+      "libSDL2-2.0.0.dylib": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+      "libSDL3.dylib": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+    }
+  },
+  "matched_control": {
+    "source_head": "396eaf98c81b320cd57c0c80d3fe2e1868d12051",
+    "architecture": "arm64",
+    "binary_sha256": "d9073285a7c5131f00a1969ca5458cf091707aa2e614075cfd32121308671991",
+    "build_marks": [
+      "OPENCNC3D|build|v0.8.7+396eaf9-dirty"
+    ],
+    "source_control": {
+      "game/cnc_eyes.cpp": "ed4199e23c9eb2fb95327a1f66d5501e0ca6220ebcd101eba40d180b952778a4",
+      "game/mesh_batch.h": "24766aef1a72135130ffe8edc5308d3cfcd9eaefb1ac93761b34c1faa74c6781"
+    },
+    "patches": {
+      "${EVIDENCE_ROOT}/code/full-wind-hoist.patch": "688fac5e1f1616409b8d2cb51d09ddf534aa2a37556f2efe987de61fabf653ae",
+      "${EVIDENCE_ROOT}/code/wind-depth-direct.patch": "98b7ea5955379aebc512deed9c4f665ce259a976c552bafb8cab5aa974fbab37"
+    },
+    "forward_roundtrip_exact": true,
+    "reused_object_count": 29
+  },
+  "benchmark": {
+    "resolution": [
+      3008,
+      1547
+    ],
+    "method": "ABBA separate matched current-main baseline/candidate builds,120 GPU-completed frames after20warm frames; frozen simulation. Shared host load varies.",
+    "cases": {
+      "td": {
+        "views": [
+          {
+            "camera_xz_distance": [
+              44,
+              36,
+              4200
+            ],
+            "baseline_ms": 24.244999999999997,
+            "candidate_ms": 21.35,
+            "frame_time_reduction_percent": 11.940606310579486,
+            "sun_shadow_cpu_baseline_ms": 8.83,
+            "sun_shadow_cpu_candidate_ms": 5.9350000000000005,
+            "observed_direction": "lower",
+            "guaranteed_gain": false
+          },
+          {
+            "camera_xz_distance": [
+              42,
+              34,
+              3000
+            ],
+            "baseline_ms": 23.165,
+            "candidate_ms": 19.04,
+            "frame_time_reduction_percent": 17.80703647744442,
+            "sun_shadow_cpu_baseline_ms": 7.994999999999999,
+            "sun_shadow_cpu_candidate_ms": 5.1,
+            "observed_direction": "lower",
+            "guaranteed_gain": false
+          }
+        ],
+        "runs": [
+          {
+            "arm": "baseline",
+            "binary_sha256": "d9073285a7c5131f00a1969ca5458cf091707aa2e614075cfd32121308671991",
+            "times": [
+              {
+                "median_ms": 25.77,
+                "p90_ms": 27.66
+              },
+              {
+                "median_ms": 22.25,
+                "p90_ms": 24.95
+              }
+            ],
+            "shots": [
+              "77e3e70ed6f6b067b93cd3daf75e14b5c59eb034c00986dee20a91ed97fe26c2",
+              "490251c291058b968ee22c31053cacea40a44240973c1d6c4a1b5c982ed42b62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 8.81,
+                "benchmark_median_ms": 25.77,
+                "benchmark_p90_ms": 27.66,
+                "windows": [
+                  {
+                    "line": 944,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 8.81,
+                    "frame_mean_ms": 25.83
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 8.609999999999998,
+                "benchmark_median_ms": 22.25,
+                "benchmark_p90_ms": 24.95,
+                "windows": [
+                  {
+                    "line": 963,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 8.61,
+                    "frame_mean_ms": 22.49
+                  }
+                ]
+              }
+            },
+            "log_sha256": "c187a9f603d5e418bd4a533974e7d21db326df717d59471dfa1809727fb796ca"
+          },
+          {
+            "arm": "candidate",
+            "binary_sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+            "times": [
+              {
+                "median_ms": 22.36,
+                "p90_ms": 24.1
+              },
+              {
+                "median_ms": 17.02,
+                "p90_ms": 23.57
+              }
+            ],
+            "shots": [
+              "77e3e70ed6f6b067b93cd3daf75e14b5c59eb034c00986dee20a91ed97fe26c2",
+              "490251c291058b968ee22c31053cacea40a44240973c1d6c4a1b5c982ed42b62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 6.28,
+                "benchmark_median_ms": 22.36,
+                "benchmark_p90_ms": 24.1,
+                "windows": [
+                  {
+                    "line": 944,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 6.28,
+                    "frame_mean_ms": 22.27
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 5.179999999999999,
+                "benchmark_median_ms": 17.02,
+                "benchmark_p90_ms": 23.57,
+                "windows": [
+                  {
+                    "line": 964,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 5.18,
+                    "frame_mean_ms": 18.96
+                  }
+                ]
+              }
+            },
+            "log_sha256": "9589bf19720c0d2a0b364ab080eb3575d735a2f31377b7c5c0a63344a6bab623"
+          },
+          {
+            "arm": "candidate",
+            "binary_sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+            "times": [
+              {
+                "median_ms": 20.34,
+                "p90_ms": 23.74
+              },
+              {
+                "median_ms": 21.06,
+                "p90_ms": 22.62
+              }
+            ],
+            "shots": [
+              "77e3e70ed6f6b067b93cd3daf75e14b5c59eb034c00986dee20a91ed97fe26c2",
+              "490251c291058b968ee22c31053cacea40a44240973c1d6c4a1b5c982ed42b62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 5.59,
+                "benchmark_median_ms": 20.34,
+                "benchmark_p90_ms": 23.74,
+                "windows": [
+                  {
+                    "line": 944,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 5.59,
+                    "frame_mean_ms": 20.62
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 5.02,
+                "benchmark_median_ms": 21.06,
+                "benchmark_p90_ms": 22.62,
+                "windows": [
+                  {
+                    "line": 964,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 5.02,
+                    "frame_mean_ms": 20.22
+                  }
+                ]
+              }
+            },
+            "log_sha256": "ea80c077f16a97fd009da9aa987545501205a04f69b438031f56ee5daa9d290b"
+          },
+          {
+            "arm": "baseline",
+            "binary_sha256": "d9073285a7c5131f00a1969ca5458cf091707aa2e614075cfd32121308671991",
+            "times": [
+              {
+                "median_ms": 22.72,
+                "p90_ms": 27.66
+              },
+              {
+                "median_ms": 24.08,
+                "p90_ms": 26.84
+              }
+            ],
+            "shots": [
+              "77e3e70ed6f6b067b93cd3daf75e14b5c59eb034c00986dee20a91ed97fe26c2",
+              "490251c291058b968ee22c31053cacea40a44240973c1d6c4a1b5c982ed42b62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 8.85,
+                "benchmark_median_ms": 22.72,
+                "benchmark_p90_ms": 27.66,
+                "windows": [
+                  {
+                    "line": 944,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 8.85,
+                    "frame_mean_ms": 23.18
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 7.38,
+                "benchmark_median_ms": 24.08,
+                "benchmark_p90_ms": 26.84,
+                "windows": [
+                  {
+                    "line": 963,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 7.38,
+                    "frame_mean_ms": 24.36
+                  }
+                ]
+              }
+            },
+            "log_sha256": "7b033868b897c4fe16c9d7253e2ecac2668967af6c0db1a2d325577b66b0e815"
+          }
+        ],
+        "exact_image_comparisons": 6
+      },
+      "ra": {
+        "views": [
+          {
+            "camera_xz_distance": [
+              32,
+              43,
+              4200
+            ],
+            "baseline_ms": 23.46,
+            "candidate_ms": 21.655,
+            "frame_time_reduction_percent": 7.69394714407502,
+            "sun_shadow_cpu_baseline_ms": 13.184999999999999,
+            "sun_shadow_cpu_candidate_ms": 8.085,
+            "observed_direction": "lower",
+            "guaranteed_gain": false
+          },
+          {
+            "camera_xz_distance": [
+              27,
+              36,
+              3000
+            ],
+            "baseline_ms": 24.75,
+            "candidate_ms": 24.39,
+            "frame_time_reduction_percent": 1.4545454545454521,
+            "sun_shadow_cpu_baseline_ms": 11.355,
+            "sun_shadow_cpu_candidate_ms": 7.325,
+            "observed_direction": "lower",
+            "guaranteed_gain": false
+          }
+        ],
+        "runs": [
+          {
+            "arm": "baseline",
+            "binary_sha256": "d9073285a7c5131f00a1969ca5458cf091707aa2e614075cfd32121308671991",
+            "times": [
+              {
+                "median_ms": 22.74,
+                "p90_ms": 31.68
+              },
+              {
+                "median_ms": 26.21,
+                "p90_ms": 33.17
+              }
+            ],
+            "shots": [
+              "cbc7dd75c313b710cbfb514f89c4b854a6fba03958e9e7443868e9d53d05261e",
+              "c1ce5164ae04a99789f7c648cceb518c2f687a933477dfd98695e764f173fd62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 13.35,
+                "benchmark_median_ms": 22.74,
+                "benchmark_p90_ms": 31.68,
+                "windows": [
+                  {
+                    "line": 932,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 13.35,
+                    "frame_mean_ms": 24.14
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 11.71,
+                "benchmark_median_ms": 26.21,
+                "benchmark_p90_ms": 33.17,
+                "windows": [
+                  {
+                    "line": 951,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 11.71,
+                    "frame_mean_ms": 26.68
+                  }
+                ]
+              }
+            },
+            "log_sha256": "14a7b3313d2dd0881cef407e113498b1e1120a36100934c0454fec6104459a44"
+          },
+          {
+            "arm": "candidate",
+            "binary_sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+            "times": [
+              {
+                "median_ms": 17.76,
+                "p90_ms": 26.39
+              },
+              {
+                "median_ms": 24.63,
+                "p90_ms": 26.55
+              }
+            ],
+            "shots": [
+              "cbc7dd75c313b710cbfb514f89c4b854a6fba03958e9e7443868e9d53d05261e",
+              "c1ce5164ae04a99789f7c648cceb518c2f687a933477dfd98695e764f173fd62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 8.46,
+                "benchmark_median_ms": 17.76,
+                "benchmark_p90_ms": 26.39,
+                "windows": [
+                  {
+                    "line": 932,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 8.46,
+                    "frame_mean_ms": 19.37
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 7.61,
+                "benchmark_median_ms": 24.63,
+                "benchmark_p90_ms": 26.55,
+                "windows": [
+                  {
+                    "line": 952,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 7.61,
+                    "frame_mean_ms": 25.01
+                  }
+                ]
+              }
+            },
+            "log_sha256": "1ab83da7d7837bedfc047a1f66b678e9bbf7f7297a1c1bc7d7de45a1962f2d42"
+          },
+          {
+            "arm": "candidate",
+            "binary_sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+            "times": [
+              {
+                "median_ms": 25.55,
+                "p90_ms": 27.12
+              },
+              {
+                "median_ms": 24.15,
+                "p90_ms": 25.57
+              }
+            ],
+            "shots": [
+              "cbc7dd75c313b710cbfb514f89c4b854a6fba03958e9e7443868e9d53d05261e",
+              "c1ce5164ae04a99789f7c648cceb518c2f687a933477dfd98695e764f173fd62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 7.71,
+                "benchmark_median_ms": 25.55,
+                "benchmark_p90_ms": 27.12,
+                "windows": [
+                  {
+                    "line": 932,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 7.71,
+                    "frame_mean_ms": 25.46
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 7.04,
+                "benchmark_median_ms": 24.15,
+                "benchmark_p90_ms": 25.57,
+                "windows": [
+                  {
+                    "line": 952,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 7.04,
+                    "frame_mean_ms": 23.9
+                  }
+                ]
+              }
+            },
+            "log_sha256": "db4c2fbc5cc7f42629dfc684f6b923ab1caef0419ea947b29be6caa403eb82ce"
+          },
+          {
+            "arm": "baseline",
+            "binary_sha256": "d9073285a7c5131f00a1969ca5458cf091707aa2e614075cfd32121308671991",
+            "times": [
+              {
+                "median_ms": 24.18,
+                "p90_ms": 31.66
+              },
+              {
+                "median_ms": 23.29,
+                "p90_ms": 30.45
+              }
+            ],
+            "shots": [
+              "cbc7dd75c313b710cbfb514f89c4b854a6fba03958e9e7443868e9d53d05261e",
+              "c1ce5164ae04a99789f7c648cceb518c2f687a933477dfd98695e764f173fd62"
+            ],
+            "steady_cpu_profiles": {
+              "0": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 13.02,
+                "benchmark_median_ms": 24.18,
+                "benchmark_p90_ms": 31.66,
+                "windows": [
+                  {
+                    "line": 932,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 13.02,
+                    "frame_mean_ms": 24.99
+                  }
+                ]
+              },
+              "1": {
+                "profiled_frames": 120,
+                "sun_shadow_cpu_ms": 11.0,
+                "benchmark_median_ms": 23.29,
+                "benchmark_p90_ms": 30.45,
+                "windows": [
+                  {
+                    "line": 951,
+                    "frames": 120,
+                    "sun_shadow_cpu_ms": 11.0,
+                    "frame_mean_ms": 23.79
+                  }
+                ]
+              }
+            },
+            "log_sha256": "4bd3670518b29a251c4a8028336d38bcee5d586cb9441b8235a700c54caf9c1b"
+          }
+        ],
+        "exact_image_comparisons": 6
+      }
+    }
+  },
+  "live_loop": {
+    "passed": true,
+    "module": "td",
+    "scenario": "SCM01EA / Green Acres",
+    "camera_xz_distance": [
+      44,
+      36,
+      4200
+    ],
+    "resolution": [
+      3008,
+      1547
+    ],
+    "method": "ABBA 8s hidden real tick/present loop per run; final profile window after 5s initial live warmup. Same current-main control/candidate and private captured settings. Shared host load varies.",
+    "aggregation": "Final profile window only after approximately five seconds of live warmup; mean/profile values weighted by tail frame counts; worst values are maxima, not averages.",
+    "runs": [
+      {
+        "index": 0,
+        "arm": "baseline",
+        "binary_sha256": "d9073285a7c5131f00a1969ca5458cf091707aa2e614075cfd32121308671991",
+        "profiled_tail_frames": 155,
+        "mean_frame_ms": 20.94,
+        "worst_frame_ms": 28.7,
+        "sun_shadow_cpu_ms": 9.06,
+        "excluded_initial_profile_seconds": 5.004239999999999,
+        "elapsed_seconds": 8.251,
+        "ticks": 144,
+        "log_sha256": "f2911a1ae8650a496137337c306bb22457d3af7c649ec7bf1d7602dc4f71a728"
+      },
+      {
+        "index": 1,
+        "arm": "candidate",
+        "binary_sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+        "profiled_tail_frames": 144,
+        "mean_frame_ms": 22.4,
+        "worst_frame_ms": 36.9,
+        "sun_shadow_cpu_ms": 7.51,
+        "excluded_initial_profile_seconds": 5.017600000000001,
+        "elapsed_seconds": 8.242,
+        "ticks": 144,
+        "log_sha256": "4ac11d4b444578685c0131591905318a4b2111bc4c7c3444796e46c345a02d27"
+      },
+      {
+        "index": 2,
+        "arm": "candidate",
+        "binary_sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+        "profiled_tail_frames": 161,
+        "mean_frame_ms": 20.43,
+        "worst_frame_ms": 36.0,
+        "sun_shadow_cpu_ms": 7.29,
+        "excluded_initial_profile_seconds": 5.01008,
+        "elapsed_seconds": 8.299,
+        "ticks": 144,
+        "log_sha256": "6701335381d96e61dc6a91b691b6b2b601c1fc35de40ee1ef58ccbc223798838"
+      },
+      {
+        "index": 3,
+        "arm": "baseline",
+        "binary_sha256": "d9073285a7c5131f00a1969ca5458cf091707aa2e614075cfd32121308671991",
+        "profiled_tail_frames": 140,
+        "mean_frame_ms": 23.32,
+        "worst_frame_ms": 29.8,
+        "sun_shadow_cpu_ms": 10.29,
+        "excluded_initial_profile_seconds": 5.018400000000001,
+        "elapsed_seconds": 8.283,
+        "ticks": 144,
+        "log_sha256": "3ccbc03721828c9343e240ed8a0bb8e393c763d5146bc6f3961507722efdbdf1"
+      }
+    ],
+    "arms": {
+      "baseline": {
+        "runs": 2,
+        "profiled_tail_frames": 295,
+        "run_mean_range_ms": [
+          20.94,
+          23.32
+        ],
+        "run_worst_range_ms": [
+          28.7,
+          29.8
+        ],
+        "run_sun_shadow_range_ms": [
+          9.06,
+          10.29
+        ],
+        "frame_weighted_mean_ms": 22.06949152542373,
+        "worst_observed_ms": 29.8,
+        "frame_weighted_sun_shadow_cpu_ms": 9.643728813559322,
+        "frame_weighted_profile_ms": {
+          "crystals: before": 0.0,
+          "crystals: field merge": 0.0,
+          "crystals: glow": 0.22423728813559324,
+          "crystals: layout": 0.0947457627118644,
+          "crystals: update": 0.09949152542372881,
+          "cutout + translucent": 0.19474576271186442,
+          "editor + options": 0.0,
+          "effects": 0.14898305084745764,
+          "events + tick + refresh": 3.201186440677966,
+          "gpu finish": 0.0,
+          "hud + present": 0.9774576271186441,
+          "infantry": 0.0,
+          "markers + bars": 0.03474576271186441,
+          "mean": 22.06949152542373,
+          "mottle": 0.3,
+          "objects (opaque)": 1.0254237288135593,
+          "panels": 0.0,
+          "post chain": 0.11949152542372882,
+          "post: atmosphere": 0.0,
+          "post: ground normals": 1.6971186440677968,
+          "post: light": 0.0947457627118644,
+          "post: specular": 0.18423728813559323,
+          "prep + shroud corners": 0.03,
+          "rain + shroud draw": 0.04,
+          "seabed": 0.13949152542372883,
+          "shore": 0.0,
+          "smudges": 0.4484745762711865,
+          "sun shadow map": 9.643728813559322,
+          "swap": 1.7052542372881356,
+          "terrain": 0.24474576271186438,
+          "tiberium": 0.0,
+          "tiberium crystals": 0.03949152542372881,
+          "tiberium ground": 0.27525423728813564,
+          "tread marks": 0.01,
+          "trees + foliage": 1.0716949152542372,
+          "water": 0.014745762711864408
+        }
+      },
+      "candidate": {
+        "runs": 2,
+        "profiled_tail_frames": 305,
+        "run_mean_range_ms": [
+          20.43,
+          22.4
+        ],
+        "run_worst_range_ms": [
+          36.0,
+          36.9
+        ],
+        "run_sun_shadow_range_ms": [
+          7.29,
+          7.51
+        ],
+        "frame_weighted_mean_ms": 21.360098360655737,
+        "worst_observed_ms": 36.9,
+        "frame_weighted_sun_shadow_cpu_ms": 7.393868852459017,
+        "frame_weighted_profile_ms": {
+          "crystals: before": 0.0,
+          "crystals: field merge": 0.0,
+          "crystals: glow": 0.24000000000000002,
+          "crystals: layout": 0.1,
+          "crystals: update": 0.1,
+          "cutout + translucent": 0.21472131147540988,
+          "editor + options": 0.0,
+          "effects": 0.16944262295081966,
+          "events + tick + refresh": 3.2677704918032786,
+          "gpu finish": 0.0,
+          "hud + present": 1.0641639344262297,
+          "infantry": 0.0,
+          "markers + bars": 0.04,
+          "mean": 21.360098360655737,
+          "mottle": 0.30944262295081965,
+          "objects (opaque)": 1.1077704918032787,
+          "panels": 0.0,
+          "post chain": 0.13,
+          "post: atmosphere": 0.0,
+          "post: ground normals": 1.8824918032786888,
+          "post: light": 0.10472131147540983,
+          "post: specular": 0.21472131147540988,
+          "prep + shroud corners": 0.030000000000000002,
+          "rain + shroud draw": 0.04,
+          "seabed": 0.15,
+          "shore": 0.0,
+          "smudges": 0.4936065573770492,
+          "sun shadow map": 7.393868852459017,
+          "swap": 2.479049180327869,
+          "terrain": 0.25944262295081966,
+          "tiberium": 0.0,
+          "tiberium crystals": 0.05,
+          "tiberium ground": 0.29055737704918033,
+          "tread marks": 0.01,
+          "trees + foliage": 1.1888852459016395,
+          "water": 0.02
+        }
+      }
+    },
+    "frame_weighted_mean_reduction_percent": 3.2143611643738197,
+    "guaranteed_gain": false,
+    "caveat": "Short hidden live tick/present check on a shared host; run ranges expose variation. It does not guarantee sustained FPS or 60 FPS and does not reproduce an exact screenshot camera."
+  },
+  "fidelity": {
+    "passed": true,
+    "optimization": "shadow",
+    "cases": {
+      "ra": {
+        "arms": {
+          "off": {
+            "counters": {
+              "draws": 0,
+              "vertices": 0,
+              "fallbacks": 0,
+              "verified": 0,
+              "mismatches": 0
+            },
+            "states": 9,
+            "raw_targets_checked": true
+          },
+          "on": {
+            "counters": {
+              "draws": 3564,
+              "vertices": 21699792,
+              "fallbacks": 0,
+              "verified": 0,
+              "mismatches": 0
+            },
+            "states": 9,
+            "raw_targets_checked": true
+          },
+          "verify": {
+            "counters": {
+              "draws": 0,
+              "vertices": 0,
+              "fallbacks": 0,
+              "verified": 3564,
+              "mismatches": 0
+            },
+            "states": 9,
+            "raw_targets_checked": true
+          }
+        },
+        "comparisons": {
+          "on": {
+            "passed": true,
+            "state_exact": true,
+            "state_records": 2981,
+            "exact_targets": 63,
+            "png_targets": 9,
+            "raw_targets": 54,
+            "target_hashes": [
+              {
+                "file": "authored-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6",
+                "candidate_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6"
+              },
+              {
+                "file": "authored-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "authored-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345",
+                "candidate_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345"
+              },
+              {
+                "file": "authored-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d",
+                "candidate_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d"
+              },
+              {
+                "file": "authored-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915",
+                "candidate_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915"
+              },
+              {
+                "file": "authored-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "authored-return.png",
+                "exact": true,
+                "reference_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da",
+                "candidate_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da"
+              },
+              {
+                "file": "fog-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a",
+                "candidate_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a"
+              },
+              {
+                "file": "fog-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "fog-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10",
+                "candidate_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10"
+              },
+              {
+                "file": "fog-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+                "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+              },
+              {
+                "file": "fog-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "fog-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "fog.png",
+                "exact": true,
+                "reference_sha256": "13ff7dfd9c656240950f9eddf1e65e100289819d5345546cf5dae70eb504803a",
+                "candidate_sha256": "13ff7dfd9c656240950f9eddf1e65e100289819d5345546cf5dae70eb504803a"
+              },
+              {
+                "file": "reveal-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6",
+                "candidate_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6"
+              },
+              {
+                "file": "reveal-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "reveal-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345",
+                "candidate_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345"
+              },
+              {
+                "file": "reveal-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d",
+                "candidate_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d"
+              },
+              {
+                "file": "reveal-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915",
+                "candidate_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915"
+              },
+              {
+                "file": "reveal-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "reveal-return.png",
+                "exact": true,
+                "reference_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da",
+                "candidate_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da"
+              },
+              {
+                "file": "scale-a-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5",
+                "candidate_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5"
+              },
+              {
+                "file": "scale-a-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529",
+                "candidate_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529"
+              },
+              {
+                "file": "scale-a-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5",
+                "candidate_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5"
+              },
+              {
+                "file": "scale-a-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529",
+                "candidate_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529"
+              },
+              {
+                "file": "scale-a-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6",
+                "candidate_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6"
+              },
+              {
+                "file": "scale-a-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1",
+                "candidate_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1"
+              },
+              {
+                "file": "scale-a-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "scale-a-return.png",
+                "exact": true,
+                "reference_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d",
+                "candidate_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d"
+              },
+              {
+                "file": "scale-a-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6",
+                "candidate_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6"
+              },
+              {
+                "file": "scale-a-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1",
+                "candidate_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1"
+              },
+              {
+                "file": "scale-a-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "scale-a.png",
+                "exact": true,
+                "reference_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d",
+                "candidate_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d"
+              },
+              {
+                "file": "scale-b-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "102a36245e4873c27498b98d3364cc68efd8c87a999e2c8f1142a211a437fa54",
+                "candidate_sha256": "102a36245e4873c27498b98d3364cc68efd8c87a999e2c8f1142a211a437fa54"
+              },
+              {
+                "file": "scale-b-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-b-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "758cd6d77fd948bf490c16f7ed187ed7c9bb3d2ab5db6a49a249b85df96ce18a",
+                "candidate_sha256": "758cd6d77fd948bf490c16f7ed187ed7c9bb3d2ab5db6a49a249b85df96ce18a"
+              },
+              {
+                "file": "scale-b-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "01bbc0562691b4564f49bb1edef8edd2c6f1cc35a831b50a13234d3a377f5cd4",
+                "candidate_sha256": "01bbc0562691b4564f49bb1edef8edd2c6f1cc35a831b50a13234d3a377f5cd4"
+              },
+              {
+                "file": "scale-b-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "650672ef0ad39d6027bff43199493103d0357f7103ce1b7ac151d4bcd0b7437c",
+                "candidate_sha256": "650672ef0ad39d6027bff43199493103d0357f7103ce1b7ac151d4bcd0b7437c"
+              },
+              {
+                "file": "scale-b-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "scale-b.png",
+                "exact": true,
+                "reference_sha256": "b89e407d29ddbf4040c38e426063d97ff82b7ac4082381daa53fd364149439c5",
+                "candidate_sha256": "b89e407d29ddbf4040c38e426063d97ff82b7ac4082381daa53fd364149439c5"
+              },
+              {
+                "file": "view-0-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "2c54fa253608f49c3f7b3124fbe417d2d7d3a6126ea5ce91103ca5a331f23559",
+                "candidate_sha256": "2c54fa253608f49c3f7b3124fbe417d2d7d3a6126ea5ce91103ca5a331f23559"
+              },
+              {
+                "file": "view-0-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-0-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "9c621b68e21d20413929d3e3b6eefa405b2d99f6deac69ea1f0f8cfc555a0ad3",
+                "candidate_sha256": "9c621b68e21d20413929d3e3b6eefa405b2d99f6deac69ea1f0f8cfc555a0ad3"
+              },
+              {
+                "file": "view-0-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "feb2a29d531cfade9e915ef3883896a30211186a02bbad24de2a555c59bdcea7",
+                "candidate_sha256": "feb2a29d531cfade9e915ef3883896a30211186a02bbad24de2a555c59bdcea7"
+              },
+              {
+                "file": "view-0-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "75e592e2bee41c61d911f99a4e16bf1d920fb3f9b290569274cc2ba27e5ddac8",
+                "candidate_sha256": "75e592e2bee41c61d911f99a4e16bf1d920fb3f9b290569274cc2ba27e5ddac8"
+              },
+              {
+                "file": "view-0-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7",
+                "candidate_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7"
+              },
+              {
+                "file": "view-0.png",
+                "exact": true,
+                "reference_sha256": "98d9d099b49b40914003c92870ea81754df1682cbbfb9880515cf354bc864543",
+                "candidate_sha256": "98d9d099b49b40914003c92870ea81754df1682cbbfb9880515cf354bc864543"
+              },
+              {
+                "file": "view-1-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "9feea4cd367ecc38e1e3d3857022fe0e795973ecd32abc455c6e23214d741762",
+                "candidate_sha256": "9feea4cd367ecc38e1e3d3857022fe0e795973ecd32abc455c6e23214d741762"
+              },
+              {
+                "file": "view-1-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-1-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "19e05a3bd314157498c280375a9c69fcdbd2fe80479fda65ae03dc8530b2d61f",
+                "candidate_sha256": "19e05a3bd314157498c280375a9c69fcdbd2fe80479fda65ae03dc8530b2d61f"
+              },
+              {
+                "file": "view-1-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "ab3a088df79ba07c30c136a5af0938193868bc9f7ced03ee7d72b75603e1f1ce",
+                "candidate_sha256": "ab3a088df79ba07c30c136a5af0938193868bc9f7ced03ee7d72b75603e1f1ce"
+              },
+              {
+                "file": "view-1-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "7befd6f35df487184d44b3285b5be287372b5297b41411a7ad9b0f69ada836c3",
+                "candidate_sha256": "7befd6f35df487184d44b3285b5be287372b5297b41411a7ad9b0f69ada836c3"
+              },
+              {
+                "file": "view-1-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "view-1.png",
+                "exact": true,
+                "reference_sha256": "80dd6927d4a9ed7eb7a8625bc59307f6c1f855a80b0e13bdcadd5e5e13ac06d9",
+                "candidate_sha256": "80dd6927d4a9ed7eb7a8625bc59307f6c1f855a80b0e13bdcadd5e5e13ac06d9"
+              },
+              {
+                "file": "view-2-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "2514455ee746ec16107dc88d97acd225b14d56ce343e4018f41f35d3c762fcd1",
+                "candidate_sha256": "2514455ee746ec16107dc88d97acd225b14d56ce343e4018f41f35d3c762fcd1"
+              },
+              {
+                "file": "view-2-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-2-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "9b0498bb1f1957cebe48945ba887146a3fd9b483fc8d74e9d2fb8ec178bda56d",
+                "candidate_sha256": "9b0498bb1f1957cebe48945ba887146a3fd9b483fc8d74e9d2fb8ec178bda56d"
+              },
+              {
+                "file": "view-2-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "21dd89896f84cd6d086a9b84081ab43b63ca91b42975352e1ca87adc5b4fef63",
+                "candidate_sha256": "21dd89896f84cd6d086a9b84081ab43b63ca91b42975352e1ca87adc5b4fef63"
+              },
+              {
+                "file": "view-2-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "fdaa707cbe9db2aa2de27960d5da21ffd1373ae7ee90067aa906adfc07b21a6a",
+                "candidate_sha256": "fdaa707cbe9db2aa2de27960d5da21ffd1373ae7ee90067aa906adfc07b21a6a"
+              },
+              {
+                "file": "view-2-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a",
+                "candidate_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a"
+              },
+              {
+                "file": "view-2.png",
+                "exact": true,
+                "reference_sha256": "e80f1af708c5469b0d7fc5b607afe4cc34a54dc959ed23e73280106f4aa8373f",
+                "candidate_sha256": "e80f1af708c5469b0d7fc5b607afe4cc34a54dc959ed23e73280106f4aa8373f"
+              }
+            ]
+          },
+          "verify": {
+            "passed": true,
+            "state_exact": true,
+            "state_records": 2981,
+            "exact_targets": 63,
+            "png_targets": 9,
+            "raw_targets": 54,
+            "target_hashes": [
+              {
+                "file": "authored-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6",
+                "candidate_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6"
+              },
+              {
+                "file": "authored-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "authored-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345",
+                "candidate_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345"
+              },
+              {
+                "file": "authored-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d",
+                "candidate_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d"
+              },
+              {
+                "file": "authored-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915",
+                "candidate_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915"
+              },
+              {
+                "file": "authored-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "authored-return.png",
+                "exact": true,
+                "reference_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da",
+                "candidate_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da"
+              },
+              {
+                "file": "fog-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a",
+                "candidate_sha256": "bbdd1c7176bc1e2fa732fa41606bb7e2d2ccfc03ba000cb5f6d981dfaaaae26a"
+              },
+              {
+                "file": "fog-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "fog-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10",
+                "candidate_sha256": "9350d83e8b37db54d4e6a883568298b484fb3e1fea62223d1bd5f21533d25d10"
+              },
+              {
+                "file": "fog-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+                "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+              },
+              {
+                "file": "fog-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "fog-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "fog.png",
+                "exact": true,
+                "reference_sha256": "13ff7dfd9c656240950f9eddf1e65e100289819d5345546cf5dae70eb504803a",
+                "candidate_sha256": "13ff7dfd9c656240950f9eddf1e65e100289819d5345546cf5dae70eb504803a"
+              },
+              {
+                "file": "reveal-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6",
+                "candidate_sha256": "6feabe1c67e3094bc9682d7bdeda57ec0e4d756d2e4324b9e9e5b04e5b81ecd6"
+              },
+              {
+                "file": "reveal-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "reveal-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345",
+                "candidate_sha256": "e3de5ff79ecb8ad0bdfc654e8581ffaf0da3bfb0332497a954d2abf44b493345"
+              },
+              {
+                "file": "reveal-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d",
+                "candidate_sha256": "7d8786e5008271e902ec1eac73ff69460b90fe001bbd13f22eb7832ed62d1b3d"
+              },
+              {
+                "file": "reveal-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915",
+                "candidate_sha256": "86ff0126150a9a49bab521de41823eddff1be705d03d8185227f314d2d726915"
+              },
+              {
+                "file": "reveal-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "reveal-return.png",
+                "exact": true,
+                "reference_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da",
+                "candidate_sha256": "80a984a93b37750f6b63a424525c9e26d34285f35613dcec0cfcb2ad8dd175da"
+              },
+              {
+                "file": "scale-a-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5",
+                "candidate_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5"
+              },
+              {
+                "file": "scale-a-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529",
+                "candidate_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529"
+              },
+              {
+                "file": "scale-a-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5",
+                "candidate_sha256": "5097ee227746ca78cdd91ff277ea1cd5741834c6d108f84466928ef20c28f7e5"
+              },
+              {
+                "file": "scale-a-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529",
+                "candidate_sha256": "e894a143da770f61b5eddd2b828ee9b3dfa3bde91e7300e830a7dd6996892529"
+              },
+              {
+                "file": "scale-a-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6",
+                "candidate_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6"
+              },
+              {
+                "file": "scale-a-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1",
+                "candidate_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1"
+              },
+              {
+                "file": "scale-a-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "scale-a-return.png",
+                "exact": true,
+                "reference_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d",
+                "candidate_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d"
+              },
+              {
+                "file": "scale-a-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6",
+                "candidate_sha256": "af47ef66e6442dead80ce3941b424e72abe62efb88cf1eafffd6a6df719247b6"
+              },
+              {
+                "file": "scale-a-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1",
+                "candidate_sha256": "ebb36b0012d635cc2d45d8c2056523b55a666e7ce6d85c9b121a0551230934b1"
+              },
+              {
+                "file": "scale-a-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "scale-a.png",
+                "exact": true,
+                "reference_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d",
+                "candidate_sha256": "57ae3297a284443f7fefd6a41092c4e914d3dd14170d67859e770688e7386b0d"
+              },
+              {
+                "file": "scale-b-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "102a36245e4873c27498b98d3364cc68efd8c87a999e2c8f1142a211a437fa54",
+                "candidate_sha256": "102a36245e4873c27498b98d3364cc68efd8c87a999e2c8f1142a211a437fa54"
+              },
+              {
+                "file": "scale-b-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-b-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "758cd6d77fd948bf490c16f7ed187ed7c9bb3d2ab5db6a49a249b85df96ce18a",
+                "candidate_sha256": "758cd6d77fd948bf490c16f7ed187ed7c9bb3d2ab5db6a49a249b85df96ce18a"
+              },
+              {
+                "file": "scale-b-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "01bbc0562691b4564f49bb1edef8edd2c6f1cc35a831b50a13234d3a377f5cd4",
+                "candidate_sha256": "01bbc0562691b4564f49bb1edef8edd2c6f1cc35a831b50a13234d3a377f5cd4"
+              },
+              {
+                "file": "scale-b-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "650672ef0ad39d6027bff43199493103d0357f7103ce1b7ac151d4bcd0b7437c",
+                "candidate_sha256": "650672ef0ad39d6027bff43199493103d0357f7103ce1b7ac151d4bcd0b7437c"
+              },
+              {
+                "file": "scale-b-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "scale-b.png",
+                "exact": true,
+                "reference_sha256": "b89e407d29ddbf4040c38e426063d97ff82b7ac4082381daa53fd364149439c5",
+                "candidate_sha256": "b89e407d29ddbf4040c38e426063d97ff82b7ac4082381daa53fd364149439c5"
+              },
+              {
+                "file": "view-0-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "2c54fa253608f49c3f7b3124fbe417d2d7d3a6126ea5ce91103ca5a331f23559",
+                "candidate_sha256": "2c54fa253608f49c3f7b3124fbe417d2d7d3a6126ea5ce91103ca5a331f23559"
+              },
+              {
+                "file": "view-0-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-0-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "9c621b68e21d20413929d3e3b6eefa405b2d99f6deac69ea1f0f8cfc555a0ad3",
+                "candidate_sha256": "9c621b68e21d20413929d3e3b6eefa405b2d99f6deac69ea1f0f8cfc555a0ad3"
+              },
+              {
+                "file": "view-0-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "feb2a29d531cfade9e915ef3883896a30211186a02bbad24de2a555c59bdcea7",
+                "candidate_sha256": "feb2a29d531cfade9e915ef3883896a30211186a02bbad24de2a555c59bdcea7"
+              },
+              {
+                "file": "view-0-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "75e592e2bee41c61d911f99a4e16bf1d920fb3f9b290569274cc2ba27e5ddac8",
+                "candidate_sha256": "75e592e2bee41c61d911f99a4e16bf1d920fb3f9b290569274cc2ba27e5ddac8"
+              },
+              {
+                "file": "view-0-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7",
+                "candidate_sha256": "470b0c44d63004d0e3b752f7282550b6e654ef7bf9865362ace14edfdb1857e7"
+              },
+              {
+                "file": "view-0.png",
+                "exact": true,
+                "reference_sha256": "98d9d099b49b40914003c92870ea81754df1682cbbfb9880515cf354bc864543",
+                "candidate_sha256": "98d9d099b49b40914003c92870ea81754df1682cbbfb9880515cf354bc864543"
+              },
+              {
+                "file": "view-1-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "9feea4cd367ecc38e1e3d3857022fe0e795973ecd32abc455c6e23214d741762",
+                "candidate_sha256": "9feea4cd367ecc38e1e3d3857022fe0e795973ecd32abc455c6e23214d741762"
+              },
+              {
+                "file": "view-1-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-1-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "19e05a3bd314157498c280375a9c69fcdbd2fe80479fda65ae03dc8530b2d61f",
+                "candidate_sha256": "19e05a3bd314157498c280375a9c69fcdbd2fe80479fda65ae03dc8530b2d61f"
+              },
+              {
+                "file": "view-1-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "ab3a088df79ba07c30c136a5af0938193868bc9f7ced03ee7d72b75603e1f1ce",
+                "candidate_sha256": "ab3a088df79ba07c30c136a5af0938193868bc9f7ced03ee7d72b75603e1f1ce"
+              },
+              {
+                "file": "view-1-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "7befd6f35df487184d44b3285b5be287372b5297b41411a7ad9b0f69ada836c3",
+                "candidate_sha256": "7befd6f35df487184d44b3285b5be287372b5297b41411a7ad9b0f69ada836c3"
+              },
+              {
+                "file": "view-1-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50",
+                "candidate_sha256": "52487cc16a2cf325eaa9e8af6a363c310f43b76aadc5fa4a19a68d308ef03f50"
+              },
+              {
+                "file": "view-1.png",
+                "exact": true,
+                "reference_sha256": "80dd6927d4a9ed7eb7a8625bc59307f6c1f855a80b0e13bdcadd5e5e13ac06d9",
+                "candidate_sha256": "80dd6927d4a9ed7eb7a8625bc59307f6c1f855a80b0e13bdcadd5e5e13ac06d9"
+              },
+              {
+                "file": "view-2-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "2514455ee746ec16107dc88d97acd225b14d56ce343e4018f41f35d3c762fcd1",
+                "candidate_sha256": "2514455ee746ec16107dc88d97acd225b14d56ce343e4018f41f35d3c762fcd1"
+              },
+              {
+                "file": "view-2-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-2-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "9b0498bb1f1957cebe48945ba887146a3fd9b483fc8d74e9d2fb8ec178bda56d",
+                "candidate_sha256": "9b0498bb1f1957cebe48945ba887146a3fd9b483fc8d74e9d2fb8ec178bda56d"
+              },
+              {
+                "file": "view-2-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "21dd89896f84cd6d086a9b84081ab43b63ca91b42975352e1ca87adc5b4fef63",
+                "candidate_sha256": "21dd89896f84cd6d086a9b84081ab43b63ca91b42975352e1ca87adc5b4fef63"
+              },
+              {
+                "file": "view-2-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "fdaa707cbe9db2aa2de27960d5da21ffd1373ae7ee90067aa906adfc07b21a6a",
+                "candidate_sha256": "fdaa707cbe9db2aa2de27960d5da21ffd1373ae7ee90067aa906adfc07b21a6a"
+              },
+              {
+                "file": "view-2-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a",
+                "candidate_sha256": "9878612473c630f0cf68a6ef4044b4788d9feffed6f5fa48eca565ab37d3177a"
+              },
+              {
+                "file": "view-2.png",
+                "exact": true,
+                "reference_sha256": "e80f1af708c5469b0d7fc5b607afe4cc34a54dc959ed23e73280106f4aa8373f",
+                "candidate_sha256": "e80f1af708c5469b0d7fc5b607afe4cc34a54dc959ed23e73280106f4aa8373f"
+              }
+            ]
+          }
+        }
+      },
+      "td": {
+        "arms": {
+          "off": {
+            "counters": {
+              "draws": 0,
+              "vertices": 0,
+              "fallbacks": 0,
+              "verified": 0,
+              "mismatches": 0
+            },
+            "states": 9,
+            "raw_targets_checked": true
+          },
+          "on": {
+            "counters": {
+              "draws": 1953,
+              "vertices": 12477672,
+              "fallbacks": 0,
+              "verified": 0,
+              "mismatches": 0
+            },
+            "states": 9,
+            "raw_targets_checked": true
+          },
+          "verify": {
+            "counters": {
+              "draws": 0,
+              "vertices": 0,
+              "fallbacks": 0,
+              "verified": 1953,
+              "mismatches": 0
+            },
+            "states": 9,
+            "raw_targets_checked": true
+          }
+        },
+        "comparisons": {
+          "on": {
+            "passed": true,
+            "state_exact": true,
+            "state_records": 7036,
+            "exact_targets": 63,
+            "png_targets": 9,
+            "raw_targets": 54,
+            "target_hashes": [
+              {
+                "file": "authored-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e",
+                "candidate_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e"
+              },
+              {
+                "file": "authored-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "authored-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380",
+                "candidate_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380"
+              },
+              {
+                "file": "authored-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08",
+                "candidate_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08"
+              },
+              {
+                "file": "authored-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44",
+                "candidate_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44"
+              },
+              {
+                "file": "authored-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "authored-return.png",
+                "exact": true,
+                "reference_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7",
+                "candidate_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7"
+              },
+              {
+                "file": "fog-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "e97ebd0d1cae57f19176c78c80c57ae7d65731b44caef17e500ffdb7b5d802fd",
+                "candidate_sha256": "e97ebd0d1cae57f19176c78c80c57ae7d65731b44caef17e500ffdb7b5d802fd"
+              },
+              {
+                "file": "fog-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "fog-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "ad7420f612967a2360e7b2dbe73426be2735044d49cd1a3937491241408375b0",
+                "candidate_sha256": "ad7420f612967a2360e7b2dbe73426be2735044d49cd1a3937491241408375b0"
+              },
+              {
+                "file": "fog-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+                "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+              },
+              {
+                "file": "fog-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "5be41d57bc429c471fef7a1bec8569a69ad4d226286ce08f38701dc4be536e0d",
+                "candidate_sha256": "5be41d57bc429c471fef7a1bec8569a69ad4d226286ce08f38701dc4be536e0d"
+              },
+              {
+                "file": "fog-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "fog.png",
+                "exact": true,
+                "reference_sha256": "bd9763085070f285d03339ba7c16117327ba0d42df2616b9787f252dca968846",
+                "candidate_sha256": "bd9763085070f285d03339ba7c16117327ba0d42df2616b9787f252dca968846"
+              },
+              {
+                "file": "reveal-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e",
+                "candidate_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e"
+              },
+              {
+                "file": "reveal-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "reveal-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380",
+                "candidate_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380"
+              },
+              {
+                "file": "reveal-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08",
+                "candidate_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08"
+              },
+              {
+                "file": "reveal-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44",
+                "candidate_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44"
+              },
+              {
+                "file": "reveal-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "reveal-return.png",
+                "exact": true,
+                "reference_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7",
+                "candidate_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7"
+              },
+              {
+                "file": "scale-a-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae",
+                "candidate_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae"
+              },
+              {
+                "file": "scale-a-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205",
+                "candidate_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205"
+              },
+              {
+                "file": "scale-a-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae",
+                "candidate_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae"
+              },
+              {
+                "file": "scale-a-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205",
+                "candidate_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205"
+              },
+              {
+                "file": "scale-a-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937",
+                "candidate_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937"
+              },
+              {
+                "file": "scale-a-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91",
+                "candidate_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91"
+              },
+              {
+                "file": "scale-a-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "scale-a-return.png",
+                "exact": true,
+                "reference_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb",
+                "candidate_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb"
+              },
+              {
+                "file": "scale-a-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937",
+                "candidate_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937"
+              },
+              {
+                "file": "scale-a-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91",
+                "candidate_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91"
+              },
+              {
+                "file": "scale-a-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "scale-a.png",
+                "exact": true,
+                "reference_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb",
+                "candidate_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb"
+              },
+              {
+                "file": "scale-b-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "ed4aac97acff841d6a07b5ebc4e4ef920a58f952cc0dbf0b25e898cd3961bd7f",
+                "candidate_sha256": "ed4aac97acff841d6a07b5ebc4e4ef920a58f952cc0dbf0b25e898cd3961bd7f"
+              },
+              {
+                "file": "scale-b-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-b-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "ba835dda80f53407fd4c1206c9f410f751a5732aba95df1eddae1bd413483744",
+                "candidate_sha256": "ba835dda80f53407fd4c1206c9f410f751a5732aba95df1eddae1bd413483744"
+              },
+              {
+                "file": "scale-b-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "cc0d4ac6bb27cdd500fcdce2e4d7861bd1eda83fa443ea1164a9948437c35fd8",
+                "candidate_sha256": "cc0d4ac6bb27cdd500fcdce2e4d7861bd1eda83fa443ea1164a9948437c35fd8"
+              },
+              {
+                "file": "scale-b-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "8937cdddf13d61252367fca986299d72b435d49063b601c689fce3b3771a8941",
+                "candidate_sha256": "8937cdddf13d61252367fca986299d72b435d49063b601c689fce3b3771a8941"
+              },
+              {
+                "file": "scale-b-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "scale-b.png",
+                "exact": true,
+                "reference_sha256": "0a868aca3e35948745d3d0758efc58a87332f80b0b908ed3ee277e6cb43099a5",
+                "candidate_sha256": "0a868aca3e35948745d3d0758efc58a87332f80b0b908ed3ee277e6cb43099a5"
+              },
+              {
+                "file": "view-0-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "dafd30897629a2e9bf99e1adf33da0e7b8cdb0a85775aad3b2b1780fc89d7743",
+                "candidate_sha256": "dafd30897629a2e9bf99e1adf33da0e7b8cdb0a85775aad3b2b1780fc89d7743"
+              },
+              {
+                "file": "view-0-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-0-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "2433b91cb86e88c28e6a0847603dfccb2ef38ca1b3a97466a65cccc56ab5ac4e",
+                "candidate_sha256": "2433b91cb86e88c28e6a0847603dfccb2ef38ca1b3a97466a65cccc56ab5ac4e"
+              },
+              {
+                "file": "view-0-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "a381da7ad8355a497a16230b9ec9fdf7b33ecdb74685af7aff451a0ff7db6e04",
+                "candidate_sha256": "a381da7ad8355a497a16230b9ec9fdf7b33ecdb74685af7aff451a0ff7db6e04"
+              },
+              {
+                "file": "view-0-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "e5001c58c2feef49d6165499dd17052e18e01c31fa7c0588bb637f6c837671da",
+                "candidate_sha256": "e5001c58c2feef49d6165499dd17052e18e01c31fa7c0588bb637f6c837671da"
+              },
+              {
+                "file": "view-0-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "c640d2cb1d572041575e89bed1b952eef408560dfa120471ccd4045e77f67952",
+                "candidate_sha256": "c640d2cb1d572041575e89bed1b952eef408560dfa120471ccd4045e77f67952"
+              },
+              {
+                "file": "view-0.png",
+                "exact": true,
+                "reference_sha256": "694ea51b326afcd44a220f9e1a28bdc6265fc023a0a86dbeadc4f9c54295b8e9",
+                "candidate_sha256": "694ea51b326afcd44a220f9e1a28bdc6265fc023a0a86dbeadc4f9c54295b8e9"
+              },
+              {
+                "file": "view-1-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "151642c825237b76ed496e7101f0f04709fffeb7e545d022d055ec29d985cc21",
+                "candidate_sha256": "151642c825237b76ed496e7101f0f04709fffeb7e545d022d055ec29d985cc21"
+              },
+              {
+                "file": "view-1-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-1-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "d1605b60bac6abd5d76309d16bed56bc4614cac865915fd585dfc128beb347cb",
+                "candidate_sha256": "d1605b60bac6abd5d76309d16bed56bc4614cac865915fd585dfc128beb347cb"
+              },
+              {
+                "file": "view-1-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "4cda3f5d298a5f7467980d976bc731fcfdd164da513cb5d87e927a25d4436613",
+                "candidate_sha256": "4cda3f5d298a5f7467980d976bc731fcfdd164da513cb5d87e927a25d4436613"
+              },
+              {
+                "file": "view-1-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "e4f6f98673d06f2681b3a0c6c32342a84f3d53ca53278451e684f003b0c78974",
+                "candidate_sha256": "e4f6f98673d06f2681b3a0c6c32342a84f3d53ca53278451e684f003b0c78974"
+              },
+              {
+                "file": "view-1-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "view-1.png",
+                "exact": true,
+                "reference_sha256": "614031f3208d06f8cd608a20430a829d88bba3c6c9bfec50ae5aa7110bfe41ed",
+                "candidate_sha256": "614031f3208d06f8cd608a20430a829d88bba3c6c9bfec50ae5aa7110bfe41ed"
+              },
+              {
+                "file": "view-2-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "0063be94adc83a6f6658b666f6955286fad3c95f0e26e7fc35f10d6f1ba18d9f",
+                "candidate_sha256": "0063be94adc83a6f6658b666f6955286fad3c95f0e26e7fc35f10d6f1ba18d9f"
+              },
+              {
+                "file": "view-2-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-2-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "b2ff65483930f7c584bea9438cded75ee116ce338c27e293889ede083a0b6e90",
+                "candidate_sha256": "b2ff65483930f7c584bea9438cded75ee116ce338c27e293889ede083a0b6e90"
+              },
+              {
+                "file": "view-2-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "2a0d06ab520b9f890d7d0f5e12318a70e786be9768e332cd012d9fa7679a24e4",
+                "candidate_sha256": "2a0d06ab520b9f890d7d0f5e12318a70e786be9768e332cd012d9fa7679a24e4"
+              },
+              {
+                "file": "view-2-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "8476f1ca3c335690306121fed764826d6e7f034a9a20704be4808ae6c13ea39f",
+                "candidate_sha256": "8476f1ca3c335690306121fed764826d6e7f034a9a20704be4808ae6c13ea39f"
+              },
+              {
+                "file": "view-2-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "dbb7bcf4cfd1ec14c4188fbb9a5209bc03213ea7fc21507a41c0cddc1bfafed2",
+                "candidate_sha256": "dbb7bcf4cfd1ec14c4188fbb9a5209bc03213ea7fc21507a41c0cddc1bfafed2"
+              },
+              {
+                "file": "view-2.png",
+                "exact": true,
+                "reference_sha256": "eed649264e68365ab77ece310fa7f4b96eb1ddcfa00b4d94d67673f64f81292c",
+                "candidate_sha256": "eed649264e68365ab77ece310fa7f4b96eb1ddcfa00b4d94d67673f64f81292c"
+              }
+            ]
+          },
+          "verify": {
+            "passed": true,
+            "state_exact": true,
+            "state_records": 7036,
+            "exact_targets": 63,
+            "png_targets": 9,
+            "raw_targets": 54,
+            "target_hashes": [
+              {
+                "file": "authored-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e",
+                "candidate_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e"
+              },
+              {
+                "file": "authored-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "authored-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380",
+                "candidate_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380"
+              },
+              {
+                "file": "authored-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08",
+                "candidate_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08"
+              },
+              {
+                "file": "authored-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44",
+                "candidate_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44"
+              },
+              {
+                "file": "authored-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "authored-return.png",
+                "exact": true,
+                "reference_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7",
+                "candidate_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7"
+              },
+              {
+                "file": "fog-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "e97ebd0d1cae57f19176c78c80c57ae7d65731b44caef17e500ffdb7b5d802fd",
+                "candidate_sha256": "e97ebd0d1cae57f19176c78c80c57ae7d65731b44caef17e500ffdb7b5d802fd"
+              },
+              {
+                "file": "fog-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "fog-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "ad7420f612967a2360e7b2dbe73426be2735044d49cd1a3937491241408375b0",
+                "candidate_sha256": "ad7420f612967a2360e7b2dbe73426be2735044d49cd1a3937491241408375b0"
+              },
+              {
+                "file": "fog-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c",
+                "candidate_sha256": "b117b587f79b00435b5b71afc412ab3d8664cec402dce291b7f3aa85abce3c4c"
+              },
+              {
+                "file": "fog-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "5be41d57bc429c471fef7a1bec8569a69ad4d226286ce08f38701dc4be536e0d",
+                "candidate_sha256": "5be41d57bc429c471fef7a1bec8569a69ad4d226286ce08f38701dc4be536e0d"
+              },
+              {
+                "file": "fog-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "fog.png",
+                "exact": true,
+                "reference_sha256": "bd9763085070f285d03339ba7c16117327ba0d42df2616b9787f252dca968846",
+                "candidate_sha256": "bd9763085070f285d03339ba7c16117327ba0d42df2616b9787f252dca968846"
+              },
+              {
+                "file": "reveal-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e",
+                "candidate_sha256": "8c8ac4569f2fdf4de7b33f55a0c520a8b1f558e7e30ff66422308f22f6350f5e"
+              },
+              {
+                "file": "reveal-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "reveal-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380",
+                "candidate_sha256": "b1cc605818f2343ef595b5a8f8a602e5b423c7cb7c95a10b815c0876818b0380"
+              },
+              {
+                "file": "reveal-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08",
+                "candidate_sha256": "04c7efd5c74386c2a49fae6f515ef45732e4171dca78992f05d93887007a2e08"
+              },
+              {
+                "file": "reveal-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44",
+                "candidate_sha256": "00b90902092736dffea55c63d9bb4b89a91b33889c569df39412a01fcb011e44"
+              },
+              {
+                "file": "reveal-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "reveal-return.png",
+                "exact": true,
+                "reference_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7",
+                "candidate_sha256": "d434db776295d03cae11d1e365250e4eb53c1f727d08205ec326186f2dba21f7"
+              },
+              {
+                "file": "scale-a-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae",
+                "candidate_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae"
+              },
+              {
+                "file": "scale-a-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205",
+                "candidate_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205"
+              },
+              {
+                "file": "scale-a-return-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae",
+                "candidate_sha256": "dd6a9a0aa65e5d651eff3bc9d25dbec4d14c53fd34382bba4e9324728b785eae"
+              },
+              {
+                "file": "scale-a-return-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-a-return-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205",
+                "candidate_sha256": "dd7d12d1db13a4c1c6b5edb2ef0ebc4b1cee065e9fe8788a42a8a4aaae813205"
+              },
+              {
+                "file": "scale-a-return-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937",
+                "candidate_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937"
+              },
+              {
+                "file": "scale-a-return-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91",
+                "candidate_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91"
+              },
+              {
+                "file": "scale-a-return-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "scale-a-return.png",
+                "exact": true,
+                "reference_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb",
+                "candidate_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb"
+              },
+              {
+                "file": "scale-a-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937",
+                "candidate_sha256": "d61d8e110bc6d60930e99667af3f1852516b9d53d5aadd542e4070a67d5be937"
+              },
+              {
+                "file": "scale-a-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91",
+                "candidate_sha256": "bb298512076d263698bf98ce5ff10258f1831555e47e2bdbeb4faa9a9e74fd91"
+              },
+              {
+                "file": "scale-a-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "scale-a.png",
+                "exact": true,
+                "reference_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb",
+                "candidate_sha256": "e9b7948475759aa4095479793e65f6b5a40be6dc9ac7027186cec91284151ddb"
+              },
+              {
+                "file": "scale-b-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "ed4aac97acff841d6a07b5ebc4e4ef920a58f952cc0dbf0b25e898cd3961bd7f",
+                "candidate_sha256": "ed4aac97acff841d6a07b5ebc4e4ef920a58f952cc0dbf0b25e898cd3961bd7f"
+              },
+              {
+                "file": "scale-b-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "scale-b-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "ba835dda80f53407fd4c1206c9f410f751a5732aba95df1eddae1bd413483744",
+                "candidate_sha256": "ba835dda80f53407fd4c1206c9f410f751a5732aba95df1eddae1bd413483744"
+              },
+              {
+                "file": "scale-b-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "cc0d4ac6bb27cdd500fcdce2e4d7861bd1eda83fa443ea1164a9948437c35fd8",
+                "candidate_sha256": "cc0d4ac6bb27cdd500fcdce2e4d7861bd1eda83fa443ea1164a9948437c35fd8"
+              },
+              {
+                "file": "scale-b-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "8937cdddf13d61252367fca986299d72b435d49063b601c689fce3b3771a8941",
+                "candidate_sha256": "8937cdddf13d61252367fca986299d72b435d49063b601c689fce3b3771a8941"
+              },
+              {
+                "file": "scale-b-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "scale-b.png",
+                "exact": true,
+                "reference_sha256": "0a868aca3e35948745d3d0758efc58a87332f80b0b908ed3ee277e6cb43099a5",
+                "candidate_sha256": "0a868aca3e35948745d3d0758efc58a87332f80b0b908ed3ee277e6cb43099a5"
+              },
+              {
+                "file": "view-0-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "dafd30897629a2e9bf99e1adf33da0e7b8cdb0a85775aad3b2b1780fc89d7743",
+                "candidate_sha256": "dafd30897629a2e9bf99e1adf33da0e7b8cdb0a85775aad3b2b1780fc89d7743"
+              },
+              {
+                "file": "view-0-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-0-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "2433b91cb86e88c28e6a0847603dfccb2ef38ca1b3a97466a65cccc56ab5ac4e",
+                "candidate_sha256": "2433b91cb86e88c28e6a0847603dfccb2ef38ca1b3a97466a65cccc56ab5ac4e"
+              },
+              {
+                "file": "view-0-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "a381da7ad8355a497a16230b9ec9fdf7b33ecdb74685af7aff451a0ff7db6e04",
+                "candidate_sha256": "a381da7ad8355a497a16230b9ec9fdf7b33ecdb74685af7aff451a0ff7db6e04"
+              },
+              {
+                "file": "view-0-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "e5001c58c2feef49d6165499dd17052e18e01c31fa7c0588bb637f6c837671da",
+                "candidate_sha256": "e5001c58c2feef49d6165499dd17052e18e01c31fa7c0588bb637f6c837671da"
+              },
+              {
+                "file": "view-0-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "c640d2cb1d572041575e89bed1b952eef408560dfa120471ccd4045e77f67952",
+                "candidate_sha256": "c640d2cb1d572041575e89bed1b952eef408560dfa120471ccd4045e77f67952"
+              },
+              {
+                "file": "view-0.png",
+                "exact": true,
+                "reference_sha256": "694ea51b326afcd44a220f9e1a28bdc6265fc023a0a86dbeadc4f9c54295b8e9",
+                "candidate_sha256": "694ea51b326afcd44a220f9e1a28bdc6265fc023a0a86dbeadc4f9c54295b8e9"
+              },
+              {
+                "file": "view-1-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "151642c825237b76ed496e7101f0f04709fffeb7e545d022d055ec29d985cc21",
+                "candidate_sha256": "151642c825237b76ed496e7101f0f04709fffeb7e545d022d055ec29d985cc21"
+              },
+              {
+                "file": "view-1-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-1-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "d1605b60bac6abd5d76309d16bed56bc4614cac865915fd585dfc128beb347cb",
+                "candidate_sha256": "d1605b60bac6abd5d76309d16bed56bc4614cac865915fd585dfc128beb347cb"
+              },
+              {
+                "file": "view-1-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "4cda3f5d298a5f7467980d976bc731fcfdd164da513cb5d87e927a25d4436613",
+                "candidate_sha256": "4cda3f5d298a5f7467980d976bc731fcfdd164da513cb5d87e927a25d4436613"
+              },
+              {
+                "file": "view-1-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "e4f6f98673d06f2681b3a0c6c32342a84f3d53ca53278451e684f003b0c78974",
+                "candidate_sha256": "e4f6f98673d06f2681b3a0c6c32342a84f3d53ca53278451e684f003b0c78974"
+              },
+              {
+                "file": "view-1-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99",
+                "candidate_sha256": "a975a0efa2526ea1935f200769a769e563ef530715ad2fef333f39f389104d99"
+              },
+              {
+                "file": "view-1.png",
+                "exact": true,
+                "reference_sha256": "614031f3208d06f8cd608a20430a829d88bba3c6c9bfec50ae5aa7110bfe41ed",
+                "candidate_sha256": "614031f3208d06f8cd608a20430a829d88bba3c6c9bfec50ae5aa7110bfe41ed"
+              },
+              {
+                "file": "view-2-depth.bin.gz",
+                "exact": true,
+                "reference_sha256": "0063be94adc83a6f6658b666f6955286fad3c95f0e26e7fc35f10d6f1ba18d9f",
+                "candidate_sha256": "0063be94adc83a6f6658b666f6955286fad3c95f0e26e7fc35f10d6f1ba18d9f"
+              },
+              {
+                "file": "view-2-infantry-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+                "candidate_sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6"
+              },
+              {
+                "file": "view-2-normals.bin.gz",
+                "exact": true,
+                "reference_sha256": "b2ff65483930f7c584bea9438cded75ee116ce338c27e293889ede083a0b6e90",
+                "candidate_sha256": "b2ff65483930f7c584bea9438cded75ee116ce338c27e293889ede083a0b6e90"
+              },
+              {
+                "file": "view-2-scene.bin.gz",
+                "exact": true,
+                "reference_sha256": "2a0d06ab520b9f890d7d0f5e12318a70e786be9768e332cd012d9fa7679a24e4",
+                "candidate_sha256": "2a0d06ab520b9f890d7d0f5e12318a70e786be9768e332cd012d9fa7679a24e4"
+              },
+              {
+                "file": "view-2-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "8476f1ca3c335690306121fed764826d6e7f034a9a20704be4808ae6c13ea39f",
+                "candidate_sha256": "8476f1ca3c335690306121fed764826d6e7f034a9a20704be4808ae6c13ea39f"
+              },
+              {
+                "file": "view-2-terrain-sun.bin.gz",
+                "exact": true,
+                "reference_sha256": "dbb7bcf4cfd1ec14c4188fbb9a5209bc03213ea7fc21507a41c0cddc1bfafed2",
+                "candidate_sha256": "dbb7bcf4cfd1ec14c4188fbb9a5209bc03213ea7fc21507a41c0cddc1bfafed2"
+              },
+              {
+                "file": "view-2.png",
+                "exact": true,
+                "reference_sha256": "eed649264e68365ab77ece310fa7f4b96eb1ddcfa00b4d94d67673f64f81292c",
+                "candidate_sha256": "eed649264e68365ab77ece310fa7f4b96eb1ddcfa00b4d94d67673f64f81292c"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "exact_target_comparisons": 252
+  },
+  "deployment": {
+    "version": "v0.8.7+396eaf9-dirty",
+    "source_head": "9cd9c1d669701e0fa1fb0af3100785ddd153e0a9",
+    "deployed": {
+      "${SOURCE_ROOT}/playable": {
+        "opencnc3d": {
+          "before": "40b8cd4065dabcf8dcae7921b5c88e9987b619f9bfb5776a1c00b2c4a61df687",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "cnc3d": {
+          "before": "40b8cd4065dabcf8dcae7921b5c88e9987b619f9bfb5776a1c00b2c4a61df687",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "ra3d/opencnc3d": {
+          "before": "40b8cd4065dabcf8dcae7921b5c88e9987b619f9bfb5776a1c00b2c4a61df687",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "ra3d/cnc3d": {
+          "before": "40b8cd4065dabcf8dcae7921b5c88e9987b619f9bfb5776a1c00b2c4a61df687",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "cnc_eyes": {
+          "before": "edf09c1dd7964c926524643f6cadf82685b0b8b0057efd1e00a45e55c1d22572",
+          "after": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e"
+        },
+        "libSDL2-2.0.0.dylib": {
+          "before": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+          "after": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8"
+        },
+        "libSDL3.dylib": {
+          "before": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+          "after": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+        },
+        "ra3d/libSDL2-2.0.0.dylib": {
+          "before": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+          "after": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8"
+        },
+        "ra3d/libSDL3.dylib": {
+          "before": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+          "after": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+        },
+        "cnc3d-install.txt": {
+          "before": "ec4cfcd53557ac975fa15182a24cd05504f8acbf4c1e4c4683ec0ee0ab84efd3",
+          "after": "daf1b26ab5f6d60094b82f4e95656ffd55ae14ad2db7de4a0315e631f15b3d53"
+        },
+        "opencnc3d-install.txt": {
+          "before": "ec4cfcd53557ac975fa15182a24cd05504f8acbf4c1e4c4683ec0ee0ab84efd3",
+          "after": "daf1b26ab5f6d60094b82f4e95656ffd55ae14ad2db7de4a0315e631f15b3d53"
+        },
+        "BUILD-ID": {
+          "before": "22b78dc6a875e09c7f4eb82b7bc427c9de7754defc3cdd109a59ff40d80c7466",
+          "after": "19106435952033e950b3a066543625f4d55d1abab3898ba708e5924807ffa94b"
+        },
+        "BUILD-ID.txt": {
+          "before": "22b78dc6a875e09c7f4eb82b7bc427c9de7754defc3cdd109a59ff40d80c7466",
+          "after": "19106435952033e950b3a066543625f4d55d1abab3898ba708e5924807ffa94b"
+        }
+      },
+      "${DOCK_RUNTIME}": {
+        "opencnc3d": {
+          "before": "9522fdbe13bfb9b7ff38ecab57695d5e94c6c7b61c9a1b93336cbf4f47328d67",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "cnc3d": {
+          "before": "9522fdbe13bfb9b7ff38ecab57695d5e94c6c7b61c9a1b93336cbf4f47328d67",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "ra3d/opencnc3d": {
+          "before": "9522fdbe13bfb9b7ff38ecab57695d5e94c6c7b61c9a1b93336cbf4f47328d67",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "ra3d/cnc3d": {
+          "before": "9522fdbe13bfb9b7ff38ecab57695d5e94c6c7b61c9a1b93336cbf4f47328d67",
+          "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+        },
+        "cnc_eyes": {
+          "before": "16733449069fe578f4ea7f13d147655170ed129bebc5032fc45746297d0456ad",
+          "after": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e"
+        },
+        "libSDL2-2.0.0.dylib": {
+          "before": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+          "after": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8"
+        },
+        "libSDL3.dylib": {
+          "before": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+          "after": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+        },
+        "ra3d/libSDL2-2.0.0.dylib": {
+          "before": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+          "after": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8"
+        },
+        "ra3d/libSDL3.dylib": {
+          "before": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+          "after": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+        },
+        "cnc3d-install.txt": {
+          "before": "62f598c3c9c79387342e5cfc61fe5cbfe012a45fed1ac981570719655d3906de",
+          "after": "daf1b26ab5f6d60094b82f4e95656ffd55ae14ad2db7de4a0315e631f15b3d53"
+        },
+        "opencnc3d-install.txt": {
+          "before": "62f598c3c9c79387342e5cfc61fe5cbfe012a45fed1ac981570719655d3906de",
+          "after": "daf1b26ab5f6d60094b82f4e95656ffd55ae14ad2db7de4a0315e631f15b3d53"
+        },
+        "BUILD-ID": {
+          "before": "989d06874326a6ee80fcf76fc25a67107956a69d19c0bb8e785cac1f152a629f",
+          "after": "19106435952033e950b3a066543625f4d55d1abab3898ba708e5924807ffa94b"
+        },
+        "BUILD-ID.txt": {
+          "before": "989d06874326a6ee80fcf76fc25a67107956a69d19c0bb8e785cac1f152a629f",
+          "after": "19106435952033e950b3a066543625f4d55d1abab3898ba708e5924807ffa94b"
+        }
+      }
+    },
+    "preserved": {
+      "count": 70,
+      "unchanged": true,
+      "differences": []
+    },
+    "canonical_build_outputs": {
+      "app/opencnc3d": {
+        "before": "40b8cd4065dabcf8dcae7921b5c88e9987b619f9bfb5776a1c00b2c4a61df687",
+        "after": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d"
+      },
+      "app/libSDL2-2.0.0.dylib": {
+        "before": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+        "after": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8"
+      },
+      "app/libSDL3.dylib": {
+        "before": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+        "after": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+      },
+      "game/cnc_eyes": {
+        "before": "edf09c1dd7964c926524643f6cadf82685b0b8b0057efd1e00a45e55c1d22572",
+        "after": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e"
+      },
+      "game/libSDL2-2.0.0.dylib": {
+        "before": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+        "after": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8"
+      },
+      "game/libSDL3.dylib": {
+        "before": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+        "after": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+      }
+    },
+    "verified_files_at_report": 26
+  },
+  "installed_smoke": {
+    "passed": true,
+    "generated_only": false,
+    "cases": [
+      {
+        "case": "actual-td-standalone",
+        "kind": "td-standalone",
+        "binary": "${DOCK_RUNTIME}/cnc_eyes",
+        "sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+        "preset_sha256": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+        "passed": true,
+        "exit": 0,
+        "wind_depth": {
+          "draws": 297,
+          "vertices": 1863702,
+          "fallbacks": 0,
+          "verified": 0,
+          "mismatches": 0
+        },
+        "fog_changes_pixels": true,
+        "reveal_restored_exact": true,
+        "screenshots": [
+          "revealed.png",
+          "fog.png",
+          "restored.png"
+        ]
+      },
+      {
+        "case": "actual-td-app",
+        "kind": "td-app",
+        "binary": "${DOCK_RUNTIME}/opencnc3d",
+        "sha256": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d",
+        "preset_sha256": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+        "passed": true,
+        "exit": 0,
+        "screenshots": [
+          "shots/h_game1.png",
+          "shots/h_menu0.png",
+          "shots/h_menu1.png",
+          "shots/h_menu2.png"
+        ]
+      },
+      {
+        "case": "actual-ra-app",
+        "kind": "ra-app",
+        "binary": "${DOCK_RUNTIME}/ra3d/opencnc3d",
+        "sha256": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d",
+        "preset_sha256": "63f9f054ad32661ec3a945c5bf54cff6ec913b655eb6379f27738a818a5bdf89",
+        "passed": true,
+        "exit": 0,
+        "wind_depth": {
+          "draws": 504,
+          "vertices": 3098520,
+          "fallbacks": 0,
+          "verified": 0,
+          "mismatches": 0
+        },
+        "ore": {
+          "on": "1",
+          "theater": "RASNOW",
+          "loaded": "2",
+          "cells": "1049",
+          "states": "1049",
+          "drawn": "119",
+          "pieces": "2621",
+          "tris": "194422",
+          "built": "0",
+          "ms": "0.121",
+          "frames": "1,4,0,10,17,0,26,23,19,0,15,4",
+          "cast": "119",
+          "mines": "8",
+          "minesdrawn": "8",
+          "minecards": "0",
+          "oredecals": "0"
+        },
+        "fog_changes_pixels": true,
+        "reveal_restored_exact": true,
+        "screenshots": [
+          "revealed.png",
+          "fog.png",
+          "restored.png"
+        ]
+      },
+      {
+        "case": "canonical-td-standalone",
+        "kind": "td-standalone",
+        "binary": "${SOURCE_ROOT}/playable/cnc_eyes",
+        "sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e",
+        "preset_sha256": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+        "passed": true,
+        "exit": 0,
+        "wind_depth": {
+          "draws": 711,
+          "vertices": 1251315,
+          "fallbacks": 0,
+          "verified": 0,
+          "mismatches": 0
+        },
+        "fog_changes_pixels": true,
+        "reveal_restored_exact": true,
+        "screenshots": [
+          "revealed.png",
+          "fog.png",
+          "restored.png"
+        ]
+      },
+      {
+        "case": "canonical-td-app",
+        "kind": "td-app",
+        "binary": "${SOURCE_ROOT}/playable/opencnc3d",
+        "sha256": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d",
+        "preset_sha256": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+        "passed": true,
+        "exit": 0,
+        "screenshots": [
+          "shots/h_game1.png",
+          "shots/h_menu0.png",
+          "shots/h_menu1.png",
+          "shots/h_menu2.png"
+        ]
+      },
+      {
+        "case": "canonical-ra-app",
+        "kind": "ra-app",
+        "binary": "${SOURCE_ROOT}/playable/ra3d/opencnc3d",
+        "sha256": "765fc5a8d684afbffa76e8cc72f2114e1b4a89117e8a9295a6213ee5fb8fc86d",
+        "preset_sha256": "63f9f054ad32661ec3a945c5bf54cff6ec913b655eb6379f27738a818a5bdf89",
+        "passed": true,
+        "exit": 0,
+        "wind_depth": {
+          "draws": 504,
+          "vertices": 3098520,
+          "fallbacks": 0,
+          "verified": 0,
+          "mismatches": 0
+        },
+        "ore": {
+          "on": "1",
+          "theater": "RASNOW",
+          "loaded": "2",
+          "cells": "1049",
+          "states": "1049",
+          "drawn": "119",
+          "pieces": "2621",
+          "tris": "194422",
+          "built": "0",
+          "ms": "0.183",
+          "frames": "1,4,0,10,17,0,26,23,19,0,15,4",
+          "cast": "119",
+          "mines": "8",
+          "minesdrawn": "8",
+          "minecards": "0",
+          "oredecals": "0"
+        },
+        "fog_changes_pixels": true,
+        "reveal_restored_exact": true,
+        "screenshots": [
+          "revealed.png",
+          "fog.png",
+          "restored.png"
+        ]
+      }
+    ],
+    "preservation": {
+      "checked_paths": 70,
+      "changes_since_investigation": [
+        {
+          "path": "${DOCK_RUNTIME}/opencnc3d-fx.cfg",
+          "before": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+          "after": "e3ba65eab335435565287e3265b51d90cb85033d14e32be6f612135963205a04"
+        }
+      ],
+      "changes_since_investigation_after": [
+        {
+          "path": "${DOCK_RUNTIME}/opencnc3d-fx.cfg",
+          "before": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+          "after": "e3ba65eab335435565287e3265b51d90cb85033d14e32be6f612135963205a04"
+        }
+      ],
+      "changes_during_smoke": [],
+      "captured_presets_changed": [],
+      "review_required": true
+    },
+    "dock": {
+      "expected": "${DOCK_RUNTIME}/OpenCNC3D.app/",
+      "before": [
+        {
+          "label": "OpenCNC3D",
+          "url": "${DOCK_RUNTIME}/OpenCNC3D.app/"
+        }
+      ],
+      "after": [
+        {
+          "label": "OpenCNC3D",
+          "url": "${DOCK_RUNTIME}/OpenCNC3D.app/"
+        }
+      ],
+      "unchanged_during_smoke": true
+    },
+    "deployed_binaries_match": true
+  },
+  "ore_assets": {
+    "created_utc": "2026-10-19T20:39:28.170562+00:00",
+    "source_main": "396eaf98c81b320cd57c0c80d3fe2e1868d12051",
+    "merged_remote": "948368580a8e5e032145b4e980436738540d6351",
+    "source_manifest_sha256": "85c59511dc2f25e28151b77853687c41444a6ae8f698cbc7500a861c6fe4b255",
+    "approval_verified": {
+      "resources/GOLD01": "2026-10-19 20:56",
+      "resources/GOLD02": "2026-10-19 20:56",
+      "resources/GOLD03": "2026-10-19 20:56",
+      "resources/GOLD04": "2026-10-19 20:56",
+      "resources/GEM01": "2026-10-19 20:56",
+      "resources/GEM02": "2026-10-19 20:56",
+      "resources/GEM03": "2026-10-19 20:56",
+      "resources/GEM04": "2026-10-19 20:56",
+      "resources/MINE": "2026-10-19 20:56"
+    },
+    "scope": "Only four approved ore runtime files in each of two installations",
+    "destinations": [
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/ore3d_TEM.pack",
+        "destination": "${SOURCE_ROOT}/playable/ra3d/ore/ore3d_TEM.pack",
+        "before_sha256": null,
+        "sha256": "126482187d4ef14fc753efab15745d8289c23c2e6857de5876a128ab592eee2f",
+        "bytes": 2586432,
+        "action": "copied_atomically"
+      },
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/ore3d_TEM.pack",
+        "destination": "${DOCK_RUNTIME}/ra3d/ore/ore3d_TEM.pack",
+        "before_sha256": null,
+        "sha256": "126482187d4ef14fc753efab15745d8289c23c2e6857de5876a128ab592eee2f",
+        "bytes": 2586432,
+        "action": "copied_atomically"
+      },
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/ore3d_WIN.pack",
+        "destination": "${SOURCE_ROOT}/playable/ra3d/ore/ore3d_WIN.pack",
+        "before_sha256": null,
+        "sha256": "2da13483077a53bf7cdfbe987fbea1f9257c90bdde99536b33d03666c57a5bcc",
+        "bytes": 2586432,
+        "action": "copied_atomically"
+      },
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/ore3d_WIN.pack",
+        "destination": "${DOCK_RUNTIME}/ra3d/ore/ore3d_WIN.pack",
+        "before_sha256": null,
+        "sha256": "2da13483077a53bf7cdfbe987fbea1f9257c90bdde99536b33d03666c57a5bcc",
+        "bytes": 2586432,
+        "action": "copied_atomically"
+      },
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/MINE_TEM.ebld",
+        "destination": "${SOURCE_ROOT}/playable/ra3d/ebld/MINE_TEM.ebld",
+        "before_sha256": null,
+        "sha256": "6a31ee3c3ec633dcd1c20d9ef865049aa4175b05a3d0134cd390889277213fe1",
+        "bytes": 1148496,
+        "action": "copied_atomically"
+      },
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/MINE_TEM.ebld",
+        "destination": "${DOCK_RUNTIME}/ra3d/ebld/MINE_TEM.ebld",
+        "before_sha256": null,
+        "sha256": "6a31ee3c3ec633dcd1c20d9ef865049aa4175b05a3d0134cd390889277213fe1",
+        "bytes": 1148496,
+        "action": "copied_atomically"
+      },
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/MINE_WIN.ebld",
+        "destination": "${SOURCE_ROOT}/playable/ra3d/ebld/MINE_WIN.ebld",
+        "before_sha256": null,
+        "sha256": "acbefa7855944d646d9434ffa9e4d38f16d62a17e72d2e77e8b85ddd2d3b557f",
+        "bytes": 1248370,
+        "action": "copied_atomically"
+      },
+      {
+        "source": "${SOURCE_ROOT}/data/ra3d_ore/MINE_WIN.ebld",
+        "destination": "${DOCK_RUNTIME}/ra3d/ebld/MINE_WIN.ebld",
+        "before_sha256": null,
+        "sha256": "acbefa7855944d646d9434ffa9e4d38f16d62a17e72d2e77e8b85ddd2d3b557f",
+        "bytes": 1248370,
+        "action": "copied_atomically"
+      }
+    ],
+    "passed": true,
+    "protected_files_checked": 70,
+    "protected_file_changes_during_staging": {},
+    "all_destinations_verified": true
+  },
+  "preservation_review": {
+    "reviewed": true,
+    "status": "reviewed_concurrent_preset_change_preserved_as_found",
+    "changes": [
+      {
+        "path": "${DOCK_RUNTIME}/opencnc3d-fx.cfg",
+        "before": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+        "after": "e3ba65eab335435565287e3265b51d90cb85033d14e32be6f612135963205a04"
+      }
+    ],
+    "observed_file_mtime": "2026-10-19T22:36:16.984996+02:00",
+    "timing_review": "Preset modification at 22:36 preceded this performance deployment. It is a concurrent tuning change and was preserved as found.",
+    "semantic_changes": [
+      {
+        "key": "explosion_bloom",
+        "before": null,
+        "after": "0.30000"
+      },
+      {
+        "key": "muzzle_bloom",
+        "before": null,
+        "after": "0.08000"
+      },
+      {
+        "key": "muzzle_flash_gain",
+        "before": null,
+        "after": "0.30000"
+      },
+      {
+        "key": "muzzle_light_gain",
+        "before": null,
+        "after": "0.15000"
+      },
+      {
+        "key": "sand_brightness",
+        "before": null,
+        "after": "0.92857"
+      },
+      {
+        "key": "sand_contrast",
+        "before": null,
+        "after": "1.14286"
+      },
+      {
+        "key": "sand_saturation",
+        "before": "0.84375",
+        "after": "0.68304"
+      },
+      {
+        "key": "terrain_shadow_strength",
+        "before": "0.68750",
+        "after": "0.33036"
+      }
+    ],
+    "formatting_changes": "Old inline comments were removed.",
+    "captured_benchmark_preset_sha256": "90c4018c702d362050e031bd3713af4dbc6d67cee335e888fea28d2196beea6d",
+    "current_preset_sha256": "e3ba65eab335435565287e3265b51d90cb85033d14e32be6f612135963205a04",
+    "benchmark_policy": "Benchmarks intentionally retain the captured original preset so matched control/candidate comparisons use identical original settings. The installed concurrent preset is not restored or overwritten.",
+    "preservation_windows": {
+      "ore_staging": {
+        "checked": 70,
+        "changes": 0
+      },
+      "binary_deployment": {
+        "checked": 70,
+        "changes": 0
+      },
+      "installed_smoke": {
+        "checked": 70,
+        "changes": 0
+      }
+    },
+    "restoration_performed": false
+  },
+  "current_preset_smoke": {
+    "passed": true,
+    "preset_sha256": "e3ba65eab335435565287e3265b51d90cb85033d14e32be6f612135963205a04",
+    "unchanged": true,
+    "fog_changes_pixels": true,
+    "reveal_restored_exact": true,
+    "binary_sha256": "0747f06221f3b037c03282a51e436ee0363d1d896b57fdd7d262755c17e5985e"
+  },
+  "caveats": [
+    "Camera and seed reconstruct the scene approximately; the exact moved screenshot camera was not recorded.",
+    "ABBA measurements are GPU-completed frozen-frame rendering tests on a shared host; background load varies.",
+    "Signed frame-time reductions report the observed results, including zero gains or regressions; they do not establish guaranteed improvement.",
+    "These measurements do not guarantee live-match FPS or verify a 60 FPS target.",
+    "CPU shadow measurements exclude initialization and warmup; they are main-thread wall/driver attribution, not isolated GPU timestamps.",
+    "Measured runtime timing is macOS arm64; universal binaries include x86_64, whose runtime FPS was not measured.",
+    "The one historical preset difference was reviewed as a concurrent tuning update before deployment and preserved as found. Matched benchmarks intentionally use the captured original preset."
+  ],
+  "remaining_performance_work": {
+    "overall_live_result": "Inconclusive: these short shared-host results do not establish reliable end-to-end FPS improvement or fully resolve the low-FPS complaint.",
+    "remaining_cost": "GPU ambient-occlusion and lighting work remains material.",
+    "next_experiments": [
+      "Dedicated ambient-occlusion pass with depth-aware lower-resolution evaluation and reconstruction",
+      "Cached ambient occlusion for static terrain"
+    ],
+    "validation_required": "Matched image-quality and regression validation before any such rendering change is accepted.",
+    "quality_changes_shipped": false
+  }
+}

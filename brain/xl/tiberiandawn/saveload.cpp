@@ -13,6 +13,10 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Persists per-house fair AI plans, exploration, levels and random streams; validates the optional footer and normalizes old skirmish handicaps.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\saveload.cpv   2.18   16 Oct 1995 16:48:44   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -45,6 +49,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_td.h"
 
 extern bool DLLSave(FileClass& file);
 extern bool DLLLoad(FileClass& file);
@@ -258,6 +263,8 @@ bool Save_Game(const char* file_name, const char* descr)
         Decode_All_Pointers();
         return (false);
     }
+
+    if (!TD_Fair_AI_Save(file)) { file.Close(); Decode_All_Pointers(); return false; }
 
     Call_Back();
 
@@ -488,6 +495,7 @@ bool Load_Game(const char* file_name)
         return (false);
     }
 
+    if (!TD_Fair_AI_Load(file)) { file.Close(); return false; }
     file.Close();
     Decode_All_Pointers();
     Map.Init_IO();
@@ -519,6 +527,9 @@ bool Load_Game(const char* file_name)
         HouseClass* hptr = HouseClass::As_Pointer(house);
         if (hptr && hptr->IsActive) {
             hptr->Init_Unit_Trackers();
+            // Legacy skirmish saves may contain a handicap in their copied
+            // house fields. Skill migration restores normal faction rules.
+            if (GameToPlay != GAME_NORMAL) hptr->Assign_Handicap(DIFF_NORMAL);
         }
     }
 

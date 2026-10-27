@@ -38,11 +38,9 @@
  * WHAT A MODULE IS. Another game built on this engine, started from this launcher
  * and able to play across to the others. OpenCNC3D is the first, and the grid of four
  * tiles is where the next one goes. Three of the four are empty and say so, and
- * pressing one opens the module browser, which today lists nothing: the browser is
- * the real screen with a real empty list rather than a button that does nothing,
- * because the day a second module exists the only change is what the list reads
- * from. Nothing in the grid is read off the disk yet, because nothing on the disk
- * is a module yet.
+ * pressing one opens the module browser. A version-bound public catalog offers
+ * downloads and updates for both games; verified private caches support offline
+ * restoration. The same accepted cards and media checkboxes drive each route.
  *
  * That button used to be drawn disabled, in the engine's own BOXSTYLE_GREEN_DIS_RAISED,
  * for as long as the editor existed in the tree and not in anything a player was
@@ -65,9 +63,15 @@
  */
 
 #include "lcfg.h"
+#include "lcmdline.h"
 #include "lmedia.h"
+#include "lmodule.h"
 #include "lpath.h"
 #include "lui.h"
+#include "lskin.h"
+#include "lsignal.h"
+#include "launcher_logos.h"
+#include "llogo.h"
 #include "lupdate.h"
 #include "lzip.h"
 #include "pngwrite.h"
@@ -88,6 +92,7 @@ int lsetup_cli_main(int argc, char **argv, int *handled);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 #include <sys/stat.h>
 #include "ra_emblem.h"
 
@@ -136,6 +141,9 @@ int lsetup_cli_main(int argc, char **argv, int *handled);
 #define L_VIEW_SETUP 3     /* first start: download the movies and music?        */
 #define L_VIEW_MEDIA_RUN 4 /* a download or removal under way, or stopped by one  */
 #define L_VIEW_SETTINGS 5  /* the gear: add or remove them later                  */
+#define L_VIEW_MODULE_RUN 8
+#define L_VIEW_MODULE_OPTIONS 9 /* same accepted media form, before module writes */
+#define L_VIEW_REMOVE 7    /* confirmed removal of the selected installed module */
 #define L_VIEW_INSTALL 6   /* a folder with the launcher and not the game         */
 
 /* The heading row inside the well, shared by every screen. */
@@ -222,7 +230,7 @@ int lsetup_cli_main(int argc, char **argv, int *handled);
  * 8 pixel gaps is 280, from 20 to 300, which is the dialog's own margin either
  * side. */
 #define L_BTN_Y 175
-#define L_BTN_H 11
+#define L_BTN_H (ls_enabled() ? 14 : 11)
 #define L_BTN_W 64
 #define L_BTN_STEP (L_BTN_W + 8)
 #define L_BTN_X0 20
@@ -244,6 +252,13 @@ enum
     L_BTN_CHK_MOVIES,
     L_BTN_CHK_MUSIC,
     L_BTN_GEAR,
+    L_BTN_WINDOW_CLOSE,
+    L_BTN_REMOVE,
+    L_BTN_REMOVE_RA,
+    L_BTN_REMOVE_2,
+    L_BTN_REMOVE_3,
+    L_BTN_LANG0,
+    L_BTN_LANG1,
     L_BTN_COUNT
 };
 #define L_BTN_ROW 4 /* how many of the above are the row along the bottom */
@@ -260,7 +275,7 @@ enum
 typedef struct
 {
     const char *name;
-    int installed;
+    int installed, needs_update;
 } L_Module;
 
 typedef struct
@@ -268,11 +283,12 @@ typedef struct
     SDL_Window *win;
     GLuint tex;
     int tw, th;          /* power-of-two texture holding the 320x200 */
-    int scale, vpx, vpy; /* letterbox, recomputed every frame        */
+    int scale, vpx, vpy, vptop; /* GL bottom origin and input top origin */
     float px, py;        /* drawable pixels per window point         */
 
     DB_Pack *pack;
     DB_Pack *ra_pack;
+    char ra_missing[96]; /* why Red Alert is not installed, or "" when it is */
     DB_Surface surf;
     unsigned char screen[DM_SCREEN_W * DM_SCREEN_H];
     unsigned char *rgba, *padded;
@@ -283,6 +299,13 @@ typedef struct
     int pressed;     /* button index held down, or -1    */
     int hot;         /* keyboard highlight               */
     int frame;       /* for the barber pole              */
+    unsigned signal_ms; /* elapsed monotonic time for the EVA transmission */
+    int no_motion;
+    int hidden_ui_test;
+    float cursor_x, cursor_y; /* native pixels, independent of the hit-test grid */
+    int hover_btn, hover_mod;
+    unsigned click_at[L_BTN_COUNT + L_MOD_COUNT];
+    unsigned char clicked[L_BTN_COUNT + L_MOD_COUNT];
 
     LUI_Button btn[L_BTN_COUNT];
     LUI_Text notes;
@@ -295,6 +318,15 @@ typedef struct
     int on_mods;
     int mod_hot;     /* module under the highlight                          */
     int mod_pressed; /* module held down by the mouse, or -1                */
+    SDL_Thread *module_worker, *catalog_worker;
+    SDL_atomic_t catalog_phase;
+    LMOD_Catalog catalog;
+    int catalog_allowed, catalog_applied;
+    char catalog_error[256];
+    SDL_atomic_t module_phase, module_progress, module_cancel;
+    int module_target, module_return_sel, module_movies, module_music, module_after_media;
+    char module_error[256];
+    int remove_module; /* frozen target while the confirmation is open */
     int mod_sel;     /* the module this launcher is in: OpenCNC3D, for now     */
     L_Module mod[L_MOD_COUNT];
 
@@ -309,6 +341,15 @@ typedef struct
     /* MOVIES AND MUSIC. lmedia owns the files, the worker and the record; this
      * holds only what the screens show and what the player has ticked. */
     LM_State *media;
+    int media_add_only; /* Browser/installation choices preserve unchecked content. */
+    LM_State *settings_media, *language[2];
+    char media_manifest[1024];
+    char language_code[2][16], language_name[2][80], language_note[2][64];
+    int language_count, language_want[2], language_have[2], language_any[2];
+    int language_pending[2], language_record[2];
+    long long language_size[2], language_here[2];
+    int component_queue[3], component_count, component_at, component_active;
+    int settings_movies, settings_music;
     int have_movies, have_music;     /* all of it on the disk, re-read when a screen opens and a job ends */
     int any_movies, any_music;       /* any of it on the disk: what an untick would remove */
     long long here_movies, here_music; /* how much that is, for the removal question */
@@ -333,6 +374,7 @@ typedef struct
      * game. Its own updater state, made when Install is pressed and gone when the job
      * ends; it holds the folder's lock, and the movies and music job runs under it. */
     int install_offer;  /* this folder holds the launcher and not the game */
+    int private_source; /* current local main build; public modules cannot replace it */
     LU_State *fresh;
     int i_job;          /* the job on the downloading screen is a first install */
     int i_stage;        /* 0 asking the site, 1 the game package, 2 the movies and music */
@@ -350,6 +392,136 @@ typedef struct
     long long shot_done, shot_total;
     char shot_reason[256];
 } L_App;
+
+/* The exact Enhanced menu CUR00 asset and camera from menu/enhanced_menu_cursor.h.
+ * Live presentation uses the same GL triangles/blend modes as the game. The
+ * CPU witness raster uses that mesh, UVs, texture and ordered blend operations. */
+typedef struct { float x,y,u,v,c[4]; } L_CurVertex;
+typedef struct {
+    unsigned char *bytes;
+    size_t size;
+    const unsigned char *texture[256], *triangles;
+    int width[256],height[256];
+    unsigned ntex,ntri;
+    GLuint gl[256];
+    unsigned long crc;
+} L_Cursor;
+static L_Cursor l_cursor;
+static unsigned l_cur_u32(const unsigned char *p)
+{ return (unsigned)p[0]|(unsigned)p[1]<<8|(unsigned)p[2]<<16|(unsigned)p[3]<<24; }
+static float l_cur_float(const unsigned char *p)
+{ unsigned n=l_cur_u32(p);float f;memcpy(&f,&n,4);return f; }
+static int l_cursor_load(const char *dir)
+{
+    char path[1200];FILE *f;long size;size_t pos;unsigned i,j,nmesh;
+    snprintf(path,sizeof path,"%s/ecur/ecur.bin",dir);
+    f=fopen(path,"rb");if(!f)return 0;
+    if(fseek(f,0,SEEK_END)||((size=ftell(f))<16)||size>64*1024*1024||fseek(f,0,SEEK_SET)){fclose(f);return 0;}
+    l_cursor.bytes=(unsigned char *)malloc((size_t)size);if(!l_cursor.bytes){fclose(f);return 0;}
+    l_cursor.size=(size_t)size;
+    if(fread(l_cursor.bytes,1,l_cursor.size,f)!=l_cursor.size){fclose(f);goto bad;}fclose(f);
+    if(memcmp(l_cursor.bytes,"ECUR",4)||l_cur_u32(l_cursor.bytes+4)!=1)goto bad;
+    l_cursor.ntex=l_cur_u32(l_cursor.bytes+8);nmesh=l_cur_u32(l_cursor.bytes+12);
+    if(l_cursor.ntex>256||nmesh>256)goto bad;pos=16;
+    for(i=0;i<l_cursor.ntex;i++){
+        size_t bytes;int w,h;if(pos+4>l_cursor.size)goto bad;
+        w=l_cursor.bytes[pos]|l_cursor.bytes[pos+1]<<8;h=l_cursor.bytes[pos+2]|l_cursor.bytes[pos+3]<<8;pos+=4;
+        if(w<1||h<1||w>256||h>256)goto bad;bytes=(size_t)w*h*4;
+        if(bytes>l_cursor.size-pos)goto bad;
+        l_cursor.texture[i]=l_cursor.bytes+pos;l_cursor.width[i]=w;l_cursor.height[i]=h;pos+=bytes;
+    }
+    for(i=0;i<nmesh;i++){
+        unsigned count;int wanted;if(pos+20>l_cursor.size)goto bad;
+        wanted=!memcmp(l_cursor.bytes+pos,"CUR00\0",6);count=l_cur_u32(l_cursor.bytes+pos+16);pos+=20;
+        if(count>100000||(size_t)count*76>l_cursor.size-pos)goto bad;
+        if(wanted){l_cursor.triangles=l_cursor.bytes+pos;l_cursor.ntri=count;}
+        for(j=0;j<count;j++){
+            const unsigned char *t=l_cursor.bytes+pos+(size_t)j*76;int tex=(short)(t[0]|t[1]<<8),k;
+            if(tex< -1||tex>=(int)l_cursor.ntex||(t[2]!=0&&t[2]!=3))goto bad;
+            for(k=0;k<15;k++){float v=l_cur_float(t+4+(k/5)*24+(k%5)*4);if(!(v>-10000000.f&&v<10000000.f))goto bad;}
+        }
+        pos+=(size_t)count*76;
+    }
+    if(pos!=l_cursor.size||!l_cursor.ntri)goto bad;
+    l_cursor.crc=crc32(0,l_cursor.bytes,(uInt)l_cursor.size);
+    return 1;
+bad:free(l_cursor.bytes);memset(&l_cursor,0,sizeof l_cursor);return 0;
+}
+static void l_cursor_vertices(const unsigned char *t,L_CurVertex p[3],float x,float y,float scale)
+{
+    const float unit=40.f*scale/(770.949f*.819152f);int k,c;
+    for(k=0;k<3;k++){
+        const unsigned char *a=t+4+k*24;
+        p[k].x=x+(l_cur_float(a)-16.9984f)*unit;
+        p[k].y=y+((l_cur_float(a+8)-7.00416f)*.819152f-(l_cur_float(a+4)-88.4019f)*.573576f)*unit;
+        p[k].u=l_cur_float(a+12);p[k].v=l_cur_float(a+16);
+        for(c=0;c<4;c++)p[k].c[c]=a[20+c]/255.f;
+    }
+}
+static float l_cursor_edge(const L_CurVertex *a,const L_CurVertex *b,float x,float y)
+{ return (b->x-a->x)*(y-a->y)-(b->y-a->y)*(x-a->x); }
+static int l_cursor_top_left(const L_CurVertex *a,const L_CurVertex *b)
+{ return b->y<a->y||(b->y==a->y&&b->x>a->x); }
+static void l_cursor_cpu(float x,float y)
+{
+    unsigned i;unsigned char *rgba=ls_pixels();int w=ls_width(),h=ls_height();
+    if(!l_cursor.ntri||x<0||y<0||x>=w||y>=h)return;
+    for(i=0;i<l_cursor.ntri;i++){
+        const unsigned char *t=l_cursor.triangles+(size_t)i*76;
+        L_CurVertex p[3],swap;float area,minx,maxx,miny,maxy;int xx,yy,x0,x1,y0,y1,tex=(short)(t[0]|t[1]<<8),k;
+        l_cursor_vertices(t,p,x,y,1.f);area=l_cursor_edge(p,p+1,p[2].x,p[2].y);if(area==0)continue;
+        if(area<0){swap=p[1];p[1]=p[2];p[2]=swap;area=-area;}
+        minx=maxx=p[0].x;miny=maxy=p[0].y;
+        for(k=1;k<3;k++){if(p[k].x<minx)minx=p[k].x;if(p[k].x>maxx)maxx=p[k].x;if(p[k].y<miny)miny=p[k].y;if(p[k].y>maxy)maxy=p[k].y;}
+        x0=(int)minx-1;x1=(int)maxx+1;y0=(int)miny-1;y1=(int)maxy+1;
+        if(x0<0)x0=0;if(y0<0)y0=0;if(x1>=w)x1=w-1;if(y1>=h)y1=h-1;
+        for(yy=y0;yy<=y1;yy++)for(xx=x0;xx<=x1;xx++){
+            float e0=l_cursor_edge(p+1,p+2,xx+.5f,yy+.5f),e1=l_cursor_edge(p+2,p,xx+.5f,yy+.5f),e2=l_cursor_edge(p,p+1,xx+.5f,yy+.5f);
+            float b[3],src[4];unsigned char *d;int c;
+            if(e0<0||(e0==0&&!l_cursor_top_left(p+1,p+2))||e1<0||(e1==0&&!l_cursor_top_left(p+2,p))||e2<0||(e2==0&&!l_cursor_top_left(p,p+1)))continue;
+            b[0]=e0/area;b[1]=e1/area;b[2]=e2/area;
+            for(c=0;c<4;c++)src[c]=p[0].c[c]*b[0]+p[1].c[c]*b[1]+p[2].c[c]*b[2];
+            if(tex>=0){
+                float u=p[0].u*b[0]+p[1].u*b[1]+p[2].u*b[2],v=p[0].v*b[0]+p[1].v*b[1]+p[2].v*b[2];
+                int tx=(int)(u*l_cursor.width[tex]),ty=(int)(v*l_cursor.height[tex]);const unsigned char *sample;
+                if(tx<0)tx=0;if(ty<0)ty=0;if(tx>=l_cursor.width[tex])tx=l_cursor.width[tex]-1;if(ty>=l_cursor.height[tex])ty=l_cursor.height[tex]-1;
+                sample=l_cursor.texture[tex]+((size_t)ty*l_cursor.width[tex]+tx)*4;
+                for(c=0;c<4;c++)src[c]*=sample[c]/255.f;
+            }
+            d=rgba+((size_t)yy*w+xx)*4;
+            for(c=0;c<3;c++){
+                float out=t[2]==3?src[c]*255.f+d[c]:src[c]*src[3]*255.f+d[c]*(1.f-src[3]);
+                int value=(int)(out+.5f);d[c]=(unsigned char)(value>255?255:value<0?0:value);
+            }
+        }
+    }
+}
+static void l_cursor_gl(float x,float y,float scale)
+{
+    unsigned i;const float unit=40.f*scale/(770.949f*.819152f);
+    if(!l_cursor.ntri)return;
+    glEnable(GL_BLEND);glDisable(GL_DEPTH_TEST);glDepthMask(GL_FALSE);glDisable(GL_SCISSOR_TEST);glShadeModel(GL_SMOOTH);
+    for(i=0;i<l_cursor.ntri;i++){
+        const unsigned char *t=l_cursor.triangles+(size_t)i*76;int tex=(short)(t[0]|t[1]<<8),k;
+        glBlendFunc(t[2]==3?GL_ONE:GL_SRC_ALPHA,t[2]==3?GL_ONE:GL_ONE_MINUS_SRC_ALPHA);
+        if(tex>=0){
+            if(!l_cursor.gl[tex]){
+                glGenTextures(1,&l_cursor.gl[tex]);glBindTexture(GL_TEXTURE_2D,l_cursor.gl[tex]);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,0x812F);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,0x812F);
+                glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,l_cursor.width[tex],l_cursor.height[tex],0,GL_RGBA,GL_UNSIGNED_BYTE,l_cursor.texture[tex]);
+            }
+            glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,l_cursor.gl[tex]);
+        }else glDisable(GL_TEXTURE_2D);
+        glBegin(GL_TRIANGLES);
+        for(k=0;k<3;k++){
+            const unsigned char *p=t+4+k*24;
+            glColor4ub(p[20],p[21],p[22],p[23]);glTexCoord2f(l_cur_float(p+12),l_cur_float(p+16));
+            glVertex2f(x+(l_cur_float(p)-16.9984f)*unit,y+((l_cur_float(p+8)-7.00416f)*.819152f-(l_cur_float(p+4)-88.4019f)*.573576f)*unit);
+        }glEnd();
+    }
+    glEnable(GL_TEXTURE_2D);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glColor4f(1,1,1,1);
+}
 
 /* ------------------------------------------------------------------------ *
  * Finding the install.
@@ -410,6 +582,12 @@ static void l_find_install(L_App *a)
     for (level = 0; level < 5; level++) {
         char before[1024];
         if (l_has_install(cur)) {
+            /* SAID, when it overrides a --dir: a folder named on the command line
+             * and passed over without a word is how a test meant for one folder
+             * started the game in another. */
+            if (a->dir[0])
+                fprintf(stderr, "--dir %s holds no game; using %s, where this "
+                        "launcher is\n", a->dir, cur);
             snprintf(a->dir, sizeof a->dir, "%s", cur);
             return;
         }
@@ -422,37 +600,40 @@ static void l_find_install(L_App *a)
         snprintf(a->dir, sizeof a->dir, "%s", own);
 }
 
+/* WHAT MAKES RED ALERT INSTALLED is lmodule.c's test, the one the movies and music
+ * also ask before they fetch Red Alert's own, and then a menu pack that loads. */
+static int l_module_available(const L_App *a,int target)
+{
+    if (a->private_source) return 0;
+    return lmod_cached(a->dir,target) ||
+        (SDL_AtomicGet((SDL_atomic_t *)&a->catalog_phase)==2 && a->catalog.module[target].available);
+}
+static int l_module_actionable(const L_App *a,int target)
+{return !a->mod[target].installed || a->mod[target].needs_update;}
+static void l_module_versions(L_App *a)
+{
+    int i;for(i=0;i<2;i++)a->mod[i].needs_update=!a->private_source && a->mod[i].installed &&
+        SDL_AtomicGet(&a->catalog_phase)==2 && a->catalog.module[i].available &&
+        !lmod_module_current(a->dir,i,LCFG_BUILD);
+}
+static void l_catalog_start(L_App *a);
+static void l_module_start(L_App *a,int target);
+static void l_module_offer(L_App *a,int target);
 static void l_find_ra_module(L_App *a)
 {
     char path[1200], error[256];
-#ifdef _WIN32
-    const char *brain = "ra3d/RedAlert.dll";
-    const char *frontend = "ra3d/opencnc3d-game.exe";
-#else
-    const char *brain = "ra3d/RedAlert.dylib";
-    const char *frontend = "ra3d/opencnc3d";
-#endif
-    if (!l_has_named_file(a->dir, frontend)
-        || !l_has_named_file(a->dir, brain)
-        || !l_has_named_file(a->dir, "ra3d/dosmenu.pack")
-        || !l_has_named_file(a->dir, "ra3d/audio/SOUNDS.MIX")
-        || !l_has_named_file(a->dir, "ra3d/audio/SPEECH.MIX")
-        || !l_has_named_file(a->dir, "ra3d/audio/SCORES.MIX")
-        || !l_has_named_file(a->dir, "ra3d/audio/RA_LOCAL.MIX")
-        || !l_has_named_file(a->dir, "ra3d/movies/REDINTRO.VQA")
-        || !l_has_named_file(a->dir, "ra3d/movies/PROLOG.VQA")
-        || !l_has_named_file(a->dir, "ra3d/missions/SCG01EA.INI")
-        || !l_has_named_file(a->dir, "ra3d/missions/TUTORIAL.INI")
-        || !l_has_named_file(a->dir, "ra3d/missions/RULES.INI")
-        || !l_has_named_file(a->dir, "ra3d/SCG01EA.pack"))
+    a->mod[1].name = "RA3D";
+    if (!lmod_ra_present(a->dir, a->ra_missing, (int)sizeof a->ra_missing))
         return;
     snprintf(path, sizeof path, "%s/ra3d/dosmenu.pack", a->dir);
+    if(a->ra_pack){db_pack_free(a->ra_pack);a->ra_pack=NULL;}
     a->ra_pack = db_pack_load(path, error, sizeof error);
     if (!a->ra_pack) {
         fprintf(stderr, "RA3D menu pack: %s\n", error);
+        snprintf(a->ra_missing, sizeof a->ra_missing, "ra3d/dosmenu.pack does not load");
         return;
     }
-    a->mod[1].name = "Red Alert 3D";
+    a->mod[1].name = "RA3D";
     a->mod[1].installed = 1;
 }
 
@@ -500,6 +681,8 @@ static void l_read_installed(L_App *a)
     char path[1200];
     char *blob, *p;
 
+    a->private_source = lz_is_private_developer(a->dir);
+
     /* The launcher's OWN build number, as the fallback. A release package always
      * carries opencnc3d-install.txt and that wins, because it describes the install
      * rather than the launcher; a folder built straight out of the tree has no
@@ -532,9 +715,10 @@ static void l_read_installed(L_App *a)
  * straight to the game. The macOS bundle passes "--w 1600 --h 960" this way,
  * which is not a number the launcher should know: the sidebar magnifies by whole
  * numbers only, so the window height has to be a multiple of 480, and that is a
- * fact about the renderer recorded in known-gap notes. Forwarding rather than
- * hardcoding keeps it in the one place it was already written down. */
-static char *l_game_args[16];
+ * fact about the renderer. Forwarding rather than hardcoding keeps it in the
+ * renderer's hands. How many fit, and why a longer list is refused rather than
+ * cut, is lcmdline.h's. */
+static char *l_game_args[LC_GAME_ARGS];
 static int l_game_argc;
 
 /* ------------------------------------------------------------------------ *
@@ -555,16 +739,30 @@ static int l_launch(const char *dir, const char *exe, const char *module,
 #ifdef _WIN32
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
-    char cmd[2048];
-    int n;
+    /* AS LONG AS WINDOWS TAKES, 32767 characters with the terminator, and every
+     * argument quoted by lc_win_append: the install path can hold spaces, and so
+     * can a forwarded save folder or script, and CreateProcess hands the game one
+     * string that its C runtime splits on them. A line that does not fit is
+     * REFUSED, naming the argument it stopped at, rather than cut. */
+    static char cmd[32767];
+    size_t n = 0;
+    const char *at = path;
     snprintf(path, sizeof path, "%s\\%s", dir, exe);
-    /* Quoted, because the install path can contain spaces and CreateProcess
-     * splits an unquoted command line on them. */
-    n = snprintf(cmd, sizeof cmd, "\"%s\"", path);
-    if (module && n < (int)sizeof cmd)
-        n += snprintf(cmd + n, sizeof cmd - (size_t)n, " --module %s", module);
-    for (i = 0; i < l_game_argc && n < (int)sizeof cmd; i++)
-        n += snprintf(cmd + n, sizeof cmd - (size_t)n, " %s", l_game_args[i]);
+    cmd[0] = '\0';
+    if (lc_win_append(cmd, sizeof cmd, &n, path)
+        && (!module || (lc_win_append(cmd, sizeof cmd, &n, at = "--module")
+                        && lc_win_append(cmd, sizeof cmd, &n, at = module)))) {
+        for (i = 0; i < l_game_argc; i++)
+            if (!lc_win_append(cmd, sizeof cmd, &n, at = l_game_args[i]))
+                break;
+        if (i == l_game_argc)
+            at = NULL;
+    }
+    if (at) {
+        snprintf(err, (size_t)errlen, "the command line for %.40s is longer than "
+                 "Windows takes; it stops at %.400s", exe, at);
+        return 0;
+    }
     memset(&si, 0, sizeof si);
     si.cb = sizeof si;
     memset(&pi, 0, sizeof pi);
@@ -640,6 +838,27 @@ static int l_pot(int v)
     return p;
 }
 
+static int l_canvas_w(void) { return ls_enabled() ? ls_width() : DM_SCREEN_W; }
+static int l_canvas_h(void) { return ls_enabled() ? ls_height() : DM_SCREEN_H; }
+static int l_native_x(int x) { return ls_enabled() ? 28 + x * 3 : x; }
+static int l_native_y(int y) { return ls_enabled() ? 18 + y * 3 : y; }
+static int l_native_extent(int n) { return ls_enabled() ? n * 3 : n; }
+
+/* Indexed artwork remains original content; chrome never passes through this palette. */
+static void l_skin_indexed(L_App *a, const unsigned char *pixels, int width, int height,
+                           int dx, int dy, int sx, int sy, int sw, int sh, int dw, int dh)
+{
+    int x,y,c;
+    if (!ls_enabled()) return;
+    for (y=0;y<dh*3;y++) for(x=0;x<dw*3;x++) {
+        int px=sx+x*sw/(dw*3), py=sy+y*sh/(dh*3);
+        if(px<0||py<0||px>=width||py>=height) continue;
+        c=pixels[py*width+px];
+        if(c) ls_pixel_rect(28+dx*3+x,18+dy*3+y,1,1,
+                 (a->pack->pal8[c*3]<<16)|(a->pack->pal8[c*3+1]<<8)|a->pack->pal8[c*3+2]);
+    }
+}
+
 static void l_layout(L_App *a)
 {
     int w = 0, h = 0, pw = 0, ph = 0, sc;
@@ -647,16 +866,17 @@ static void l_layout(L_App *a)
     SDL_GetWindowSize(a->win, &pw, &ph);
     a->px = pw > 0 ? (float)w / (float)pw : 1.0f;
     a->py = ph > 0 ? (float)h / (float)ph : 1.0f;
-    if (w < DM_SCREEN_W || h < DM_SCREEN_H) {
+    if (w < l_canvas_w() || h < l_canvas_h()) {
         a->scale = 1;
     } else {
-        sc = w / DM_SCREEN_W;
-        if (h / DM_SCREEN_H < sc)
-            sc = h / DM_SCREEN_H;
+        sc = w / l_canvas_w();
+        if (h / l_canvas_h() < sc)
+            sc = h / l_canvas_h();
         a->scale = sc < 1 ? 1 : sc;
     }
-    a->vpx = (w - DM_SCREEN_W * a->scale) / 2;
-    a->vpy = (h - DM_SCREEN_H * a->scale) / 2;
+    a->vpx = (w - l_canvas_w() * a->scale) / 2;
+    a->vpy = (h - l_canvas_h() * a->scale) / 2;
+    a->vptop = h - a->vpy - l_canvas_h() * a->scale;
 }
 
 /* Window points -> menu pixels. A click on the letterbox bars lands a long way
@@ -682,23 +902,68 @@ static void l_to_menu(const L_App *a, int wx, int wy, int *mx, int *my)
        be zero again one day. */
     const int sc = a->scale > 0 ? a->scale : 1;
     int fx = (int)(wx * a->px), fy = (int)(wy * a->py);
-    if (fx < a->vpx || fy < a->vpy) {
+    if (fx < a->vpx || fy < a->vptop) {
         *mx = *my = -1000;
         return;
     }
     *mx = (fx - a->vpx) / sc;
-    *my = (fy - a->vpy) / sc;
+    *my = (fy - a->vptop) / sc;
+    if (ls_enabled()) {
+        if (*mx < 28 || *my < 18 || *mx >= 988 || *my >= 618) { *mx=*my=-1000; return; }
+        *mx=(*mx-28)/3; *my=(*my-18)/3;
+    }
 }
 
-static void l_present(L_App *a)
+static int l_mod_hit(const L_App *a,int mx,int my);
+static void l_pointer_native(L_App *a,float nx,float ny)
+{
+    int i;a->cursor_x=nx;a->cursor_y=ny;a->hover_btn=a->hover_mod=-1;
+    if(nx<0||ny<0||nx>=l_canvas_w()||ny>=l_canvas_h()){a->mx=a->my=-1000;return;}
+    if(ls_enabled()){
+        if(nx<28||ny<18||nx>=988||ny>=618){a->mx=a->my=-1000;return;}
+        a->mx=((int)nx-28)/3;a->my=((int)ny-18)/3;
+    }else{a->mx=(int)nx;a->my=(int)ny;}
+    for(i=0;i<L_BTN_COUNT;i++)if(lui_button_hit(&a->btn[i],a->mx,a->my)){
+        a->hover_btn=i;
+    }
+    a->hover_mod=l_mod_hit(a,a->mx,a->my);
+}
+static void l_pointer_window(L_App *a,int wx,int wy)
+{
+    int w,h,sc=a->scale>0?a->scale:1;
+    SDL_GetWindowSize(a->win,&w,&h);
+    if(wx<0||wy<0||wx>=w||wy>=h){l_pointer_native(a,-1000,-1000);return;}
+    l_pointer_native(a,((int)(wx*a->px)-a->vpx)/(float)sc,
+                       ((int)(wy*a->py)-a->vptop)/(float)sc);
+}
+static SDL_HitTestResult SDLCALL l_window_hit(SDL_Window *window,const SDL_Point *point,void *data)
+{
+    L_App *a=(L_App *)data;int w,h,mx,my;
+    SDL_GetWindowSize(window,&w,&h);
+    if(point->y<6){if(point->x<8)return SDL_HITTEST_RESIZE_TOPLEFT;if(point->x>=w-8)return SDL_HITTEST_RESIZE_TOPRIGHT;return SDL_HITTEST_RESIZE_TOP;}
+    if(point->y>=h-6){if(point->x<8)return SDL_HITTEST_RESIZE_BOTTOMLEFT;if(point->x>=w-8)return SDL_HITTEST_RESIZE_BOTTOMRIGHT;return SDL_HITTEST_RESIZE_BOTTOM;}
+    if(point->x<6)return SDL_HITTEST_RESIZE_LEFT;if(point->x>=w-6)return SDL_HITTEST_RESIZE_RIGHT;
+    if(!a->pack){
+        mx=point->x*DM_SCREEN_W/w;my=point->y*DM_SCREEN_H/h;
+        if(mx>=279&&mx<291&&my>=9&&my<18)return SDL_HITTEST_NORMAL;
+        return my<24?SDL_HITTEST_DRAGGABLE:SDL_HITTEST_NORMAL;
+    }
+    l_to_menu(a,point->x,point->y,&mx,&my);
+    if(lui_button_hit(&a->btn[L_BTN_WINDOW_CLOSE],mx,my))return SDL_HITTEST_NORMAL;
+    if(mx>=10&&mx<310&&my>=0&&my<(ls_enabled()?27:24))return SDL_HITTEST_DRAGGABLE;
+    return SDL_HITTEST_NORMAL;
+}
+
+static void l_render_present(L_App *a,int swap)
 {
     float u, v;
     int w = 0, h = 0, y;
 
-    db_surface_to_rgba(&a->surf, a->pack->pal8, a->rgba, 0);
-    for (y = 0; y < DM_SCREEN_H; y++)
-        memcpy(a->padded + (long)y * a->tw * 4, a->rgba + (long)y * DM_SCREEN_W * 4,
-               (size_t)DM_SCREEN_W * 4);
+    if (ls_enabled()) memcpy(a->rgba, ls_pixels(), (size_t)l_canvas_w()*l_canvas_h()*4);
+    else db_surface_to_rgba(&a->surf, a->pack->pal8, a->rgba, 0);
+    for (y = 0; y < l_canvas_h(); y++)
+        memcpy(a->padded + (long)y * a->tw * 4, a->rgba + (long)y * l_canvas_w() * 4,
+               (size_t)l_canvas_w() * 4);
     glBindTexture(GL_TEXTURE_2D, a->tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, a->tw, a->th, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                  a->padded);
@@ -717,15 +982,15 @@ static void l_present(L_App *a)
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-    glViewport(a->vpx, a->vpy, DM_SCREEN_W * a->scale, DM_SCREEN_H * a->scale);
+    glViewport(a->vpx, a->vpy, l_canvas_w() * a->scale, l_canvas_h() * a->scale);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(0, 1, 1, 0, -1, 1);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glEnable(GL_TEXTURE_2D);
-    u = (float)DM_SCREEN_W / (float)a->tw;
-    v = (float)DM_SCREEN_H / (float)a->th;
+    u = (float)l_canvas_w() / (float)a->tw;
+    v = (float)l_canvas_h() / (float)a->th;
     glBegin(GL_QUADS);
     glTexCoord2f(0, 0);
     glVertex2f(0, 0);
@@ -736,8 +1001,19 @@ static void l_present(L_App *a)
     glTexCoord2f(0, v);
     glVertex2f(0, 1);
     glEnd();
-    SDL_GL_SwapWindow(a->win);
+    if(ls_enabled()&&l_cursor.ntri&&!a->hidden_ui_test){
+        int mouse_x,mouse_y;
+        if(SDL_GetWindowFlags(a->win)&SDL_WINDOW_MOUSE_FOCUS){
+            SDL_GetMouseState(&mouse_x,&mouse_y);l_pointer_window(a,mouse_x,mouse_y);
+        }else l_pointer_native(a,-1000,-1000);
+        glViewport(0,0,w,h);glMatrixMode(GL_PROJECTION);glLoadIdentity();glOrtho(0,w,h,0,-1,1);
+        glMatrixMode(GL_MODELVIEW);glLoadIdentity();
+        if(a->cursor_x>=0&&a->cursor_y>=0)
+            l_cursor_gl(a->vpx+a->cursor_x*a->scale,a->vptop+a->cursor_y*a->scale,(float)a->scale);
+    }
+    if(swap)SDL_GL_SwapWindow(a->win);
 }
+static void l_present(L_App *a){l_render_present(a,1);}
 
 /* ------------------------------------------------------------------------ *
  * Movies and music: what the screens read.
@@ -814,7 +1090,7 @@ static void l_m_reason(L_App *a, char *buf, int len)
 static int l_m_busy(L_App *a)
 {
     LM_Phase ph = l_m_phase(a);
-    return a->m_running || ph == LM_FETCHING || ph == LM_CHECKING || ph == LM_REMOVING;
+    return SDL_AtomicGet(&a->module_phase) == 1 || a->m_running || ph == LM_FETCHING || ph == LM_CHECKING || ph == LM_REMOVING;
 }
 
 /* What the disk holds and what the record says, re-read whenever a screen opens or a
@@ -838,13 +1114,33 @@ static void l_m_refresh(L_App *a)
     a->free_bytes = l_free_bytes(a->dir);
 }
 
+static void l_language_refresh(L_App *a)
+{
+    int i;
+    for (i = 0; i < a->language_count; i++) {
+        int music, pending, have_record;
+        lm_installed(a->language[i], &a->language_have[i], &music);
+        lm_present_any(a->language[i], &a->language_any[i], &music, &a->language_here[i], NULL);
+        lm_sizes(a->language[i], &a->language_size[i], NULL);
+        have_record = lm_wanted(a->language[i], &a->language_record[i], &music,
+                                &pending, NULL);
+        a->language_pending[i] = have_record && pending;
+        a->language_want[i] = a->language_pending[i] ? a->language_record[i] : a->language_any[i];
+    }
+}
+
 /* What the ticks would download: each ticked component that is not all on the disk. A
  * component part way down still counts whole, so this is the most the job can need
  * rather than a guess at what is left. */
 static long long l_m_need(const L_App *a)
 {
-    return (a->want_movies && !a->have_movies ? a->size_movies : 0) +
-           (a->want_music && !a->have_music ? a->size_music : 0);
+    long long n = (a->want_movies && !a->have_movies ? a->size_movies : 0) +
+                  (a->want_music && !a->have_music ? a->size_music : 0);
+    int i;
+    if (a->view == L_VIEW_SETTINGS)
+        for (i = 0; i < a->language_count; i++)
+            if (a->language_want[i] && !a->language_have[i]) n += a->language_size[i];
+    return n;
 }
 
 /* WHAT AN UNTICK WOULD TAKE AWAY: every unticked component with ANY of its files on the
@@ -855,8 +1151,14 @@ static long long l_m_need(const L_App *a)
  * a half-downloaded score without asking. */
 static long long l_m_frees(const L_App *a)
 {
-    return (!a->want_movies && a->any_movies ? (a->here_movies > 0 ? a->here_movies : 1) : 0) +
-           (!a->want_music && a->any_music ? (a->here_music > 0 ? a->here_music : 1) : 0);
+    if (a->media_add_only) return 0;
+    long long n = (!a->want_movies && a->any_movies ? (a->here_movies > 0 ? a->here_movies : 1) : 0) +
+                  (!a->want_music && a->any_music ? (a->here_music > 0 ? a->here_music : 1) : 0);
+    int i;
+    if (a->view == L_VIEW_SETTINGS)
+        for (i = 0; i < a->language_count; i++)
+            if (!a->language_want[i] && a->language_any[i]) n += a->language_here[i] > 0 ? a->language_here[i] : 1;
+    return n;
 }
 
 /* Whether Apply has anything to do for one component: download what is not all there,
@@ -868,6 +1170,11 @@ static int l_m_comp_changed(int want, int have, int any, int rec_ok, int rec_wan
 
 static int l_m_changed(const L_App *a)
 {
+    int i;
+    if (a->view == L_VIEW_SETTINGS)
+        for (i = 0; i < a->language_count; i++)
+            if (l_m_comp_changed(a->language_want[i], a->language_have[i], a->language_any[i],
+                                 1, a->language_record[i], a->language_pending[i])) return 1;
     return l_m_comp_changed(a->want_movies, a->have_movies, a->any_movies, a->rec_ok,
                             a->rec_movies, a->pend_movies) ||
            l_m_comp_changed(a->want_music, a->have_music, a->any_music, a->rec_ok,
@@ -879,6 +1186,7 @@ static int l_m_changed(const L_App *a)
  * rather than playing without them. */
 static int l_m_job_removes_only(const L_App *a)
 {
+    if (a->media_add_only) return 0;
     return !(a->job_movies && !a->had_movies) && !(a->job_music && !a->had_music);
 }
 
@@ -900,6 +1208,17 @@ static void l_m_question(const L_App *a, char *buf, int len)
     const int mo = !a->want_movies && a->any_movies;
     const int mu = !a->want_music && a->any_music;
     l_m_size(l_m_frees(a), sz, sizeof sz);
+    if (a->view == L_VIEW_SETTINGS) {
+        char names[150] = ""; int i;
+        if (mo) strcat(names, "movies");
+        if (mu) strcat(names, mo ? ", music" : "music");
+        for (i = 0; i < a->language_count; i++)
+            if (!a->language_want[i] && a->language_any[i]) {
+                if (names[0]) strcat(names, ", ");
+                strncat(names, a->language_name[i], sizeof names - strlen(names) - 1);
+            }
+        snprintf(buf, (size_t)len, "Remove %s (%s)?", names, sz); return;
+    }
     snprintf(buf, (size_t)len, "Remove the %s, %s?",
              mo && mu ? "movies and music" : mo ? "movies" : "music", sz);
 }
@@ -908,8 +1227,8 @@ static void l_m_question(const L_App *a, char *buf, int len)
 static void l_m_result(const L_App *a, char *buf, int len)
 {
     const int add_mo = a->job_movies && !a->had_movies, add_mu = a->job_music && !a->had_music;
-    const int rem_mo = !a->job_movies && a->had_any_movies;
-    const int rem_mu = !a->job_music && a->had_any_music;
+    const int rem_mo = !a->media_add_only && !a->job_movies && a->had_any_movies;
+    const int rem_mu = !a->media_add_only && !a->job_music && a->had_any_music;
     char added[64], removed[64];
 
     added[0] = removed[0] = '\0';
@@ -928,6 +1247,8 @@ static void l_m_result(const L_App *a, char *buf, int len)
                  a->job_movies && a->job_music ? "Movies and music"
                  : a->job_movies              ? "Movies"
                                               : "Music");
+    else if (a->media_add_only && (a->any_movies || a->any_music))
+        snprintf(buf, (size_t)len, "Game installed. Existing movies and music kept.");
     else
         snprintf(buf, (size_t)len, "No movies or music. The gear adds them whenever you like.");
 }
@@ -971,7 +1292,8 @@ static const char *l_m_note(L_App *a, int which)
     if (want && have)
         snprintf(a->m_note[which], sizeof a->m_note[which], "%s", "INSTALLED");
     else if (!want && any)
-        snprintf(a->m_note[which], sizeof a->m_note[which], "%s", "WILL BE REMOVED");
+        snprintf(a->m_note[which], sizeof a->m_note[which], "%s",
+                 a->media_add_only ? "KEPT" : "WILL BE REMOVED");
     else if (a->view == L_VIEW_SETTINGS)
         snprintf(a->m_note[which], sizeof a->m_note[which], "%s, %s",
                  want ? "WILL BE DOWNLOADED" : "NOT INSTALLED", sz);
@@ -990,10 +1312,10 @@ static void l_set_buttons(L_App *a)
     const int updating = ph == LU_DOWNLOADING || ph == LU_APPLYING;
     const int busy = l_m_busy(a);
     const int form = a->view == L_VIEW_SETUP || a->view == L_VIEW_SETTINGS ||
-                     a->view == L_VIEW_INSTALL;
+                     a->view == L_VIEW_INSTALL || a->view == L_VIEW_MODULE_OPTIONS;
     int i;
-    static const char *labels[L_BTN_COUNT] = {"Play", "Changelog", "Editor", "Quit",
-                                              "Close", "", "", ""};
+    static const char *labels[L_BTN_COUNT] = {"Launch", "Changelog", "Editor", "Quit",
+                                              "Close", "", "", "", "X", "X", "X", "X", "X", "", ""};
 
     for (i = 0; i < L_BTN_COUNT; i++) {
         a->btn[i].x = L_BTN_X0 + i * L_BTN_STEP;
@@ -1016,7 +1338,7 @@ static void l_set_buttons(L_App *a)
         LUI_Button *c = &a->btn[L_BTN_CHK_MOVIES + i];
         c->kind = LUI_KIND_CHECK;
         c->x = L_CHK_X;
-        c->y = L_CHK_Y0 + i * L_CHK_STEP;
+        c->y = (a->view == L_VIEW_SETTINGS ? 73 : L_CHK_Y0) + i * L_CHK_STEP;
         c->w = L_CHK_W;
         c->h = L_CHK_H;
         c->hidden = !form;
@@ -1029,6 +1351,25 @@ static void l_set_buttons(L_App *a)
         c->note = form ? l_m_note(a, i) : NULL;
     }
 
+    for (i = 0; i < 2; i++) {
+        LUI_Button *c = &a->btn[L_BTN_LANG0 + i];
+        c->kind = LUI_KIND_CHECK; c->x = L_CHK_X; c->y = 103 + i * 15;
+        c->w = L_CHK_W; c->h = L_CHK_H;
+        c->hidden = a->view != L_VIEW_SETTINGS || i >= a->language_count;
+        c->disabled = a->m_confirm; c->checked = a->language_want[i];
+        c->label = a->language_name[i];
+        if (a->language_want[i] && a->language_have[i])
+            snprintf(a->language_note[i], sizeof a->language_note[i], "INSTALLED");
+        else if (!a->language_want[i] && a->language_any[i])
+            snprintf(a->language_note[i], sizeof a->language_note[i], "WILL BE REMOVED");
+        else {
+            char size[32]; lm_format_size(a->language_size[i], size, sizeof size);
+            snprintf(a->language_note[i], sizeof a->language_note[i], "%s, %s",
+                     a->language_want[i] ? "DOWNLOAD" : "NOT INSTALLED", size);
+        }
+        c->note = a->language_note[i];
+    }
+
     /* The gear: on the module grid only, and not while either worker is busy, so
      * an update and a media job never run at once. */
     a->btn[L_BTN_GEAR].kind = LUI_KIND_GEAR;
@@ -1038,13 +1379,39 @@ static void l_set_buttons(L_App *a)
     a->btn[L_BTN_GEAR].w = L_GEAR_W;
     a->btn[L_BTN_GEAR].h = L_GEAR_H;
     a->btn[L_BTN_GEAR].hidden = a->view != L_VIEW_MODULES;
-    a->btn[L_BTN_GEAR].disabled = updating || busy || !a->media;
+    a->btn[L_BTN_GEAR].disabled = updating || busy || !a->media || !a->mod[a->mod_sel].installed;
+
+    for (i = 0; i < L_MOD_COUNT; i++) {
+        LUI_Button *remove = &a->btn[L_BTN_REMOVE + i];
+        remove->x = L_MOD_X0 + i * L_MOD_STEP + L_MOD_W - 12;
+        remove->y = L_MOD_Y - 12;
+        remove->w = 12;
+        remove->h = 9;
+        remove->label = "X";
+        remove->hidden = a->view != L_VIEW_MODULES || !a->mod[i].installed;
+        remove->disabled = updating || busy || !lz_held_here(a->dir);
+    }
+    if (!a->mod[a->mod_sel].installed) {
+        a->btn[L_BTN_PLAY].disabled = 1;
+        a->btn[L_BTN_EDITOR].disabled = 1;
+    }
 
     /* Close is not in the row: it belongs to the browser and stands in it. */
-    a->btn[L_BTN_CLOSE].x = L_PANEL_X + (L_PANEL_W - L_CLOSE_W) / 2;
-    a->btn[L_BTN_CLOSE].y = L_CLOSE_Y;
+    a->btn[L_BTN_CLOSE].x = L_BTN_X0 + L_BTN_STEP;
+    a->btn[L_BTN_CLOSE].y = L_BTN_Y;
     a->btn[L_BTN_CLOSE].w = L_CLOSE_W;
     a->btn[L_BTN_CLOSE].hidden = a->view != L_VIEW_BROWSE;
+    if (a->view == L_VIEW_BROWSE) {
+        a->btn[L_BTN_CLOSE].label = "Back";
+        a->btn[L_BTN_NOTES].hidden = a->btn[L_BTN_PLAY].hidden = a->btn[L_BTN_EDITOR].hidden = 1;
+    }
+
+    /* The native window has no OS title bar. Keep this close control on every
+     * screen, outside the drag strip and clear of the preserved frame fittings. */
+    a->btn[L_BTN_WINDOW_CLOSE].x=ls_enabled()?304:279;
+    a->btn[L_BTN_WINDOW_CLOSE].y=ls_enabled()?4:9;
+    a->btn[L_BTN_WINDOW_CLOSE].w=ls_enabled()?15:12;
+    a->btn[L_BTN_WINDOW_CLOSE].h=ls_enabled()?11:9;
 
     /* When a new version is available the Play button says Update. One button, two
      * jobs, and the label is the only place the difference shows: a second button
@@ -1052,21 +1419,25 @@ static void l_set_buttons(L_App *a)
      * one. The Changelog button works the same way, because it is the way back as
      * well as the way in, and a second button to leave a screen with one thing on
      * it is furniture. */
-    if (ph == LU_AVAILABLE)
+    if (!a->private_source && ph == LU_AVAILABLE && a->mod_sel == 0 && a->mod[0].installed)
         a->btn[L_BTN_PLAY].label = "Update";
     else if (ph == LU_DOWNLOADING || ph == LU_APPLYING)
         a->btn[L_BTN_PLAY].label = "Updating";
     else if (ph == LU_DONE)
-        a->btn[L_BTN_PLAY].label = a->mod_sel == 1 ? "Launch" : "Play";
-    else if (a->mod_sel == 1)
         a->btn[L_BTN_PLAY].label = "Launch";
 
+
+    if(!a->private_source && a->mod[a->mod_sel].needs_update && l_module_available(a,a->mod_sel) && !updating && !busy){
+        a->btn[L_BTN_PLAY].label="Update";a->btn[L_BTN_PLAY].disabled=0;
+    }
     /* The map editor still knows TD theaters and objects only. */
     if (a->mod_sel == 1)
         a->btn[L_BTN_EDITOR].disabled = 1;
 
-    if (a->view == L_VIEW_NOTES)
-        a->btn[L_BTN_NOTES].label = "Modules";
+    if (a->view == L_VIEW_NOTES) {
+        a->btn[L_BTN_NOTES].label = "Back";
+        a->btn[L_BTN_PLAY].hidden = a->btn[L_BTN_EDITOR].hidden = 1;
+    }
 
     /* THE EDITOR BUTTON IS LIVE, and the enable is not the whole of the change.
      * It was drawn disabled because the editor existed in the tree and not in a
@@ -1115,6 +1486,9 @@ static void l_set_buttons(L_App *a)
             a->btn[L_BTN_PLAY].label =
                 (a->want_movies || a->want_music) ? "Install" : "Continue";
             a->btn[L_BTN_QUIT].label = "Quit";
+        } else if(a->view==L_VIEW_MODULE_OPTIONS){
+            a->btn[L_BTN_PLAY].label=a->mod[a->module_target].installed?"Update":"Install";
+            a->btn[L_BTN_QUIT].label="Back";
         } else if (a->view == L_VIEW_INSTALL) {
             a->btn[L_BTN_PLAY].label = "Install"; /* the game, whatever the ticks say */
             a->btn[L_BTN_QUIT].label = "Quit";
@@ -1131,7 +1505,7 @@ static void l_set_buttons(L_App *a)
              * hidden until there is one. */
             a->btn[L_BTN_PLAY].label = "Retry";
             a->btn[L_BTN_NOTES].hidden = a->i_job && a->install_offer;
-            if (!a->i_job && l_m_job_removes_only(a))
+            if (!a->i_job && (a->component_active || l_m_job_removes_only(a)))
                 a->btn[L_BTN_NOTES].label = "Back";
             else {
                 a->btn[L_BTN_NOTES].label = "Play without";
@@ -1146,6 +1520,33 @@ static void l_set_buttons(L_App *a)
             a->btn[L_BTN_QUIT].disabled = a->m_cancelling;
         }
     }
+    if (a->view == L_VIEW_REMOVE) {
+        for (i = 0; i < L_BTN_COUNT; i++) a->btn[i].hidden = 1;
+        a->btn[L_BTN_PLAY].hidden = a->btn[L_BTN_QUIT].hidden = 0;
+        a->btn[L_BTN_PLAY].label = "Remove";
+        a->btn[L_BTN_PLAY].x = 72;
+        a->btn[L_BTN_PLAY].y = 114;
+        a->btn[L_BTN_PLAY].w = 80;
+        a->btn[L_BTN_PLAY].h = 14;
+        a->btn[L_BTN_PLAY].disabled = updating || busy || !lz_held_here(a->dir);
+        a->btn[L_BTN_QUIT].label = "Keep";
+        a->btn[L_BTN_QUIT].x = 168;
+        a->btn[L_BTN_QUIT].y = 114;
+        a->btn[L_BTN_QUIT].w = 80;
+        a->btn[L_BTN_QUIT].h = 14;
+        a->btn[L_BTN_QUIT].disabled = 0;
+        a->btn[L_BTN_WINDOW_CLOSE].hidden = 0;
+    }
+    if (a->view == L_VIEW_MODULE_RUN) {
+        int running = SDL_AtomicGet(&a->module_phase) == 1 || SDL_AtomicGet(&a->module_phase) == 2;
+        for (i = 0; i < L_BTN_COUNT; i++) a->btn[i].hidden = 1;
+        a->btn[L_BTN_WINDOW_CLOSE].hidden = 0;
+        a->btn[L_BTN_PLAY].hidden = running;
+        a->btn[L_BTN_PLAY].disabled = 0; a->btn[L_BTN_PLAY].label = "Retry";
+        a->btn[L_BTN_QUIT].hidden = 0; a->btn[L_BTN_QUIT].disabled = 0;
+        a->btn[L_BTN_QUIT].label = running ? "Cancel" : "Back";
+    }
+
 }
 
 /* THE HIGHLIGHT NEVER SITS ON A CONTROL THE SCREEN DOES NOT SHOW. When a screen
@@ -1155,7 +1556,7 @@ static void l_fix_hot(L_App *a)
 {
     static const int order[] = {L_BTN_CHK_MOVIES, L_BTN_CHK_MUSIC, L_BTN_PLAY,
                                 L_BTN_NOTES,      L_BTN_EDITOR,    L_BTN_QUIT,
-                                L_BTN_CLOSE,      L_BTN_GEAR};
+                                L_BTN_CLOSE, L_BTN_GEAR, L_BTN_REMOVE, L_BTN_REMOVE_RA, L_BTN_REMOVE_2, L_BTN_REMOVE_3, L_BTN_LANG0, L_BTN_LANG1, L_BTN_WINDOW_CLOSE};
     int i;
     if (a->hot >= 0 && a->hot < L_BTN_COUNT && !a->btn[a->hot].hidden &&
         !a->btn[a->hot].disabled)
@@ -1183,8 +1584,13 @@ static void l_set_view(L_App *a, int view)
     a->view = view;
     a->mod_pressed = -1;
     a->pressed = -1;
-    if (view != L_VIEW_MODULES)
-        a->on_mods = 0;
+    if (view != L_VIEW_MODULES) a->on_mods = 0;
+    if (view == L_VIEW_BROWSE) {
+        int i; l_catalog_start(a); a->hot = L_BTN_CLOSE; for (i = 0; i < 2; i++)
+            if (a->mod[i].name && l_module_actionable(a,i) && l_module_available(a, i)) {
+                a->on_mods = 1; a->mod_hot = i; break;
+            }
+    }
     if (view != L_VIEW_BROWSE && a->hot == L_BTN_CLOSE)
         a->hot = L_BTN_PLAY;
     l_set_buttons(a);
@@ -1199,6 +1605,7 @@ static void l_set_view(L_App *a, int view)
  * presses Install without reading should get the whole of it. */
 static void l_open_setup(L_App *a)
 {
+    a->media_add_only = 1;
     l_m_refresh(a);
     a->want_movies = a->want_music = 1;
     a->m_confirm = 0;
@@ -1214,8 +1621,43 @@ static void l_open_setup(L_App *a)
  * disk: a half-finished download, or the shorter score an older package carried, is
  * ticked, so Apply pressed for the other box keeps it rather than removing it. Apply
  * with nothing to do is drawn disabled. */
+static void l_free_components(L_App *a)
+{
+    int i;
+    if (a->settings_media) {
+        a->media = NULL;
+        lm_destroy(a->settings_media); a->settings_media = NULL;
+    } else { lm_destroy(a->media); a->media = NULL; }
+    for (i = 0; i < 2; i++) { lm_destroy(a->language[i]); a->language[i] = NULL; }
+    a->language_count = 0; a->component_active = 0;
+    a->media_add_only = 0;
+}
+
+static void l_module_offer(L_App *a,int target)
+{
+    if(l_m_busy(a)||target<0||target>1||!l_module_available(a,target))return;
+    a->module_return_sel=a->mod_sel;a->module_target=target;a->mod_sel=target;
+    l_free_components(a);a->media_add_only=1;a->media=lm_create_game(a->dir,a->media_manifest[0]?a->media_manifest:NULL,target);
+    l_m_refresh(a);lm_game_sizes(a->media,&a->size_movies,&a->size_music);
+    a->want_movies=a->rec_ok?a->rec_movies:1;a->want_music=a->rec_ok?a->rec_music:1;
+    a->m_confirm=0;a->mstatus[0]=0;a->hot=L_BTN_CHK_MOVIES;
+    l_set_view(a,L_VIEW_MODULE_OPTIONS);
+}
+
 static void l_open_settings(L_App *a)
 {
+    int i;
+    if (l_m_busy(a)) return;
+    l_free_components(a);
+    a->media = a->settings_media = lm_create_game(a->dir, a->media_manifest[0] ? a->media_manifest : NULL, a->mod_sel == 1);
+    for (i = 0; i < 2 && lm_language_pack(a->mod_sel == 1, i,
+             a->language_code[i], sizeof a->language_code[i], a->language_name[i], sizeof a->language_name[i]); i++) {
+        a->language[i] = lm_create_language(a->dir, a->mod_sel == 1, a->language_code[i], NULL);
+        if (!a->language[i]) break;
+        a->language_count++;
+    }
+    lm_sizes(a->media, &a->size_movies, &a->size_music);
+    l_language_refresh(a);
     l_m_refresh(a);
     a->want_movies = (a->rec_ok && a->pend_movies) ? a->rec_movies : a->any_movies;
     a->want_music = (a->rec_ok && a->pend_music) ? a->rec_music : a->any_music;
@@ -1238,9 +1680,56 @@ static void l_open_install(L_App *a)
 
 /* Hand the ticks to lmedia. A refusal is lmedia's to explain, in its own words,
  * and the screen stays where it is with that reason under the well. */
+static void l_components_restore(L_App *a)
+{
+    a->media = a->settings_media; a->component_active = 0;
+    a->m_running = a->m_cancelling = a->m_confirm = 0;
+    l_m_refresh(a); l_language_refresh(a);
+    a->want_movies = (a->rec_ok && a->pend_movies) ? a->rec_movies : a->any_movies;
+    a->want_music = (a->rec_ok && a->pend_music) ? a->rec_music : a->any_music;
+    a->hot = L_BTN_CHK_MOVIES;
+    l_set_view(a, L_VIEW_SETTINGS);
+}
+
+static void l_components_next(L_App *a)
+{
+    int c = a->component_queue[a->component_at];
+    a->media = c < 0 ? a->settings_media : a->language[c];
+    a->job_movies = c < 0 ? a->settings_movies : a->language_want[c];
+    a->job_music = c < 0 ? a->settings_music : 0;
+    lm_installed(a->media, &a->had_movies, &a->had_music);
+    lm_present_any(a->media, &a->had_any_movies, &a->had_any_music, NULL, NULL);
+    a->m_cancelling = a->m_confirm = 0;
+    if (!lm_apply(a->media, a->job_movies, a->job_music)) {
+        lm_status(a->media, a->mstatus, sizeof a->mstatus);
+        l_components_restore(a); return;
+    }
+    a->m_running = 1; a->hot = L_BTN_QUIT;
+    l_set_view(a, L_VIEW_MEDIA_RUN);
+}
+
+static void l_components_start(L_App *a)
+{
+    int i;
+    a->settings_movies = a->want_movies; a->settings_music = a->want_music;
+    a->component_count = a->component_at = 0;
+    if (l_m_comp_changed(a->want_movies, a->have_movies, a->any_movies, a->rec_ok, a->rec_movies, a->pend_movies) ||
+        l_m_comp_changed(a->want_music, a->have_music, a->any_music, a->rec_ok, a->rec_music, a->pend_music))
+        a->component_queue[a->component_count++] = -1;
+    for (i = 0; i < a->language_count; i++)
+        if (l_m_comp_changed(a->language_want[i], a->language_have[i], a->language_any[i],
+                             1, a->language_record[i], a->language_pending[i]))
+            a->component_queue[a->component_count++] = i;
+    if (!a->component_count) return;
+    a->component_active = 1; a->m_from = L_VIEW_SETTINGS; a->mstatus[0] = 0;
+    l_components_next(a);
+}
+
 static void l_m_start(L_App *a)
 {
     char why[256];
+    if (a->component_active) { l_components_next(a); return; }
+    if (a->view == L_VIEW_SETTINGS && a->settings_media) { l_components_start(a); return; }
     if (!a->media)
         return;
     if (a->view == L_VIEW_SETUP || a->view == L_VIEW_SETTINGS)
@@ -1253,7 +1742,8 @@ static void l_m_start(L_App *a)
     a->had_any_music = a->any_music;
     a->m_confirm = 0;
     a->mstatus[0] = '\0';
-    if (!lm_apply(a->media, a->job_movies, a->job_music)) {
+    if (!(a->media_add_only ? lm_apply_add_only(a->media, a->job_movies, a->job_music)
+                           : lm_apply(a->media, a->job_movies, a->job_music))) {
         lm_status(a->media, why, sizeof why);
         snprintf(a->mstatus, sizeof a->mstatus, "%s",
                  why[0] ? why : "The download could not start.");
@@ -1390,7 +1880,7 @@ static void l_i_done(L_App *a)
     l_i_stop(a, LM_DONE, "");
     a->i_job = 0;
     l_m_result(a, media, sizeof media);
-    snprintf(a->mstatus, sizeof a->mstatus, "OpenCNC3D v%s is installed. %s", a->version, media);
+    snprintf(a->mstatus, sizeof a->mstatus, "Dawn3D v%s is installed. %s", a->version, media);
     a->hot = L_BTN_PLAY;
     l_set_view(a, L_VIEW_MODULES);
 }
@@ -1513,6 +2003,22 @@ static void l_m_tick(L_App *a)
     if (!a->m_running || !a->media)
         return;
     ph = lm_phase(a->media);
+    if (a->component_active) {
+        if (ph == LM_DONE) {
+            a->m_running = 0;
+            if (++a->component_at < a->component_count) l_components_next(a);
+            else {
+                l_components_restore(a);
+                snprintf(a->mstatus, sizeof a->mstatus, "%s content updated.", a->mod[a->mod_sel].name);
+            }
+        } else if (ph == LM_CANCELLED || (ph == LM_FAILED && a->m_cancelling)) {
+            l_components_restore(a);
+            snprintf(a->mstatus, sizeof a->mstatus, "Stopped. The gear can resume this game's downloads.");
+        } else if (ph == LM_FAILED) {
+            a->m_running = 0; a->hot = L_BTN_PLAY; l_set_buttons(a);
+        }
+        return;
+    }
     if (ph == LM_DONE) {
         a->m_running = 0;
         l_m_refresh(a);
@@ -1536,6 +2042,74 @@ static void l_m_tick(L_App *a)
 }
 
 
+static int l_catalog_worker(void *user)
+{
+    L_App *a=(L_App *)user;
+    int ok=lmod_catalog_fetch(LCFG_BUILD,&a->catalog,a->catalog_error,sizeof a->catalog_error);
+    SDL_AtomicSet(&a->catalog_phase,ok?2:-1);return 0;
+}
+static void l_catalog_start(L_App *a)
+{
+    int phase=SDL_AtomicGet(&a->catalog_phase);
+    if(a->private_source||!a->catalog_allowed||phase==1||phase==2)return;
+    if(a->catalog_worker){SDL_WaitThread(a->catalog_worker,NULL);a->catalog_worker=NULL;}
+    a->catalog_error[0]=0;a->catalog_applied=0;SDL_AtomicSet(&a->catalog_phase,1);
+    a->catalog_worker=SDL_CreateThread(l_catalog_worker,"module-catalog",a);
+    if(!a->catalog_worker){snprintf(a->catalog_error,sizeof a->catalog_error,"The module catalog worker could not start.");SDL_AtomicSet(&a->catalog_phase,-1);}
+}
+static int l_module_progress(void *user, int done, int total)
+{
+    L_App *a = (L_App *)user;
+    SDL_AtomicSet(&a->module_progress, total > 0 ? done * 1000 / total : 0);
+    return !SDL_AtomicGet(&a->module_cancel);
+}
+static int l_module_worker(void *user)
+{
+    L_App *a = (L_App *)user;
+    int ok;
+    if(SDL_AtomicGet(&a->catalog_phase)==2 && a->catalog.module[a->module_target].available)
+        ok=lmod_install_remote(a->dir,a->module_target,LCFG_BUILD,&a->catalog,l_module_progress,a,a->module_error,sizeof a->module_error);
+    else ok=lmod_install_cached(a->dir,a->module_target,LCFG_BUILD,l_module_progress,a,a->module_error,sizeof a->module_error);
+    SDL_AtomicSet(&a->module_phase, ok ? 2 : -1); return 0;
+}
+static void l_module_start(L_App *a, int target)
+{
+    LU_Phase phase=a->up?lu_phase(a->up):LU_NOTCONFIGURED;
+    if (phase==LU_DOWNLOADING || phase==LU_APPLYING || l_m_busy(a) || target < 0 || target > 1 || !l_module_available(a, target)) return;
+    if (a->module_worker) {SDL_WaitThread(a->module_worker, NULL); a->module_worker = NULL;}
+    if(a->view==L_VIEW_MODULE_OPTIONS){a->module_movies=a->want_movies;a->module_music=a->want_music;a->module_after_media=1;}
+    a->module_target = target; a->module_error[0] = 0;
+    SDL_AtomicSet(&a->module_progress, 0); SDL_AtomicSet(&a->module_cancel, 0);
+    SDL_AtomicSet(&a->module_phase, 1);
+    a->module_worker = SDL_CreateThread(l_module_worker, "module-install", a);
+    if (!a->module_worker) {snprintf(a->module_error, sizeof a->module_error, "The install worker could not start."); SDL_AtomicSet(&a->module_phase, -1);}
+    a->on_mods = 0; a->hot = L_BTN_QUIT; l_set_view(a, L_VIEW_MODULE_RUN);
+}
+static void l_module_tick(L_App *a)
+{
+    int phase = SDL_AtomicGet(&a->module_phase);
+    if (a->view != L_VIEW_MODULE_RUN || phase == 1 || phase == 0) return;
+    if (a->module_worker) {SDL_WaitThread(a->module_worker, NULL); a->module_worker = NULL;}
+    if (phase == 2) {
+        a->install_offer=0;
+        if(a->up){lu_destroy(a->up);a->up=lu_create(a->dir,NULL);l_read_installed(a);lu_set_installed(a->up,a->version);}
+        if (a->module_target == 1) l_find_ra_module(a);
+        else a->mod[0].installed = lmod_td_present(a->dir);
+        a->mod_sel = a->module_target;
+        l_module_versions(a);
+        snprintf(a->mstatus, sizeof a->mstatus, "%s installed.", a->mod[a->mod_sel].name);
+        SDL_AtomicSet(&a->module_phase, 0); a->hot = L_BTN_PLAY;
+        if(a->module_after_media&&!SDL_AtomicGet(&a->module_cancel)){
+            a->module_after_media=0;a->want_movies=a->module_movies;a->want_music=a->module_music;
+            l_m_refresh(a);l_set_view(a,L_VIEW_SETUP);l_m_start(a);
+        }else{a->module_after_media=0;l_set_view(a, L_VIEW_MODULES);}
+    } else if (SDL_AtomicGet(&a->module_cancel)) {
+        SDL_AtomicSet(&a->module_phase, 0);a->module_after_media=0;
+        snprintf(a->mstatus, sizeof a->mstatus, "Installation stopped. The package is kept for another try.");
+        l_set_view(a, L_VIEW_BROWSE);
+    } else l_set_buttons(a);
+}
+
 /* ------------------------------------------------------------------------ *
  * The module grid.
  * ------------------------------------------------------------------------ */
@@ -1548,36 +2122,46 @@ static void l_mod_rect(int i, int *x, int *y, int *w, int *h)
     *h = L_MOD_H;
 }
 
+static void l_browser_rect(const L_App *a, int item, int *x, int *y, int *w, int *h)
+{
+    int i, count = 0, column = 0;
+    for (i = 0; i < 2; i++) if (a->mod[i].name) {count++; if (i < item) column++;}
+    *x = L_PANEL_X + (L_PANEL_W - (count * L_MOD_W + (count - 1) * 8)) / 2 + column * L_MOD_STEP;
+    *y = L_MOD_Y; *w = L_MOD_W; *h = L_MOD_H;
+}
+
 /* The tile under a pixel, or -1. Only on the grid screen: the tiles are not drawn
  * on the other two, and a control that cannot be seen cannot be pressed. */
 static int l_mod_hit(const L_App *a, int mx, int my)
 {
     int i, x, y, w, h;
-    if (a->view != L_VIEW_MODULES)
-        return -1;
-    for (i = 0; i < L_MOD_COUNT; i++) {
-        l_mod_rect(i, &x, &y, &w, &h);
+    if (a->view != L_VIEW_MODULES && a->view != L_VIEW_BROWSE) return -1;
+    for (i = 0; i < (a->view == L_VIEW_BROWSE ? 2 : L_MOD_COUNT); i++) {
+        if (a->view == L_VIEW_BROWSE) {
+            if (!a->mod[i].name || !l_module_actionable(a,i) || !l_module_available(a, i)) continue;
+            l_browser_rect(a, i, &x, &y, &w, &h);
+        } else l_mod_rect(i, &x, &y, &w, &h);
         if (mx >= x && mx < x + w && my >= y && my < y + h)
             return i;
     }
     return -1;
 }
 
-static void l_draw_module(L_App *a, int i)
+static void l_draw_module_emblem(L_App *a, int i, int x, int y, int w, int h)
 {
-    const L_Module *m = &a->mod[i];
-    int x, y, w, h, ex, ey;
-    int hot = a->on_mods && a->mod_hot == i;
-
-    l_mod_rect(i, &x, &y, &w, &h);
-
-    if (m->installed) {
-        /* Red Alert's cover circle is baked into the launcher's DOS palette;
-         * the original C&C tile keeps its title-plate emblem. */
-        const DB_Shape *title = i == 1 ? NULL : db_shape(a->pack, "TITLE");
-        dm_green_button(&a->surf, x, y, w, h, a->mod_pressed == i, 0);
-        if (i == 1) {
+    const DB_Shape *title = i == 1 ? NULL : db_shape(a->pack, "TITLE");
+    int ex, ey;
+        if (i == 0 && ls_enabled()) {
+            ll_logo_draw(launcher_module_rgba,launcher_ra_rgba,L_MODULE_LOGO_W,L_MODULE_LOGO_H,LL_LOGO_CNC,
+                          l_native_x(x)+(w*3-L_MODULE_LOGO_W)/2,
+                          l_native_y(y)+(h*3-L_MODULE_LOGO_H)/2);
+        } else if (i == 1 && ls_enabled()) {
+            ll_logo_draw(launcher_module_rgba,launcher_ra_rgba,L_RA_LOGO_W,L_RA_LOGO_H,LL_LOGO_RA,
+                          l_native_x(x)+(w*3-L_RA_LOGO_W)/2,
+                          l_native_y(y)+(h*3-L_RA_LOGO_H)/2);
+        } else if (i == 1) {
             const int left = x + (w - 48) / 2, top = y + 5;
+            if (ls_enabled()) l_skin_indexed(a,ra_emblem_pixels,48,48,left,top,0,0,48,48,48,48);
             for (ey = 0; ey < 48; ey++)
                 for (ex = 0; ex < 48; ex++) {
                     const unsigned char pixel = ra_emblem_pixels[ey * 48 + ex];
@@ -1586,10 +2170,28 @@ static void l_draw_module(L_App *a, int i)
                         a->surf.px[(top + ey) * a->surf.w + left + ex] = pixel;
                 }
         } else if (title) {
+            l_skin_indexed(a,title->pixels,title->w,title->h,x+(w-L_LOGO_W)/2,y+5,
+                           L_EMBLEM_X,L_EMBLEM_Y,L_EMBLEM_W,L_EMBLEM_H,L_LOGO_W,L_LOGO_H);
             lui_blit_scaled(&a->surf, title, 0, L_EMBLEM_X, L_EMBLEM_Y, L_EMBLEM_W,
                             L_EMBLEM_H, x + (w - L_LOGO_W) / 2, y + 5,
                             L_LOGO_W, L_LOGO_H);
         }
+}
+
+static void l_draw_module(L_App *a, int i)
+{
+    const L_Module *m = &a->mod[i];
+    int x, y, w, h;
+    int hot = a->on_mods && a->mod_hot == i;
+
+    l_mod_rect(i, &x, &y, &w, &h);
+
+    if (m->installed) {
+        /* Enhanced module emblems keep full-colour RGBA cutouts over the plate.
+         * The standalone Classic fallback retains its indexed title emblems. */
+        if (ls_enabled()) ls_button(x,y,w,h,a->mod_pressed==i,hot,0,a->mod_sel==i);
+        else dm_green_button(&a->surf, x, y, w, h, a->mod_pressed == i, 0);
+        l_draw_module_emblem(a, i, x, y, w, h);
         lui_print_centered(&a->surf, a->f6, m->name, x + w / 2, L_MOD_NAME_Y,
                            a->mod_sel == i ? DM_TEXT_BRIGHT : DM_TEXT_MEDIUM);
     } else {
@@ -1597,10 +2199,11 @@ static void l_draw_module(L_App *a, int i)
          * drawn in while there was no editor: BOXSTYLE_GREEN_DIS_RAISED and a flat
          * CC_GREEN label, not a dimmed green button. An empty slot says what it is
          * and says when, which is the whole of what it can honestly say. */
-        dm_green_button(&a->surf, x, y, w, h, 0, 1);
+        if (ls_enabled()) ls_button(x,y,w,h,0,hot,1,0);
+        else dm_green_button(&a->surf, x, y, w, h, 0, 1);
         lui_plus(&a->surf, x + w / 2, y + L_MOD_PLUS_DY, L_MOD_PLUS_ARM,
                  L_MOD_PLUS_THICK, DM_DIS_HILITE);
-        lui_print_centered(&a->surf, a->f6, "Coming soon", x + w / 2,
+        lui_print_centered(&a->surf, a->f6, "Add Game", x + w / 2,
                            y + L_MOD_SOON_DY, DM_TEXT_DISABLED);
     }
 
@@ -1630,23 +2233,50 @@ static void l_draw_modules(L_App *a)
         l_draw_module(a, i);
 }
 
-/* The browser, with the list it will one day fill. It is drawn as an empty list
- * rather than as a message on the plate because empty is a state of the list, and
- * the screen has to look the same the day there is something in it. */
+static void l_grey_card(L_App *a, int x, int y, int w, int h)
+{
+    int xx, yy;
+    if (ls_enabled()) {
+        unsigned char *canvas = ls_pixels(); int width = ls_width();
+        for (yy = l_native_y(y); yy < l_native_y(y) + h * 3; yy++)
+            for (xx = l_native_x(x); xx < l_native_x(x) + w * 3; xx++) {
+                unsigned char *pixel = canvas + ((size_t)yy * width + xx) * 4;
+                unsigned char grey = (unsigned char)((pixel[0] * 54 + pixel[1] * 183 + pixel[2] * 19) * 3 / 1024);
+                pixel[0] = pixel[1] = pixel[2] = grey;
+            }
+    } else {
+        unsigned char map[256]; int i, j;
+        for (i = 0; i < 256; i++) {
+            int grey = (a->pack->pal8[i*3] * 54 + a->pack->pal8[i*3+1] * 183 + a->pack->pal8[i*3+2] * 19) * 3 / 1024;
+            int best = 0x7fffffff; map[i] = 0;
+            for (j = 0; j < 256; j++) {
+                int r=a->pack->pal8[j*3]-grey,g=a->pack->pal8[j*3+1]-grey,b=a->pack->pal8[j*3+2]-grey;
+                int d=r*r+g*g+b*b; if(d<best){best=d;map[i]=(unsigned char)j;}
+            }
+        }
+        for (yy=y; yy<y+h; yy++) for(xx=x; xx<x+w; xx++)
+            a->surf.px[yy*a->surf.w+xx]=map[a->surf.px[yy*a->surf.w+xx]];
+    }
+}
+
+/* The browser is an icon grid, including disabled Installed game cards. */
 static void l_draw_browser(L_App *a)
 {
-    int cx = L_PANEL_X + L_PANEL_W / 2;
-
-    lui_print(&a->surf, a->f6, "MODULE BROWSER", L_PANEL_X + 8, L_HEAD_Y,
-              DM_TEXT_MEDIUM);
-    lui_panel(&a->surf, L_PANEL_X + 8, L_BROWSE_LIST_Y, L_PANEL_W - 16,
-              L_BROWSE_LIST_H);
-    lui_print_centered(&a->surf, a->f6, "No modules are available yet.", cx,
-                       L_PANEL_Y + 38, DM_TEXT_BRIGHT);
-    lui_print_centered(&a->surf, a->f6, "A module is another game on the OpenCNC3D",
-                       cx, L_PANEL_Y + 52, DM_TEXT_MEDIUM);
-    lui_print_centered(&a->surf, a->f6, "engine, and it plays across to the others.",
-                       cx, L_PANEL_Y + 60, DM_TEXT_MEDIUM);
+    int i;
+    lui_print(&a->surf, a->f6, "MODULE BROWSER", L_PANEL_X + 8, L_HEAD_Y, DM_TEXT_MEDIUM);
+    for (i = 0; i < 2; i++) {
+        const L_Module *m = &a->mod[i];
+        int x,y,w,h,disabled=!l_module_actionable(a,i) || !l_module_available(a,i);
+        if (!m->name) continue;
+        l_browser_rect(a,i,&x,&y,&w,&h);
+        if (ls_enabled()) ls_button(x,y,w,h,a->mod_pressed==i,a->on_mods&&a->mod_hot==i,disabled,0);
+        else dm_green_button(&a->surf,x,y,w,h,a->mod_pressed==i,disabled);
+        l_draw_module_emblem(a, i, x, L_MOD_Y, L_MOD_W, L_MOD_H);
+        if (m->installed&&!m->needs_update) l_grey_card(a,x,y,w,h);
+        lui_print_centered(&a->surf, a->f6, m->name, x + L_MOD_W / 2, L_MOD_NAME_Y, DM_TEXT_MEDIUM);
+        lui_print_centered(&a->surf, a->f6, m->installed ? (m->needs_update?"Update":"Installed") : disabled ? (SDL_AtomicGet(&a->catalog_phase)==1?"Checking":"Unavailable") : "Install",
+                           x + L_MOD_W / 2, L_MOD_NAME_Y + 10, disabled ? DM_TEXT_DISABLED : DM_TEXT_BRIGHT);
+    }
 }
 
 /* Setup and Settings: the heading, what this is, the two ticks, and whether it
@@ -1655,17 +2285,34 @@ static void l_draw_browser(L_App *a)
 static void l_draw_media_form(L_App *a)
 {
     char need[32], fre[64], line[96];
+    const int module=a->view==L_VIEW_MODULE_OPTIONS;
     const int install = a->view == L_VIEW_INSTALL;
-    const long long game = install && a->up ? lu_package_size(a->up) : 0;
+    const long long game = module&&SDL_AtomicGet(&a->catalog_phase)==2?a->catalog.module[a->module_target].size:install&&a->up?lu_package_size(a->up):0;
     const long long n = l_m_need(a) + (game > 0 ? game : 0), frees = l_m_frees(a);
     const int short_of_room = a->free_bytes >= 0 && n > a->free_bytes;
     const int setup = a->view == L_VIEW_SETUP;
+
+    if(module){
+        snprintf(line,sizeof line,"%s %s",a->mod[a->module_target].installed?"UPDATE":"INSTALL",a->mod[a->module_target].name);
+        lui_print(&a->surf,a->f6,line,L_PANEL_X+8,L_HEAD_Y,DM_TEXT_MEDIUM);
+        lui_print_wrapped(&a->surf,a->f6,"Install this game, then download the movies and music selected below. Change these choices later in Settings.",
+                          L_MEDIA_TEXT_X,L_MEDIA_TEXT_Y,L_MEDIA_TEXT_W,DM_TEXT_MEDIUM,0,3);
+        lm_format_size(n,need,sizeof need);snprintf(line,sizeof line,"DOWNLOAD %s",need);
+        lui_print(&a->surf,a->f6,line,L_CHK_X,L_SPACE_Y,DM_TEXT_MEDIUM);return;
+    }
+    if (a->view == L_VIEW_SETTINGS) {
+        snprintf(line, sizeof line, "%s SETTINGS", a->mod[a->mod_sel].name);
+        lui_print(&a->surf, a->f6, line, L_PANEL_X + 8, L_HEAD_Y, DM_TEXT_MEDIUM);
+        lui_print(&a->surf, a->f6, "Tick to download; untick to remove.", L_MEDIA_TEXT_X, 63, DM_TEXT_MEDIUM);
+        lui_print(&a->surf, a->f6, "English: included with this game", L_CHK_X, 134, DM_TEXT_DISABLED);
+        return;
+    }
 
     /* WHERE THEY COME FROM, said plainly on every screen that downloads them: the
      * movies from the Gold discs EA gave away in 2007, and the music from the Covert
      * Operations disc, which is the only one that carries the whole score. */
     lui_print(&a->surf, a->f6,
-              install ? "INSTALL OPENCNC3D" : setup ? "MOVIES AND MUSIC" : "SETTINGS",
+              install ? "INSTALL DAWN3D" : setup ? "MOVIES AND MUSIC" : "SETTINGS",
               L_PANEL_X + 8, L_HEAD_Y, DM_TEXT_MEDIUM);
     if (!setup)
         lui_print_right(&a->surf, a->f6, install ? "NOT INSTALLED YET" : "MOVIES AND MUSIC",
@@ -1746,7 +2393,9 @@ static void l_draw_media_run(L_App *a)
     else
         head = "DOWNLOADING";
     lui_print(&a->surf, a->f6, head, L_PANEL_X + 8, L_HEAD_Y, DM_TEXT_MEDIUM);
-    lui_print_right(&a->surf, a->f6, a->i_job ? "OPENCNC3D" : "MOVIES AND MUSIC",
+    lui_print_right(&a->surf, a->f6, a->i_job ? "DAWN3D" : a->component_active ?
+                    (a->component_queue[a->component_at] < 0 ? a->mod[a->mod_sel].name :
+                     a->language_name[a->component_queue[a->component_at]]) : "MOVIES AND MUSIC",
                     L_PANEL_X + L_PANEL_W - 8, L_HEAD_Y, DM_TEXT_MEDIUM);
 
     if (failed) {
@@ -1780,6 +2429,7 @@ static void l_draw_media_run(L_App *a)
                       : failed && !a->i_job && l_m_job_removes_only(a)
                           ? "Retry tries the removal again; Back leaves the files that "
                             "were not removed where they are."
+                      : failed && a->component_active ? "Retry resumes this game's content. Back returns to its settings."
                       : failed ? "Retry carries on from where it stopped. Play without "
                                  "starts the game with no movies or music, and the gear "
                                  "adds them later."
@@ -1812,19 +2462,22 @@ static void l_draw(L_App *a)
     memset(a->screen, DB_TBLACK, sizeof a->screen);
 
     /* menus.cpp:802 Load_Title_Screen: the CPS is a full 320x200 plate. */
-    dm_draw_plate(&a->surf, a->pack);
+    if (ls_enabled()) ls_begin();
+    else dm_draw_plate(&a->surf, a->pack);
 
     /* menus.cpp:809 Dialog_Box, then :810 Draw_Caption's filigree pair. */
-    dm_green_dialog(&a->surf, L_DLG_X, L_DLG_Y, L_DLG_W, L_DLG_H);
+    if (!ls_enabled()) dm_green_dialog(&a->surf, L_DLG_X, L_DLG_Y, L_DLG_W, L_DLG_H);
     options = db_shape(a->pack, "OPTIONS");
-    if (options) {
+    if (options && !ls_enabled()) {
         db_draw_shape_centered(&a->surf, options, DM_FILIGREE_LEFT, L_DLG_X + 12,
                                L_DLG_Y + 11);
         db_draw_shape_centered(&a->surf, options, DM_FILIGREE_RIGHT,
                                L_DLG_X + L_DLG_W - 14, L_DLG_Y + 11);
     }
 
-    lui_print_centered(&a->surf, a->f8, "OpenCNC3D", DM_SCREEN_W / 2, L_TITLE_Y,
+    if (ls_enabled()) ls_rgba_image(launcher_wordmark_rgba,L_WORDMARK_W,L_WORDMARK_H,
+                                    (ls_width()-L_WORDMARK_W)/2,12);
+    else lui_print_centered(&a->surf, a->f8, "OpenCNC3D", DM_SCREEN_W / 2, L_TITLE_Y,
                        DM_TEXT_BRIGHT);
 
     /* THE TWO NUMBERS ARE THE HEADLINE, because the question a player opens this to
@@ -1862,6 +2515,8 @@ static void l_draw(L_App *a)
         line[0] = '\0';
         break;
     }
+    if (a->private_source)
+        snprintf(line, sizeof line, "LOCAL SOURCE BUILD");
     lui_print_right(&a->surf, a->f6, line, L_PANEL_X + L_PANEL_W, L_INFO_Y,
                     ph == LU_AVAILABLE ? DM_TEXT_BRIGHT : DM_TEXT_MEDIUM);
 
@@ -1870,6 +2525,30 @@ static void l_draw(L_App *a)
      * Changelog or open the browser. */
     lui_panel(&a->surf, L_PANEL_X, L_PANEL_Y, L_PANEL_W, L_PANEL_H);
     switch (a->view) {
+    case L_VIEW_MODULE_RUN:
+        snprintf(line, sizeof line, "INSTALL %s", a->mod[a->module_target].name);
+        lui_print(&a->surf,a->f6,line,L_PANEL_X+8,L_HEAD_Y,DM_TEXT_MEDIUM);
+        lui_print_wrapped(&a->surf,a->f6,SDL_AtomicGet(&a->module_phase)==-1 ? a->module_error :
+                          "Downloading, verifying and installing this game. Saves, settings and optional media are kept.",
+                          L_MEDIA_TEXT_X,L_MEDIA_TEXT_Y,L_MEDIA_TEXT_W,DM_TEXT_MEDIUM,0,3);
+        lui_gauge_draw(&a->surf,L_RUN_GAUGE_X,L_RUN_GAUGE_Y,L_RUN_GAUGE_W,L_RUN_GAUGE_H,
+                       SDL_AtomicGet(&a->module_progress),a->frame);
+        break;
+    case L_VIEW_REMOVE: {
+        char question[96];
+        l_draw_modules(a);
+        if (ls_enabled()) {
+            int px, py;
+            for (py = 0; py < ls_height(); py++) for (px = 0; px < ls_width(); px++)
+                ls_pixel_rgba(px, py, 0, 0, 0, 140);
+            ls_image("confirm-frame", (ls_width() - 676) / 2, (ls_height() - 340) / 2);
+        } else lui_panel(&a->surf, 48, 44, 224, 112);
+        lui_print_centered(&a->surf, a->f6, "ARE YOU SURE?", 160, 60, DM_TEXT_BRIGHT);
+        snprintf(question, sizeof question, "Remove %s?", a->mod[a->remove_module].name);
+        lui_print_centered(&a->surf, a->f6, question, 160, 80, DM_TEXT_MEDIUM);
+        lui_print_centered(&a->surf, a->f6, "Your saves and settings will be kept.", 160, 94, DM_TEXT_MEDIUM);
+        break;
+    }
     case L_VIEW_NOTES:
         lui_text_draw(&a->surf, a->f6, &a->notes, L_TEXT_X, L_TEXT_Y, L_TEXT_W,
                       L_TEXT_H);
@@ -1881,6 +2560,7 @@ static void l_draw(L_App *a)
     case L_VIEW_SETUP:
     case L_VIEW_SETTINGS:
     case L_VIEW_INSTALL:
+    case L_VIEW_MODULE_OPTIONS:
         l_draw_media_form(a);
         break;
     case L_VIEW_MEDIA_RUN:
@@ -1906,7 +2586,7 @@ static void l_draw(L_App *a)
         lu_status(a->up, a->status, sizeof a->status);
     {
         const int media_view = a->view == L_VIEW_SETUP || a->view == L_VIEW_SETTINGS ||
-                               a->view == L_VIEW_MEDIA_RUN || a->view == L_VIEW_INSTALL;
+                               a->view == L_VIEW_MEDIA_RUN || a->view == L_VIEW_INSTALL || a->view == L_VIEW_MODULE_OPTIONS;
         const int gauge = !media_view && (ph == LU_DOWNLOADING || ph == LU_APPLYING);
         const char *text = a->status;
         unsigned char ink = ph == LU_FAILED ? DB_WHITE : DM_TEXT_MEDIUM;
@@ -1928,7 +2608,41 @@ static void l_draw(L_App *a)
         lui_control_draw(&a->surf, a->grad, a->f6, &a->btn[i], a->pressed == i,
                          !a->on_mods && a->hot == i);
 
-    dm_draw_cursor(&a->surf, a->pack, a->mx, a->my);
+    if (ls_enabled()) {
+        unsigned char cursor[DM_SCREEN_W*DM_SCREEN_H]; DB_Surface cs;
+        /* A transmission over the assembled display. Hit seats, text shapes and
+         * source material stay still; the Enhanced CUR00 pointer is drawn above it. */
+        if (!a->no_motion)
+            ls_signal_apply(ls_pixels(),ls_width(),ls_height(),a->signal_ms);
+        if(!a->no_motion){
+            for(i=0;i<L_BTN_COUNT;i++)if(!a->btn[i].hidden){
+                const LUI_Button *b=&a->btn[i];unsigned age=a->clicked[i]?a->signal_ms-a->click_at[i]:~0u;
+                ls_signal_react(ls_pixels(),ls_width(),ls_height(),l_native_x(b->x),l_native_y(b->y),
+                                l_native_extent(b->w),l_native_extent(b->h),a->signal_ms,
+                                a->hover_btn==i&&!b->disabled,a->pressed==i&&!b->disabled,age);
+                if(a->hover_btn!=i&&a->pressed!=i&&(age==~0u||age>=LS_SIGNAL_CLICK_MS)&&!b->disabled)
+                    ls_signal_idle(ls_pixels(),ls_width(),ls_height(),l_native_x(b->x),l_native_y(b->y),
+                                   l_native_extent(b->w),l_native_extent(b->h),a->signal_ms,(unsigned)i);
+            }
+            if(a->view==L_VIEW_MODULES)for(i=0;i<L_MOD_COUNT;i++){
+                int x,y,w,h,identity=L_BTN_COUNT+i;l_mod_rect(i,&x,&y,&w,&h);
+                ls_signal_react(ls_pixels(),ls_width(),ls_height(),l_native_x(x),l_native_y(y),
+                                l_native_extent(w),l_native_extent(h),a->signal_ms,
+                                a->hover_mod==i,a->mod_pressed==i,
+                                a->clicked[identity]?a->signal_ms-a->click_at[identity]:~0u);
+                if(a->hover_mod!=i&&a->mod_pressed!=i&&(!a->clicked[identity]||a->signal_ms-a->click_at[identity]>=LS_SIGNAL_CLICK_MS))
+                    ls_signal_idle(ls_pixels(),ls_width(),ls_height(),l_native_x(x),l_native_y(y),
+                                   l_native_extent(w),l_native_extent(h),a->signal_ms,(unsigned)identity);
+            }
+        }
+        if(l_cursor.ntri){
+            if(!a->win||a->hidden_ui_test)l_cursor_cpu(a->cursor_x,a->cursor_y);
+        }else{
+        memset(cursor,0,sizeof cursor); db_surface_init(&cs,DM_SCREEN_W,DM_SCREEN_H,cursor);
+        dm_draw_cursor(&cs,a->pack,a->mx,a->my);
+        l_skin_indexed(a,cursor,DM_SCREEN_W,DM_SCREEN_H,0,0,0,0,DM_SCREEN_W,DM_SCREEN_H,DM_SCREEN_W,DM_SCREEN_H);
+        }
+    } else dm_draw_cursor(&a->surf, a->pack, a->mx, a->my);
 }
 
 /* Rebuild the wrapped panel. Called when the text it shows changes, and not per
@@ -1961,12 +2675,46 @@ static void l_activate(L_App *a, int item)
         return;
     if (a->btn[item].disabled || a->btn[item].hidden)
         return;
+    if(item==L_BTN_WINDOW_CLOSE){a->quit=1;return;}
 
     /* A job's result stays on the grid until the player does something; this is
      * something. */
     if (a->view == L_VIEW_MODULES || a->view == L_VIEW_NOTES || a->view == L_VIEW_BROWSE)
         a->mstatus[0] = '\0';
 
+    if (item >= L_BTN_REMOVE && item < L_BTN_REMOVE + L_MOD_COUNT) {
+        a->remove_module = item - L_BTN_REMOVE;
+        a->hot = L_BTN_QUIT; /* Keep is the safe default. */
+        l_set_view(a, L_VIEW_REMOVE);
+        return;
+    }
+    if (a->view == L_VIEW_MODULE_RUN) {
+        if (item == L_BTN_QUIT) {
+            if (SDL_AtomicGet(&a->module_phase)==1 || SDL_AtomicGet(&a->module_phase)==2) SDL_AtomicSet(&a->module_cancel,1);
+            else {SDL_AtomicSet(&a->module_phase,0); l_set_view(a,L_VIEW_BROWSE);}
+        } else if(item==L_BTN_PLAY && SDL_AtomicGet(&a->module_phase)==-1) l_module_start(a,a->module_target);
+        return;
+    }
+    if (a->view == L_VIEW_REMOVE) {
+        if (item == L_BTN_PLAY) {
+            char reason[256];
+            int target = a->remove_module;
+            if (!lmod_remove(a->dir, target, reason, sizeof reason)) {
+                snprintf(a->mstatus, sizeof a->mstatus, "%s", reason);
+            } else {
+                snprintf(a->mstatus, sizeof a->mstatus, "%s removed. Saves and settings kept.", a->mod[target].name);
+                a->mod[target].installed = 0;
+                if (target == 1 && a->ra_pack) {db_pack_free(a->ra_pack);a->ra_pack=NULL;}
+                a->mod_sel = a->mod[0].installed ? 0 : a->mod[1].installed ? 1 : 0;
+                l_m_refresh(a);
+            }
+        }
+        if (item == L_BTN_PLAY || item == L_BTN_QUIT) {
+            a->hot = L_BTN_PLAY;
+            l_set_view(a, L_VIEW_MODULES);
+        }
+        return;
+    }
     if (item == L_BTN_CHK_MOVIES || item == L_BTN_CHK_MUSIC) {
         if (item == L_BTN_CHK_MOVIES)
             a->want_movies = !a->want_movies;
@@ -1976,11 +2724,28 @@ static void l_activate(L_App *a, int item)
         l_set_buttons(a);
         return;
     }
+    if (item == L_BTN_LANG0 || item == L_BTN_LANG1) {
+        int i = item - L_BTN_LANG0;
+        a->language_want[i] = !a->language_want[i]; a->mstatus[0] = 0;
+        l_set_buttons(a); return;
+    }
     if (item == L_BTN_GEAR) {
         l_open_settings(a);
         return;
     }
 
+    if(a->view==L_VIEW_MODULE_OPTIONS){
+        if(item==L_BTN_PLAY){
+            l_module_start(a,a->module_target);
+        }else if(item==L_BTN_QUIT){
+            if(a->m_confirm){a->m_confirm=0;a->mstatus[0]=0;l_set_buttons(a);}
+            else{
+                a->mod_sel=a->module_return_sel;a->module_after_media=0;l_free_components(a);
+                a->media=lm_create_game(a->dir,a->media_manifest[0]?a->media_manifest:NULL,a->mod_sel==1);
+                lm_sizes(a->media,&a->size_movies,&a->size_music);l_m_refresh(a);l_set_view(a,L_VIEW_BROWSE);
+            }
+        }return;
+    }
     /* The movies and music screens give the four slots their own jobs. */
     if (a->view == L_VIEW_SETUP || a->view == L_VIEW_SETTINGS || a->view == L_VIEW_INSTALL) {
         if (item == L_BTN_PLAY) {
@@ -2012,6 +2777,8 @@ static void l_activate(L_App *a, int item)
             else if (item == L_BTN_PLAY) {
                 a->i_job = 0; /* the game is in: what is left is the movies and music */
                 l_m_start(a); /* lmedia carries on from what it kept */
+            } else if (item == L_BTN_NOTES && a->component_active) {
+                l_components_restore(a);
             } else if (item == L_BTN_NOTES && !a->i_job && l_m_job_removes_only(a)) {
                 l_m_refresh(a);
                 l_set_view(a, a->m_from == L_VIEW_SETTINGS ? L_VIEW_SETTINGS
@@ -2036,7 +2803,12 @@ static void l_activate(L_App *a, int item)
 
     switch (item) {
     case L_BTN_PLAY:
-        if (ph == LU_AVAILABLE) {
+        if (a->private_source && a->mod[a->mod_sel].installed) {
+            a->play_after = 1;
+            a->quit = 1;
+        } else if(a->mod[a->mod_sel].needs_update&&l_module_available(a,a->mod_sel)){
+            l_module_offer(a,a->mod_sel);
+        } else if (ph == LU_AVAILABLE && a->mod_sel == 0 && a->mod[0].installed) {
             lu_apply(a->up);
         } else {
             a->play_after = 1;
@@ -2069,12 +2841,15 @@ static void l_activate(L_App *a, int item)
 
 /* Pressing a tile. An installed module is one you can be in, so it is selected;
  * an empty slot is one you might fill, so it opens the browser. The browser
- * currently lists nothing, and that is a fact about what exists rather than about
- * what this does. */
+ * offers only verified current-build downloads, updates and private restores. */
 static void l_activate_module(L_App *a, int item)
 {
     if (item < 0 || item >= L_MOD_COUNT)
         return;
+    if (a->view == L_VIEW_BROWSE) {
+        if (l_module_actionable(a,item) && l_module_available(a,item)) l_module_offer(a,item);
+        return;
+    }
     if (a->mod[item].installed) {
         a->mod_sel = item;
         l_set_buttons(a);
@@ -2099,14 +2874,14 @@ static int l_next_enabled(const L_App *a, int from, int delta)
     return from;
 }
 
-static int l_next_module(int from, int delta)
+static int l_next_module(const L_App *a, int from, int delta)
 {
-    int idx = from + delta;
-    if (idx < 0)
-        idx = L_MOD_COUNT - 1;
-    if (idx >= L_MOD_COUNT)
-        idx = 0;
-    return idx;
+    int n,idx=from;
+    for(n=0;n<L_MOD_COUNT;n++) {
+        idx=(idx+delta+L_MOD_COUNT)%L_MOD_COUNT;
+        if(a->view!=L_VIEW_BROWSE || (idx<2&&a->mod[idx].name&&l_module_actionable(a,idx)&&l_module_available(a,idx))) return idx;
+    }
+    return from;
 }
 
 /* Up and Down on Setup and Settings: the movies tick, the music tick, then the
@@ -2115,14 +2890,16 @@ static int l_next_module(int from, int delta)
  * frozen tick (a removal question is waiting) is stepped over. */
 static void l_m_step(L_App *a, int delta)
 {
-    static const int col[3] = {L_BTN_CHK_MOVIES, L_BTN_CHK_MUSIC, -1};
-    int pos = a->hot == L_BTN_CHK_MOVIES ? 0 : a->hot == L_BTN_CHK_MUSIC ? 1 : 2;
+    static const int col[5] = {L_BTN_CHK_MOVIES, L_BTN_CHK_MUSIC, L_BTN_LANG0, L_BTN_LANG1, -1};
+    int count = a->view == L_VIEW_SETTINGS ? 2 + a->language_count : 2;
+    int pos = a->hot == L_BTN_CHK_MOVIES ? 0 : a->hot == L_BTN_CHK_MUSIC ? 1 :
+              a->hot == L_BTN_LANG0 ? 2 : a->hot == L_BTN_LANG1 ? 3 : count;
     int next = pos;
     for (;;) {
         next += delta;
-        if (next < 0 || next > 2)
+        if (next < 0 || next > count)
             return;
-        if (next == 2) {
+        if (next == count) {
             a->hot = !a->btn[L_BTN_PLAY].disabled ? L_BTN_PLAY : L_BTN_QUIT;
             return;
         }
@@ -2140,7 +2917,14 @@ static void l_event(L_App *a, const SDL_Event *e)
     case SDL_QUIT:
         a->quit = 1;
         break;
+    case SDL_WINDOWEVENT:
+        if(e->window.event==SDL_WINDOWEVENT_CLOSE)a->quit=1;
+        else if(e->window.event==SDL_WINDOWEVENT_LEAVE||e->window.event==SDL_WINDOWEVENT_FOCUS_LOST){
+            l_pointer_native(a,-1000,-1000);a->pressed=a->mod_pressed=-1;
+        }else if(e->window.event==SDL_WINDOWEVENT_SIZE_CHANGED)l_layout(a);
+        break;
     case SDL_MOUSEMOTION:
+        l_pointer_window(a,e->motion.x,e->motion.y);
         l_to_menu(a, e->motion.x, e->motion.y, &a->mx, &a->my);
         for (i = 0; i < L_BTN_COUNT; i++)
             if (lui_button_hit(&a->btn[i], a->mx, a->my)) {
@@ -2156,6 +2940,7 @@ static void l_event(L_App *a, const SDL_Event *e)
     case SDL_MOUSEBUTTONDOWN:
         if (e->button.button != SDL_BUTTON_LEFT)
             break;
+        l_pointer_window(a,e->button.x,e->button.y);
         l_to_menu(a, e->button.x, e->button.y, &a->mx, &a->my);
         for (i = 0; i < L_BTN_COUNT; i++)
             if (lui_button_hit(&a->btn[i], a->mx, a->my)) {
@@ -2173,6 +2958,7 @@ static void l_event(L_App *a, const SDL_Event *e)
     case SDL_MOUSEBUTTONUP:
         if (e->button.button != SDL_BUTTON_LEFT)
             break;
+        l_pointer_window(a,e->button.x,e->button.y);
         l_to_menu(a, e->button.x, e->button.y, &a->mx, &a->my);
         /* gadget.cpp releases on the control the press started on, so a drag off
          * a button cancels it rather than firing the one under the cursor. The
@@ -2180,11 +2966,13 @@ static void l_event(L_App *a, const SDL_Event *e)
          * runs because opening the browser takes the tile off the screen. */
         if (a->pressed >= 0 && lui_button_hit(&a->btn[a->pressed], a->mx, a->my)) {
             i = a->pressed;
+            a->clicked[i]=1;a->click_at[i]=a->signal_ms;
             a->pressed = -1;
             l_activate(a, i);
         }
         if (a->mod_pressed >= 0 && l_mod_hit(a, a->mx, a->my) == a->mod_pressed) {
             m = a->mod_pressed;
+            a->clicked[L_BTN_COUNT+m]=1;a->click_at[L_BTN_COUNT+m]=a->signal_ms;
             a->mod_pressed = -1;
             l_activate_module(a, m);
         }
@@ -2208,15 +2996,16 @@ static void l_event(L_App *a, const SDL_Event *e)
              * it does nothing at all: a key pressed by accident must not throw
              * a long download away, and Cancel is a button of its own. */
             if (a->view == L_VIEW_SETUP || a->view == L_VIEW_SETTINGS ||
-                a->view == L_VIEW_INSTALL)
+                a->view == L_VIEW_INSTALL || a->view == L_VIEW_REMOVE || a->view == L_VIEW_MODULE_RUN || a->view == L_VIEW_MODULE_OPTIONS)
                 l_activate(a, L_BTN_QUIT);
             else if (a->view == L_VIEW_MEDIA_RUN) {
                 if (!a->m_running && a->i_job) {
                     a->i_job = 0;
                     l_set_view(a, a->install_offer ? L_VIEW_INSTALL : L_VIEW_SETUP);
-                } else if (!a->m_running)
-                    l_set_view(a, a->m_from == L_VIEW_SETTINGS ? L_VIEW_SETTINGS
-                                                               : L_VIEW_SETUP);
+                } else if (!a->m_running) {
+                    if (a->component_active) l_components_restore(a);
+                    else l_set_view(a, a->m_from == L_VIEW_SETTINGS ? L_VIEW_SETTINGS : L_VIEW_SETUP);
+                }
             } else if (a->view != L_VIEW_MODULES)
                 l_set_view(a, L_VIEW_MODULES);
             else
@@ -2232,14 +3021,14 @@ static void l_event(L_App *a, const SDL_Event *e)
             break;
         case SDLK_LEFT:
             if (a->on_mods)
-                a->mod_hot = l_next_module(a->mod_hot, -1);
+                a->mod_hot = l_next_module(a,a->mod_hot, -1);
             else
                 a->hot = l_next_enabled(a, a->hot, -1);
             break;
         case SDLK_RIGHT:
         case SDLK_TAB:
             if (a->on_mods)
-                a->mod_hot = l_next_module(a->mod_hot, +1);
+                a->mod_hot = l_next_module(a,a->mod_hot, +1);
             else
                 a->hot = l_next_enabled(a, a->hot, +1);
             break;
@@ -2261,7 +3050,7 @@ static void l_event(L_App *a, const SDL_Event *e)
                 } else if (a->hot != L_BTN_GEAR)
                     a->on_mods = 1;
             } else if (a->view == L_VIEW_SETUP || a->view == L_VIEW_SETTINGS ||
-                       a->view == L_VIEW_INSTALL)
+                       a->view == L_VIEW_INSTALL || a->view == L_VIEW_MODULE_OPTIONS)
                 l_m_step(a, -1);
             break;
         case SDLK_DOWN:
@@ -2270,7 +3059,7 @@ static void l_event(L_App *a, const SDL_Event *e)
             else if (a->view == L_VIEW_MODULES && !a->on_mods && a->hot == L_BTN_GEAR)
                 a->on_mods = 1;
             else if (a->view == L_VIEW_SETUP || a->view == L_VIEW_SETTINGS ||
-                     a->view == L_VIEW_INSTALL)
+                     a->view == L_VIEW_INSTALL || a->view == L_VIEW_MODULE_OPTIONS)
                 l_m_step(a, +1);
             else {
                 a->on_mods = 0;
@@ -2389,14 +3178,21 @@ static void l_usage(void)
            "  --dir <folder>   the installed game (default: found from this binary)\n"
            "  --shot <file>    render one frame to a PNG and exit\n"
            "  --view <screen>  modules (default), changelog, browser, setup,\n"
-           "                   setup-progress, settings or install\n"
+           "                   setup-progress, settings, remove or install\n"
            "  --scale <n>      window scale for --shot and for the window\n");
+    printf("  --no-motion      disable the Enhanced EVA signal animation\n"
+           "  --signal-time <ms>  fix its phase for --shot (0..3600000)\n");
+    printf("  --shot-mouse X,Y native cursor fixture for CPU-only shots\n"
+           "  --shot-press    hold the fixture's hovered control without activating it\n"
+           "  --hidden-ui-test DIR  bounded hidden SDL input/frame witnesses\n");
     printf("  --play           start the game at once, no window\n"
            "  -- <args>        everything after -- is passed to the game\n"
            "  --check          ask the update host what it has, print it, exit\n"
            "  --update         check and, if there is one, install it. No window.\n");
     printf("  --media-install movies,music|movies|music|none --dir <folder>\n"
            "                   download or remove the movies and music. No window.\n"
+           "  --media-game td|ra --media-add-only\n"
+           "                   installer mode: add checked media, preserve unchecked media.\n"
            "  --install-game [--build <version>] [--media ...] --dir <folder>\n"
            "                   install the newest build, or that version, into a folder,\n"
            "                   then the media\n"
@@ -2439,7 +3235,9 @@ static int l_open_window(L_App *a, int scale)
     }
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     a->win = SDL_CreateWindow("OpenCNC3D", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              DM_SCREEN_W * scale, DM_SCREEN_H * scale, SDL_WINDOW_OPENGL);
+                              l_canvas_w() * scale, l_canvas_h() * scale,
+                              SDL_WINDOW_OPENGL|SDL_WINDOW_BORDERLESS|SDL_WINDOW_RESIZABLE|
+                              (a->hidden_ui_test?SDL_WINDOW_HIDDEN:0));
     if (!a->win) {
         fprintf(stderr, "SDL: %s\n", SDL_GetError());
         return 0;
@@ -2448,10 +3246,11 @@ static int l_open_window(L_App *a, int scale)
         fprintf(stderr, "GL: %s\n", SDL_GetError());
         return 0;
     }
-    SDL_GL_SetSwapInterval(1);
-    a->tw = l_pot(DM_SCREEN_W);
-    a->th = l_pot(DM_SCREEN_H);
-    a->rgba = (unsigned char *)calloc((size_t)DM_SCREEN_W * DM_SCREEN_H * 4, 1);
+    SDL_GL_SetSwapInterval(0);
+    SDL_SetWindowMinimumSize(a->win,l_canvas_w(),l_canvas_h());
+    a->tw = l_pot(l_canvas_w());
+    a->th = l_pot(l_canvas_h());
+    a->rgba = (unsigned char *)calloc((size_t)l_canvas_w() * l_canvas_h() * 4, 1);
     a->padded = (unsigned char *)calloc((size_t)a->tw * a->th * 4, 1);
     glGenTextures(1, &a->tex);
     glBindTexture(GL_TEXTURE_2D, a->tex);
@@ -2459,6 +3258,9 @@ static int l_open_window(L_App *a, int scale)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    l_layout(a);
+    if(SDL_SetWindowHitTest(a->win,l_window_hit,a)!=0)
+        fprintf(stderr,"Launcher frame hit test unavailable: %s\n",SDL_GetError());
     return 1;
 }
 
@@ -2527,6 +3329,7 @@ static int l_fetch_pack_window(L_App *a)
 {
     L_PackJob j;
     SDL_Thread *t;
+    int close_pressed=0;
     memset(&j, 0, sizeof j);
     j.dir = a->dir;
     j.mx = SDL_CreateMutex();
@@ -2540,9 +3343,18 @@ static int l_fetch_pack_window(L_App *a)
         long long got, total;
         float f = 0.0f;
         int w = 0, h = 0;
-        while (SDL_PollEvent(&e))
-            if (e.type == SDL_QUIT)
+        while (SDL_PollEvent(&e)){
+            if (e.type == SDL_QUIT||(e.type==SDL_WINDOWEVENT&&e.window.event==SDL_WINDOWEVENT_CLOSE)||
+                (e.type==SDL_KEYDOWN&&e.key.keysym.sym==SDLK_ESCAPE))
                 j.cancel = 1;
+            if((e.type==SDL_MOUSEBUTTONDOWN||e.type==SDL_MOUSEBUTTONUP)&&e.button.button==SDL_BUTTON_LEFT){
+                int ww,hh,x,y,inside;SDL_GetWindowSize(a->win,&ww,&hh);
+                x=e.button.x*DM_SCREEN_W/(ww>0?ww:1);y=e.button.y*DM_SCREEN_H/(hh>0?hh:1);
+                inside=x>=279&&x<291&&y>=9&&y<18;
+                if(e.type==SDL_MOUSEBUTTONDOWN)close_pressed=inside;
+                else {if(close_pressed&&inside)j.cancel=1;close_pressed=0;}
+            }
+        }
         SDL_LockMutex(j.mx);
         got = j.got;
         total = j.total;
@@ -2567,6 +3379,10 @@ static int l_fetch_pack_window(L_App *a)
         glRectf(59.0f, 97.0f, 261.0f, 105.0f);
         glColor3ub(104, 172, 96);
         glRectf(60.0f, 98.0f, 60.0f + 200.0f * f, 104.0f);
+        /* The initial art bootstrap has no font/chrome yet, but a borderless
+         * first-install window still needs its own working close control. */
+        glColor3ub(48,84,44);glRectf(279,9,291,18);glColor3ub(210,230,204);
+        glBegin(GL_LINES);glVertex2i(282,11);glVertex2i(288,16);glVertex2i(288,11);glVertex2i(282,16);glEnd();
         SDL_GL_SwapWindow(a->win);
         SDL_Delay(16);
     }
@@ -2614,6 +3430,142 @@ static void mac_local_network_probe(void)
 }
 #endif
 
+/* The hidden UI witness drives the real event/controller/render path without
+ * taking focus, moving the system pointer, downloading, or showing a window. */
+static int l_ui_hit(const L_App *a,int mx,int my)
+{int i;for(i=0;i<L_BTN_COUNT;i++)if(lui_button_hit(&a->btn[i],mx,my))return i;return -1;}
+static void l_ui_map(L_App *a,const char *name,int wx,int wy,int enx,int eny,int emx,int emy,int expected_hit)
+{
+    int mx,my,nx=(int)((wx*a->px-a->vpx)/a->scale),ny=(int)((wy*a->py-a->vptop)/a->scale);
+    l_to_menu(a,wx,wy,&mx,&my);
+    printf("UIQ|map|name=%s|wx=%d|wy=%d|nx=%d|ny=%d|expected_nx=%d|expected_ny=%d|mx=%d|my=%d|expected_mx=%d|expected_my=%d|hit=%d|expected_hit=%d\n",name,wx,wy,nx,ny,enx,eny,mx,my,emx,emy,l_ui_hit(a,mx,my),expected_hit);
+}
+static void l_ui_push(L_App *a,Uint32 type,int nx,int ny)
+{
+    SDL_Event e,p;int wx=(int)((a->vpx+nx*a->scale)/a->px),wy=(int)((a->vptop+ny*a->scale)/a->py);
+    memset(&e,0,sizeof e);e.type=type;
+    if(type==SDL_MOUSEMOTION){e.motion.windowID=SDL_GetWindowID(a->win);e.motion.x=wx;e.motion.y=wy;}
+    else {e.button.windowID=SDL_GetWindowID(a->win);e.button.button=SDL_BUTTON_LEFT;e.button.x=wx;e.button.y=wy;}
+    SDL_PushEvent(&e);while(SDL_PollEvent(&p))l_event(a,&p);
+}
+static void l_ui_save(L_App *a,const char *dir,const char *name)
+{
+    char path[1400];l_draw(a);
+    snprintf(path,sizeof path,"%s/%s.png",dir,name);
+    if(ls_enabled())png_write_rgba(path,ls_pixels(),ls_width(),ls_height());
+    else {db_surface_to_rgba(&a->surf,a->pack->pal8,a->rgba,0);png_write_rgba(path,a->rgba,DM_SCREEN_W,DM_SCREEN_H);}
+}
+static void l_ui_cursor_gl(L_App *a,const char *dir)
+{
+    char path[1400];FILE *f;unsigned char *readback,*topdown;int y,w=ls_width(),h=ls_height();float u=(float)w/a->tw,v=(float)h/a->th;
+    if(!ls_enabled()||!l_cursor.ntri)return;
+    l_pointer_native(a,-1000,-1000);l_draw(a);
+    snprintf(path,sizeof path,"%s/cursor-gl-base.rgba",dir);f=fopen(path,"wb");if(!f)return;fwrite(ls_pixels(),1,(size_t)w*h*4,f);fclose(f);
+    l_render_present(a,0);glViewport(0,0,w,h);glMatrixMode(GL_PROJECTION);glLoadIdentity();glOrtho(0,w,h,0,-1,1);glMatrixMode(GL_MODELVIEW);glLoadIdentity();
+    glDisable(GL_BLEND);glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,a->tex);glColor4f(1,1,1,1);
+    glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(0,0);glTexCoord2f(u,0);glVertex2f(w,0);glTexCoord2f(u,v);glVertex2f(w,h);glTexCoord2f(0,v);glVertex2f(0,h);glEnd();
+    l_cursor_gl(500,300,1.f);glFinish();
+    readback=(unsigned char *)malloc((size_t)w*h*4);topdown=(unsigned char *)malloc((size_t)w*h*4);
+    if(!readback||!topdown){free(readback);free(topdown);return;}
+    glReadBuffer(GL_BACK);glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,readback);
+    for(y=0;y<h;y++)memcpy(topdown+(size_t)y*w*4,readback+(size_t)(h-1-y)*w*4,(size_t)w*4);
+    snprintf(path,sizeof path,"%s/cursor-gl-actual.rgba",dir);f=fopen(path,"wb");if(f){fwrite(topdown,1,(size_t)w*h*4,f);fclose(f);}
+    snprintf(path,sizeof path,"%s/cursor-gl.png",dir);png_write_rgba(path,topdown,w,h);
+    free(readback);free(topdown);
+    printf("UIQ|cursor_gl|width=%d|height=%d|x=500|y=300|base=cursor-gl-base.rgba|actual=cursor-gl-actual.rgba\n",w,h);
+}
+static int l_hidden_ui_run(L_App *a,const char *dir)
+{
+    L_App sim;SDL_Point point;Uint32 flags;Uint64 start,stop,frequency=SDL_GetPerformanceFrequency();double times[32],elapsed;int i,j,outside,dragoff,cx,cy;
+#ifdef _WIN32
+    CreateDirectoryA(dir,NULL);
+#else
+    mkdir(dir,0700);
+#endif
+    /* The gallery/input fixture starts on Modules regardless of a player's
+     * first-run media prompt. This changes only test memory, never preferences. */
+    a->view=L_VIEW_MODULES;a->on_mods=0;a->hot=L_BTN_PLAY;
+    l_set_buttons(a);l_layout(a);flags=SDL_GetWindowFlags(a->win);
+    printf("UIQ|flags|value=%u|hidden=%d|borderless=%d|ever_shown=%d|raise_calls=0|focus_calls=0\n",flags,!!(flags&SDL_WINDOW_HIDDEN),!!(flags&SDL_WINDOW_BORDERLESS),!!(flags&SDL_WINDOW_SHOWN));
+    sim=*a;sim.scale=1;sim.px=sim.py=1;sim.vpx=sim.vptop=0;
+    if(ls_enabled()){
+        l_ui_map(&sim,"close-centre",961,45,961,45,311,9,L_BTN_WINDOW_CLOSE);
+        l_ui_map(&sim,"button-top-left",88,543,88,543,20,175,L_BTN_PLAY);
+        l_ui_map(&sim,"button-right-outside",280,543,280,543,84,175,-1);
+        sim.scale=2;sim.px=sim.py=2;sim.vpx=10;sim.vptop=14;
+        l_ui_map(&sim,"high-dpi",966,52,961,45,311,9,L_BTN_WINDOW_CLOSE);
+        sim.px=sim.py=1;sim.vpx=20;sim.vptop=30;
+        l_ui_map(&sim,"letterbox",10,10,-5,-10,-1000,-1000,-1);
+    }else{
+        l_ui_map(&sim,"close-centre",284,13,284,13,284,13,L_BTN_WINDOW_CLOSE);
+        l_ui_map(&sim,"button-top-left",20,175,20,175,20,175,L_BTN_PLAY);
+        l_ui_map(&sim,"button-right-outside",84,175,84,175,84,175,-1);
+        sim.scale=2;sim.px=sim.py=2;sim.vpx=10;sim.vptop=14;
+        l_ui_map(&sim,"high-dpi",289,20,284,13,284,13,L_BTN_WINDOW_CLOSE);
+    }
+    cx=l_native_x(a->btn[L_BTN_WINDOW_CLOSE].x)+l_native_extent(a->btn[L_BTN_WINDOW_CLOSE].w)/2;
+    cy=l_native_y(a->btn[L_BTN_WINDOW_CLOSE].y)+l_native_extent(a->btn[L_BTN_WINDOW_CLOSE].h)/2;
+    point.x=(int)((a->vpx+l_native_x(200)*a->scale)/a->px);point.y=(int)((a->vptop+l_native_y(12)*a->scale)/a->py);
+    i=l_window_hit(a->win,&point,a)==SDL_HITTEST_DRAGGABLE;
+    point.x=(int)((a->vpx+cx*a->scale)/a->px);point.y=(int)((a->vptop+cy*a->scale)/a->py);
+    printf("UIQ|drag|header=%d|control=%d\n",i,l_window_hit(a->win,&point,a)==SDL_HITTEST_DRAGGABLE);
+    {
+        int tx,ty,tw,th,opened,returned;
+        l_mod_rect(2,&tx,&ty,&tw,&th);
+        l_ui_push(a,SDL_MOUSEBUTTONDOWN,l_native_x(tx+tw/2),l_native_y(ty+th/2));
+        l_ui_push(a,SDL_MOUSEBUTTONUP,l_native_x(tx+tw/2),l_native_y(ty+th/2));
+        opened=a->view==L_VIEW_BROWSE&&!a->btn[L_BTN_CLOSE].hidden;
+        l_ui_save(a,dir,"browser-installed");
+        tx=a->btn[L_BTN_CLOSE].x+a->btn[L_BTN_CLOSE].w/2;ty=a->btn[L_BTN_CLOSE].y+a->btn[L_BTN_CLOSE].h/2;
+        l_ui_push(a,SDL_MOUSEBUTTONDOWN,l_native_x(tx),l_native_y(ty));
+        l_ui_push(a,SDL_MOUSEBUTTONUP,l_native_x(tx),l_native_y(ty));
+        returned=a->view==L_VIEW_MODULES;
+        printf("UIQ|browser|opened=%d|returned=%d|installed_rows=%d|tile_label=Add Game\n",opened,returned,a->mod[0].installed+a->mod[1].installed);
+        if (!opened || !returned) return 1;
+    }
+    if (!a->btn[L_BTN_REMOVE + a->mod_sel].hidden && !a->btn[L_BTN_REMOVE + a->mod_sel].disabled) {
+        int rx=l_native_x(a->btn[L_BTN_REMOVE+a->mod_sel].x+a->btn[L_BTN_REMOVE+a->mod_sel].w/2);
+        int ry=l_native_y(a->btn[L_BTN_REMOVE+a->mod_sel].y+a->btn[L_BTN_REMOVE+a->mod_sel].h/2);
+        int target=a->mod_sel, opened, kept;
+        l_ui_push(a,SDL_MOUSEBUTTONDOWN,rx,ry);l_ui_push(a,SDL_MOUSEBUTTONUP,rx,ry);
+        opened=a->view==L_VIEW_REMOVE&&a->remove_module==target&&a->hot==L_BTN_QUIT;
+        l_ui_save(a,dir,"module-removal-confirm");
+        rx=l_native_x(a->btn[L_BTN_QUIT].x+a->btn[L_BTN_QUIT].w/2);
+        ry=l_native_y(a->btn[L_BTN_QUIT].y+a->btn[L_BTN_QUIT].h/2);
+        l_ui_push(a,SDL_MOUSEBUTTONDOWN,rx,ry);l_ui_push(a,SDL_MOUSEBUTTONUP,rx,ry);
+        kept=a->view==L_VIEW_MODULES&&a->mod[target].installed;
+        printf("UIQ|module_remove|confirmation=%d|keep=%d|disk_removal_requested=0\n",opened,kept);
+        if (!opened || !kept) return 1;
+        a->hot=L_BTN_PLAY;a->on_mods=0;
+    }
+    a->signal_ms=4400;l_pointer_native(a,-1000,-1000);l_ui_save(a,dir,"idle");
+    l_ui_push(a,SDL_MOUSEMOTION,l_native_x(54),l_native_y(90));l_ui_save(a,dir,"module-hover");
+    l_ui_push(a,SDL_MOUSEMOTION,l_native_x(124),l_native_y(181));l_ui_save(a,dir,"button-hover");
+    l_ui_push(a,SDL_MOUSEBUTTONDOWN,l_native_x(124),l_native_y(181));l_ui_save(a,dir,"button-pressed");
+    l_ui_push(a,SDL_MOUSEBUTTONUP,l_native_x(180),l_native_y(160));
+    l_ui_push(a,SDL_MOUSEBUTTONDOWN,l_native_x(54),l_native_y(90));l_ui_push(a,SDL_MOUSEBUTTONUP,l_native_x(54),l_native_y(90));
+    a->signal_ms+=40;l_ui_push(a,SDL_MOUSEMOTION,l_native_x(180),l_native_y(160));l_ui_save(a,dir,"click-pulse");
+    l_ui_push(a,SDL_MOUSEMOTION,cx,cy);l_ui_save(a,dir,"close-hover");
+    l_ui_push(a,SDL_MOUSEBUTTONDOWN,cx,cy);l_ui_push(a,SDL_MOUSEBUTTONUP,cx+80,cy+80);dragoff=!a->quit;
+    l_ui_push(a,SDL_MOUSEBUTTONDOWN,cx+80,cy+80);l_ui_push(a,SDL_MOUSEBUTTONUP,cx+80,cy+80);outside=!a->quit;
+    l_ui_push(a,SDL_MOUSEMOTION,333,271);l_ui_save(a,dir,"cursor-native");
+    start=SDL_GetPerformanceCounter();
+    for(i=0;i<32;i++){
+        Uint64 one=SDL_GetPerformanceCounter();l_ui_push(a,SDL_MOUSEMOTION,350+i,270);
+        a->signal_ms=4500+(unsigned)i*8;l_draw(a);l_present(a);
+        times[i]=(SDL_GetPerformanceCounter()-one)*1000.0/frequency;
+    }
+    stop=SDL_GetPerformanceCounter();elapsed=(stop-start)*1000.0/frequency;
+    for(i=0;i<31;i++)for(j=i+1;j<32;j++)if(times[j]<times[i]){double t=times[i];times[i]=times[j];times[j]=t;}
+    printf("UIQ|motion|nx=%.3f|ny=%.3f|expected_nx=381|expected_ny=270|before_present=1\n",a->cursor_x,a->cursor_y);
+    printf("UIQ|pacing|fixed33=0|target_hz=125|max_budget_ms=8|frame_count=32|elapsed_ms=%.3f|median_ms=%.3f|max_ms=%.3f|hidden_throughput_only=1\n",elapsed,(times[15]+times[16])/2,times[31]);
+    l_ui_cursor_gl(a,dir);
+    l_ui_push(a,SDL_MOUSEBUTTONDOWN,cx,cy);l_ui_push(a,SDL_MOUSEBUTTONUP,cx,cy);
+    printf("UIQ|close|outside_kept=%d|dragoff_kept=%d|quit=%d|x=%d|y=%d|w=%d|h=%d\n",outside,dragoff,a->quit,l_native_x(a->btn[L_BTN_WINDOW_CLOSE].x),l_native_y(a->btn[L_BTN_WINDOW_CLOSE].y),l_native_extent(a->btn[L_BTN_WINDOW_CLOSE].w),l_native_extent(a->btn[L_BTN_WINDOW_CLOSE].h));
+    printf("UIQ|cursor|source=ecur/ecur.bin|mesh=CUR00|triangles=%u|source_crc32=%08lx|native_size=40|smoothing=0\n",l_cursor.ntri,l_cursor.crc);
+    return !(outside&&dragoff&&a->quit&&(flags&SDL_WINDOW_HIDDEN)&&(flags&SDL_WINDOW_BORDERLESS)&&!(flags&SDL_WINDOW_SHOWN));
+}
+
 int main(int argc, char **argv)
 {
     L_App a;
@@ -2624,7 +3576,13 @@ int main(int argc, char **argv)
     char *local_notes;
     int scale = 3, play_now = 0, headless = 0, view_given = 0, i;
     int shot_choice = -1, shot_confirm = 0, shot_tick = 0;
+    int restore_module = -1;
+    const char *module_site=NULL;
     int cli_handled = 0, cli_rc;
+    Uint32 signal_start;
+    int signal_fixed = 0;
+    int shot_mouse=0,shot_x=0,shot_y=0,shot_press=0;
+    char ui_report_dir[1024];
 
 #ifdef _WIN32
     /* The launcher is linked -mwindows so that double-clicking it does not put a
@@ -2648,39 +3606,83 @@ int main(int argc, char **argv)
     if (cli_handled)
         return cli_rc;
 
-#ifdef __APPLE__
-    mac_local_network_probe();
-#endif
 
     memset(&a, 0, sizeof a);
     a.pressed = -1;
     a.mod_pressed = -1;
+    a.cursor_x=a.cursor_y=-1000;a.hover_btn=a.hover_mod=-1;
     a.hot = L_BTN_PLAY;
     a.view = L_VIEW_MODULES;
 
     /* THE ONE MODULE THERE IS. The other three rows stay empty, which is the state
      * the add tile is drawn for, and it is a state rather than a placeholder: the
      * day a second game ships, it is a second row here. */
-    a.mod[0].name = "OpenCNC3D";
+    a.mod[0].name = "Dawn3D";
     a.mod[0].installed = 1;
     a.mod_sel = 0;
     a.mod_hot = 0;
     a.free_bytes = -1;
     shot[0] = '\0';
     manifest[0] = '\0';
+    ui_report_dir[0]='\0';
 
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--")) {
-            /* Everything after this belongs to the game, not to the launcher. */
-            while (++i < argc && l_game_argc < (int)(sizeof l_game_args / sizeof *l_game_args))
+            /* Everything after this belongs to the game, not to the launcher. ALL
+             * of it or none: a list that stopped copying when it filled up handed
+             * the game a flag without its value, and the game's usage message was
+             * the only sign. Room is kept for the editor's own three. */
+            int keep = LC_GAME_ARGS - LC_EDITOR_ARGS;
+            if (argc - i - 1 > keep) {
+                fprintf(stderr, "%d arguments after --, and the launcher hands the "
+                        "game at most %d. Not starting rather than dropping:",
+                        argc - i - 1, keep);
+                for (i += 1 + keep; i < argc; i++)
+                    fprintf(stderr, " %s", argv[i]);
+                fprintf(stderr, "\n");
+                return 2;
+            }
+            while (++i < argc)
                 l_game_args[l_game_argc++] = argv[i];
             break;
         }
-        if (!strcmp(argv[i], "--dir") && i + 1 < argc)
+        if (!strcmp(argv[i], "--restore-module") && i+1<argc) {
+            const char *name=argv[++i];restore_module=!strcmp(name,"ra3d")?1:!strcmp(name,"td")?0:-1;
+            if(restore_module<0){fprintf(stderr,"Unknown restore module.\n");return 2;}
+        } else if(!strcmp(argv[i],"--module-site")&&i+1<argc){
+            module_site=argv[++i];
+            if(strncmp(module_site,"http://127.0.0.1:",17)&&strncmp(module_site,"http://localhost:",17)){
+                fprintf(stderr,"--module-site is restricted to loopback qualification servers.\n");return 2;
+            }
+        } else if (!strcmp(argv[i], "--dir") && i + 1 < argc)
             snprintf(a.dir, sizeof a.dir, "%s", argv[++i]);
         else if (!strcmp(argv[i], "--shot") && i + 1 < argc)
             snprintf(shot, sizeof shot, "%s", argv[++i]);
-        else if (!strcmp(argv[i], "--scale") && i + 1 < argc)
+        else if (!strcmp(argv[i], "--no-motion"))
+            a.no_motion = 1;
+        else if(!strcmp(argv[i],"--hidden-ui-test")){
+            if(i+1>=argc){fprintf(stderr,"--hidden-ui-test needs a report directory\n");return 2;}
+            snprintf(ui_report_dir,sizeof ui_report_dir,"%s",argv[++i]);a.hidden_ui_test=1;
+        }else if(!strcmp(argv[i],"--shot-mouse")||!strcmp(argv[i],"--shot-pointer")){
+            char extra;if(i+1>=argc||sscanf(argv[++i],"%d,%d%c",&shot_x,&shot_y,&extra)!=2||shot_x< -10000||shot_y< -10000||shot_x>10000||shot_y>10000){fprintf(stderr,"--shot-mouse needs native X,Y\n");return 2;}shot_mouse=1;
+        }else if(!strcmp(argv[i],"--shot-press"))shot_press=1;
+        else if (!strcmp(argv[i], "--signal-time")) {
+            char *end;
+            const char *value;
+            unsigned long ms;
+            if (i + 1 == argc) {
+                fprintf(stderr, "--signal-time needs milliseconds from 0 to 3600000\n");
+                return 2;
+            }
+            value = argv[++i];
+            ms = strtoul(value, &end, 10);
+            if (!*value || *end || ms > 3600000ul || value[0] == '-') {
+                fprintf(stderr, "--signal-time needs milliseconds from 0 to 3600000\n");
+                return 2;
+            }
+            a.signal_ms = (unsigned)ms;
+            signal_fixed = 1;
+        } else if (!strcmp(argv[i], "--scale") && i + 1 < argc)
             scale = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--view") && i + 1 < argc) {
             /* Which screen the well opens on, so a still picture can be taken of
@@ -2691,12 +3693,14 @@ int main(int argc, char **argv)
                 a.view = L_VIEW_NOTES;
             else if (!strcmp(v, "browser"))
                 a.view = L_VIEW_BROWSE;
+            else if(!strcmp(v,"module-options"))a.view=L_VIEW_MODULE_OPTIONS;
             else if (!strcmp(v, "setup"))
                 a.view = L_VIEW_SETUP;
             else if (!strcmp(v, "setup-progress"))
                 a.view = L_VIEW_MEDIA_RUN;
             else if (!strcmp(v, "settings"))
                 a.view = L_VIEW_SETTINGS;
+            else if (!strcmp(v, "remove")) { a.view = L_VIEW_REMOVE; a.remove_module = a.mod_sel; }
             else if (!strcmp(v, "install"))
                 a.view = L_VIEW_INSTALL;
             else
@@ -2749,11 +3753,8 @@ int main(int argc, char **argv)
         scale = 1;
 
     l_find_install(&a);
-    l_find_ra_module(&a);
-    if (a.mod_sel == 1 && !a.mod[1].installed) {
-        fprintf(stderr, "Red Alert 3D module media or brain is missing from %s\n", a.dir);
-        return 1;
-    }
+    a.private_source = lz_is_private_developer(a.dir);
+    /* Module detection follows update/removal recovery below. */
 
     /* AN UNFINISHED UPDATE IS FINISHED BEFORE ANYTHING IS READ, by a launcher that
      * gets the install lock. lu_create takes it and undoes, or completes, whatever
@@ -2768,10 +3769,39 @@ int main(int argc, char **argv)
      * folder at this moment, say), or while the undo is refused because something
      * still has a file open, nothing is recovered here and the folder is read as it
      * stands: the window says nothing about it, and --play starts the game over it. */
+#ifdef __APPLE__
+    /* CPU witnesses and hidden checks must never open an OS permission prompt. */
+    if (!shot[0] && !headless && !play_now && restore_module < 0 && !a.hidden_ui_test &&
+        !SDL_getenv("OPENCNC3D_BACKGROUND") && !SDL_getenv("SDL_MAC_BACKGROUND_APP"))
+        mac_local_network_probe();
+#endif
     a.up = lu_create(a.dir, NULL);
+    if (lz_held_here(a.dir) && !lmod_settle(a.dir, err, sizeof err)) {
+        fprintf(stderr, "%s\n", err);lu_destroy(a.up);return 1;
+    }
+    if (restore_module >= 0) {
+        int ok=lmod_install_cached(a.dir,restore_module,LCFG_BUILD,NULL,NULL,err,sizeof err);
+        printf("MODULE-INSTALL|%s|%s\n",ok?"PASS":"FAIL",ok?"verified cached game installed":err);
+        lu_destroy(a.up);return ok?0:1;
+    }
+    a.mod[0].installed = lmod_td_present(a.dir);
+    l_find_ra_module(&a);
+    if(module_site){
+        if(!lmod_catalog_fetch_at(module_site,LCFG_BUILD,&a.catalog,err,sizeof err)){fprintf(stderr,"%s\n",err);lu_destroy(a.up);return 1;}
+        SDL_AtomicSet(&a.catalog_phase,2);l_module_versions(&a);
+    }
+    a.remove_module = a.mod_sel;
+    if (!a.mod[a.mod_sel].installed && !play_now && a.view!=L_VIEW_MODULE_OPTIONS)
+        a.mod_sel = a.mod[0].installed ? 0 : a.mod[1].installed ? 1 : 0;
     l_read_installed(&a);
     lu_set_installed(a.up, a.version);
 
+    if (play_now && !a.mod[a.mod_sel].installed) {
+        if (a.mod_sel == 1) fprintf(stderr, "RA3D is not installed in %s: %s\n", a.dir, a.ra_missing);
+        else fprintf(stderr, "The selected module is not installed.\n");
+        lu_destroy(a.up);
+        return 1;
+    }
     if (play_now) {
         lu_destroy(a.up); /* the lock belongs to the launcher, never to the game */
         if (!l_launch(a.dir, a.mod_sel == 1 ? L_RA_GAME_EXE : L_GAME_EXE,
@@ -2781,6 +3811,11 @@ int main(int argc, char **argv)
         }
         return 0;
     }
+
+    snprintf(path,sizeof path,"%s/enhanced-menu.pack",a.dir);
+    ls_load(path);
+    if(ls_enabled())l_cursor_load(a.dir);
+    if (ls_enabled()) scale = scale >= 3 ? scale / 3 : 1;
 
     a.install_offer = l_install_offer(&a);
     snprintf(path, sizeof path, "%s/dosmenu.pack", a.dir);
@@ -2861,7 +3896,8 @@ int main(int argc, char **argv)
      * --view of its own. The development play folder is not an install, so it
      * never shows Setup and never gets a record; a player who has answered once,
      * either way, is not asked again, and the gear is where the answer changes. */
-    a.media = lm_create(a.dir, manifest[0] ? manifest : NULL);
+    snprintf(a.media_manifest, sizeof a.media_manifest, "%s", manifest);
+    a.media = lm_create_game(a.dir, manifest[0] ? manifest : NULL, a.mod_sel==1);
     if (a.media)
         lm_sizes(a.media, &a.size_movies, &a.size_music);
     l_m_refresh(&a);
@@ -2869,9 +3905,9 @@ int main(int argc, char **argv)
      * folder can: asked for anywhere else, the screen is the module grid. */
     if (a.view == L_VIEW_INSTALL && !a.install_offer)
         a.view = L_VIEW_MODULES;
-    if (!view_given && a.media && a.install_offer)
-        a.view = L_VIEW_INSTALL;
-    else if (!view_given && a.media && lz_is_install(a.dir) && !lm_choice_recorded(a.dir))
+    if (!view_given && a.install_offer)
+        a.view = L_VIEW_MODULES;
+    else if (!view_given && !a.private_source && a.media && a.mod[a.mod_sel].installed && lz_is_install(a.dir) && !a.rec_ok)
         a.view = L_VIEW_SETUP;
     /* The downloading screen has nothing to show without a job, and the stand-ins
      * that give it one are for pictures: a window asked for it opens on Setup. */
@@ -2882,7 +3918,9 @@ int main(int argc, char **argv)
         if (a.view == L_VIEW_MEDIA_RUN)
             a.view = L_VIEW_SETUP;
     }
-    if (a.view == L_VIEW_SETUP)
+    if(a.view==L_VIEW_MODULE_OPTIONS)
+        l_module_offer(&a,a.mod_sel);
+    else if (a.view == L_VIEW_SETUP)
         l_open_setup(&a);
     else if (a.view == L_VIEW_SETTINGS)
         l_open_settings(&a);
@@ -2902,6 +3940,7 @@ int main(int argc, char **argv)
             a.shot_phase = LM_FETCHING;
         }
     }
+    if (a.view == L_VIEW_REMOVE) a.hot = L_BTN_QUIT;
     if (shot_choice >= 0) {
         a.want_movies = (shot_choice & 1) != 0;
         a.want_music = (shot_choice & 2) != 0;
@@ -2929,14 +3968,14 @@ int main(int argc, char **argv)
          * wants to look at pixels rather than at a description of them. No window
          * and no GL: the surface IS the evidence. */
         unsigned char *big;
-        int bw = DM_SCREEN_W * scale, bh = DM_SCREEN_H * scale, ok, guard, bi;
-        a.rgba = (unsigned char *)calloc((size_t)DM_SCREEN_W * DM_SCREEN_H * 4, 1);
+        int bw = l_canvas_w() * scale, bh = l_canvas_h() * scale, ok, guard, bi;
+        a.rgba = (unsigned char *)calloc((size_t)l_canvas_w() * l_canvas_h() * 4, 1);
 
         /* A REAL CHECK BEFORE THE PICTURE, when there is a host to ask. A shot of
          * the launcher showing "UPDATES OFF" would be a shot of a state a player
          * with a working host never sees, and this file's whole job is to be
          * evidence. Bounded, so a dead host costs ten seconds and still draws. */
-        if (lu_phase(a.up) != LU_NOTCONFIGURED) {
+        if (!a.hidden_ui_test && lu_phase(a.up) != LU_NOTCONFIGURED) {
             lu_check(a.up);
             for (guard = 0; guard < 100 && lu_phase(a.up) == LU_CHECKING; guard++)
                 SDL_Delay(100);
@@ -2946,15 +3985,29 @@ int main(int argc, char **argv)
         l_set_buttons(&a);
         a.mx = -100; /* no pointer in a reference shot */
         a.my = -100;
+        if(shot_mouse){
+            l_pointer_native(&a,(float)shot_x,(float)shot_y);
+            if(a.hover_btn>=0){a.hot=a.hover_btn;a.on_mods=0;}
+            if(a.hover_mod>=0){a.mod_hot=a.hover_mod;a.on_mods=1;}
+            if(shot_press){a.pressed=a.hover_btn;a.mod_pressed=a.hover_mod;}
+        }
         l_draw(&a);
-        db_surface_to_rgba(&a.surf, a.pack->pal8, a.rgba, 0);
+        if (ls_enabled()) memcpy(a.rgba,ls_pixels(),(size_t)l_canvas_w()*l_canvas_h()*4);
+        else db_surface_to_rgba(&a.surf, a.pack->pal8, a.rgba, 0);
         big = (unsigned char *)malloc((size_t)bw * bh * 4);
-        png_nearest_scale(a.rgba, DM_SCREEN_W, DM_SCREEN_H, big, scale);
+        png_nearest_scale(a.rgba, l_canvas_w(), l_canvas_h(), big, scale);
         ok = png_write_rgba(shot, big, bw, bh);
         free(big);
         free(a.rgba);
         printf("%s %s (%dx%d)\n", ok ? "wrote" : "FAILED to write", shot, bw, bh);
+        printf("LSIGNAL|enabled=%d|ms=%u|period_ms=%u\n",
+               ls_enabled() && !a.no_motion ? 1 : 0,a.signal_ms,LS_SIGNAL_PERIOD_MS);
+        printf("LCURSOR|source=ecur/ecur.bin|mesh=CUR00|triangles=%u|source_crc32=%08lx|native_x=%.3f|native_y=%.3f|smoothing=0\n",l_cursor.ntri,l_cursor.crc,a.cursor_x,a.cursor_y);
 
+        if (a.view == L_VIEW_BROWSE) {
+            for (bi = 0; bi < 2; bi++) if (a.mod[bi].name)
+                printf("LBROWSER|i=%d|name=%s|installed=%d|status=%s|grey=%d|enabled=%d\n",bi,a.mod[bi].name,a.mod[bi].installed,a.mod[bi].installed?(a.mod[bi].needs_update?"Update":"Installed"):"Install",a.mod[bi].installed&&!a.mod[bi].needs_update,l_module_actionable(&a,bi)&&l_module_available(&a,bi));
+        }
         /* WHERE THE ROW BUTTONS ARE IN THE PICTURE JUST WRITTEN, and whether each was
          * drawn live. Proving a button is enabled means sampling its fill, and sampling
          * needs a rectangle. A reader that carries its own copy of the geometry holds
@@ -2966,9 +4019,24 @@ int main(int argc, char **argv)
         for (bi = 0; bi < L_BTN_ROW; bi++)
             printf("LBTN|i=%d|label=%s|x=%d|y=%d|w=%d|h=%d|disabled=%d|hidden=%d\n",
                    bi, a.btn[bi].label ? a.btn[bi].label : "",
-                   a.btn[bi].x * scale, a.btn[bi].y * scale,
-                   a.btn[bi].w * scale, a.btn[bi].h * scale,
+                   l_native_x(a.btn[bi].x) * scale, l_native_y(a.btn[bi].y) * scale,
+                   l_native_extent(a.btn[bi].w) * scale, l_native_extent(a.btn[bi].h) * scale,
                    a.btn[bi].disabled ? 1 : 0, a.btn[bi].hidden ? 1 : 0);
+        /* THE MODULE TABLE, the same way: each tile's rectangle, whether it is a
+         * live module or an empty slot, and for Red Alert's slot, why it is empty.
+         * drawn=0 when this screen is not the module grid, so a reader never samples
+         * a tile that is not in the picture. */
+        for (bi = 0; bi < L_MOD_COUNT; bi++) {
+            int mx, my, mw, mh;
+            l_mod_rect(bi, &mx, &my, &mw, &mh);
+            printf("LMOD|i=%d|name=%s|installed=%d|selected=%d|x=%d|y=%d|w=%d|h=%d|drawn=%d",
+                   bi, a.mod[bi].name ? a.mod[bi].name : "", a.mod[bi].installed ? 1 : 0,
+                   a.mod_sel == bi ? 1 : 0, l_native_x(mx) * scale, l_native_y(my) * scale, l_native_extent(mw) * scale,
+                   l_native_extent(mh) * scale, a.view == L_VIEW_MODULES ? 1 : 0);
+            if (bi == 1 && a.ra_missing[0])
+                printf("|missing=%s", a.ra_missing);
+            printf("\n");
+        }
         /* The rest of the table that is on this screen, the same way and for the
          * same reason: a checkbox's state and rectangle, and the gear's. A row
          * that is hidden on this screen is not listed, so a reader never samples
@@ -2976,29 +4044,39 @@ int main(int argc, char **argv)
         for (bi = L_BTN_ROW; bi < L_BTN_COUNT; bi++) {
             if (a.btn[bi].hidden)
                 continue;
+            if(bi==L_BTN_WINDOW_CLOSE){printf("LWINDOW|label=Close|x=%d|y=%d|w=%d|h=%d\n",l_native_x(a.btn[bi].x)*scale,l_native_y(a.btn[bi].y)*scale,l_native_extent(a.btn[bi].w)*scale,l_native_extent(a.btn[bi].h)*scale);continue;}
+            if (bi >= L_BTN_REMOVE && bi < L_BTN_REMOVE + L_MOD_COUNT) {
+                printf("LREMOVE|label=X|x=%d|y=%d|w=%d|h=%d|disabled=%d\n",l_native_x(a.btn[bi].x)*scale,l_native_y(a.btn[bi].y)*scale,l_native_extent(a.btn[bi].w)*scale,l_native_extent(a.btn[bi].h)*scale,a.btn[bi].disabled);continue;
+            }
             if (a.btn[bi].kind == LUI_KIND_CHECK)
                 printf("LCHK|label=%s|checked=%d|x=%d|y=%d|w=%d|h=%d|disabled=%d\n",
                        a.btn[bi].label ? a.btn[bi].label : "", a.btn[bi].checked ? 1 : 0,
-                       a.btn[bi].x * scale, a.btn[bi].y * scale, a.btn[bi].w * scale,
-                       a.btn[bi].h * scale, a.btn[bi].disabled ? 1 : 0);
+                       l_native_x(a.btn[bi].x) * scale, l_native_y(a.btn[bi].y) * scale, l_native_extent(a.btn[bi].w) * scale,
+                       l_native_extent(a.btn[bi].h) * scale, a.btn[bi].disabled ? 1 : 0);
+            else if (a.btn[bi].kind == LUI_KIND_BUTTON)
+                printf("LBTN|i=%d|label=%s|x=%d|y=%d|w=%d|h=%d|disabled=%d|hidden=0\n",
+                       bi,a.btn[bi].label?a.btn[bi].label:"",
+                       l_native_x(a.btn[bi].x)*scale,l_native_y(a.btn[bi].y)*scale,
+                       l_native_extent(a.btn[bi].w)*scale,l_native_extent(a.btn[bi].h)*scale,
+                       a.btn[bi].disabled?1:0);
             else if (a.btn[bi].kind == LUI_KIND_GEAR)
                 printf("LGEAR|label=%s|x=%d|y=%d|w=%d|h=%d|disabled=%d\n",
-                       a.btn[bi].label ? a.btn[bi].label : "", a.btn[bi].x * scale,
-                       a.btn[bi].y * scale, a.btn[bi].w * scale, a.btn[bi].h * scale,
+                       a.btn[bi].label ? a.btn[bi].label : "", l_native_x(a.btn[bi].x) * scale,
+                       l_native_y(a.btn[bi].y) * scale, l_native_extent(a.btn[bi].w) * scale, l_native_extent(a.btn[bi].h) * scale,
                        a.btn[bi].disabled ? 1 : 0);
         }
         /* WHAT THE STATUS LINE SAID, and on Setup, Settings and Install what the first
          * button would hand to lmedia, and whether the removal question would come
          * first, so a test can prove what a press would do without pressing it. */
         printf("LSTATUS|text=%s\n", a.drawn_status);
-        if (a.view == L_VIEW_SETUP || a.view == L_VIEW_SETTINGS || a.view == L_VIEW_INSTALL)
+        if (a.view == L_VIEW_SETUP || a.view == L_VIEW_SETTINGS || a.view == L_VIEW_INSTALL || a.view == L_VIEW_MODULE_OPTIONS)
             printf("LAPPLY|movies=%d|music=%d|asks=%d|game=%d|enabled=%d\n",
                    a.want_movies ? 1 : 0, a.want_music ? 1 : 0,
                    a.view != L_VIEW_INSTALL && l_m_frees(&a) > 0 ? 1 : 0,
-                   a.view == L_VIEW_INSTALL ? 1 : 0, a.btn[L_BTN_PLAY].disabled ? 0 : 1);
+                   (a.view == L_VIEW_INSTALL || a.view == L_VIEW_MODULE_OPTIONS) ? 1 : 0, a.btn[L_BTN_PLAY].disabled ? 0 : 1);
         lui_text_free(&a.notes);
         if (a.media)
-            lm_destroy(a.media);
+            l_free_components(&a);
         lu_destroy(a.up);
         db_pack_free(a.pack);
         return ok ? 0 : 1;
@@ -3007,7 +4085,12 @@ int main(int argc, char **argv)
     /* The window may be up already: a folder that needed its menu art fetched first. */
     if (!a.win && !l_open_window(&a, scale))
         return 1;
-    SDL_ShowCursor(SDL_DISABLE); /* the plate draws MOUSE.SHP, the 1995 pointer */
+    if(a.hidden_ui_test){
+        int rc=l_hidden_ui_run(&a,ui_report_dir);
+        if(a.media)l_free_components(&a);lu_destroy(a.up);db_pack_free(a.pack);db_pack_free(a.ra_pack);
+        SDL_DestroyWindow(a.win);ls_free();free(l_cursor.bytes);SDL_Quit();return rc;
+    }
+    SDL_ShowCursor(SDL_DISABLE); /* CUR00 is presented at the unsnapped pointer. */
 
     /* THE LAYOUT IS KNOWN BEFORE THE FIRST EVENT IS READ, not after the first frame is
      * drawn. The loop below polls events first and presents last, and l_layout used to
@@ -3019,21 +4102,43 @@ int main(int argc, char **argv)
     /* Ask the host what it has, at once, so the answer is usually on screen before
      * the player has finished reading the changelog they already had. */
     lu_check(a.up);
+    a.catalog_allowed=1;l_catalog_start(&a);
 
+    signal_start = SDL_GetTicks();
     while (!a.quit) {
         SDL_Event e;
+        Uint32 frame_start = SDL_GetTicks(), spent;
+        l_module_tick(&a);
+        if(SDL_AtomicGet(&a.catalog_phase)==2&&!a.catalog_applied){l_module_versions(&a);a.catalog_applied=1;}
+        if(a.view==L_VIEW_BROWSE && SDL_AtomicGet(&a.catalog_phase)==-1)
+            snprintf(a.mstatus,sizeof a.mstatus,"Catalog unavailable. Reopen browser to retry.");
         l_m_tick(&a);
         l_set_buttons(&a);
         while (SDL_PollEvent(&e))
             l_event(&a, &e);
+        if(SDL_GetWindowFlags(a.win)&SDL_WINDOW_MOUSE_FOCUS){
+            int wx,wy;SDL_GetMouseState(&wx,&wy);l_pointer_window(&a,wx,wy);
+        }else l_pointer_native(&a,-1000,-1000);
         if (lu_notes_changed(a.up)) {
             const char *n = lu_notes(a.up);
             if (n)
                 l_set_notes(&a, n);
         }
+        if (!signal_fixed)
+            a.signal_ms = (unsigned)(frame_start - signal_start);
+        /* Stay responsive without rendering into a minimized window. Clock time
+         * continues, so restoring resumes the same calm transmission loop. */
+        if (SDL_GetWindowFlags(a.win) & SDL_WINDOW_MINIMIZED) {
+            SDL_Delay(50);
+            continue;
+        }
         a.frame++;
         l_draw(&a);
         l_present(&a);
+        /* About 125 Hz leaves an eight-ms paint budget, with no cursor easing
+         * or three-pixel snapping. The pointer is sampled again before GL paint. */
+        spent = SDL_GetTicks() - frame_start;
+        if (spent < 8u) SDL_Delay(8u - spent);
     }
 
     /* A window closed in the middle of a download stops it rather than leaving a
@@ -3041,29 +4146,27 @@ int main(int argc, char **argv)
     if (a.media) {
         if (l_m_busy(&a))
             lm_cancel(a.media);
-        lm_destroy(a.media);
+        l_free_components(&a);
     }
+    if (a.module_worker) {SDL_AtomicSet(&a.module_cancel,1); SDL_WaitThread(a.module_worker,NULL); a.module_worker=NULL;}
+    if(a.catalog_worker){SDL_WaitThread(a.catalog_worker,NULL);a.catalog_worker=NULL;}
     lu_destroy(a.fresh); /* after the media job, which ran under its lock */
     lui_text_free(&a.notes);
     lu_destroy(a.up);
     db_pack_free(a.pack);
     db_pack_free(a.ra_pack);
     SDL_DestroyWindow(a.win);
+    ls_free();
+    free(l_cursor.bytes);
     SDL_Quit();
 
-    /* The editor's own two arguments go on the END of whatever was forwarded after
-     * `--`, which on macOS is the window size the app bundle passes. Room is
-     * CHECKED rather than assumed: silently dropping --edit would start the
-     * renderer in a mission, which looks like the game misbehaving rather than
-     * like the editor failing to open. */
+    /* The editor's own arguments go on the END of whatever was forwarded after
+     * `--`, which on macOS is the window size the app bundle passes. Their room
+     * was KEPT when the command line was read, which refuses a forwarded list
+     * that would leave none: silently dropping --edit would start the renderer in
+     * a mission, which looks like the game misbehaving rather than like the
+     * editor failing to open. */
     if (a.play_after == 2) {
-        int room = (int)(sizeof l_game_args / sizeof *l_game_args) - l_game_argc;
-        if (room < 3) {
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenCNC3D",
-                                     "too many forwarded arguments to add the "
-                                     "editor's own", NULL);
-            return 1;
-        }
         l_game_args[l_game_argc++] = "--edit";
         l_game_args[l_game_argc++] = "--scen";
         l_game_args[l_game_argc++] = L_EDIT_SCEN;

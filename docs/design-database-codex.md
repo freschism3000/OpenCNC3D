@@ -1,10 +1,16 @@
 # The DATABASE tab
 
 An in-game codex: a full-screen reference for every structure, soldier, vehicle and
-aircraft the player can build, with the real cartridge model turning in it and the 1995
+aircraft the player can build, with the installed Enhanced model turning in it and the 1995
 engine's own numbers beside it. Opening it stops the world.
 
-Section 6 lists what this feature still owes.
+Current Enhanced implementation: the accepted metal menu housing,
+three-column roster/model/data layout, original font, faction-logo buttons, and
+Info / Stats / Matchups / Tech tabs. Model coverage is 49 of 50 installed Enhanced
+assets; the S.S.M. Launcher explicitly reports its missing model. See
+`enhanced-menu-runtime.md` and `art/interface/enhanced-database-v08/` for current
+verified evidence. The numbered sections below preserve the original implementation
+history; cartridge previews and the green page describe that earlier version.
 
 ---
 

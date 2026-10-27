@@ -293,6 +293,31 @@ int cnc_audio_play_named_loop(CncAudio *au, const char *name, int bus, int gain,
 
 const char *cnc_audio_dosdata(const CncAudio *au) { return au ? au->dosdata : ""; }
 
+/* A LANGUAGE PACK'S VOICES (game/lang_mod.h): its SOUNDS.MIX and SPEECH.MIX searched
+   before the English archives, the death sounds still English (bank_add_language); NULL or
+   "" puts English back. Returns how many of the two archives were mounted. */
+int cnc_audio_set_language(CncAudio *au, const char *dir)
+{
+    char path[600], err[256];
+    int n = 0;
+    if (!au)
+        return 0;
+    bank_drop_languages(au->bank);
+    if (!dir || !*dir)
+        return 0;
+    {
+        /* (Red Alert's unit voices are its ALLIES.MIX and RUSSIAN.MIX; a pack without them,
+           Tiberian Dawn's, simply has none to open) */
+        static const char *const names[] = { "SOUNDS.MIX", "ALLIES.MIX", "RUSSIAN.MIX", "SPEECH.MIX", 0 };
+        int k;
+        for (k = 0; names[k]; k++) {
+            snprintf(path, sizeof path, "%s/%s", dir, names[k]);
+            n += bank_add_language(au->bank, path, err, (int)sizeof err);
+        }
+    }
+    return n;
+}
+
 /* ------------------------------------------------------ the duplicate window */
 
 void cnc_audio_begin_tick(CncAudio *au)

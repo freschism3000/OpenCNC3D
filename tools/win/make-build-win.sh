@@ -16,7 +16,8 @@
 # The file list is an INCLUDE list, not an exclude list. playable/ accumulates gate
 # output, proof screenshots (151 MB of them) and Mac-only launchers, and a zip built by
 # subtraction would quietly grow every one of those the first time someone adds a new
-# kind of artefact.
+# kind of artefact. Runtime diagnostic Logs/ is never an input; the final check
+# below also refuses it if a future staging step introduces that personal folder.
 #
 # THE MOVIES AND THE MUSIC ARE NOT IN IT. A player's install fetches them from disc images
 # on archive.org instead (the movies from the 1995 Gold discs, EA's 2007 freeware release;
@@ -37,7 +38,7 @@ DIST_ZIP="${OPENCNC3D_WIN_ZIP:-$HOME/Desktop}"
 DO_ZIP=1
 BINS_ONLY=0
 [ "$1" = "--no-zip" ] && DO_ZIP=0
-# --bins-only: the four files that change when code changes, and nothing else. The full
+# --bins-only: the binaries and small top-level packs that change with code. The full
 # package is 845 MB and takes minutes to copy and zip, and 99% of it is game data that is
 # identical build to build. When the machine already has a folder on Windows, this is the
 # thing to send him: unzip over the top and the data stays where it is.
@@ -63,8 +64,8 @@ OUT="$STAGE/$NAME"
 # the only module there is. tools/release.sh sets it for a release cut without the
 # module, and the Mac packager reads the same variable, so both halves of one release
 # carry the same modules. Unset or 0 stages the module whenever the data folder has it,
-# and the package is then refused, because the module carries its own movies and score
-# and those may not ship (the media check near the end).
+# without its movies and score: tools/ra3d/stage-runtime.py leaves out the media list's
+# paths under ra3d/, and the media check near the end still asks.
 NO_RA=0
 case "${OPENCNC3D_NO_RA:-0}" in 0) ;; *) NO_RA=1 ;; esac
 
@@ -74,7 +75,7 @@ case "${OPENCNC3D_NO_RA:-0}" in 0) ;; *) NO_RA=1 ;; esac
 # The paths below are a FLOOR under that file, not a second copy of it: they stay out, and
 # are refused, even if a line goes missing from the file, and every path the file adds
 # stays out on top of them. Red Alert's movies and score are among them: they may not ship
-# either, so a package that stages the Red Alert module is refused.
+# either, so the Red Alert module is staged without them.
 MEDIA_FLOOR="dosdata/movies/
 dosdata/music/
 dosdata/SCORES.MIX
@@ -109,6 +110,7 @@ tools/win/build-launcher-win.sh
 echo "== assembling $OUT"
 rm -rf "$STAGE"
 mkdir -p "$OUT"
+printf '%s\n' 'OpenCNC3D fresh public package v1' > "$OUT/.opencnc3d-public-stage"
 
 # THE PACKAGE HAS ONE OBVIOUS FILE TO RUN, and it is OpenCNC3D.exe, the launcher. It
 # carries the game icon (the windres step in build-launcher-win.sh), shows which build
@@ -128,7 +130,7 @@ mkdir -p "$OUT"
 # renderer (--edit) and not a program of its own, and opencnc3d-game.exe's entry point
 # never reads that flag. So the launcher's EDITOR button runs this file. It is still not
 # a plausible thing to double-click; the button in front of it is.
-PLACED="OpenCNC3D.exe opencnc3d-game.exe cnc_eyes.exe netcheck.exe SDL2.dll TiberianDawn.dll"
+PLACED="OpenCNC3D.exe opencnc3d-game.exe OpenCNC3D-Diagnostics.exe cnc_eyes.exe netcheck.exe SDL2.dll TiberianDawn.dll"
 PLACED_DUP=$(printf '%s\n' $PLACED | tr '[:upper:]' '[:lower:]' | sort | uniq -d)
 [ -z "$PLACED_DUP" ] || {
     echo "two files this package places share a name once letter case is ignored:" >&2
@@ -138,11 +140,13 @@ PLACED_DUP=$(printf '%s\n' $PLACED | tr '[:upper:]' '[:lower:]' | sort | uniq -d
 }
 cp "$ROOT/build/win/OpenCNC3D.exe"  "$OUT/OpenCNC3D.exe"
 cp "$ROOT/build/win/opencnc3d-game.exe"  "$OUT/opencnc3d-game.exe"
+cp "$ROOT/build/win/OpenCNC3D-Diagnostics.exe" "$OUT/OpenCNC3D-Diagnostics.exe"
 cp "$ROOT/build/win/cnc_eyes.exe" \
    "$ROOT/build/win/SDL2.dll"  "$ROOT/build/win/TiberianDawn.dll" "$OUT/"
-# Red Alert uses the same renderer build, its own brain and its own media, all inside
-# ra3d/. Only the full package carries it: the binary-only update is flat by contract
-# (see the zip step at the end), so it has no subfolder to put a module in.
+# Red Alert uses the same renderer build, its own brain and its own data, all inside
+# ra3d/, staged without its movies and score. Only the full package carries it: the
+# binary-only update is flat by contract (see the zip step at the end), so it has no
+# subfolder to put a module in.
 if [ $NO_RA -eq 1 ]; then
     echo "   red alert: left out (OPENCNC3D_NO_RA=1)"
 elif [ $BINS_ONLY -eq 1 ]; then
@@ -170,6 +174,13 @@ for f in $PLACED; do
     [ -s "$OUT/$f" ] || { echo "$f did not reach the package" >&2; exit 1; }
 done
 
+# Automatic reports use a separate entry of the same optimized renderer. Validate
+# the entry marker and matching provenance without requiring a diagnostic +SHA mark.
+set --
+[ -z "$OPENCNC3D_COOKED" ] || set -- "$@" --cooked
+[ -z "$OPENCNC3D_BUILD_ID" ] || set -- "$@" --expected-build "$OPENCNC3D_BUILD_ID"
+python3 "$ROOT/tools/win/check-diagnostics.py" "$OUT" "$@"
+
 # ---- the editor ships, and the button in front of it is wired to it ----------------
 # The launcher's EDITOR button was drawn grey for as long as the editor existed in the
 # tree and not in a package. Turning it on is one line of C; keeping it honest is this
@@ -185,15 +196,15 @@ done
 # A COOKED PACKAGE CARRIES NO F5 PANEL, and this is what stops the fail-open case: the
 # packager asked for a cook (OPENCNC3D_COOKED set, as tools/release.sh does) but the binaries
 # were built without the define. The cooked fxp_toggle prints one sentence and nothing
-# else; a binary that does not carry it was not cooked. Checked on both programs.
+# else; a binary that does not carry it was not cooked. Checked on all three game entries.
 if [ -n "$OPENCNC3D_COOKED" ]; then
-  for b in cnc_eyes.exe opencnc3d-game.exe; do
+  for b in cnc_eyes.exe opencnc3d-game.exe OpenCNC3D-Diagnostics.exe; do
     strings -a "$OUT/$b" 2>/dev/null | grep -q 'unavailable in a cooked build' || {
       echo "$b was packaged as a cooked build but carries the F5 panel: it was compiled" >&2
       echo "without OPENCNC3D_COOKED. Rebuild with the packager, not by hand." >&2
       exit 1; }
   done
-  echo "cooked: cnc_eyes.exe and opencnc3d-game.exe carry no F5 panel"
+  echo "cooked: game, editor and diagnostic entry carry no F5 panel"
 fi
 strings -a "$OUT/cnc_eyes.exe" 2>/dev/null | grep -q 'edit: world grid' || {
     echo "cnc_eyes.exe carries no editor: the editor-only diagnostic string is not in" >&2
@@ -271,6 +282,11 @@ echo "   OpenCNC3D.exe is the launcher, opencnc3d-game.exe is the game"
 # send a file nothing created, so every Windows report arrived with no log at all
 # today.
 
+# Rebuild the small required decal pack from authored finals for both archive forms.
+# Source gameplay folders may be older installations without it or with stale art.
+python3 "$ROOT/tools/art/remaster/decals/build-runtime.py" --pack "$OUT/decalenh.pack" >/dev/null
+[ -s "$OUT/decalenh.pack" ] || { echo "Enhanced decal pack is missing or empty" >&2; exit 1; }
+
 if [ $BINS_ONLY -eq 1 ]; then
     # DOS Classic's two top-level files ride with the binaries, as they do in the macOS
     # binary-only update. Its theater archives (content/TEMPERAT.MIX, content/DESERT.MIX)
@@ -283,16 +299,24 @@ if [ $BINS_ONLY -eq 1 ]; then
     # fingerprint counts sizes, so this update is the only way it arrives.
     [ -f "$SRC/dosmenu.pack" ] || { echo "dosmenu.pack is required for the menus" >&2; exit 1; }
     cp "$SRC/dosmenu.pack" "$OUT/"
+    cp "$SRC/enhanced-menu.pack" "$OUT/"
     cat > "$OUT/READ-ME-FIRST.txt" <<TXT
 Binaries only, build $GITDESC.
 
 Copy these over the folder you already have, keeping the game data where it is:
 
-  OpenCNC3D.exe  opencnc3d-game.exe  cnc_eyes.exe  netcheck.exe  SDL2.dll  TiberianDawn.dll
-  dosclassic.pack  dosmenu.pack  CONQUER.MIX
+  OpenCNC3D.exe  opencnc3d-game.exe  OpenCNC3D-Diagnostics.exe
+  cnc_eyes.exe  netcheck.exe  SDL2.dll  TiberianDawn.dll
+  dosclassic.pack  dosmenu.pack  decalenh.pack  CONQUER.MIX
 
 OpenCNC3D.exe is the launcher and opencnc3d-game.exe is the game. If you have the launcher
 already you do not need to do any of this by hand: press Update in it.
+
+For a performance report, run OpenCNC3D-Diagnostics.exe, reproduce the problem,
+and exit. Zip the newest Logs/session-... folder and attach it to your report.
+If that folder cannot be written beside the game, find it in
+%LOCALAPPDATA%\OpenCNC3D\Logs. Settings, saves and graphics quality are unchanged;
+nothing is uploaded automatically. Inspect the folder before sharing.
 
 Delete any PLAY*.bat you still have from an older build. They are gone, and they
 pass options the game no longer needs.
@@ -312,16 +336,22 @@ else
     # players' hands and not only in the next one. Copied from the TRACKED masters at the
     # repo root, never from the play folder, for the same reason the READ-ME is written
     # fresh rather than copied: an untracked copy goes stale in silence.
-    for f in LICENSE NOTICE.md; do
+    for f in LICENSE; do
         [ -f "$ROOT/$f" ] || { echo "$f is missing from the repo root; a GPL binary package has to carry it" >&2; exit 1; }
         cp "$ROOT/$f" "$OUT/"
     done
+    python3 "$ROOT/tools/make-package-notice.py" "$OUT/NOTICE.md" \
+        --package-root "$OUT" --no-ra "$NO_RA"
 
     # The data. -L on dosdata because it is a symlink into the repo on the Mac side and
     # a symlink is worthless once this is unzipped on another machine.
     [ -f "$SRC/dosclassic.pack" ] || { echo "dosclassic.pack is required for DOS Classic" >&2; exit 1; }
     [ -f "$SRC/CONQUER.MIX" ] || { echo "CONQUER.MIX is required for DOS Classic" >&2; exit 1; }
     for f in "$SRC"/*.pack "$SRC"/CONQUER.MIX; do
+        [ "${f##*/}" != decalenh.pack ] || continue
+        if [ $NO_RA -eq 1 ]; then
+            case "${f##*/}" in waterbase_RA_TEMPERAT.pack) ;; *_RA_*) continue ;; esac
+        fi
         [ -f "$f" ] && cp "$f" "$OUT/"
     done
     # THE ROCKS' THEATER PACKS, from the same script the Mac build runs rather than from
@@ -392,7 +422,18 @@ MEDIA
     if [ -d "$ROOT/game/ebld" ]; then
         mkdir -p "$OUT/ebld"
         cp "$ROOT"/game/ebld/*.ebld "$OUT/ebld/"
+        for m in "$ROOT"/game/ebld/*.ebld.fclv "$ROOT"/game/ebld/*.spec; do
+            [ -f "$m" ] && cp "$m" "$OUT/ebld/"
+        done
     fi
+    python3 "$ROOT/tools/art/terrain/stage_desert_details.py" "$OUT"
+    if [ $NO_RA -eq 1 ]; then
+        python3 "$ROOT/tools/art/rocks/stage_stone_materials.py" "$OUT" \
+            --banks TEMPERAT DESERT WINTER SNOW SAND
+    else
+        python3 "$ROOT/tools/art/rocks/stage_stone_materials.py" "$OUT"
+    fi
+
     # The placements (eplc/<TYPE>.eplc, Enhanced only), from the TREE for the same reason;
     # an empty folder stops the build the same way.
     if [ -d "$ROOT/game/eplc" ]; then
@@ -404,6 +445,8 @@ MEDIA
     if [ -d "$ROOT/game/evhc" ]; then
         mkdir -p "$OUT/evhc"
         cp "$ROOT"/game/evhc/*.evhc "$OUT/evhc/"
+        # (a type's specular maps, <TYPE>.spec, where its export has them)
+        for f in "$ROOT"/game/evhc/*.spec; do [ -f "$f" ] && cp "$f" "$OUT/evhc/"; done
     fi
     # The remastered soldiers (einf/<TYPE>.c3m, Enhanced only), from the TREE for the same
     # reason; an empty folder stops the build the same way.
@@ -495,6 +538,16 @@ echo "$GITDESC  windows  $(date '+%Y-%m-%d %H:%M')" > "$OUT/BUILD-ID.txt"
 # The fingerprint comes from tools/launcher/data-id.sh, the same script
 # tools/launcher/make-manifest.sh reads back out of this file when it writes the
 # manifest. One implementation, quoted at both ends.
+if [ -n "$OPENCNC3D_COOKED" ]; then
+    python3 "$ROOT/tools/release/strip-windows-debug.py" prepare --stage "$OUT" \
+        --reference-root "$ROOT/build/win" --marker "$STAGE/public-debug-strip-marker.json" \
+        --receipt "$STAGE/public-debug-strip-receipt.json"
+    python3 "$ROOT/tools/release/strip-windows-debug.py" apply --marker "$STAGE/public-debug-strip-marker.json"
+    python3 "$ROOT/tools/launcher/prepare-public-runtime.py" "$OUT"
+else
+    # Developer test folders retain their explicit donor and provenance copies.
+    rm "$OUT/.opencnc3d-public-stage"
+fi
 if [ $BINS_ONLY -eq 0 ]; then
     VERNUM=$(tr -d '[:space:]' < "$ROOT/VERSION")
     tools/launcher/make-changelog-txt.sh "$OUT/CHANGELOG.txt" >/dev/null
@@ -517,10 +570,10 @@ fi
 #     (.ocpart) or the choice record (opencnc3d-media.txt), anywhere. A package that
 #     carried the record would tell every new install that its player had already chosen.
 #
-# RED ALERT IS NOT AN EXCEPTION. Its module, under ra3d/, carries its own movies and
-# score, and those may not ship either, so a package with the module staged in it is
-# refused here, as the Mac packager refuses one, until Red Alert has downloads of its
-# own. Every public release leaves the module out (OPENCNC3D_NO_RA=1, checked below).
+# RED ALERT IS NOT AN EXCEPTION. Its movies and score may not ship either. Its module,
+# under ra3d/, is staged without them (tools/ra3d/stage-runtime.py reads the same list),
+# so a movie or a score found under ra3d/ is refused here like any other, as the Mac
+# packager refuses one.
 MEDIA_LEFT=$(cd "$OUT" && {
     while IFS= read -r p; do
         [ -n "$p" ] && find . -ipath "./${p%/}" -print
@@ -534,8 +587,9 @@ MEDIA
     echo "the package holds movies or music, which no package may carry:" >&2
     echo "$MEDIA_LEFT" | sed 's/^/  /' >&2
     [ ! -d "$OUT/ra3d" ] || {
-        echo "The Red Alert module carries its own movies and score, which may not ship" >&2
-        echo "either: build with OPENCNC3D_NO_RA=1." >&2
+        echo "Red Alert's movies and score may not ship either. tools/ra3d/stage-runtime.py" >&2
+        echo "stages the module without the paths tools/media/media-paths.txt names under" >&2
+        echo "ra3d/, so one found there is missing from that list or came by another road." >&2
     }
     exit 1
 }
@@ -545,7 +599,8 @@ echo "   media: no movies and no music in the package"
 # so a pack, a brain or an engine copy for Red Alert that reaches the package by any
 # other road (a top-level pack copied by the glob above, say) stops the build here.
 if [ $NO_RA -eq 1 ]; then
-    RA_LEFT=$(cd "$OUT" && find . \( -iname 'ra3d' -o -iname 'RedAlert*' -o -name '*_RA_*' \) -print | sed 's|^\./||')
+    RA_LEFT=$(cd "$OUT" && find . \( -iname 'ra3d' -o -iname 'RedAlert*' -o -name '*_RA_*' \) \
+        ! -name 'waterbase_RA_TEMPERAT.pack' -print | sed 's|^\./||')
     [ -z "$RA_LEFT" ] || {
         echo "OPENCNC3D_NO_RA=1, and the package still holds Red Alert files:" >&2
         echo "$RA_LEFT" | sed 's/^/  /' >&2
@@ -553,6 +608,12 @@ if [ $NO_RA -eq 1 ]; then
     }
     echo "   red alert: none of it is in the package"
 fi
+# Diagnostic sessions are runtime output, never release content.
+LOG_LEFT=$(cd "$OUT" && find . -ipath './Logs' -print)
+[ -z "$LOG_LEFT" ] || {
+    echo "the package holds runtime diagnostic Logs; session reports must not ship" >&2
+    exit 1
+}
 # NO TWO PATHS THAT ARE ONE PATH ON WINDOWS. Windows compares names without regard to
 # case, so two entries that differ only in case unpack as one file, and which of the two
 # survives depends on the order of the zip. On a case-sensitive file system both are
@@ -570,6 +631,10 @@ SIZE=$(du -sh "$OUT" | cut -f1)
 echo "   $OUT  ($SIZE)"
 
 if [ $DO_ZIP -eq 1 ]; then
+    # A fresh release-owned override may not exist yet. Resolve it before the
+    # archive subshell changes directory, so relative custom paths work too.
+    mkdir -p "$DIST_ZIP"
+    DIST_ZIP=$(cd "$DIST_ZIP" && pwd -P)
     [ $BINS_ONLY -eq 1 ] && SUF="-bins" || SUF=""
     ZIP="$DIST_ZIP/OpenCNC3D-windows-$GITDESC$SUF.zip"
     echo "== zipping to $ZIP"
@@ -615,11 +680,11 @@ if [ $DO_ZIP -eq 1 ]; then
         set --
         for f in $ZTAIL; do set -- "$@" -x "$ZPRE$f"; done
         if [ -n "$ZPRE" ]; then
-            zip -rqX "$ZIP" "$NAME" -x '*.DS_Store' "$@"
+            zip -9rqX "$ZIP" "$NAME" -x '*.DS_Store' "$@"
         else
-            zip -rqX "$ZIP" . -x '*.DS_Store' "$@"
+            zip -9rqX "$ZIP" . -x '*.DS_Store' "$@"
         fi
-        for f in $ZTAIL; do zip -qX -g "$ZIP" "$ZPRE$f"; done
+        for f in $ZTAIL; do zip -9qX -g "$ZIP" "$ZPRE$f"; done
     )
     ZWANT=$(for f in $ZTAIL; do printf '%s%s\n' "$ZPRE" "$f"; done)
     ZGOT=$(unzip -Z1 "$ZIP" | tail -n "$(echo $ZTAIL | wc -w | tr -d ' ')")

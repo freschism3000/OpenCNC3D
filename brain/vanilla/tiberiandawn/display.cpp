@@ -32,6 +32,10 @@
 // and NOTICE.md lists every modified file.
 //
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Maintains per-house exploration for skirmish computers through the normal reveal path.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\display.cpv   2.16   16 Oct 1995 16:48:24   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -1936,7 +1940,7 @@ bool DisplayClass::Map_Cell(CELL cell, HouseClass* house, bool and_for_allies)
     if (house == NULL || cell >= (CELL)Size)
         return (false);
 #ifdef REMASTER_BUILD
-    if (!house->IsHuman) {
+    if (!house->IsHuman && GameToPlay == GAME_NORMAL) {
         if (!ShareAllyVisibility || !and_for_allies) {
             return false;
         }

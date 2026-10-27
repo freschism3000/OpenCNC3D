@@ -1,0 +1,2058 @@
+{
+  "version": "enhanced-menu-review-v06",
+  "release": "v0.7.3",
+  "scope": "Remaster Lab design and interactions for review; no engine or Dock runtime changes",
+  "density": "one source texel per native UI pixel, shared integer screen scale",
+  "fonts": {
+    "body": "font_menu",
+    "header": "font_menu",
+    "support": "font_menu"
+  },
+  "light": "upper left; all four fasteners keep original native size",
+  "geometry": {
+    "main": [
+      572,
+      564
+    ],
+    "pause": [
+      708,
+      528
+    ],
+    "settings": [
+      676,
+      584
+    ],
+    "visuals": [
+      1016,
+      636
+    ],
+    "confirm": [
+      676,
+      340
+    ],
+    "lobby": [
+      1216,
+      636
+    ]
+  },
+  "assets": {
+    "title": {
+      "file": "title.png",
+      "w": 320,
+      "h": 200,
+      "sha256": "7395c29d885d88318813cd26dd2efa2e20822a6175024f0adfc017e875ce1bd3",
+      "role": "Original title artwork"
+    },
+    "title-backdrop": {
+      "file": "title-backdrop.png",
+      "w": 320,
+      "h": 200,
+      "sha256": "a757dac95294f4bf0cd2547c67b42bcb2641977e8a0d5bcc6bf18019f788a0de",
+      "role": "Original portrait strips separated from the centre crest and wordmark"
+    },
+    "wordmark": {
+      "file": "wordmark.png",
+      "w": 126,
+      "h": 47,
+      "sha256": "fcdf0a49f91e43c5acfa73c5acfbeaa9c5259bdef51c9d379bb8bb93780a8d5f",
+      "role": "Original title wordmark, separate content"
+    },
+    "main-frame": {
+      "file": "main-frame.png",
+      "w": 572,
+      "h": 564,
+      "sha256": "e62aec25e2e5a4b96a95e98d060c7887a7090e8866180c6e3ee16f9db6a818f8",
+      "role": "Continuous dark backing under original source-preserved corners, rails and vent"
+    },
+    "pause-frame": {
+      "file": "pause-frame.png",
+      "w": 708,
+      "h": 528,
+      "sha256": "de9d6132b5851b1026edc94bc9f48a33f26ce0f6a9fc743e9d35762f5647c506",
+      "role": "Continuous dark backing under original source-preserved corners, rails and vent"
+    },
+    "settings-frame": {
+      "file": "settings-frame.png",
+      "w": 676,
+      "h": 584,
+      "sha256": "5edc3679c096b80bb2ae8dbd728134f9b2eb2cbea0aab1afcbd6e9424b70d5ae",
+      "role": "Continuous dark backing under original source-preserved corners, rails and vent"
+    },
+    "slots-frame": {
+      "file": "slots-frame.png",
+      "w": 676,
+      "h": 528,
+      "sha256": "5ba45f72e5e94f248bb083ac5dc18b29069e722421b09f46a72c517d6d8cf536",
+      "role": "Continuous dark backing under original source-preserved corners, rails and vent"
+    },
+    "visuals-frame": {
+      "file": "visuals-frame.png",
+      "w": 1016,
+      "h": 636,
+      "sha256": "5de197a739c19c51aa6c05a0894783c56fba840425198b8c0e2df4cac1b1183b",
+      "role": "Continuous dark backing under original source-preserved corners, rails and vent"
+    },
+    "confirm-frame": {
+      "file": "confirm-frame.png",
+      "w": 676,
+      "h": 340,
+      "sha256": "fc1c90224bc2a60ab8e78545f2d41a10236422e452560363467f9fd76481dad7",
+      "role": "Continuous dark backing under original source-preserved corners, rails and vent"
+    },
+    "lobby-frame": {
+      "file": "lobby-frame.png",
+      "w": 1216,
+      "h": 636,
+      "sha256": "e3ea028e326c5056580c5ff871520ce249c6daa62d6cf1869c9014289899612f",
+      "role": "Continuous dark backing under original source-preserved corners, rails and vent"
+    },
+    "button-500-40-normal": {
+      "file": "button-500-40-normal.png",
+      "w": 500,
+      "h": 40,
+      "sha256": "bb96cd8d3b22e0d1d46914ea0459a338b2fe2a9431a8108ca08a8b2d36e812c9",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-500-40-hover": {
+      "file": "button-500-40-hover.png",
+      "w": 500,
+      "h": 40,
+      "sha256": "30a1c7570ed00370f57d15f0704ad82dfbdc3edb98fbe547ab070e19205e2a3a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-500-40-active": {
+      "file": "button-500-40-active.png",
+      "w": 500,
+      "h": 40,
+      "sha256": "828bd7311b1f7a0ae473ca053a7cb61c3cea5a22b8cce14bec7130236a9631b6",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-500-40-activehover": {
+      "file": "button-500-40-activehover.png",
+      "w": 500,
+      "h": 40,
+      "sha256": "70b9463bb845037fc78ed9314c0fb17cb93334bf3c2577d04de63ea8f6e6f707",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-500-40-pressed": {
+      "file": "button-500-40-pressed.png",
+      "w": 500,
+      "h": 40,
+      "sha256": "e04a45902971ee684f3e6b076788dde85b82911677fc2c709db34570146c21a3",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-500-40-disabled": {
+      "file": "button-500-40-disabled.png",
+      "w": 500,
+      "h": 40,
+      "sha256": "89b50c8c017ffbf9b08481cd7047748404dbf2eb39366a5909502f7f43f461a5",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-48-normal": {
+      "file": "button-604-48-normal.png",
+      "w": 604,
+      "h": 48,
+      "sha256": "44c0380ce57beaffa5c6324568fe65169f790a921afbcfef760d3bdb7ff78e2c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-48-hover": {
+      "file": "button-604-48-hover.png",
+      "w": 604,
+      "h": 48,
+      "sha256": "b4741a84ee5873a71e44711e61dbc0236858f102d6d36b6264c64136455225e6",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-48-active": {
+      "file": "button-604-48-active.png",
+      "w": 604,
+      "h": 48,
+      "sha256": "dfdd6da14098711e3193e7cfa2dc109445cfd82d1313e5ee181050d8d0065892",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-48-activehover": {
+      "file": "button-604-48-activehover.png",
+      "w": 604,
+      "h": 48,
+      "sha256": "d58437f641332025182d3da319ac705ba2128451b608e2e992a05fc851e27d4c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-48-pressed": {
+      "file": "button-604-48-pressed.png",
+      "w": 604,
+      "h": 48,
+      "sha256": "4b07fb13bee10cf0fbfe637925580363054c75997a2a60c9ec08e3d9cc9ea593",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-48-disabled": {
+      "file": "button-604-48-disabled.png",
+      "w": 604,
+      "h": 48,
+      "sha256": "8eeb0ed9035bfdb5929b77476f6a10c6fc0e06a4e0bf398ccd03dbffadd7c63f",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-294-40-normal": {
+      "file": "button-294-40-normal.png",
+      "w": 294,
+      "h": 40,
+      "sha256": "6f4dd0fac42fc81c71fc5f5e18ba04602ee656eab955d2d6d45626a91c05db98",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-294-40-hover": {
+      "file": "button-294-40-hover.png",
+      "w": 294,
+      "h": 40,
+      "sha256": "208bc947e12d2df573a70b93c39947426d1709baaf5d1a2f3f74c4aa6ebb584a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-294-40-active": {
+      "file": "button-294-40-active.png",
+      "w": 294,
+      "h": 40,
+      "sha256": "721e80359b9a8d9fcefad48abd3dc057512bb84b6740aeccfd3869d38dc6b8dd",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-294-40-activehover": {
+      "file": "button-294-40-activehover.png",
+      "w": 294,
+      "h": 40,
+      "sha256": "cc607bb651319f173a837cb5a12c804ac3e718b9a9fc3ade13684e33053e0bf8",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-294-40-pressed": {
+      "file": "button-294-40-pressed.png",
+      "w": 294,
+      "h": 40,
+      "sha256": "638712650a4318f2342eed82ee730e637a3d208934d03693d6c4920da371de9b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-294-40-disabled": {
+      "file": "button-294-40-disabled.png",
+      "w": 294,
+      "h": 40,
+      "sha256": "0ec6578ae4d66fd1c22694e7ccee1beff938726f120a82dfdbf963e835414714",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-310-40-normal": {
+      "file": "button-310-40-normal.png",
+      "w": 310,
+      "h": 40,
+      "sha256": "b8e8b126a25086afbd78e12fe58a66295105df25f3dde333857013b3c0fa5340",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-310-40-hover": {
+      "file": "button-310-40-hover.png",
+      "w": 310,
+      "h": 40,
+      "sha256": "2f14f13d6f1735cfc5829b0fb18a107d4ac257cf56da6c28713beac1073729e4",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-310-40-active": {
+      "file": "button-310-40-active.png",
+      "w": 310,
+      "h": 40,
+      "sha256": "3376518dd08138abc58b4b3574ff66ae3ac895759f5fe214c587918f5643a72b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-310-40-activehover": {
+      "file": "button-310-40-activehover.png",
+      "w": 310,
+      "h": 40,
+      "sha256": "86f299cfbb6e26d0b71dee3fa1843ec204ddc02a6e2b78622ae0f6d9abd92b4c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-310-40-pressed": {
+      "file": "button-310-40-pressed.png",
+      "w": 310,
+      "h": 40,
+      "sha256": "a1fda5364d1c1848a793ad723c848c1259c3cd3d7111ac83b4cb9ada0ffa3e35",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-310-40-disabled": {
+      "file": "button-310-40-disabled.png",
+      "w": 310,
+      "h": 40,
+      "sha256": "e3b5ce9f1b0549af31a5e185a3860a4ef41dfc2427fd1f3bfaa45c4038882c69",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-636-48-normal": {
+      "file": "button-636-48-normal.png",
+      "w": 636,
+      "h": 48,
+      "sha256": "f303565959648cfc3ebbfe7c6ca049e9c0adc76037974edb50e7388235067c8a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-636-48-hover": {
+      "file": "button-636-48-hover.png",
+      "w": 636,
+      "h": 48,
+      "sha256": "b2661a4c47a79c0c5ae6e0e7a6a5ca64f52119f39597e2caa4248332af48a54f",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-636-48-active": {
+      "file": "button-636-48-active.png",
+      "w": 636,
+      "h": 48,
+      "sha256": "28276e34e5349b71c7ca28265a59939fd7f85790d7d732bea58bbea2dacb6f78",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-636-48-activehover": {
+      "file": "button-636-48-activehover.png",
+      "w": 636,
+      "h": 48,
+      "sha256": "017721a179ec8b325ab2d2d288261ee785d52b133ad3d1d27154613bc60d06a6",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-636-48-pressed": {
+      "file": "button-636-48-pressed.png",
+      "w": 636,
+      "h": 48,
+      "sha256": "0968f340a98116af304df31137428196232b329692029dc9c67402bff2ea1d05",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-636-48-disabled": {
+      "file": "button-636-48-disabled.png",
+      "w": 636,
+      "h": 48,
+      "sha256": "031ffa1811a1cc5df7d31d9f6c24bd7133b1d8d25337c1432171426171db82ab",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-40-normal": {
+      "file": "button-604-40-normal.png",
+      "w": 604,
+      "h": 40,
+      "sha256": "44efe50db0c80cb6dc107b9f925a9697a979e56154aa307c87707df01bf0245e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-40-hover": {
+      "file": "button-604-40-hover.png",
+      "w": 604,
+      "h": 40,
+      "sha256": "12243fcdd596681815bd155e26a59b7665ea84d62d7a4ff3aa80e5a893782797",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-40-active": {
+      "file": "button-604-40-active.png",
+      "w": 604,
+      "h": 40,
+      "sha256": "02219bd9e8844ac6244893aed6b4c3a2a21115b1ef4336874178438c2933533b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-40-activehover": {
+      "file": "button-604-40-activehover.png",
+      "w": 604,
+      "h": 40,
+      "sha256": "53496f678c30cd33fffcc5c3a51caa56a6b593ea2cfdaad3483ea7d8eeb5f3d6",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-40-pressed": {
+      "file": "button-604-40-pressed.png",
+      "w": 604,
+      "h": 40,
+      "sha256": "c0e59a7ffd417be49314f4387b2de3947f5bd14cf92ff49e709b75143bc72931",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-604-40-disabled": {
+      "file": "button-604-40-disabled.png",
+      "w": 604,
+      "h": 40,
+      "sha256": "2edb64ec8cae9b93a398c203dd35a02758c95a51c9e6868023b260c1e3858707",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-148-40-normal": {
+      "file": "button-148-40-normal.png",
+      "w": 148,
+      "h": 40,
+      "sha256": "f7e669003ab037b9fb96d251643ec903a34aa42c5bdb8500494e448725ae12ba",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-148-40-hover": {
+      "file": "button-148-40-hover.png",
+      "w": 148,
+      "h": 40,
+      "sha256": "8987757b3cea2100bc73c01b8ec82d602460b093c2c1f47183f1bbafbf06a458",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-148-40-active": {
+      "file": "button-148-40-active.png",
+      "w": 148,
+      "h": 40,
+      "sha256": "45d7d2ea54d78131a8cc2b0dd4c54bbc76124cab00ba42a5582cf8bcea9e3291",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-148-40-activehover": {
+      "file": "button-148-40-activehover.png",
+      "w": 148,
+      "h": 40,
+      "sha256": "b77efefc3a93d1ea70fc0f6fbc75b6475701b263b94ade2cf0f50a9b490d772a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-148-40-pressed": {
+      "file": "button-148-40-pressed.png",
+      "w": 148,
+      "h": 40,
+      "sha256": "25cd57a65e33e3d101b7dcb99955567b230f82f0af095882754981e09211de22",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-148-40-disabled": {
+      "file": "button-148-40-disabled.png",
+      "w": 148,
+      "h": 40,
+      "sha256": "f04f6e83827fa4c634bd06426d9b323e332dd4bbbe222b32dd5c6f6a24958a72",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-564-40-normal": {
+      "file": "button-564-40-normal.png",
+      "w": 564,
+      "h": 40,
+      "sha256": "46628783be903764b149422fcc82ace3bd01a76e9c4f1be9808e002fc7411cd4",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-564-40-hover": {
+      "file": "button-564-40-hover.png",
+      "w": 564,
+      "h": 40,
+      "sha256": "e520bd890f56e95654e3591bcc8adf5c86181038120a403e911df4b5600b0cf0",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-564-40-active": {
+      "file": "button-564-40-active.png",
+      "w": 564,
+      "h": 40,
+      "sha256": "8af933578d29b37e651a1a207b23186efc611240d36455991fadbe276d30daab",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-564-40-activehover": {
+      "file": "button-564-40-activehover.png",
+      "w": 564,
+      "h": 40,
+      "sha256": "c53d09d6172a44f7f9eb56728f6c5da0acd072bdac2802f7c7f84925b443ae0b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-564-40-pressed": {
+      "file": "button-564-40-pressed.png",
+      "w": 564,
+      "h": 40,
+      "sha256": "552b3763bd0405a2453456cd9e32b5c0dc1a6be8fdd59de5b80eb85ca7251b8c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-564-40-disabled": {
+      "file": "button-564-40-disabled.png",
+      "w": 564,
+      "h": 40,
+      "sha256": "7ef0bada4cb083bfc4b0a714e49a74b1ee210ed1bc262143f86aa9199e8e21f2",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-180-40-normal": {
+      "file": "button-180-40-normal.png",
+      "w": 180,
+      "h": 40,
+      "sha256": "8cb495c1519999af3b0e5a984a8d4effae4f2808c4533993d71a07e6b19b84d1",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-180-40-hover": {
+      "file": "button-180-40-hover.png",
+      "w": 180,
+      "h": 40,
+      "sha256": "c6bf39648780ac61946af9dea97c96329ac101ec024e4173a1c94b055366a654",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-180-40-active": {
+      "file": "button-180-40-active.png",
+      "w": 180,
+      "h": 40,
+      "sha256": "df18ecb9a49ea7cd08059509411d12b6c1277981a123ee6be821471610e4d39f",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-180-40-activehover": {
+      "file": "button-180-40-activehover.png",
+      "w": 180,
+      "h": 40,
+      "sha256": "89c576b01c4c16e81307c32768636e1af9469fecdc471cf22606cc3058968dd3",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-180-40-pressed": {
+      "file": "button-180-40-pressed.png",
+      "w": 180,
+      "h": 40,
+      "sha256": "0e6a88dff62aa04194fde78580c78a9bb0f3570dc71f884722d6f0ded812468a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-180-40-disabled": {
+      "file": "button-180-40-disabled.png",
+      "w": 180,
+      "h": 40,
+      "sha256": "72eeb6aa1b79a7cf1530ec41a0d4f5a3f9a8f0458e7383dcb67f079ee9338f69",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-196-40-normal": {
+      "file": "button-196-40-normal.png",
+      "w": 196,
+      "h": 40,
+      "sha256": "c1cb657fa3b45ca39a63bd8039899b37e828f3efb2c8d9f6ff7331fe085b9de9",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-196-40-hover": {
+      "file": "button-196-40-hover.png",
+      "w": 196,
+      "h": 40,
+      "sha256": "7969dd90c4c40604a7ae4db28de7027d5af91bd797e3a3d3934690c3ddc490cb",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-196-40-active": {
+      "file": "button-196-40-active.png",
+      "w": 196,
+      "h": 40,
+      "sha256": "0a2c773853c6e0b59ba4dd6abff56118d3d1de9fd41d0824f72ca2fa02b65f32",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-196-40-activehover": {
+      "file": "button-196-40-activehover.png",
+      "w": 196,
+      "h": 40,
+      "sha256": "2c39d438fb7719b9f6858be1474ae33fd8abe62d3cc680f6f33241e3268db41b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-196-40-pressed": {
+      "file": "button-196-40-pressed.png",
+      "w": 196,
+      "h": 40,
+      "sha256": "9390a7666bb21c6940c7bf887874ec1b8fd4b723561eda8553782010e9658e13",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-196-40-disabled": {
+      "file": "button-196-40-disabled.png",
+      "w": 196,
+      "h": 40,
+      "sha256": "4a3d72008634b5a4399c1449423237c04be62392e97705dea761899c9f56a03e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-204-40-normal": {
+      "file": "button-204-40-normal.png",
+      "w": 204,
+      "h": 40,
+      "sha256": "8db994d1d4b17cf240df41a5a2b6bb180e99f5176974e3abfdb379a76d7d3d22",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-204-40-hover": {
+      "file": "button-204-40-hover.png",
+      "w": 204,
+      "h": 40,
+      "sha256": "de110c13ee19332e8095e17e57c1df18c9705d4d73ef3c515e85cc9607118b72",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-204-40-active": {
+      "file": "button-204-40-active.png",
+      "w": 204,
+      "h": 40,
+      "sha256": "e95de62477599fce9e4d92490fbe760300120491e0ba62ca2dfb3d3cb4779123",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-204-40-activehover": {
+      "file": "button-204-40-activehover.png",
+      "w": 204,
+      "h": 40,
+      "sha256": "29dcf7464fd0b5cada98fa5b96352fccd1195083056452a91b24c2d1ff46527e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-204-40-pressed": {
+      "file": "button-204-40-pressed.png",
+      "w": 204,
+      "h": 40,
+      "sha256": "e36da8d1d7f1b527756a8ca1925ebb882b701061d9ac60783508967cd32f5ab3",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-204-40-disabled": {
+      "file": "button-204-40-disabled.png",
+      "w": 204,
+      "h": 40,
+      "sha256": "350ce17ee07e6b9db8967263f446e4367dfcd9a5218f144af311c161abab370f",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-464-40-normal": {
+      "file": "button-464-40-normal.png",
+      "w": 464,
+      "h": 40,
+      "sha256": "ea5129a27a766b99dbe797737ff106909b1edea40b901924dff6f8df2a57a85e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-464-40-hover": {
+      "file": "button-464-40-hover.png",
+      "w": 464,
+      "h": 40,
+      "sha256": "0b3bca733e12fc784f36318b392706f572c43d3901f34710720fa8a200945762",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-464-40-active": {
+      "file": "button-464-40-active.png",
+      "w": 464,
+      "h": 40,
+      "sha256": "1fce348d5794c81b96a7d143980e682242449f90fb2572f6261e9a8e3a836891",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-464-40-activehover": {
+      "file": "button-464-40-activehover.png",
+      "w": 464,
+      "h": 40,
+      "sha256": "45b43b78d031d60647f39ee26b149d61ef5ad4d19941b881af71d7915dd3116b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-464-40-pressed": {
+      "file": "button-464-40-pressed.png",
+      "w": 464,
+      "h": 40,
+      "sha256": "1eeec363dd4d74cbc1dbe1fc3a03eee7b3241d66218fb3bec7933167b9f771a2",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-464-40-disabled": {
+      "file": "button-464-40-disabled.png",
+      "w": 464,
+      "h": 40,
+      "sha256": "1ebb63522cdd0639719af7de7d8404c6a04c41ba0867a4f8f41b7b1db819aa9b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-424-40-normal": {
+      "file": "button-424-40-normal.png",
+      "w": 424,
+      "h": 40,
+      "sha256": "8b1b699d379681185a917379d9011ee306587b253c63460f3d0746e21267040c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-424-40-hover": {
+      "file": "button-424-40-hover.png",
+      "w": 424,
+      "h": 40,
+      "sha256": "c6b6e502b639038eb01ce2cfdb9bccf02671001b9037a88ce9cfcc90cc39fd30",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-424-40-active": {
+      "file": "button-424-40-active.png",
+      "w": 424,
+      "h": 40,
+      "sha256": "59b6464eb5ff4aa43838772a0373fdfe5665ff76fdb4f00fa019d02fbc44910e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-424-40-activehover": {
+      "file": "button-424-40-activehover.png",
+      "w": 424,
+      "h": 40,
+      "sha256": "c3462ae7c6ab92511b172d74a370336b841aed637cfbc88da2359f335a91e1ca",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-424-40-pressed": {
+      "file": "button-424-40-pressed.png",
+      "w": 424,
+      "h": 40,
+      "sha256": "f07ef2730087769dbd085c769386f81301230ca8905fcd673fae1306c2fca578",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-424-40-disabled": {
+      "file": "button-424-40-disabled.png",
+      "w": 424,
+      "h": 40,
+      "sha256": "4ac14889d2236f4acf1abe70e556d3c8e56ce0a5469b34dd0ec259eb00a86131",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-292-40-normal": {
+      "file": "button-292-40-normal.png",
+      "w": 292,
+      "h": 40,
+      "sha256": "f3f3680a54cac9efaaf874f8094245c2e30907dd5e8b352b243aef2fe2e5a4df",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-292-40-hover": {
+      "file": "button-292-40-hover.png",
+      "w": 292,
+      "h": 40,
+      "sha256": "8f39560575704662f5aab224e564488e8e50a6efa625ffd9ddb35896f6cdee9a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-292-40-active": {
+      "file": "button-292-40-active.png",
+      "w": 292,
+      "h": 40,
+      "sha256": "d79fd7cae15c8ce84da5d0ae6ea7a729d777a80cf006e5fe0d32e3c22d105f1b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-292-40-activehover": {
+      "file": "button-292-40-activehover.png",
+      "w": 292,
+      "h": 40,
+      "sha256": "025ac2e5c51cfc22b3e4f9d4c31b97b309abbb98ef454aaadf679ec9ff4ff501",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-292-40-pressed": {
+      "file": "button-292-40-pressed.png",
+      "w": 292,
+      "h": 40,
+      "sha256": "056fd8ee03187170da6b031baca5b640b6866f1a95a3c01d1d4e35c1ee65a528",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-292-40-disabled": {
+      "file": "button-292-40-disabled.png",
+      "w": 292,
+      "h": 40,
+      "sha256": "d71c3966006aaa4e2fd626ed36964abfe30a1a535f70f57ca1585f2eb7611afa",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-284-40-normal": {
+      "file": "button-284-40-normal.png",
+      "w": 284,
+      "h": 40,
+      "sha256": "009bc41aad0f0642eae451c1521cb799a77d2888f58bb635e18ef060479b446e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-284-40-hover": {
+      "file": "button-284-40-hover.png",
+      "w": 284,
+      "h": 40,
+      "sha256": "5d59a734b9592827169030a6407929955f501fd1abac472996e0e7661a75f155",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-284-40-active": {
+      "file": "button-284-40-active.png",
+      "w": 284,
+      "h": 40,
+      "sha256": "388252ea073624ce61cedf0f728e1acff5389446ad093703a6a66da33ee61270",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-284-40-activehover": {
+      "file": "button-284-40-activehover.png",
+      "w": 284,
+      "h": 40,
+      "sha256": "8660ef2c19ccb77547f74ff88940c2768a1a9ff139f80f923723f1eeb0b61ee1",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-284-40-pressed": {
+      "file": "button-284-40-pressed.png",
+      "w": 284,
+      "h": 40,
+      "sha256": "bb37313f94ec2b6a87f83b6443202e9bdae40a3d0ff35ca7c712d86156f1e6d7",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-284-40-disabled": {
+      "file": "button-284-40-disabled.png",
+      "w": 284,
+      "h": 40,
+      "sha256": "0fbd1278f5ff24ad87e863897b79d442aba1fd31031185623c0a871fc25598da",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-220-40-normal": {
+      "file": "button-220-40-normal.png",
+      "w": 220,
+      "h": 40,
+      "sha256": "cfb793ec3c4beab65e3960798a8cb317b3296f5e03560a6759ad609ca77467de",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-220-40-hover": {
+      "file": "button-220-40-hover.png",
+      "w": 220,
+      "h": 40,
+      "sha256": "b6417592b3bb3d8c698b0f8eb5fef4b98f96ed7ad3fd1cecc84c4efac75d3cb0",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-220-40-active": {
+      "file": "button-220-40-active.png",
+      "w": 220,
+      "h": 40,
+      "sha256": "eeb2b5bf8dba695410cc084bca92259a94fc5b39b68aeb3a7ed281f003d151b5",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-220-40-activehover": {
+      "file": "button-220-40-activehover.png",
+      "w": 220,
+      "h": 40,
+      "sha256": "711c1cf3d10c20c9aee999d6da5949de739a33bee9f38ab0cb2ced18ff3d67f2",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-220-40-pressed": {
+      "file": "button-220-40-pressed.png",
+      "w": 220,
+      "h": 40,
+      "sha256": "995ea05a82126ee2942292407119414b6348e9494a729b74de5f9ac7bd11bf11",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-220-40-disabled": {
+      "file": "button-220-40-disabled.png",
+      "w": 220,
+      "h": 40,
+      "sha256": "0c848c50838593d89494188bea7f0b95b0a9e7fcdb53ed81c08bccc26ccdeab3",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-192-40-normal": {
+      "file": "button-192-40-normal.png",
+      "w": 192,
+      "h": 40,
+      "sha256": "4d8c0b2ec9ac359038cabcb14cba077dfeda6eb9def16f888695e9d5b015dcaa",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-192-40-hover": {
+      "file": "button-192-40-hover.png",
+      "w": 192,
+      "h": 40,
+      "sha256": "aadbf279085c04b20fff396915ba72b9e365f4f34f98c59a6fd6993287dcc2d7",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-192-40-active": {
+      "file": "button-192-40-active.png",
+      "w": 192,
+      "h": 40,
+      "sha256": "b2bb0bfa428d91dd76ad96d562a154bdefa056969fca19990afd62e1f3f120c6",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-192-40-activehover": {
+      "file": "button-192-40-activehover.png",
+      "w": 192,
+      "h": 40,
+      "sha256": "1cd82260aa1c74f39edb6bb7f2af2f3756a96fcab1143dd6511199a0bdd11376",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-192-40-pressed": {
+      "file": "button-192-40-pressed.png",
+      "w": 192,
+      "h": 40,
+      "sha256": "c63da659cc74d86aaf8b307bed192ab479d44b033d4b1841984cc0df18404f00",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-192-40-disabled": {
+      "file": "button-192-40-disabled.png",
+      "w": 192,
+      "h": 40,
+      "sha256": "d8c568fd07fce46c6c0138bf5d91d09f7a7f32a086bdf9411dee4c91a50cbda0",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-40-normal": {
+      "file": "button-132-40-normal.png",
+      "w": 132,
+      "h": 40,
+      "sha256": "46c7bcebb928b2549e2d1dff9d004d52c94514988c3597b378ef1dafaf004790",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-40-hover": {
+      "file": "button-132-40-hover.png",
+      "w": 132,
+      "h": 40,
+      "sha256": "5c1a3b296666b27136ce4faabfcc562c34d244f56343ace176147a0d6c8fe4a1",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-40-active": {
+      "file": "button-132-40-active.png",
+      "w": 132,
+      "h": 40,
+      "sha256": "9eee882c34cd6c1f8da81b254ae8f66075d27c8279acc7f303344b09bef5ab45",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-40-activehover": {
+      "file": "button-132-40-activehover.png",
+      "w": 132,
+      "h": 40,
+      "sha256": "31e4e32be3e6aa76a333e6d5bbf865e859f9ec4a535c6d9e68b1388527cbe040",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-40-pressed": {
+      "file": "button-132-40-pressed.png",
+      "w": 132,
+      "h": 40,
+      "sha256": "6cbb124ffcfbeb7963c8ecee5fd83c0d85f09cf920824a047d81d354f2adcc2d",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-40-disabled": {
+      "file": "button-132-40-disabled.png",
+      "w": 132,
+      "h": 40,
+      "sha256": "d50dca4cfb042a62e69b107911de193d5083f4474053d6af3cc9e7e07d1cef92",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-230-40-normal": {
+      "file": "button-230-40-normal.png",
+      "w": 230,
+      "h": 40,
+      "sha256": "3edb7b7f16dc227171d3c2cef6244a9db61e04e61d640a9715db55697e64ae87",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-230-40-hover": {
+      "file": "button-230-40-hover.png",
+      "w": 230,
+      "h": 40,
+      "sha256": "764736ba93af8b3cdcd22a0c930a9be4654017f2a7b0daf551c1654902e0c132",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-230-40-active": {
+      "file": "button-230-40-active.png",
+      "w": 230,
+      "h": 40,
+      "sha256": "bd877a102d11423572aa0ece6d63d5d4fc18619924fb572eccf7ad3efd71c0f2",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-230-40-activehover": {
+      "file": "button-230-40-activehover.png",
+      "w": 230,
+      "h": 40,
+      "sha256": "ae20b275b7606dec1e68918557d0e44358990aa0145cd6ff11369b3470e939ac",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-230-40-pressed": {
+      "file": "button-230-40-pressed.png",
+      "w": 230,
+      "h": 40,
+      "sha256": "912e5664ac97ed17aeb7e133347d894feb15f24831aa04c7e5e8dc102a2d15cf",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-230-40-disabled": {
+      "file": "button-230-40-disabled.png",
+      "w": 230,
+      "h": 40,
+      "sha256": "4056186a290802010feb20652774a82a0c122065bda2f5d238a7bf5ad622e16e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-140-40-normal": {
+      "file": "button-140-40-normal.png",
+      "w": 140,
+      "h": 40,
+      "sha256": "897057f7778825d2fd04dfb9c4f8bc8018b5e24a1b25c64c495e4bce58fe5189",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-140-40-hover": {
+      "file": "button-140-40-hover.png",
+      "w": 140,
+      "h": 40,
+      "sha256": "9b29c4b5a13628d6042b6cf6f2b2ea660f72e64aaa66e9dfdd05122fbc6662cf",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-140-40-active": {
+      "file": "button-140-40-active.png",
+      "w": 140,
+      "h": 40,
+      "sha256": "000888628c170b3532bab572e49499df21ebce0644fdbfb72746ea74738ea8d3",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-140-40-activehover": {
+      "file": "button-140-40-activehover.png",
+      "w": 140,
+      "h": 40,
+      "sha256": "dced3eb5c70401415d1ad1e1d35a2b5d440d34b7e079e4edf4ea2fb50a0057a1",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-140-40-pressed": {
+      "file": "button-140-40-pressed.png",
+      "w": 140,
+      "h": 40,
+      "sha256": "545ba690943ec74285081e8f66cad5be4170c8081f34c47be195051dfcbb56c2",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-140-40-disabled": {
+      "file": "button-140-40-disabled.png",
+      "w": 140,
+      "h": 40,
+      "sha256": "d24ea84b2eee8ddd9d7b40cb838d5877c560759331a821b1576b9f5e2cfa3c7c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-268-40-normal": {
+      "file": "button-268-40-normal.png",
+      "w": 268,
+      "h": 40,
+      "sha256": "209c13eccfe69b0edf74e03ce8fd75576d8be368f0c9e581cabfb34d8a01a51e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-268-40-hover": {
+      "file": "button-268-40-hover.png",
+      "w": 268,
+      "h": 40,
+      "sha256": "0918e30fe807babfd4a183fda96355a8eb698754f191090a629a32bf3b8e523b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-268-40-active": {
+      "file": "button-268-40-active.png",
+      "w": 268,
+      "h": 40,
+      "sha256": "b0c75e5294416b571141505fba3a89490a572bc63067970967afaca70e37f4f0",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-268-40-activehover": {
+      "file": "button-268-40-activehover.png",
+      "w": 268,
+      "h": 40,
+      "sha256": "654ff3b34ea7033b513ada74428aa01e3b76dcc34ec1ec9bf67af09ab81ad5c5",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-268-40-pressed": {
+      "file": "button-268-40-pressed.png",
+      "w": 268,
+      "h": 40,
+      "sha256": "0d7f8d264ca854aae68314e644f7234624abeb60fbbf6b200f33a91e6d369e1a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-268-40-disabled": {
+      "file": "button-268-40-disabled.png",
+      "w": 268,
+      "h": 40,
+      "sha256": "456aec7aa6001284d66892018fdb7d6d986a8bae1c10c75589e58b03847c115f",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-32-normal": {
+      "file": "button-132-32-normal.png",
+      "w": 132,
+      "h": 32,
+      "sha256": "51bdbde7a5544efda18b5e81bc077bb092b74cac01a8e96092978a6c40b1884e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-32-hover": {
+      "file": "button-132-32-hover.png",
+      "w": 132,
+      "h": 32,
+      "sha256": "8c9ea64f9259814e3823d54233134448192ec7176b7d67be4f20330dab434d80",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-32-active": {
+      "file": "button-132-32-active.png",
+      "w": 132,
+      "h": 32,
+      "sha256": "2703e42221e44a7643fad93fba3c1bb50e3cee197fe1d7cc7bf624e72c79b779",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-32-activehover": {
+      "file": "button-132-32-activehover.png",
+      "w": 132,
+      "h": 32,
+      "sha256": "1195483d0466b526888a6e2ae5329e153136a7402bbf9bad800859a4cf18e269",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-32-pressed": {
+      "file": "button-132-32-pressed.png",
+      "w": 132,
+      "h": 32,
+      "sha256": "f365fdd0f92334c34f34c710fd9256bad0f9edef2b3c4b15dcb81fb315ae4aef",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-132-32-disabled": {
+      "file": "button-132-32-disabled.png",
+      "w": 132,
+      "h": 32,
+      "sha256": "263839c6034daf49a4e49ac94e61a8a1016a56c56f83df93e7a44cf4b8f7f641",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-154-40-normal": {
+      "file": "button-154-40-normal.png",
+      "w": 154,
+      "h": 40,
+      "sha256": "8c4575e32aa05d593c9597e6b013a3eac51b4a5d23024a76d07da8f438dbdea1",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-154-40-hover": {
+      "file": "button-154-40-hover.png",
+      "w": 154,
+      "h": 40,
+      "sha256": "29a6976e49585a3022b77e789e9d62d3a5a69b2b722b4cc08985b786e1db3ec0",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-154-40-active": {
+      "file": "button-154-40-active.png",
+      "w": 154,
+      "h": 40,
+      "sha256": "a0b1eda5aec237b945d9e3fdb90e0621eccaee275d117b4c728130fa4b5d61d2",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-154-40-activehover": {
+      "file": "button-154-40-activehover.png",
+      "w": 154,
+      "h": 40,
+      "sha256": "c27d666af69fcbdf73aa0ba41030a2f949e687a6e4ea8b6879f40fb1625f788b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-154-40-pressed": {
+      "file": "button-154-40-pressed.png",
+      "w": 154,
+      "h": 40,
+      "sha256": "d8e18c55db8c17a17de403ce8f5505bbef4efaddf5ae4200068026af50c3914e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-154-40-disabled": {
+      "file": "button-154-40-disabled.png",
+      "w": 154,
+      "h": 40,
+      "sha256": "074b5f593d75a611bd6909f37519aa1aae64bc47e30141df4a264b2f2172d681",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-28-28-normal": {
+      "file": "button-28-28-normal.png",
+      "w": 28,
+      "h": 28,
+      "sha256": "e3123f8dce5ffe7b05271a0c51aa04dbf7e0b3731051f09412f951d52354385d",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-28-28-hover": {
+      "file": "button-28-28-hover.png",
+      "w": 28,
+      "h": 28,
+      "sha256": "85b10d1eac83ce7e66e6a830a786f18128b016a314e5871c3804d2b050208ed4",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-28-28-active": {
+      "file": "button-28-28-active.png",
+      "w": 28,
+      "h": 28,
+      "sha256": "cbcf121e746dccea42c4c8f3c04065275128bc97b058c62c707fba69051b8256",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-28-28-activehover": {
+      "file": "button-28-28-activehover.png",
+      "w": 28,
+      "h": 28,
+      "sha256": "492898b2f36c7ad31f2d6a13e36b926579727d0f39fb4804f5bdcf112d97dc35",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-28-28-pressed": {
+      "file": "button-28-28-pressed.png",
+      "w": 28,
+      "h": 28,
+      "sha256": "9bae776cab091250a17ec0102d5b3fbb527933a67dcf74a54cc786f3d2dc77ef",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-28-28-disabled": {
+      "file": "button-28-28-disabled.png",
+      "w": 28,
+      "h": 28,
+      "sha256": "17dbada339833aa0954fa4f507a72dfcf13d633a6053f7a97f3e436f9c8d817c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-80-40-normal": {
+      "file": "button-80-40-normal.png",
+      "w": 80,
+      "h": 40,
+      "sha256": "22b40046148eea0c3876f31825032e4863e6eeb6c77987c2c8f29e0e260cee6c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-80-40-hover": {
+      "file": "button-80-40-hover.png",
+      "w": 80,
+      "h": 40,
+      "sha256": "7c920c05d7eeadf3c6f167a4cef3e660d96984f477663f7737f3283ef8ef064b",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-80-40-active": {
+      "file": "button-80-40-active.png",
+      "w": 80,
+      "h": 40,
+      "sha256": "92d72074c988c8f28b1674e40c4592ff9fbea43e3aacb9cb204d6cd4c3833e4a",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-80-40-activehover": {
+      "file": "button-80-40-activehover.png",
+      "w": 80,
+      "h": 40,
+      "sha256": "327a5e479c1ed53b9d0764c577663ffeeb3c5fdb3586effc580a1227e5298625",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-80-40-pressed": {
+      "file": "button-80-40-pressed.png",
+      "w": 80,
+      "h": 40,
+      "sha256": "7affbfbf7b559bf835bca1c3a18757bb6933ea345d22e1efdf7b048e37cc3369",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-80-40-disabled": {
+      "file": "button-80-40-disabled.png",
+      "w": 80,
+      "h": 40,
+      "sha256": "b7ddf1d21d32968a16a30a27d14541d14f61d57a1d8ffdaf7730990502e4371c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-332-40-normal": {
+      "file": "button-332-40-normal.png",
+      "w": 332,
+      "h": 40,
+      "sha256": "1b98f550afb11b7f2c834f28257262a5f13937a5c3142dc96b08355faca1aa40",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-332-40-hover": {
+      "file": "button-332-40-hover.png",
+      "w": 332,
+      "h": 40,
+      "sha256": "eef1e0211b17ea6874372045868529246600bb3d60bba58e867b315dd1582a72",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-332-40-active": {
+      "file": "button-332-40-active.png",
+      "w": 332,
+      "h": 40,
+      "sha256": "b0a13f8f7c2e2210a0f2749607c9a9a1d0e9917456e2fefdef388cda141d55e5",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-332-40-activehover": {
+      "file": "button-332-40-activehover.png",
+      "w": 332,
+      "h": 40,
+      "sha256": "77e69b48064905efa18f72190d2b1665ff8de56387b8345ebecbddbc64c962ed",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-332-40-pressed": {
+      "file": "button-332-40-pressed.png",
+      "w": 332,
+      "h": 40,
+      "sha256": "46d29913b2783184d370aad67de533fd79d7bd0a97a6a5d574adf0eb9b053f6c",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "button-332-40-disabled": {
+      "file": "button-332-40-disabled.png",
+      "w": 332,
+      "h": 40,
+      "sha256": "e805bd253f3f95ee9d5c0c5a115cb908538c74ddc1ef83f563f1307b56a89e8e",
+      "role": "Independently fitted housing, original native material and fittings"
+    },
+    "font_menu": {
+      "file": "font_menu.png",
+      "w": 1808,
+      "h": 8,
+      "sha256": "96b80046fa1d960e979e7c555292f654c87016b9ae8e14563f64526e345c2ae9",
+      "role": "Original GRAD6FNT main/options glyphs, black native shadow classes 2/3",
+      "cellW": 8,
+      "cellH": 8,
+      "frames": 226,
+      "charStart": 0,
+      "scale": 2,
+      "advance": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        4,
+        3,
+        5,
+        6,
+        6,
+        6,
+        6,
+        3,
+        3,
+        3,
+        6,
+        6,
+        3,
+        6,
+        3,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        3,
+        3,
+        4,
+        5,
+        4,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        4,
+        6,
+        4,
+        5,
+        6,
+        4,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        5,
+        3,
+        5,
+        6,
+        6,
+        5,
+        6,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        4,
+        4,
+        4,
+        2,
+        2,
+        2,
+        6,
+        5,
+        4,
+        6,
+        6,
+        5,
+        6,
+        5,
+        5,
+        5,
+        6,
+        5,
+        5,
+        5,
+        6,
+        5,
+        6,
+        5,
+        5,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        -2,
+        -2,
+        -2,
+        -2,
+        4,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        6,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        6
+      ],
+      "preserveCase": true
+    },
+    "eva": {
+      "file": "eva.png",
+      "w": 1000,
+      "h": 373,
+      "sha256": "b0ba8b3a40d6c05e099d3fc5365b116643329a1af9179dc96a53c0af64de23bf",
+      "role": "Exact user-linked EVA logo captured from the loaded browser image; clean native-grid metal stamp"
+    },
+    "gameplay": {
+      "file": "gameplay.png",
+      "w": 1280,
+      "h": 720,
+      "sha256": "f6e3c67f46e8000c25c06c6f38b6a93a7ce577255a04b24e4e8c4de7aea9079d",
+      "role": "Actual installed Enhanced gameplay capture"
+    },
+    "map-SCM01EA": {
+      "file": "map-SCM01EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "26292b99eb87d8a0a6de63d1eb7585c1b957f39990078af9a44f13caf6d02dbd",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM02EA": {
+      "file": "map-SCM02EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "0c5cc3e1f3086d87eaa1f54ba1a2ebab7e6e19948eca070457150e1f1a0af758",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM03EA": {
+      "file": "map-SCM03EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "14763e51c520f9e76ba62192bd61838dbdce3c1e3c97d17d37153e8c452fb987",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM04EA": {
+      "file": "map-SCM04EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "f022dae9ad7784d56bbf5be846433e4804b425effa34f8db7828876def433ca2",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM05EA": {
+      "file": "map-SCM05EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "5cc2786987f268c36463307f2965aff31e6591014ec97909b0d363550693e245",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM06EA": {
+      "file": "map-SCM06EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "c4a994a18259a2f78c82bd378dcade415063366895012adab0e3604d50b2d49e",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM07EA": {
+      "file": "map-SCM07EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "a4b81ae89d7940d9f1d55e96bba3ebda9bdf850382a083b1298787914cc780e8",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM08EA": {
+      "file": "map-SCM08EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "4f585f019da7658ed5a545de9c80c91c8881211918d35011a2ac70f6336fc373",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "map-SCM09EA": {
+      "file": "map-SCM09EA.png",
+      "w": 120,
+      "h": 120,
+      "sha256": "252764735f03bf239c5d738e1f0aa1abf804088fd7d6396158dc57f30c6bed90",
+      "role": "Exact installed marked lobby preview; no invented terrain"
+    },
+    "faction-GDI": {
+      "file": "faction-GDI.png",
+      "w": 136,
+      "h": 120,
+      "sha256": "bedcd6cdc50c5685caede042919519718e79d448b00e5f6d9f61f5a43ad777c7",
+      "role": "Original radar-off faction artwork, separate content"
+    },
+    "faction-Nod": {
+      "file": "faction-Nod.png",
+      "w": 136,
+      "h": 120,
+      "sha256": "22dc60f82db09c51da5deb222fffa3d3b7ae9cbd08be20532c64acaa29c1e73b",
+      "role": "Original radar-off faction artwork, separate content"
+    },
+    "intro-frame": {
+      "file": "intro-frame.png",
+      "w": 1280,
+      "h": 720,
+      "sha256": "8417d0ef476ca49acbbf54c765842ae710a74efa54714fac09141ffbd60e2c27",
+      "role": "Original installed INTRO2 decoded frame, still playback preview"
+    }
+  },
+  "sources": {
+    "playable/dosmenu.pack": {
+      "sha256": "7aac7c4787087abf9d3f8ce7d229d5b49758d239b4b7b261eebf06313b3177f5"
+    },
+    "review-lab/tools/cnc_interface_lab/public/reference/chassis.png": {
+      "sha256": "87bbb6068019629eac30b7c79277ee27f1a8df760458dcface1f131807c7a6b3"
+    },
+    "review-lab/tools/cnc_interface_lab/public/buttons/plate-normal.png": {
+      "sha256": "0defb9d06d69741dc9c63002c34f5612a395799fd3935ead8356dab7ab2b5684"
+    },
+    "review-lab/tools/cnc_interface_lab/public/menus/eva-user-source-browser-capture.jpg": {
+      "sha256": "35a1e1aec0980a4aba56f6788992735a8d4972c01bec827f4cf0e058b0457fbe"
+    },
+    "review-lab/tmp/cnc-menu-redesign-2026-10-11/before/gameplay.png": {
+      "sha256": "83022896e4959303a023db5023d1d0fe23eb535d505a111da74ec32307a2fefe"
+    },
+    "menu/dosmenu.c": {
+      "sha256": "665e6d058023184779963ac902ca193a0191e0199156b134d31d18a3a52ad9b2"
+    },
+    "game/dosopt.c": {
+      "sha256": "1f25e1417e5b5ca63d6f8f86e436b3292d05d4a97950ab33a8f279104d52e5d6"
+    },
+    "app/opencnc3d.cpp": {
+      "sha256": "015e8b9687aa0067350dda0e8d742bb69541153b048168ac0e8826f6e064b2bb"
+    },
+    "playable/missions/SCB20EA.INI": {
+      "sha256": "92832962f005ce57505d01a3e58ba4f041c7d0c80d906e054d5e73ee0a08044e"
+    },
+    "playable/missions/SCB21EA.INI": {
+      "sha256": "6511d1f65bbf953f52ee68755915dc3a9f493ff3a2b7dfcb0a736d261a98e792"
+    },
+    "playable/missions/SCB22EB.INI": {
+      "sha256": "c157840d25436b0579ba85d661d3409ab6ef19679f655ded5ec703b2a1a361d6"
+    },
+    "playable/missions/SCB31EA.INI": {
+      "sha256": "f94110ad41c9f0afdc3c1f95d17546c0865597d0d9be1e4829454dff5ccc604f"
+    },
+    "playable/missions/SCB32EA.INI": {
+      "sha256": "0ef9fb3e514ef09705619ebf1b01887c32a201fbf3c8416035bd86e68c6210d8"
+    },
+    "playable/missions/SCB33EA.INI": {
+      "sha256": "e57618ec1214652df2718a454250c2050b6444ac6408133bd3f8b3f79715ee4d"
+    },
+    "playable/missions/SCB35EA.INI": {
+      "sha256": "fbac268b49a6925a794c1cb58fd44baaf149c062a40a505238bac97311f3e46b"
+    },
+    "playable/missions/SCB37EA.INI": {
+      "sha256": "088ee47401eeb289e09670977bd30fc2bfa05a26d6d5eca170223b422d286660"
+    },
+    "playable/missions/SCB60EA.INI": {
+      "sha256": "1484338e5b078c5954f8cce37f210633762f1b5fabe71d37c0f23fd289aca208"
+    },
+    "playable/missions/SCB61EA.INI": {
+      "sha256": "2d8c691640eea07cb895cfc79bbe484012494a48d0fa0730e581f2581a1fbfe9"
+    },
+    "playable/missions/SCB70EA.INI": {
+      "sha256": "8315f81c1feb379612d7bed85137b06f1dd07c022fe7d1e003319ca06fc76413"
+    },
+    "playable/missions/SCG22EA.INI": {
+      "sha256": "56c4e5dc3085ef45fd5a8db349f40d4529a640dea9ede7fc113a06f1ab9d6065"
+    },
+    "playable/missions/SCG23EA.INI": {
+      "sha256": "35ed9876b32e7c723394950fefda44d2de728d7b188a2d8aedbf4b6b44220441"
+    },
+    "playable/missions/SCG30EA.INI": {
+      "sha256": "0b80977722bc4187d031ff8ddff6cc28f5c231f421fd5f476ba888f64e35a571"
+    },
+    "playable/missions/SCG32EA.INI": {
+      "sha256": "555fc23e8d631535f8f707d0c21cf0ff69605ca122b4f123dd16c93ba78fdf20"
+    },
+    "playable/missions/SCG36EA.INI": {
+      "sha256": "8809c59f6111f7388af7aade6a7e65e81485d0a0580c4adcf7700fbee0dd9c66"
+    },
+    "playable/missions/SCG38EA.INI": {
+      "sha256": "91c55fc59bf8d9b4c1d41c5ee8b735c9833f232cfcf1360ae2a625b990c62853"
+    },
+    "playable/missions/SCG40EA.INI": {
+      "sha256": "0326db64e0330820718412f145a3223d2319154e26e1bb90b4ed07a6d97b2672"
+    },
+    "playable/missions/SCG41EA.INI": {
+      "sha256": "82c919b7985eba9de9c93607d92935df23b2890df36d3ef53076643204da97b2"
+    },
+    "playable/missions/SCG50EA.INI": {
+      "sha256": "5a38278d75a29ff775e98be2886e125bd117765b61f1f6c66af85c3bb090c2e5"
+    },
+    "playable/missions/SCG60EA.INI": {
+      "sha256": "ca8e2de59ffad381f167ddf2799547191a595391ec434ff51c90c58fbd5a791b"
+    },
+    "playable/missions/SCG61EA.INI": {
+      "sha256": "7b36582b7411cc44919b3d8972a80d9f7447d620fabdf317e2a36db4b0130510"
+    },
+    "playable/missions/SCG62EA.INI": {
+      "sha256": "6b15b79c94b4ab0d4992d2af108ed96b1d63e36258685f22a73fa3f8271c24bf"
+    },
+    "playable/missions/SCG71EB.INI": {
+      "sha256": "fbddeace6702b502fee489f4e5eadc2149492d5144fd7384d7f2733d15d9b3ad"
+    },
+    "playable/missions/SCG72EA.INI": {
+      "sha256": "508d027e81b1fc5178e138d2ffc1c7d887b639a4fcb97163108444b8fa626ffa"
+    },
+    "playable/missions/SCG73EA.INI": {
+      "sha256": "555fc23e8d631535f8f707d0c21cf0ff69605ca122b4f123dd16c93ba78fdf20"
+    },
+    "playable/missions/SCG74EA.INI": {
+      "sha256": "a596e14be467e6338cdc1fdda04c8b6f72f926207dc3d89602e75b27faf47619"
+    },
+    "playable/missions/SCG90EA.INI": {
+      "sha256": "d6e56fb02daa73d2921c5ebb78963f83389d58a2972f3d8daa780cccbb361eb0"
+    },
+    "playable/missions/user_maps/USER00.INI": {
+      "sha256": "a2ec5a3c0e03c20e0f950b98df0fa719430b3d8118b84340ead7a05e516e4703"
+    },
+    "playable/missions/user_maps/USER01.INI": {
+      "sha256": "155e9a8d1dc2ffd671a9c8bafdf2c0e17b6125e1bf4a099c10aaa2991501fc87"
+    },
+    "playable/missions/user_maps/USER02.INI": {
+      "sha256": "89514a2d5927eb8cc5748e288a393add0bd4eefc53d73a6da6b598c978d2fe7b"
+    },
+    "playable/missions/user_maps/USER03.INI": {
+      "sha256": "fe66a8db02b3f2b601fcb67cb98d0cf0a00fc9d1cb933f85b0f582b312ae43ed"
+    },
+    "playable/missions/user_maps/USER04.INI": {
+      "sha256": "e131adad45488a8112a039787924dcecc3582b36f4627eba1a670e8a5242afb3"
+    },
+    "playable/missions/user_maps/USER07.INI": {
+      "sha256": "03b146e30a51208f4155f994803b74325e5eba39db792ebe5cb0745c12a284a1"
+    },
+    "playable/missions/user_maps/USER30.INI": {
+      "sha256": "15ba5d3e996231c1c12f7d0fa0957bcf9247409830b8326defecc399fb499452"
+    },
+    "playable/missions/user_maps/USER50.INI": {
+      "sha256": "eb76866f9c24ce7cf321024c64c132e48786e4cfdf49932a6301a6917518de85"
+    },
+    "playable/missions/user_maps/USER60.INI": {
+      "sha256": "3024f8a8d4cc90410fde8f01eb7ba958a5f933cc984afed3814d203f8c2a2fae"
+    },
+    "playable/missions/user_maps/USER90.INI": {
+      "sha256": "d9f5b5eff22c740f36baed7f5df4cbb9f2962a1c52efb427cdd9893a01b84b03"
+    },
+    "playable/missions/user_maps/USER91.INI": {
+      "sha256": "d73d041e1517d317c2d1ca709c8c0adb2a8d40d50cfa03870fe21391376764ee"
+    },
+    "playable/missions/user_maps/USER92.INI": {
+      "sha256": "2671584d65289d969765198f219ed2d269d610da7c84f49eb03f1366edb5fc10"
+    },
+    "playable/missions/user_maps/USER93.INI": {
+      "sha256": "2e670e081b61b3fa13a48dafdff3486196040db5e65b9ab0d0f8ff1f90cf89da"
+    },
+    "playable/missions/SCA01EA.INI": {
+      "sha256": "382a270bc4cd2f864abd0f5abe2e2d781fcbe3da19d9e3454b47d94f263ac707"
+    },
+    "playable/missions/SCB01EA.INI": {
+      "sha256": "8907aaa134966b529d18902362775c6bf9ceb7d949a7ad5baf0be29d83f76f52"
+    },
+    "playable/missions/SCB01EC.INI": {
+      "sha256": "46daebdc336447d735e6801d2529c5ec88d51253dffba9dc9744cb12e6aea774"
+    },
+    "playable/missions/SCB02EA.INI": {
+      "sha256": "b331a22e2e6a8b17935c374d249184481bac0e0e6db47325046ac31614319802"
+    },
+    "playable/missions/SCB02EB.INI": {
+      "sha256": "eba757e74393c690cc52c2754375e04563b9fa5d8e3f4737d140c09d2cdad0f2"
+    },
+    "playable/missions/SCB03EA.INI": {
+      "sha256": "43a195f4eec73a7dc22ff07217ae0b560967663ff7276b282aa59335e38c53f4"
+    },
+    "playable/missions/SCB03EB.INI": {
+      "sha256": "95072bacbeb7362b3227bb7e54e2f637b155abbc5b44ce5b9f263cadcaf83fef"
+    },
+    "playable/missions/SCB04EA.INI": {
+      "sha256": "c769773d49e1c4258ed4f4178089a7b4bc7591c9777489552f97ac1a553b3d33"
+    },
+    "playable/missions/SCB04EB.INI": {
+      "sha256": "a5753cfae2169b4e21e0d239d7262f9f7759ced74c8ac713385b4d0c47360d1a"
+    },
+    "playable/missions/SCB05EA.INI": {
+      "sha256": "ce68bcac940511ef9bea7a21cb08d4b47d3b6562963ba155c3beacc6fc010847"
+    },
+    "playable/missions/SCB06EA.INI": {
+      "sha256": "69f90f5eb1efcdf89f52138d87c1bf2a2c29d79aa2a8ef555782cd2140b85c52"
+    },
+    "playable/missions/SCB06EB.INI": {
+      "sha256": "064d359023dafc7e08515f3900f8f14ca16f540f5533fcb44b9545d53cd0b3c1"
+    },
+    "playable/missions/SCB06EC.INI": {
+      "sha256": "cfdb7498bfd226f662c71876c34a707bd13306411fafa8648f741aa2e6a53a15"
+    },
+    "playable/missions/SCB07EA.INI": {
+      "sha256": "9fce30e11cf928d62a8554a34c856f4faad2aef6a2377727865e1dfb32345bc4"
+    },
+    "playable/missions/SCB07EB.INI": {
+      "sha256": "435b65b3fb3fa6659f2cfbbc28eb21a9c93015c27bb17109edb24d9359d50f3d"
+    },
+    "playable/missions/SCB07EC.INI": {
+      "sha256": "74141816c8391f74f2f03b209175d694f38b9a3360502ceb309c593437810eb0"
+    },
+    "playable/missions/SCB08EA.INI": {
+      "sha256": "fdf5f585a092ff4b16b7e5a489083e8ff09f21b386bb03588c0ed3087351b5fb"
+    },
+    "playable/missions/SCB08EB.INI": {
+      "sha256": "919051791f544e11465f4dcbd31b9557a6fdc803f131f321d0a2a74b28105f3d"
+    },
+    "playable/missions/SCB09EA.INI": {
+      "sha256": "4619b24e9cb51172c2c013ba162e8b67767c4ac4e003aaa56d9ed8c538d50e59"
+    },
+    "playable/missions/SCB10EA.INI": {
+      "sha256": "3f7d0a25846225a9d386d331970d846e2e742bce4d0f385e3e977564fe5dab0d"
+    },
+    "playable/missions/SCB10EB.INI": {
+      "sha256": "f8b4b64e3991bfc4169a2bbb38f6a69487bdc4753ebd66ca6e3cb4e82fa00dda"
+    },
+    "playable/missions/SCB11EA.INI": {
+      "sha256": "8e71f99a1c45651330bfd5e5b52fcf55836a004398c3af38cd94fb7618a1f9c7"
+    },
+    "playable/missions/SCB11EB.INI": {
+      "sha256": "0121241369b34ec65261f39edc4bfc6349e1c85feb2d628b9c897cf99f930a72"
+    },
+    "playable/missions/SCB12EA.INI": {
+      "sha256": "092700645c4dc5598777caa4d46d1ccd0e43b0db506573420569bb12e84cc735"
+    },
+    "playable/missions/SCB13EA.INI": {
+      "sha256": "548a7b8e95ef92abcedd4f334f90f4ce259d876c0df6ebbe8f2ccc942b8d5452"
+    },
+    "playable/missions/SCB13EB.INI": {
+      "sha256": "ae093b3e1cfaf51e4fc6bd421cd4f92166880a7f98c687b4af14bf3b66a1f7bf"
+    },
+    "playable/missions/SCB13EC.INI": {
+      "sha256": "095abe6d2ed8fb20ee0457f0c20342f7b00bad3ea5d8d4c2e17eb2d5f4432e6c"
+    },
+    "playable/missions/SCG01EA.INI": {
+      "sha256": "ef4f85b29389187cc27a39fe658baf0a0b97361178894a789e358ab0aaff9738"
+    },
+    "playable/missions/SCG01EB.INI": {
+      "sha256": "3fee4ec642ccb7dbd59c79d94480db30629dc68fd92d89a2bc42fb2cc487c86b"
+    },
+    "playable/missions/SCG01EC.INI": {
+      "sha256": "7f870bd09e3969490ff22ef24fecbcbbfb1ca392b8fd2bfc11b4367fc035b08f"
+    },
+    "playable/missions/SCG02EA.INI": {
+      "sha256": "23f23affafa7a7ba14021e994622ade697a281503920b864a9b1ede6a815dc8f"
+    },
+    "playable/missions/SCG03EA.INI": {
+      "sha256": "9ff7f9a048ec5ead3b75c07b0902c98fcc3bb6dec899c02268f1d8b98c9c0611"
+    },
+    "playable/missions/SCG04EA.INI": {
+      "sha256": "abfc5062a4f8ed9ff11cbd3d5224e5d1581afabfacdb3e9c9bbb3ec14f799a0a"
+    },
+    "playable/missions/SCG04WA.INI": {
+      "sha256": "4095a8e93809bcd45093c69738375f095413c87864af93bb68d4e3b3d3142c1c"
+    },
+    "playable/missions/SCG04WB.INI": {
+      "sha256": "08d376119555bd82f4927cca5cb27812b108b12aa04366a9e126b28c97d4c358"
+    },
+    "playable/missions/SCG05EA.INI": {
+      "sha256": "cfdd2abbdf13e17883143993a284420a2de457a3b8a944065c48e02927c30fe1"
+    },
+    "playable/missions/SCG05EB.INI": {
+      "sha256": "e8806f7fad43c96dc2f56a35961b1517f6290e136a46336a096d0894ef467101"
+    },
+    "playable/missions/SCG05WA.INI": {
+      "sha256": "817742be4527e34988f229e5f233736222f3c7afe9aa824e8efba32e517d74c4"
+    },
+    "playable/missions/SCG05WB.INI": {
+      "sha256": "5d14919bc3609e05ff892285ae910fbf03db6977b02211b361f638a49987e772"
+    },
+    "playable/missions/SCG06EA.INI": {
+      "sha256": "bceed7242a64d89cfd1434df8af374ec63d7b2bbb58509b9ddb461eea5f5764c"
+    },
+    "playable/missions/SCG07EA.INI": {
+      "sha256": "0cbdf5f3d3ec78e629a3dc00f61b0a0e78f3f78bfb4c134f3029299477a7bcd8"
+    },
+    "playable/missions/SCG08EA.INI": {
+      "sha256": "2c9ffa015ed3567c5c71f11d67610c182953ac9a2f8203a568e0319adb3185a0"
+    },
+    "playable/missions/SCG08EB.INI": {
+      "sha256": "776ea9cb7b00608d903cbc42a99f607ba4c254754c20fe9d1c9574c480e7d0d0"
+    },
+    "playable/missions/SCG09EA.INI": {
+      "sha256": "084df6f7e3fb023674aba9935bdf20a6719651bdc4a3a19c83468ed1767a12ba"
+    },
+    "playable/missions/SCG10EA.INI": {
+      "sha256": "8f35ddf6baf985793fc094dc2b029d776d6affeeff47fe731e3d6bd9bfa4c5c5"
+    },
+    "playable/missions/SCG10EB.INI": {
+      "sha256": "edd4c107f3418bae9b6243852390c1582627bbc2d317fa715cbedf99fe781ffd"
+    },
+    "playable/missions/SCG11EA.INI": {
+      "sha256": "456f992c7aa77821f7b29035e4d62baa2ef37f8aa806e41d32a0189a7e7768b4"
+    },
+    "playable/missions/SCG12EA.INI": {
+      "sha256": "49dba747a61e1780f4de27f4c9689ad03823513c9ee42103b886c1429094fc5c"
+    },
+    "playable/missions/SCG12EB.INI": {
+      "sha256": "11629d46e40105a2ed8a29c3929dcf639efba005298f583526fabba03e93e3a2"
+    },
+    "playable/missions/SCG13EA.INI": {
+      "sha256": "6e86b7b0dcefbc651b4480d0d10ae1a218ea9244a7c1bbe7032aa6ff47d5f55a"
+    },
+    "playable/missions/SCG13EB.INI": {
+      "sha256": "6e86b7b0dcefbc651b4480d0d10ae1a218ea9244a7c1bbe7032aa6ff47d5f55a"
+    },
+    "playable/missions/SCG14EA.INI": {
+      "sha256": "4333c5f1cc9937fd7f94fbb2172c78a78af15412b1e3a1be4acb155f14bf5287"
+    },
+    "playable/missions/SCG15EA.INI": {
+      "sha256": "5ae32bc2b1c51865bc3a5744c9313d28ac14f92ee4c5342b167684adff231a1b"
+    },
+    "playable/missions/SCG15EB.INI": {
+      "sha256": "e7e1c9dc08d5fd434945a4b8ea07d62f8a0dfa527ef1000f8b9023c5084dae64"
+    },
+    "playable/missions/SCG15EC.INI": {
+      "sha256": "25385dba8c70694a654413ef1e5caf3b84fc63768951085ce75e87d3c3945d9b"
+    },
+    "playable/missions/SCM01EA.INI": {
+      "sha256": "b5c1a559dd4cc66e34d09ec4b9340b7d2fd191a50e8915b4cc2f10cebc31bef1"
+    },
+    "playable/missions/SCM02EA.INI": {
+      "sha256": "d9f2916f5f00ad048cf8c53853d3458d4b514f322aa7743ac5e84e6b6efc4081"
+    },
+    "playable/missions/SCM03EA.INI": {
+      "sha256": "cfb1d5fc6ee8f579d9059cbf95f9a37b56492ec7a42b25b94e038c3ec1093192"
+    },
+    "playable/missions/SCM04EA.INI": {
+      "sha256": "3b88b90b7155faabe057620256683c98a8df409c74a0d0e73c8e8973eec36a58"
+    },
+    "playable/missions/SCM05EA.INI": {
+      "sha256": "b621dcc05fb29ab43c0f0129ee3d02db0893266b814ae2342be8669109d60ba9"
+    },
+    "playable/missions/SCM06EA.INI": {
+      "sha256": "678a175b6b1c9dafb3890bbe2cc3aad5715554849b30f837e534caa3753ed4a9"
+    },
+    "playable/missions/SCM07EA.INI": {
+      "sha256": "ff30afa3a13a8eb5411fa430b109e89c30cfbee8b63da00699060e713a8cebcd"
+    },
+    "playable/missions/SCM08EA.INI": {
+      "sha256": "4f1f28eef8852a0bf5505b3435e19e0926abc5c59f54c6ca672c6f845f93dbd9"
+    },
+    "playable/missions/SCM09EA.INI": {
+      "sha256": "ab540b57cc1898abf2399ac13400ad83b314c5aa4293bc31990a46b47bd154ed"
+    },
+    "playable/missions/SCM90EA.INI": {
+      "sha256": "6a57f98b0239cd7bd41bfbc3a6e92cf669dc36f3b29b1f6d34035d32bbd56e56"
+    },
+    "playable/missions/SCM91EA.INI": {
+      "sha256": "727ac0d0f89839e2489a4b3af6ce2acfbc0abfef8638803c2d07417dc9091d3a"
+    },
+    "playable/missions/SCS01EA.INI": {
+      "sha256": "aee6b3f465df1f2bf3d79d1fbffc22e101eb5857916e70f9e604821420128bdb"
+    },
+    "playable/missions/SCW01EA.INI": {
+      "sha256": "51018cd9b8bf8bd5499a6fe225e652785cbfe75b16a95cca04826bf770aec30e"
+    },
+    "playable/missions/TSTBOAT.INI": {
+      "sha256": "dcae1ca729d38106dabc0cd437b0870a45e496162eb51434f9399be8350a9a26"
+    },
+    "playable/missions/TSTFACE.INI": {
+      "sha256": "fb2e156e65fd12d707f4560c5cd7e7a5257865f79bdaed999088a4c75ef0b5a2"
+    },
+    "playable/missions/TSTFOLD.INI": {
+      "sha256": "d4b28539c99c683bc0338577637b300f2a722701e9de3b42edf00c5343ebca96"
+    },
+    "playable/missions/USER01.INI": {
+      "sha256": "155e9a8d1dc2ffd671a9c8bafdf2c0e17b6125e1bf4a099c10aaa2991501fc87"
+    },
+    "playable/missions/USER91.INI": {
+      "sha256": "c0fa4873c5e3b997cafba22d25a0098f4bdba08229a07e7aed9a4f5c6cc6e3f8"
+    },
+    "playable/missions/user_maps/SCA01EA.INI": {
+      "sha256": "382a270bc4cd2f864abd0f5abe2e2d781fcbe3da19d9e3454b47d94f263ac707"
+    },
+    "playable/missions/user_maps/SCB05EA.INI": {
+      "sha256": "9de82cb1c256451a6ec75b57c37da9933699a6f1577efa0cba942bb7944d5527"
+    },
+    "playable/missions/user_maps/SCB20EA.INI": {
+      "sha256": "f019281e823571e1ba2f64fc2701da7cfae45f67e21786717cac0befd9656770"
+    },
+    "playable/missions/user_maps/SCB32EA.INI": {
+      "sha256": "e1e73588443e0c551d0aa614e999d4dabfbb89f38bf27f619706cdecf887ee8e"
+    },
+    "playable/missions/user_maps/SCB35EA.INI": {
+      "sha256": "606bd4f08514395723144ef203ef5786598432b925f3b59579efcc3d182ac828"
+    },
+    "playable/missions/user_maps/SCG01EA.INI": {
+      "sha256": "59e2a8b378e840a236d1635b44cf12ea59f0e9e02e7807e7c0e7b8e8f623377a"
+    },
+    "playable/missions/user_maps/SCM93EA.INI": {
+      "sha256": "67aa17b12bd4de9e6d0df104b5b2cee566eeb79efff74ee308e5ab54e3512f69"
+    },
+    "playable/missions/user_maps/SCM94EA.INI": {
+      "sha256": "a54e0d07f27de24d6cafc048424ea6ccd6fab39966633aa0f91a2a06a53cf113"
+    },
+    "playable/missions/user_maps/SCM98EA.INI": {
+      "sha256": "f30d931e1277990810c4fb56f5a252d6ec95a3653b8724eaa71d2f1d61456577"
+    },
+    "playable/missions/user_maps/SCM98EB.INI": {
+      "sha256": "9fa46f0871034f49d304381b1c2e06bcc27e7efbe64f0d68e0bf9ae2cdbcb835"
+    },
+    "playable/missions/user_maps/SCM98EC.INI": {
+      "sha256": "e246e78195d2a5e8b1c1c80762b546b4b08a730d6627cc5c6cd514ebfa734ff9"
+    },
+    "playable/missions/user_maps/SCS01EA.INI": {
+      "sha256": "aee6b3f465df1f2bf3d79d1fbffc22e101eb5857916e70f9e604821420128bdb"
+    },
+    "playable/missions/user_maps/SCW01EA.INI": {
+      "sha256": "51018cd9b8bf8bd5499a6fe225e652785cbfe75b16a95cca04826bf770aec30e"
+    },
+    "playable/mappreview.pack": {
+      "sha256": "c15486baf2548aaa2f5ada23168332c0062cf1a172df42fce4d901c9adfc9f5e"
+    },
+    "review-lab/tools/cnc_interface_lab/public/reference/radar_off.png": {
+      "sha256": "bedcd6cdc50c5685caede042919519718e79d448b00e5f6d9f61f5a43ad777c7"
+    },
+    "review-lab/tools/cnc_interface_lab/public/reference/radar_off_nod.png": {
+      "sha256": "22dc60f82db09c51da5deb222fffa3d3b7ae9cbd08be20532c64acaa29c1e73b"
+    },
+    "playable/INTRO2_f00020.png": {
+      "sha256": "6b36f1c15077a6caf603ae7c2e7eaa55d9b5b30834b353e1c9294e0d87c927ff"
+    },
+    "menu/doslobby.h": {
+      "sha256": "6e916582697063841e42e1656aff9087f2d071bc1abe45bd47363cd7fe365dab"
+    },
+    "menu/doslobby.c": {
+      "sha256": "e0366a9ee16a515fd95f6f9929a0a4fb35e4757f2301d39d52f86f4236b73eff"
+    },
+    "menu/dosmp.h": {
+      "sha256": "21960fb1e713f72d728a4ffa44aa08e9a3dfa21d7e9af2bad3d9a74399a8098b"
+    },
+    "menu/dosmp.c": {
+      "sha256": "8dbe766d8d32e2411af124b50cd351ed880b2c31e92d1625e7db3c0b3646cdd6"
+    },
+    "menu/dosops.h": {
+      "sha256": "37605c0e6584bedfd93a3d54ee011bc3b5bb6aa7111d6be22424124b908bbb53"
+    },
+    "game/dosopt.h": {
+      "sha256": "18ff19308c654d0f236ae852432844de4b20bbdda98677800bf7a38f45b51b60"
+    }
+  },
+  "main_items": [
+    {
+      "label": "Special Ops",
+      "disabled": false
+    },
+    {
+      "label": "User Maps",
+      "disabled": false
+    },
+    {
+      "label": "Start New Game",
+      "disabled": false
+    },
+    {
+      "label": "Load Mission",
+      "disabled": false
+    },
+    {
+      "label": "Skirmish",
+      "disabled": false
+    },
+    {
+      "label": "Multiplayer",
+      "disabled": false
+    },
+    {
+      "label": "Intro & Sneak Peek",
+      "disabled": false
+    },
+    {
+      "label": "Visuals",
+      "disabled": false
+    },
+    {
+      "label": "Exit Game",
+      "disabled": false
+    }
+  ],
+  "pause_items": [
+    {
+      "label": "Load Mission",
+      "disabled": false
+    },
+    {
+      "label": "Save Mission",
+      "disabled": false
+    },
+    {
+      "label": "Delete Mission",
+      "disabled": true
+    },
+    {
+      "label": "Game Controls",
+      "disabled": false
+    },
+    {
+      "label": "Visuals",
+      "disabled": false
+    },
+    {
+      "label": "Gameplay",
+      "disabled": false
+    },
+    {
+      "label": "Abort Mission",
+      "disabled": false
+    },
+    {
+      "label": "Exit Game",
+      "disabled": false
+    },
+    {
+      "label": "Resume Mission",
+      "disabled": false
+    },
+    {
+      "label": "Restate",
+      "disabled": false
+    }
+  ]
+}

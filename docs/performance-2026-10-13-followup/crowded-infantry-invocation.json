@@ -1,0 +1,740 @@
+{
+  "status": "Measured in six hidden runs; normalized path descriptor for portable replay. See crowd-validation.json.",
+  "baseline_commit": "67df3dea9468fa6c454195541c82768903373795",
+  "cwd": "${REPO_ROOT}/playable",
+  "args": [
+    "${REPO_ROOT}/playable/cnc_eyes",
+    "--scen",
+    "USER94",
+    "--pack",
+    "${REPO_ROOT}/playable/SCG01EA.pack",
+    "--dylib",
+    "${REPO_ROOT}/playable/TiberianDawn.dylib",
+    "--dir",
+    "${EVIDENCE_ROOT}/crowded-map/",
+    "--content",
+    "${REPO_ROOT}/playable/content/",
+    "--cameos",
+    "${REPO_ROOT}/playable/cameos.pack",
+    "--dospack",
+    "${REPO_ROOT}/playable/dossidebar.pack",
+    "--dosinf",
+    "${REPO_ROOT}/playable/dosinfantry.pack",
+    "--models3d",
+    "${REPO_ROOT}/playable/",
+    "--nosound",
+    "--w",
+    "1280",
+    "--h",
+    "720",
+    "--vsync",
+    "0",
+    "--enhanced",
+    "--reskin",
+    "--gfx",
+    "${EVIDENCE_ROOT}/baseline-fx.cfg",
+    "--savedir",
+    "${OUTPUT_ROOT}/saves",
+    "--script",
+    "${EVIDENCE_ROOT}/crowded-infantry-script.txt"
+  ],
+  "env": {
+    "OPENCNC3D_BACKGROUND": "1",
+    "OPENCNC3D_FRAMEPROF": "1",
+    "OPENCNC3D_GPUPROF": "1",
+    "OPENCNC3D_PERFDETAIL": "1"
+  },
+  "population": 80,
+  "positions": [
+    {
+      "index": 0,
+      "cell": [
+        26,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 1,
+      "cell": [
+        27,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 2,
+      "cell": [
+        28,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 3,
+      "cell": [
+        29,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 4,
+      "cell": [
+        30,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 5,
+      "cell": [
+        31,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 6,
+      "cell": [
+        32,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 7,
+      "cell": [
+        33,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 8,
+      "cell": [
+        34,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 9,
+      "cell": [
+        35,
+        27
+      ],
+      "slot": 1
+    },
+    {
+      "index": 10,
+      "cell": [
+        26,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 11,
+      "cell": [
+        27,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 12,
+      "cell": [
+        28,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 13,
+      "cell": [
+        29,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 14,
+      "cell": [
+        30,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 15,
+      "cell": [
+        31,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 16,
+      "cell": [
+        32,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 17,
+      "cell": [
+        33,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 18,
+      "cell": [
+        34,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 19,
+      "cell": [
+        35,
+        28
+      ],
+      "slot": 1
+    },
+    {
+      "index": 20,
+      "cell": [
+        26,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 21,
+      "cell": [
+        27,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 22,
+      "cell": [
+        28,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 23,
+      "cell": [
+        29,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 24,
+      "cell": [
+        30,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 25,
+      "cell": [
+        31,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 26,
+      "cell": [
+        32,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 27,
+      "cell": [
+        33,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 28,
+      "cell": [
+        34,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 29,
+      "cell": [
+        35,
+        29
+      ],
+      "slot": 1
+    },
+    {
+      "index": 30,
+      "cell": [
+        26,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 31,
+      "cell": [
+        27,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 32,
+      "cell": [
+        28,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 33,
+      "cell": [
+        29,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 34,
+      "cell": [
+        30,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 35,
+      "cell": [
+        31,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 36,
+      "cell": [
+        32,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 37,
+      "cell": [
+        33,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 38,
+      "cell": [
+        34,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 39,
+      "cell": [
+        35,
+        30
+      ],
+      "slot": 1
+    },
+    {
+      "index": 40,
+      "cell": [
+        26,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 41,
+      "cell": [
+        27,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 42,
+      "cell": [
+        28,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 43,
+      "cell": [
+        29,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 44,
+      "cell": [
+        30,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 45,
+      "cell": [
+        31,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 46,
+      "cell": [
+        32,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 47,
+      "cell": [
+        33,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 48,
+      "cell": [
+        34,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 49,
+      "cell": [
+        35,
+        31
+      ],
+      "slot": 1
+    },
+    {
+      "index": 50,
+      "cell": [
+        26,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 51,
+      "cell": [
+        27,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 52,
+      "cell": [
+        28,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 53,
+      "cell": [
+        29,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 54,
+      "cell": [
+        30,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 55,
+      "cell": [
+        31,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 56,
+      "cell": [
+        32,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 57,
+      "cell": [
+        33,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 58,
+      "cell": [
+        34,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 59,
+      "cell": [
+        35,
+        32
+      ],
+      "slot": 1
+    },
+    {
+      "index": 60,
+      "cell": [
+        26,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 61,
+      "cell": [
+        27,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 62,
+      "cell": [
+        28,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 63,
+      "cell": [
+        29,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 64,
+      "cell": [
+        30,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 65,
+      "cell": [
+        31,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 66,
+      "cell": [
+        32,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 67,
+      "cell": [
+        33,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 68,
+      "cell": [
+        34,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 69,
+      "cell": [
+        35,
+        33
+      ],
+      "slot": 1
+    },
+    {
+      "index": 70,
+      "cell": [
+        26,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 71,
+      "cell": [
+        27,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 72,
+      "cell": [
+        28,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 73,
+      "cell": [
+        29,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 74,
+      "cell": [
+        30,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 75,
+      "cell": [
+        31,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 76,
+      "cell": [
+        32,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 77,
+      "cell": [
+        33,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 78,
+      "cell": [
+        34,
+        34
+      ],
+      "slot": 1
+    },
+    {
+      "index": 79,
+      "cell": [
+        35,
+        34
+      ],
+      "slot": 1
+    }
+  ],
+  "samples": 120,
+  "engine_ticks_measured": 30,
+  "subtick_phases": [
+    0,
+    0.25,
+    0.5,
+    0.75
+  ],
+  "assertions_in_script": [
+    "count E1 80 at idle, before movement and after movement",
+    "expectsel 80 before ordinary move order"
+  ],
+  "source_provenance": {
+    "INI_template": "${REPO_ROOT}/playable/missions/user_maps/USER93.INI",
+    "BIN_template": "${REPO_ROOT}/playable/missions/user_maps/USER93.BIN",
+    "HGT_template": "${REPO_ROOT}/playable/missions/user_maps/USER93.HGT"
+  },
+  "model": {
+    "path": "${REPO_ROOT}/playable/einf/E1.c3m",
+    "magic": "C3DMODL1",
+    "version": 2,
+    "vertices": 1242,
+    "triangles": 957,
+    "bones": 20,
+    "pose_stream_bytes_per_full_soldier": 29808,
+    "pose_stream_bytes_per_80_unique_full_poses": 2384640,
+    "selector": "!experimental_textures && einf_on; importer model.enh=true; --reskin changes only terrain"
+  },
+  "fixture_file_sha256": {
+    "${EVIDENCE_ROOT}/crowded-map/USER94.INI": "0acb2468c588698122c2a249af3fb9ffab8acdce6c630ca093b6ce272bc7589b",
+    "${EVIDENCE_ROOT}/crowded-map/USER94.BIN": "fab4bb5605b299912bc5404e43acafe376c506cdbdec3663df92e17129a3e3bb",
+    "${EVIDENCE_ROOT}/crowded-map/USER94.HGT": "d82fe816139abc15f461babdfa422ba9a1abc4c58449c0cccda7b5fbfc619fea",
+    "${EVIDENCE_ROOT}/crowded-infantry-script.txt": "bbc77dd424185e2751ef46865bedc5e8c5e5082608ba5caa0bded51dacefe1f9"
+  },
+  "runtime_acceptance": [
+    "exit 0 and SCRIPT end with 0 failures",
+    "both M3E E1 load and m3dump inf=80, inffall=0",
+    "M3INFLIGHT infsh=1 and M3POSE hits>0; count and selection checks all pass",
+    "ORDER reached 41,31 without mismatch/out-of-screen; at least one watched OBJ cell changes",
+    "moving M3INF/M3GAIT lines demonstrate run weights/phase movement for a substantial subset (target >=40)",
+    "120 FRAMEBENCH n=1 samples; exclude screenshot/readback and warm-up samples"
+  ],
+  "notes": [
+    "Run only after parent measurement window permits. All game calls hidden.",
+    "Population is loaded by the existing TD mission reader; no unsupported spawn verb.",
+    "Private terrain/height clone is from an existing tested TD user map; the enemy silo remains far outside the camera to keep a live opponent without combat.",
+    "No forced low LOD, lower-quality settings, paused animation or reveal/no-shroud switch.",
+    "For another run, replace crowded-output paths in a copied script and assign separate output/savedir; preserve identical source/preset/map.",
+    "Source validation is not runtime validation; camera selection/order acceptance must pass before using timing results."
+  ]
+}

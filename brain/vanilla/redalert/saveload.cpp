@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Rejects invalid DLL save metadata and restores normal skirmish country statistics after load.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -45,6 +46,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 #include "factory.h"
 #include "xpipe.h"
 #include "blowpipe.h"
@@ -531,7 +533,7 @@ bool Load_Game(const char* file_name)
     ** Load the DLLs variables first, in case we need to do something different based on version
     */
     if (RunningAsDLL) {
-        DLLLoad(fstraw);
+        if (!DLLLoad(fstraw)) return false;
     }
 #endif
     /*
@@ -816,6 +818,7 @@ bool Load_Game(const char* file_name)
     **	data loaded.
     */
     Post_Load_Game(load_net);
+    FairAI_RA_Post_Load();
 
     /*
     ** Re-init unit trackers. They will be garbage pointers after the load

@@ -1,0 +1,252 @@
+{
+  "passed": true,
+  "visible_window_requested": false,
+  "launcher": "launcher-preview (local build)",
+  "launcher_sha256": "fe2c4ed8c324616461baad1f624a8745599a2d257738d05d1472b2992784e7ec",
+  "installation": "playable",
+  "hidden_ui_records": [
+    {
+      "kind": "flags",
+      "value": "58",
+      "hidden": "1",
+      "borderless": "1",
+      "ever_shown": "0",
+      "raise_calls": "0",
+      "focus_calls": "0"
+    },
+    {
+      "kind": "map",
+      "name": "close-centre",
+      "wx": "961",
+      "wy": "45",
+      "nx": "961",
+      "ny": "45",
+      "expected_nx": "961",
+      "expected_ny": "45",
+      "mx": "311",
+      "my": "9",
+      "expected_mx": "311",
+      "expected_my": "9",
+      "hit": "8",
+      "expected_hit": "8"
+    },
+    {
+      "kind": "map",
+      "name": "button-top-left",
+      "wx": "88",
+      "wy": "543",
+      "nx": "88",
+      "ny": "543",
+      "expected_nx": "88",
+      "expected_ny": "543",
+      "mx": "20",
+      "my": "175",
+      "expected_mx": "20",
+      "expected_my": "175",
+      "hit": "0",
+      "expected_hit": "0"
+    },
+    {
+      "kind": "map",
+      "name": "button-right-outside",
+      "wx": "280",
+      "wy": "543",
+      "nx": "280",
+      "ny": "543",
+      "expected_nx": "280",
+      "expected_ny": "543",
+      "mx": "84",
+      "my": "175",
+      "expected_mx": "84",
+      "expected_my": "175",
+      "hit": "-1",
+      "expected_hit": "-1"
+    },
+    {
+      "kind": "map",
+      "name": "high-dpi",
+      "wx": "966",
+      "wy": "52",
+      "nx": "961",
+      "ny": "45",
+      "expected_nx": "961",
+      "expected_ny": "45",
+      "mx": "311",
+      "my": "9",
+      "expected_mx": "311",
+      "expected_my": "9",
+      "hit": "8",
+      "expected_hit": "8"
+    },
+    {
+      "kind": "map",
+      "name": "letterbox",
+      "wx": "10",
+      "wy": "10",
+      "nx": "-5",
+      "ny": "-10",
+      "expected_nx": "-5",
+      "expected_ny": "-10",
+      "mx": "-1000",
+      "my": "-1000",
+      "expected_mx": "-1000",
+      "expected_my": "-1000",
+      "hit": "-1",
+      "expected_hit": "-1"
+    },
+    {
+      "kind": "drag",
+      "header": "1",
+      "control": "0"
+    },
+    {
+      "kind": "motion",
+      "nx": "381.000",
+      "ny": "270.000",
+      "expected_nx": "381",
+      "expected_ny": "270",
+      "before_present": "1"
+    },
+    {
+      "kind": "pacing",
+      "fixed33": "0",
+      "target_hz": "125",
+      "max_budget_ms": "8",
+      "frame_count": "32",
+      "elapsed_ms": "199.387",
+      "median_ms": "4.960",
+      "max_ms": "16.749",
+      "hidden_throughput_only": "1"
+    },
+    {
+      "kind": "cursor_gl",
+      "width": "1016",
+      "height": "636",
+      "x": "500",
+      "y": "300",
+      "base": "cursor-gl-base.rgba",
+      "actual": "cursor-gl-actual.rgba"
+    },
+    {
+      "kind": "close",
+      "outside_kept": "1",
+      "dragoff_kept": "1",
+      "quit": "1",
+      "x": "940",
+      "y": "30",
+      "w": "45",
+      "h": "33"
+    },
+    {
+      "kind": "cursor",
+      "source": "ecur/ecur.bin",
+      "mesh": "CUR00",
+      "triangles": "108",
+      "source_crc32": "6e5d2e4e",
+      "native_size": "40",
+      "smoothing": "0"
+    }
+  ],
+  "hardware_frame_timing_is_record_only": true,
+  "cursor": {
+    "source_asset": "playable/ecur/ecur.bin",
+    "source_asset_sha256": "e82a142e4c4a4a986bd61feff28b999bae10602a990be9d0e8c884c0ebda8217",
+    "game_draw_source": "menu/enhanced_menu_cursor.h",
+    "game_draw_source_sha256": "5aceda8b0745c32ba4e85eb209ddc7a5867bf1d3d29c8203236933430359746f",
+    "mesh": "CUR00",
+    "native_scale": 1,
+    "reference_uses_unchanged_game_draw": true,
+    "cases": [
+      {
+        "native_xy": [
+          500,
+          300
+        ],
+        "rgba_sha256": "840cc7e5098448b111dfc67bc88cdd6111ac41e0bbdfdd58d9c97a700b90ee0c",
+        "game_reference_rgba_sha256": "c307d74171e66d7c5832c1230c73458632cc7e28e20e6445f2734179d270f119",
+        "different_pixels": 18,
+        "maximum_channel_delta": 27,
+        "source_crc32": 1851600462,
+        "software_vs_gl_rasterization_difference_recorded": true
+      },
+      {
+        "native_xy": [
+          501,
+          300
+        ],
+        "rgba_sha256": "a99aa8abbab082fad77ade8f3a46ded2f31167a373d11334654047c4a444a3ff",
+        "game_reference_rgba_sha256": "9a123fcc0ef77ca244a88116f6074eeb8e4bdb4002a71b7ca77dc70c3f65e4fd",
+        "different_pixels": 18,
+        "maximum_channel_delta": 27,
+        "source_crc32": 1851600462,
+        "software_vs_gl_rasterization_difference_recorded": true
+      },
+      {
+        "native_xy": [
+          502,
+          300
+        ],
+        "rgba_sha256": "8d7fcc539917a041c2c1932616c4cf9ffb59565dcb28a4d87f1273b9ca837276",
+        "game_reference_rgba_sha256": "587e89ba02ddd571198cfad6c3997222246d0e670d73f0382132f0559e97efd5",
+        "different_pixels": 18,
+        "maximum_channel_delta": 27,
+        "source_crc32": 1851600462,
+        "software_vs_gl_rasterization_difference_recorded": true
+      },
+      {
+        "native_xy": [
+          0,
+          0
+        ],
+        "rgba_sha256": "729fa83be84b02bbcf2782e5cefc039c91a4d2971ce785030fa499480d924d05",
+        "game_reference_rgba_sha256": "5d7f16711882064b9003c85f2ad9095a8bf8310b0be1c842570bccaed6599cb2",
+        "different_pixels": 12,
+        "maximum_channel_delta": 27,
+        "source_crc32": 1851600462,
+        "software_vs_gl_rasterization_difference_recorded": true
+      }
+    ],
+    "live_gl_cases": [
+      {
+        "native_xy": [
+          500,
+          300
+        ],
+        "size": [
+          1016,
+          636
+        ],
+        "pixel_exact": true,
+        "actual_rgba_sha256": "3ce2863398b2d3eb57db6578930403158054bd61382c35b500abeab402fbbd98",
+        "game_reference_rgba_sha256": "3ce2863398b2d3eb57db6578930403158054bd61382c35b500abeab402fbbd98"
+      }
+    ]
+  },
+  "interaction": {
+    "target": {
+      "i": "1",
+      "label": "Changelog",
+      "x": "304",
+      "y": "543",
+      "w": "192",
+      "h": "42",
+      "hidden": "0",
+      "drawn": null
+    },
+    "mouse_native": "400,564",
+    "hover_changed_pixels": 6710,
+    "held_changed_pixels": 5950,
+    "hover_signal_reaction_pixels": 3875,
+    "held_signal_reaction_pixels": 4195,
+    "fixed_phase_idle_changed_pixels_per_quadrant": [
+      65226,
+      85073,
+      36182,
+      44015
+    ],
+    "geometry_unchanged": true,
+    "shot_press_activated_nothing": true
+  },
+  "protected_file_count": 252,
+  "protected_files_changed": []
+}

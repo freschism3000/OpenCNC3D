@@ -126,16 +126,17 @@ static void ambience_hud_sound(bool click)
 
 /* Uses the renderer's exact CPU wet/river classification, cached when it builds its
    water field. It remains available even when the water shader's effect is disabled. */
-static void ambience_update(int fbw, int fbh)
+struct AmbienceLevels {
+    float zoom, ocean, river, gains[7];
+    int riverPan;
+};
+
+static AmbienceLevels ambience_levels(int fbw, int fbh)
 {
-    if (!g_au || !g_fx.enabled || g_editOn) {
-        ambience_stop(); g_ambOcean = g_ambRiver = 0; return;
-    }
-    g_ambZoom = g_camMode == CAM_N64
+    AmbienceLevels levels = {};
+    levels.zoom = g_camMode == CAM_N64
         ? ambience_zoom_fraction(g_dist, dist_min_now(), DIST_MAX_OURS)
         : ambience_zoom_fraction(g_zoom, zoom_max_now(), ZOOM_MIN);
-    g_ambOcean = g_ambRiver = 0;
-    int riverPan = 0;
     bool hasWater = false;
     for (size_t i = 0; i < water_cells().size(); ++i)
         if (water_cells()[i].holes) { hasWater = true; break; }
@@ -161,24 +162,77 @@ static void ambience_update(int fbw, int fbh)
             } else if (d < seaD) seaD = d;
         }
         // A quiet approach begins near shore; coverage takes over as the camera crosses it.
-        g_ambOcean = fmaxf(ocean / (24.0f * 14.0f), 0.20f * ambience_attenuation(seaD));
-        g_ambRiver = ambience_attenuation(riverD) * ambience_river_mix(g_ambZoom);
+        levels.ocean = fmaxf(ocean / (24.0f * 14.0f), 0.20f * ambience_attenuation(seaD));
+        levels.river = ambience_attenuation(riverD) * ambience_river_mix(levels.zoom);
         const float yaw = g_camMode == CAM_N64 ? g_camYaw : YAW_DEG * (float)M_PI / 180;
         const float side = (rx - g_camX) * cosf(yaw) + (rz - g_camZ) * sinf(yaw);
-        riverPan = (int)(fmaxf(-0.75f, fminf(0.75f, side / 8)) * 1000);
+        levels.riverPan = (int)(fmaxf(-0.75f, fminf(0.75f, side / 8)) * 1000);
     }
     // Near and far are two unrelated recordings, so the zoom blend between them is
     // equal-power: a straight linear blend sags about 3 dB at mid zoom.
-    const float nearMix = ambience_near_mix(g_ambZoom);
+    const float nearMix = ambience_near_mix(levels.zoom);
     const float nearG = sinf(nearMix * (float)M_PI * 0.5f), farG = cosf(nearMix * (float)M_PI * 0.5f);
     bool desert = !strcmp(g_pack.theater, "DESERT");
-    bool temperate = !strcmp(g_pack.theater, "TEMPERAT");
-    ambience_bed(0, desert ? nearG * (1 - g_ambOcean) : 0);
-    ambience_bed(1, desert ? farG * (1 - g_ambOcean) : 0);
-    ambience_bed(2, temperate ? nearG * (1 - g_ambOcean) : 0);
-    ambience_bed(3, temperate ? farG * (1 - g_ambOcean) : 0);
-    ambience_bed(4, g_ambRiver, riverPan);
-    ambience_bed(5, nearG * g_ambOcean);
-    ambience_bed(6, farG * g_ambOcean);
+    bool temperate = !strcmp(g_pack.theater, "TEMPERAT") || !strcmp(g_pack.theater, "RATEMP");
+    levels.gains[0] = desert ? nearG * (1 - levels.ocean) : 0;
+    levels.gains[1] = desert ? farG * (1 - levels.ocean) : 0;
+    levels.gains[2] = temperate ? nearG * (1 - levels.ocean) : 0;
+    levels.gains[3] = temperate ? farG * (1 - levels.ocean) : 0;
+    levels.gains[4] = levels.river;
+    levels.gains[5] = nearG * levels.ocean;
+    levels.gains[6] = farG * levels.ocean;
+    return levels;
+}
+
+static void ambience_prepare_loading(int fbw, int fbh)
+{
+    if (!g_au || !g_fx.enabled || g_editOn || !mesh_perf_switch("OPENCNC3D_AMBIENCE_PREPARE")) return;
+    GLint active = GL_TEXTURE0, binding = 0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &active);
+    glActiveTexture(GL_TEXTURE0);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &binding);
+    const Uint64 started = SDL_GetPerformanceCounter();
+    Uint64 fieldReady = started;
+    int pendingClip = -1, preparedClips = 0;
+    bool complete = false;
+    try {
+        const AmbienceLevels levels = ambience_levels(fbw, fbh);
+        fieldReady = SDL_GetPerformanceCounter();
+        for (int clipIndex = 0; clipIndex < 7; clipIndex++) {
+            if (levels.gains[clipIndex] <= 0 || g_ambClips[clipIndex].tried) continue;
+            pendingClip = clipIndex;
+            if (ambience_clip(clipIndex)) preparedClips++;
+            pendingClip = -1;
+        }
+        complete = true;
+    } catch (const std::bad_alloc&) {
+        if (pendingClip >= 0) {
+            SDL_FreeWAV(g_ambClips[pendingClip].pcm);
+            g_ambClips[pendingClip] = AmbienceClip();
+        } else {
+            water_field_free();
+            g_waterFieldNone.valid = false;
+        }
+    }
+    glBindTexture(GL_TEXTURE_2D, (GLuint)binding);
+    glActiveTexture((GLenum)active);
+    const Uint64 finished = SDL_GetPerformanceCounter();
+    const double milliseconds = 1000.0 / SDL_GetPerformanceFrequency();
+    fprintf(stderr, "AMBIENCEPREPARE|ready=%d|field_ms=%.3f|clips_ms=%.3f|clips=%d|voices_started=0\n",
+            complete ? 1 : 0, (fieldReady - started) * milliseconds,
+            (finished - fieldReady) * milliseconds, preparedClips);
+}
+
+static void ambience_update(int fbw, int fbh)
+{
+    if (!g_au || !g_fx.enabled || g_editOn) {
+        ambience_stop(); g_ambOcean = g_ambRiver = 0; return;
+    }
+    const AmbienceLevels levels = ambience_levels(fbw, fbh);
+    g_ambZoom = levels.zoom;
+    g_ambOcean = levels.ocean;
+    g_ambRiver = levels.river;
+    for (int clipIndex = 0; clipIndex < 7; clipIndex++)
+        ambience_bed(clipIndex, levels.gains[clipIndex], clipIndex == 4 ? levels.riverPan : 0);
 }
 #endif

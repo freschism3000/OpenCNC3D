@@ -1,0 +1,1906 @@
+{
+ "design": "ra-enhanced-menu-v01",
+ "assets": {
+  "btn-pl-blue": {
+   "rgba_sha256": "9f3d9a79b55eb8dc5f2704100fd076f51b5ebe1fdbe3aa1ac34cd9b7572cc7ba",
+   "width": 24,
+   "height": 18
+  },
+  "btn-pl-red": {
+   "rgba_sha256": "41c4291a5ce88003d6e19b1f3c725d2210272b36efca0a6cdb3941d4f63cd92c",
+   "width": 24,
+   "height": 18
+  },
+  "btn-st-blue": {
+   "rgba_sha256": "8304c356e02b82b8d7b51c9027e7cf6a9495ee6bac9bff64c7587089e52295e8",
+   "width": 24,
+   "height": 18
+  },
+  "btn-st-red": {
+   "rgba_sha256": "2534921b983076e62f1e8ff48241681b31a57572004cd1e2a7eb773cec6f6d9b",
+   "width": 24,
+   "height": 18
+  },
+  "button-132-32-active-blue": {
+   "rgba_sha256": "f80536c0b72fd1e7acefa20454b7ae5d1fb31a0ecbee0531aa59766e4b37680c",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-active-red": {
+   "rgba_sha256": "6eb897bb792ffd87c9450f199adc8402b19a93a8aee632315dd433d83e154cac",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-activehover-blue": {
+   "rgba_sha256": "6e1d7bf5e5717abdac49196763fe94bbbfe61e119816ffdf83a2a1e542cc334f",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-activehover-red": {
+   "rgba_sha256": "7c00ac75bc8730b9a33e3938576227bc9701166b499358d53619c66a5fc55da6",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-disabled-blue": {
+   "rgba_sha256": "5ff511f2ca088af1b3f5501b8c545a27722d2168e9c58073444c3ff597e0f679",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-disabled-red": {
+   "rgba_sha256": "680e05bee191df2e5107e0d8374e3d2be9fddad8a090956a4f2350db9055a438",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-hover-blue": {
+   "rgba_sha256": "ffff3d3a4adf771ef4f165bc167beb3ce8d45c2406b69fb6baf891a5f35cb53a",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-hover-red": {
+   "rgba_sha256": "b6b2cf67f9baeb386d67777df98883bfec741875e4cb20280326c86400bbc576",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-normal-blue": {
+   "rgba_sha256": "ee1a026bc06df20a24bcd4e089870c25db8726c69b9b4ed1b0befef95f1413d4",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-normal-red": {
+   "rgba_sha256": "197fcb83c00ff95bc8cb8e29809d31b21953f3e4a4df16bd706947ee5b453cf0",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-pressed-blue": {
+   "rgba_sha256": "38e659c0938b78d17f0d9f3a81018899f7a723e2737c51c87874e482b81aa58b",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-32-pressed-red": {
+   "rgba_sha256": "18910f48e9cc59166c62f854df82c6c5cd7783a8cddde1fc60598d314cab235f",
+   "width": 132,
+   "height": 32
+  },
+  "button-132-40-active-blue": {
+   "rgba_sha256": "e8b8ac4b5e697beefd49c7f2bafc6d0a7ad1e8e3636d3ac03e65ae2dd7bbe40d",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-active-red": {
+   "rgba_sha256": "25a07836dbdd201c9850df31530335dc546c32c470888a34dd5a63075ad93f9b",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-activehover-blue": {
+   "rgba_sha256": "b99c14a719d22d0ca558c46e523d3da35f20ac3b8fcc165add9629b491a08731",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-activehover-red": {
+   "rgba_sha256": "8e56797e3bb5d2bbb8afa6fc820fc80e1a3702b661f1bf2f1f58866c9b6c0132",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-disabled-blue": {
+   "rgba_sha256": "866233c6dfad46400ff5ff7874ab0cb68881d59364575137e921534da17d06bc",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-disabled-red": {
+   "rgba_sha256": "b5c102864701ac204d6f62bdd53dda126e1475287e2402ca6df8b7d324b09afb",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-hover-blue": {
+   "rgba_sha256": "319d353dbf91d921c859cf1c1f5afaa0a6e44382b8016645df939319f160e790",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-hover-red": {
+   "rgba_sha256": "9271b5bad5c2762fe4bdda4edc5b8f62dbcdb7f6ce8e05f561167c648dbfa39c",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-normal-blue": {
+   "rgba_sha256": "3d2fb411330877a7f7ba4d4ad1b0d8659ec92861f668de6d929c04ef5672f8fe",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-normal-red": {
+   "rgba_sha256": "f3f6ec3f444c3f2694f1ecb71994fb6fc400e8740f0add8320052e5bd1097508",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-pressed-blue": {
+   "rgba_sha256": "fc1b20e968e70ca5f7db75898f28dde9edcd88c26b81eb801c4631f17d3eb71a",
+   "width": 132,
+   "height": 40
+  },
+  "button-132-40-pressed-red": {
+   "rgba_sha256": "6cd234eda130b48a91b53bdeef8dc4e0c5395b4a4017cdb4b68e05c1842bf9ed",
+   "width": 132,
+   "height": 40
+  },
+  "button-140-40-active-blue": {
+   "rgba_sha256": "9bb2edde76862c09f9389a45f97494abf576c1c35913c6793064b3ca0a6e3438",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-active-red": {
+   "rgba_sha256": "3e42162114bdf9824939fda8f9eced245d7a4bde710cdcc2e54f40fb90991df0",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-activehover-blue": {
+   "rgba_sha256": "7d09bb3bfc478279e8a69514d5a25fc727fe467dbc89d68cbd72ace835fb4a3a",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-activehover-red": {
+   "rgba_sha256": "0bd49132272b3118ed9d9c91bddf552dcdada62e8f4795ec2b63a57ace7c65cd",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-disabled-blue": {
+   "rgba_sha256": "9a2a8ff6074d665be75d6c71fae16402c4fc3d658c985000ea7486d7205ad865",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-disabled-red": {
+   "rgba_sha256": "8d666fbc954d75746a583f1130f06c758f963dffcc8dc0f33a877818c8d6cf72",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-hover-blue": {
+   "rgba_sha256": "6ae3c5d26970804d0e0fc01588ff4852348410b55cae08fe799fbdfadaab5677",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-hover-red": {
+   "rgba_sha256": "dd32150e7a02b889e6c4cad34dbecb269ea9411f3440252efc4ff6937e38d332",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-normal-blue": {
+   "rgba_sha256": "d509bbe8df3f17e6272cdbf9966d9e11c354290457f13c2b5680836667b6038c",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-normal-red": {
+   "rgba_sha256": "b9be0388e4a8ae21f108b38f1d1efb9e7085e951e03e722de41bae7fd5594fbd",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-pressed-blue": {
+   "rgba_sha256": "5dbfe03f6605436f04bf1ef59294c36aea0e4f32b90eeeca62172f28bd8f9f7e",
+   "width": 140,
+   "height": 40
+  },
+  "button-140-40-pressed-red": {
+   "rgba_sha256": "ab9f2f0e4611eee9344a79bb7be25df2aa273841820b62c67f4eb0a5b0359f6b",
+   "width": 140,
+   "height": 40
+  },
+  "button-148-40-active-blue": {
+   "rgba_sha256": "2187d189d11b2db86f69567855b0219817bb1bae0d8c3b5c128d5a685797e5f9",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-active-red": {
+   "rgba_sha256": "7a138d548d42b94610130ed3268b51d0624a532e4d6d7a00f1524413ed00e951",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-activehover-blue": {
+   "rgba_sha256": "d740062200413976794d998fcece26cc862516274905a4161e87ce1502713f11",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-activehover-red": {
+   "rgba_sha256": "9e2ae71efbf9e7eeb54998f439051489d94fcb385c5cf628cac9b390bf539258",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-disabled-blue": {
+   "rgba_sha256": "9171058c720c3944e8199a5d78e9493e57f873f2dbe729c59ede66ce5f8ec9f9",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-disabled-red": {
+   "rgba_sha256": "9cc1a7f57af592d89de1da2f4ba72fcc856994a1c209a44bcc8ec9cce4edfc30",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-hover-blue": {
+   "rgba_sha256": "c3a15c8ebc87536b9f25c262b5f23f287f21aca4312db29970c673f09c0763bb",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-hover-red": {
+   "rgba_sha256": "60e4229fefa2b0fecdd245e233b1b1ead4d8e081c645c8c1fc3d78e1441a684b",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-normal-blue": {
+   "rgba_sha256": "fa753e8036b81c4e299e540aabeb41c8516624f75b15a6bf5cbe0267b6e10cab",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-normal-red": {
+   "rgba_sha256": "218e1c76a179098a2c5ee428ea1f806b9d3980c02f0f8142271cbb076a115d92",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-pressed-blue": {
+   "rgba_sha256": "f42999994d5f44641055dd4f077eb14b789c945818da2bc3b96fd5fde2f021cb",
+   "width": 148,
+   "height": 40
+  },
+  "button-148-40-pressed-red": {
+   "rgba_sha256": "8e4d01b2e3fa3783df2132eb7afb084c62672f6a24be91171f0b68206dfb9496",
+   "width": 148,
+   "height": 40
+  },
+  "button-154-40-active-blue": {
+   "rgba_sha256": "dd6c607708e979f0d5dc82eddd385e6962417bfec12469c490e536cd16cea04d",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-active-red": {
+   "rgba_sha256": "46c29b2275bcd57175dd71aaca17889bb9ac2fc6255e9ec07884790bfeced790",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-activehover-blue": {
+   "rgba_sha256": "e3df32c90c0e7df3a64350cd942eaf64d64739a7111cd3072d806cfbb6740e30",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-activehover-red": {
+   "rgba_sha256": "aabebf5069a300c8f0112b20ef1425647a5809b49bbc699e7174f70a6cbede70",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-disabled-blue": {
+   "rgba_sha256": "836f141d851bb33e5ee39eedc0321e6d08e33e5996e89e5c7916f9a93465b561",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-disabled-red": {
+   "rgba_sha256": "cb84cfd4df187aa07825e3dbda3663a1829621276621e70311fd57cb5994c87c",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-hover-blue": {
+   "rgba_sha256": "99d8ac1c453a01b38a699b6fb8c39ac620f17a54f399b310423e1b4c32100c7d",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-hover-red": {
+   "rgba_sha256": "34de30d3b6cc2ec15546272c65aabf77893c4a03d38125d73c9134b4d924dc34",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-normal-blue": {
+   "rgba_sha256": "426e6d42dada59d6377f65450f57d6d164b1dffe15e98e9ce04e3196307d4295",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-normal-red": {
+   "rgba_sha256": "2912a49050ec7a230bfc8d4026de35da822a5c1cd2c611c0a71fe34b9ac7aafc",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-pressed-blue": {
+   "rgba_sha256": "bb1550dc779fdb155af5e65b68110a82e2dae152cb9f03d4f1b7a278f3420686",
+   "width": 154,
+   "height": 40
+  },
+  "button-154-40-pressed-red": {
+   "rgba_sha256": "f1e94f306e9513d5460a4a6de79e4ad09889502becafebaf19c46f96b88c1492",
+   "width": 154,
+   "height": 40
+  },
+  "button-160-40-active-blue": {
+   "rgba_sha256": "320dea66c3fa6911563ab380afeecbff7d4d6adf1cd49254dbe0b59c40a4eaeb",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-active-red": {
+   "rgba_sha256": "ab3063882e32d0edb40e9531e873cb91f650e57664979e2e1e8e0cb533b3186b",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-activehover-blue": {
+   "rgba_sha256": "6488e42110441edd06f597f7dfd0959ead2496faf4aa23f244c9576446f360de",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-activehover-red": {
+   "rgba_sha256": "776a9c46f52055bdad079a60a32601e172bef7d4a3d9076f9cda7b216eacf195",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-disabled-blue": {
+   "rgba_sha256": "b6dfc6f6fa5fe7ca9f0dbb134c599c295c55fb1af39330ee149053824fbde8f3",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-disabled-red": {
+   "rgba_sha256": "f254589dff60423e8940804d9c17b8329607b09f1088875bc361e0f94905a3a3",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-hover-blue": {
+   "rgba_sha256": "17b530eb12df8e3990a32b2bf6f48cbf9d1eeeddb060691d99aa3468392a5aae",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-hover-red": {
+   "rgba_sha256": "88d4d62b1040a536855b02752eaed121af6932c46c0722ffbad4b257f917f286",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-normal-blue": {
+   "rgba_sha256": "319cad2d2f9ba8ad4b19f17a9897254c7dbcda148fc0a7c0ce673140eaab68c0",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-normal-red": {
+   "rgba_sha256": "6eb50d6333ba6ff104aef18aed9005738e34b63de3f34947769352dc90980cb5",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-pressed-blue": {
+   "rgba_sha256": "f65bf5d4331eb7791d5afdb3913252f1ef9ed725fd090a88b0cb48d339be881b",
+   "width": 160,
+   "height": 40
+  },
+  "button-160-40-pressed-red": {
+   "rgba_sha256": "5c1ed0d16d0c10f15f294944882e0654d4db5384d01fe47d57f02cfba8f3d3d1",
+   "width": 160,
+   "height": 40
+  },
+  "button-180-40-active-blue": {
+   "rgba_sha256": "b5c9e40ad029410a818aa8ef4c14e2155ebf92b49d97af1ea2d11d29b02792f0",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-active-red": {
+   "rgba_sha256": "b4211ce1abc0735cf84d1731bdcad7a9069c2f315560f70827cd32d32697052b",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-activehover-blue": {
+   "rgba_sha256": "ad4316de5123d4d171e69e050cffe2eff793f3a3f0a6d7b8a3dba2cd9394f093",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-activehover-red": {
+   "rgba_sha256": "ed5ed947b8bdf0e54189d37b9e303a12f91272a089799790f612daaac27c4bfd",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-disabled-blue": {
+   "rgba_sha256": "dfd15f6f34dae549783e8a8b8613e176399945dac70ee2bdb31a3e4522060a0a",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-disabled-red": {
+   "rgba_sha256": "0bac5c3974548cfb02c9092cc989307db6835e6afd77709aad150837fd0e83d6",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-hover-blue": {
+   "rgba_sha256": "88d8438b2e0adfe24ff598bb0112f8d05b4a42f1fdfcfa1536125734520e9a27",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-hover-red": {
+   "rgba_sha256": "ed0a674bc5899c6894d5b2ffc69e9887b11faab410651c5fc9f8ee859e58860d",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-normal-blue": {
+   "rgba_sha256": "206ec94a0a0f1663ca480b0906db9e65c09c01cb4e3bb06d95be3c683775dd1a",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-normal-red": {
+   "rgba_sha256": "b948602b4c67e0ab10d4e93da4016a7e09db3b06f00668d223649e862d79db99",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-pressed-blue": {
+   "rgba_sha256": "2b1bababa94685acc5fc10e2f119a4aa1a1b6d7b01a8fd33b038a8cbfa571c03",
+   "width": 180,
+   "height": 40
+  },
+  "button-180-40-pressed-red": {
+   "rgba_sha256": "4e8e9ccd0f46183c17d5831b7f9b57215c3fc21468c0aef5f500787220dd0c38",
+   "width": 180,
+   "height": 40
+  },
+  "button-192-40-active-blue": {
+   "rgba_sha256": "6cec14d8d9e1ea917fa6e9f3de711e5b45de6dc0133e572497bc56ecb3aeab31",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-active-red": {
+   "rgba_sha256": "eec3e1c96afae40f9ab0c90de125f048fa05bdeab455685dc9b60869316acd70",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-activehover-blue": {
+   "rgba_sha256": "e76fe4a65ecdad62191b3f4aaffebe325cb3072b8404c66933384f01f0b344c3",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-activehover-red": {
+   "rgba_sha256": "f728956f273de875a8ef1c187d20d748681283bf1ea3f6cd3aa2832343bae2b8",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-disabled-blue": {
+   "rgba_sha256": "3ad60297cdf22fc25d17a7e1b9046c04d9f94b35326da2202c3d0c1ba00dbf37",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-disabled-red": {
+   "rgba_sha256": "4c40c0d6731a7175b28a30150bbcfa7f44b3cdadfa06027681e40bee4498ee37",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-hover-blue": {
+   "rgba_sha256": "3653f06123bfce9c90ae60fb7ccc10b449356816c917f7547152b8ed881973bf",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-hover-red": {
+   "rgba_sha256": "3eab07c785527457d695a5ba6b2d6290c8c49e982117140e52b13b87d46fa4eb",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-normal-blue": {
+   "rgba_sha256": "f1c8e406d13c954414796c78326c4f5536b06876a6122003584d60a843e81711",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-normal-red": {
+   "rgba_sha256": "08f104ec1c5e87b208098036990f7546d2aac687812b6217145da38adb6dbcb5",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-pressed-blue": {
+   "rgba_sha256": "810d62e63e453d0744c8a6b7650e4e6c6f3c6fa602ef460e9b7a40c984f9dc04",
+   "width": 192,
+   "height": 40
+  },
+  "button-192-40-pressed-red": {
+   "rgba_sha256": "7164d585144e0315691901614ede95e04a083381395e0ea58f2c5e251d707c39",
+   "width": 192,
+   "height": 40
+  },
+  "button-196-40-active-blue": {
+   "rgba_sha256": "2a18ac3e16ab9fe4413765d8bedb90e51606e054e469467a9ddd713d52b7d959",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-active-red": {
+   "rgba_sha256": "d5553d9dba8d369dbcaca1ad1077708f8de73184840c204cc3cc43657e07d728",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-activehover-blue": {
+   "rgba_sha256": "b76ff7f725c7f6e9b5884dcaf5a1eae5229aea8974cd069a038417b3024d01a9",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-activehover-red": {
+   "rgba_sha256": "b18a9ea81bfa9d58844aa9bdc93ac735dd748c6491b5a2aadd21393c3a754bd7",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-disabled-blue": {
+   "rgba_sha256": "db3b794eae0848e0f9dbf0076309f1a5828ab456e3a4b0be55dd005b9f33c0b7",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-disabled-red": {
+   "rgba_sha256": "572ba71c8357f5f53511bcd5158715f0e58a2ce70e320f831b82ed8cc97f9cbf",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-hover-blue": {
+   "rgba_sha256": "257280b2ad115af19e5cf4f2f0db313818ed2fa61343c2b9216c2ff0d18fef4c",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-hover-red": {
+   "rgba_sha256": "7b5ce39bef19125be0f6b09c45882fdd72dc78130287970d61c08acc1c4fcbf2",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-normal-blue": {
+   "rgba_sha256": "a36a41aa2ab242e6619e6e043396538e1c26807e31aec4aa030bee7d6b635266",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-normal-red": {
+   "rgba_sha256": "b7970fbe64bd0333055c68adaf7b152c7e50e044366dc68b5b969e31caea4f1a",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-pressed-blue": {
+   "rgba_sha256": "0f1bd0a66db9ae39f7481bcce3c3eeaa169d179d5da31368cc6321b5f73b3c1a",
+   "width": 196,
+   "height": 40
+  },
+  "button-196-40-pressed-red": {
+   "rgba_sha256": "1b8be1a329b48cd52490ac7f5beb70adfcd90639911519487b5dff874688f860",
+   "width": 196,
+   "height": 40
+  },
+  "button-204-40-active-blue": {
+   "rgba_sha256": "dc37846b2410ae196e4d1822edc0d6ca2c9f697c1894ac3a9861be410daa418f",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-active-red": {
+   "rgba_sha256": "d20b5708ccab8700d5cfdfa11a9e585a05f904a23b2dc04bb5c749a0b9d20749",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-activehover-blue": {
+   "rgba_sha256": "1a667694093827ad00478d4aa45fc4364a258e41cd4e839b73558b3220b2e415",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-activehover-red": {
+   "rgba_sha256": "aa24c28396b198c3bbd8ad7f4d0c9ce38d880d219ef31d5d9d7e43fc691c52f1",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-disabled-blue": {
+   "rgba_sha256": "55de0fe971eb8bdf14c3c9e651fe6905def082d22daf94f0a3bcc4553045a631",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-disabled-red": {
+   "rgba_sha256": "03180cef4f20867500c2f02c96a5955a8c3cdb2eb6a0f670529ee5a61ce916f2",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-hover-blue": {
+   "rgba_sha256": "a062b56c52a2336facfccf71295ca5f4b3f67342b4779313e1d5535254bbaa2b",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-hover-red": {
+   "rgba_sha256": "efc33d682b2a144b0269e8d924a9e81e663cdba912daeefd2e0b403d79ab7952",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-normal-blue": {
+   "rgba_sha256": "48bd61e64d2be7e2a3c1de2ef8dd3c8c688a74734a64b14382b297ab16359e44",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-normal-red": {
+   "rgba_sha256": "543511985b7f7667b1fabaca9844da8df1b3a6427722703cf0d883bc45911bdd",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-pressed-blue": {
+   "rgba_sha256": "c25eeb69e88ab3160572c6c75157893376c21620e291940ec449e87877021c5e",
+   "width": 204,
+   "height": 40
+  },
+  "button-204-40-pressed-red": {
+   "rgba_sha256": "fcde0164606b20688ec9968e6dc7db9c7e1879359c6e028645e42c9b51d07edd",
+   "width": 204,
+   "height": 40
+  },
+  "button-220-40-active-blue": {
+   "rgba_sha256": "965158a61839794fc2b25470677ca096401628a37a93a5aa91390633b80c2c70",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-active-red": {
+   "rgba_sha256": "fd44164a0ab9798148f8e308e3bad7bd0b4ede923e60601b4985891378fd7fa1",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-activehover-blue": {
+   "rgba_sha256": "2a272face103401d235ee64315eb53b5a1525ff971aa7765d28c47e19647608d",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-activehover-red": {
+   "rgba_sha256": "5650d1951561858660385ad64772dcae2ba8dbed4491265410acca8c2d292a0a",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-disabled-blue": {
+   "rgba_sha256": "df4f36c5b6213d462811914a4c769d67fbb9bb1c2fcc601362df5771be8fba72",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-disabled-red": {
+   "rgba_sha256": "311f6b4e29361ccc7e10f79cb7f52d20b113227bd78556d1ea1e822a7f0882d4",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-hover-blue": {
+   "rgba_sha256": "2f60848670a6a00c5ffb99553e34aa9e0b5a9a18054a12eb5dab68eefc93cbed",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-hover-red": {
+   "rgba_sha256": "4b69eb4617e214aa7ae553fec003d46899217208a9081d007ee639391bf332f6",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-normal-blue": {
+   "rgba_sha256": "2538e11ab5a5c1dc0b6933ee1dd97b4d24d7a5171c7ec70446a5f56161e82fe9",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-normal-red": {
+   "rgba_sha256": "64debf489fb47af54e21ef22042b1a0aa0205d4a77bc324bb33598ffda93c167",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-pressed-blue": {
+   "rgba_sha256": "5d7e1f306a3d401b760071d62a596de63bf89a50014798652dbd8f4bb074afdf",
+   "width": 220,
+   "height": 40
+  },
+  "button-220-40-pressed-red": {
+   "rgba_sha256": "8018571326e58e484312df4c664ccb4e2e261bd9e6dac3442ffea9dcf17e751d",
+   "width": 220,
+   "height": 40
+  },
+  "button-230-40-active-blue": {
+   "rgba_sha256": "75778484c2f43fa5116a0412fb41e7101616a18177deb340c6784ac54eb5c842",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-active-red": {
+   "rgba_sha256": "ef47194ce1642af675e3b99ad9099dfb21c24ebd0d77881eef6f1e500688dbc4",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-activehover-blue": {
+   "rgba_sha256": "c365b2e872b3d0107a46fa16816911a9cdc2fb560c6eae6fd74cde6eb004f7d1",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-activehover-red": {
+   "rgba_sha256": "b230a9400897cd828141a0215bbba481c7504ca327c4d40ebb2a514df3eca8fa",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-disabled-blue": {
+   "rgba_sha256": "10f3757361e254f4a30b337a4980bee26abdd908b1cbfcb52b2eb16f15bd20e9",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-disabled-red": {
+   "rgba_sha256": "22d3f40b8913736000c35c9fe4bfc5565295516b36a1fbe800c1c309c5be49bb",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-hover-blue": {
+   "rgba_sha256": "31b9ecb0fba27ddfba1e85ef3a2f4dbdb299ce4d1edfaff0eb1fb682e631f889",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-hover-red": {
+   "rgba_sha256": "15a68edab6fe99d05900add1eb9a2dc2b8098c16d72520050b28b734b4365c3b",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-normal-blue": {
+   "rgba_sha256": "18c29857cec5c7e012d1759db4268a47a9495e819f6389a00c7ea446777b6efd",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-normal-red": {
+   "rgba_sha256": "c3c7c699302c558b6443a86310868bad60612f3075880bb2ba99d129447da113",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-pressed-blue": {
+   "rgba_sha256": "65f184c3198f759aed772330e00fb173b197292b57bcbb68f67ecfd0a6a71409",
+   "width": 230,
+   "height": 40
+  },
+  "button-230-40-pressed-red": {
+   "rgba_sha256": "49d49cf53bcb9950de7b6b6eeb834a8e008697decef82a3b270ed33968163bf6",
+   "width": 230,
+   "height": 40
+  },
+  "button-268-40-active-blue": {
+   "rgba_sha256": "12409eebcfd2560d562d360c943a4234d331d42a81036348278879ae7124c00e",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-active-red": {
+   "rgba_sha256": "952878ffe8f2e0ad7995c9e3ab8cf242418edceedcc245fe7556d9329ec4f8cc",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-activehover-blue": {
+   "rgba_sha256": "a7b199e2f5ec493d8592769d045e31fa78a91d583f9b1cce2f3606dfc97ec66f",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-activehover-red": {
+   "rgba_sha256": "8cbbc56b363b7e24fea37de6ca970ffa9c30a635355faacd4e964635f36aec70",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-disabled-blue": {
+   "rgba_sha256": "02c280d7a8036157e9c4e0bb61c71965a635a9a1f0e352c84c2f2c79278713ec",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-disabled-red": {
+   "rgba_sha256": "8b70b2000d964b0eda704bf7814d5ea8aa64924265306a28fe8de5ba046de4c1",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-hover-blue": {
+   "rgba_sha256": "c5a38a9a4cfcd2cc706d27175ceb7ef07c9058286b6604616d9aa2022ca2b6ae",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-hover-red": {
+   "rgba_sha256": "9792d9a61002dcf29439e58708642584ef469348df051f4c56b17ec6ef4821ac",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-normal-blue": {
+   "rgba_sha256": "6dac601d3c678ddb2cd6e0dfc5c41990c9f7ad777d621e8bbc876a108d7d81f9",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-normal-red": {
+   "rgba_sha256": "c90ae26562bc50b0d88850f102c965231e731babc633a01abdb1ef00606f2f65",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-pressed-blue": {
+   "rgba_sha256": "af2ce21a61a03d60819f1cadcab11225938e83060d204a826d816df8204b94c7",
+   "width": 268,
+   "height": 40
+  },
+  "button-268-40-pressed-red": {
+   "rgba_sha256": "aa39c45ba2ab233737b3be574b28bc3e7de23456733bcef53d04e02fc60730b4",
+   "width": 268,
+   "height": 40
+  },
+  "button-28-28-active-blue": {
+   "rgba_sha256": "021a5711fdddcc8df54899edef2ad9b2563e0ed89636683692774a3e01172002",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-active-red": {
+   "rgba_sha256": "e4c48333eddbb18993e67bf5d7aa9728a54ff300d3f682bd4f0e7eb567b77dd6",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-activehover-blue": {
+   "rgba_sha256": "1ccf29071c3e542b421b582ccc174a69c6f7983c99188682167d4c81fc66b902",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-activehover-red": {
+   "rgba_sha256": "b128b936d9135ea68e6c48a5d7f7048b342db749df1b0b703817ea068ca42095",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-disabled-blue": {
+   "rgba_sha256": "218809af0edd347d0976b94b79f4aa867a3285f0591cc3334a9baf1d2a1f6b19",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-disabled-red": {
+   "rgba_sha256": "42c3468ed257317b49976b3255518f12657b9ad305aaf17a0bcfd7eb1b7dbd67",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-hover-blue": {
+   "rgba_sha256": "c9f4efc2b50407e6cc0bd44bb506e1c32f60e1463b9c10bb87cc4f1ecb173b75",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-hover-red": {
+   "rgba_sha256": "35424c549f08d5c89175f63cf6eb1a2cf2108e820d3519648684fe57a983525d",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-normal-blue": {
+   "rgba_sha256": "921d37aed332cd29a4be65c5881134b9e4045af6628006b5132ce5a55391eaf6",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-normal-red": {
+   "rgba_sha256": "8bee6851f035c3d3e8201948c4ac12eeaef10abc82300a1d2c0b8989554c1138",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-pressed-blue": {
+   "rgba_sha256": "267bfa3ea5bfed1abd9da193dc36dd4d3c4cbfa2cc520ceaa97f15874064d65e",
+   "width": 28,
+   "height": 28
+  },
+  "button-28-28-pressed-red": {
+   "rgba_sha256": "87154b18b9f232fa68f100dae10437262af97962ecd3374ecc77ff33a272feed",
+   "width": 28,
+   "height": 28
+  },
+  "button-284-40-active-blue": {
+   "rgba_sha256": "148341ec0a8d59bb85cc0209574e55d634e307e73e537ba64554a9efe4f3817c",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-active-red": {
+   "rgba_sha256": "bc7fe7eb69778a072289d8f863cd0b9a8e9e3436ccb870fbd181ce01a07379d4",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-activehover-blue": {
+   "rgba_sha256": "de52023faad9971a150992ec16ebf1cb859989daaa6de447a58d7e3b6c8125ab",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-activehover-red": {
+   "rgba_sha256": "0c2a951646de8a3c484f42b28f702a22f8dffa64d5aace1526fe54b7e7029ce1",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-disabled-blue": {
+   "rgba_sha256": "341c7a096e647a2ac52f49f0f4034125fe656c3944e5c297b665af0db4c57608",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-disabled-red": {
+   "rgba_sha256": "8e7b5699309f6fc7ca7df87b182a946bd3427a6b016b2f9a54b96550822c4635",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-hover-blue": {
+   "rgba_sha256": "0a7cbb8d1286cfea267cbd7ad7e7fb910a0237036bb88c4adc2c5f40fb721f3b",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-hover-red": {
+   "rgba_sha256": "ed1d59dce7f861f3ff219f829670191cce1899efcd4c327143b0703401c1cbde",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-normal-blue": {
+   "rgba_sha256": "5d5439db5ab152fc098bd2abfc73a9339d91d918a9159cd5a4a2a54363f5fd51",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-normal-red": {
+   "rgba_sha256": "91cef53272cfea61cc7320dca394eb0e1ffb339faf22bde558296f9cb54016e0",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-pressed-blue": {
+   "rgba_sha256": "c2c758d010c6d0e29d2da761ebc6e19460767a0c6a323cc89167b674e7d9db00",
+   "width": 284,
+   "height": 40
+  },
+  "button-284-40-pressed-red": {
+   "rgba_sha256": "8b7ad97ff581fabbf7b313d99533d3127a38985e93f4c3d7fa91b4efc28eb95c",
+   "width": 284,
+   "height": 40
+  },
+  "button-292-40-active-blue": {
+   "rgba_sha256": "0811bcfa6a91b18787ada5f42de3f9a3299ddbff65abe0e351d53a69c9174bb1",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-active-red": {
+   "rgba_sha256": "f4ca033bbcfdbd42a0f87f4ece50cdef4582c1b895073b0ca4540377e2858bc3",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-activehover-blue": {
+   "rgba_sha256": "ec22b05a00991c19126ed3541579a7060e25af1bd270b7d0db20b25762d5e7bb",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-activehover-red": {
+   "rgba_sha256": "f947bfe7854b4b78e5b589e358d76ca243459a54c04a68c3e9e4fcfffe926d66",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-disabled-blue": {
+   "rgba_sha256": "54b463e060ae17a6773bdffb9f0e81ae4d3bcc3a3a6402b2e05e046082c4287c",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-disabled-red": {
+   "rgba_sha256": "2b749d185c09e9b7ce3c24f767fb037a5d8ed897373bb05285e7aaa2087e67a9",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-hover-blue": {
+   "rgba_sha256": "d57286c57e1e4db53a68fd65c806ed605171eac5e61c7c57eb9f7ff73467d6bd",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-hover-red": {
+   "rgba_sha256": "6e36050d1deb43561965a34dcdba3b3bed08fa517368d8ec488a827e1d7358a1",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-normal-blue": {
+   "rgba_sha256": "ca7b60bba2c3f360e4f158e0dffdedd0508bf117db7a185ff70777c8f4b23bc8",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-normal-red": {
+   "rgba_sha256": "3bb58625a03962e29b1897c106a7a81578455f2a5e3866bc263ad39f57a645e5",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-pressed-blue": {
+   "rgba_sha256": "b185a0f009db1e168520f0651da5b40453b659e5ddd2b32c6f5103d100aacf2a",
+   "width": 292,
+   "height": 40
+  },
+  "button-292-40-pressed-red": {
+   "rgba_sha256": "1c9cb7ab263c630fd1be8c2a4bba96d3e6303735d6355995d83585f47cf0e063",
+   "width": 292,
+   "height": 40
+  },
+  "button-294-40-active-blue": {
+   "rgba_sha256": "24595bee889b2b35e46a6de7c640193923230d59ff492f4fcd5ee83f6ad7bb17",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-active-red": {
+   "rgba_sha256": "d83ed3ce9c9e2b5cc2903369b7cf3af563757fc83b4d3b24b977c3ad6b57a641",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-activehover-blue": {
+   "rgba_sha256": "63bae2e059d48166ab5f737296c7abc92b4bee59ca3288a924ec447a77e3c210",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-activehover-red": {
+   "rgba_sha256": "9a75aaf13f15705dd7a7e05c3f9287b43c200fb9a8f3c02bbba8763f29d8e258",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-disabled-blue": {
+   "rgba_sha256": "aaf97504bb2e9584ecf83c269a233ef1c990d5d30c0e4676aecd09951f69ae6f",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-disabled-red": {
+   "rgba_sha256": "61ba16d07236498c2dfb79eee02472e982849bc2e0b4ceb8c4c073cc3c7238d4",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-hover-blue": {
+   "rgba_sha256": "5f26b278193b542783b4e5c163ec388c0f793622e6964cc3806b5845e79bedb2",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-hover-red": {
+   "rgba_sha256": "268d96f0041719db16873422838793d7d12ea6acbdce5e69ad86aa62c613cd97",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-normal-blue": {
+   "rgba_sha256": "007c7c987b1b25982c1a182dbb62608852a2a3210aad03b3ca49b5a1d95ecdd3",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-normal-red": {
+   "rgba_sha256": "17de0ca10fa961fa39d7e4646cc4988622d7142127c90bdd00a03668103582e4",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-pressed-blue": {
+   "rgba_sha256": "7d97b69982d16c1b6ab030ac025af5ffdcb4081ba36e169ef09a50e712d35958",
+   "width": 294,
+   "height": 40
+  },
+  "button-294-40-pressed-red": {
+   "rgba_sha256": "45deca69b6e3d8d253500d79a8064ce7956fbbfcc0ffd7afd9339a273cd21a81",
+   "width": 294,
+   "height": 40
+  },
+  "button-310-40-active-blue": {
+   "rgba_sha256": "3e928eeb3d468477ea3b5dfd919e68cca6f69ab3bb10ba10c2e22365beb0d41a",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-active-red": {
+   "rgba_sha256": "5cac0eee317a48e9f7c7c0f6c2de4b53fcce32cd700d14d8cac09e595a4a72bd",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-activehover-blue": {
+   "rgba_sha256": "80f0043e55818d5055eee979562925151e83b7118141e86bdd689b03637db28b",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-activehover-red": {
+   "rgba_sha256": "62facb8a47f2ae77584c29fba56c8c92a668141c0e45f41eee3d4ba93051065e",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-disabled-blue": {
+   "rgba_sha256": "dbe0b1fe23750f2e79d8277d3fb61da6e125757c107f9e0cf6d702f1aefb1ae2",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-disabled-red": {
+   "rgba_sha256": "d4cf0d553a3364f80cf235de2b37fca6ae061d0078d3f32bbc736ebf7b2179c7",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-hover-blue": {
+   "rgba_sha256": "d4d154ca45351ce8ce673a2ab7ecc7cc9149f39a1d43b8396eff069dbe8d593c",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-hover-red": {
+   "rgba_sha256": "111483bd42c089a488566295773fce255e73effa7c048eddcdee767a4c8e7aa9",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-normal-blue": {
+   "rgba_sha256": "e7dc90530e454d81b967e800e7b54ce2af00edb45a2bd1b7e6b019468a010a0d",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-normal-red": {
+   "rgba_sha256": "cc604c7dabc1ca0fdd5911df0f06e253fbc4849d27d2a5b84db28525c837430c",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-pressed-blue": {
+   "rgba_sha256": "aff55db86ed6ebc2283a803a5296d7f0a4fc462cc34cb513f670ddfcb70567a4",
+   "width": 310,
+   "height": 40
+  },
+  "button-310-40-pressed-red": {
+   "rgba_sha256": "6a1cf84921109c9f5bedebe8f2eeab42f897524a0ecb9285000ce0a466d7353e",
+   "width": 310,
+   "height": 40
+  },
+  "button-332-40-active-blue": {
+   "rgba_sha256": "a811b0ee94085086ac7fd2e898dfbac494fe87bddd9690b3e49a790514017e8a",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-active-red": {
+   "rgba_sha256": "9f1de508e69bc0b3772721b798c2b98b775dfcfdd38fcbe75252225b69010695",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-activehover-blue": {
+   "rgba_sha256": "47650ec0c6e4405168ab056a53ece66f7203cac6b07af27b7ea37d59023a9208",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-activehover-red": {
+   "rgba_sha256": "390deca889fa65926a2d2d4c19141223cab06d274669d9bd3bee1181460f8340",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-disabled-blue": {
+   "rgba_sha256": "1b8522775123f29331b838ade48a91aa5101e7ac88da928cb2fcc9471c0ec3f7",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-disabled-red": {
+   "rgba_sha256": "16b0573a3a6245b619cb8f8063c1afacde3b81f14779591f953640c4a1935478",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-hover-blue": {
+   "rgba_sha256": "f0feb2aa857c2d833adcdc432fa0a729e85e255bb5b0168981543ec6f3ba38fb",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-hover-red": {
+   "rgba_sha256": "6b2fdbaf96a992d36eb757cb9b927b6f9db29844007b91239dba969a76371cb9",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-normal-blue": {
+   "rgba_sha256": "2aac86aee6dfb43ffed26d187d85c7c998e58d47f351dbc4bc48ca71b8f087ab",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-normal-red": {
+   "rgba_sha256": "c08109e702841136c50155c7c77f9a26a25de71fc15bfc724f13ca9be60661c4",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-pressed-blue": {
+   "rgba_sha256": "e1dc66337f7c0e6d27d4e031233c0645351aebffdf893faca745d81159195369",
+   "width": 332,
+   "height": 40
+  },
+  "button-332-40-pressed-red": {
+   "rgba_sha256": "2777ee86d157a984b16fd09adcab45f0173b790f89bdcb6a3933745aa140679d",
+   "width": 332,
+   "height": 40
+  },
+  "button-424-40-active-blue": {
+   "rgba_sha256": "dcf22229c153df3f2bc03c9b030eb92e48644778cf162db28c77f2640883dcc1",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-active-red": {
+   "rgba_sha256": "b962d62b128c4b3b6ce5ffe52d4bdf46496f37dab07bc296a14e2657912066e5",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-activehover-blue": {
+   "rgba_sha256": "1d7b6c7fd9f45f3e8c1df0fc0c4cb98224b9aeea839c9a50f791447798c3d2e2",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-activehover-red": {
+   "rgba_sha256": "d2d0970d912ccdcda316d40207f1ef3ab4f132311cb61e238abb2ccba5bff707",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-disabled-blue": {
+   "rgba_sha256": "01f47c25650332a10179f7f5dc8f2e39c61032aab53f4fc4835cea21cc740946",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-disabled-red": {
+   "rgba_sha256": "b0d3e10acf4962761a8ccdd52e73e24ee35de8dbafeeaedc9bb5052d58513b18",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-hover-blue": {
+   "rgba_sha256": "4dd610867d86b7ffa9a3a344fa0e2b022e1237b2aa76777d1729b20e5832a05c",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-hover-red": {
+   "rgba_sha256": "17de95494424750fecf675ca9f95f825010f7039ca5dbb310469655ccdeb0939",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-normal-blue": {
+   "rgba_sha256": "d2d95eebc5e4edb8b9bb508dae463aae38c8aabf2f0e6412e7d4ae2a0a2465e5",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-normal-red": {
+   "rgba_sha256": "deac6fc4b7899dd4b033f7714d5efddc1ab5f3f0e0a11e0e947ca4c5d737c2b2",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-pressed-blue": {
+   "rgba_sha256": "0404a723d73f65efa64ece500826c9e69d5ba2aaaccbd121198c65032d3ab9a2",
+   "width": 424,
+   "height": 40
+  },
+  "button-424-40-pressed-red": {
+   "rgba_sha256": "8f6515872e505e2b9f1f6b6fbe667c039bc3f63f2d0e7ccaf1859bc24a50cc89",
+   "width": 424,
+   "height": 40
+  },
+  "button-464-40-active-blue": {
+   "rgba_sha256": "8ddd3ebebb2f7a41b0ff0f296de84d7965d172a8319a7864e9151c431a23ff73",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-active-red": {
+   "rgba_sha256": "bc6b3433aac7a1c78cba3b169b6487c7d592f2f6f205dbdd0b77b42d2b8706af",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-activehover-blue": {
+   "rgba_sha256": "994c3d37b87149f53681c6f8bbfb9520c9130de45aa6810813306a5b945bc017",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-activehover-red": {
+   "rgba_sha256": "c0a9bc775d09206149bb890ccf810585b77f6fcaa5fc64e533f02c5f3cec181b",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-disabled-blue": {
+   "rgba_sha256": "dd8993a08e582bc3f52019905ceab116c1699a2d58a5737587f67bb7c3da052f",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-disabled-red": {
+   "rgba_sha256": "275e2e9fa45d8b1e80828be303d5e6fcf8b6a532e3ab6da9a6182a63a8089b91",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-hover-blue": {
+   "rgba_sha256": "13c4266d237139e7cf38fcd37b1ec202a175a78f7b9346ff669517498ed697e3",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-hover-red": {
+   "rgba_sha256": "9f7dd7567c99c667e8e26eafe4ccbc4d8bb9fb57000b05bf21a18dae82d2a3f2",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-normal-blue": {
+   "rgba_sha256": "8f0b4eb17270f8db87d77f7f43926aa001a9304a4dde99763b36ca1e40c8c376",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-normal-red": {
+   "rgba_sha256": "ee7103d280dc38bf1c460e75ad1c6516b938a7bb603ba89126dd9e8765d541dd",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-pressed-blue": {
+   "rgba_sha256": "62841cd5dfb337c02e4dcaefd4f6fcd670d64a1669518ab33302a353f114a063",
+   "width": 464,
+   "height": 40
+  },
+  "button-464-40-pressed-red": {
+   "rgba_sha256": "aa6d4bed977dda7bd123923cdfff5740d8e02883384fa425418b693f1fbbbb78",
+   "width": 464,
+   "height": 40
+  },
+  "button-500-40-active-blue": {
+   "rgba_sha256": "863871b5fd2e848442cc97b13e5d70b63729916e8d2a889f5b82fc9f8bccf1ba",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-active-red": {
+   "rgba_sha256": "0dd3af1b6414d35c398fa8f1524566507b9ab2a12aad5815c26553c479d531c7",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-activehover-blue": {
+   "rgba_sha256": "7d0c70b4107618c9ae209afa9f905dec8b50e1cdb52b203299bc93b8a6cb6642",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-activehover-red": {
+   "rgba_sha256": "f6baf51b36ec2ea0c249271a559cc481c1231076d3a6899d3a931e9e3e4e488c",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-disabled-blue": {
+   "rgba_sha256": "d29d421ffe2eea0e9dca6321119536ed4f19378ed891ff79269ee6b51af9d1a1",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-disabled-red": {
+   "rgba_sha256": "c216eb40aa3523f9919a9aad2adb6bf43ea48048046189d0c80f858c9714861b",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-hover-blue": {
+   "rgba_sha256": "317b817181cb67ccfd9ec196f3f578630877e145240c14911847cd3e0330dc39",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-hover-red": {
+   "rgba_sha256": "824b01367c231d6cd895a031533ec854ddd7c978be3a1e18e0cb59d221c731cc",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-normal-blue": {
+   "rgba_sha256": "1a40bf5d060e214861f9df86080b93e8d856eeaa912d679bef8481c8e849b7b5",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-normal-red": {
+   "rgba_sha256": "6050869d74805f862809152e14191bc3b7be52fc1f00c110f0540ac982d1373b",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-pressed-blue": {
+   "rgba_sha256": "e6ed0d30d901e95572d191636b50afa9003657b5abb873b11c35773b5b88f2a7",
+   "width": 500,
+   "height": 40
+  },
+  "button-500-40-pressed-red": {
+   "rgba_sha256": "3a0b1490f4f3b709f86729685c1e3d64954edbb4ed8747f62edc4c4dfdfcc061",
+   "width": 500,
+   "height": 40
+  },
+  "button-564-40-active-blue": {
+   "rgba_sha256": "81be3e8223d9cecbc6c1e946eb5c607dbcecb58fc8620cc7437f7937b457ac51",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-active-red": {
+   "rgba_sha256": "7dd6d00aa867e9c7cc09ef1ae861fea641142c56623e68648215f103827c9048",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-activehover-blue": {
+   "rgba_sha256": "4e44ff33a38729be714db5e19d773a1d30ef0285481d4f186b9d4813b2bc1a48",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-activehover-red": {
+   "rgba_sha256": "4732057f4554bf59e6ecddecda2d0b28208032c4c3fefa0297c7867c60ab9b72",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-disabled-blue": {
+   "rgba_sha256": "07b95f780b0e8ae1605732941e9b309f1efbfb6bff2a27a6f5e3be84b3a72750",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-disabled-red": {
+   "rgba_sha256": "a0e27c21b2d836c0340b475cd6752adb34e25d7c9573d283f867eac77818fc51",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-hover-blue": {
+   "rgba_sha256": "1bde8aa87abafb39977ea6195589ade714c3ae0c965a2a4ec561e9c1b2779d66",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-hover-red": {
+   "rgba_sha256": "24cce5d369d627ef2f9d43e784fdc462509b21ae9100a88c0d238c8d54fa72f3",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-normal-blue": {
+   "rgba_sha256": "18f75a216f35d5a0d51849f679e59b1224457dbd03393cd26a6c1c0342d5c2e3",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-normal-red": {
+   "rgba_sha256": "e902ce64a9d29b19cd3a07983991f270229eb1c1fcd15c2f28d4fbe0e31affa2",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-pressed-blue": {
+   "rgba_sha256": "0c1f530e441d95cc0f73fa52bcc1fe72f06d527d5032d8f748fd768eb4a34d7e",
+   "width": 564,
+   "height": 40
+  },
+  "button-564-40-pressed-red": {
+   "rgba_sha256": "69aff70b4b8e9b30e1ef9a260e7f5b860ab055b9f852318cee89301701f2cf6b",
+   "width": 564,
+   "height": 40
+  },
+  "button-604-40-active-blue": {
+   "rgba_sha256": "1f3c30af92654367deb3d0748dc37ae3384f51263f2e413b6c399f30d6d774f3",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-active-red": {
+   "rgba_sha256": "369c3d584a528259b87f91ab26fcad64e9962d1f8da66b4850ceff9e9a9045e9",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-activehover-blue": {
+   "rgba_sha256": "c2a15b97ee12fce0127590d7af6b171cfcd49d0dfb26cf71d3c698c99bfb11f0",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-activehover-red": {
+   "rgba_sha256": "fdeef8cbc88f8f3944738ceb7be28e548345413c2178a0d0836e2a0cf443efa3",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-disabled-blue": {
+   "rgba_sha256": "73f1672e99b83b9efa898785780ab3bafdd80b0342da66916917fa3cce09bb8c",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-disabled-red": {
+   "rgba_sha256": "a77d3c30de851c3605df05d9c48c69ed29ae3fcbe40bc3422ab94e483f174d23",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-hover-blue": {
+   "rgba_sha256": "fc6124ecfdccf67550373181c35c29003831171981744ecd17e1df5712a051f4",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-hover-red": {
+   "rgba_sha256": "7670f11df338e56afcca1c7fa6568a5103cc39daab1e6af634f77b9305cf8a6c",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-normal-blue": {
+   "rgba_sha256": "35e718cceb40729114ec64f533ba77605f565b94148943fcde80682458133d98",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-normal-red": {
+   "rgba_sha256": "e378b379c2749a209256dbc6d55ef6c31df7a7e778d44311d0430be1c937a374",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-pressed-blue": {
+   "rgba_sha256": "819b723c2244e8d5813d6dbca0b673de40954dd27d8ffa2c0f1e8a8175194a28",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-40-pressed-red": {
+   "rgba_sha256": "ddda82923d858cc49c6b6f0503c4d51a647191e6a6d9fd66f6e0d324ab222c1c",
+   "width": 604,
+   "height": 40
+  },
+  "button-604-48-active-blue": {
+   "rgba_sha256": "a64c2bdc98e30d10e0da32891519ae5e749da159a36b034d9c5554b8db6aa6ea",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-active-red": {
+   "rgba_sha256": "d359dc034abd8bba7f79d76cebc58ba8c70caec4e7af272103a7d0bbf52ac9f8",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-activehover-blue": {
+   "rgba_sha256": "32a3242871f1d674c54022f41e904dd3f9ac2662a2cbc14662abc8094d15feea",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-activehover-red": {
+   "rgba_sha256": "e8213661430c08494005b86cc50702249c9c2799dcc24760bff33435121f9587",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-disabled-blue": {
+   "rgba_sha256": "bf134705f774c3cdc52d76c343329c66195ba06f9c9530c30bd97c6c98fb5586",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-disabled-red": {
+   "rgba_sha256": "30f8c318be3cd106e68f4297a1aae55afebd6661555fc568bc8f2f386d512245",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-hover-blue": {
+   "rgba_sha256": "0c67cbf93db470d745e795b8d73596f43d6714b1491c5578dd8b0471e6f8bbb0",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-hover-red": {
+   "rgba_sha256": "08b432b64ee0d29ee04fb9cb802eb422318a5361e1b9eb07554abe5aff7d55d4",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-normal-blue": {
+   "rgba_sha256": "b1491d1e9da24a4cf7631ed5e4d2f29623117399c14bfef36cfd9f04064163fe",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-normal-red": {
+   "rgba_sha256": "bf3afe7e7621bbf099853e7b968aad9c1e85c332c4a132d68132c20bad4d10a1",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-pressed-blue": {
+   "rgba_sha256": "da8e90d447d5c19b7db18232fc3d23a143c70c25a76216f05a11ad2afb9fc4fd",
+   "width": 604,
+   "height": 48
+  },
+  "button-604-48-pressed-red": {
+   "rgba_sha256": "85d302199d2411df19ab13c8e315d0ae8eae0d20167a2b509238ed2f450108db",
+   "width": 604,
+   "height": 48
+  },
+  "button-636-48-active-blue": {
+   "rgba_sha256": "490aecbc7ae24ea15d4ecb45fa9babaed2d47693d44c840bfdc2a5629bb362e1",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-active-red": {
+   "rgba_sha256": "4c05a1cf40b163a92baf0f9140dcddc1b64e4edd266b01c3a18477516fa3472d",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-activehover-blue": {
+   "rgba_sha256": "b946d42e76a89987612d5cde5f6ce327ea7bb4b5b747afb6c9c9ab7c9982eb26",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-activehover-red": {
+   "rgba_sha256": "c15c9fe83c4412810d3dda9d3938048bc711501ee25bfd5d49702d928496bcb2",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-disabled-blue": {
+   "rgba_sha256": "2c2eaf747dabc10d2bbccfa525873cb5787308d2648d072d136baae2072e18bb",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-disabled-red": {
+   "rgba_sha256": "6c8a1eb286e343423e17f97f8cea935ec85d4ae38eabad4eb883ba6dcd9ebe5c",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-hover-blue": {
+   "rgba_sha256": "d174de29b36309cb5adc9324ab1bacb3ec8541a64a5507f0e6aa58e4ca1b748d",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-hover-red": {
+   "rgba_sha256": "531de6d3467a3c4823c5ea7ba619d980e640a1795e36b78197971d39546665dc",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-normal-blue": {
+   "rgba_sha256": "06bfa159208f7214bf06ea38ff9772db83447f24a4b8637e6b16a0b3340a1420",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-normal-red": {
+   "rgba_sha256": "0205ab6b7ff0d342c7780a35aabc4757317ed6e68f481b085e303e8546b6f3a7",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-pressed-blue": {
+   "rgba_sha256": "fcdbcebb39d8f03707453869b7926a97550287ed8765f8751085af793895114b",
+   "width": 636,
+   "height": 48
+  },
+  "button-636-48-pressed-red": {
+   "rgba_sha256": "601c45f8535af4e5d73a6d2b8ede2a9421c470e031fc05806493f70db8505e9f",
+   "width": 636,
+   "height": 48
+  },
+  "button-80-40-active-blue": {
+   "rgba_sha256": "79178f02ebdc5cab5d8267acebd817c7c74ab475eca81166c1e09ec4dc4aa498",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-active-red": {
+   "rgba_sha256": "00a48847b6674638fe359825bb6a257236acd788d8d98c0e395005f9786faac1",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-activehover-blue": {
+   "rgba_sha256": "64b2c06bf8eb8744c9c09c2a92b2a46b4d2fdbee756c36f6a8b63b29ef5e4c8e",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-activehover-red": {
+   "rgba_sha256": "583b3ceba8055b64a932785789264fdb231cabae4bf6ca7d2089fc8266d54cc8",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-disabled-blue": {
+   "rgba_sha256": "2761f506963f7374fe39ca7bd7cbe70c3642fb51ceb3e710c4e4e1062ca09ae2",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-disabled-red": {
+   "rgba_sha256": "12420a6d7ff5590c8f25bf22d8fc464318ddfad56feaa8b39791f0e60a2f745e",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-hover-blue": {
+   "rgba_sha256": "5beb36a1d337416a46d283450fc893efa338db517076d30bf61a3dd738918715",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-hover-red": {
+   "rgba_sha256": "01e762d2571aefd0f0c212e5bf9cb107a7a78e8abcc37b87bf358be35f7e021c",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-normal-blue": {
+   "rgba_sha256": "e756e0e7f907be996f2ce4e1740c2793004b39336dd4dc02f4f0e9b693be4f03",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-normal-red": {
+   "rgba_sha256": "f6b0ec98413a8653f549b9f5a3c0ddb2ac4b905eddc3b984512237b5b643ec1d",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-pressed-blue": {
+   "rgba_sha256": "833a6c51e2121b590ce0c8b4e49da34d8f82c329d2893639cb336c27f8e293c9",
+   "width": 80,
+   "height": 40
+  },
+  "button-80-40-pressed-red": {
+   "rgba_sha256": "e521098c9019e228cde55d004ab73e60c828e0f4f512f4227a36006ad197761a",
+   "width": 80,
+   "height": 40
+  },
+  "confirm-frame-blue": {
+   "rgba_sha256": "f7eebbcd20c67cb3f650ce575e9bb43ac701c195a302f6a1f4e3180021b4c5ae",
+   "width": 676,
+   "height": 340
+  },
+  "confirm-frame-compact-red": {
+   "rgba_sha256": "acc061854f28cb9701e6f8c11b825af92ced875c321d648d7f3b48283b836d1a",
+   "width": 676,
+   "height": 564
+  },
+  "confirm-frame-red": {
+   "rgba_sha256": "7af5ce575503a8c0764c883abfbbad2048b236856f9a6b397241293178b9b6ba",
+   "width": 676,
+   "height": 340
+  },
+  "font_advance": {
+   "rgba_sha256": "025478bf769f43835c14df8103f827eee1379d0380f952669dfc4d5ae30231ae",
+   "width": 239,
+   "height": 1
+  },
+  "font_menu": {
+   "rgba_sha256": "46c04d1048b03da7b1706e32e0c7b5713f4363a87b81a4df3872c3ee0c312c23",
+   "width": 1912,
+   "height": 8
+  },
+  "intro-frame": {
+   "rgba_sha256": "a3286cb1beca449b889807bd6b13e60bd981b6a3f0c76e2b187be3bdc271d81e",
+   "width": 320,
+   "height": 156
+  },
+  "lobby-frame-blue": {
+   "rgba_sha256": "4da15ca346389529ade2b764e1e748f84447d3c32e12bfa8ed47114bdb6fd11f",
+   "width": 1216,
+   "height": 636
+  },
+  "lobby-frame-red": {
+   "rgba_sha256": "c6c6a316ab858fe934fc9e2f243396c9f7e8bf06d8f1c14b4c617b3e1338a235",
+   "width": 1216,
+   "height": 636
+  },
+  "main-frame-red": {
+   "rgba_sha256": "f869255fe119da1d193c9c19074cf9fd47a403a2313e5689f092b7000307e361",
+   "width": 572,
+   "height": 564
+  },
+  "paper-allied": {
+   "rgba_sha256": "2ddd357ee2c97c70527d1d827cf2e8b7122d617c478b04171761e77c0f5ceda4",
+   "width": 600,
+   "height": 350
+  },
+  "paper-soviet": {
+   "rgba_sha256": "c35ba82c6cbffa338cb9b015467e93497dc06e30c8c9b8d1934e27d9b4214f1b",
+   "width": 600,
+   "height": 350
+  },
+  "pause-frame-blue": {
+   "rgba_sha256": "99e6df274dceaee8d443f298c02043976613ef858374cffc95c0906f77856301",
+   "width": 708,
+   "height": 528
+  },
+  "pause-frame-compact-red": {
+   "rgba_sha256": "1a36bb30e4d44b9f5d4d42989e383f78e65d422a3f7b02b0f2606d5739ead670",
+   "width": 708,
+   "height": 564
+  },
+  "pause-frame-red": {
+   "rgba_sha256": "9c338091ccbae73a4dfd004004c4bd6b9816f9aa5972d1e1bd1eb0f75cb8c747",
+   "width": 708,
+   "height": 528
+  },
+  "plate": {
+   "rgba_sha256": "a636fceed2fa931ee30eee6239542f0795ec6b7a36d1c6134545e680d4739338",
+   "width": 136,
+   "height": 120
+  },
+  "preview-SCM01EA": {
+   "rgba_sha256": "f5b4d9f54a28f89dd9d86c6bfd8f24f7d532765904006e9e9439f65e26ab3300",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM02EA": {
+   "rgba_sha256": "f865640ae44eddc2786e738b9e531f27334c60c836468247fa0e736fbdd5536a",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM03EA": {
+   "rgba_sha256": "599704af6c6398dc39f0dcfeab65aa2f0a3da85b9268f31d94d3357a489d8548",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM04EA": {
+   "rgba_sha256": "9ede72d2b4ea2b36e41ecdd2c22ff0ad1a99a8aed65ae0ea25868f56f4b4ed28",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM05EA": {
+   "rgba_sha256": "357abee648767eb53127292151ae5ff1363c59b7fd0b1f6a6530fd78ce21bd85",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM06EA": {
+   "rgba_sha256": "99927c5d047e4fad08bedbfdf56f3372bd1541b10ed26b062aae021892e9de63",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM07EA": {
+   "rgba_sha256": "52b565627d60019fc13dd9da633b78892c680c4996e60cfef5f360e8eaaa6e8a",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM08EA": {
+   "rgba_sha256": "9f91510d8dbbe536965336bdbba6bfd513bf48f44d04a3aca88cc3fc037c7217",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM09EA": {
+   "rgba_sha256": "b44c0983126c345862df64e09a73fcf67ab231a94debb3508354bcdbbe9bfe2a",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM10EA": {
+   "rgba_sha256": "413023af64bf8825290cbe6ad7d5b85f73ea2de3e62f88272fe2f6fb0032bdaf",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM11EA": {
+   "rgba_sha256": "061e72c9ab1ac77cfd1f9c8cf30897883251ed53d1307dee3c0c27c2d2bf31f7",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM12EA": {
+   "rgba_sha256": "03e9160651a0bc02959c56d18a366f56b26cae774c8db5d1ab6c8b1add3aa4d8",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM13EA": {
+   "rgba_sha256": "b4b93762fdb121bcb44a719503fc11bb68dc21d2f4020a1c2b7b504d14c2d9cc",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM14EA": {
+   "rgba_sha256": "9c4c927b0bcaf22da3f8cfc48b327811ef268204dac31b9f5d7543713a584d10",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM15EA": {
+   "rgba_sha256": "afeb5e3483d8372cffc47827778fdae037ad27cd5186bcc79cb8e21a53fdfa80",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM16EA": {
+   "rgba_sha256": "487136ed835f3ece95049edbed471f862269bbb54d973cace01f77fde1c7fa9d",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM17EA": {
+   "rgba_sha256": "3490fa4c2a8f274dc8256c4fef9a1c46ec0963909c42efc439ba5ce387cc8522",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM18EA": {
+   "rgba_sha256": "09b48e445d97f2e2b773ac35635f6ac9fd5d2aead8cd2e6122e4b744c988f5cd",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM19EA": {
+   "rgba_sha256": "80b36db5d71ebf250e0a09b32e28994fa2ec9734d514e7046268afd383052397",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM20EA": {
+   "rgba_sha256": "498d6efcaed6a8198798743af07fe9c36b35305d16df05b73f2f173126c60b58",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM21EA": {
+   "rgba_sha256": "414ec54315eb9a464c62f3ab3bfadfd981e65340c58b92796f498a04c3a43529",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM22EA": {
+   "rgba_sha256": "9e06d4a4bd098e96d0c4e41b62146bb86a510b7f61c2ffefa8298643cece0fb8",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM23EA": {
+   "rgba_sha256": "41b7d9de55c0b29daebb8b77a7c0582e52c17cef143bd4cfae0204c02a666d98",
+   "width": 120,
+   "height": 120
+  },
+  "preview-SCM24EA": {
+   "rgba_sha256": "3424040f1c3c63bf623df91b4231eddea6ca3d0b108bacec08ad643998e4027a",
+   "width": 120,
+   "height": 120
+  },
+  "remap-colours": {
+   "rgba_sha256": "d0c4af1f04ebe2db8d776e2cb4947dc2b831d94667dd6c98f8e6a15d1e4b59e7",
+   "width": 8,
+   "height": 1
+  },
+  "settings-frame-blue": {
+   "rgba_sha256": "51abe5177e4b944048c040f0d6fa7f0a33032e2a34f7f9444a363c4427c54d6c",
+   "width": 676,
+   "height": 584
+  },
+  "settings-frame-compact-red": {
+   "rgba_sha256": "acc061854f28cb9701e6f8c11b825af92ced875c321d648d7f3b48283b836d1a",
+   "width": 676,
+   "height": 564
+  },
+  "settings-frame-red": {
+   "rgba_sha256": "9b1b98f714ae7905984cf284f80e225d7f09c06e58fe90b84b67c30977f0db3e",
+   "width": 676,
+   "height": 584
+  },
+  "theme-blue": {
+   "rgba_sha256": "66726c825e6b97fd6a5c7221105e5fd5b50d429e347ec94a8cd2522098f3b95f",
+   "width": 16,
+   "height": 1
+  },
+  "theme-red": {
+   "rgba_sha256": "b385c030c51f7ba3dd351f158ccbebde3dd75707592e75319949ceaae1a3203d",
+   "width": 16,
+   "height": 1
+  },
+  "title-backdrop": {
+   "rgba_sha256": "608bf44d74bf3cb0a8990fc2546328b85490faeaa255dda23a14cfa3fa3de609",
+   "width": 640,
+   "height": 400
+  },
+  "title-backdrop-lo": {
+   "rgba_sha256": "a49d8deaf72a6b33ca674f32613596418553ad6406e295c1f0d16ff59c02f6de",
+   "width": 320,
+   "height": 200
+  },
+  "visuals-frame-blue": {
+   "rgba_sha256": "ebf187c525fb7e4cca2d39e15818ded0bd68692d07b03bfcf88842ab4c0879ed",
+   "width": 1016,
+   "height": 636
+  },
+  "visuals-frame-compact-red": {
+   "rgba_sha256": "299928424d633172f5bf141e05decc39f8d8dd7d5cc20e91f9ba8b99763e94d4",
+   "width": 1016,
+   "height": 564
+  },
+  "visuals-frame-red": {
+   "rgba_sha256": "cab380739e0f69e0301f75f9fdd5b95d4fe144131b5b36b2d3fb6a005a88047a",
+   "width": 1016,
+   "height": 636
+  },
+  "wordmark": {
+   "rgba_sha256": "d52556f198b40052d6da3220205abd58d086af65fcdc440e947cfe00052a0027",
+   "width": 384,
+   "height": 130
+  },
+  "wordmark-lo": {
+   "rgba_sha256": "f86e593896e0f94af56f23fc2a178806a49e211fa25a12389261aa9ab7c947b1",
+   "width": 192,
+   "height": 65
+  }
+ },
+ "pack_sha256": "81873e882e6ba533fcdbeb4fa6c3d4e9c37046d26cd3e677705b515228cd30b6"
+}

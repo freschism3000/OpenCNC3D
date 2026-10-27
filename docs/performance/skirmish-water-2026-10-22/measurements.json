@@ -1,0 +1,4736 @@
+{
+ "bisection_live_and_frozen_ms": {
+  "td 3771661e7": [
+   {
+    "live": 9.920634920634921,
+    "fb": 11.83,
+    "ok": true
+   },
+   {
+    "live": 9.46124763705104,
+    "fb": 10.42,
+    "ok": true
+   }
+  ],
+  "ra 3771661e7": [
+   {
+    "live": 20.34552845528455,
+    "fb": 13.49,
+    "ok": true
+   },
+   {
+    "live": 15.423728813559322,
+    "fb": 14.08,
+    "ok": true
+   }
+  ],
+  "td 4fa1b102b": [
+   {
+    "live": 9.43449575871819,
+    "fb": 14.62,
+    "ok": true
+   },
+   {
+    "live": 11.953488372093023,
+    "fb": 12.8,
+    "ok": true
+   }
+  ],
+  "ra 4fa1b102b": [
+   {
+    "live": 17.74822695035461,
+    "fb": 15.05,
+    "ok": true
+   },
+   {
+    "live": 11.453089244851258,
+    "fb": 10.44,
+    "ok": true
+   }
+  ],
+  "td 5ff119dbf": [
+   {
+    "live": 9.372071227741332,
+    "fb": 20.28,
+    "ok": true
+   },
+   {
+    "live": 11.612529002320185,
+    "fb": 12.92,
+    "ok": true
+   }
+  ],
+  "ra 5ff119dbf": [
+   {
+    "live": 12.165450121654501,
+    "fb": 15.11,
+    "ok": true
+   },
+   {
+    "live": 15.64945226917058,
+    "fb": 13.79,
+    "ok": true
+   }
+  ],
+  "td 94ba8187b": [
+   {
+    "live": 9.920713577799802,
+    "fb": 13.1,
+    "ok": true
+   },
+   {
+    "live": 10.245649948822928,
+    "fb": 12.6,
+    "ok": true
+   }
+  ],
+  "ra 94ba8187b": [
+   {
+    "live": 22.048458149779737,
+    "fb": 15.38,
+    "ok": true
+   },
+   {
+    "live": 13.49056603773585,
+    "fb": 13.66,
+    "ok": true
+   }
+  ],
+  "td fc616485b": [
+   {
+    "live": 10.319917440660475,
+    "fb": 18.82,
+    "ok": true
+   },
+   {
+    "live": 10.235173824130879,
+    "fb": 12.61,
+    "ok": true
+   }
+  ],
+  "ra fc616485b": [
+   {
+    "live": 10.405405405405405,
+    "fb": 22.58,
+    "ok": true
+   },
+   {
+    "live": 15.99041533546326,
+    "fb": 13.89,
+    "ok": true
+   }
+  ],
+  "td 19997d13d": [
+   {
+    "live": 10.76426264800861,
+    "fb": 16.81,
+    "ok": true
+   },
+   {
+    "live": 9.718446601941748,
+    "fb": 12.97,
+    "ok": true
+   }
+  ],
+  "ra 19997d13d": [
+   {
+    "live": 17.36111111111111,
+    "fb": 17.74,
+    "ok": true
+   },
+   {
+    "live": 16.302931596091206,
+    "fb": 15.59,
+    "ok": true
+   }
+  ],
+  "td b808a1a93": [
+   {
+    "live": 11.626016260162602,
+    "fb": 17.73,
+    "ok": true
+   },
+   {
+    "live": 11.481056257175661,
+    "fb": 11.92,
+    "ok": true
+   }
+  ],
+  "ra b808a1a93": [
+   {
+    "live": 15.788643533123029,
+    "fb": 14.19,
+    "ok": true
+   },
+   {
+    "live": 13.382352941176471,
+    "fb": 13.5,
+    "ok": true
+   }
+  ],
+  "td 7c4308ee5": [
+   {
+    "live": 17.62323943661972,
+    "fb": 24.43,
+    "ok": true
+   },
+   {
+    "live": 15.748031496062993,
+    "fb": 18.36,
+    "ok": true
+   }
+  ],
+  "ra 7c4308ee5": [
+   {
+    "live": 21.71366594360087,
+    "fb": 19.18,
+    "ok": true
+   },
+   {
+    "live": 16.60033167495854,
+    "fb": 16.08,
+    "ok": true
+   }
+  ],
+  "td db1fddccf": [
+   {
+    "live": 17.14041095890411,
+    "fb": 23.6,
+    "ok": true
+   },
+   {
+    "live": 17.56140350877193,
+    "fb": 19.73,
+    "ok": true
+   }
+  ],
+  "ra db1fddccf": [
+   {
+    "live": 21.252653927813164,
+    "fb": 19.57,
+    "ok": true
+   },
+   {
+    "live": 15.384615384615385,
+    "fb": 14.21,
+    "ok": true
+   }
+  ],
+  "td 4ba3d6e17": [
+   {
+    "live": 16.863406408094434,
+    "fb": 22.12,
+    "ok": true
+   },
+   {
+    "live": 14.727540500736376,
+    "fb": 17.13,
+    "ok": true
+   }
+  ],
+  "ra 4ba3d6e17": [
+   {
+    "live": 18.29981718464351,
+    "fb": 17.44,
+    "ok": true
+   },
+   {
+    "live": 17.685512367491167,
+    "fb": 17.56,
+    "ok": true
+   }
+  ],
+  "td 9baffd60b": [
+   {
+    "live": 16.85185185185185,
+    "fb": 22.68,
+    "ok": true
+   },
+   {
+    "live": 18.867924528301888,
+    "fb": 18.02,
+    "ok": true
+   }
+  ],
+  "ra 9baffd60b": [
+   {
+    "live": 17.62323943661972,
+    "fb": 18.89,
+    "ok": true
+   },
+   {
+    "live": 21.71366594360087,
+    "fb": 18.71,
+    "ok": true
+   }
+  ],
+  "td fcfa8544d": [
+   {
+    "live": 16.76716917922948,
+    "fb": 21.62,
+    "ok": true
+   },
+   {
+    "live": 16.693811074918568,
+    "fb": 17.65,
+    "ok": true
+   }
+  ],
+  "ra fcfa8544d": [
+   {
+    "live": 17.19931271477663,
+    "fb": 16.18,
+    "ok": true
+   },
+   {
+    "live": 24.498777506112468,
+    "fb": 19.84,
+    "ok": true
+   }
+  ],
+  "td 16fd5aeb4": [
+   {
+    "live": 17.123287671232877,
+    "fb": 26.85,
+    "ok": true
+   },
+   {
+    "live": 14.836795252225519,
+    "fb": 17.85,
+    "ok": true
+   }
+  ],
+  "ra 16fd5aeb4": [
+   {
+    "live": 18.233151183970858,
+    "fb": 16.1,
+    "ok": true
+   },
+   {
+    "live": 14.947683109118087,
+    "fb": 15.47,
+    "ok": true
+   }
+  ],
+  "td 0714b4ba2": [
+   {
+    "live": 17.21170395869191,
+    "fb": 25.49,
+    "ok": true
+   },
+   {
+    "live": 18.41620626151013,
+    "fb": 19.4,
+    "ok": true
+   }
+  ],
+  "ra 0714b4ba2": [
+   {
+    "live": 20.100401606425702,
+    "fb": 19.63,
+    "ok": true
+   },
+   {
+    "live": 19.70472440944882,
+    "fb": 18.67,
+    "ok": true
+   }
+  ],
+  "td 2f8541851": [
+   {
+    "live": 15.813586097946288,
+    "fb": 22.75,
+    "ok": true
+   },
+   {
+    "live": 17.825311942959,
+    "fb": 16.77,
+    "ok": true
+   }
+  ],
+  "ra 2f8541851": [
+   {
+    "live": 19.55078125,
+    "fb": 20.31,
+    "ok": true
+   },
+   {
+    "live": 18.233151183970858,
+    "fb": 16.94,
+    "ok": true
+   }
+  ],
+  "td 5d1edba61": [
+   {
+    "live": 16.75041876046901,
+    "fb": 22.52,
+    "ok": true
+   },
+   {
+    "live": 13.94700139470014,
+    "fb": 23.24,
+    "ok": true
+   }
+  ],
+  "ra 5d1edba61": [
+   {
+    "live": 19.512670565302145,
+    "fb": 18.94,
+    "ok": true
+   },
+   {
+    "live": 16.760797342192692,
+    "fb": 14.73,
+    "ok": true
+   }
+  ],
+  "td a6a2a7249": [
+   {
+    "live": 18.036036036036037,
+    "fb": 27.1,
+    "ok": true
+   },
+   {
+    "live": 17.24137931034483,
+    "fb": 25.23,
+    "ok": true
+   }
+  ],
+  "ra a6a2a7249": [
+   {
+    "live": 26.908602150537636,
+    "fb": 25.16,
+    "ok": true
+   },
+   {
+    "live": 24.271844660194176,
+    "fb": 23.75,
+    "ok": true
+   }
+  ],
+  "td cd2b05c22": [
+   {
+    "live": 18.068592057761734,
+    "fb": 26.41,
+    "ok": true
+   },
+   {
+    "live": 15.88888888888889,
+    "fb": 27.01,
+    "ok": true
+   }
+  ],
+  "ra cd2b05c22": [
+   {
+    "live": 21.526881720430108,
+    "fb": 28.2,
+    "ok": true
+   },
+   {
+    "live": 20.100401606425702,
+    "fb": 20.3,
+    "ok": true
+   }
+  ],
+  "td ea6d5d0a1": [
+   {
+    "live": 34.36426116838488,
+    "fb": 46.82,
+    "ok": true
+   },
+   {
+    "live": 34.72222222222222,
+    "fb": 46.7,
+    "ok": true
+   }
+  ],
+  "ra ea6d5d0a1": [
+   {
+    "live": 19.011406844106464,
+    "fb": 19.32,
+    "ok": true
+   },
+   {
+    "live": 32.18649517684887,
+    "fb": 30.98,
+    "ok": true
+   }
+  ],
+  "td 4ad1ea1ba": [
+   {
+    "live": 34.08163265306123,
+    "fb": 41.44,
+    "ok": true
+   },
+   {
+    "live": 34.826388888888886,
+    "fb": 43.25,
+    "ok": true
+   }
+  ],
+  "ra 4ad1ea1ba": [
+   {
+    "live": 30.48780487804878,
+    "fb": 31.63,
+    "ok": true
+   },
+   {
+    "live": 29.791666666666668,
+    "fb": 28.53,
+    "ok": true
+   }
+  ]
+ },
+ "bisection_note": "first pass forward, second reverse; RA rows used a random seed and are not comparable across builds",
+ "ab_proto_td": {
+  "main_orig_loop": {
+   "live_ms": 153.21,
+   "fps": 6.5,
+   "framebench_ms": 153.58,
+   "runs": [
+    {
+     "live_ms": 153.84615384615384,
+     "framebench_ms": 154.95,
+     "ok": true
+    },
+    {
+     "live_ms": 152.57575757575756,
+     "framebench_ms": 152.21,
+     "ok": true
+    }
+   ]
+  },
+  "main_bed_on_gpu": {
+   "live_ms": 71.32,
+   "fps": 14.0,
+   "framebench_ms": 69.72,
+   "runs": [
+    {
+     "live_ms": 75.18796992481202,
+     "framebench_ms": 72.16,
+     "ok": true
+    },
+    {
+     "live_ms": 67.4496644295302,
+     "framebench_ms": 67.29,
+     "ok": true
+    }
+   ]
+  },
+  "build_4ad1ea1": {
+   "live_ms": 36.24,
+   "fps": 27.6,
+   "framebench_ms": 38.7,
+   "runs": [
+    {
+     "live_ms": 36.20938628158845,
+     "framebench_ms": 39.41,
+     "ok": true
+    },
+    {
+     "live_ms": 36.268115942028984,
+     "framebench_ms": 37.99,
+     "ok": true
+    }
+   ]
+  },
+  "pre_bed_cd2b05c": {
+   "live_ms": 18.66,
+   "fps": 53.6,
+   "framebench_ms": 21.77,
+   "runs": [
+    {
+     "live_ms": 18.6219739292365,
+     "framebench_ms": 21.17,
+     "ok": true
+    },
+    {
+     "live_ms": 18.69402985074627,
+     "framebench_ms": 22.37,
+     "ok": true
+    }
+   ]
+  },
+  "pre_shore_b808a1a": {
+   "live_ms": 13.64,
+   "fps": 73.3,
+   "framebench_ms": 13.48,
+   "runs": [
+    {
+     "live_ms": 13.980446927374302,
+     "framebench_ms": 13.79,
+     "ok": true
+    },
+    {
+     "live_ms": 13.306772908366534,
+     "framebench_ms": 13.18,
+     "ok": true
+    }
+   ]
+  },
+  "oct20_3771661": {
+   "live_ms": 12.6,
+   "fps": 79.4,
+   "framebench_ms": 11.92,
+   "runs": [
+    {
+     "live_ms": 12.966321243523316,
+     "framebench_ms": 11.75,
+     "ok": true
+    },
+    {
+     "live_ms": 12.23716381418093,
+     "framebench_ms": 12.09,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "ab_proto_ra": {
+  "main_orig_loop": {
+   "live_ms": 247.39,
+   "fps": 4.0,
+   "framebench_ms": 212.02,
+   "runs": [
+    {
+     "live_ms": 263.42105263157896,
+     "framebench_ms": 214.79,
+     "ok": true
+    },
+    {
+     "live_ms": 231.36363636363637,
+     "framebench_ms": 209.25,
+     "ok": true
+    }
+   ]
+  },
+  "main_bed_on_gpu": {
+   "live_ms": 104.89,
+   "fps": 9.5,
+   "framebench_ms": 80.11,
+   "runs": [
+    {
+     "live_ms": 102.65306122448979,
+     "framebench_ms": 78.73,
+     "ok": true
+    },
+    {
+     "live_ms": 107.12765957446808,
+     "framebench_ms": 81.48,
+     "ok": true
+    }
+   ]
+  },
+  "build_4ad1ea1": {
+   "live_ms": 56.75,
+   "fps": 17.6,
+   "framebench_ms": 49.99,
+   "runs": [
+    {
+     "live_ms": 55.248618784530386,
+     "framebench_ms": 48.57,
+     "ok": true
+    },
+    {
+     "live_ms": 58.25581395348837,
+     "framebench_ms": 51.41,
+     "ok": true
+    }
+   ]
+  },
+  "pre_bed_cd2b05c": {
+   "live_ms": 27.45,
+   "fps": 36.4,
+   "framebench_ms": 23.85,
+   "runs": [
+    {
+     "live_ms": 26.9811320754717,
+     "framebench_ms": 23.77,
+     "ok": true
+    },
+    {
+     "live_ms": 27.910863509749305,
+     "framebench_ms": 23.93,
+     "ok": true
+    }
+   ]
+  },
+  "pre_shore_b808a1a": {
+   "live_ms": 20.37,
+   "fps": 49.1,
+   "framebench_ms": 16.75,
+   "runs": [
+    {
+     "live_ms": 20.181451612903224,
+     "framebench_ms": 16.53,
+     "ok": true
+    },
+    {
+     "live_ms": 20.55441478439425,
+     "framebench_ms": 16.97,
+     "ok": true
+    }
+   ]
+  },
+  "oct20_3771661": {
+   "live_ms": 18.99,
+   "fps": 52.6,
+   "framebench_ms": 14.23,
+   "runs": [
+    {
+     "live_ms": 19.157088122605366,
+     "framebench_ms": 14.22,
+     "ok": true
+    },
+    {
+     "live_ms": 18.832391713747647,
+     "framebench_ms": 14.23,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "ab_proto2_td": {
+  "main_as_is": {
+   "live_ms": 140.02,
+   "fps": 7.1,
+   "framebench_ms": 143.44,
+   "runs": [
+    {
+     "live_ms": 141.40845070422534,
+     "framebench_ms": 146.73,
+     "ok": true
+    },
+    {
+     "live_ms": 138.63013698630138,
+     "framebench_ms": 140.15,
+     "ok": true
+    }
+   ]
+  },
+  "main_K1_bed_gpu": {
+   "live_ms": 65.02,
+   "fps": 15.4,
+   "framebench_ms": 64.53,
+   "runs": [
+    {
+     "live_ms": 66.49006622516556,
+     "framebench_ms": 64.9,
+     "ok": true
+    },
+    {
+     "live_ms": 63.54430379746835,
+     "framebench_ms": 64.17,
+     "ok": true
+    }
+   ]
+  },
+  "main_K1_K2_gpu": {
+   "live_ms": 10.66,
+   "fps": 93.8,
+   "framebench_ms": 13.82,
+   "runs": [
+    {
+     "live_ms": 10.705882352941176,
+     "framebench_ms": 14.26,
+     "ok": true
+    },
+    {
+     "live_ms": 10.615058324496289,
+     "framebench_ms": 13.39,
+     "ok": true
+    }
+   ]
+  },
+  "build_4ad1ea1": {
+   "live_ms": 35.02,
+   "fps": 28.6,
+   "framebench_ms": 36.39,
+   "runs": [
+    {
+     "live_ms": 35.24647887323944,
+     "framebench_ms": 36.07,
+     "ok": true
+    },
+    {
+     "live_ms": 34.791666666666664,
+     "framebench_ms": 36.7,
+     "ok": true
+    }
+   ]
+  },
+  "pre_bed_cd2b05c": {
+   "live_ms": 18.33,
+   "fps": 54.6,
+   "framebench_ms": 20.29,
+   "runs": [
+    {
+     "live_ms": 18.502772643253234,
+     "framebench_ms": 19.79,
+     "ok": true
+    },
+    {
+     "live_ms": 18.148820326678766,
+     "framebench_ms": 20.79,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "ab_proto2_ra": {
+  "main_as_is": {
+   "live_ms": 228.51,
+   "fps": 4.4,
+   "framebench_ms": 211.18,
+   "runs": [
+    {
+     "live_ms": 218.69565217391303,
+     "framebench_ms": 201.96,
+     "ok": true
+    },
+    {
+     "live_ms": 238.33333333333334,
+     "framebench_ms": 220.39,
+     "ok": true
+    }
+   ]
+  },
+  "main_K1_bed_gpu": {
+   "live_ms": 105.11,
+   "fps": 9.5,
+   "framebench_ms": 81.38,
+   "runs": [
+    {
+     "live_ms": 103.29896907216495,
+     "framebench_ms": 80.0,
+     "ok": true
+    },
+    {
+     "live_ms": 106.91489361702128,
+     "framebench_ms": 82.77,
+     "ok": true
+    }
+   ]
+  },
+  "main_K1_K2_gpu": {
+   "live_ms": 25.44,
+   "fps": 39.3,
+   "framebench_ms": 16.73,
+   "runs": [
+    {
+     "live_ms": 26.385224274406333,
+     "framebench_ms": 16.46,
+     "ok": true
+    },
+    {
+     "live_ms": 24.498777506112468,
+     "framebench_ms": 16.99,
+     "ok": true
+    }
+   ]
+  },
+  "build_4ad1ea1": {
+   "live_ms": 54.83,
+   "fps": 18.2,
+   "framebench_ms": 49.41,
+   "runs": [
+    {
+     "live_ms": 54.34782608695652,
+     "framebench_ms": 49.07,
+     "ok": true
+    },
+    {
+     "live_ms": 55.30386740331492,
+     "framebench_ms": 49.76,
+     "ok": true
+    }
+   ]
+  },
+  "pre_bed_cd2b05c": {
+   "live_ms": 24.82,
+   "fps": 40.3,
+   "framebench_ms": 22.17,
+   "runs": [
+    {
+     "live_ms": 24.987531172069826,
+     "framebench_ms": 22.17,
+     "ok": true
+    },
+    {
+     "live_ms": 24.655172413793103,
+     "framebench_ms": 22.17,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "ab_proto2_ra3000": {
+  "main_as_is": {
+   "live_ms": 188.86,
+   "fps": 5.3,
+   "framebench_ms": 171.28,
+   "runs": [
+    {
+     "live_ms": 194.80769230769232,
+     "framebench_ms": 174.8,
+     "ok": true
+    },
+    {
+     "live_ms": 182.9090909090909,
+     "framebench_ms": 167.76,
+     "ok": true
+    }
+   ]
+  },
+  "main_K1_bed_gpu": {
+   "live_ms": 85.07,
+   "fps": 11.8,
+   "framebench_ms": 66.36,
+   "runs": [
+    {
+     "live_ms": 86.55172413793103,
+     "framebench_ms": 66.53,
+     "ok": true
+    },
+    {
+     "live_ms": 83.58333333333333,
+     "framebench_ms": 66.18,
+     "ok": true
+    }
+   ]
+  },
+  "main_K1_K2_gpu": {
+   "live_ms": 21.94,
+   "fps": 45.6,
+   "framebench_ms": 15.48,
+   "runs": [
+    {
+     "live_ms": 20.5761316872428,
+     "framebench_ms": 14.73,
+     "ok": true
+    },
+    {
+     "live_ms": 23.302325581395348,
+     "framebench_ms": 16.23,
+     "ok": true
+    }
+   ]
+  },
+  "build_4ad1ea1": {
+   "live_ms": 48.56,
+   "fps": 20.6,
+   "framebench_ms": 43.5,
+   "runs": [
+    {
+     "live_ms": 47.942583732057415,
+     "framebench_ms": 44.81,
+     "ok": true
+    },
+    {
+     "live_ms": 49.170731707317074,
+     "framebench_ms": 42.19,
+     "ok": true
+    }
+   ]
+  },
+  "pre_bed_cd2b05c": {
+   "live_ms": 20.62,
+   "fps": 48.5,
+   "framebench_ms": 20.2,
+   "runs": [
+    {
+     "live_ms": 20.81081081081081,
+     "framebench_ms": 20.57,
+     "ok": true
+    },
+    {
+     "live_ms": 20.428571428571427,
+     "framebench_ms": 19.83,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "ab_main2_td": {
+  "main_now_a588908": {
+   "live_ms": 13.71,
+   "fps": 72.9,
+   "framebench_ms": 17.38,
+   "runs": [
+    {
+     "live_ms": 13.787878787878787,
+     "framebench_ms": 18.32,
+     "ok": true
+    },
+    {
+     "live_ms": 13.637602179836513,
+     "framebench_ms": 16.45,
+     "ok": true
+    }
+   ]
+  },
+  "d1edca3_K1_K2_proto": {
+   "live_ms": 10.21,
+   "fps": 97.9,
+   "framebench_ms": 12.95,
+   "runs": [
+    {
+     "live_ms": 9.794520547945206,
+     "framebench_ms": 12.87,
+     "ok": true
+    },
+    {
+     "live_ms": 10.626992561105208,
+     "framebench_ms": 13.02,
+     "ok": true
+    }
+   ]
+  },
+  "build_4ad1ea1": {
+   "live_ms": 33.15,
+   "fps": 30.2,
+   "framebench_ms": 35.39,
+   "runs": [
+    {
+     "live_ms": 33.36666666666667,
+     "framebench_ms": 35.48,
+     "ok": true
+    },
+    {
+     "live_ms": 32.92763157894737,
+     "framebench_ms": 35.31,
+     "ok": true
+    }
+   ]
+  },
+  "pre_bed_cd2b05c": {
+   "live_ms": 17.41,
+   "fps": 57.4,
+   "framebench_ms": 19.95,
+   "runs": [
+    {
+     "live_ms": 17.37847222222222,
+     "framebench_ms": 19.74,
+     "ok": true
+    },
+    {
+     "live_ms": 17.4390243902439,
+     "framebench_ms": 20.15,
+     "ok": true
+    }
+   ]
+  },
+  "pre_shore_b808a1a": {
+   "live_ms": 9.26,
+   "fps": 108.0,
+   "framebench_ms": 12.05,
+   "runs": [
+    {
+     "live_ms": 9.311627906976744,
+     "framebench_ms": 12.13,
+     "ok": true
+    },
+    {
+     "live_ms": 9.19963201471941,
+     "framebench_ms": 11.98,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "ab_main2_ra": {
+  "main_now_a588908": {
+   "live_ms": 20.7,
+   "fps": 48.3,
+   "framebench_ms": 18.65,
+   "runs": [
+    {
+     "live_ms": 20.28397565922921,
+     "framebench_ms": 18.5,
+     "ok": true
+    },
+    {
+     "live_ms": 21.11814345991561,
+     "framebench_ms": 18.8,
+     "ok": true
+    }
+   ]
+  },
+  "d1edca3_K1_K2_proto": {
+   "live_ms": 23.48,
+   "fps": 42.6,
+   "framebench_ms": 16.39,
+   "runs": [
+    {
+     "live_ms": 23.14814814814815,
+     "framebench_ms": 16.1,
+     "ok": true
+    },
+    {
+     "live_ms": 23.80952380952381,
+     "framebench_ms": 16.67,
+     "ok": true
+    }
+   ]
+  },
+  "build_4ad1ea1": {
+   "live_ms": 53.98,
+   "fps": 18.5,
+   "framebench_ms": 48.74,
+   "runs": [
+    {
+     "live_ms": 52.96296296296296,
+     "framebench_ms": 47.69,
+     "ok": true
+    },
+    {
+     "live_ms": 55.0,
+     "framebench_ms": 49.79,
+     "ok": true
+    }
+   ]
+  },
+  "pre_bed_cd2b05c": {
+   "live_ms": 24.83,
+   "fps": 40.3,
+   "framebench_ms": 22.08,
+   "runs": [
+    {
+     "live_ms": 24.449877750611247,
+     "framebench_ms": 21.79,
+     "ok": true
+    },
+    {
+     "live_ms": 25.21410579345088,
+     "framebench_ms": 22.37,
+     "ok": true
+    }
+   ]
+  },
+  "pre_shore_b808a1a": {
+   "live_ms": 17.74,
+   "fps": 56.4,
+   "framebench_ms": 14.8,
+   "runs": [
+    {
+     "live_ms": 17.14041095890411,
+     "framebench_ms": 14.44,
+     "ok": true
+    },
+    {
+     "live_ms": 18.333333333333332,
+     "framebench_ms": 15.17,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "ab_bed_td": {
+  "build_4ad1ea1_play_folder": {
+   "live_ms": 33.31,
+   "fps": 30.0,
+   "framebench_ms": 41.53,
+   "runs": [
+    {
+     "live_ms": 34.91289198606272,
+     "framebench_ms": 43.38,
+     "ok": true
+    },
+    {
+     "live_ms": 31.70886075949367,
+     "framebench_ms": 39.67,
+     "ok": true
+    }
+   ]
+  },
+  "rebuilt_same": {
+   "live_ms": 34.03,
+   "fps": 29.4,
+   "framebench_ms": 41.68,
+   "runs": [
+    {
+     "live_ms": 34.8780487804878,
+     "framebench_ms": 43.99,
+     "ok": true
+    },
+    {
+     "live_ms": 33.17880794701987,
+     "framebench_ms": 39.37,
+     "ok": true
+    }
+   ]
+  },
+  "bed_off": {
+   "live_ms": 18.58,
+   "fps": 53.8,
+   "framebench_ms": 25.27,
+   "runs": [
+    {
+     "live_ms": 21.09704641350211,
+     "framebench_ms": 25.47,
+     "ok": true
+    },
+    {
+     "live_ms": 16.06741573033708,
+     "framebench_ms": 25.08,
+     "ok": true
+    }
+   ]
+  },
+  "bed_normals_off": {
+   "live_ms": 27.98,
+   "fps": 35.7,
+   "framebench_ms": 33.39,
+   "runs": [
+    {
+     "live_ms": 32.32258064516129,
+     "framebench_ms": 33.42,
+     "ok": true
+    },
+    {
+     "live_ms": 23.632075471698112,
+     "framebench_ms": 33.35,
+     "ok": true
+    }
+   ]
+  },
+  "shore_off": {
+   "live_ms": 25.1,
+   "fps": 39.8,
+   "framebench_ms": 36.09,
+   "runs": [
+    {
+     "live_ms": 25.70694087403599,
+     "framebench_ms": 33.38,
+     "ok": true
+    },
+    {
+     "live_ms": 24.498777506112468,
+     "framebench_ms": 38.8,
+     "ok": true
+    }
+   ]
+  },
+  "before_bed_commit": {
+   "live_ms": 16.47,
+   "fps": 60.7,
+   "framebench_ms": 27.21,
+   "runs": [
+    {
+     "live_ms": 15.128593040847202,
+     "framebench_ms": 27.8,
+     "ok": true
+    },
+    {
+     "live_ms": 17.81138790035587,
+     "framebench_ms": 26.62,
+     "ok": true
+    }
+   ]
+  }
+ },
+ "matrix_ra_4ad1ea1": {
+  "scene": "ra",
+  "w": 3008,
+  "h": 1547,
+  "env": [],
+  "base_all": [
+   30.69,
+   34.99,
+   34.41,
+   34.0,
+   34.56,
+   36.11,
+   33.1,
+   34.32,
+   34.08,
+   35.46,
+   34.39,
+   34.34,
+   32.88,
+   35.04,
+   33.29,
+   34.41,
+   35.41,
+   37.95,
+   33.79,
+   35.05,
+   33.72,
+   33.94,
+   35.64,
+   33.86,
+   33.38,
+   33.81,
+   34.67,
+   34.02,
+   34.29,
+   33.65,
+   34.91,
+   35.56,
+   35.23,
+   34.82,
+   36.01,
+   35.1,
+   35.75,
+   35.64,
+   36.01,
+   35.14,
+   35.79,
+   38.38,
+   36.32,
+   34.03,
+   36.9,
+   35.45,
+   33.9,
+   33.61,
+   33.75,
+   34.87,
+   35.37,
+   35.3,
+   36.36,
+   34.68,
+   34.61,
+   35.18,
+   34.88,
+   34.69,
+   35.81,
+   34.34,
+   33.87,
+   34.42,
+   33.66,
+   36.44,
+   34.52,
+   35.75,
+   36.91,
+   41.83,
+   39.71,
+   30.92,
+   31.86,
+   30.62,
+   31.95,
+   33.46
+  ],
+  "rows": [
+   {
+    "label": "shadow_on 0",
+    "arm_ms": 26.24,
+    "base_ms": 32.77,
+    "delta_ms": -6.53,
+    "deltas": [
+     -5.54,
+     -7.52
+    ]
+   },
+   {
+    "label": "shadow_span 0.6",
+    "arm_ms": 32.52,
+    "base_ms": 32.99,
+    "delta_ms": -0.48,
+    "deltas": [
+     0.37,
+     -1.32
+    ]
+   },
+   {
+    "label": "shadow_res 2048",
+    "arm_ms": 31.84,
+    "base_ms": 32.72,
+    "delta_ms": -0.89,
+    "deltas": [
+     -0.17,
+     -1.6
+    ]
+   },
+   {
+    "label": "m3inf_shadow 0",
+    "arm_ms": 31.43,
+    "base_ms": 32.84,
+    "delta_ms": -1.41,
+    "deltas": [
+     -1.92,
+     -0.89
+    ]
+   },
+   {
+    "label": "shadow_terrain 0",
+    "arm_ms": 33.01,
+    "base_ms": 35.33,
+    "delta_ms": -2.31,
+    "deltas": [
+     -1.7,
+     -2.93
+    ]
+   },
+   {
+    "label": "rock_shadows 0",
+    "arm_ms": 33.92,
+    "base_ms": 37.69,
+    "delta_ms": -3.77,
+    "deltas": [
+     -1.71,
+     -5.83
+    ]
+   },
+   {
+    "label": "tree3d 0",
+    "arm_ms": 30.61,
+    "base_ms": 36.54,
+    "delta_ms": -5.93,
+    "deltas": [
+     -3.7,
+     -8.16
+    ]
+   },
+   {
+    "label": "m3inf_on 0",
+    "arm_ms": 35.8,
+    "base_ms": 35.27,
+    "delta_ms": 0.54,
+    "deltas": [
+     3.18,
+     -2.11
+    ]
+   },
+   {
+    "label": "vlight_on 0",
+    "arm_ms": 35.44,
+    "base_ms": 34.95,
+    "delta_ms": 0.48,
+    "deltas": [
+     -0.1,
+     1.06
+    ]
+   },
+   {
+    "label": "vspec_on 0",
+    "arm_ms": 33.98,
+    "base_ms": 35.2,
+    "delta_ms": -1.22,
+    "deltas": [
+     -1.09,
+     -1.35
+    ]
+   },
+   {
+    "label": "unified_lighting 0",
+    "arm_ms": 30.8,
+    "base_ms": 34.71,
+    "delta_ms": -3.91,
+    "deltas": [
+     -3.59,
+     -4.23
+    ]
+   },
+   {
+    "label": "fol_on 0",
+    "arm_ms": 35.03,
+    "base_ms": 33.83,
+    "delta_ms": 1.21,
+    "deltas": [
+     1.34,
+     1.08
+    ]
+   },
+   {
+    "label": "rock_on 0",
+    "arm_ms": 33.88,
+    "base_ms": 34.05,
+    "delta_ms": -0.17,
+    "deltas": [
+     -0.27,
+     -0.07
+    ]
+   },
+   {
+    "label": "water_fx 0",
+    "arm_ms": 18.57,
+    "base_ms": 34.14,
+    "delta_ms": -15.57,
+    "deltas": [
+     -18.2,
+     -12.94
+    ]
+   },
+   {
+    "label": "water_swash 0",
+    "arm_ms": 36.95,
+    "base_ms": 34.46,
+    "delta_ms": 2.48,
+    "deltas": [
+     3.0,
+     1.96
+    ]
+   },
+   {
+    "label": "terrain_relief 0",
+    "arm_ms": 34.22,
+    "base_ms": 35.08,
+    "delta_ms": -0.86,
+    "deltas": [
+     -1.11,
+     -0.6
+    ]
+   },
+   {
+    "label": "bib_enh 0",
+    "arm_ms": 37.02,
+    "base_ms": 35.73,
+    "delta_ms": 1.28,
+    "deltas": [
+     0.5,
+     2.07
+    ]
+   },
+   {
+    "label": "decal_enh 0",
+    "arm_ms": 34.84,
+    "base_ms": 35.45,
+    "delta_ms": -0.61,
+    "deltas": [
+     -0.78,
+     -0.43
+    ]
+   },
+   {
+    "label": "ssao_on 0",
+    "arm_ms": 34.46,
+    "base_ms": 34.66,
+    "delta_ms": -0.2,
+    "deltas": [
+     -0.42,
+     0.03
+    ]
+   },
+   {
+    "label": "contact_on 0",
+    "arm_ms": 36.36,
+    "base_ms": 34.52,
+    "delta_ms": 1.84,
+    "deltas": [
+     2.19,
+     1.5
+    ]
+   },
+   {
+    "label": "tibfog_on 0",
+    "arm_ms": 36.54,
+    "base_ms": 34.67,
+    "delta_ms": 1.87,
+    "deltas": [
+     4.12,
+     -0.39
+    ]
+   },
+   {
+    "label": "light_tiberium 0",
+    "arm_ms": 36.27,
+    "base_ms": 35.31,
+    "delta_ms": 0.96,
+    "deltas": [
+     -0.36,
+     2.27
+    ]
+   },
+   {
+    "label": "lights_on 0",
+    "arm_ms": 33.86,
+    "base_ms": 35.04,
+    "delta_ms": -1.19,
+    "deltas": [
+     -1.51,
+     -0.86
+    ]
+   },
+   {
+    "label": "cloud_on 0",
+    "arm_ms": 33.33,
+    "base_ms": 34.37,
+    "delta_ms": -1.04,
+    "deltas": [
+     -0.63,
+     -1.45
+    ]
+   },
+   {
+    "label": "dfog_on 0",
+    "arm_ms": 34.01,
+    "base_ms": 33.95,
+    "delta_ms": 0.06,
+    "deltas": [
+     0.45,
+     -0.34
+    ]
+   },
+   {
+    "label": "bloom_on 0",
+    "arm_ms": 34.59,
+    "base_ms": 33.96,
+    "delta_ms": 0.63,
+    "deltas": [
+     -0.83,
+     2.1
+    ]
+   },
+   {
+    "label": "grade_on 0",
+    "arm_ms": 34.64,
+    "base_ms": 34.05,
+    "delta_ms": 0.59,
+    "deltas": [
+     0.79,
+     0.39
+    ]
+   },
+   {
+    "label": "terrain_normals 0",
+    "arm_ms": 34.67,
+    "base_ms": 34.41,
+    "delta_ms": 0.25,
+    "deltas": [
+     0.34,
+     0.17
+    ]
+   },
+   {
+    "label": "snow_shadow_strength 1",
+    "arm_ms": 35.73,
+    "base_ms": 35.07,
+    "delta_ms": 0.66,
+    "deltas": [
+     1.35,
+     -0.02
+    ]
+   },
+   {
+    "label": "fog_fx 0",
+    "arm_ms": 34.51,
+    "base_ms": 34.87,
+    "delta_ms": -0.36,
+    "deltas": [
+     0.0,
+     -0.73
+    ]
+   },
+   {
+    "label": "bldshow 0",
+    "arm_ms": 34.45,
+    "base_ms": 35.2,
+    "delta_ms": -0.75,
+    "deltas": [
+     -0.7,
+     -0.79
+    ]
+   },
+   {
+    "label": "vhshow 0",
+    "arm_ms": 34.38,
+    "base_ms": 36.37,
+    "delta_ms": -2.0,
+    "deltas": [
+     -2.12,
+     -1.87
+    ]
+   },
+   {
+    "label": "infdraw 0",
+    "arm_ms": 34.77,
+    "base_ms": 36.05,
+    "delta_ms": -1.29,
+    "deltas": [
+     -0.99,
+     -1.59
+    ]
+   },
+   {
+    "label": "walls 0",
+    "arm_ms": 34.65,
+    "base_ms": 35.44,
+    "delta_ms": -0.79,
+    "deltas": [
+     -1.12,
+     -0.47
+    ]
+   },
+   {
+    "label": "bibhue 0",
+    "arm_ms": 36.37,
+    "base_ms": 35.56,
+    "delta_ms": 0.8,
+    "deltas": [
+     0.05,
+     1.55
+    ]
+   },
+   {
+    "label": "raore 0",
+    "arm_ms": 36.56,
+    "base_ms": 35.62,
+    "delta_ms": 0.94,
+    "deltas": [
+     1.01,
+     0.88
+    ]
+   }
+  ],
+  "ok": true,
+  "secs": 171.9
+ },
+ "matrix_ra_pre": {
+  "scene": "ra",
+  "w": 3008,
+  "h": 1547,
+  "env": [],
+  "base_all": [
+   13.7,
+   13.69,
+   13.82,
+   13.68,
+   14.02,
+   17.77,
+   15.87,
+   19.94,
+   17.76,
+   16.86,
+   16.54,
+   16.65,
+   16.51,
+   16.32,
+   16.94,
+   16.81,
+   16.76,
+   16.94,
+   21.6,
+   17.49,
+   16.79,
+   16.57,
+   16.6,
+   17.23,
+   18.61,
+   18.45,
+   14.35,
+   20.44,
+   19.34,
+   25.54,
+   17.25,
+   18.4,
+   19.32,
+   23.98,
+   15.97,
+   20.82,
+   17.0,
+   20.45,
+   17.67,
+   16.62,
+   16.68,
+   17.85,
+   18.06,
+   23.18,
+   18.61,
+   19.86,
+   18.2,
+   26.36,
+   18.29,
+   20.56,
+   27.5,
+   23.45,
+   17.78,
+   22.45,
+   24.81,
+   18.85,
+   17.13,
+   20.39,
+   20.73,
+   19.76,
+   22.94,
+   21.19,
+   19.8,
+   17.33,
+   17.15,
+   19.17,
+   21.41,
+   24.77,
+   16.13,
+   21.17,
+   22.53,
+   17.81,
+   17.56,
+   18.03
+  ],
+  "rows": [
+   {
+    "label": "shadow_on 0",
+    "arm_ms": 10.87,
+    "base_ms": 15.75,
+    "delta_ms": -4.88,
+    "deltas": [
+     -4.47,
+     -5.29
+    ]
+   },
+   {
+    "label": "shadow_span 0.6",
+    "arm_ms": 14.3,
+    "base_ms": 15.72,
+    "delta_ms": -1.41,
+    "deltas": [
+     -0.69,
+     -2.13
+    ]
+   },
+   {
+    "label": "shadow_res 2048",
+    "arm_ms": 18.82,
+    "base_ms": 16.96,
+    "delta_ms": 1.86,
+    "deltas": [
+     -0.11,
+     3.83
+    ]
+   },
+   {
+    "label": "m3inf_shadow 0",
+    "arm_ms": 17.45,
+    "base_ms": 17.85,
+    "delta_ms": -0.41,
+    "deltas": [
+     -0.42,
+     -0.39
+    ]
+   },
+   {
+    "label": "shadow_terrain 0",
+    "arm_ms": 20.43,
+    "base_ms": 17.27,
+    "delta_ms": 3.16,
+    "deltas": [
+     5.8,
+     0.51
+    ]
+   },
+   {
+    "label": "rock_shadows 0",
+    "arm_ms": 18.6,
+    "base_ms": 18.63,
+    "delta_ms": -0.04,
+    "deltas": [
+     2.26,
+     -2.33
+    ]
+   },
+   {
+    "label": "tree3d 0",
+    "arm_ms": 15.44,
+    "base_ms": 20.5,
+    "delta_ms": -5.06,
+    "deltas": [
+     -6.78,
+     -3.34
+    ]
+   },
+   {
+    "label": "m3inf_on 0",
+    "arm_ms": 20.68,
+    "base_ms": 19.57,
+    "delta_ms": 1.11,
+    "deltas": [
+     -0.68,
+     2.9
+    ]
+   },
+   {
+    "label": "vlight_on 0",
+    "arm_ms": 17.03,
+    "base_ms": 17.73,
+    "delta_ms": -0.71,
+    "deltas": [
+     -0.77,
+     -0.64
+    ]
+   },
+   {
+    "label": "vspec_on 0",
+    "arm_ms": 16.84,
+    "base_ms": 16.97,
+    "delta_ms": -0.13,
+    "deltas": [
+     -0.08,
+     -0.18
+    ]
+   },
+   {
+    "label": "unified_lighting 0",
+    "arm_ms": 15.49,
+    "base_ms": 17.58,
+    "delta_ms": -2.09,
+    "deltas": [
+     -2.32,
+     -1.85
+    ]
+   },
+   {
+    "label": "fol_on 0",
+    "arm_ms": 18.54,
+    "base_ms": 18.54,
+    "delta_ms": 0.0,
+    "deltas": [
+     0.23,
+     -0.23
+    ]
+   },
+   {
+    "label": "rock_on 0",
+    "arm_ms": 15.22,
+    "base_ms": 19.24,
+    "delta_ms": -4.02,
+    "deltas": [
+     -2.86,
+     -5.18
+    ]
+   },
+   {
+    "label": "water_fx 0",
+    "arm_ms": 17.85,
+    "base_ms": 18.99,
+    "delta_ms": -1.14,
+    "deltas": [
+     -1.2,
+     -1.08
+    ]
+   },
+   {
+    "label": "water_swash 0",
+    "arm_ms": 19.45,
+    "base_ms": 18.56,
+    "delta_ms": 0.89,
+    "deltas": [
+     0.05,
+     1.74
+    ]
+   },
+   {
+    "label": "terrain_relief 0",
+    "arm_ms": 21.7,
+    "base_ms": 18.67,
+    "delta_ms": 3.03,
+    "deltas": [
+     0.62,
+     5.43
+    ]
+   },
+   {
+    "label": "bib_enh 0",
+    "arm_ms": 21.2,
+    "base_ms": 17.8,
+    "delta_ms": 3.4,
+    "deltas": [
+     5.7,
+     1.1
+    ]
+   },
+   {
+    "label": "decal_enh 0",
+    "arm_ms": 17.07,
+    "base_ms": 18.63,
+    "delta_ms": -1.57,
+    "deltas": [
+     -3.69,
+     0.56
+    ]
+   },
+   {
+    "label": "ssao_on 0",
+    "arm_ms": 19.92,
+    "base_ms": 20.69,
+    "delta_ms": -0.77,
+    "deltas": [
+     1.78,
+     -3.32
+    ]
+   },
+   {
+    "label": "contact_on 0",
+    "arm_ms": 18.45,
+    "base_ms": 20.38,
+    "delta_ms": -1.94,
+    "deltas": [
+     -0.26,
+     -3.61
+    ]
+   },
+   {
+    "label": "tibfog_on 0",
+    "arm_ms": 20.85,
+    "base_ms": 18.4,
+    "delta_ms": 2.45,
+    "deltas": [
+     1.66,
+     3.24
+    ]
+   },
+   {
+    "label": "light_tiberium 0",
+    "arm_ms": 18.86,
+    "base_ms": 18.6,
+    "delta_ms": 0.26,
+    "deltas": [
+     0.13,
+     0.38
+    ]
+   },
+   {
+    "label": "lights_on 0",
+    "arm_ms": 21.24,
+    "base_ms": 21.2,
+    "delta_ms": 0.04,
+    "deltas": [
+     -0.4,
+     0.49
+    ]
+   },
+   {
+    "label": "cloud_on 0",
+    "arm_ms": 20.41,
+    "base_ms": 20.98,
+    "delta_ms": -0.56,
+    "deltas": [
+     -1.44,
+     0.32
+    ]
+   },
+   {
+    "label": "dfog_on 0",
+    "arm_ms": 19.37,
+    "base_ms": 18.98,
+    "delta_ms": 0.39,
+    "deltas": [
+     2.43,
+     -1.64
+    ]
+   },
+   {
+    "label": "bloom_on 0",
+    "arm_ms": 18.14,
+    "base_ms": 19.36,
+    "delta_ms": -1.22,
+    "deltas": [
+     -1.08,
+     -1.36
+    ]
+   },
+   {
+    "label": "grade_on 0",
+    "arm_ms": 20.67,
+    "base_ms": 19.84,
+    "delta_ms": 0.83,
+    "deltas": [
+     4.55,
+     -2.89
+    ]
+   },
+   {
+    "label": "terrain_normals 0",
+    "arm_ms": 18.36,
+    "base_ms": 19.46,
+    "delta_ms": -1.1,
+    "deltas": [
+     0.03,
+     -2.23
+    ]
+   },
+   {
+    "label": "snow_shadow_strength 1",
+    "arm_ms": 19.41,
+    "base_ms": 20.84,
+    "delta_ms": -1.42,
+    "deltas": [
+     -4.92,
+     2.07
+    ]
+   },
+   {
+    "label": "fog_fx 0",
+    "arm_ms": 19.86,
+    "base_ms": 21.14,
+    "delta_ms": -1.28,
+    "deltas": [
+     -3.72,
+     1.16
+    ]
+   },
+   {
+    "label": "bldshow 0",
+    "arm_ms": 18.05,
+    "base_ms": 19.22,
+    "delta_ms": -1.18,
+    "deltas": [
+     -0.05,
+     -2.3
+    ]
+   },
+   {
+    "label": "vhshow 0",
+    "arm_ms": 19.0,
+    "base_ms": 18.41,
+    "delta_ms": 0.59,
+    "deltas": [
+     -2.13,
+     3.32
+    ]
+   },
+   {
+    "label": "infdraw 0",
+    "arm_ms": 17.6,
+    "base_ms": 19.46,
+    "delta_ms": -1.85,
+    "deltas": [
+     -3.41,
+     -0.3
+    ]
+   },
+   {
+    "label": "walls 0",
+    "arm_ms": 16.13,
+    "base_ms": 18.31,
+    "delta_ms": -2.18,
+    "deltas": [
+     -4.26,
+     -0.11
+    ]
+   },
+   {
+    "label": "bibhue 0",
+    "arm_ms": 18.35,
+    "base_ms": 17.77,
+    "delta_ms": 0.58,
+    "deltas": [
+     1.0,
+     0.16
+    ]
+   },
+   {
+    "label": "raore 0",
+    "arm_ms": 20.89,
+    "base_ms": 18.98,
+    "delta_ms": 1.91,
+    "deltas": [
+     0.57,
+     3.25
+    ]
+   }
+  ],
+  "ok": true,
+  "secs": 100.3
+ },
+ "matrix_td_4ad1ea1": {
+  "scene": "td",
+  "w": 3008,
+  "h": 1547,
+  "env": [],
+  "base_all": [
+   44.48,
+   45.17,
+   44.67,
+   47.07,
+   44.69,
+   48.08,
+   43.9,
+   44.81,
+   38.91,
+   45.43,
+   46.24,
+   45.63,
+   44.96,
+   45.21,
+   41.88,
+   44.28,
+   38.41,
+   43.99,
+   41.87,
+   40.54,
+   45.14,
+   43.34,
+   41.16,
+   45.28,
+   44.26,
+   44.22,
+   44.49,
+   44.23,
+   36.73,
+   41.37,
+   44.14,
+   41.06,
+   41.34,
+   44.78,
+   38.36,
+   36.5,
+   44.58,
+   45.41,
+   44.69,
+   44.52,
+   44.73,
+   45.02,
+   44.77,
+   42.02,
+   45.19,
+   45.11,
+   38.81,
+   41.7,
+   45.15,
+   43.4,
+   39.27,
+   44.92,
+   44.43,
+   44.94,
+   42.69,
+   44.41,
+   46.37,
+   44.91,
+   44.35,
+   42.18,
+   40.62,
+   44.73,
+   44.92,
+   45.87,
+   38.09,
+   42.66,
+   44.07,
+   43.69,
+   39.06,
+   45.11,
+   44.1,
+   43.96,
+   44.8,
+   43.36
+  ],
+  "rows": [
+   {
+    "label": "shadow_on 0",
+    "arm_ms": 41.87,
+    "base_ms": 44.45,
+    "delta_ms": -2.59,
+    "deltas": [
+     -4.2,
+     -0.98
+    ]
+   },
+   {
+    "label": "shadow_span 0.6",
+    "arm_ms": 44.73,
+    "base_ms": 44.65,
+    "delta_ms": 0.09,
+    "deltas": [
+     0.54,
+     -0.37
+    ]
+   },
+   {
+    "label": "shadow_res 2048",
+    "arm_ms": 44.97,
+    "base_ms": 44.95,
+    "delta_ms": 0.02,
+    "deltas": [
+     0.16,
+     -0.12
+    ]
+   },
+   {
+    "label": "m3inf_shadow 0",
+    "arm_ms": 46.17,
+    "base_ms": 45.24,
+    "delta_ms": 0.93,
+    "deltas": [
+     2.25,
+     -0.4
+    ]
+   },
+   {
+    "label": "shadow_terrain 0",
+    "arm_ms": 43.83,
+    "base_ms": 44.23,
+    "delta_ms": -0.41,
+    "deltas": [
+     -2.38,
+     1.57
+    ]
+   },
+   {
+    "label": "rock_shadows 0",
+    "arm_ms": 44.05,
+    "base_ms": 43.68,
+    "delta_ms": 0.37,
+    "deltas": [
+     -1.75,
+     2.48
+    ]
+   },
+   {
+    "label": "tree3d 0",
+    "arm_ms": 42.9,
+    "base_ms": 44.12,
+    "delta_ms": -1.22,
+    "deltas": [
+     -2.27,
+     -0.18
+    ]
+   },
+   {
+    "label": "m3inf_on 0",
+    "arm_ms": 45.07,
+    "base_ms": 42.61,
+    "delta_ms": 2.46,
+    "deltas": [
+     1.92,
+     3.0
+    ]
+   },
+   {
+    "label": "vlight_on 0",
+    "arm_ms": 38.95,
+    "base_ms": 41.27,
+    "delta_ms": -2.33,
+    "deltas": [
+     -4.02,
+     -0.63
+    ]
+   },
+   {
+    "label": "vspec_on 0",
+    "arm_ms": 44.38,
+    "base_ms": 43.91,
+    "delta_ms": 0.47,
+    "deltas": [
+     -1.16,
+     2.1
+    ]
+   },
+   {
+    "label": "unified_lighting 0",
+    "arm_ms": 43.32,
+    "base_ms": 45.66,
+    "delta_ms": -2.34,
+    "deltas": [
+     -3.34,
+     -1.34
+    ]
+   },
+   {
+    "label": "fol_on 0",
+    "arm_ms": 38.68,
+    "base_ms": 45.06,
+    "delta_ms": -6.38,
+    "deltas": [
+     -8.23,
+     -4.53
+    ]
+   },
+   {
+    "label": "rock_on 0",
+    "arm_ms": 43.58,
+    "base_ms": 43.88,
+    "delta_ms": -0.3,
+    "deltas": [
+     -0.66,
+     0.05
+    ]
+   },
+   {
+    "label": "water_fx 0",
+    "arm_ms": 11.21,
+    "base_ms": 42.47,
+    "delta_ms": -31.26,
+    "deltas": [
+     -32.55,
+     -29.96
+    ]
+   },
+   {
+    "label": "water_swash 0",
+    "arm_ms": 44.7,
+    "base_ms": 43.17,
+    "delta_ms": 1.53,
+    "deltas": [
+     -0.46,
+     3.52
+    ]
+   },
+   {
+    "label": "terrain_relief 0",
+    "arm_ms": 41.74,
+    "base_ms": 42.99,
+    "delta_ms": -1.25,
+    "deltas": [
+     3.18,
+     -5.67
+    ]
+   },
+   {
+    "label": "bib_enh 0",
+    "arm_ms": 42.56,
+    "base_ms": 43.42,
+    "delta_ms": -0.86,
+    "deltas": [
+     -0.09,
+     -1.62
+    ]
+   },
+   {
+    "label": "decal_enh 0",
+    "arm_ms": 45.7,
+    "base_ms": 44.16,
+    "delta_ms": 1.54,
+    "deltas": [
+     2.34,
+     0.74
+    ]
+   },
+   {
+    "label": "ssao_on 0",
+    "arm_ms": 38.91,
+    "base_ms": 42.38,
+    "delta_ms": -3.46,
+    "deltas": [
+     -3.53,
+     -3.39
+    ]
+   },
+   {
+    "label": "contact_on 0",
+    "arm_ms": 43.83,
+    "base_ms": 43.33,
+    "delta_ms": 0.5,
+    "deltas": [
+     1.74,
+     -0.73
+    ]
+   },
+   {
+    "label": "tibfog_on 0",
+    "arm_ms": 41.88,
+    "base_ms": 44.46,
+    "delta_ms": -2.59,
+    "deltas": [
+     -2.28,
+     -2.9
+    ]
+   },
+   {
+    "label": "light_tiberium 0",
+    "arm_ms": 44.04,
+    "base_ms": 43.46,
+    "delta_ms": 0.58,
+    "deltas": [
+     1.85,
+     -0.7
+    ]
+   },
+   {
+    "label": "lights_on 0",
+    "arm_ms": 44.6,
+    "base_ms": 42.66,
+    "delta_ms": 1.94,
+    "deltas": [
+     1.46,
+     2.43
+    ]
+   },
+   {
+    "label": "cloud_on 0",
+    "arm_ms": 44.53,
+    "base_ms": 43.05,
+    "delta_ms": 1.47,
+    "deltas": [
+     -0.74,
+     3.69
+    ]
+   },
+   {
+    "label": "dfog_on 0",
+    "arm_ms": 44.63,
+    "base_ms": 44.26,
+    "delta_ms": 0.37,
+    "deltas": [
+     -0.41,
+     1.16
+    ]
+   },
+   {
+    "label": "bloom_on 0",
+    "arm_ms": 39.78,
+    "base_ms": 43.89,
+    "delta_ms": -4.11,
+    "deltas": [
+     -4.21,
+     -4.0
+    ]
+   },
+   {
+    "label": "grade_on 0",
+    "arm_ms": 41.96,
+    "base_ms": 42.31,
+    "delta_ms": -0.35,
+    "deltas": [
+     -2.09,
+     1.39
+    ]
+   },
+   {
+    "label": "terrain_normals 0",
+    "arm_ms": 44.05,
+    "base_ms": 41.22,
+    "delta_ms": 2.84,
+    "deltas": [
+     2.95,
+     2.72
+    ]
+   },
+   {
+    "label": "mottle_on 0",
+    "arm_ms": 39.45,
+    "base_ms": 42.1,
+    "delta_ms": -2.65,
+    "deltas": [
+     -1.54,
+     -3.77
+    ]
+   },
+   {
+    "label": "tib3d 0",
+    "arm_ms": 43.01,
+    "base_ms": 43.18,
+    "delta_ms": -0.17,
+    "deltas": [
+     1.61,
+     -1.95
+    ]
+   },
+   {
+    "label": "sand_fx 0",
+    "arm_ms": 41.44,
+    "base_ms": 43.0,
+    "delta_ms": -1.56,
+    "deltas": [
+     -1.97,
+     -1.16
+    ]
+   },
+   {
+    "label": "bldshow 0",
+    "arm_ms": 39.23,
+    "base_ms": 43.05,
+    "delta_ms": -3.82,
+    "deltas": [
+     -1.06,
+     -6.58
+    ]
+   },
+   {
+    "label": "vhshow 0",
+    "arm_ms": 42.95,
+    "base_ms": 43.97,
+    "delta_ms": -1.01,
+    "deltas": [
+     -1.31,
+     -0.72
+    ]
+   },
+   {
+    "label": "infdraw 0",
+    "arm_ms": 44.95,
+    "base_ms": 43.1,
+    "delta_ms": 1.85,
+    "deltas": [
+     4.04,
+     -0.34
+    ]
+   },
+   {
+    "label": "walls 0",
+    "arm_ms": 42.13,
+    "base_ms": 41.02,
+    "delta_ms": 1.12,
+    "deltas": [
+     2.73,
+     -0.5
+    ]
+   },
+   {
+    "label": "bibhue 0",
+    "arm_ms": 43.48,
+    "base_ms": 42.8,
+    "delta_ms": 0.69,
+    "deltas": [
+     1.61,
+     -0.23
+    ]
+   }
+  ],
+  "ok": true,
+  "secs": 209.1
+ },
+ "matrix_td_pre": {
+  "scene": "td",
+  "w": 3008,
+  "h": 1547,
+  "env": [],
+  "base_all": [
+   23.38,
+   19.57,
+   19.37,
+   22.44,
+   23.04,
+   21.78,
+   26.47,
+   24.24,
+   23.46,
+   19.62,
+   20.17,
+   19.62,
+   20.71,
+   22.74,
+   21.78,
+   23.65,
+   26.06,
+   26.12,
+   22.29,
+   19.77,
+   22.95,
+   20.85,
+   22.27,
+   21.76,
+   21.81,
+   22.0,
+   22.51,
+   24.08,
+   24.11,
+   21.54,
+   26.19,
+   21.58,
+   23.71,
+   26.36,
+   25.63,
+   26.09,
+   25.38,
+   25.6,
+   25.46,
+   23.46,
+   25.78,
+   24.66,
+   24.69,
+   22.75,
+   24.49,
+   25.6,
+   25.65,
+   25.33,
+   23.41,
+   26.31,
+   25.54,
+   20.02,
+   19.44,
+   22.71,
+   26.54,
+   20.39,
+   21.86,
+   21.33,
+   20.67,
+   20.84,
+   25.16,
+   20.58,
+   23.01,
+   20.8,
+   21.4,
+   25.1,
+   21.08,
+   21.73,
+   19.42,
+   21.41,
+   19.87,
+   20.94,
+   21.73,
+   21.79
+  ],
+  "rows": [
+   {
+    "label": "shadow_on 0",
+    "arm_ms": 21.59,
+    "base_ms": 21.62,
+    "delta_ms": -0.02,
+    "deltas": [
+     0.83,
+     -0.88
+    ]
+   },
+   {
+    "label": "shadow_span 0.6",
+    "arm_ms": 23.93,
+    "base_ms": 20.4,
+    "delta_ms": 3.53,
+    "deltas": [
+     4.24,
+     2.81
+    ]
+   },
+   {
+    "label": "shadow_res 2048",
+    "arm_ms": 24.84,
+    "base_ms": 20.66,
+    "delta_ms": 4.18,
+    "deltas": [
+     3.45,
+     4.9
+    ]
+   },
+   {
+    "label": "m3inf_shadow 0",
+    "arm_ms": 26.87,
+    "base_ms": 21.69,
+    "delta_ms": 5.18,
+    "deltas": [
+     -0.37,
+     10.73
+    ]
+   },
+   {
+    "label": "shadow_terrain 0",
+    "arm_ms": 24.25,
+    "base_ms": 21.41,
+    "delta_ms": 2.83,
+    "deltas": [
+     -0.56,
+     6.23
+    ]
+   },
+   {
+    "label": "rock_shadows 0",
+    "arm_ms": 21.54,
+    "base_ms": 22.35,
+    "delta_ms": -0.81,
+    "deltas": [
+     -4.09,
+     2.47
+    ]
+   },
+   {
+    "label": "tree3d 0",
+    "arm_ms": 21.54,
+    "base_ms": 23.38,
+    "delta_ms": -1.84,
+    "deltas": [
+     -5.57,
+     1.89
+    ]
+   },
+   {
+    "label": "m3inf_on 0",
+    "arm_ms": 22.05,
+    "base_ms": 23.47,
+    "delta_ms": -1.42,
+    "deltas": [
+     -3.2,
+     0.36
+    ]
+   },
+   {
+    "label": "vlight_on 0",
+    "arm_ms": 25.83,
+    "base_ms": 22.39,
+    "delta_ms": 3.43,
+    "deltas": [
+     3.74,
+     3.12
+    ]
+   },
+   {
+    "label": "vspec_on 0",
+    "arm_ms": 26.13,
+    "base_ms": 20.5,
+    "delta_ms": 5.63,
+    "deltas": [
+     6.72,
+     4.54
+    ]
+   },
+   {
+    "label": "unified_lighting 0",
+    "arm_ms": 24.55,
+    "base_ms": 20.9,
+    "delta_ms": 3.65,
+    "deltas": [
+     6.72,
+     0.58
+    ]
+   },
+   {
+    "label": "fol_on 0",
+    "arm_ms": 21.81,
+    "base_ms": 20.98,
+    "delta_ms": 0.83,
+    "deltas": [
+     4.73,
+     -3.07
+    ]
+   },
+   {
+    "label": "rock_on 0",
+    "arm_ms": 21.91,
+    "base_ms": 22.3,
+    "delta_ms": -0.38,
+    "deltas": [
+     4.02,
+     -4.79
+    ]
+   },
+   {
+    "label": "water_fx 0",
+    "arm_ms": 12.62,
+    "base_ms": 22.63,
+    "delta_ms": -10.01,
+    "deltas": [
+     -9.47,
+     -10.55
+    ]
+   },
+   {
+    "label": "water_swash 0",
+    "arm_ms": 30.52,
+    "base_ms": 21.73,
+    "delta_ms": 8.78,
+    "deltas": [
+     9.96,
+     7.59
+    ]
+   },
+   {
+    "label": "terrain_relief 0",
+    "arm_ms": 22.91,
+    "base_ms": 22.93,
+    "delta_ms": -0.01,
+    "deltas": [
+     -4.71,
+     4.69
+    ]
+   },
+   {
+    "label": "bib_enh 0",
+    "arm_ms": 26.3,
+    "base_ms": 23.84,
+    "delta_ms": 2.45,
+    "deltas": [
+     3.73,
+     1.18
+    ]
+   },
+   {
+    "label": "decal_enh 0",
+    "arm_ms": 24.18,
+    "base_ms": 22.66,
+    "delta_ms": 1.51,
+    "deltas": [
+     -1.4,
+     4.43
+    ]
+   },
+   {
+    "label": "ssao_on 0",
+    "arm_ms": 23.2,
+    "base_ms": 22.25,
+    "delta_ms": 0.96,
+    "deltas": [
+     2.75,
+     -0.84
+    ]
+   },
+   {
+    "label": "contact_on 0",
+    "arm_ms": 22.72,
+    "base_ms": 22.99,
+    "delta_ms": -0.28,
+    "deltas": [
+     3.15,
+     -3.7
+    ]
+   },
+   {
+    "label": "tibfog_on 0",
+    "arm_ms": 22.05,
+    "base_ms": 21.49,
+    "delta_ms": 0.57,
+    "deltas": [
+     1.01,
+     0.12
+    ]
+   },
+   {
+    "label": "light_tiberium 0",
+    "arm_ms": 23.49,
+    "base_ms": 20.65,
+    "delta_ms": 2.84,
+    "deltas": [
+     3.56,
+     2.13
+    ]
+   },
+   {
+    "label": "lights_on 0",
+    "arm_ms": 24.52,
+    "base_ms": 22.4,
+    "delta_ms": 2.12,
+    "deltas": [
+     4.52,
+     -0.28
+    ]
+   },
+   {
+    "label": "cloud_on 0",
+    "arm_ms": 23.57,
+    "base_ms": 23.85,
+    "delta_ms": -0.28,
+    "deltas": [
+     4.82,
+     -5.38
+    ]
+   },
+   {
+    "label": "dfog_on 0",
+    "arm_ms": 23.47,
+    "base_ms": 23.38,
+    "delta_ms": 0.09,
+    "deltas": [
+     3.11,
+     -2.94
+    ]
+   },
+   {
+    "label": "bloom_on 0",
+    "arm_ms": 25.29,
+    "base_ms": 23.31,
+    "delta_ms": 1.97,
+    "deltas": [
+     4.17,
+     -0.23
+    ]
+   },
+   {
+    "label": "grade_on 0",
+    "arm_ms": 24.78,
+    "base_ms": 24.39,
+    "delta_ms": 0.39,
+    "deltas": [
+     2.63,
+     -1.86
+    ]
+   },
+   {
+    "label": "terrain_normals 0",
+    "arm_ms": 23.73,
+    "base_ms": 24.86,
+    "delta_ms": -1.13,
+    "deltas": [
+     -0.36,
+     -1.91
+    ]
+   },
+   {
+    "label": "mottle_on 0",
+    "arm_ms": 23.33,
+    "base_ms": 23.94,
+    "delta_ms": -0.61,
+    "deltas": [
+     1.85,
+     -3.07
+    ]
+   },
+   {
+    "label": "tib3d 0",
+    "arm_ms": 25.88,
+    "base_ms": 23.74,
+    "delta_ms": 2.14,
+    "deltas": [
+     2.37,
+     1.9
+    ]
+   },
+   {
+    "label": "sand_fx 0",
+    "arm_ms": 24.52,
+    "base_ms": 23.8,
+    "delta_ms": 0.71,
+    "deltas": [
+     1.08,
+     0.35
+    ]
+   },
+   {
+    "label": "bldshow 0",
+    "arm_ms": 21.01,
+    "base_ms": 23.66,
+    "delta_ms": -2.65,
+    "deltas": [
+     0.84,
+     -6.14
+    ]
+   },
+   {
+    "label": "vhshow 0",
+    "arm_ms": 21.9,
+    "base_ms": 25.13,
+    "delta_ms": -3.23,
+    "deltas": [
+     -3.68,
+     -2.78
+    ]
+   },
+   {
+    "label": "infdraw 0",
+    "arm_ms": 21.01,
+    "base_ms": 25.31,
+    "delta_ms": -4.3,
+    "deltas": [
+     -5.36,
+     -3.23
+    ]
+   },
+   {
+    "label": "walls 0",
+    "arm_ms": 23.27,
+    "base_ms": 25.16,
+    "delta_ms": -1.88,
+    "deltas": [
+     -4.02,
+     0.25
+    ]
+   },
+   {
+    "label": "bibhue 0",
+    "arm_ms": 23.25,
+    "base_ms": 25.63,
+    "delta_ms": -2.38,
+    "deltas": [
+     -2.88,
+     -1.89
+    ]
+   }
+  ],
+  "ok": true,
+  "secs": 115.4
+ },
+ "census_td": {
+  "td build_4ad1ea1": {
+   "calls_per_frame": {
+    "glVertex3f": 770480.0,
+    "glColor3f": 477569.0,
+    "glTexCoord3f": 477348.0,
+    "glMultiTexCoord3f": 278850.0,
+    "glColor4f": 278184.0,
+    "glMultiTexCoord2f": 274718.0,
+    "glTexCoord2f": 13583.0,
+    "glClipPlane": 11772.0,
+    "glMatrixMode": 5165.0,
+    "glPopMatrix": 5115.0,
+    "glPushMatrix": 5115.0,
+    "glMultMatrixf": 5070.0,
+    "glGetFloatv": 3925.0,
+    "glActiveTexture": 3365.0,
+    "glUniformMatrix4fv": 3126.0,
+    "glColor4ubv": 2622.0,
+    "glBindTexture": 2406.0,
+    "glTexCoord2fv": 2016.0,
+    "glUniform1f": 1876.0,
+    "glUniform1i": 1421.0,
+    "glNormal3fv": 1196.0,
+    "glClientActiveTexture": 1048.0,
+    "glTexCoordPointer": 1020.0,
+    "glDisable": 919.0,
+    "glEnable": 904.0,
+    "glGetIntegerv": 745.0,
+    "glColorPointer": 537.0,
+    "glUniform3f": 528.0,
+    "glNormalPointer": 502.0,
+    "glDisableClientState": 214.0,
+    "glPopClientAttrib": 214.0,
+    "glPushClientAttrib": 214.0,
+    "glEnableClientState": 198.0,
+    "glTexParameteri": 144.0,
+    "glVertex2f": 108.0,
+    "glDepthMask": 93.0,
+    "glUseProgram": 77.0,
+    "glBegin": 57.0,
+    "glEnd": 57.0,
+    "glUniform2f": 41.0,
+    "glLoadIdentity": 40.0,
+    "glBlendFunc": 33.0,
+    "glTexEnvi": 29.0,
+    "glViewport": 28.0,
+    "glBindFramebuffer": 25.0,
+    "glDepthFunc": 24.0,
+    "glUniform4fv": 14.0,
+    "glPolygonOffset": 13.0,
+    "glAlphaFunc": 12.0,
+    "glColorMask": 12.0,
+    "glPopAttrib": 12.0,
+    "glPushAttrib": 12.0,
+    "glIsEnabled": 9.0,
+    "glFramebufferTexture2D": 9.0,
+    "glClear": 8.0,
+    "glClearColor": 8.0,
+    "glLoadMatrixf": 5.0,
+    "glGetBooleanv": 4.0,
+    "glTranslatef": 3.0,
+    "glOrtho": 2.0,
+    "glShadeModel": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3ubv": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glScalef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1260.0,
+     1044726.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     4578.0,
+     554.0,
+     9064734.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     2.0,
+     9306752.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     14.0,
+     1051488.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 2632857
+  },
+  "td main_d1edca3": {
+   "calls_per_frame": {
+    "glMultiTexCoord3f": 4581600.0,
+    "glVertex3f": 3273002.0,
+    "glColor3f": 1925921.0,
+    "glNormal3f": 1925700.0,
+    "glTexCoord3f": 1925700.0,
+    "glColor4f": 1332354.0,
+    "glMultiTexCoord2f": 274718.0,
+    "glTexCoord2f": 13583.0,
+    "glClipPlane": 11772.0,
+    "glMatrixMode": 5165.0,
+    "glPopMatrix": 5115.0,
+    "glPushMatrix": 5115.0,
+    "glMultMatrixf": 5070.0,
+    "glGetFloatv": 3925.0,
+    "glActiveTexture": 3369.0,
+    "glUniformMatrix4fv": 3126.0,
+    "glColor4ubv": 2622.0,
+    "glBindTexture": 2410.0,
+    "glTexCoord2fv": 2016.0,
+    "glUniform1f": 1876.0,
+    "glUniform1i": 1423.0,
+    "glNormal3fv": 1196.0,
+    "glClientActiveTexture": 1048.0,
+    "glTexCoordPointer": 1020.0,
+    "glDisable": 921.0,
+    "glEnable": 904.0,
+    "glGetIntegerv": 745.0,
+    "glColorPointer": 537.0,
+    "glUniform3f": 528.0,
+    "glNormalPointer": 502.0,
+    "glDisableClientState": 214.0,
+    "glPopClientAttrib": 214.0,
+    "glPushClientAttrib": 214.0,
+    "glEnableClientState": 198.0,
+    "glTexParameteri": 144.0,
+    "glVertex2f": 108.0,
+    "glDepthMask": 93.0,
+    "glUseProgram": 77.0,
+    "glBegin": 57.0,
+    "glEnd": 57.0,
+    "glUniform2f": 41.0,
+    "glLoadIdentity": 40.0,
+    "glBlendFunc": 33.0,
+    "glTexEnvi": 29.0,
+    "glViewport": 28.0,
+    "glBindFramebuffer": 25.0,
+    "glDepthFunc": 24.0,
+    "glUniform4fv": 14.0,
+    "glPolygonOffset": 13.0,
+    "glAlphaFunc": 12.0,
+    "glColorMask": 12.0,
+    "glPopAttrib": 12.0,
+    "glPushAttrib": 12.0,
+    "glIsEnabled": 9.0,
+    "glFramebufferTexture2D": 9.0,
+    "glClear": 8.0,
+    "glClearColor": 8.0,
+    "glLoadMatrixf": 5.0,
+    "glGetBooleanv": 4.0,
+    "glTranslatef": 3.0,
+    "glOrtho": 2.0,
+    "glShadeModel": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3ubv": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glScalef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1260.0,
+     1044726.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     4578.0,
+     554.0,
+     9064734.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     2.0,
+     9306752.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     14.0,
+     1051488.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 15314715
+  },
+  "td bed_off": {
+   "calls_per_frame": {
+    "glVertex3f": 298202.0,
+    "glMultiTexCoord3f": 278850.0,
+    "glColor4f": 278184.0,
+    "glMultiTexCoord2f": 274718.0,
+    "glTexCoord2f": 18653.0,
+    "glClipPlane": 11772.0,
+    "glColor3f": 5292.0,
+    "glMatrixMode": 5165.0,
+    "glPopMatrix": 5115.0,
+    "glPushMatrix": 5115.0,
+    "glMultMatrixf": 5070.0,
+    "glGetFloatv": 3925.0,
+    "glActiveTexture": 3356.0,
+    "glUniformMatrix4fv": 3126.0,
+    "glColor4ubv": 2622.0,
+    "glBindTexture": 2403.0,
+    "glTexCoord2fv": 2016.0,
+    "glUniform1f": 1870.0,
+    "glUniform1i": 1415.0,
+    "glNormal3fv": 1196.0,
+    "glClientActiveTexture": 1048.0,
+    "glTexCoordPointer": 1020.0,
+    "glDisable": 912.0,
+    "glEnable": 902.0,
+    "glGetIntegerv": 743.0,
+    "glColorPointer": 537.0,
+    "glUniform3f": 528.0,
+    "glNormalPointer": 502.0,
+    "glDisableClientState": 214.0,
+    "glPopClientAttrib": 214.0,
+    "glPushClientAttrib": 214.0,
+    "glEnableClientState": 198.0,
+    "glTexParameteri": 142.0,
+    "glVertex2f": 108.0,
+    "glDepthMask": 91.0,
+    "glUseProgram": 72.0,
+    "glBegin": 55.0,
+    "glEnd": 55.0,
+    "glLoadIdentity": 40.0,
+    "glUniform2f": 39.0,
+    "glBlendFunc": 33.0,
+    "glTexEnvi": 28.0,
+    "glViewport": 28.0,
+    "glBindFramebuffer": 25.0,
+    "glDepthFunc": 22.0,
+    "glUniform4fv": 14.0,
+    "glPolygonOffset": 13.0,
+    "glAlphaFunc": 12.0,
+    "glColorMask": 12.0,
+    "glPopAttrib": 10.0,
+    "glPushAttrib": 10.0,
+    "glIsEnabled": 9.0,
+    "glFramebufferTexture2D": 9.0,
+    "glClear": 8.0,
+    "glClearColor": 8.0,
+    "glLoadMatrixf": 5.0,
+    "glGetBooleanv": 4.0,
+    "glTranslatef": 3.0,
+    "glOrtho": 2.0,
+    "glShadeModel": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3ubv": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glScalef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1260.0,
+     1044726.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     4578.0,
+     554.0,
+     9064734.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     2.0,
+     9306752.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     14.0,
+     1051488.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 1215967
+  },
+  "td pre_bed": {
+   "calls_per_frame": {
+    "glVertex3f": 298202.0,
+    "glMultiTexCoord3f": 278850.0,
+    "glColor4f": 278184.0,
+    "glMultiTexCoord2f": 274718.0,
+    "glTexCoord2f": 18653.0,
+    "glClipPlane": 11772.0,
+    "glColor3f": 5292.0,
+    "glMatrixMode": 5165.0,
+    "glPopMatrix": 5115.0,
+    "glPushMatrix": 5115.0,
+    "glMultMatrixf": 5070.0,
+    "glGetFloatv": 3925.0,
+    "glActiveTexture": 3356.0,
+    "glUniformMatrix4fv": 3126.0,
+    "glColor4ubv": 2622.0,
+    "glBindTexture": 2403.0,
+    "glTexCoord2fv": 2016.0,
+    "glUniform1f": 1870.0,
+    "glUniform1i": 1415.0,
+    "glNormal3fv": 1196.0,
+    "glClientActiveTexture": 1048.0,
+    "glTexCoordPointer": 1020.0,
+    "glDisable": 912.0,
+    "glEnable": 902.0,
+    "glGetIntegerv": 743.0,
+    "glColorPointer": 537.0,
+    "glUniform3f": 528.0,
+    "glNormalPointer": 502.0,
+    "glDisableClientState": 214.0,
+    "glPopClientAttrib": 214.0,
+    "glPushClientAttrib": 214.0,
+    "glEnableClientState": 198.0,
+    "glTexParameteri": 142.0,
+    "glVertex2f": 108.0,
+    "glDepthMask": 91.0,
+    "glUseProgram": 72.0,
+    "glBegin": 55.0,
+    "glEnd": 55.0,
+    "glLoadIdentity": 40.0,
+    "glUniform2f": 39.0,
+    "glBlendFunc": 33.0,
+    "glTexEnvi": 28.0,
+    "glViewport": 28.0,
+    "glBindFramebuffer": 25.0,
+    "glDepthFunc": 22.0,
+    "glUniform4fv": 14.0,
+    "glPolygonOffset": 13.0,
+    "glAlphaFunc": 12.0,
+    "glColorMask": 12.0,
+    "glPopAttrib": 10.0,
+    "glPushAttrib": 10.0,
+    "glIsEnabled": 9.0,
+    "glFramebufferTexture2D": 9.0,
+    "glClear": 8.0,
+    "glClearColor": 8.0,
+    "glLoadMatrixf": 5.0,
+    "glGetBooleanv": 4.0,
+    "glTranslatef": 3.0,
+    "glOrtho": 2.0,
+    "glShadeModel": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3ubv": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glScalef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1174.0,
+     862614.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     4926.0,
+     554.0,
+     9064734.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     2.0,
+     9306752.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     14.0,
+     1051488.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 1215967
+  },
+  "ra build_4ad1ea1": {
+   "calls_per_frame": {
+    "glVertex3f": 793048.0,
+    "glColor3f": 564632.2,
+    "glTexCoord3f": 564631.2,
+    "glMultiTexCoord3f": 226908.0,
+    "glMultiTexCoord2f": 223554.8,
+    "glColor4f": 223367.2,
+    "glBindTexture": 3889.2,
+    "glActiveTexture": 3722.2,
+    "glUniform1f": 3063.2,
+    "glTexCoordPointer": 2493.6,
+    "glClientActiveTexture": 1829.8,
+    "glColorPointer": 1285.8,
+    "glNormalPointer": 1217.2,
+    "glUniform3f": 909.4,
+    "glDisableClientState": 362.8,
+    "glEnableClientState": 351.9,
+    "glPopClientAttrib": 244.0,
+    "glPushClientAttrib": 244.0,
+    "glUniform1i": 224.6,
+    "glColor4ubv": 184.8,
+    "glTexCoord2fv": 176.8,
+    "glTexCoord2f": 121.8,
+    "glTexParameteri": 113.6,
+    "glMatrixMode": 91.0,
+    "glDisable": 87.0,
+    "glGetIntegerv": 85.8,
+    "glDepthMask": 79.0,
+    "glEnable": 67.0,
+    "glUseProgram": 61.0,
+    "glUniform4fv": 61.0,
+    "glBegin": 56.0,
+    "glEnd": 56.0,
+    "glUniform2f": 56.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glLoadIdentity": 38.0,
+    "glNormal3fv": 36.8,
+    "glViewport": 31.0,
+    "glDepthFunc": 28.0,
+    "glBindFramebuffer": 28.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glBlendFunc": 20.0,
+    "glTexEnvi": 18.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 15.0,
+    "glPushAttrib": 15.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glGenBuffers": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1160.7,
+     1104086.4
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     3008.4,
+     1744.8,
+     3330532.8
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     109.1,
+     14566032.5
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     1.9,
+     3250.1
+    ]
+   },
+   "all_calls_per_frame": 2617749
+  },
+  "ra main_d1edca3": {
+   "calls_per_frame": {
+    "glMultiTexCoord3f": 3401618.4,
+    "glVertex3f": 2473597.6,
+    "glColor3f": 1534076.2,
+    "glNormal3f": 1534075.2,
+    "glTexCoord3f": 1534075.2,
+    "glColor4f": 935728.8,
+    "glMultiTexCoord2f": 192076.4,
+    "glBindTexture": 3417.0,
+    "glActiveTexture": 3222.2,
+    "glUniform1f": 2702.0,
+    "glTexCoordPointer": 2292.4,
+    "glClientActiveTexture": 1589.0,
+    "glColorPointer": 1197.0,
+    "glNormalPointer": 1103.6,
+    "glUniform3f": 789.0,
+    "glDisableClientState": 520.7,
+    "glEnableClientState": 468.0,
+    "glPopClientAttrib": 300.5,
+    "glPushClientAttrib": 300.5,
+    "glUniform1i": 199.4,
+    "glColor4ubv": 181.4,
+    "glTexCoord2fv": 176.0,
+    "glTexParameteri": 100.0,
+    "glTexCoord2f": 96.2,
+    "glMatrixMode": 91.0,
+    "glDisable": 89.0,
+    "glDepthMask": 79.0,
+    "glGetIntegerv": 72.2,
+    "glEnable": 67.0,
+    "glUseProgram": 61.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glBegin": 40.0,
+    "glEnd": 40.0,
+    "glUniform2f": 40.0,
+    "glLoadIdentity": 38.0,
+    "glViewport": 31.0,
+    "glDepthFunc": 28.0,
+    "glBindFramebuffer": 28.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glBlendFunc": 20.0,
+    "glNormal3fv": 18.8,
+    "glTexEnvi": 18.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 15.0,
+    "glPushAttrib": 15.0,
+    "glUniform4fv": 13.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glGenBuffers": 1.8,
+    "glGetBufferParameteriv": 1.2,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     856.2,
+     1366543.4
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     3714.0,
+     1615.6,
+     3015304.2
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     175.1,
+     18002683.5
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     -0.9,
+     697.0
+    ]
+   },
+   "all_calls_per_frame": 11624952
+  },
+  "ra bed_off": {
+   "calls_per_frame": {
+    "glMultiTexCoord3f": 526178.4,
+    "glVertex3f": 525034.8,
+    "glMultiTexCoord2f": 518406.8,
+    "glColor4f": 514913.8,
+    "glBindTexture": 4395.0,
+    "glActiveTexture": 4254.0,
+    "glUniform1f": 3461.6,
+    "glTexCoordPointer": 2503.6,
+    "glClientActiveTexture": 2107.4,
+    "glColorPointer": 1294.6,
+    "glNormalPointer": 1213.6,
+    "glUniform3f": 1044.2,
+    "glDisableClientState": 490.2,
+    "glEnableClientState": 413.4,
+    "glPopClientAttrib": 273.9,
+    "glPushClientAttrib": 273.9,
+    "glUniform1i": 233.0,
+    "glColor4ubv": 183.0,
+    "glTexCoord2fv": 172.8,
+    "glTexCoord2f": 116.4,
+    "glTexParameteri": 101.6,
+    "glGetIntegerv": 91.0,
+    "glMatrixMode": 91.0,
+    "glDisable": 79.0,
+    "glDepthMask": 77.0,
+    "glUniform4fv": 74.8,
+    "glEnable": 64.0,
+    "glUniform2f": 58.6,
+    "glBegin": 57.6,
+    "glEnd": 57.6,
+    "glUseProgram": 56.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glLoadIdentity": 38.0,
+    "glViewport": 31.0,
+    "glNormal3fv": 28.4,
+    "glBindFramebuffer": 28.0,
+    "glDepthFunc": 26.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glBlendFunc": 20.0,
+    "glTexEnvi": 17.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 13.0,
+    "glPushAttrib": 13.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3f": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1295.6,
+     1358770.1
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     3672.0,
+     1549.8,
+     2248346.4
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     122.8,
+     17124473.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     1355.0
+    ]
+   },
+   "all_calls_per_frame": 2108230
+  },
+  "ra pre_bed": {
+   "calls_per_frame": {
+    "glVertex3f": 94113.2,
+    "glMultiTexCoord3f": 93372.0,
+    "glMultiTexCoord2f": 92032.4,
+    "glColor4f": 90400.2,
+    "glBindTexture": 3700.6,
+    "glActiveTexture": 3633.2,
+    "glUniform1f": 3000.8,
+    "glTexCoordPointer": 1881.2,
+    "glClientActiveTexture": 1800.2,
+    "glColorPointer": 965.0,
+    "glNormalPointer": 925.6,
+    "glUniform3f": 890.6,
+    "glUniform1i": 226.6,
+    "glEnableClientState": 207.3,
+    "glDisableClientState": 172.8,
+    "glColor4ubv": 119.0,
+    "glPopClientAttrib": 112.5,
+    "glPushClientAttrib": 112.5,
+    "glTexCoord2fv": 112.0,
+    "glTexCoord2f": 110.0,
+    "glTexParameteri": 98.4,
+    "glMatrixMode": 91.0,
+    "glGetIntegerv": 87.8,
+    "glDisable": 79.0,
+    "glDepthMask": 77.0,
+    "glEnable": 64.0,
+    "glUseProgram": 56.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glLoadIdentity": 38.0,
+    "glViewport": 31.0,
+    "glBindFramebuffer": 28.0,
+    "glDepthFunc": 26.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glNormal3fv": 22.0,
+    "glUniform2f": 21.8,
+    "glBegin": 20.8,
+    "glEnd": 20.8,
+    "glBlendFunc": 20.0,
+    "glTexEnvi": 17.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 13.0,
+    "glPushAttrib": 13.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3f": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     713.3,
+     354504.2
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     3048.0,
+     1061.8,
+     986650.2
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     12.8,
+     6266503.8
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     -1.7,
+     -2110.1
+    ]
+   },
+   "all_calls_per_frame": 388955
+  }
+ },
+ "census_ra_fixed_view": {
+  "ra build_4ad1ea1": {
+   "calls_per_frame": {
+    "glVertex3f": 1159746.0,
+    "glColor3f": 821869.0,
+    "glTexCoord3f": 821868.0,
+    "glMultiTexCoord3f": 337794.0,
+    "glMultiTexCoord2f": 332810.0,
+    "glColor4f": 330993.0,
+    "glBindTexture": 4003.0,
+    "glActiveTexture": 3835.0,
+    "glUniform1f": 3176.0,
+    "glTexCoordPointer": 2431.0,
+    "glClientActiveTexture": 1905.0,
+    "glColorPointer": 1264.0,
+    "glNormalPointer": 1174.0,
+    "glUniform3f": 947.0,
+    "glDisableClientState": 523.0,
+    "glEnableClientState": 457.0,
+    "glPopClientAttrib": 256.0,
+    "glPushClientAttrib": 256.0,
+    "glUniform1i": 187.0,
+    "glColor4ubv": 162.0,
+    "glTexCoord2fv": 159.0,
+    "glTexCoord2f": 113.0,
+    "glTexParameteri": 96.0,
+    "glMatrixMode": 91.0,
+    "glDisable": 87.0,
+    "glDepthMask": 79.0,
+    "glEnable": 67.0,
+    "glGetIntegerv": 67.0,
+    "glUseProgram": 61.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glBegin": 40.0,
+    "glEnd": 40.0,
+    "glUniform2f": 40.0,
+    "glLoadIdentity": 38.0,
+    "glViewport": 31.0,
+    "glDepthFunc": 28.0,
+    "glBindFramebuffer": 28.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glNormal3fv": 22.0,
+    "glBlendFunc": 20.0,
+    "glTexEnvi": 18.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 15.0,
+    "glPushAttrib": 15.0,
+    "glUniform4fv": 13.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1484.0,
+     1654446.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     3606.0,
+     1581.0,
+     2023473.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     132.0,
+     14386608.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 3827066
+  },
+  "ra main_d1edca3": {
+   "calls_per_frame": {
+    "glMultiTexCoord3f": 6529368.0,
+    "glVertex3f": 4933932.0,
+    "glColor3f": 3324625.0,
+    "glNormal3f": 3324624.0,
+    "glTexCoord3f": 3324624.0,
+    "glColor4f": 1602423.0,
+    "glMultiTexCoord2f": 332810.0,
+    "glBindTexture": 4005.0,
+    "glActiveTexture": 3839.0,
+    "glUniform1f": 3176.0,
+    "glTexCoordPointer": 2431.0,
+    "glClientActiveTexture": 1905.0,
+    "glColorPointer": 1264.0,
+    "glNormalPointer": 1174.0,
+    "glUniform3f": 947.0,
+    "glDisableClientState": 523.0,
+    "glEnableClientState": 457.0,
+    "glPopClientAttrib": 256.0,
+    "glPushClientAttrib": 256.0,
+    "glUniform1i": 189.0,
+    "glColor4ubv": 162.0,
+    "glTexCoord2fv": 159.0,
+    "glTexCoord2f": 113.0,
+    "glTexParameteri": 96.0,
+    "glMatrixMode": 91.0,
+    "glDisable": 89.0,
+    "glDepthMask": 79.0,
+    "glEnable": 67.0,
+    "glGetIntegerv": 67.0,
+    "glUseProgram": 61.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glBegin": 40.0,
+    "glEnd": 40.0,
+    "glUniform2f": 40.0,
+    "glLoadIdentity": 38.0,
+    "glViewport": 31.0,
+    "glDepthFunc": 28.0,
+    "glBindFramebuffer": 28.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glNormal3fv": 22.0,
+    "glBlendFunc": 20.0,
+    "glTexEnvi": 18.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 15.0,
+    "glPushAttrib": 15.0,
+    "glUniform4fv": 13.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1484.0,
+     1654446.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     3606.0,
+     1581.0,
+     2023473.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     132.0,
+     14386608.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 23394402
+  },
+  "ra bed_off": {
+   "calls_per_frame": {
+    "glVertex3f": 337878.0,
+    "glMultiTexCoord3f": 337794.0,
+    "glMultiTexCoord2f": 332810.0,
+    "glColor4f": 330994.0,
+    "glBindTexture": 3997.0,
+    "glActiveTexture": 3826.0,
+    "glUniform1f": 3170.0,
+    "glTexCoordPointer": 2432.0,
+    "glClientActiveTexture": 1913.0,
+    "glColorPointer": 1265.0,
+    "glNormalPointer": 1174.0,
+    "glUniform3f": 947.0,
+    "glDisableClientState": 534.0,
+    "glEnableClientState": 460.0,
+    "glPopClientAttrib": 257.0,
+    "glPushClientAttrib": 257.0,
+    "glUniform1i": 181.0,
+    "glColor4ubv": 162.0,
+    "glTexCoord2fv": 159.0,
+    "glTexCoord2f": 114.0,
+    "glTexParameteri": 92.0,
+    "glMatrixMode": 91.0,
+    "glDisable": 79.0,
+    "glDepthMask": 77.0,
+    "glGetIntegerv": 65.0,
+    "glEnable": 64.0,
+    "glUseProgram": 56.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glLoadIdentity": 38.0,
+    "glUniform2f": 38.0,
+    "glBegin": 37.0,
+    "glEnd": 37.0,
+    "glViewport": 31.0,
+    "glBindFramebuffer": 28.0,
+    "glDepthFunc": 26.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glNormal3fv": 22.0,
+    "glBlendFunc": 20.0,
+    "glTexEnvi": 17.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 13.0,
+    "glPushAttrib": 13.0,
+    "glUniform4fv": 13.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3f": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1507.0,
+     1661298.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     3606.0,
+     1581.0,
+     2023473.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     132.0,
+     14386608.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 1361424
+  },
+  "ra pre_bed": {
+   "calls_per_frame": {
+    "glVertex3f": 337878.0,
+    "glMultiTexCoord3f": 337794.0,
+    "glMultiTexCoord2f": 332810.0,
+    "glColor4f": 330994.0,
+    "glBindTexture": 3997.0,
+    "glActiveTexture": 3826.0,
+    "glUniform1f": 3170.0,
+    "glTexCoordPointer": 2432.0,
+    "glClientActiveTexture": 1913.0,
+    "glColorPointer": 1265.0,
+    "glNormalPointer": 1174.0,
+    "glUniform3f": 947.0,
+    "glDisableClientState": 534.0,
+    "glEnableClientState": 460.0,
+    "glPopClientAttrib": 257.0,
+    "glPushClientAttrib": 257.0,
+    "glUniform1i": 181.0,
+    "glColor4ubv": 162.0,
+    "glTexCoord2fv": 159.0,
+    "glTexCoord2f": 114.0,
+    "glTexParameteri": 92.0,
+    "glMatrixMode": 91.0,
+    "glDisable": 79.0,
+    "glDepthMask": 77.0,
+    "glGetIntegerv": 65.0,
+    "glEnable": 64.0,
+    "glUseProgram": 56.0,
+    "glPopMatrix": 44.0,
+    "glPushMatrix": 44.0,
+    "glLoadIdentity": 38.0,
+    "glUniform2f": 38.0,
+    "glBegin": 37.0,
+    "glEnd": 37.0,
+    "glViewport": 31.0,
+    "glBindFramebuffer": 28.0,
+    "glDepthFunc": 26.0,
+    "glGetFloatv": 26.0,
+    "glVertex2f": 24.0,
+    "glNormal3fv": 22.0,
+    "glBlendFunc": 20.0,
+    "glTexEnvi": 17.0,
+    "glAlphaFunc": 15.0,
+    "glPopAttrib": 13.0,
+    "glPushAttrib": 13.0,
+    "glUniform4fv": 13.0,
+    "glPolygonOffset": 12.0,
+    "glFramebufferTexture2D": 11.0,
+    "glClearColor": 10.0,
+    "glClear": 9.0,
+    "glColorMask": 9.0,
+    "glIsEnabled": 9.0,
+    "glLoadMatrixf": 6.0,
+    "glUniformMatrix4fv": 6.0,
+    "glGetBooleanv": 3.0,
+    "glShadeModel": 2.0,
+    "glTranslatef": 2.0,
+    "glBlendEquation": 2.0,
+    "glColor3f": 1.0,
+    "glDrawBuffer": 1.0,
+    "glFinish": 1.0,
+    "glFrustum": 1.0,
+    "glOrtho": 1.0,
+    "glReadBuffer": 1.0,
+    "glRotatef": 1.0,
+    "glTexEnvfv": 1.0,
+    "glCheckFramebufferStatus": 1.0
+   },
+   "totals_per_frame": {
+    "DRAWARRAYS calls verts calls verts": [
+     0.0,
+     0.0,
+     1282.0,
+     1538202.0
+    ],
+    "DRAWELEMENTS calls idx calls idx": [
+     1.0,
+     4986.0,
+     1581.0,
+     2023473.0
+    ],
+    "TEXIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "TEXSUBIMAGE calls px": [
+     0.0,
+     0.0
+    ],
+    "READPIXELS calls px": [
+     0.0,
+     0.0
+    ],
+    "COPYTEXSUB calls px": [
+     1.0,
+     4653376.0
+    ],
+    "GETTEXIMAGE calls": [
+     0.0
+    ],
+    "BUFFERDATA calls bytes": [
+     132.0,
+     14386608.0
+    ],
+    "BUFFERSUBDATA calls bytes": [
+     0.0,
+     0.0
+    ]
+   },
+   "all_calls_per_frame": 1361424
+  }
+ },
+ "phase2_sweeps": {
+  "zoom td d1edca344": {
+   "1920": 81.42,
+   "2400": 100.53,
+   "3000": 112.2,
+   "3600": 123.77,
+   "4200": 139.51
+  },
+  "zoom td pre": {
+   "1920": 17.43,
+   "2400": 16.6,
+   "3000": 17.45,
+   "3600": 17.78,
+   "4200": 19.53
+  },
+  "zoom ra d1edca344": {
+   "1920": 55.43,
+   "2400": 78.34,
+   "3000": 87.58,
+   "3600": 91.05,
+   "4200": 113.72
+  },
+  "zoom ra pre": {
+   "1920": 13.47,
+   "2400": 14.41,
+   "3000": 15.05,
+   "3600": 15.4,
+   "4200": 16.62
+  },
+  "res td d1edca344": {
+   "3008x1547": [
+    136.93,
+    138.69
+   ],
+   "2256x1160": [
+    137.94,
+    137.49
+   ],
+   "1504x774": [
+    136.62,
+    136.06
+   ],
+   "752x387": [
+    133.63,
+    133.61
+   ]
+  },
+  "res td pre": {
+   "3008x1547": [
+    19.98,
+    19.32
+   ],
+   "2256x1160": [
+    19.21,
+    18.38
+   ],
+   "1504x774": [
+    19.3,
+    17.15
+   ],
+   "752x387": [
+    18.48,
+    16.69
+   ]
+  },
+  "res ra d1edca344": {
+   "3008x1547": [
+    115.05,
+    111.38
+   ],
+   "2256x1160": [
+    97.05,
+    230.28
+   ],
+   "1504x774": [
+    214.05,
+    110.36
+   ],
+   "752x387": [
+    33.21,
+    88.27
+   ]
+  },
+  "res ra pre": {
+   "3008x1547": [
+    23.95,
+    13.52
+   ],
+   "2256x1160": [
+    14.31,
+    14.06
+   ],
+   "1504x774": [
+    22.25,
+    15.84
+   ],
+   "752x387": [
+    14.68,
+    14.72
+   ]
+  },
+  "gpu td d1edca344": [
+   {
+    "live_ms": 131.2,
+    "gpu_busy": 43.0
+   },
+   {
+    "live_ms": 131.85,
+    "gpu_busy": 43.1
+   }
+  ],
+  "gpu td pre": [
+   {
+    "live_ms": 16.94,
+    "gpu_busy": 52.9
+   },
+   {
+    "live_ms": 16.87,
+    "gpu_busy": 53.8
+   }
+  ],
+  "gpu ra d1edca344": [
+   {
+    "live_ms": 104.14,
+    "gpu_busy": 42.6
+   },
+   {
+    "live_ms": 103.25,
+    "gpu_busy": 39.8
+   }
+  ],
+  "gpu ra pre": [
+   {
+    "live_ms": 18.68,
+    "gpu_busy": 48.4
+   },
+   {
+    "live_ms": 19.59,
+    "gpu_busy": 50.5
+   }
+  ],
+  "gpu idle": 37.9,
+  "hitch td d1edca344": {
+   "spikes_ms": [
+    465.2
+   ],
+   "surface_rebuilds": 2,
+   "windows": [
+    [
+     "182.60",
+     "974.8"
+    ],
+    [
+     "134.83",
+     "326.0"
+    ],
+    [
+     "129.81",
+     "142.0"
+    ],
+    [
+     "129.34",
+     "150.3"
+    ],
+    [
+     "127.92",
+     "135.4"
+    ],
+    [
+     "129.75",
+     "148.7"
+    ],
+    [
+     "127.93",
+     "135.1"
+    ],
+    [
+     "142.49",
+     "465.2"
+    ],
+    [
+     "135.88",
+     "146.1"
+    ],
+    [
+     "137.43",
+     "158.5"
+    ]
+   ],
+   "live_ms": 132.05278592375367
+  },
+  "hitch td pre": {
+   "spikes_ms": [
+    351.1,
+    40.1
+   ],
+   "surface_rebuilds": 2,
+   "windows": [
+    [
+     "53.05",
+     "693.9"
+    ],
+    [
+     "16.96",
+     "200.7"
+    ],
+    [
+     "15.05",
+     "18.5"
+    ],
+    [
+     "15.32",
+     "18.6"
+    ],
+    [
+     "15.22",
+     "18.7"
+    ],
+    [
+     "14.56",
+     "18.8"
+    ],
+    [
+     "16.02",
+     "19.9"
+    ],
+    [
+     "20.14",
+     "351.1"
+    ],
+    [
+     "19.15",
+     "42.2"
+    ],
+    [
+     "17.25",
+     "23.7"
+    ],
+    [
+     "16.63",
+     "17.3"
+    ]
+   ],
+   "live_ms": 16.38282387190684
+  },
+  "hitch ra d1edca344": {
+   "spikes_ms": [
+    126.3
+   ],
+   "surface_rebuilds": 2,
+   "windows": [
+    [
+     "141.43",
+     "1997.3"
+    ],
+    [
+     "35.81",
+     "76.0"
+    ],
+    [
+     "31.62",
+     "46.9"
+    ],
+    [
+     "34.18",
+     "126.3"
+    ],
+    [
+     "32.72",
+     "40.2"
+    ],
+    [
+     "31.51",
+     "46.7"
+    ],
+    [
+     "32.40",
+     "42.9"
+    ],
+    [
+     "32.56",
+     "41.9"
+    ],
+    [
+     "33.26",
+     "45.2"
+    ],
+    [
+     "34.98",
+     "52.2"
+    ]
+   ],
+   "live_ms": 33.16138540899042
+  },
+  "hitch ra pre": {
+   "spikes_ms": [
+    92.2
+   ],
+   "surface_rebuilds": 2,
+   "windows": [
+    [
+     "118.52",
+     "1754.8"
+    ],
+    [
+     "24.47",
+     "89.9"
+    ],
+    [
+     "19.22",
+     "25.4"
+    ],
+    [
+     "21.66",
+     "92.2"
+    ],
+    [
+     "20.72",
+     "28.5"
+    ],
+    [
+     "19.52",
+     "26.5"
+    ],
+    [
+     "19.54",
+     "25.1"
+    ],
+    [
+     "19.49",
+     "26.0"
+    ],
+    [
+     "19.67",
+     "24.8"
+    ],
+    [
+     "21.97",
+     "33.7"
+    ]
+   ],
+   "live_ms": 20.566468707172223
+  }
+ },
+ "phase2_note": "phase2 arms named d1edca344 ran the play-folder binary, which was d1edca344 at the time of the sweep"
+}

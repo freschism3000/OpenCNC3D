@@ -1,0 +1,18 @@
+{
+ "allied": {
+  "triangles": 296,
+  "materials": [
+   "gold",
+   "silver"
+  ]
+ },
+ "soviet": {
+  "triangles": 712,
+  "materials": [
+   "silver",
+   "red",
+   "yellow",
+   "bronze"
+  ]
+ }
+}

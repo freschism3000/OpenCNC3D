@@ -19,6 +19,10 @@
 #   play      a click in Enhanced selects the Ranger and the move order lands it at 60,50,
 #             as in Classic: the 3D picture did not break the 3D click mapping.
 #   picture   the frame is a lit scene, not a black or flat screen.
+#   menu      each mission goes back to Classic before it quits, so the harness compares
+#             the menu after the mission with the Classic menu it started from: a player
+#             who leaves a mission in Enhanced comes back to the Enhanced menu, which
+#             would not be the same picture.
 #   theaters  Soviet 1, Allied 5 and Soviet 7 each boot on their own scene in their own
 #             bank (RASNOW, RATEMP, RAINT), with no ground tile and no sprite missing;
 #             Allied 5's temperate ground is painted from the 144-texel pack, and Soviet
@@ -43,12 +47,17 @@ order 60 50
 tick 90
 seldump
 shot $work/allied3d.png
+gfxmode 0
+tick 1
 quit
 EOF
 cat > "$work/other.script" <<EOF
 tick 30
 gfxmode 2
 tick 5
+shot $work/other3d.png
+gfxmode 0
+tick 1
 quit
 EOF
 cd "$install"

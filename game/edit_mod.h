@@ -11734,7 +11734,7 @@ static const signed char EUI_HOUSE_LIVERY[8] = { 1, 4, 3, 5, 0, 2, 6, 7 };
    sheets the pack ships, and there is nothing to build for them. */
 static bool edit_livery_built(int colour)
 {
-    const int slot = livery_slot(colour);
+    const int slot = team_livery_slot(colour);
     if (slot < 2) return true;
     for (size_t i = 0; i < g_pack.tex.size(); i++)
         if (g_pack.tex[i].gl_extra[slot - 2]) return true;

@@ -24,6 +24,10 @@
 // and NOTICE.md lists every modified file.
 //
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Restricts skirmish aircraft target selection and purchase handling to observed targets and ordinary production rules.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\aircraft.cpv   2.12   19 Jun 1995 09:27:22   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -781,7 +785,7 @@ void AircraftClass::AI(void)
     **	Perform sighting every so often as controlled by the sight timer.
     */
     // if (IsOwnedByPlayer && Class->SightRange && SightTimer.Expired()) {		// Changed for multiple player mapping
-    if (House->IsHuman && Class->SightRange && SightTimer.Expired()) {
+    if ((House->IsHuman || GameToPlay != GAME_NORMAL) && Class->SightRange && SightTimer.Expired()) {
         Map.Sight_From(House, Coord_Cell(Coord), Class->SightRange, false);
         SightTimer = TICKS_PER_SECOND;
     }

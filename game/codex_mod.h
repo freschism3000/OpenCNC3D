@@ -44,6 +44,7 @@
 #define CODEX_MOD_H
 
 #include "codex_table.h"
+#include "../menu/enhanced_menu.h"
 extern "C" {
 #include "../app/logo3d.h"
 }
@@ -58,6 +59,7 @@ static unsigned g_cxHouse = CODEX_HOUSE_NOD;
 /* The DRAW counter, not the engine's. The world is stopped while this is up, so the
    engine frame is standing still and cannot turn anything -- the same reason eui_coin
    spins off the editor's own counter. */
+static int g_cxDetail = 0;
 static unsigned long g_cxFrame = 0;
 static bool     g_cxDirty = true;
 static int      g_cxSlideWas = 0;   /* the drawer's position before we folded it away */
@@ -173,8 +175,12 @@ static const CodexBounds* codex_bounds(int mi)
     return &g_cxBounds[mi];
 }
 
+static int codex_enhanced_mesh(const char* code);
+static int codex_enhanced_m3(const char* code);
+static void codex_enhanced_draw_m3(int mi, float x, float y, float z, int house);
 static int codex_mesh_for(const char* code)
 {
+    if (g_fx.enabled) return codex_enhanced_mesh(code);
     std::map<std::string, PackType>::iterator it = g_pack.type.find(code);
     if (it == g_pack.type.end() || it->second.conf < 1) return -1;
     /* Under Enhanced a building with an approved fixed model turns on this page as the
@@ -567,9 +573,24 @@ static void codex_raster(void)
    world pass leaves set -- the shadow flag, the tint, the alpha -- is off; the model is
    drawn exactly the way the battlefield draws it, which is the point. */
 static void codex_draw_model(int mi, int fx, int fy, int fw, int fh, int fbh,
-                             float yaw, int house)
+                             float yaw, int house, int m3 = -1)
 {
+    CodexBounds authored;
     const CodexBounds* b = codex_bounds(mi);
+    if (m3 >= 0) {
+        M3Model& m = g_m3[m3];
+        float lo[3]={1e30f,1e30f,1e30f},hi[3]={-1e30f,-1e30f,-1e30f};
+        if(!m.bone.empty())m3_pose(m,m3_clip(m,"idle"),0);
+        const float *p=m.drawPosed?m.drawPosed:!m.posed.empty()?m.posed.data():m.vert.data();
+        const int stride=m.drawPosed?6:8;
+        for(size_t i=0;i<m.vert.size()/8;i++)for(int a=0;a<3;a++){
+            float value=p[i*stride+a]*MODEL_SCALE;lo[a]=std::min(lo[a],value);hi[a]=std::max(hi[a],value);
+        }
+        authored.cx=(lo[0]+hi[0])/2;authored.cy=(lo[1]+hi[1])/2;authored.cz=(lo[2]+hi[2])/2;
+        authored.dx=hi[0]-lo[0];authored.dy=hi[1]-lo[1];authored.dz=hi[2]-lo[2];
+        authored.r=std::max(.01f,sqrtf(authored.dx*authored.dx+authored.dy*authored.dy+authored.dz*authored.dz)/2);
+        b=&authored;
+    }
     if (!b || fw < 4 || fh < 4) return;
 
     glViewport(fx, fbh - (fy + fh), fw, fh);
@@ -609,6 +630,7 @@ static void codex_draw_model(int mi, int fx, int fy, int fw, int fh, int fbh,
        translation and this is what they are for; aiming instead works out the same for a
        static mesh and stops working the moment anything rotates. */
     const float ground = terrain_y(0.0f, 0.0f);
+    if(m3>=0&&!g_m3[m3].bone.empty())yaw+=(float)M_PI;
     const float ex = d * cosf(pitch) * sinf(yaw);
     const float ey = d * sinf(pitch);
     const float ez = d * cosf(pitch) * cosf(yaw);
@@ -659,6 +681,8 @@ static void codex_draw_model(int mi, int fx, int fy, int fw, int fh, int fbh,
 
     const float ox = -b->cx, oz = -b->cz;
     const float lift = -ground - b->cy;
+    if(m3>=0)codex_enhanced_draw_m3(m3,ox,-b->cy,oz,house);
+    else {
     draw_mesh(mi, ox, oz, -1, MODE_OPAQUE, 0, 0.0f, house, 1.0f, lift);
     glEnable(GL_TEXTURE_2D);
     draw_mesh(mi, ox, oz, -1, MODE_CUTOUT, 0, 0.0f, house, 1.0f, lift);
@@ -669,6 +693,7 @@ static void codex_draw_model(int mi, int fx, int fy, int fw, int fh, int fbh,
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
 
+    }
     g_meshNoShroud = shroudWas;
     g_meshGroundPerVertex = groundWas;
 
@@ -751,9 +776,32 @@ static void codex_logos_open(void)
     fprintf(stderr, "codex: no logos.pack (%s); the emblems will be absent\n", err);
 }
 
+/* the Database in the game's own Enhanced kit: Red Alert's only from Red Alert's */
+static bool codex_enhanced_ui(void){return (g_raModule || g_optRedAlert) == (em_red_alert() != 0) && g_fx.enabled && em_available();}
+static void codex_enhanced_page(int fbw,int fbh){
+    const int ci=codex_current();if(ci<0)return;
+    const CodexRow &r=CODEX[ci];int rows[CODEX_N];const char* names[CODEX_N];
+    int n=codex_rows(g_cxCat,rows,CODEX_N),sel=g_cxSel[g_cxCat],top=g_cxTop[g_cxCat];
+    if(sel<top)top=sel;if(sel>=top+8)top=sel-7;top=std::max(0,std::min(top,std::max(0,n-8)));g_cxTop[g_cxCat]=top;
+    for(int i=0;i<n;i++)names[i]=CODEX[rows[i]].name;
+    EM_Database st={};st.category=g_cxCat;st.house=g_cxHouse;st.selected=sel;st.top=top;st.count=n;st.detail=g_cxDetail;st.names=names;
+    st.name=r.name;st.code=r.code;st.brief=r.brief;st.armour=r.armour;st.strong=r.strong;st.weak=r.weak;st.unlocks=r.unlocks;
+    st.cost=r.cost;st.hp=r.hitpoints;st.damage=r.damage;st.speed=r.speed;st.rof=r.rof;st.range256=r.range256;
+    int mi=codex_mesh_for(r.code),m3=codex_enhanced_m3(r.code);st.model_available=mi>=0||m3>=0;
+    em_database(&st);em_viewport(fbw,fbh);em_pick(int(g_mouseScrC),int(g_mouseScrR));em_database(&st);em_draw(fbw,fbh,0);
+    int x,y,w,h;if(st.model_available&&em_database_view(&x,&y,&w,&h)){
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
+        codex_draw_model(mi,x,y,w,h,fbh,(getenv("OPENCNC3D_BACKGROUND")?.65f:float(SDL_GetTicks()%30000)*2.f*M_PI/30000.f+.65f),g_cxHouse==CODEX_HOUSE_NOD?0:1,m3);
+        glPopAttrib();
+    }
+    g_cxL.scale=em_density();g_cxL.stripFb=int(H6_TAB_H*g_h6Scale+.5f);
+    g_cxL.boxY=(fbh-636*g_cxL.scale)/2/g_cxL.scale;
+}
+
 static void codex_draw(int fbw, int fbh)
 {
     if (!g_cxOpen) return;
+    if(codex_enhanced_ui()){codex_enhanced_page(fbw,fbh);return;}
     codex_layout(fbw, fbh);
     if (g_cxDirty) {
         codex_raster();
@@ -966,7 +1014,7 @@ static bool codex_holds_the_world(void)
    one function, so the tab cannot be clickable on a screen that is not drawing it. */
 static bool codex_available(void)
 {
-    return g_fx.enabled != 0 && g_hudNew && g_h6Pack != NULL;
+    return g_fx.enabled != 0 && sb_hud_active();
 }
 
 static void codex_set_house_from_player(void)
@@ -980,6 +1028,7 @@ static void codex_open(void)
     if (g_cxOpen || !codex_available()) return;
     g_cxOpen = true;
     codex_set_house_from_player();
+    g_cxBounds.clear();g_cxDetail=0;em_reset();
     /* FOLD THE DRAWER AWAY and remember where it was, so closing the screen gives the
        player back the sidebar they had rather than the one this decided they should
        have. The three plates are pinned to the window and stay. */
@@ -1028,6 +1077,17 @@ static void codex_select(int cat, int sel)
 static bool codex_click(float col, float row, int fbw, int fbh)
 {
     if (!g_cxOpen) return false;
+    if(codex_enhanced_ui()){
+        if(row<H6_TAB_H*g_h6Scale)return false;
+        int hit=em_pick(int(col),int(row));
+        if(hit>=1000&&hit<1004)codex_select(hit-1000,g_cxSel[hit-1000]);
+        else if(hit>=2000&&hit<2000+CODEX_N)codex_select(g_cxCat,hit-2000);
+        else if(hit==3000||hit==3001)codex_select(g_cxCat,g_cxSel[g_cxCat]+(hit==3000?-8:8));
+        else if(hit==4000||hit==4001){g_cxHouse=hit==4000?CODEX_HOUSE_GDI:CODEX_HOUSE_NOD;for(int i=0;i<CODEX_CATS;i++)g_cxSel[i]=g_cxTop[i]=0;}
+        else if(hit>=5000&&hit<5004)g_cxDetail=hit-5000;
+        else if(hit==6000)codex_close();
+        return true;
+    }
     codex_layout(fbw, fbh);
     const int sc = g_cxL.scale;
     const int x = (int)col / sc, y = (int)row / sc;

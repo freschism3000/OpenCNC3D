@@ -159,6 +159,16 @@ typedef struct SK_Lobby
      * where the roster is the prefix rule and this says nothing. */
     int mode[8];
     char name[8][12];   /* who is in each seat, off the wire */
+    /* Red Alert: each player's country, as SK_State::country; zero for Tiberian Dawn. */
+    int country[8];
+    /* RED ALERT'S OWN RULES, which this screen does not draw and leaves at zero: a Red
+     * Alert room or skirmish fills them. They travel as NmSetup's fields of the same names,
+     * with each seat's country (above) as NmSetup.house[]. */
+    int shroud;         /* 1 the shroud grows back over unwatched ground  */
+    int ctf;            /* 1 capture the flag                             */
+    int ai_difficulty;  /* default for new AI seats: 0 Easy, 1 Normal, 2 Hard, 3 Expert */
+    unsigned char ai_levels[8]; /* per-seat behavior difficulty; human values are ignored */
+    unsigned seed;      /* the match's random seed; 0 none                */
 } SK_Lobby;
 
 /* ------------------------------------------------------------------------ *
@@ -232,6 +242,8 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * now, in order and to the pixel:
  *     1 gap | 5 swatch | 1 gap | 58 name | 2 gap | 18 side | 2 gap | 6 team | 1 gap
  * which is 94 exactly. sk_check_layout asserts that sum rather than trusting it. */
+/* October19: AI adds a6px E/N/H/X column. Current row is1+5+1+50+2+18+2+6+2+6+1=94;
+ * CPU n keeps computer names readable inside the50px name column. */
 #define SK_ROSTER_X 24
 #define SK_ROSTER_Y 34
 #define SK_ROSTER_W 94
@@ -255,16 +267,18 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
  * swatch by exactly the swatch's width plus its two gaps, so the name column keeps the
  * 58 pixels "COMPUTER 7" measures and loses nothing. */
 #define SK_ROSTER_NAME 7
-#define SK_ROSTER_TAB 67
+#define SK_ROSTER_TAB 59
 /* A THIRD COLUMN, which 1995 did not have because 1995 put teams in a separate drop
  * list: the team number, one digit, right of the side. It is only worth six pixels and
  * it is the only place the screen can SHOW a team, so it earns them. */
-#define SK_ROSTER_TEAM 87
+#define SK_ROSTER_TEAM 79
+#define SK_ROSTER_LEVEL 87
+#define SK_ROSTER_LEVEL_W 6
 /* Each column's own room, written once so the draw and the audit measure the same
  * number. The team's is what is left of the row less a one pixel margin. */
 #define SK_ROSTER_NAME_W (SK_ROSTER_TAB - SK_ROSTER_NAME - 2)
 #define SK_ROSTER_SIDE_W (SK_ROSTER_TEAM - SK_ROSTER_TAB - 2)
-#define SK_ROSTER_TEAM_W (SK_ROSTER_W - SK_ROSTER_TEAM - 1)
+#define SK_ROSTER_TEAM_W (SK_ROSTER_LEVEL - SK_ROSTER_TEAM - 2)
 
 /* MEASURED, not chosen: the longest map name installed, "MOOSEHEAD BARRENS", prints
  * 100 pixels wide in GRAD6FNT, and db_print does not truncate. 108 of content is that
@@ -494,8 +508,9 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 #define SK_POP_HDR_H 7
 /* As wide as the widest strip: the three seat buttons (114) outgrow the eight team and
  * colour cells (96), and the box takes the wider so every strip lines up on one left
- * edge. It still ends at 186, well inside the dialog's 304. */
-#define SK_POP_W (SK_POP_PAD * 2 + SK_POP_LAB_W + SK_POP_MODE_W * SK_POP_MODES)
+ * edge. The four difficulty choices below now set its width to184px (ends at208). */
+#define SK_POP_LEVEL_W 44 /* 36px Normal/Expert plus the native 8px button inset */
+#define SK_POP_W (SK_POP_PAD * 2 + SK_POP_LEVEL_W * 4)
 /* WHICH ROW EACH STRIP IS ON. The box is as tall as the rows it shows: a skirmish and a
  * joiner get three, a host gets the SEAT row as well. SK_POP_H is the TALLEST, and it
  * is what the clamp below is computed against. */
@@ -503,9 +518,10 @@ int sk_prev_find(const SK_Prev *p, const char *scen);
 #define SK_POP_ROW_START 1
 #define SK_POP_ROW_TEAM 2
 #define SK_POP_ROW_COLOUR 3
-#define SK_POP_ROW_MODE 4
-#define SK_POP_ROWS_JOINER 4   /* a joiner sets nobody's seat                   */
-#define SK_POP_ROWS_HOST 5     /* a host, AND a skirmish: BOT / BLOCK there      */
+#define SK_POP_ROW_LEVEL 4
+#define SK_POP_ROW_MODE 5
+#define SK_POP_ROWS_JOINER 5   /* a joiner sets nobody's seat                   */
+#define SK_POP_ROWS_HOST 6     /* a host, AND a skirmish: BOT / BLOCK there      */
 #define SK_POP_H_ROWS(n) (SK_POP_PAD * 2 + SK_POP_HDR_H + SK_POP_ROW_H * (n))
 #define SK_POP_H SK_POP_H_ROWS(SK_POP_ROWS_HOST)
 #define SK_POP_X SK_ROSTER_X
@@ -523,6 +539,8 @@ typedef enum
      * has no rectangle and is skipped by the walk. Clicking one opens the drop down. */
     SK_I_ROW0 = 0,
     SK_I_ROW7 = SK_I_ROW0 + SK_ROSTER_ROWS - 1,
+    SK_I_LEVEL0,
+    SK_I_LEVEL7 = SK_I_LEVEL0 + SK_ROSTER_ROWS - 1,
     SK_I_GDI,      /* a latched pair: exactly one of the two is lit */
     SK_I_NOD,
     /* THE CHANGE MAP BUTTON, in the slot the map list held: the list is a window now,
@@ -566,6 +584,10 @@ typedef enum
      * order, so SK_I_POP_C1 + n is colour index n on both sides of the handoff. */
     SK_I_POP_C1,
     SK_I_POP_C8 = SK_I_POP_C1 + SK_POP_COLOURS - 1,
+    SK_I_POP_EASY,
+    SK_I_POP_NORMAL,
+    SK_I_POP_HARD,
+    SK_I_POP_EXPERT,
     /* THE MAP PICKER'S OWN CONTROLS, last for the same reason the popup's are: they
      * exist only while the window covers the dialog. The list rows are not items -- a
      * rect walk, sk_map_row_at, the way the old list was -- so the ring stays short. */
@@ -580,7 +602,9 @@ typedef enum
 /* The row and popup ids are RANGES, and every test on them is written as one so adding
  * a seat is a change to SK_ROSTER_ROWS and nothing else. */
 #define SK_IS_ROW(i) ((i) >= SK_I_ROW0 && (i) <= SK_I_ROW7)
-#define SK_IS_POP(i) ((i) >= SK_I_POP_GDI && (i) <= SK_I_POP_C8)
+#define SK_IS_LEVEL(i) ((i) >= SK_I_LEVEL0 && (i) <= SK_I_LEVEL7)
+#define SK_IS_POP_LEVEL(i) ((i) >= SK_I_POP_EASY && (i) <= SK_I_POP_EXPERT)
+#define SK_IS_POP(i) ((i) >= SK_I_POP_GDI && (i) <= SK_I_POP_EXPERT)
 #define SK_IS_POP_COL(i) ((i) >= SK_I_POP_C1 && (i) <= SK_I_POP_C8)
 #define SK_IS_POP_MODE(i) ((i) >= SK_I_POP_BOT && (i) <= SK_I_POP_BLOCK)
 #define SK_IS_POP_START(i) ((i) >= SK_I_POP_S1 && (i) <= SK_I_POP_S8)
@@ -677,6 +701,20 @@ typedef struct SK_State
      * through sk_row_house() and never straight out of the array. */
     int house[SK_ROSTER_ROWS];
     int house_set[SK_ROSTER_ROWS];
+    /* RED ALERT'S SEATS ARE COUNTRIES (sk_set_red_alert): country[] holds each seat's,
+     * in the engine's HousesType order (0 Spain, 1 Greece, 2 USSR, 3 England, 4 Ukraine,
+     * 5 Germany, 6 France, 7 Turkey), and house[] follows it (1 for USSR and Ukraine, the
+     * Soviet side). countries is 0 for Tiberian Dawn, whose seats are the two sides only;
+     * build_max is its tech ceiling when not 0 (Red Alert's is 10). */
+    int countries;
+    int country[SK_ROSTER_ROWS];
+    int build_max;
+    /* Red Alert shroud/flag rules, followed by the shared behavioral AI default and
+     * individual seat levels. They reach SK_Lobby through sk_result. */
+    int shroud;
+    int ctf;
+    int ai_difficulty; /* default for newly enabled AI seats */
+    unsigned char ai_levels[SK_ROSTER_ROWS];
     /* ZERO BASED; the screen prints team + 1. sk_init writes team[i] = i, which is
      * the project owner's rule: eight players, eight teams, everyone on their own. */
     int team[SK_ROSTER_ROWS];
@@ -776,6 +814,23 @@ typedef struct SK_State
 } SK_State;
 
 void sk_init(SK_State *st, const SK_Map *maps, int count, const SK_Prev *prev);
+/* Red Alert's lobby, called after sk_init: eight countries (each seat its own, in its
+ * own colour), tech up to 10. */
+void sk_set_red_alert(SK_State *st);
+/* A seat's country (SK_State::country), or -1 when the seats are sides. */
+int sk_row_country(const SK_State *st, int seat);
+/* The Enhanced lobby's country list: set a seat's country, and its side with it. */
+void sk_enh_set_country(SK_State *st, int seat, int country);
+const char *sk_level_name(int level);
+int sk_row_level(const SK_State *st, int seat);
+void sk_enh_set_level(SK_State *st, int seat, int level);
+/* Red Alert's rules on the Enhanced lobby: SK_RA_SHROUD and SK_RA_CTF take 0 or 1,
+ * SK_RA_DIFFICULTY 0 Easy, 1 Normal, 2 Hard, 3 Expert. Refused on a joiner's screen, whose rules are
+ * the host's; sk_ra_rule reads one back. */
+enum { SK_RA_SHROUD, SK_RA_CTF, SK_RA_DIFFICULTY };
+void sk_enh_ra_rule(SK_State *st, int rule, int value);
+int sk_ra_rule(const SK_State *st, int rule);
+int sk_ra_rule_disabled(const SK_State *st);
 
 /* ------------------------------------------------------------------------ *
  * Per seat readouts. The roster, the drop down, sk_result and the layout audit all
@@ -846,6 +901,11 @@ const char *sk_tab_label(int tab);
 void sk_set_tab(SK_State *st, int tab);
 
 /* The whole screen, over whatever the caller left in the surface. */
+int sk_preview_rgba(const SK_State *st, const DB_Pack *p, int ix, unsigned char *rgba, int w, int h);
+int sk_enh_action(SK_State *st, int item);
+void sk_enh_control(SK_State *st, int item, int value);
+void sk_enh_pick_row(SK_State *st, int ix);
+void sk_enh_random_start(SK_State *st);
 void sk_draw(DB_Surface *s, const DB_Pack *p, const SK_State *st);
 
 /* HOW A NAME A PLAYER TYPED IS CUT TO FIT A BOX: trimmed until it fits `maxw` pixels in

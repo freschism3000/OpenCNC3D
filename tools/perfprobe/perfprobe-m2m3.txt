@@ -1,0 +1,21 @@
+echo PROBE|m2m3|v4
+gfxsave perfprobe-fx.cfg
+tick 60
+echo SECTION|mission 2
+framebench 120
+echo SECTION|mission 2, the enemy base blown up
+blowup 1
+tick 30
+framebench 30
+tick 150
+echo SECTION|mission 2, after the wreck settles
+framebench 60
+meshperfdump
+remission SCB03EB SCB03EB.pack
+tick 30
+echo SECTION|baseline
+framebench 60
+framebench 300
+meshperfdump
+echo PROBE|m2m3|done
+quit

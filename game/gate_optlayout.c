@@ -134,8 +134,10 @@ static int adv_pos(const DOPT_State *st, int item)
 /* THE SLOT DIALOG IS MEASURED TWICE TOO: in LOAD mode the description field does not
  * exist, so the page answers DOPT_SL_COUNT - 1 rectangles; in SAVE mode all of them. */
 /* THE NOTICE BOX answers ONE rectangle, its lone OK, on the Restate geometry. */
+/* (Game Controls answers its speed, scroll and Options Menu only: the four items from its
+ * music volume to Sound Controls moved to the pause menu's Audio page) */
 #define OPTLAYOUT_EXPECT                                                                 \
-    (DOPT_ITEM_COUNT + DOPT_C_COUNT + DOPT_V_COUNT                                       \
+    (DOPT_ITEM_COUNT + (DOPT_C_COUNT - (DOPT_C_SOUNDCTRL - DOPT_C_MUSIC + 1)) + DOPT_V_COUNT \
      + adv_expect(DOPT_MODE_CLASSIC) + adv_expect(DOPT_MODE_ENHANCED)                   \
      + adv_expect(DOPT_MODE_N64)                                                       \
      + DOPT_S_COUNT + DOPT_G_COUNT + DOPT_R_COUNT + 1 + (DOPT_SL_COUNT - 1) + DOPT_SL_COUNT \
@@ -203,6 +205,11 @@ static void page(DOPT_State *st, const DB_Pack *p, int pg, const char *name, int
                as one. */
             if ((pg == DOPT_PAGE_RESTATE || pg == DOPT_PAGE_NOTICE) && i == DOPT_R_RIGHT
                 && !st->rvideo)
+                continue;
+            /* And Game Controls' volumes and Sound Controls, which moved to the pause
+               menu's Audio page: their numbers stay, dead and drawn nowhere here. */
+            if (pg == DOPT_PAGE_CONTROLS && i >= DOPT_C_MUSIC && i <= DOPT_C_SOUNDCTRL
+                && dopt_item_disabled(st, i))
                 continue;
             /* And the slot dialog's field, which exists only in SAVE mode. */
             if (pg == DOPT_PAGE_SLOTS && i == DOPT_SL_EDIT && st->sl.mode != DOPT_SL_SAVE)

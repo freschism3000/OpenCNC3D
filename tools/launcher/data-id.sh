@@ -63,6 +63,7 @@ fi
 set -- \
     ! -name 'opencnc3d'      ! -name 'opencnc3d-game.exe' \
     ! -name 'cnc_eyes'   ! -name 'cnc_eyes.exe' \
+    ! -name 'OpenCNC3D-Diagnostics.exe' \
     ! -name 'OpenCNC3D.exe'  ! -name 'opencnc3d-launcher' \
     ! -name 'TiberianDawn.dylib' ! -name 'TiberianDawn.dll' \
     ! -name 'SDL2.dll'   ! -name 'libSDL*.dylib' \
@@ -70,6 +71,7 @@ set -- \
     ! -name 'opencnc3d-install.txt' ! -name 'CHANGELOG.txt' \
     ! -name 'opencnc3d-log.txt'     ! -name '.DS_Store' \
     ! -name 'opencnc3d-media.txt'   ! -name '*.ocpart' \
+    ! -ipath './Logs/*' \
     ! -path './OpenCNC3D.app/Contents/MacOS/*'
 # Split on lines, and never glob: a list entry is a find pattern, not a shell word.
 set -f

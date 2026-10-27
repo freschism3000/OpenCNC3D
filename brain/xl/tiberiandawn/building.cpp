@@ -13,6 +13,10 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Uses ordinary skirmish purchase/refund and prerequisite rules for computer structures; preserves campaign behavior.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\building.cpv   2.13   02 Aug 1995 17:00:14   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -1175,7 +1179,7 @@ void BuildingClass::AI(void)
                 // GB 2022 improvement by TobiasKarnat, This on top would improve
                 // skirmish by randomizing building choice, prioritizing power and
                 // sell off later [TD].
-                if (IsTickedOff && (int)Scen.Scenario > 2 && Random_Pick(0, 50) < (int)Scen.Scenario && !Trigger
+                if (GameToPlay == GAME_NORMAL && IsTickedOff && (int)Scen.Scenario > 2 && Random_Pick(0, 50) < (int)Scen.Scenario && !Trigger
                     && *this != STRUCT_CONST && Health_Ratio() < (unsigned)(0x0040)) {
                     if (GameToPlay != GAME_NORMAL || Scen.Scenario != 15 || PlayerPtr->ActLike != HOUSE_GOOD
                         || *this != STRUCT_TEMPLE) {
@@ -1209,14 +1213,22 @@ void BuildingClass::AI(void)
                 **	money available. In cases where there is no practical money left, then
                 **	production can never complete -- don't bother starting it.
                 */
-                if (House->IsStarted && House->Available_Money() > 10) {
+                bool category_busy = false;
+                if (GameToPlay != GAME_NORMAL) {
+                    for (int n=0;n<Buildings.Count();++n) {
+                        BuildingClass* other=Buildings.Ptr(n);
+                        if (other && other!=this && other->House==House && other->Factory
+                            && other->Class->ToBuild==Class->ToBuild) { category_busy=true;break; }
+                    }
+                }
+                if (!category_busy && House->IsStarted && House->Available_Money() > 10) {
                     TechnoTypeClass const* techno = House->Suggest_New_Object(Class->ToBuild);
 
                     /*
                     **	If a suitable object type was selected for production, then start
                     **	producing it now.
                     */
-                    if (techno) {
+                    if (techno && (GameToPlay == GAME_NORMAL || House->Can_Build(techno, ActLike))) {
                         Factory = new FactoryClass;
                         if (Factory) {
                             if (!Factory->Set(*techno, *House)) {
@@ -2484,7 +2496,9 @@ void BuildingClass::Update_Buildables(void)
 
     bool buildable_via_capture = (IsCaptured && ActLike != House->ActLike) ? true : false;
 
-    if (!IsInLimbo && Is_Discovered_By_Player()) {
+    /* Sidebar recalc excludes a selling factory. It must not re-add its choices
+       when another building finishes selling and refreshes the house scan. */
+    if (!IsInLimbo && Mission != MISSION_DECONSTRUCTION && Is_Discovered_By_Player()) {
         switch (Class->ToBuild) {
             StructType i;
             UnitType u;
@@ -2957,7 +2971,7 @@ void BuildingClass::Grand_Opening(bool captured)
     **	at this time.
     */
     if (*this == STRUCT_REFINERY && !ScenarioInit && !captured && !Debug_Map
-        && (!House->IsHuman || PurchasePrice == 0 || PurchasePrice > Class->Raw_Cost())) {
+        && ((GameToPlay == GAME_NORMAL && !House->IsHuman) || PurchasePrice == 0 || PurchasePrice > Class->Raw_Cost())) {
         CELL cell = Coord_Cell(Adjacent_Cell(Center_Coord(), DIR_SW));
         //		if (!Map[cell].Cell_Unit()) {
         UnitClass* unit = new UnitClass(UNIT_HARVESTER, House->Class->House);
@@ -2994,7 +3008,7 @@ void BuildingClass::Grand_Opening(bool captured)
     **	Helicopter pads get a free attack helicopter.
     */
     if (*this == STRUCT_HELIPAD && !captured
-        && (!House->IsHuman || PurchasePrice == 0 || PurchasePrice > Class->Raw_Cost())) {
+        && ((GameToPlay == GAME_NORMAL && !House->IsHuman) || PurchasePrice == 0 || PurchasePrice > Class->Raw_Cost())) {
         ScenarioInit++;
         AircraftClass* air = 0;
         if (House->ActLike == HOUSE_GOOD) {

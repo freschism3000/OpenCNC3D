@@ -9,6 +9,8 @@
 # The readers:
 #   tools/mac/make-package-mac.sh and tools/win/make-build-win.sh leave these out of the
 #     copy, and refuse a package in which any of them is present however it got there;
+#   tools/ra3d/stage-runtime.py, which stages the Red Alert module for both packagers,
+#     leaves out the lines under /ra3d/;
 #   tools/release.sh refuses a staged folder or a zip that holds one;
 #   tools/launcher/data-id.sh leaves them out of the data fingerprint.
 
@@ -22,8 +24,11 @@
 /movies/
 
 # Red Alert: its movies and its score may not ship either. The Red Alert module is staged
-# under ra3d/ only when a build is not told to leave it out, and it carries these, so a
-# package with the module in it is refused until Red Alert has downloads of its own.
+# under ra3d/ only when a build is not told to leave it out, and it is staged without
+# these, so a package with the module in it carries no movie and no score. The game plays
+# without them by file presence, as Tiberian Dawn does: a missing movie is skipped and a
+# missing score is silence. Its RA_LOCAL.MIX holds two themes as well as the campaign
+# text, so it ships.
 /ra3d/movies/
 /ra3d/audio/SCORES.MIX
 /ra3d/data/SCORES.MIX

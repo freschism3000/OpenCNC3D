@@ -1,0 +1,17 @@
+{
+  "original_tested_driver_sha256": {
+    "benchmark.py": "cb580b2e67c3eb1215ec094140f0ddd1f2c64d684deb7f9bb7a385db91341ee8",
+    "run-paired.py": "35e8b61a6960cebec5adf306c312c4e9a66b42f7d2eab2d65086205bb08c8a81",
+    "livebench.py": "c2f4a00ad00942f277e12be064880fa3ffb5a2e7e2c41be8dc8edbb7310aa329",
+    "crowd-run.py": "b88ba983a67b1a1c8f810dd324d2b3cdee581083348c0c2fe8885371ad81c0ac",
+    "crowded-infantry-script.txt": "bbc77dd424185e2751ef46865bedc5e8c5e5082608ba5caa0bded51dacefe1f9",
+    "crowded-infantry-invocation.json": "fb0f33f11f794dca6b26629905d40209e88d0f2b5c328285c5edaa315b60e745"
+  },
+  "changes": "Only replay path/argument portability, explicit optional interposer path and baseline-only crowd default. Measurements and tested fixture bytes are unchanged; portable derivatives were syntax/help checked, not rerun as game benchmarks.",
+  "portable_driver_sha256": {
+    "benchmark.py": "730d12c0db7d1d0b6810e98aa4a424525a1a1bc3b58e62e0bd1e6fdd5549f330",
+    "run-paired.py": "5bb86007015fb73cf6646c5056d6c70f0377ba0c324128b313cccc1875d319b9",
+    "livebench.py": "4afa395e565351812961e51505856258497895b83da82beeedbf56108c1ec791",
+    "crowd-run.py": "f35d1f73df6199dc02b63356db155d212a043b4b9ce109d735760ae64ba0b945"
+  }
+}

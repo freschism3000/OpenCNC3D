@@ -83,6 +83,8 @@ int dm_state_item_disabled(const DM_State *st, int item)
 {
     if (dm_item_disabled(item))
         return 1;
+    if (st && st->special_missing && item == DM_SPECIAL)
+        return 1;
     return (st && st->intro_missing && item == DM_INTRO) ? 1 : 0;
 }
 

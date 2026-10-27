@@ -106,7 +106,9 @@ extern "C" {
  * and MEASURED by game/gate_optlayout.c, which reads the separation
  * back out of dopt_item_rect rather than trusting this paragraph. Nothing in the gate
  * suite could see this dialog's geometry until that binary existed. */
-#define DOPT_H 133
+/* (144: one row more than the 133 the Visuals button made, for the Audio button under
+   Gameplay) */
+#define DOPT_H 144
 #define DOPT_X 48  /* (SeenBuff width - OptionWidth) / 2          goptions.cpp:54 */
 /* DERIVED, not a literal any more. It used to be 50, which is goptions.cpp:55's formula
    evaluated for a 100-tall box; with the box grown for the Visuals button a literal
@@ -287,9 +289,12 @@ extern "C" {
 #define DOPT_SND_REPEAT_Y (DOPT_SND_Y + 142)   /* Repeat_Y         sounddlg.cpp:93 */
 
 #define DOPT_SND_MVOL_X (DOPT_SND_X + 147)  /* MSlider_X           sounddlg.cpp:95 */
-#define DOPT_SND_MVOL_Y (DOPT_SND_Y + 28)   /* MSlider_Y           sounddlg.cpp:96 */
-#define DOPT_SND_FXVOL_Y (DOPT_SND_Y + 40)  /* FXSlider_Y          sounddlg.cpp:101 */
-#define DOPT_SND_AMBVOL_Y (DOPT_SND_Y + 52)
+/* FOUR VOLUMES where 1995 had two, ten rows apart instead of twelve so the fourth, the
+   voices, still ends above the track list at +66 (sounddlg.cpp's MSlider_Y was +28) */
+#define DOPT_SND_MVOL_Y (DOPT_SND_Y + 24)   /* MSlider_Y           sounddlg.cpp:96 */
+#define DOPT_SND_FXVOL_Y (DOPT_SND_Y + 34)  /* FXSlider_Y          sounddlg.cpp:101 */
+#define DOPT_SND_SPVOL_Y (DOPT_SND_Y + 44)  /* ours: the voices */
+#define DOPT_SND_AMBVOL_Y (DOPT_SND_Y + 54)
 #define DOPT_SND_VOL_W 108                  /* MSlider_W           sounddlg.cpp:97 */
 #define DOPT_SND_VOL_H 5                    /* MSlider_Height      sounddlg.cpp:98 */
 
@@ -299,6 +304,7 @@ typedef enum
 {
     DOPT_S_MUSIC = 0,
     DOPT_S_SOUND,
+    DOPT_S_SPEECH,    /* ours: the voices, the announcer's bus (the pause menu's Audio)  */
     DOPT_S_AMBIENCE,
     DOPT_S_LIST,      /* the whole listbox; the row is worked out from the y        */
     DOPT_S_STOP,
@@ -418,6 +424,9 @@ typedef enum
     DOPT_EXIT,     /* TXT_EXIT_GAME         conquer.h:81  "Exit Game"  OURS  */
     DOPT_RESUME,   /* TXT_RESUME_MISSION    conquer.h:78  "Resume Mission"   */
     DOPT_RESTATE,  /* TXT_RESTATE_MISSION   conquer.h:653 "Restate"          */
+    /* ours: the Audio page (the jukebox and every volume), drawn under Gameplay and
+       APPENDED here, after Restate, because gates and the layout walk number these */
+    DOPT_AUDIO,
     DOPT_ITEM_COUNT
 } DOPT_Item;
 
@@ -877,6 +886,9 @@ typedef struct
     int infset;
     int uiscale;                  /* 0..DOPT_UI_COUNT-1: 1x, -2x                 */
     int perspective;              /* 0 Classic, 1 Isometric (v0.6.8)             */
+    /* Keep the older model switch independently until an explicit infantry choice.
+       Reading a preset or opening the menu must not normalize unrelated flags. */
+    int model_soldiers;
 } DOPT_Profile;
 
 typedef struct
@@ -898,6 +910,8 @@ typedef struct
     int vsync;
     int fps;
     int nres, residx;
+    int resolution_changed; /* one apply only: an explicit resolution pick */
+    int drawable_w, drawable_h;    /* current rendered pixels, independent of selection */
     int res_w[DOPT_RES_MAX], res_h[DOPT_RES_MAX], res_fit[DOPT_RES_MAX];
     /* Whether the DOS entry can be chosen -- the host sets this from whether THIS MAP'S
        pack actually carries a second terrain atlas. Two theaters (SNOW, SAND) have no
@@ -927,8 +941,10 @@ typedef struct
    that Enhanced stays 3. DOPT_TEX_COUNT is the range of values, not how many are listed. */
 enum { DOPT_TEX_N64 = 0, DOPT_TEX_DOS = 1, DOPT_TEX_REMASTER = 2, DOPT_TEX_ENH = 3,
        DOPT_TEX_COUNT = 4 };
-/* The infantry row keeps the first two: there are no Enhanced sprites on it. */
-enum { DOPT_INF_COUNT = 2 };
+/* The first two remain sprite fallbacks. Retired sprite slot 2 stays hidden;
+   Enhanced 3D is UI-only and enables the production model path, never infset=2. */
+enum { DOPT_INF_N64 = 0, DOPT_INF_DOS = 1, DOPT_INF_REMASTER = 2,
+       DOPT_INF_ENHANCED = 3, DOPT_INF_COUNT = 4 };
 /* The display modes, the same numbers as fullscreen.h's FS_MODE_*; and the UI scale
    entries. The Resolution list's own two sizes are DOPT_RES_MAX and DOPT_RES_VIEW,
    declared above the struct that holds the list. */
@@ -1326,6 +1342,12 @@ typedef struct
     /* THE NOTICE PAGE's caption. The box itself is the Restate box (brief, brwrap,
        rx..rh above), opened with no movie so it carries the lone OK. */
     char ncaption[DOPT_N_CAPTION_MAX];
+    /* Non-zero when the notice was opened from the pause page: its OK goes back there,
+       to the button it was opened from, instead of closing the dialog. */
+    int nback;
+    int nprev;
+    char nbrief[DOPT_R_TEXT_MAX];   /* the mission's briefing, kept while the notice uses the box */
+    int nvideo;
     /* THE SLOT DIALOG's state, and which question the confirmation box is asking:
        0 the abort question (goptions.cpp:425), 1 "Delete this file?" (loaddlg.cpp:450).
        One box, because msgbox.cpp is one box. */
@@ -1419,6 +1441,9 @@ const char *dopt_brief_line(const DOPT_State *st, int i);
    report DOPT_ACT_RESUME, "close me". It is the Restate box lent to a caller that has
    something to say before the menu comes back, which is why it takes the pack and does
    the layout itself: there is no pause page whose open would have done so. */
+/* A notice over the pause page, answered by going back to it (dopt_open_notice closes the
+   dialog). The Enhanced menu draws it from the caption and text alone. */
+void dopt_open_page_notice(DOPT_State *st, const char *caption, const char *text);
 void dopt_open_notice(DOPT_State *st, const DB_Pack *p, const char *caption,
                       const char *text);
 
@@ -1544,6 +1569,23 @@ int dopt_key(DOPT_State *st, int key);
 /* Draw the current page into a 320x200 surface. The surface must already hold whatever
  * should show through: this only paints the dialog, and everything it does not touch is
  * left as it was found. Fill with DB_TBLACK first and index 0 comes out transparent. */
+void dopt_enh_confirm_exit(DOPT_State *st);
+void dopt_enh_row(DOPT_State *st, int ix);
+int dopt_enh_action(DOPT_State *st, int item);
+void dopt_enh_control(DOPT_State *st, int item, int value);
+/* The Settings screen's Gameplay and Audio tabs: one setting each, by which. */
+enum { DOPT_ES_SPEED = 0, DOPT_ES_SCROLL, DOPT_ES_MUSIC, DOPT_ES_SOUND, DOPT_ES_VOICES,
+       DOPT_ES_AMBIENCE, DOPT_ES_COUNT };
+int  dopt_enh_setting_max(int which);
+/* "Normal", "Fast" ...: a game speed setting's name */
+const char *dopt_speed_name(int speed);
+int  dopt_enh_setting_value(DOPT_State *st, int which);
+void dopt_enh_setting(DOPT_State *st, int which, int value);
+void dopt_enh_gameplay_toggle(DOPT_State *st, int which);
+void dopt_enh_mode(DOPT_State *st, int mode);
+int dopt_enh_drop_value(const DOPT_State *st, int item);
+int dopt_enh_drop_allowed(DOPT_State *st, int item, int value);
+void dopt_enh_choose(DOPT_State *st, int item, int value);
 void dopt_draw(DB_Surface *s, const DB_Pack *p, const DOPT_State *st);
 
 /* The DOS pointer, MOUSE.SHP frame 0 at its own hotspot (the top left pixel). */

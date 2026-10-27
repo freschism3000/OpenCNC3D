@@ -276,6 +276,7 @@ int  mp_hit_test(const MP_State *st, int mx, int my);
    it and the scroll bar beside it never select a row. */
 int  mp_row_at(const MP_State *st, int mx, int my);
 
+void mp_enh_select(MP_State *st, int row);
 int  mp_press(MP_State *st, int mx, int my);    /* returns MP_ACT_* */
 void mp_motion(MP_State *st, int mx, int my);
 void mp_release(MP_State *st);

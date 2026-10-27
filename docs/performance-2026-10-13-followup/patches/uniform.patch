@@ -1,0 +1,159 @@
+--- a/game/cnc_eyes.cpp
++++ b/game/cnc_eyes.cpp
+@@ -28365,0 +28366 @@
++        fx_uniform_values_dump();
+@@ -28539,0 +28541 @@
++    fx_uniform_frame_begin(); /* isolated value-cache experiment */
+--- a/game/fx_gl.h
++++ b/game/fx_gl.h
+@@ -197,2 +197,148 @@
+-static void fx_link_program(GLuint p)   { g_fxUniformLoc.erase(p); (fx_glLinkProgram)(p); }
+-static void fx_delete_program(GLuint p) { g_fxUniformLoc.erase(p); (fx_glDeleteProgram)(p); }
++
++/* ISOLATED RESEARCH ONLY: identical uniform writes suppressed within one frame.
++   Compare exact bytes (including signed zero / NaN payload); never approximate.
++   Array elements are separate records, so partial overlapping updates invalidate
++   the right logical elements. No shader/vertex/physics arithmetic changes. */
++#include <unordered_map>
++struct FxUniformSeen {
++    unsigned kind=0; GLboolean transpose=GL_FALSE; size_t bytes=0;
++    unsigned char value[16*sizeof(GLfloat)]={};
++};
++static std::map<GLuint,std::unordered_map<GLint,FxUniformSeen> > g_fxUniformSeen;
++static std::map<GLuint,bool> g_fxUniformLinked;
++struct FxUniformType { GLenum type=0;GLint remaining=1; };
++static std::map<GLuint,std::unordered_map<GLint,FxUniformType> > g_fxUniformTypes;
++typedef void (APIENTRY *FxGetActiveUniform)(GLuint,GLuint,GLsizei,GLsizei*,GLint*,GLenum*,FxGLchar*);
++static void fx_uniform_describe(GLuint p) {
++    FxGetActiveUniform describe=(FxGetActiveUniform)SDL_GL_GetProcAddress("glGetActiveUniform");
++    if(!describe)describe=(FxGetActiveUniform)SDL_GL_GetProcAddress("glGetActiveUniformARB");
++    if(!describe)return;
++    GLint n=0,length=0;(fx_glGetProgramiv)(p,0x8B86,&n);(fx_glGetProgramiv)(p,0x8B87,&length);
++    if(n<=0||length<=0||length>65536)return;
++    std::vector<FxGLchar> name((size_t)length);auto& types=g_fxUniformTypes[p];
++    for(GLint i=0;i<n;i++) {
++        GLsizei used=0;GLint size=0;GLenum type=0;
++        describe(p,(GLuint)i,length,&used,&size,&type,name.data());
++        if(size<=0||used<=0||used>=length)continue;
++        std::string key(name.data(),(size_t)used);
++        const size_t bracket=key.find("[0]");
++        for(GLint k=0;k<size;k++) {
++            std::string element=key;
++            if(size>1&&bracket!=std::string::npos)element.replace(bracket,3,"["+std::to_string(k)+"]");
++            const GLint l=(fx_glGetUniformLocation)(p,element.c_str());
++            if(l>=0)types[l]={type,size-k};
++        }
++    }
++}
++static bool fx_uniform_valid(GLuint p,GLint l,GLsizei count,unsigned kind) {
++    const auto program=g_fxUniformTypes.find(p);if(program==g_fxUniformTypes.end())return false;
++    const auto field=program->second.find(l);if(field==program->second.end()||count>field->second.remaining)return false;
++    const GLenum t=field->second.type;
++    if(kind==1)return t==GL_INT||t==0x8B56||(t>=0x8B5D&&t<=0x8B64);
++    if(kind==2)return t==GL_FLOAT||t==0x8B56;
++    if(kind>=3&&kind<=5)return t==0x8B50+(kind-3)||t==0x8B57+(kind-3);
++    return kind==6&&t==0x8B5C;
++}
++static SDL_GLContext g_fxUniformContext=NULL;
++static GLuint g_fxUniformCurrent=0;
++static bool g_fxUniformCurrentKnown=false;
++static unsigned long g_fxUniformAsked=0,g_fxUniformSent=0,g_fxUniformSkipped=0;
++static bool fx_uniform_values_on() {
++    static const bool on=[](){const char* s=getenv("OPENCNC3D_UNIFORM_VALUES");return !s||strcmp(s,"0");}();
++    return on;
++}
++static void fx_uniform_context_sync() {
++    const SDL_GLContext c=SDL_GL_GetCurrentContext();
++    if(c!=g_fxUniformContext) {
++        g_fxUniformContext=c;g_fxUniformSeen.clear();g_fxUniformLinked.clear();
++        g_fxUniformCurrentKnown=false;g_fxUniformLoc.clear();g_fxUniformTypes.clear();
++    }
++}
++static void fx_uniform_frame_begin() {
++    fx_uniform_context_sync();g_fxUniformSeen.clear();g_fxUniformCurrentKnown=false;
++}
++static void fx_uniform_program_forget(GLuint p) {
++    g_fxUniformSeen.erase(p);g_fxUniformLinked.erase(p);g_fxUniformTypes.erase(p);
++    if(g_fxUniformCurrent==p)g_fxUniformCurrentKnown=false;
++}
++static void fx_uniform_use(GLuint p) {
++    fx_uniform_context_sync();(fx_glUseProgram)(p);
++    const auto i=g_fxUniformLinked.find(p);
++    /* An invalid UseProgram leaves the old program bound. Only already linked
++       ids are predicted; otherwise the first setter obtains the real answer. */
++    if(p==0||(i!=g_fxUniformLinked.end()&&i->second)) {
++        g_fxUniformCurrent=p;g_fxUniformCurrentKnown=true;
++    } else g_fxUniformCurrentKnown=false;
++}
++static GLuint fx_uniform_current() {
++    if(!g_fxUniformCurrentKnown) {
++        GLint p=0;glGetIntegerv(GL_CURRENT_PROGRAM,&p);
++        g_fxUniformCurrent=(GLuint)p;g_fxUniformCurrentKnown=true;
++    }
++    return g_fxUniformCurrent;
++}
++static bool fx_uniform_repeated(GLint location,GLsizei count,unsigned kind,
++                                GLboolean transpose,const void* data,size_t bytes) {
++    g_fxUniformAsked++;
++    const GLuint p=fx_uniform_current();
++    const auto linked=g_fxUniformLinked.find(p);
++    if(!fx_uniform_values_on()||location<0||count<=0||count>256||!data
++       ||!p||linked==g_fxUniformLinked.end()||!linked->second||!fx_uniform_valid(p,location,count,kind)) {
++        if(p)g_fxUniformSeen.erase(p);g_fxUniformSent++;return false;
++    }
++    auto& values=g_fxUniformSeen[p];bool same=true;
++    const auto* v=(const unsigned char*)data;
++    for(GLsizei i=0;i<count;i++) {
++        const auto found=values.find(location+i);
++        if(found==values.end()||found->second.kind!=kind
++           ||found->second.transpose!=transpose||found->second.bytes!=bytes
++           ||memcmp(found->second.value,v+(size_t)i*bytes,bytes)) {same=false;break;}
++    }
++    if(same){g_fxUniformSkipped++;return true;}
++    for(GLsizei i=0;i<count;i++) {
++        auto& seen=values[location+i];seen.kind=kind;seen.transpose=transpose;seen.bytes=bytes;
++        memcpy(seen.value,v+(size_t)i*bytes,bytes);
++    }
++    g_fxUniformSent++;return false;
++}
++static void fx_uniform1i(GLint l,GLint v) {
++    if(!fx_uniform_repeated(l,1,1,GL_FALSE,&v,sizeof v))(fx_glUniform1i)(l,v);
++}
++static void fx_uniform1f(GLint l,GLfloat v) {
++    if(!fx_uniform_repeated(l,1,2,GL_FALSE,&v,sizeof v))(fx_glUniform1f)(l,v);
++}
++static void fx_uniform2f(GLint l,GLfloat a,GLfloat b) {
++    const GLfloat v[2]={a,b};if(!fx_uniform_repeated(l,1,3,GL_FALSE,v,sizeof v))(fx_glUniform2f)(l,a,b);
++}
++static void fx_uniform3f(GLint l,GLfloat a,GLfloat b,GLfloat c) {
++    const GLfloat v[3]={a,b,c};if(!fx_uniform_repeated(l,1,4,GL_FALSE,v,sizeof v))(fx_glUniform3f)(l,a,b,c);
++}
++static void fx_uniform4f(GLint l,GLfloat a,GLfloat b,GLfloat c,GLfloat d) {
++    const GLfloat v[4]={a,b,c,d};if(!fx_uniform_repeated(l,1,5,GL_FALSE,v,sizeof v))(fx_glUniform4f)(l,a,b,c,d);
++}
++static void fx_uniform4fv(GLint l,GLsizei count,const GLfloat* v) {
++    if(!fx_uniform_repeated(l,count,5,GL_FALSE,v,4*sizeof *v))(fx_glUniform4fv)(l,count,v);
++}
++static void fx_uniformmat(GLint l,GLsizei count,GLboolean transpose,const GLfloat* v) {
++    if(!fx_uniform_repeated(l,count,6,transpose,v,16*sizeof *v))(fx_glUniformMatrix4fv)(l,count,transpose,v);
++}
++static void fx_uniform_values_dump() {
++    printf("UNIFORMPERF|asked=%lu|sent=%lu|skipped=%lu\n",g_fxUniformAsked,g_fxUniformSent,g_fxUniformSkipped);
++}
++#define fx_glUseProgram(p) fx_uniform_use(p)
++#define fx_glUniform1i(l,v) fx_uniform1i(l,v)
++#define fx_glUniform1f(l,v) fx_uniform1f(l,v)
++#define fx_glUniform2f(l,a,b) fx_uniform2f(l,a,b)
++#define fx_glUniform3f(l,a,b,c) fx_uniform3f(l,a,b,c)
++#define fx_glUniform4f(l,a,b,c,d) fx_uniform4f(l,a,b,c,d)
++#define fx_glUniform4fv(l,n,v) fx_uniform4fv(l,n,v)
++#define fx_glUniformMatrix4fv(l,n,t,v) fx_uniformmat(l,n,t,v)
++
++static void fx_link_program(GLuint p) {
++    fx_uniform_context_sync();g_fxUniformLoc.erase(p);fx_uniform_program_forget(p);
++    (fx_glLinkProgram)(p);GLint ok=0;(fx_glGetProgramiv)(p,GL_LINK_STATUS,&ok);
++    g_fxUniformLinked[p]=ok!=0;if(ok)fx_uniform_describe(p);
++}
++static void fx_delete_program(GLuint p) {
++    g_fxUniformLoc.erase(p);fx_uniform_program_forget(p);(fx_glDeleteProgram)(p);
++}

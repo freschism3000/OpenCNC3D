@@ -1,0 +1,130 @@
+{
+  "vehicle-wreck": {
+    "pixels": [
+      {
+        "frame": "0.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "1.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "2.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "3.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "4.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "5.png",
+        "pixels": 0,
+        "max_delta": 0
+      }
+    ],
+    "targets": [
+      {
+        "frame": "1-depth.bin.gz",
+        "bytes": 4096012,
+        "equal": true
+      },
+      {
+        "frame": "1-infantry-sun.bin.gz",
+        "bytes": 67108876,
+        "equal": true
+      },
+      {
+        "frame": "1-normals.bin.gz",
+        "bytes": 16384012,
+        "equal": true
+      },
+      {
+        "frame": "1-scene.bin.gz",
+        "bytes": 16384012,
+        "equal": true
+      },
+      {
+        "frame": "1-sun.bin.gz",
+        "bytes": 67108876,
+        "equal": true
+      },
+      {
+        "frame": "1-terrain-sun.bin.gz",
+        "bytes": 67108876,
+        "equal": true
+      },
+      {
+        "frame": "3-depth.bin.gz",
+        "bytes": 4096012,
+        "equal": true
+      },
+      {
+        "frame": "3-infantry-sun.bin.gz",
+        "bytes": 67108876,
+        "equal": true
+      },
+      {
+        "frame": "3-normals.bin.gz",
+        "bytes": 16384012,
+        "equal": true
+      },
+      {
+        "frame": "3-scene.bin.gz",
+        "bytes": 16384012,
+        "equal": true
+      },
+      {
+        "frame": "3-sun.bin.gz",
+        "bytes": 67108876,
+        "equal": true
+      },
+      {
+        "frame": "3-terrain-sun.bin.gz",
+        "bytes": 67108876,
+        "equal": true
+      }
+    ],
+    "physics_equal": true
+  },
+  "modes": {
+    "pixels": [
+      {
+        "frame": "0.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "1.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "2.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "3.png",
+        "pixels": 0,
+        "max_delta": 0
+      },
+      {
+        "frame": "4.png",
+        "pixels": 0,
+        "max_delta": 0
+      }
+    ],
+    "targets": [],
+    "physics_equal": true
+  }
+}

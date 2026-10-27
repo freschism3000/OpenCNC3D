@@ -20,6 +20,7 @@
 set -e
 cd "$(dirname "$0")/../.."
 ROOT=$(pwd)
+python3 "$ROOT/tools/bakery/materialize-grassmask.py"
 
 # THE BUILD NUMBER, regenerated before anything compiles. tools/version.sh reads the
 # VERSION file at the repo root and writes game/opencnc3d_build.h; nothing else in the tree
@@ -77,6 +78,20 @@ CDEFS="-DGL_SILENCE_DEPRECATION"
 PATHMAP="-ffile-prefix-map=$ROOT=. -ffile-prefix-map=$SDK=winsdk"
 CDEFS="$CDEFS $PATHMAP"
 
+# SSE2 FLOATING POINT FOR THE GAME, NOT THE 1995 x87 UNIT. Left to itself this compiler
+# targets a Pentium Pro and does every float on the x87 stack, and every float-to-int
+# conversion there switches the rounding mode and back (2,004 fldcw in the renderer
+# alone). The renderer converts floats all frame long. Measured with the same scenes on
+# two Windows PCs: GDI 1 under Enhanced 40.4 -> 20.0 ms (RTX 3060, Ryzen 7 5700X) and
+# 24.2 -> 15.4 ms (RX 7900 GRE, Ryzen 5 7500F), the big map with the shroud lifted
+# 71.7 -> 39.1 and 43.7 -> 24.7 ms, nothing else changed. Every CPU that runs Windows 10
+# or 11 has SSE2.
+# -mstackrealign because a 32-bit Windows callback (an SDL thread, the audio callback)
+# arrives with the stack aligned to 4 bytes while SSE code may assume 16; realigning in
+# the functions that need it costs a few instructions and removes the one way this
+# could crash. The brain DLL is built separately and keeps its own flags.
+WIN_CPU="-msse2 -mfpmath=sse -mstackrealign"
+
 echo "== C sources ($HOST)"
 # THE C DIALECT SPLIT IS THE MAC BUILD'S, NOT A NEW ONE.
 #
@@ -95,7 +110,7 @@ compile_c() {
     std=$1; shift
     for f in "$@"; do
         o="$OBJ/$(basename "$f" .c).o"
-        $CC -std=$std -O2 -g -Wall $CDEFS $INC -c "$f" -o "$o"
+        $CC -std=$std -O2 -g $WIN_CPU -Wall $CDEFS $INC -c "$f" -o "$o"
         COBJ="$COBJ $o"
     done
 }
@@ -124,6 +139,10 @@ compile_c gnu89 net/roomcode.c
 # nobody.
 compile_c gnu99 $WIN_HTTP_C
 
+# RGBA menu art remains GL 1.1/nearest; compile the shared native renderer once.
+$CXX -std=c++14 -O2 -g $CDEFS $INC -c "$WIN_MENU_CPP" -o "$OBJ/enhanced_menu.o"
+COBJ="$COBJ $OBJ/enhanced_menu.o"
+
 echo "== renderer"
 # -fpermissive for the same reason the brain build needs it, and only for that reason:
 # these translation units include the Remaster's dllinterface.h, whose MS-style anonymous
@@ -132,12 +151,15 @@ echo "== renderer"
 # app build does. It is compiled twice because cnc_eyes.exe (what the gates drive) needs
 # the main() and opencnc3d-game.exe must not have two. Both take the build header, so
 # cnc_eyes.exe carries the same build mark the Mac renderer does.
-$CXX -std=c++14 -O2 -g -fms-extensions -fpermissive -DOPENCNC3D_NO_MAIN \
+$CXX -std=c++14 -O2 -g $WIN_CPU -fms-extensions -fpermissive -DOPENCNC3D_NO_MAIN \
      $CDEFS -include "$ROOT/game/opencnc3d_build.h" $INC -I"$HDR" -c "$WIN_EYES_CPP" -o "$OBJ/cnc_eyes_lib.o"
-$CXX -std=c++14 -O2 -g -fms-extensions -fpermissive \
+$CXX -std=c++14 -O2 -g $WIN_CPU -fms-extensions -fpermissive \
      $CDEFS -include "$ROOT/game/opencnc3d_build.h" $INC -I"$HDR" -c "$WIN_EYES_CPP" -o "$OBJ/cnc_eyes_main.o"
-$CXX -std=c++14 -O2 -g -fms-extensions -fpermissive \
+$CXX -std=c++14 -O2 -g $WIN_CPU -fms-extensions -fpermissive \
      $CDEFS $INC -I"$HDR" -c "$WIN_APP_CPP" -o "$OBJ/opencnc3d.o"
+# Same game, settings and renderer; automatic diagnostics is entry-specific.
+$CXX -std=c++14 -O2 -g $WIN_CPU -fms-extensions -fpermissive \
+     -DOPENCNC3D_DIAGNOSTIC_APP=1 $CDEFS $INC -I"$HDR" -c "$WIN_APP_CPP" -o "$OBJ/opencnc3d_diagnostics.o"
 
 # -static-libgcc and -static-libstdc++ are NOT enough on their own: they leave
 # libwinpthread-1.dll as a runtime dependency, and a stock Windows 11 does not have it,
@@ -253,6 +275,8 @@ fi
 # process 4 GB. Read back with objdump -p: the Characteristics word carries 0x20.
 $CXX -Wl,--large-address-aware -o "$OUT/cnc_eyes.exe" "$OBJ/cnc_eyes_main.o" $MANOBJ $COBJ $LIBDIRS $LIBS
 $CXX -Wl,--large-address-aware -o "$OUT/opencnc3d-game.exe"    "$OBJ/opencnc3d.o" "$OBJ/cnc_eyes_lib.o" $RCOBJ $MANOBJ $COBJ $LIBDIRS $LIBS
+
+$CXX -mwindows -Wl,--large-address-aware -o "$OUT/OpenCNC3D-Diagnostics.exe" "$OBJ/opencnc3d_diagnostics.o" "$OBJ/cnc_eyes_lib.o" $RCOBJ $MANOBJ $COBJ $LIBDIRS $LIBS
 
 cp "$SDL2_ROOT/bin/SDL2.dll" "$OUT/"
 

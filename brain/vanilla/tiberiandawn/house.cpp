@@ -29,6 +29,10 @@
 // and NOTICE.md lists every modified file.
 //
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Runs the per-house fair skirmish planner, neutralizes difficulty stat handicaps and applies ordinary economy and prerequisites.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\house.cpv   2.13   02 Aug 1995 17:03:50   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -123,6 +127,7 @@
 #include "common/irandom.h"
 #include "ccini.h"
 #include "common/fixed.h"
+#include "fair_ai_td.inc"
 
 /***********************************************************************************************
  * HouseClass::Validate -- validates house pointer															  *
@@ -252,19 +257,20 @@ void HouseClass::One_Time(void)
 DiffType HouseClass::Assign_Handicap(DiffType handicap)
 {
     DiffType old = Difficulty;
+    if (GameToPlay != GAME_NORMAL) handicap = DIFF_NORMAL;
     Difficulty = handicap;
 
     if (GameToPlay != GAME_NORMAL) {
         HouseTypeClass const* hptr = &HouseTypeClass::As_Reference(ActLike);
-        FirepowerBias = hptr->FirepowerBias * Rule.Diff[handicap].FirepowerBias;
-        GroundspeedBias = hptr->GroundspeedBias * Rule.Diff[handicap].GroundspeedBias;
-        AirspeedBias = hptr->AirspeedBias * Rule.Diff[handicap].AirspeedBias;
-        ArmorBias = hptr->ArmorBias * Rule.Diff[handicap].ArmorBias;
-        ROFBias = hptr->ROFBias * Rule.Diff[handicap].ROFBias;
-        CostBias = hptr->CostBias * Rule.Diff[handicap].CostBias;
+        FirepowerBias = hptr->FirepowerBias;
+        GroundspeedBias = hptr->GroundspeedBias;
+        AirspeedBias = hptr->AirspeedBias;
+        ArmorBias = hptr->ArmorBias;
+        ROFBias = hptr->ROFBias;
+        CostBias = hptr->CostBias;
         RepairDelay = Rule.Diff[handicap].RepairDelay;
         BuildDelay = Rule.Diff[handicap].BuildDelay;
-        BuildSpeedBias = hptr->BuildSpeedBias * Rule.Diff[handicap].BuildSpeedBias;
+        BuildSpeedBias = hptr->BuildSpeedBias;
     } else {
         FirepowerBias = Rule.Diff[handicap].FirepowerBias;
         GroundspeedBias = Rule.Diff[handicap].GroundspeedBias;
@@ -566,6 +572,14 @@ HouseClass::HouseClass(HousesType house)
  *=============================================================================================*/
 bool HouseClass::Can_Build(TechnoTypeClass const* type, HousesType house) const
 {
+    return Can_Build_With_Prerequisites(type, house, ActiveBScan);
+}
+
+/* Same legality rules, with a caller-supplied prerequisite set for a read-only
+   potential build tree. Production still passes the live ActiveBScan above. */
+bool HouseClass::Can_Build_With_Prerequisites(TechnoTypeClass const* type, HousesType house,
+                                             unsigned int prerequisites) const
+{
     Validate();
     if (!type || !type->IsBuildable || !((1L << house) & type->Ownable))
         return (false);
@@ -584,13 +598,13 @@ bool HouseClass::Can_Build(TechnoTypeClass const* type, HousesType house) const
     /*
     **	Perform some equivalency fixups for the building existance flags.
     */
-    int flags = ActiveBScan;
+    int flags = (int)prerequisites;
 
     /*
     **	AI players update flags using building quantity tracker.
     **	Ensures consistent logic when determining building choices.
     */
-    if (!IsHuman) {
+    if (!IsHuman && GameToPlay == GAME_NORMAL) {
         flags = 0;
         for (int i = 0; i < 32; i++) {
             if (BQuantity[i] > 0) {
@@ -903,6 +917,7 @@ bool HouseClass::OpenCNC3D_Cheat_Supers(HousesType house)
 
 void HouseClass::Init(void)
 {
+    TD_Fair_AI_Reset();
     Houses.Free_All();
 
     /*
@@ -1038,7 +1053,7 @@ void HouseClass::AI(void)
     **	see if the attack timer has expired. If it has, then create the attack
     **	teams.
     */
-    if (IsAlerted && AlertTime.Expired()) {
+    if (GameToPlay == GAME_NORMAL && IsAlerted && AlertTime.Expired()) {
 
         /*
         **	Adjusted to reduce maximum number of teams created.
@@ -1067,7 +1082,7 @@ void HouseClass::AI(void)
     **	Create teams for this house if necessary.
     ** (Use the same timer for some extra capture-the-flag logic.)
     */
-    if (TeamTime.Expired()) {
+    if (GameToPlay == GAME_NORMAL && TeamTime.Expired()) {
         TeamTypeClass const* ttype = Suggested_New_Team(false);
         if (ttype) {
             ttype->Create_One_Of();
@@ -1430,7 +1445,7 @@ void HouseClass::AI(void)
         **	available, then make the nuke strike strike available.
         */
         if ((GameToPlay == GAME_NORMAL || Rule.AllowSuperWeapons) && (ActiveBScan & STRUCTF_TEMPLE) && Has_Nuke_Device()
-            && IsHuman) {
+            && (IsHuman || GameToPlay != GAME_NORMAL)) {
             NukeStrike.Enable((GameToPlay == GAME_NORMAL), this == PlayerPtr);
 
             /*
@@ -1668,23 +1683,7 @@ void HouseClass::AI(void)
 #ifdef USE_RA_AI
     if (GameToPlay != GAME_NORMAL && IsHuman == false) {
 
-        /*
-        ** Perform any expert system AI processing.
-        */
-        if (IsBaseBuilding && AITimer == 0) {
-            AITimer = Expert_AI();
-        }
-
-        if (!IsBaseBuilding && State == STATE_ENDGAME) {
-            Fire_Sale();
-            Do_All_To_Hunt();
-        }
-
-        AI_Building();
-        AI_Unit();
-        AI_Vessel();
-        AI_Infantry();
-        AI_Aircraft();
+        TD_Fair_AI_Tick(this);
     }
 #endif
 
@@ -2707,9 +2706,11 @@ void HouseClass::Special_Weapon_AI(SpecialWeaponType id)
         ** If the building is valid, not in limbo, not in the process of
         ** being destroyed and not our ally, then we can consider it.
         */
-        if (b && !b->IsInLimbo && b->Strength && !Is_Ally(b)) {
-            if (b->Value() > best || best == -1) {
-                best = b->Value();
+        if (b && !b->IsInLimbo && b->Strength && !Is_Ally(b)
+            && (GameToPlay == GAME_NORMAL || TD_Fair_AI_Knows(this, b))) {
+            int public_value=GameToPlay == GAME_NORMAL ? b->Value() : b->Risk()+b->Class->Reward;
+            if (public_value > best || best == -1) {
+                best = public_value;
                 bestptr = b;
             }
         }
@@ -5232,7 +5233,7 @@ COORDINATE HouseClass::Find_Build_Location(BuildingClass* building) const
         ZoneType tryzone = _zones[(zz + start) % ARRAY_SIZE(_zones)];
         zcell = Find_Cell_In_Zone(building, tryzone);
         if (zcell)
-            return (zcell);
+            return (Cell_Coord(zcell));
     }
 
     return (0);
@@ -7723,7 +7724,8 @@ TARGET HouseClass::Find_Juicy_Target(COORDINATE coord) const
     for (int index = 0; index < Units.Count(); index++) {
         UnitClass* unit = Units.Ptr(index);
 
-        if (unit && !unit->IsInLimbo && !Is_Ally(unit) && unit->House->Which_Zone(unit) == ZONE_NONE) {
+        if (unit && !unit->IsInLimbo && !Is_Ally(unit) && unit->House->Which_Zone(unit) == ZONE_NONE
+            && (GameToPlay == GAME_NORMAL || TD_Fair_AI_Knows(this, unit))) {
             int val = Distance(coord, unit->Center_Coord());
 
             if (unit->Anti_Air())
@@ -8260,8 +8262,12 @@ CELL HouseClass::Find_Cell_In_Zone(TechnoClass const* techno, ZoneType zone) con
     */
     for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
         //		if (Map.In_Radar(cell)) {
-        if (Map.In_Radar(cell) && Which_Zone(cell) != ZONE_NONE) {
+        if (Map.In_Radar(cell) && Which_Zone(cell) != ZONE_NONE
+            && (GameToPlay == GAME_NORMAL || Map[cell].Is_Mapped(Class->House))) {
             bool ok = ttype->Legal_Placement(cell);
+            // TD permits a foundation to extend beyond explored origin cells.
+            // Match the normal human placement rule, including terrain/bib and
+            // adjacency validation, rather than requiring every bib pixel seen.
 
             /*
             **	Another (adjacency) check is required for buildings.

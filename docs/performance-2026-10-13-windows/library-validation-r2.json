@@ -1,0 +1,285 @@
+{
+  "helper_source_sha256": "235ec7d445a5945f011bec8d1db78c49e94ef7f890a4f4781ff96be02a8d204a",
+  "bundle_source_sha256": "349723d33c79601ff878fba3b6e4d786cf4b4a9f5ae798b35289aa85c5a499fb",
+  "actual_published_inputs": [
+    {
+      "archive": "bins",
+      "member": "TiberianDawn.dll",
+      "size": 21786119,
+      "sha256": "db5f35c428aac460dbc25b57170e54ad4e32aaac772500437778d2b36a9ff019",
+      "private_path": "${PRIVATE_TEST_ROOT}/bins/TiberianDawn.dll"
+    },
+    {
+      "archive": "bins",
+      "member": "SDL2.dll",
+      "size": 1912320,
+      "sha256": "06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e",
+      "private_path": "${PRIVATE_TEST_ROOT}/bins/SDL2.dll"
+    },
+    {
+      "archive": "full",
+      "member": "OpenCNC3D-windows-v0.8.4/TiberianDawn.dll",
+      "size": 21786119,
+      "sha256": "f2354af233b08c768b9d44ad5ddb582bb772a227edb4294c14ac9563227eab98",
+      "private_path": "${PRIVATE_TEST_ROOT}/full/TiberianDawn.dll"
+    },
+    {
+      "archive": "full",
+      "member": "OpenCNC3D-windows-v0.8.4/SDL2.dll",
+      "size": 1912320,
+      "sha256": "06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e",
+      "private_path": "${PRIVATE_TEST_ROOT}/full/SDL2.dll"
+    }
+  ],
+  "cases": [
+    {
+      "name": "bins-TiberianDawn.dll",
+      "accepted": true,
+      "expected": true,
+      "metadata": {
+        "name": "TiberianDawn.dll",
+        "size": 21786119,
+        "sha256": "db5f35c428aac460dbc25b57170e54ad4e32aaac772500437778d2b36a9ff019",
+        "release_variant": "windows_bins"
+      },
+      "error": ""
+    },
+    {
+      "name": "bins-SDL2.dll",
+      "accepted": true,
+      "expected": true,
+      "metadata": {
+        "name": "SDL2.dll",
+        "size": 1912320,
+        "sha256": "06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e",
+        "release_variant": "windows_full_and_bins"
+      },
+      "error": ""
+    },
+    {
+      "name": "full-TiberianDawn.dll",
+      "accepted": true,
+      "expected": true,
+      "metadata": {
+        "name": "TiberianDawn.dll",
+        "size": 21786119,
+        "sha256": "f2354af233b08c768b9d44ad5ddb582bb772a227edb4294c14ac9563227eab98",
+        "release_variant": "windows_full"
+      },
+      "error": ""
+    },
+    {
+      "name": "full-SDL2.dll",
+      "accepted": true,
+      "expected": true,
+      "metadata": {
+        "name": "SDL2.dll",
+        "size": 1912320,
+        "sha256": "06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e",
+        "release_variant": "windows_full_and_bins"
+      },
+      "error": ""
+    },
+    {
+      "name": "truncated-wrong-size",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "TiberianDawn.dll is not listed in this diagnostic bundle's published v0.8.4 fingerprints. Observed size: 21786118; SHA256: 963eab724642132d8eef5b4de0aa234103e87d4510cf8ba55a8cb0db1aae8af2. Use the latest diagnostic ZIP, or include this fingerprint when reporting the error."
+    },
+    {
+      "name": "same-size-code-payload-tampered",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "TiberianDawn.dll is not listed in this diagnostic bundle's published v0.8.4 fingerprints. Observed size: 21786119; SHA256: 83122afb6da3460d6102ba59022fc8a28c20725301ee5c0f88480b639ecf3a15. Use the latest diagnostic ZIP, or include this fingerprint when reporting the error."
+    },
+    {
+      "name": "valid-PE32-third-unknown-hash",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "TiberianDawn.dll is not listed in this diagnostic bundle's published v0.8.4 fingerprints. Observed size: 21786119; SHA256: ba47028f8f305f401e82786177a43efed0a42269649e347321570d89ee0ac2f3. Use the latest diagnostic ZIP, or include this fingerprint when reporting the error."
+    },
+    {
+      "name": "wrong-machine",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "TiberianDawn.dll is not listed in this diagnostic bundle's published v0.8.4 fingerprints. Observed size: 21786119; SHA256: 8a79b0b8e15ce0562bdceea368130aee04bb2a176c8e3fc117ea53dfec79a8b4. Use the latest diagnostic ZIP, or include this fingerprint when reporting the error."
+    },
+    {
+      "name": "same-size-malformed-header",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "TiberianDawn.dll is not listed in this diagnostic bundle's published v0.8.4 fingerprints. Observed size: 21786119; SHA256: d0e2bed3af26c740a1326491157bd2d4f175e7b030df1cacfbc55a7140efea7c. Use the latest diagnostic ZIP, or include this fingerprint when reporting the error."
+    },
+    {
+      "name": "missing-library",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "Cannot find path '${PRIVATE_TEST_ROOT}/negative/missing/TiberianDawn.dll' because it does not exist."
+    },
+    {
+      "name": "legacy-flat-bins-positive",
+      "accepted": true,
+      "expected": true,
+      "metadata": {
+        "name": "TiberianDawn.dll",
+        "size": 21786119,
+        "sha256": "db5f35c428aac460dbc25b57170e54ad4e32aaac772500437778d2b36a9ff019",
+        "release_variant": "legacy_single_fingerprint"
+      },
+      "error": ""
+    },
+    {
+      "name": "legacy-flat-full-rejected",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "TiberianDawn.dll is not listed in this diagnostic bundle's published v0.8.4 fingerprints. Observed size: 21786119; SHA256: f2354af233b08c768b9d44ad5ddb582bb772a227edb4294c14ac9563227eab98. Use the latest diagnostic ZIP, or include this fingerprint when reporting the error."
+    },
+    {
+      "name": "zero-modern-variants-rejected",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "The diagnostic manifest has no library fingerprints for TiberianDawn.dll."
+    },
+    {
+      "name": "invalid-hash-rejected",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "The diagnostic manifest has an invalid library fingerprint for TiberianDawn.dll."
+    },
+    {
+      "name": "missing-size-rejected",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "The diagnostic manifest has an invalid library fingerprint for TiberianDawn.dll."
+    },
+    {
+      "name": "zero-size-rejected",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "The diagnostic manifest has an invalid library fingerprint for TiberianDawn.dll."
+    },
+    {
+      "name": "null-variants-rejected",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "The property 'Properties' cannot be found on this object. Verify that the property exists."
+    },
+    {
+      "name": "valid-match-then-invalid-variant-rejected",
+      "accepted": false,
+      "expected": false,
+      "metadata": null,
+      "error": "The diagnostic manifest has an invalid library fingerprint for TiberianDawn.dll."
+    }
+  ],
+  "launcher_negative_preflight": [
+    {
+      "name": "truncated-wrong-size",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "same-size-code-payload-tampered",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "valid-PE32-third-unknown-hash",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "wrong-machine",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "same-size-malformed-header",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "missing-library",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "legacy-flat-full-rejected",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "zero-modern-variants-rejected",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "invalid-hash-rejected",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "missing-size-rejected",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "zero-size-rejected",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "null-variants-rejected",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    },
+    {
+      "name": "valid-match-then-invalid-variant-rejected",
+      "rejected_before_copy_or_launch": true,
+      "correct_library_error_verified": true,
+      "original_install_unchanged": true,
+      "exit_code": 1
+    }
+  ],
+  "originals_unchanged": true,
+  "game_runs": 0,
+  "native_windows_execution": false,
+  "runtime": "existing official PowerShell7.4Macarm64; helper usesPowerShell5.1-compatible syntax",
+  "limitation": "Function behavior is executed; Windows UI/process/copy end-to-end still needs native Windows."
+}

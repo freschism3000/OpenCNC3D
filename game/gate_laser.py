@@ -225,8 +225,11 @@ def check(logs, d):
                      % (name, age, n, int((diff & ~near).sum()), e[0], e[1]))
             else:
                 # the core: white-hot pixels on the line; the glow and the bloom around it
-                # (the impact's flare is wider than the beam: a disc round the far end)
-                hot = diff & (a[:, :, 0] >= 250) & (a[:, :, 1] >= 150)
+                # (the impact's flare is wider than the beam: a disc round the far end).
+                # White-hot means the beam MADE the pixel so: one that was nearly white
+                # already (a pale marking on the target, which the beam's own red light
+                # takes to 255) is lit, not the beam's core.
+                hot = diff & (a[:, :, 0] >= 250) & (a[:, :, 1] >= 150) & (b.max(axis=2) < 200)
                 near |= corridor(diff.shape, e[1], e[1], 60)
                 need(int((hot & near).sum()) >= (200 if age < 3 else 20)
                      and int((hot & ~near).sum()) == 0,

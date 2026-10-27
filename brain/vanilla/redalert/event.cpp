@@ -12,6 +12,18 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Three changes in EventClass. The new POWER_SWITCH order toggles a building's
+// power when the ordering house owns it. The REPAIR arm requires the ordering
+// house to own the building, the test the SELL arm always had, so an order
+// that arrives off a wire cannot repair another player's building. A beacon's
+// thirty second kill time is a frame number rather than the Windows wall
+// clock, so every peer agrees on it and it expires on every platform.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/EVENT.CPP 1     3/03/97 10:24a Joe_bostic $ */
 /***********************************************************************************************
@@ -92,6 +104,7 @@ unsigned char EventClass::EventLength[EventClass::LAST_EVENT] = {
     0,                                         //	PROPOSE_DRAW
     0,                                         //	RETRACT_DRAW
 #endif
+    size_of(EventClass, Data.Target),          // POWER_SWITCH
 };
 
 const char* EventClass::EventNames[EventClass::LAST_EVENT] = {
@@ -103,6 +116,7 @@ const char* EventClass::EventNames[EventClass::LAST_EVENT] = {
 #ifdef FIXIT_VERSION_3 //	Stalemate games.
     "PROPOSE_DRAW", "RETRACT_DRAW",
 #endif
+    "POWER_SWITCH",
 };
 
 /***********************************************************************************************
@@ -523,10 +537,29 @@ void EventClass::Execute(void)
     */
     case REPAIR:
         techno = Data.Target.Whom.As_Techno();
-        if (techno && techno->IsActive) {
+        /*
+        **	OpenCNC3D: the ownership test the SELL arm below has always had and this one never
+        **	did. Harmless while only the owner's mouse could queue a REPAIR. It matters once
+        **	orders arrive off a wire, where a peer's bytes may name any house: without it one
+        **	player could repair, and so spend money on, another player's building.
+        */
+        if (techno && techno->IsActive && techno->House == Houses.Raw_Ptr(ID)) {
             techno->Repair(-1);
         }
         break;
+
+    /*
+    **	OpenCNC3D: switches a building's power off or back on. Ordered by the building's owner
+    **	from the sidebar's power button; refused for anybody else's building and, inside
+    **	Toggle_Power, for a building that is still being built, sold or is a wall.
+    */
+    case POWER_SWITCH: {
+        BuildingClass* building = Data.Target.Whom.As_Building();
+        if (building && building->IsActive && !building->IsInLimbo && building->House == Houses.Raw_Ptr(ID)) {
+            building->Toggle_Power();
+        }
+        break;
+    }
 
     /*
     **	Tells a building/unit to sell. This event is triggered by the player clicking the
@@ -566,16 +599,16 @@ void EventClass::Execute(void)
             /*
             **	Beacons have a 30-second kill time.
             */
+            /*
+            ** OpenCNC3D: the deadline is a FRAME NUMBER, not a wall clock. The original read
+            ** GetSystemTimeAsFileTime inside #ifdef _WIN32, so a beacon expired after 30 s of
+            ** wall time on Windows and never anywhere else. That is a real divergence between
+            ** peers, because Delete_This() removes an object from the shared Anims list.
+            ** `::Frame` is the engine's master clock; EventClass has its own member named
+            ** Frame (the frame the order was scheduled for), so the scope operator matters.
+            */
             if (Data.Anim.What == ANIM_BEACON) {
-#ifdef _WIN32
-                FILETIME ft;
-                GetSystemTimeAsFileTime(&ft);
-
-                unsigned long long kill_time =
-                    ((unsigned long long)ft.dwLowDateTime + ((unsigned long long)ft.dwHighDateTime << 32ULL))
-                    + 300000000ULL;
-                anim->Kill_At(kill_time);
-#endif
+                anim->Kill_At((unsigned long long)::Frame + (30ULL * TICKS_PER_SECOND));
             }
         }
         break;

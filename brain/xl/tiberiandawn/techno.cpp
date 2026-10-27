@@ -13,6 +13,10 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Filters hidden enemy combat targets and removes privileged hidden cargo/kill scoring from fair skirmish target evaluation.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\techno.cpv   2.13   02 Aug 1995 17:01:08   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -112,6 +116,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_td.h"
 
 /***************************************************************************
 **	Cloaking control values.
@@ -314,7 +319,7 @@ int TechnoTypeClass::Time_To_Build(HousesType house) const
     **	build time will range from double normal time at the slowest to
     **	just normal time at the fastest.
     */
-    if (!hptr->IsHuman && Rule.Diff[hptr->Difficulty].IsBuildSlowdown) {
+    if (GameToPlay == GAME_NORMAL && !hptr->IsHuman && Rule.Diff[hptr->Difficulty].IsBuildSlowdown) {
         time = (int)((time * Rule.MaxIQ * 2.0f) / (hptr->IQ + Rule.MaxIQ));
     }
 
@@ -1359,6 +1364,8 @@ bool TechnoClass::Evaluate_Object(ThreatType method, int mask, int range, Techno
     */
     if (object->IsInLimbo)
         return (false);
+    if (GameToPlay != GAME_NORMAL && !House->IsHuman && !TD_Fair_AI_Knows(House, object))
+        return false;
 
     /*
     **	Friendly units are never considered a good target. Bail if this
@@ -1479,8 +1486,9 @@ bool TechnoClass::Evaluate_Object(ThreatType method, int mask, int range, Techno
     **	target value then record this target for possible return as the
     **	best target available.
     */
-    int rawval = object->Value();
-    value = rawval + object->Kills;
+    bool fair_scan=GameToPlay != GAME_NORMAL && !House->IsHuman;
+    int rawval = fair_scan ? object->Risk()+tclass->Reward : object->Value();
+    value = rawval + (fair_scan ? 0 : object->Kills);
 
 #ifdef USE_RA_AI
     /*
@@ -1930,6 +1938,21 @@ void TechnoClass::Clicked_As_Target(HousesType house,
  *=============================================================================================*/
 void TechnoClass::AI(void)
 {
+    if (GameToPlay != GAME_NORMAL && !House->IsHuman) {
+        TechnoClass* enemy=As_Techno(TarCom);
+        if (enemy && !House->Is_Ally(enemy) && !TD_Fair_AI_Knows(House,enemy)) Assign_Target(TARGET_NONE);
+        TechnoClass* suspended=As_Techno(SuspendedTarCom);
+        if (suspended && !House->Is_Ally(suspended) && !TD_Fair_AI_Knows(House,suspended)) SuspendedTarCom=TARGET_NONE;
+        TechnoClass* archived=As_Techno(ArchiveTarget);
+        if (archived && !House->Is_Ally(archived) && !TD_Fair_AI_Knows(House,archived)) ArchiveTarget=TARGET_NONE;
+        if (What_Am_I()==RTTI_UNIT || What_Am_I()==RTTI_INFANTRY || What_Am_I()==RTTI_AIRCRAFT) {
+            FootClass* foot=(FootClass*)this;
+            TechnoClass* saved_destination=As_Techno(foot->SuspendedNavCom);
+            if (saved_destination && !House->Is_Ally(saved_destination) && !TD_Fair_AI_Knows(House,saved_destination)) foot->SuspendedNavCom=TARGET_NONE;
+            TechnoClass* destination=As_Techno(foot->NavCom);
+            if (destination && !House->Is_Ally(destination) && !TD_Fair_AI_Knows(House,destination)) foot->Assign_Destination(TARGET_NONE);
+        }
+    }
     CargoClass::AI();
     RadioClass::AI();
     DoorClass::AI();
@@ -2255,6 +2278,10 @@ void TechnoClass::Stun(void)
  *=============================================================================================*/
 void TechnoClass::Assign_Target(TARGET target)
 {
+    if (GameToPlay != GAME_NORMAL && !House->IsHuman) {
+        TechnoClass* enemy=As_Techno(target);
+        if (enemy && !House->Is_Ally(enemy) && !TD_Fair_AI_Knows(House,enemy)) target=TARGET_NONE;
+    }
     if (target == TarCom)
         return;
 
@@ -3865,7 +3892,8 @@ void TechnoClass::Base_Is_Attacked(TechnoClass const* enemy)
     /*
     ** Humans have to deal with their own base is attacked problems.
     */
-    if (!enemy || House->Is_Ally(enemy) || House->IsHuman) {
+    if (!enemy || House->Is_Ally(enemy) || House->IsHuman
+        || (GameToPlay != GAME_NORMAL && !TD_Fair_AI_Knows(House, enemy))) {
         return;
     }
 
@@ -4619,7 +4647,7 @@ int TechnoClass::Refund_Amount(void) const
     */
     cost += Fixed_To_Cardinal(UnitTypeClass::FULL_LOAD_CREDITS, Tiberium_Load()) / 2;
 
-    if (House->IsHuman) {
+    if (House->IsHuman || GameToPlay != GAME_NORMAL) {
         cost /= 2;
     }
     return (cost);

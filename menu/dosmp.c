@@ -1770,3 +1770,9 @@ int mp_check_layout(const DB_Pack *p, const MP_State *st)
     }
     return bad;
 }
+
+void mp_enh_select(MP_State *st, int row)
+{
+    if (!st || row < 0 || row >= st->rowcount) return;
+    mp_select(st, row); st->focus = -1;
+}

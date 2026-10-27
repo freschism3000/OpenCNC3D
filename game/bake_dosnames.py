@@ -129,12 +129,12 @@ def main():
         s = strs[idx]
         if comment and comment != s:
             disagree.append((ini, comment, s))
-        rows.append((ini, s, tname))
+        rows.append((ini, s, tname, idx))
 
     chrome = []
     for code, tname in CHROME:
         if tname in txt and txt[tname][0] < len(strs):
-            chrome.append((code, strs[txt[tname][0]], tname))
+            chrome.append((code, strs[txt[tname][0]], tname, txt[tname][0]))
         else:
             missing.append((code, tname, "chrome string absent"))
 
@@ -164,14 +164,16 @@ def main():
                 "   %d buildables, %d chrome labels, %d missing.\n"
                 "*/\n" % (lang, len(rows), len(chrome), len(missing)))
         f.write("#ifndef DOSNAMES_H\n#define DOSNAMES_H\n\n")
-        f.write("struct DosName { const char* asset; const char* title; };\n\n")
+        # (txt: the string's number in CONQUER.ENG, by which a language pack's own table
+        # gives the same name in its language: lang_txt in game/lang_mod.h)
+        f.write("struct DosName { const char* asset; const char* title; int txt; };\n\n")
         f.write("static const DosName DOSNAMES[] = {\n")
-        for ini, s, tname in rows:
-            f.write('    { "%s", "%s" },%s/* %s */\n'
-                    % (ini, s.replace('"', '\\"'), " " * max(1, 26 - len(ini) - len(s)), tname))
-        for code, s, tname in chrome:
-            f.write('    { "%s", "%s" },   /* %s, chrome */\n'
-                    % (code, s.replace('"', '\\"'), tname))
+        for ini, s, tname, idx in rows:
+            f.write('    { "%s", "%s", %d },%s/* %s */\n'
+                    % (ini, s.replace('"', '\\"'), idx, " " * max(1, 26 - len(ini) - len(s)), tname))
+        for code, s, tname, idx in chrome:
+            f.write('    { "%s", "%s", %d },   /* %s, chrome */\n'
+                    % (code, s.replace('"', '\\"'), idx, tname))
         f.write("};\n#define DOSNAMES_COUNT ((int)(sizeof(DOSNAMES)/sizeof(DOSNAMES[0])))\n\n")
         f.write("#endif\n")
     print("  wrote %s: %d buildables + %d chrome" % (os.path.relpath(OUT, REPO), len(rows), len(chrome)))

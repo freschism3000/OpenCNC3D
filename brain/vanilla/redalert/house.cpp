@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Uses fair multiplayer decisions, neutral country handicaps and live prerequisites; fixes placement coordinates.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -12,6 +13,20 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Four changes. Can_Build's legality test is split out as
+// Can_Build_With_Prerequisites, which takes the prerequisite set from its
+// caller; Can_Build passes the live one, so production is unchanged. The
+// building power switch reaches two house services: the radar needs a radar
+// dome that is switched on, and a nuclear missile, chronosphere or iron
+// curtain that is charging is suspended while every building supplying it is
+// switched off. And under the match's short game rule (OpenCNC3D_ShortGame, off
+// unless a match sets it) an armed building no longer keeps a house alive.
+// It DOES change the game simulation when a building is switched off.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /counterstrike/HOUSE.CPP 4     3/13/97 7:11p Steve_tall $ */
 /***********************************************************************************************
@@ -134,6 +149,8 @@
 #include "vortex.h"
 #include "rules.h"
 #include "utracker.h"
+#include "fair_ai_ra.h"
+#include "../../fair_ai.h"
 
 //#include "WolDebug.h"
 
@@ -277,6 +294,7 @@ void HouseClass::One_Time(void)
  *=============================================================================================*/
 DiffType HouseClass::Assign_Handicap(DiffType handicap)
 {
+    if (Session.Type != GAME_NORMAL) handicap = DIFF_NORMAL;
     DiffType old = Difficulty;
     Difficulty = handicap;
 
@@ -821,6 +839,18 @@ HouseStaticClass::HouseStaticClass(void)
  *=============================================================================================*/
 bool HouseClass::Can_Build(ObjectTypeClass const* type, HousesType house) const
 {
+    /*
+    **	The computer records prerequisite buildings because it can't relay on the
+    **	sidebar to keep track of this information.
+    */
+    return (Can_Build_With_Prerequisites(type, house, (Session.Type != GAME_NORMAL) ? FairAI_RA_Prerequisites(this) : (IsHuman ? ActiveBScan : OldBScan)));
+}
+
+/* OpenCNC3D: Can_Build's own test with the prerequisite set handed in, so a read-only query
+   can ask what a set of buildings the house does not own yet would allow. Can_Build passes
+   the live set, which is exactly the set the test below always used. */
+bool HouseClass::Can_Build_With_Prerequisites(ObjectTypeClass const* type, HousesType house, unsigned int prerequisites) const
+{
     assert(Houses.ID(this) == ID);
     assert(type != NULL);
 
@@ -876,17 +906,10 @@ bool HouseClass::Can_Build(ObjectTypeClass const* type, HousesType house) const
     }
 
     /*
-    **	Perform some equivalency fixups for the building existence flags.
+    **	Perform some equivalency fixups for the building existence flags. The set itself is
+    **	the caller's (Can_Build hands in ActiveBScan, or OldBScan for the computer).
     */
-    int flags = ActiveBScan;
-
-    /*
-    **	The computer records prerequisite buildings because it can't relay on the
-    **	sidebar to keep track of this information.
-    */
-    if (!IsHuman) {
-        flags = OldBScan;
-    }
+    int flags = (int)prerequisites;
 
     int pre = ((TechnoTypeClass const*)type)->Prerequisite;
 
@@ -1039,7 +1062,7 @@ void HouseClass::AI(void)
     **	see if the attack timer has expired. If it has, then create the attack
     **	teams.
     */
-    if (IsAlerted && AlertTime == 0) {
+    if (!FairAI_RA_Enabled(this) && IsAlerted && AlertTime == 0) {
 
         /*
         **	Adjusted to reduce maximum number of teams created.
@@ -1084,7 +1107,7 @@ void HouseClass::AI(void)
     **	Create teams for this house if necessary.
     ** (Use the same timer for some extra capture-the-flag logic.)
     */
-    if (!IsAlerted && !TeamTime) {
+    if (!FairAI_RA_Enabled(this) && !IsAlerted && !TeamTime) {
 
         TeamTypeClass const* ttype = Suggested_New_Team(false);
         if (ttype) {
@@ -1349,9 +1372,23 @@ void HouseClass::AI(void)
 #endif
 
         Map.Set_Jammed(this, jammed);
+        /*
+        **	OpenCNC3D: the building power switch. The radar wants a radar dome that is
+        **	switched on, so a house whose only domes are switched off loses its radar as
+        **	though it had none, and gets it back when one is switched on again.
+        */
+        unsigned int opencnc3d_radar_scan = ActiveBScan & ~(unsigned int)STRUCTF_RADAR;
+        for (int index = 0; index < Buildings.Count(); index++) {
+            BuildingClass const* dome = Buildings.Ptr(index);
+            if (dome != NULL && dome->IsActive && !dome->IsInLimbo && (HouseClass*)dome->House == this && *dome == STRUCT_RADAR
+                && !dome->IsPowerOff) {
+                opencnc3d_radar_scan |= STRUCTF_RADAR;
+                break;
+            }
+        }
         // Need to add in here where we activate it when only GPS is active.
         if (Map.Is_Radar_Active()) {
-            if (ActiveBScan & STRUCTF_RADAR) {
+            if (opencnc3d_radar_scan & STRUCTF_RADAR) {
                 if (Power_Fraction() < 1 && !IsGPSActive) {
                     Map.Radar_Activate(0);
                 }
@@ -1362,7 +1399,7 @@ void HouseClass::AI(void)
             }
 
         } else {
-            if (IsGPSActive || (ActiveBScan & STRUCTF_RADAR)) {
+            if (IsGPSActive || (opencnc3d_radar_scan & STRUCTF_RADAR)) {
                 if (Power_Fraction() >= 1 || IsGPSActive) {
                     Map.Radar_Activate(1);
                 }
@@ -1372,7 +1409,7 @@ void HouseClass::AI(void)
                 }
             }
         }
-        if (!IsGPSActive && !(ActiveBScan & STRUCTF_RADAR)) {
+        if (!IsGPSActive && !(opencnc3d_radar_scan & STRUCTF_RADAR)) {
             Radar = RADAR_NONE;
         } else {
             Radar = (Map.Is_Radar_Active() || Map.Is_Radar_Activating()) ? RADAR_ON : RADAR_OFF;
@@ -1380,6 +1417,8 @@ void HouseClass::AI(void)
     }
 
     VisibleCredits.AI(false, this, true);
+
+    FairAI_RA_Tick(this);
 
     /*
     **	Perform any expert system AI processing.
@@ -1455,6 +1494,42 @@ void HouseClass::AI(void)
  * HISTORY:                                                                                    *
  *   09/17/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
+/*
+**	OpenCNC3D: is every building that supplies this repeating super weapon switched off by its
+**	owner? Only the three that charge from a building of their own (the missile silo, the
+**	chronosphere, the iron curtain) are answered; a house without such a building is left to
+**	the 1996 rules, which remove the weapon anyway.
+*/
+static bool OpenCNC3D_Supplier_Switched_Off(HouseClass const* house, SpecialWeaponType special)
+{
+    StructType type = STRUCT_NONE;
+    switch (special) {
+    case SPC_NUCLEAR_BOMB:
+        type = STRUCT_MSLO;
+        break;
+    case SPC_CHRONOSPHERE:
+        type = STRUCT_CHRONOSPHERE;
+        break;
+    case SPC_IRON_CURTAIN:
+        type = STRUCT_IRON_CURTAIN;
+        break;
+    default:
+        return (false);
+    }
+    int standing = 0;
+    int off = 0;
+    for (int index = 0; index < Buildings.Count(); index++) {
+        BuildingClass const* bldg = Buildings.Ptr(index);
+        if (bldg != NULL && bldg->IsActive && !bldg->IsInLimbo && (HouseClass const*)bldg->House == house && *bldg == type) {
+            standing++;
+            if (bldg->IsPowerOff) {
+                off++;
+            }
+        }
+    }
+    return (standing > 0 && off >= standing);
+}
+
 void HouseClass::Super_Weapon_Handler(void)
 {
     /*
@@ -1482,7 +1557,7 @@ void HouseClass::Super_Weapon_Handler(void)
             **	is insufficient power available.
             */
             if (!super->Is_Ready() && super->Is_Powered() && !super->Is_One_Time()) {
-                super->Suspend(Power_Fraction() < 1);
+                super->Suspend(Power_Fraction() < 1 || OpenCNC3D_Supplier_Switched_Off(this, special));
             }
         }
     }
@@ -2722,6 +2797,7 @@ ProdFailType HouseClass::Abandon_Production(RTTIType type)
 void HouseClass::Special_Weapon_AI(SpecialWeaponType id)
 {
     assert(Houses.ID(this) == ID);
+    if (FairAI_RA_Enabled(this)) { FairAI_RA_Special(this, (int)id); return; }
 
     /*
     ** Loop through all of the building objects on the map
@@ -3463,6 +3539,13 @@ bool HouseClass::Does_Enemy_Building_Exist(StructType btype) const
 {
     assert(Houses.ID(this) == ID);
 
+    if (FairAI_RA_Enabled(this)) {
+        for (int i = 0; i < Buildings.Count(); ++i) {
+            BuildingClass* b = Buildings.Ptr(i);
+            if (b && *b == btype && !Is_Ally(b) && FairAI_RA_Observed(this, b)) return true;
+        }
+        return false;
+    }
     int bflag = 1L << btype;
     for (HousesType index = HOUSE_FIRST; index < HOUSE_COUNT; index++) {
         HouseClass* house = HouseClass::As_Pointer(index);
@@ -3820,7 +3903,7 @@ void HouseClass::MPlayer_Defeated(void)
     **	If this is a computer controlled house, then all computer controlled
     **	houses become paranoid.
     */
-    if (IQ == Rule.MaxIQ && !IsHuman && Rule.IsComputerParanoid) {
+    if (!FairAI_RA_Enabled(this) && IQ == Rule.MaxIQ && !IsHuman && Rule.IsComputerParanoid) {
         Computer_Paranoid();
     }
 
@@ -4715,7 +4798,7 @@ COORDINATE HouseClass::Find_Build_Location(BuildingClass* building) const
         ZoneType tryzone = _zones[(zz + start) % ARRAY_SIZE(_zones)];
         zcell = Find_Cell_In_Zone(building, tryzone);
         if (zcell)
-            return (zcell);
+            return (Cell_Coord(zcell));
     }
 
     return (0);
@@ -4874,6 +4957,7 @@ void HouseClass::Recalc_Center(void)
 int HouseClass::Expert_AI(void)
 {
     assert(Houses.ID(this) == ID);
+    if (FairAI_RA_Enabled(this)) return TICKS_PER_SECOND;
 
     BuildingClass* b = 0;
     bool stop = false;
@@ -5696,6 +5780,7 @@ int HouseClass::AI_Base_Defense(void)
 int HouseClass::AI_Building(void)
 {
     assert(Houses.ID(this) == ID);
+    if (FairAI_RA_Enabled(this)) return TICKS_PER_SECOND;
 
     if (BuildStructure != STRUCT_NONE)
         return (TICKS_PER_SECOND);
@@ -6062,6 +6147,7 @@ int HouseClass::AI_Building(void)
 int HouseClass::AI_Unit(void)
 {
     assert(Houses.ID(this) == ID);
+    if (FairAI_RA_Enabled(this)) return TICKS_PER_SECOND;
 
     if (BuildUnit != UNIT_NONE)
         return (TICKS_PER_SECOND);
@@ -6200,6 +6286,7 @@ int HouseClass::AI_Unit(void)
 int HouseClass::AI_Vessel(void)
 {
     assert(Houses.ID(this) == ID);
+    if (FairAI_RA_Enabled(this)) return TICKS_PER_SECOND;
     if (BuildVessel != VESSEL_NONE)
         return (TICKS_PER_SECOND);
 
@@ -6326,6 +6413,7 @@ int HouseClass::AI_Vessel(void)
 int HouseClass::AI_Infantry(void)
 {
     assert(Houses.ID(this) == ID);
+    if (FairAI_RA_Enabled(this)) return TICKS_PER_SECOND;
 
     if (BuildInfantry != INFANTRY_NONE)
         return (TICKS_PER_SECOND);
@@ -6533,6 +6621,7 @@ int HouseClass::AI_Infantry(void)
 int HouseClass::AI_Aircraft(void)
 {
     assert(Houses.ID(this) == ID);
+    if (FairAI_RA_Enabled(this)) return TICKS_PER_SECOND;
 
     if (!IsHuman && IQ >= Rule.IQAircraft) {
         if (BuildAircraft != AIRCRAFT_NONE)
@@ -7200,7 +7289,9 @@ TARGET HouseClass::Find_Juicy_Target(COORDINATE coord) const
     for (int index = 0; index < Units.Count(); index++) {
         UnitClass* unit = Units.Ptr(index);
 
-        if (unit && !unit->IsInLimbo && !Is_Ally(unit) && unit->House->Which_Zone(unit) == ZONE_NONE) {
+        if (unit && !unit->IsInLimbo && !Is_Ally(unit)
+            && (!FairAI_RA_Enabled(this) || FairAI_RA_Observed(this, unit))
+            && unit->House->Which_Zone(unit) == ZONE_NONE) {
             int val = Distance(coord, unit->Center_Coord());
 
             if (unit->Anti_Air())
@@ -7820,7 +7911,7 @@ void HouseClass::Computer_Paranoid(void)
         */
         for (HousesType house = HOUSE_MULTI1; house < HOUSE_COUNT; house++) {
             HouseClass* hptr = HouseClass::As_Pointer(house);
-            if (hptr != NULL && hptr->IsActive && !hptr->IsDefeated && !hptr->IsHuman) {
+            if (hptr != NULL && hptr->IsActive && !hptr->IsDefeated && !hptr->IsHuman && !FairAI_RA_Enabled(hptr)) {
                 hptr->IsParanoid = true;
 
                 /*
@@ -7959,7 +8050,8 @@ CELL HouseClass::Find_Cell_In_Zone(TechnoClass const* techno, ZoneType zone) con
     */
     for (CELL cell = 0; cell < MAP_CELL_TOTAL; cell++) {
         //		if (Map.In_Radar(cell)) {
-        if (Map.In_Radar(cell) && Which_Zone(cell) != ZONE_NONE) {
+        if (Map.In_Radar(cell) && Which_Zone(cell) != ZONE_NONE
+            && (!FairAI_RA_Enabled(this) || Map[cell].Is_Mapped((HouseClass*)this))) {
             bool ok = ttype->Legal_Placement(cell);
 
             /*
@@ -8157,7 +8249,13 @@ void HouseClass::Check_Pertinent_Structures(void)
         BuildingClass* b = Buildings.Ptr(index);
 
         if (b && b->IsActive && b->House == this) {
-            if (!b->Class->IsWall && *b != STRUCT_APMINE && *b != STRUCT_AVMINE) {
+            /*
+            **  OpenCNC3D SHORT GAME: an armed building is a defence, and a defence is not a
+            **  base. With the option on, only a building that could rebuild the house keeps
+            **  it in the match; walls and mines never counted either way.
+            */
+            if (!b->Class->IsWall && *b != STRUCT_APMINE && *b != STRUCT_AVMINE
+                && !(OpenCNC3D_ShortGame && b->Class->PrimaryWeapon != NULL)) {
                 if (!Special.ModernBalance
                     || (*b != STRUCT_SHIP_YARD && *b != STRUCT_FAKE_YARD && *b != STRUCT_SUB_PEN
                         && *b != STRUCT_FAKE_PEN)) {

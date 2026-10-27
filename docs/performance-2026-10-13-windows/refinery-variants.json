@@ -1,0 +1,531 @@
+{
+  "main": {
+    "format_version": 6,
+    "type": "PROC",
+    "bytes": 38122673,
+    "sha256": "7e3d7675ed41c5d82bd27f946d6482c159210b3b494e7cc8d9020b87b18e9ca0",
+    "texture_count": 19,
+    "emitter_count": 48,
+    "parameter_count": 19,
+    "params": [
+      366.5920104980469,
+      221.1840057373047,
+      194.55999755859375,
+      8.0,
+      0.0,
+      4.0,
+      30.0,
+      4.0,
+      18.0,
+      3.5,
+      5.0,
+      0.5,
+      0.02800000086426735,
+      0.05000000074505806,
+      0.25,
+      3.0,
+      3.0,
+      0.0,
+      0.0
+    ],
+    "sets": {
+      "INTACT": {
+        "pieces": 5,
+        "triangles": 3082
+      },
+      "CUT": {
+        "pieces": 44,
+        "triangles": 12111
+      },
+      "DESTROYED": {
+        "pieces": 94,
+        "triangles": 17798
+      }
+    },
+    "textures": [
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 0,
+        "compressed_bytes": 3934830
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 1,
+        "compressed_bytes": 182111
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 0,
+        "compressed_bytes": 458941
+      },
+      {
+        "width": 512,
+        "height": 512,
+        "house": 0,
+        "role": 9,
+        "compressed_bytes": 276580
+      },
+      {
+        "width": 512,
+        "height": 512,
+        "house": 0,
+        "role": 9,
+        "compressed_bytes": 195477
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 2,
+        "compressed_bytes": 4872032
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 0,
+        "role": 3,
+        "compressed_bytes": 45703
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 6,
+        "compressed_bytes": 15753546
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 4,
+        "compressed_bytes": 7398
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 5,
+        "compressed_bytes": 411
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 2,
+        "compressed_bytes": 502119
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 3,
+        "compressed_bytes": 4159
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 6,
+        "compressed_bytes": 1816271
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 14991
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 12476
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 15707
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 2,
+        "compressed_bytes": 4827270
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 2,
+        "compressed_bytes": 387034
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 7,
+        "compressed_bytes": 10505
+      }
+    ],
+    "parsed_body_end": 38105441
+  },
+  "installed_Dock": {
+    "format_version": 5,
+    "type": "PROC",
+    "bytes": 36382413,
+    "sha256": "cc25dcf03c818bcd71d6a56880337f06fe77ec15b83156918665c45200788abb",
+    "texture_count": 17,
+    "emitter_count": 48,
+    "parameter_count": 17,
+    "params": [
+      366.5920104980469,
+      221.1840057373047,
+      194.55999755859375,
+      8.0,
+      0.0,
+      4.0,
+      30.0,
+      4.0,
+      16.0,
+      3.5,
+      5.0,
+      0.5,
+      0.02800000086426735,
+      0.05000000074505806,
+      0.25,
+      3.0,
+      3.0
+    ],
+    "sets": {
+      "INTACT": {
+        "pieces": 5,
+        "triangles": 3082
+      },
+      "CUT": {
+        "pieces": 44,
+        "triangles": 12111
+      },
+      "DESTROYED": {
+        "pieces": 440,
+        "triangles": 41320
+      }
+    },
+    "textures": [
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 0,
+        "compressed_bytes": 3934830
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 1,
+        "compressed_bytes": 182111
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 0,
+        "compressed_bytes": 458941
+      },
+      {
+        "width": 512,
+        "height": 512,
+        "house": 0,
+        "role": 9,
+        "compressed_bytes": 276580
+      },
+      {
+        "width": 512,
+        "height": 512,
+        "house": 0,
+        "role": 9,
+        "compressed_bytes": 195477
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 2,
+        "compressed_bytes": 4872032
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 0,
+        "role": 3,
+        "compressed_bytes": 45703
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 6,
+        "compressed_bytes": 15753546
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 4,
+        "compressed_bytes": 7398
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 5,
+        "compressed_bytes": 411
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 2,
+        "compressed_bytes": 502119
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 3,
+        "compressed_bytes": 4159
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 6,
+        "compressed_bytes": 1816271
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 14991
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 12476
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 15707
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 7,
+        "compressed_bytes": 10505
+      }
+    ],
+    "parsed_body_end": 36365953
+  },
+  "released_Windows_full_archive": {
+    "format_version": 6,
+    "type": "PROC",
+    "bytes": 38122673,
+    "sha256": "7e3d7675ed41c5d82bd27f946d6482c159210b3b494e7cc8d9020b87b18e9ca0",
+    "texture_count": 19,
+    "emitter_count": 48,
+    "parameter_count": 19,
+    "params": [
+      366.5920104980469,
+      221.1840057373047,
+      194.55999755859375,
+      8.0,
+      0.0,
+      4.0,
+      30.0,
+      4.0,
+      18.0,
+      3.5,
+      5.0,
+      0.5,
+      0.02800000086426735,
+      0.05000000074505806,
+      0.25,
+      3.0,
+      3.0,
+      0.0,
+      0.0
+    ],
+    "sets": {
+      "INTACT": {
+        "pieces": 5,
+        "triangles": 3082
+      },
+      "CUT": {
+        "pieces": 44,
+        "triangles": 12111
+      },
+      "DESTROYED": {
+        "pieces": 94,
+        "triangles": 17798
+      }
+    },
+    "textures": [
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 0,
+        "compressed_bytes": 3934830
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 1,
+        "compressed_bytes": 182111
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 0,
+        "compressed_bytes": 458941
+      },
+      {
+        "width": 512,
+        "height": 512,
+        "house": 0,
+        "role": 9,
+        "compressed_bytes": 276580
+      },
+      {
+        "width": 512,
+        "height": 512,
+        "house": 0,
+        "role": 9,
+        "compressed_bytes": 195477
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 2,
+        "compressed_bytes": 4872032
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 0,
+        "role": 3,
+        "compressed_bytes": 45703
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 6,
+        "compressed_bytes": 15753546
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 4,
+        "compressed_bytes": 7398
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 5,
+        "compressed_bytes": 411
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 2,
+        "compressed_bytes": 502119
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 3,
+        "compressed_bytes": 4159
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 6,
+        "compressed_bytes": 1816271
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 14991
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 12476
+      },
+      {
+        "width": 64,
+        "height": 128,
+        "house": 0,
+        "role": 8,
+        "compressed_bytes": 15707
+      },
+      {
+        "width": 2048,
+        "height": 2048,
+        "house": 3,
+        "role": 2,
+        "compressed_bytes": 4827270
+      },
+      {
+        "width": 1024,
+        "height": 1024,
+        "house": 0,
+        "role": 2,
+        "compressed_bytes": 387034
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "house": 0,
+        "role": 7,
+        "compressed_bytes": 10505
+      }
+    ],
+    "parsed_body_end": 38105441
+  },
+  "release_archive_path": "/private/tmp/opencnc3d-release-v084-20261013/artifacts/OpenCNC3D-windows-v0.8.4.zip",
+  "release_member": "OpenCNC3D-windows-v0.8.4/ebld/PROC.ebld",
+  "tracked_manifest_matches_released_asset": true,
+  "installed_asset_matches_released_asset": false,
+  "inference_limit": "Windows tester installed asset not observed; full archive asset is not proof of bins-only installation contents."
+}

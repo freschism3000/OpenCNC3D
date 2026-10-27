@@ -1,0 +1,114 @@
+{
+  "gdi": {
+    "source": "website/public/models/gdi.fbx",
+    "sha256": "3bc737bb2a56e6b14f9d9ab703ddff3df38c2136837fb9660aefecf0552c8c62",
+    "mesh": "BRF_LOGO_GDI",
+    "triangles": 908,
+    "originalBounds": [
+      [
+        -247.0,
+        -253.0,
+        -21.0
+      ],
+      [
+        246.0,
+        232.0,
+        15.0
+      ]
+    ],
+    "center": [
+      -0.5,
+      -10.5,
+      -3.0
+    ],
+    "scale": 246.5,
+    "transform": "positions=(source-center)/scale; source triangles, corner normals, UVs and material indices unchanged",
+    "purpose": "unchanged website emblem displayed as a decorative UI marker; no player recolouring",
+    "palette": "orange GDI / red Nod as explicitly requested",
+    "spinRadiansPerSecond": 0.2,
+    "texturePairs": [
+      {
+        "albedo": "BRF_LOGO_GDI_tex0_01E14E0.png",
+        "albedoSha256": "3c8e04fcfab97de7b8b28f501f94c57f931997061d09509dd83b73fc85dd8e8e",
+        "playerMask": "BRF_LOGO_GDI_tex0_01E14E0_player-mask.png",
+        "maskIntent": "all-black decorative emblem; no player recolouring",
+        "dimensions": [
+          32,
+          32
+        ]
+      },
+      {
+        "albedo": "BRF_LOGO_GDI_tex1_01E48E0.png",
+        "albedoSha256": "26053db70b1d59a6a8bcc7d68638847e8e06390f9cc69af04688903f89a11d51",
+        "playerMask": "BRF_LOGO_GDI_tex1_01E48E0_player-mask.png",
+        "maskIntent": "all-black decorative emblem; no player recolouring",
+        "dimensions": [
+          32,
+          32
+        ]
+      }
+    ],
+    "displayPalette": "embedded source textures; GDI gold warmed to requested orange at render, silver/black preserved"
+  },
+  "nod": {
+    "source": "website/public/models/nod.fbx",
+    "sha256": "3c58a395c0f26d7f65ceb90a9ce87b1aaf5f9a96713d9480e61d6cfe0e471ca5",
+    "mesh": "BRF_LOGO_NOD",
+    "triangles": 717,
+    "originalBounds": [
+      [
+        -257.0,
+        -231.0,
+        -20.0
+      ],
+      [
+        258.0,
+        242.0,
+        26.0
+      ]
+    ],
+    "center": [
+      0.5,
+      5.5,
+      3.0
+    ],
+    "scale": 257.5,
+    "transform": "positions=(source-center)/scale; source triangles, corner normals, UVs and material indices unchanged",
+    "purpose": "unchanged website emblem displayed as a decorative UI marker; no player recolouring",
+    "palette": "orange GDI / red Nod as explicitly requested",
+    "spinRadiansPerSecond": 0.2,
+    "texturePairs": [
+      {
+        "albedo": "BRF_LOGO_NOD_tex0_01E24E0.png",
+        "albedoSha256": "176f882e30adbf22d94f2920a7591156505f7c5cd57c5be445498ff28c2b59c5",
+        "playerMask": "BRF_LOGO_NOD_tex0_01E24E0_player-mask.png",
+        "maskIntent": "all-black decorative emblem; no player recolouring",
+        "dimensions": [
+          32,
+          32
+        ]
+      },
+      {
+        "albedo": "BRF_LOGO_NOD_tex1_01E2CE0.png",
+        "albedoSha256": "998d143bedae5433c42d027889ff6816b4674a1ee1168ed0f55406a38ee643e7",
+        "playerMask": "BRF_LOGO_NOD_tex1_01E2CE0_player-mask.png",
+        "maskIntent": "all-black decorative emblem; no player recolouring",
+        "dimensions": [
+          32,
+          32
+        ]
+      },
+      {
+        "albedo": "BRF_LOGO_NOD_tex2_01E34E0.png",
+        "albedoSha256": "d855bbf250ff9cda128088e55ec079d84f0338d8a8546ccfe2d7e8d98fcdb32d",
+        "playerMask": "BRF_LOGO_NOD_tex2_01E34E0_player-mask.png",
+        "maskIntent": "all-black decorative emblem; no player recolouring",
+        "dimensions": [
+          32,
+          32
+        ]
+      }
+    ],
+    "displayPalette": "embedded source textures; GDI gold warmed to requested orange at render, silver/black preserved"
+  }
+}

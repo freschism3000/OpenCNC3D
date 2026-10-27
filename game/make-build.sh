@@ -18,6 +18,7 @@ cd "$(dirname "$0")"
 # correct everywhere else. An explicit first argument still wins, which is what
 # tools/release.sh and any deliberate out-of-tree build rely on.
 REPO="$(cd .. && pwd)"
+python3 "$REPO/tools/bakery/materialize-grassmask.py"
 DEST="${1:-$REPO/playable}"
 LOCAL_DATA="${OPENCNC3D_DATA:-$REPO/data/dist-v0.3.1}"
 GITDESC=$(git describe --always --dirty 2>/dev/null || echo untracked)
@@ -25,6 +26,15 @@ GITDESC=$(git describe --always --dirty 2>/dev/null || echo untracked)
 # moment it builds, VERSION has been bumped and not yet committed, so git describe would
 # name the artefact "-dirty" for what is about to become a clean release.
 [ -n "$OPENCNC3D_BUILD_ID" ] && GITDESC="$OPENCNC3D_BUILD_ID"
+
+# Freeze the clean source identity before any baker writes derived outputs.
+# The large grass-mask raw/provenance files are ignored, hash-verified derivatives
+# of the committed compressed source, so materialization keeps this identity clean.
+# Both renderer and merged app must compile this same pre-bake identity.
+if [ -z "$OPENCNC3D_SKIP_VERSION_HEADER" ]; then
+    sh "$REPO/tools/version.sh" --header "$REPO/game/opencnc3d_build.h"
+    export OPENCNC3D_SKIP_VERSION_HEADER=1
+fi
 
 # GENERATE BEFORE YOU COMPILE. bake_pack.py writes game/hud640_layout.h, and hud640.h
 # takes every coordinate from it, so it is a compile INPUT. It used to run after the three
@@ -39,12 +49,18 @@ GITDESC=$(git describe --always --dirty 2>/dev/null || echo untracked)
 python3 ../tools/sidebar_redesign/bake_pack.py >/dev/null || {
     echo "make-build.sh: bake_pack.py failed; hud640_layout.h would be stale" >&2; exit 1; }
 
+python3 ../menu/bake_enhanced_menu.py ../art/interface/enhanced-menu-v06 ../menu/enhanced-menu.pack
+
 ./build.sh
 (cd ../app && ./build.sh)          # the merged program: menu, movies, mission, sound
 (cd ../launcher && ./build.sh) # the front door: version, changelog, update, Play
 mkdir -p "$DEST"
 cp cnc_eyes "$DEST/"
 cp ../app/opencnc3d "$DEST/"
+# Preserve an existing legacy C&C3D.app Dock launcher, whose entry point retains the old name.
+if [ -x "$DEST/C&C3D.app/Contents/MacOS/cnc3d-launch" ]; then
+    cp ../app/opencnc3d "$DEST/cnc3d"
+fi
 # Refresh an already staged RA module with this same renderer and its own building art.
 #
 # OPENCNC3D_NO_RA=1 MAKES A BUILD WITH NO RED ALERT IN IT, which is what the public
@@ -58,8 +74,17 @@ if [ "$OPENCNC3D_NO_RA" = "1" ]; then
     [ ! -d "$DEST/ra3d" ] || echo "   the ra3d/ already there is from an earlier build: not refreshed, not packaged"
 elif [ -d "$DEST/ra3d" ]; then
     cp ../app/opencnc3d "$DEST/ra3d/opencnc3d"
+    if [ -x "$DEST/C&C3D.app/Contents/MacOS/cnc3d-launch" ]; then
+        cp ../app/opencnc3d "$DEST/ra3d/cnc3d"
+    fi
     cp "$REPO/brain/vanilla/build-native/redalert/RedAlert.dylib" "$DEST/ra3d/RedAlert.dylib"
     python3 "$REPO/tools/ra3d/stage-structures.py" "$DEST/ra3d"
+    # The 24 multiplayer maps and the list with a picture of each that a skirmish screen
+    # reads, refreshed here as well because a module staged before they existed has none.
+    python3 "$REPO/tools/ra3d/ramix.py" extract "$REPO/data/radata/GENERAL.MIX" "$DEST/ra3d/missions" \
+        $(for n in $(seq -w 1 24); do printf 'SCM%sEA.INI ' "$n"; done) >/dev/null
+    python3 "$REPO/tools/ra3d/bake-ra-map-previews.py" "$DEST/ra3d" >/dev/null \
+        || { echo "FATAL: Red Alert's map previews did not bake" >&2; exit 1; }
 fi
 cp ../art/generated/temperate_grass/v3_color_matched/grass_rgb.bin \
    "$DEST/temperate_grass_rgb.bin"
@@ -71,6 +96,7 @@ rm -f "$DEST"/terrain30_*.pack
 for th in TEMPERAT DESERT WINTER SNOW; do
     cp "../art/remaster/textures/$th/terrainenh_$th.pack" "$DEST/"
     cp "../art/remaster/textures/$th/terrainseam_$th.pack" "$DEST/"
+    if [ -f "terrainsurface_$th.pack" ]; then cp "terrainsurface_$th.pack" "$DEST/"; fi
 done
 cp ../art/generated/temperate_cliffs/approved_style_v1/cliffs_rgb_color_matched.pack \
    "$DEST/temperate_cliffs_rgb.pack"
@@ -166,6 +192,16 @@ if [ "$MENU_BAKE" = 1 ]; then
     python3 ../menu/bake_dosmenu.py || { echo "FATAL: the menu pack did not bake" >&2; exit 1; }
 fi
 cp ../menu/dosmenu.pack "$DEST/"
+cp ../menu/enhanced-menu.pack "$DEST/"
+# RED ALERT'S OWN ENHANCED KIT, baked from the 1996 data into its module (the Red Alert
+# process opens ra3d/enhanced-menu.pack from the install root, never Tiberian Dawn's pack).
+# Windows takes it with every other ra3d/*.pack (tools/ra3d/stage-runtime.py).
+if [ -d "$DEST/ra3d" ] && [ "$OPENCNC3D_NO_RA" != "1" ]; then
+    python3 ../menu/bake_ra_enhanced_menu.py "$DEST/ra3d/enhanced-menu.pack" >/dev/null \
+        || { echo "FATAL: Red Alert's Enhanced menu pack did not bake" >&2; exit 1; }
+    rm -f "$DEST/ra3d/enhanced-menu.json"
+    cp ra-enhanced-hud.pack "$DEST/ra3d/enhanced-hud.pack"
+fi
 
 # WHAT LOCAL_DATA IS, AND WHY ALMOST NOTHING COMES FROM IT.
 #
@@ -231,6 +267,12 @@ python3 bake_logos.py >/dev/null || {
 # rather than making a fresh clone remember.
 python3 bake_tib3d.py >/dev/null || {
     echo "make-build.sh: bake_tib3d.py failed; the Enhanced crystals would be absent" >&2; exit 1; }
+# AND THE CARTRIDGE INFANTRY'S FIRING, PRONE AND CRAWLING STRIPS, the same way and for
+# the same reason: game/bake_n64infantry.py reads them out of data/rom in well under a
+# second. Without n64infantry.pack, soldiers drawn in the cartridge art stand still
+# while they fight, with no muzzle flash, and one line on stderr is all that says so.
+python3 bake_n64infantry.py >/dev/null || {
+    echo "make-build.sh: bake_n64infantry.py failed; the cartridge infantry would not show firing" >&2; exit 1; }
 
 # AND THE SKY, on the same reasoning and with one extra wrinkle. bake_sky.py turns the
 # committed cross photograph under data/sky into the cube map and the nine harmonics that
@@ -251,14 +293,8 @@ python3 bake_sky.py "$REPO/data/sky/sky_cross.webp" -o sky.pack >/dev/null || {
     echo "  It needs numpy and Pillow: python3 -m pip install numpy pillow" >&2; exit 1; }
 [ -s sky.pack ] || { echo "make-build.sh: sky.pack came out empty" >&2; exit 1; }
 
-# THE TREES ARE A COMMITTED ASSET, NOT A BAKE. bake_tree3d.py rebuilds tree3d.pack from
-# a Poly Haven glTF, and that glTF is a sixty-megabyte download per species which has no
-# business in this repository. The pack it produces is one megabyte, so the PACK is what
-# is committed, under data/trees, and a build copies it. Regenerating it is a deliberate
-# step with the model to hand, not something every build pays for.
-if [ -f "$REPO/data/trees/tree3d.pack" ]; then
-    cp "$REPO/data/trees/tree3d.pack" tree3d.pack
-fi
+# Imported trees are retired. Never re-stage a leftover legacy asset.
+rm -f tree3d.pack ../playable/tree3d.pack ../playable/ra3d/tree3d.pack
 
 # THE REMASTERED TIBERIUM travels the same way. tools/art/remaster/resources/run_TIB.sh
 # builds and paints it in headless Blender and bake_candidate.py packs it, which is no step
@@ -300,7 +336,8 @@ fi
 # the same script, so both platforms carry the same stones. ROCK_STONES=unity in the
 # environment builds one folder with the old stones, for a comparison.
 ROCK_STONES_DEFAULT=painted
-sh "$REPO/tools/art/rocks/stones.sh" . "${ROCK_STONES:-$ROCK_STONES_DEFAULT}"
+sh "$REPO/tools/art/rocks/stones.sh" "$DEST" "${ROCK_STONES:-$ROCK_STONES_DEFAULT}"
+python3 "$REPO/tools/art/terrain/stage_desert_details.py" "$DEST"
 
 # THE AUTHORED VEHICLE MODELS travel for the same reason the trees do, and are committed
 # for the same reason: tools/art/blender_c3m.py rebuilds a .c3m out of a Blender file
@@ -336,7 +373,7 @@ fi
 if [ -d "$REPO/game/ebld" ]; then
     rm -rf "$DEST/ebld"
     mkdir -p "$DEST/ebld"
-    for m in "$REPO"/game/ebld/*.ebld; do
+    for m in "$REPO"/game/ebld/*.ebld "$REPO"/game/ebld/*.ebld.fclv "$REPO"/game/ebld/*.spec; do
         [ -f "$m" ] && cp "$m" "$DEST/ebld/"
     done
 fi
@@ -360,7 +397,7 @@ fi
 if [ -d "$REPO/game/evhc" ]; then
     rm -rf "$DEST/evhc"
     mkdir -p "$DEST/evhc"
-    for m in "$REPO"/game/evhc/*.evhc; do
+    for m in "$REPO"/game/evhc/*.evhc "$REPO"/game/evhc/*.spec; do
         [ -f "$m" ] && cp "$m" "$DEST/evhc/"
     done
 fi
@@ -467,6 +504,16 @@ python3 "$REPO/tools/art/remaster/bib/bake_bibenh.py" --pack "$DEST/bibenh.pack"
     echo "  and say nothing about it. It needs numpy, scipy and Pillow." >&2; exit 1; }
 [ -s "$DEST/bibenh.pack" ] || { echo "make-build.sh: bibenh.pack came out empty" >&2; exit 1; }
 
+# THE REMASTERED CRATERS AND SCORCH MARKS (Enhanced): decalenh.pack, baked every build from
+# the committed finals in art/remaster/decals/final by
+# tools/art/remaster/decals/build-runtime.py. Every authored layer must be present and the
+# complete pack verified before atomic publication. Without it Enhanced quietly draws
+# the cartridge's. Windows copies it with every other pack.
+python3 "$REPO/tools/art/remaster/decals/build-runtime.py" --pack "$DEST/decalenh.pack" >/dev/null || {
+    echo "make-build.sh: approved decal build failed; Enhanced would draw the cartridge's craters" >&2
+    echo "  and scorch marks and say nothing about it. It needs numpy and Pillow." >&2; exit 1; }
+[ -s "$DEST/decalenh.pack" ] || { echo "make-build.sh: decalenh.pack came out empty" >&2; exit 1; }
+
 rsync -a missions "$DEST/" 2>/dev/null || true
 
 # THE BRAIN TRAVELS WITH THE BUILD TOO, and it did not.
@@ -571,9 +618,17 @@ done
 # another worktree, the copies here stayed whatever an older build left, and after the move
 # to universal binaries that meant Intel-only helpers beside a universal game. Not asserted
 # one by one: the architecture check below refuses any Mach-O here that is missing a slice.
-for b in gate_tunnel gate_beacon gate_lobby gate_roomcode gate_mpbrowse cnc_twobrain; do
+for b in gate_tunnel gate_beacon gate_lobby gate_roomcode gate_mpbrowse gate_enhanced_menu cnc_twobrain; do
   [ -x "$b" ] && cp "$b" "$DEST/" && g=$((g+1))
 done
+# TWO OF THOSE LINK SDL (gate_enhanced_menu, gate_mpbrowse), and they arrive AFTER the
+# folder's SDL was fixed above. game/build.sh fixes them as it links them, but the copy in
+# game/ is whatever the last build there left: one that stopped partway, or one still
+# compiling in the same checkout, leaves them loading SDL through an @rpath nothing
+# resolves, and the check at the end of this script then refuses the whole folder. So the
+# folder is fixed once more here. It is idempotent: a binary already pointing at
+# @executable_path is left alone.
+sh ../tools/bundle-sdl.sh "$DEST"
 # fx_state.h is a SOURCE HEADER in a folder that otherwise holds a build, and it is here
 # for the same reason gate_optlayout is: a gate reads it, and a gate input that is quietly
 # absent is worse than one that is loudly wrong. G259 is a static read of the dial table
@@ -769,6 +824,7 @@ check_asset CONQUER.MIX        "the playable archive with original DOS sprites m
 check_asset dossidebar.pack    "game/bake_dossidebar.py   (the game REFUSES to draw a sidebar without it)"
 check_asset cameos.pack        "game/bake_cameos.py"
 check_asset dosinfantry.pack   "game/bake_dosinfantry.py"
+check_asset n64infantry.pack   "game/bake_n64infantry.py   (the cartridge infantry's firing, prone and crawling frames)"
 check_asset dosmake.pack       "game/bake_dosmake.py"
 check_asset campaign.pack      "game/bake_campaign.py"
 check_asset efx.pack           "game/bake_efx.py"
@@ -778,7 +834,6 @@ check_asset verdict.pack       "game/bake_verdict.py"
 check_asset dostib.pack        "game/bake_dostiberium.py"
 check_asset tib3d.pack         "game/bake_tib3d.py       (Enhanced solid crystals; without it the flat overlay draws alone)"
 check_asset tib3d_rings.pack   "data/tiberium/tib3d_rings.pack, copied above (the remastered Tiberium, Enhanced; without it the old tib3d.pack draws)"
-check_asset tree3d.pack        "data/trees/tree3d.pack   (Enhanced leafy trees; without it the cartridge tree model draws)"
 check_asset foliage3d.pack     "data/foliage/foliage3d.pack   (experimental art bushes and grass clumps; without it none are scattered)"
 check_asset rock3d.pack        "data/rocks/rock3d.pack   (the rocks at the foot of rock faces on a theater without a painted pack; without it none are laid there)"
 check_asset ebld               "game/ebld/*.ebld, copied above; tools/art/remaster/bake_ebld.py writes them (the Enhanced Power Plant; without it Enhanced draws the fixed building and the old shatter)"
@@ -788,6 +843,7 @@ check_asset einf               "game/einf/*.c3m, copied above; tools/art/remaste
 check_asset ecur/ecur.bin      "game/ecur/ecur.bin, copied above; tools/art/remaster/cursors/bake_ecur.py writes it (the remastered cursors; without it Enhanced draws the cartridge's)"
 check_asset smudge.pack        "game/bake_smudges.py"
 check_asset bibenh.pack        "tools/art/remaster/bib/bake_bibenh.py   (Enhanced remastered building aprons; without it Enhanced draws the cartridge's)"
+check_asset decalenh.pack      "tools/art/remaster/decals/bake_decalenh.py   (Enhanced remastered craters and scorch marks; without it Enhanced draws the cartridge's)"
 check_asset logos.pack         "game/bake_logos.py       (the score screen's spinning faction logo)"
 check_asset hud640.pack        "tools/sidebar_redesign/bake_pack.py"
 check_asset cameos95.pack      "tools/sidebar_redesign/cameos95.py"
@@ -849,3 +905,23 @@ echo "skirmish: $skpairs map(s) with an INI and a pack"
 
 echo "build $GITDESC -> $DEST"
 echo "$GITDESC  $(date '+%Y-%m-%d %H:%M')" >> "$DEST/BUILD-HISTORY.txt"
+
+# Shared sun-driven terrain detail packs use the same key contract in TD and RA.
+for surface in terrainsurface_*.pack *_SAND.pack; do
+    [ -f "$surface" ] && cp "$surface" "$DEST/"
+done
+# The RA module consumes Snow's accepted clear material and its native-outline
+# coverage from the install root. Fresh clean builds must stage both; an older
+# Dock folder containing them must not be an implicit dependency.
+for surface in clearblend_RA_SNOW.pack groundmask_RA_SNOW.pack; do
+    [ -s "$surface" ] || { echo "missing current-source RA ground pack: $surface" >&2; exit 1; }
+    cp "$surface" "$DEST/"
+done
+
+# Final material data follows every albedo, physical surface and scatter replacement.
+python3 "$REPO/tools/art/terrain/stage_desert_details.py" "$DEST"
+python3 "$REPO/tools/art/rocks/stage_stone_materials.py" "$DEST"
+
+# A byte-identical restored Dock stub still cannot launch if its execute bits
+# were lost. Check the actual bundle entry points after every staging operation.
+python3 "$REPO/tools/mac/gate-dock-launchers.py" "$DEST" --repair >/dev/null

@@ -290,11 +290,17 @@ static void n64fix_load(const char* dir)
             names.empty() ? "" : ": ", names.c_str());
 }
 
-static GLuint n64fix_upload(std::vector<unsigned char> px, int w, int h)
+static GLuint n64fix_upload(const std::vector<unsigned char>& px, int w, int h, bool bled = false)
 {
     /* The same bleed and the same texture state load_pack gives every pack texture, so
        the bilinear switch and the alpha test treat these exactly as they treat those. */
-    fx_bleed_rgba(&px[0], w, h, 4);
+    std::vector<unsigned char> prepared;
+    const unsigned char* pixels = px.data();
+    if (!bled) {
+        prepared = px;
+        fx_bleed_rgba(prepared.data(), w, h, 4);
+        pixels = prepared.data();
+    }
     GLuint id = 0;
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
@@ -303,7 +309,7 @@ static GLuint n64fix_upload(std::vector<unsigned char> px, int w, int h)
     fx_filter_note(id, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, &px[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     return id;
 }
 
@@ -341,7 +347,7 @@ static void n64fix_attach(void)
             pt.w = pt.uw = ft.w;
             pt.h = pt.uh = ft.h;
             pt.gl_gdi = 0;
-            for (int e = 0; e < 6; e++) pt.gl_extra[e] = 0;
+            for (int e = 0; e < 7; e++) pt.gl_extra[e] = 0;
             pt.gl = n64fix_upload(ft.base, ft.w, ft.h);
             if (!ft.gdi.empty()) {
                 pt.gl_gdi = n64fix_upload(ft.gdi, ft.w, ft.h);

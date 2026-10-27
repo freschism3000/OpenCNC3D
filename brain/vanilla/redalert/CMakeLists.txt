@@ -1,3 +1,4 @@
+# MODIFIED for OpenCNC3D. Builds the fair skirmish controller into the Red Alert library.
 #
 # MODIFIED for OpenCNC3D. This is not EA's original file.
 # Adds the non-Windows compiler flags and Win32 editor-interface selection needed
@@ -54,6 +55,7 @@ set(REDALERT_SRC
     face.cpp
     facing.cpp
     factory.cpp
+    fair_ai_ra.cpp
     findpath.cpp
     flasher.cpp
     fly.cpp

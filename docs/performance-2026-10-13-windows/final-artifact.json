@@ -1,0 +1,92 @@
+{
+  "archive": "build/diagnostics/OpenCNC3D-Windows-Performance-Diagnostic-v0.8.4-60b0bb5.zip",
+  "size": 28728155,
+  "sha256": "4eae8b219d71a43a2cd681ac036746445a947f2dbb9cc5b1d48a255a849a69ab",
+  "source_commit": "60b0bb5497d45b73f50131f9b1e374aba1af238a",
+  "member_count": 6,
+  "members": [
+    "README.txt",
+    "Run-Windows-Diagnostic.cmd",
+    "Run-Windows-Diagnostic.ps1",
+    "binaries/cnc_eyes.exe",
+    "binaries/opencnc3d-game.exe",
+    "diagnostic-manifest.json"
+  ],
+  "CRC": "pass",
+  "binary_checks": {
+    "cnc_eyes.exe": {
+      "size": 39019673,
+      "sha256": "4f7f29ef093c1714c955c74fef643693d39f28d96635f8bbe7a8c8723f9bb193",
+      "PE32_i386": true,
+      "LAA": true,
+      "marks": [
+        "OPENCNC3D|build|v0.8.4+60b0bb5-dirty|cooked"
+      ],
+      "imports": [
+        "ADVAPI32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "OPENGL32.DLL",
+        "SHELL32.dll",
+        "WININET.DLL",
+        "WS2_32.dll",
+        "SDL2.dll"
+      ],
+      "imports_match_verified_v084": true,
+      "unexpected_dynamic_toolchain_dependencies": false
+    },
+    "opencnc3d-game.exe": {
+      "size": 40375042,
+      "sha256": "e41f7bf9177142e4d1391442dac3cbec88a50712214747dd37f852d72dd45b11",
+      "PE32_i386": true,
+      "LAA": true,
+      "marks": [
+        "OPENCNC3D|build|v0.8.4+60b0bb5-dirty|cooked"
+      ],
+      "imports": [
+        "ADVAPI32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "OPENGL32.DLL",
+        "SHELL32.dll",
+        "WININET.DLL",
+        "WS2_32.dll",
+        "SDL2.dll"
+      ],
+      "imports_match_verified_v084": true,
+      "unexpected_dynamic_toolchain_dependencies": false
+    }
+  },
+  "read_only": true,
+  "windows_execution": false,
+  "prose_confidential_disclosure": false,
+  "assets_or_libraries_bundled": false,
+  "cmd_CRLF": true,
+  "scripts_match_current_main": true,
+  "manifest_binary_hashes": "pass",
+  "base_library_pins": "verified v0.8.4",
+  "zip_ps_parser_errors": 0,
+  "parser_runtime": "official PowerShell 7.4; Windows execution not performed"
+}

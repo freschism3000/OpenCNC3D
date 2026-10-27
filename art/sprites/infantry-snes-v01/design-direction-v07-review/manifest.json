@@ -1,0 +1,440 @@
+{
+  "date": "2026-10-21",
+  "kind": "Generated static design review; not native animation or runtime",
+  "baseline": "Exact E1v15",
+  "units": [
+    {
+      "id": "E2",
+      "name": "Grenadier",
+      "group": "military",
+      "design": "images/E2-cue-v01.png",
+      "original": "originals/E2.png",
+      "sha256": "a66635cf29ef7df3f88791d9433242cce79240aa127fdcaee5bdc45df06e9dcd",
+      "original_sha256": "ba7f213a44fe646b7e90901cf6cf69208a926e1d81eb3c5d90a1280c656abe07",
+      "version": "cue-v01",
+      "approval": "Generated design approved",
+      "identity": "Khaki uniform, helmet, webbing and hand grenade.",
+      "repository_png_sha256": "21bc75f56d710c5148e46ed6797ade9123cf73ea2b4a0efe7c024513cea8c7ed",
+      "rgba_sha256": "68d32a3a0155bc624045ee8588f845cc6cc71b2bf231de3f5e15f138275bcd97",
+      "compressed_idat_sha256": "b233246b3abb17b6898204bd9465abc60efedd173034ede27b8230080074c482",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "d7362390862484b31e37775223f313263d6576e75237fcc11f6c40aa02b88bc1",
+      "identity_cue": "Saturated blue waist/lower-back equipment; helmet, khaki cloth and hand grenade.",
+      "previous_design": {
+        "file": "images/E2.png",
+        "sha256": "21bc75f56d710c5148e46ed6797ade9123cf73ea2b4a0efe7c024513cea8c7ed",
+        "approval": "Design approved",
+        "version": "v07"
+      }
+    },
+    {
+      "id": "E3",
+      "name": "Rocket Soldier",
+      "group": "military",
+      "design": "images/E3-cue-v01.png",
+      "original": "originals/E3.png",
+      "sha256": "0a64e91fdad02165346236bc2657e2d36dd69c56c1acf551e67a4cddd57f83fb",
+      "original_sha256": "8aaf16fca3f61f862f7740b60de05709afdfcc53d2bad1858cd731c8fffdf7e9",
+      "version": "cue-v01",
+      "approval": "Generated design approved",
+      "identity": "Khaki soldier with a shouldered anti-tank launcher.",
+      "repository_png_sha256": "70fdb82467abf677b1ed40246e8410327a2b026ee1da55705405a1d183e29003",
+      "rgba_sha256": "ca09a7563cef1b1b81c3ee0e7e59fc1148e9800d5b7c72bca1109c765587ff49",
+      "compressed_idat_sha256": "01d76d81e4ae20af8acebcdef02c09ee8a86183e9fa6b2f0af3d045659de634c",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "3333499db14df67b2b6a9a80f9ae3ed9cdc558e8cf51b00bdfab2dd35945edd4",
+      "identity_cue": "Large pale-grey/ivory shoulder launcher, small dark muzzle.",
+      "previous_design": {
+        "file": "images/E3.png",
+        "sha256": "70fdb82467abf677b1ed40246e8410327a2b026ee1da55705405a1d183e29003",
+        "approval": "Design approved",
+        "version": "v07"
+      }
+    },
+    {
+      "id": "E4",
+      "name": "Flamethrower",
+      "group": "military",
+      "design": "images/E4-cue-v03.png",
+      "original": "originals/E4.png",
+      "sha256": "709b52a90861fa6e0fed3b8a45e2aec916a4222ed3288b7a47de9db63416751d",
+      "original_sha256": "05c52cfe5d680b50a8c7bc369594bbb09c5a8d726f98ce5803189111957aef6e",
+      "version": "cue-v03",
+      "approval": "Generated design approved",
+      "identity": "Fuel tank, connected hose and a clearer steel flamethrower gun.",
+      "repository_png_sha256": "5aed803c391b9737b58b4875732383b33abe892b5918b9040edd350ac22c3304",
+      "rgba_sha256": "5f0609a5bd9b6a6104f7ad0714b7ffc76a9bd46ab82d06c33fa4802954e312a8",
+      "compressed_idat_sha256": "7d6f8117b01164449042cc6e572e8c72792abd869c0df3e7828e730006fa13fe",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "8fd56943afa664ae2c2ee9fa40bf962b11d56fb0de1c5a02b1f71eceb2645423",
+      "identity_cue": "White/ivory compact gun, light fuel tank and one connected hose.",
+      "previous_design": {
+        "file": "images/E4.png",
+        "sha256": "5aed803c391b9737b58b4875732383b33abe892b5918b9040edd350ac22c3304",
+        "approval": "Design approved",
+        "version": "v08"
+      },
+      "approval_record": "withheld"
+    },
+    {
+      "id": "E5",
+      "name": "Chemical Warrior",
+      "group": "military",
+      "design": "images/E5-cue-v05.png",
+      "original": "originals/E5.png",
+      "sha256": "de3bfb7d39a4b33889c650c3c60d71bf28934e74665a985844c7499a477335a1",
+      "original_sha256": "34766333691fd7db7c852fe2bec12909c5d5a47e9bf40e9525fd2ec43def16d8",
+      "version": "cue-v05",
+      "approval": "Generated design approved",
+      "identity": "Protective green suit, dark respirator and chemical sprayer.",
+      "repository_png_sha256": "74cfc74b5fbdb23e8c732c81c448d4065a7da2035ef0dc1a60b9edb2d579235f",
+      "rgba_sha256": "93e2941f626cc1dce9a1480a8bfd0179fe5050572d8a5b9f746fe0c9e55b8a2d",
+      "compressed_idat_sha256": "c10f125e3c461a5e1bc8f03438a86011b82a377609474c56a98ce798508b74d9",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "142ffa457f422c03cc7da8a21cb8f7e1210169175ddce823e3c9033e6fb9a618",
+      "identity_cue": "Bright lime-green gun and tank; medium-grey respirator with two lenses/filter; muted protective suit.",
+      "previous_design": {
+        "file": "images/E5.png",
+        "sha256": "74cfc74b5fbdb23e8c732c81c448d4065a7da2035ef0dc1a60b9edb2d579235f",
+        "approval": "Design approved",
+        "version": "v07"
+      },
+      "approval_record": "withheld"
+    },
+    {
+      "id": "E6",
+      "name": "Engineer",
+      "group": "military",
+      "design": "images/E6-cue-v01.png",
+      "original": "originals/E6.png",
+      "sha256": "ff23eeb9132b84f16e4d2b1afa564a129dc379d819a51e7076149ac154047175",
+      "original_sha256": "b9a73dcfd9fea0999c6771c90e24b119a8e7b1b65acb656a384943e957400010",
+      "version": "cue-v01",
+      "approval": "Generated design approved",
+      "identity": "Yellow hardhat, pale shirt, brown vest and red-brown tool case.",
+      "repository_png_sha256": "ed5b7926415dc46c9a53cb94fb6d3ea6f6b945ddde5248c6a68c7039246d2049",
+      "rgba_sha256": "d1ceec1c5c8d7d1c1c783ce878b282c047640a8743b804defe655fe1f074a529",
+      "compressed_idat_sha256": "a2b86c052d20b97cea50059cada7afae0f8dac041b76d51e232a189bbdbabab0",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "a5e706028106345956a6233986b5484c60238a994abcc8357b3220ed0a6d3f89",
+      "identity_cue": "Bright yellow hardhat, white short sleeves, red-brown handled tool case.",
+      "previous_design": {
+        "file": "images/E6.png",
+        "sha256": "ed5b7926415dc46c9a53cb94fb6d3ea6f6b945ddde5248c6a68c7039246d2049",
+        "approval": "Design approved",
+        "version": "v07"
+      }
+    },
+    {
+      "id": "RMBO",
+      "name": "Commando",
+      "group": "military",
+      "design": "images/RMBO.png",
+      "original": "originals/RMBO.png",
+      "sha256": "07aeabaaa6864952f847ad13258332c7f10c21e325476bb9385282c3a971d19b",
+      "original_sha256": "bc1e3a1932d78c11f615844b97366352db13366ac88c1d26242fe66ac8171af2",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Red beret, khaki short sleeves, green webbing and suppressed rifle.",
+      "repository_png_sha256": "07aeabaaa6864952f847ad13258332c7f10c21e325476bb9385282c3a971d19b",
+      "rgba_sha256": "a1c6af5938a57d40e97baffaaf838d6e01fb6163269bb3fe67cd3f97019f0b26",
+      "compressed_idat_sha256": "7e96926822ae5c3d621ddf72f9f1ef94062353f4a4ac9b477a750c38d1f48a3a",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "68415acf083d167a4ef37e4dc816cb922ee243f2a989003ca83bed25a26a24cb",
+      "identity_cue": "Red beret, bare forearms, khaki short sleeves, green webbing/olive trousers, suppressed rifle."
+    },
+    {
+      "id": "C1",
+      "name": "Civilian 1",
+      "group": "civilian",
+      "design": "images/C1.png",
+      "original": "originals/C1.png",
+      "sha256": "c9bf4c41cc3636239e587cf58d6e55eae08a859a2f7513881d16954c1b30e0dc",
+      "original_sha256": "234e9b3047c8dfae72c7569414e4df17f1cc0847c70325188d8261b61a7eeaa0",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Dark hair, burgundy shirt and blue trousers.",
+      "repository_png_sha256": "c9bf4c41cc3636239e587cf58d6e55eae08a859a2f7513881d16954c1b30e0dc",
+      "rgba_sha256": "db0180ca7f5bf4f83d10270ddd6faf5fe16311ef554f3f76fbfa77ffa343d659",
+      "compressed_idat_sha256": "0375320521e8ceb3b3a9811d29cbe0b17241452ba37d54a027ed61a715e6de76",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "b4fa764bce037fc1c1e7c3096fc272648703c994f09ca3ea38c8985529e83afa",
+      "identity_cue": "Dark hair, burgundy/maroon shirt, blue trousers."
+    },
+    {
+      "id": "C2",
+      "name": "Civilian 2",
+      "group": "civilian",
+      "design": "images/C2.png",
+      "original": "originals/C2.png",
+      "sha256": "045c0fb0f92b8f59fde92dfb81ad26ac998b8add20c5ba702fa13ff13eb14848",
+      "original_sha256": "12a4de8eed585b742556d9a700cd5ded3d376ac9ef6a9cab23a2c3d324cad66b",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Blond hair, teal shirt and purple trousers.",
+      "repository_png_sha256": "045c0fb0f92b8f59fde92dfb81ad26ac998b8add20c5ba702fa13ff13eb14848",
+      "rgba_sha256": "6c1185565c15cd60f8399327b521bcae3bd22d952e2593dbaa234f185a0b1b1f",
+      "compressed_idat_sha256": "f54146817f13a79e840860c1c0202328f5e473a8fb6b5f8305bbe2d58110ca1e",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "60850b18966b2ca61f9e9c3bf78f7b5a1e97cad01d39720f3e32ba48f4750e53",
+      "identity_cue": "Blond hair, teal shirt, purple trousers."
+    },
+    {
+      "id": "C3",
+      "name": "Civilian 3",
+      "group": "civilian",
+      "design": "images/C3.png",
+      "original": "originals/C3.png",
+      "sha256": "8dedc54226805a2fc5101d80b9f250ee82ce591c33e5fa5d3e533534181fea56",
+      "original_sha256": "04981c5bd5395a6120de889832743f29ba72102b6a16416498b7f0958f10ed36",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Blond woman, khaki blouse and brick-red trousers.",
+      "repository_png_sha256": "8dedc54226805a2fc5101d80b9f250ee82ce591c33e5fa5d3e533534181fea56",
+      "rgba_sha256": "90620170c84ba6908b243d8e4a5922cc26e33168231d7c6dc47b9bee4acb475b",
+      "compressed_idat_sha256": "2a66e6dd83764ee923012481fed63e75c5b7ba970247f6275a39b54df9caef25",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "a03279f75adc7db999c37edcc3ebc1f0ff9ce6e339b2c74f7f8ad5e1cec9271b",
+      "identity_cue": "Blond bob, khaki blouse, brick-red trousers."
+    },
+    {
+      "id": "C4",
+      "name": "Civilian 4",
+      "group": "civilian",
+      "design": "images/C4.png",
+      "original": "originals/C4.png",
+      "sha256": "b0bfd3b57c1291059a043eaed40380219076be3e63e10ec4172dee2b7c794985",
+      "original_sha256": "0a1add3af8afe29f5fb8bba1d58594a1675497110fd0ae904985620ead765742",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Dark-haired woman, burgundy blouse and teal trousers.",
+      "repository_png_sha256": "b0bfd3b57c1291059a043eaed40380219076be3e63e10ec4172dee2b7c794985",
+      "rgba_sha256": "72c1bb6b357a900549fa4ff7822ed0de88f705176bfac2e42c5bbbcb170ddec3",
+      "compressed_idat_sha256": "41a042deb20860e16f8c03ec48815b53c06260a041308059a1558a4e9ee5f39d",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "16713768839dfa8ec8027ad058a17c6701cfc2948883cf74d3944bcd4e66ee96",
+      "identity_cue": "Dark navy bob, maroon blouse, teal trousers."
+    },
+    {
+      "id": "C5",
+      "name": "Civilian 5",
+      "group": "civilian",
+      "design": "images/C5.png",
+      "original": "originals/C5.png",
+      "sha256": "42e995a8edb6b7514a983ade4138cf0fa306f3266d6e111216c205c3dd45181c",
+      "original_sha256": "14355850748aa1c2fc448bc24ed8fa84cbb33887b631fed4d9ea410b1d1e1244",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Dark skin and hair, blue-grey shirt and olive trousers.",
+      "repository_png_sha256": "42e995a8edb6b7514a983ade4138cf0fa306f3266d6e111216c205c3dd45181c",
+      "rgba_sha256": "ebe6dfb09c15c3f79d54e7163d98de2a182e17da4fd14d2938cd030472e519cf",
+      "compressed_idat_sha256": "28e6ace1859494fa207934d768839af07a0b84a7f7373c3df98bc36756861d91",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "b87abf2bb8c033d40abfe48d2afc21039c9733e267040e8a23677a831f01c302",
+      "identity_cue": "Brown complexion, navy hair, blue-grey shirt, olive trousers, pale-grey shoes."
+    },
+    {
+      "id": "C6",
+      "name": "Civilian 6",
+      "group": "civilian",
+      "design": "images/C6.png",
+      "original": "originals/C6.png",
+      "sha256": "f7b6604aa082deaa7e3691522826e789c6ee4681f57767353e78e32bd58d7104",
+      "original_sha256": "dc414717d003703ef5a460ba07521c7436a4328bc377b2e83fcf02a14e12c6cc",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Brown hair, red shirt and teal trousers.",
+      "repository_png_sha256": "f7b6604aa082deaa7e3691522826e789c6ee4681f57767353e78e32bd58d7104",
+      "rgba_sha256": "9f56a32327ebe7dbf65935aa7790ac8ab879ce2113813921233a8d4714504537",
+      "compressed_idat_sha256": "b3dfb4b0ac5f760562d5de1f99a5aaa981f5506846ad319ef6596ece4fa8cc8f",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "1a3d7fa85365e9abd831daffe5f086727338ab7e91679b1a26b9caa04d6a3296",
+      "identity_cue": "Brown hair, red shirt, teal trousers, red-brown shoes."
+    },
+    {
+      "id": "C7",
+      "name": "Civilian 7",
+      "group": "civilian",
+      "design": "images/C7.png",
+      "original": "originals/C7.png",
+      "sha256": "462d8f833340d923291dd024f4088d6332cb0da2bc1c524c321fae5c7d3c1374",
+      "original_sha256": "561b58e8acc42455e46ad8278226f5e0096e465324a63fd51ac69efefefe191a",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Auburn hair, lime shirt and mauve trousers.",
+      "repository_png_sha256": "462d8f833340d923291dd024f4088d6332cb0da2bc1c524c321fae5c7d3c1374",
+      "rgba_sha256": "eda7fa21b86a514cd59ada1f03bd5a66c18eed8837308ec61443a1b56942e47b",
+      "compressed_idat_sha256": "8d3023114afac0fa49a04f14abc0c52f28e1e30994f664fca0fe218c231339b9",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "7abb84c5da12cf65b212df17a872a9120f8e44026d0d676fbaa062952867f271",
+      "identity_cue": "Auburn hair, lime shirt, mauve trousers, grey shoes."
+    },
+    {
+      "id": "C8",
+      "name": "Civilian 8",
+      "group": "civilian",
+      "design": "images/C8.png",
+      "original": "originals/C8.png",
+      "sha256": "2f402b894d5931ae1d5e913cca4205f28579eda4e9c27b7c305c045ad0e9f6ab",
+      "original_sha256": "9ad2bc1886ee74dbc7d532daf39e142c927270aed90b19841f2824be5bba3b36",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Dark skin and hair, orange shirt and teal trousers.",
+      "repository_png_sha256": "2f402b894d5931ae1d5e913cca4205f28579eda4e9c27b7c305c045ad0e9f6ab",
+      "rgba_sha256": "22a3e8ef939312da5881ea9eec43c0e87f369f2a0f3902875dff1dea655a1374",
+      "compressed_idat_sha256": "18a93f7b4dc9cad108b64be078d1b4fa1dde81ee86084dfbf4f68a6044ad3436",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "807f1df174d913cf71d791c164da6866443b15bd2a0dc647c3f1c8b0289f73f1",
+      "identity_cue": "Brown complexion, dark hair, orange shirt, teal trousers, grey shoes."
+    },
+    {
+      "id": "C9",
+      "name": "Civilian 9",
+      "group": "civilian",
+      "design": "images/C9.png",
+      "original": "originals/C9.png",
+      "sha256": "e2bd30da3fd68d03c4936e42a19c8f28a8caacd6abe0867508568cc37ee3294f",
+      "original_sha256": "2a9c500efdb9b77ee8fa11ad5463358ea671be2053be7cac6b64d350d7858eaa",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Bald crown, lavender-grey shirt and mauve trousers.",
+      "repository_png_sha256": "e2bd30da3fd68d03c4936e42a19c8f28a8caacd6abe0867508568cc37ee3294f",
+      "rgba_sha256": "0778d6da96023c676316fe051bd729d9fd5c8838a5677ee6130c1180a0d43085",
+      "compressed_idat_sha256": "f25affd142b56e1b95e5ad7fbb9d3f04400ab52b21a2080d67816bcc21ed6292",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "930975fabea1859311e700fa3ecf822b8a7edc39daca2c4bfb4532c7d2a2c6dd",
+      "identity_cue": "Bald crown/grey fringe, lavender-grey shirt, mauve trousers, tan shoes."
+    },
+    {
+      "id": "C10",
+      "name": "Civilian 10",
+      "group": "civilian",
+      "design": "images/C10.png",
+      "original": "originals/C10.png",
+      "sha256": "512d08e345ab0702d5641ac910855ab6f30cdde76a976175ec7096b091ef99f5",
+      "original_sha256": "2fdc28f8181a71b354275bed80b406324946a7b2ae3cb736523ca47cf65d940a",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Grey hair, pale shirt and blue-violet trousers.",
+      "repository_png_sha256": "512d08e345ab0702d5641ac910855ab6f30cdde76a976175ec7096b091ef99f5",
+      "rgba_sha256": "ae501cf89d090350080cc3b156037c8a25f1452c393777f69799fe7657f2d151",
+      "compressed_idat_sha256": "8d4cfe45240d2973b0bbaf5cbd797f88295789ca5246784a0bdb4b0793e1201b",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "c357deb74a4c26f1ac67944fdc4ba3e6c817ede2ca909a0d300f0c3f0ca13b8e",
+      "identity_cue": "Grey hair, pale shirt, pale blue-violet/lavender trousers, light shoes."
+    },
+    {
+      "id": "MOEBIUS",
+      "name": "Dr. Moebius",
+      "group": "mission",
+      "design": "images/MOEBIUS.png",
+      "original": "originals/MOEBIUS.png",
+      "sha256": "27b86f729bba0102c7585653dc07838bf98835a0b1d33363bd7b172b7f9dacbf",
+      "original_sha256": "0c9fdc0122349e200b0aba396ec5adf9b25de3a926b8cc22ebea78ca349e3b66",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Broad light-brown bob, white lab coat, tie and green trousers.",
+      "repository_png_sha256": "27b86f729bba0102c7585653dc07838bf98835a0b1d33363bd7b172b7f9dacbf",
+      "rgba_sha256": "a09d913f93f4bc809df2fa76c6369ce97f33c226647011a3debabc1ca080488f",
+      "compressed_idat_sha256": "6add0de06566abd8369bcd18dc174e126113d2fae144d4ee9caf4033e0ba35cb",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "e8f313891179e64e455d5942314f4a467f2a06730765469e48ebd6d2135c2490",
+      "identity_cue": "Broad light-brown/blond bob, white lab coat/tie and teal trousers."
+    },
+    {
+      "id": "DELPHI",
+      "name": "Delphi",
+      "group": "mission",
+      "design": "images/DELPHI.png",
+      "original": "originals/DELPHI.png",
+      "sha256": "2b20e6f2998f9dece785d5bfa9abf12a6bc3aa765e7bf97811d4e1392e4feffb",
+      "original_sha256": "2fdc28f8181a71b354275bed80b406324946a7b2ae3cb736523ca47cf65d940a",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Original portrait: dark hair/moustache; pale shirt and violet trousers.",
+      "repository_png_sha256": "2b20e6f2998f9dece785d5bfa9abf12a6bc3aa765e7bf97811d4e1392e4feffb",
+      "rgba_sha256": "28870356710863c3285520768796ef856160d552cd75319a2352569214c5726c",
+      "compressed_idat_sha256": "6b7f48b24f7d6fbd0d7a37cbc9c3efac7c932bfbd58e61dd050a9a98511d31f1",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "6e7b3e6a7c0cdb333ab2d9c5903079527c8c8a5e003e2db32c8bccb6000b81cb",
+      "identity_cue": "Short dark hair/moustache, waist-length pale shirt, pale-violet trousers/light shoes."
+    },
+    {
+      "id": "CHAN",
+      "name": "Dr. Chan",
+      "group": "mission",
+      "design": "images/CHAN.png",
+      "original": "originals/CHAN.png",
+      "sha256": "082eb01f4e49f55f2e088359a3af05d0b671f18f803a1760b6440b5c96947f0e",
+      "original_sha256": "da6263149a13532b7fa737cb54fd3c05b12254a61bd672651ec4a72d08c23785",
+      "version": "v07",
+      "approval": "Design approved",
+      "identity": "Short black hair, white laboratory coat and blue-grey trousers.",
+      "repository_png_sha256": "082eb01f4e49f55f2e088359a3af05d0b671f18f803a1760b6440b5c96947f0e",
+      "rgba_sha256": "35c109c65b96a5154a16b79c4f18eb68453cd7558b960a100eaeaa7167855fd4",
+      "compressed_idat_sha256": "c58c83c8a6e8584b0cb73c25d600de10cd327b7c92396096ee1a29b021c39f7b",
+      "size": [
+        1774,
+        887
+      ],
+      "accepted_raw_sha256": "07ab27ed1d04b37f472272bc81a7d2a638133a46fb1ae71873660102cb0ff99d",
+      "identity_cue": "Short black hair, white coat, blue trousers."
+    }
+  ],
+  "readability_contract": "records/identity-cue-contract.json",
+  "cue_records": "records/generation-records.json"
+}

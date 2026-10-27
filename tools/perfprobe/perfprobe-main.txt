@@ -1,0 +1,28 @@
+echo PROBE|main|v2
+gfxsave perfprobe-fx.cfg
+tick 60
+echo SECTION|baseline
+framebench 60
+framebench 300
+echo OFF|water_reflect_scene
+gfx water_reflect_scene 0
+framebench 150
+gfxload perfprobe-fx.cfg
+echo OFF|enhanced_terrain_art texset 3 to 1
+gfx texset 1
+framebench 150
+gfxload perfprobe-fx.cfg
+gfx texset 3
+echo MODE|n64
+gfxmode 1
+framebench 150
+gfxmode 2
+gfxload perfprobe-fx.cfg
+gfx texset 3
+echo MODE|enhanced_again
+framebench 150
+echo CAM|shroud_lifted
+reveal 1
+framebench 200
+echo PROBE|main|done
+quit

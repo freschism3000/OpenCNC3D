@@ -1,0 +1,143 @@
+{
+  "catalog": [
+    "td"
+  ],
+  "choices": {
+    "movies": true,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 72,
+      "id": "music",
+      "kind": "button",
+      "label": "MUSIC",
+      "w": 288,
+      "x": 206,
+      "y": 372
+    },
+    {
+      "disabled": false,
+      "h": 72,
+      "id": "movies",
+      "kind": "button",
+      "label": "MOVIES",
+      "w": 288,
+      "x": 522,
+      "y": 372
+    },
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "media-back",
+      "kind": "button",
+      "label": "BACK",
+      "w": 160,
+      "x": 206,
+      "y": 520
+    },
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "download",
+      "kind": "button",
+      "label": "DOWNLOAD & INSTALL",
+      "w": 328,
+      "x": 482,
+      "y": 520
+    }
+  ],
+  "installed": [],
+  "page": "media",
+  "progress": 0,
+  "scenario": "public",
+  "target": "td",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "DAWN3D",
+      "width": 72,
+      "x": 472,
+      "y": 68
+    },
+    {
+      "height": 16,
+      "t": "TIBERIAN DAWN",
+      "width": 152,
+      "x": 392,
+      "y": 122
+    },
+    {
+      "height": 16,
+      "t": "THE ORIGINAL COMMAND & CONQUER (DOS",
+      "width": 394,
+      "x": 392,
+      "y": 158
+    },
+    {
+      "height": 16,
+      "t": "AND N64 VERSIONS), IN ENHANCED 3D",
+      "width": 364,
+      "x": 392,
+      "y": 183
+    },
+    {
+      "height": 16,
+      "t": "OPTIONAL DOWNLOADS",
+      "width": 212,
+      "x": 206,
+      "y": 336
+    },
+    {
+      "height": 16,
+      "t": "MUSIC",
+      "width": 60,
+      "x": 262,
+      "y": 391
+    },
+    {
+      "height": 16,
+      "t": "ORIGINAL SOUNDTRACK",
+      "width": 224,
+      "x": 222,
+      "y": 422
+    },
+    {
+      "height": 16,
+      "t": "MOVIES",
+      "width": 72,
+      "x": 578,
+      "y": 391
+    },
+    {
+      "height": 16,
+      "t": "CAMPAIGN CINEMATICS",
+      "width": 224,
+      "x": 538,
+      "y": 422
+    },
+    {
+      "height": 16,
+      "t": "THE MODULE WORKS WITHOUT MUSIC OR MOVIES.",
+      "width": 462,
+      "x": 206,
+      "y": 464
+    },
+    {
+      "height": 16,
+      "t": "BACK",
+      "width": 48,
+      "x": 262,
+      "y": 532
+    },
+    {
+      "height": 16,
+      "t": "DOWNLOAD & INSTALL",
+      "width": 208,
+      "x": 542,
+      "y": 532
+    }
+  ]
+}

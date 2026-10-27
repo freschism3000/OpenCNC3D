@@ -1,0 +1,56 @@
+[
+  {
+    "leg": 0,
+    "name": "baseline",
+    "value": null,
+    "samples": 120,
+    "median_ms": 2.91,
+    "p95_ms": 3.81,
+    "max_ms": 8.29
+  },
+  {
+    "leg": 1,
+    "name": "baseline",
+    "value": null,
+    "samples": 120,
+    "median_ms": 3.2350000000000003,
+    "p95_ms": 4.73,
+    "max_ms": 5.46
+  },
+  {
+    "leg": 2,
+    "name": "uniform",
+    "value": 0,
+    "samples": 120,
+    "median_ms": 2.85,
+    "p95_ms": 3.91,
+    "max_ms": 6.98
+  },
+  {
+    "leg": 3,
+    "name": "uniform",
+    "value": 1,
+    "samples": 120,
+    "median_ms": 3.13,
+    "p95_ms": 4.1,
+    "max_ms": 4.42
+  },
+  {
+    "leg": 4,
+    "name": "uniform",
+    "value": 1,
+    "samples": 120,
+    "median_ms": 2.825,
+    "p95_ms": 3.58,
+    "max_ms": 4.05
+  },
+  {
+    "leg": 5,
+    "name": "uniform",
+    "value": 0,
+    "samples": 120,
+    "median_ms": 3.135,
+    "p95_ms": 3.97,
+    "max_ms": 4.33
+  }
+]

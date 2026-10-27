@@ -19,6 +19,7 @@
 
 extern "C" {
 #include "dosopt.h"
+#include "../menu/enhanced_menu.h"
 }
 
 #define OPT_TEX_POT 512   /* 320x200 rounded up to a power of two, for GL 1.1 */
@@ -26,6 +27,9 @@ extern "C" {
 static DOPT_State g_optState;
 static bool       g_optOpen = false;
 static bool       g_optRedAlert = false;
+static bool       g_optEnhanced = false;
+/* Title dialogs paint their own backdrop; pause dialogs preserve the battlefield. */
+static bool       g_optOnTitle = false;
 static GLuint     g_optTex = 0;
 static unsigned char g_optScreen[DOPT_SCREEN_W * DOPT_SCREEN_H];
 static unsigned char g_optRGBA[DOPT_SCREEN_W * DOPT_SCREEN_H * 4];
@@ -33,6 +37,12 @@ static DB_Surface g_optSurf;
 /* The letterbox, recomputed every frame so a resize cannot leave it stale. Kept here
    because the hit test needs exactly the same numbers the draw used. */
 static int g_optScale = 1, g_optX0 = 0, g_optY0 = 0;
+
+static void opt_scroll(int delta)
+{
+    if (g_optEnhanced) em_opt_scroll(&g_optState, delta);
+    else dopt_scroll(&g_optState, delta);
+}
 
 static void opt_layout(int fbw, int fbh)
 {
@@ -47,6 +57,7 @@ static void opt_layout(int fbw, int fbh)
    off it, so a click on the surrounding battlefield hits nothing in the dialog. */
 static void opt_to_dos(int fx, int fy, int* dx, int* dy)
 {
+    if (g_optEnhanced && em_available()) { em_to_legacy(fx, fy, dx, dy); return; }
     *dx = (fx - g_optX0) / g_optScale;
     *dy = (fy - g_optY0) / g_optScale;
     if (fx < g_optX0 || fy < g_optY0) { *dx = -1000; *dy = -1000; }
@@ -106,7 +117,20 @@ static void opt_ra_palette(void)
 static void opt_draw(int fbw, int fbh, int mouse_fx, int mouse_fy)
 {
     if (!g_optOpen || !g_dbPack) return;
+    g_optState.vis.drawable_w = fbw;
+    g_optState.vis.drawable_h = fbh;
+    /* The title shell draws in another translation unit and uploads its plate
+       between visits. Its raw GL calls can replace the texture binding that our
+       cache still associates with the cursor. Forget those answers before drawing
+       this dialog, just as draw_frame does before returning from the shell. */
+    gls_frame_begin();
     opt_layout(fbw, fbh);
+    if (g_optEnhanced && em_available()) {
+        em_title_mode(g_optOnTitle ? 1 : 0);
+        em_options(&g_optState); em_viewport(fbw, fbh);
+        int unused_x, unused_y; em_to_legacy(mouse_fx, mouse_fy, &unused_x, &unused_y);
+        em_draw(fbw, fbh, g_optOnTitle ? 2 : 0); g_optScale = em_density(); return;
+    }
 
     /* 1. rasterise. Index 0 is transparent, so the surface starts as all-transparent
           and only the dialog's own pixels end up opaque. */

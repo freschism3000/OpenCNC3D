@@ -1,0 +1,84 @@
+{
+  "catalog": [
+    "td",
+    "ra"
+  ],
+  "choices": {
+    "movies": true,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "details-back",
+      "kind": "button",
+      "label": "BACK",
+      "w": 160,
+      "x": 206,
+      "y": 418
+    },
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "install",
+      "kind": "button",
+      "label": "INSTALL",
+      "w": 190,
+      "x": 620,
+      "y": 418
+    }
+  ],
+  "installed": [
+    "ra"
+  ],
+  "page": "details",
+  "progress": 0,
+  "scenario": "ra",
+  "target": "td",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "DAWN3D",
+      "width": 72,
+      "x": 472,
+      "y": 190
+    },
+    {
+      "height": 16,
+      "t": "TIBERIAN DAWN",
+      "width": 152,
+      "x": 392,
+      "y": 244
+    },
+    {
+      "height": 16,
+      "t": "THE ORIGINAL COMMAND & CONQUER (DOS",
+      "width": 394,
+      "x": 392,
+      "y": 280
+    },
+    {
+      "height": 16,
+      "t": "AND N64 VERSIONS), IN ENHANCED 3D",
+      "width": 364,
+      "x": 392,
+      "y": 305
+    },
+    {
+      "height": 16,
+      "t": "BACK",
+      "width": 48,
+      "x": 262,
+      "y": 430
+    },
+    {
+      "height": 16,
+      "t": "INSTALL",
+      "width": 84,
+      "x": 673,
+      "y": 430
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "assets": {
+    "module": {
+      "alpha_extrema": [
+        255,
+        255
+      ],
+      "display": "module-display-160x160.png",
+      "display_mode": "RGBA",
+      "display_png_sha256": "6adea4ad3e27dd257d791ff2517bf697e83b8ce4d277dabbf958da85c53f0361",
+      "display_rgba_bytes": 102400,
+      "display_rgba_sha256": "20b7f72b3e8788170414b41a1573ac37f8fafb83837e341601025cb09968341f",
+      "display_size": [
+        160,
+        160
+      ],
+      "filter": "Pillow LANCZOS, one full-source downfilter",
+      "source": "module-original.png",
+      "source_alpha": "RGB source remains fully opaque; black background retained",
+      "source_decoded_rgba_sha256": "c4cb73ff0ce39107a1ca45ccfcd4d6f56f8a83a492175f9912e831389a4fd33d",
+      "source_mode": "RGB",
+      "source_rectangle": [
+        0,
+        0,
+        1254,
+        1254
+      ],
+      "source_sha256": "cf9f7c600669e3baa9e4baaf6f53a40e72f8043de2da4abc51d844897ca163b0",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "uniform_fit_scale": 0.12759170653907495
+    },
+    "wordmark": {
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "display": "wordmark-display-220x94.png",
+      "display_mode": "RGBA",
+      "display_png_sha256": "580ebb313828807b95e53c1105b2238dd49d1609f8bcc20d9a8c8341fb008c75",
+      "display_rgba_bytes": 82720,
+      "display_rgba_sha256": "f962f5d8e63c70cbb16382dabba1b50e0976fbd9d1451ff01522258cd1e5e7d0",
+      "display_size": [
+        220,
+        94
+      ],
+      "filter": "Pillow LANCZOS, one full-source downfilter",
+      "source": "wordmark-original.png",
+      "source_alpha": "original alpha preserved",
+      "source_decoded_rgba_sha256": "8530e79e1c7a0ff5e2da017ced7ce282f5f379048aacf50ae2f381ecd5ea4502",
+      "source_mode": "RGBA",
+      "source_rectangle": [
+        0,
+        0,
+        1922,
+        818
+      ],
+      "source_sha256": "33b4001278f281e7b6c6a351f5931d8b16a755bc6a28d5be86d93ac8de46c704",
+      "source_size": [
+        1922,
+        818
+      ],
+      "uniform_fit_scale": 0.11446409989594172
+    }
+  },
+  "crop": false,
+  "header": "source/launcher_logos.h",
+  "header_sha256": "5b6a9b6b241438c120a49045fe5c57e5e75cab1c520dc93e40307542c7ed9891",
+  "image_generation": false,
+  "operations": "byte-identical archived originals; decode to RGBA; uniformly fit complete images with rounded dimensions; one LANCZOS downfilter; encode PNG witnesses and C arrays",
+  "pillow_version": "12.3.0",
+  "purpose": "launcher module tile and actual OpenCNC3D header wordmark",
+  "recolour": false,
+  "total_rgba_bytes": 185120,
+  "transparency_inference": false,
+  "version": 2
+}

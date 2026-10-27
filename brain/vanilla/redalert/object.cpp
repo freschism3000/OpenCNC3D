@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Adds a per-house invincibility switch for the cheat menu: a static bitmask
+// on ObjectClass, a setter and a query, with the query added to the damage
+// test in Take_Damage so ordinary damage to objects owned by a flagged house
+// is refused (forced, scripted damage still lands), plus a reset of the mask
+// in Init().
+// It DOES change the game simulation when the switch is on.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/OBJECT.CPP 1     3/03/97 10:25a Joe_bostic $ */
 /***********************************************************************************************
@@ -106,6 +117,45 @@
 void const* ObjectTypeClass::SelectShapes = 0;
 
 void const* ObjectTypeClass::PipShapes = 0;
+
+/*
+**	INVINCIBILITY (project OpenCNC3D addition; not upstream). One bit per house. Zero means
+**	nobody, which every scenario starts from because Init() below resets it.
+*/
+unsigned ObjectClass::OpenCNC3D_InvincibleHouses = 0;
+
+/*
+**	Sets or clears one house's bit. Every object that house owns stops taking ordinary damage
+**	while the bit is set; nothing else changes, so the enemy still targets it and fires at it.
+**	HOUSE_NONE is ignored, since unowned objects answer HOUSE_NONE from Owner().
+*/
+void ObjectClass::OpenCNC3D_Set_Invincible(HousesType house, bool on)
+{
+    if (house == HOUSE_NONE || house >= HOUSE_COUNT) {
+        return;
+    }
+    if (on) {
+        OpenCNC3D_InvincibleHouses |= (1u << house);
+    } else {
+        OpenCNC3D_InvincibleHouses &= ~(1u << house);
+    }
+}
+
+/*
+**	Is this object's owner damage immune? Asked on every damage event, so the common case,
+**	nobody invincible, is one integer test before the virtual Owner() call is made at all.
+*/
+bool ObjectClass::OpenCNC3D_Is_Invincible(void) const
+{
+    if (OpenCNC3D_InvincibleHouses == 0) {
+        return (false);
+    }
+    HousesType owner = Owner();
+    if (owner == HOUSE_NONE || owner >= HOUSE_COUNT) {
+        return (false);
+    }
+    return ((OpenCNC3D_InvincibleHouses & (1u << owner)) != 0);
+}
 
 /***********************************************************************************************
  * ObjectClass::ObjectClass -- Default constructor for objects.                                *
@@ -1649,7 +1699,15 @@ ResultType ObjectClass::Take_Damage(int& damage, int distance, WarheadType warhe
     ResultType result = RESULT_NONE;
     int oldstrength = Strength;
 
-    if (oldstrength && damage != 0 && (forced || !Class_Of().IsImmune)) {
+    /*
+    **	OpenCNC3D: the invincibility switch is one more term on the engine's own "can this be
+    **	hurt at all" test, so an invincible object behaves exactly like one whose type is
+    **	IsImmune: the result stays RESULT_NONE and nothing downstream sees a state the game does
+    **	not already produce. Forced damage (a script destroying an object) and healing still
+    **	land.
+    */
+    if (oldstrength && damage != 0
+        && (forced || (!Class_Of().IsImmune && !(damage > 0 && OpenCNC3D_Is_Invincible())))) {
         int maxstrength = Class_Of().MaxStrength;
 
         /*
@@ -1899,6 +1957,12 @@ bool ObjectClass::Mark(MarkType mark)
 void ObjectClass::Init(void)
 {
     CurrentObject.Clear_All();
+
+    /*
+    **	OpenCNC3D: drop any invincibility the previous scenario was granted. Clear_Scenario()
+    **	calls this routine on every path that begins a scenario.
+    */
+    OpenCNC3D_InvincibleHouses = 0;
 }
 
 /***********************************************************************************************

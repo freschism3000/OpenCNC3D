@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-21",
+  "url": "http://127.0.0.1:8796/sprites/infantry-designs-v07/study-e2-throw-v31/",
+  "scope": "Served HTML and all21 native presentation frames equal authored files",
+  "checks": [
+    {
+      "url": "index.html",
+      "sha256": "ca37fc4900e07d6bb507889ac8384dfddc8ea53dd75388bf9601a62d979534bf"
+    },
+    {
+      "url": "frames/E-0.png",
+      "sha256": "44e794e179b846698e1fa1e658abda102b6852c59849a2d2a0c18936b8da31b2"
+    },
+    {
+      "url": "frames/E-1.png",
+      "sha256": "74690bbbac6b296f2d7ac7198bba8fa70e0c012055ca7dad61fd013278929167"
+    },
+    {
+      "url": "frames/E-2.png",
+      "sha256": "8c6cfea2779420d93a6ae9abdc7c1699632bb38aaaf3170d481777e6c0bcef74"
+    },
+    {
+      "url": "frames/E-3.png",
+      "sha256": "a594cae8cb9b93eafbf64c1768de48429f43c2616e6f10ba944131a69a9fce23"
+    },
+    {
+      "url": "frames/E-4.png",
+      "sha256": "8c6cfea2779420d93a6ae9abdc7c1699632bb38aaaf3170d481777e6c0bcef74"
+    },
+    {
+      "url": "frames/E-5.png",
+      "sha256": "8d4ab0b68ef8819765e1ca619fe84f2a9b568c4d8d5909e5308411f3de28a7c4"
+    },
+    {
+      "url": "frames/E-6.png",
+      "sha256": "cd7fd972818152a696ee7027d67c48d32f649ec60e90b88d2a78b2d67dadd959"
+    },
+    {
+      "url": "frames/E-7.png",
+      "sha256": "801a665d80011150f9c29b9c1b269b017647cbf6b67eee7685fb338201ccc5c6"
+    },
+    {
+      "url": "frames/E-8.png",
+      "sha256": "bec3da6b623058b604827d6dc6bf0202f255b531e6afac7adf6b3066f2333686"
+    },
+    {
+      "url": "frames/E-9.png",
+      "sha256": "d62ab665669b74ef9a9e6a50bbf1c102d79b72369cc9628cf175dbf971ac2e30"
+    },
+    {
+      "url": "frames/E-10.png",
+      "sha256": "83bb90d4a1dd85d42f41d15ed04b141b138e416f9dfe227ee6cb8411fd0c2ecc"
+    },
+    {
+      "url": "frames/E-11.png",
+      "sha256": "79fcd2135daafbf57c7cb105380027bc83cc0f95b6a57111ab73c061f3e83c00"
+    },
+    {
+      "url": "frames/E-12.png",
+      "sha256": "1fdfa23b7b63c913952b688d74c001d24e144a0372320669d9b3774c1ab50326"
+    },
+    {
+      "url": "frames/E-13.png",
+      "sha256": "04f7891b2cf5990778b774f8c3fe89eaad09598c59db6a976ef029a6b7e0a9cf"
+    },
+    {
+      "url": "frames/E-14.png",
+      "sha256": "4634628a9e7925c07317926c6ddb1207e2a9d93ef9c44d9b7275ef30aedade71"
+    },
+    {
+      "url": "frames/E-15.png",
+      "sha256": "36e03257460a1e7d63b478ef2e58b2f24daa17d5a520aee17413063549a79b61"
+    },
+    {
+      "url": "frames/E-16.png",
+      "sha256": "5c2512440a0eaa81de8f9333115bb4b61046c3b0dc821ee991dbfc440b09dc1f"
+    },
+    {
+      "url": "frames/E-17.png",
+      "sha256": "2b1549e552f4fc3e86805b765796d821f4494005f8622e6a63e6110c196fde9d"
+    },
+    {
+      "url": "frames/E-18.png",
+      "sha256": "c7afe6a477696c428e9a966eac2d5fdcc699b1101f85760b00f90bee99b9d049"
+    },
+    {
+      "url": "frames/E-19.png",
+      "sha256": "28b70fe23e4c490beb1d41af4469b27b7c00d6cb15bdaf01cfe3932ca3925d7c"
+    },
+    {
+      "url": "frames/E-ready.png",
+      "sha256": "44e794e179b846698e1fa1e658abda102b6852c59849a2d2a0c18936b8da31b2"
+    }
+  ]
+}

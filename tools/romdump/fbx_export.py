@@ -55,8 +55,11 @@ import segments                                    # noqa: E402
 import textures as TX                              # noqa: E402
 
 ROM_CANDIDATES = [
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "rom", "cnc_eu.z64")),
-    os.path.expanduser("./data/rom/cnc_eu.z64"),
+    os.path.abspath(os.path.expanduser(path))
+    for path in (
+        os.environ.get("OPENCNC3D_ROM"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "data", "rom", "cnc_eu.z64"),
+    ) if path
 ]
 
 # BriefingCode: rom = ram - delta. From the loader's own segment table (segments.py).

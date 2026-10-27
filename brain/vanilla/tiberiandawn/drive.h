@@ -209,6 +209,7 @@ private:
     static TurnTrackType const TrackControl[67];
     static RawTrackType const RawTracks[13];
     static TrackType const Track13[];
+    static TrackType const FilmFactoryTrack[];
     static TrackType const Track12[];
     static TrackType const Track11[];
     static TrackType const Track10[];

@@ -1,0 +1,1020 @@
+{
+  "summary": {
+    "all_acceptance_pass": true,
+    "accepted_legs": 6,
+    "measured_frames": 720,
+    "baseline_median_ms_range": [
+      2.91,
+      3.2350000000000003
+    ],
+    "uniform_off_mean_leg_median_ms": 2.9924999999999997,
+    "uniform_on_mean_leg_median_ms": 2.9775,
+    "cpu_section_median_ranges": {
+      "sun shadow map": [
+        0.15,
+        0.17
+      ],
+      "infantry": [
+        0.31,
+        0.36
+      ],
+      "post: ground normals": [
+        0.21,
+        0.25
+      ],
+      "post: light": [
+        0.04,
+        0.05
+      ],
+      "post: atmosphere": [
+        0.02,
+        0.02
+      ],
+      "post chain": [
+        0.305,
+        0.32
+      ],
+      "gpu finish": [
+        0.755,
+        0.94
+      ],
+      "prep + shroud corners": [
+        0.08,
+        0.1
+      ]
+    },
+    "active_model": "einf/E1.c3m selected by unchanged Enhanced set gate; M3|E1 experimental load line is not active population geometry.",
+    "gpu_timestamps": "ARB_timer_query unavailable in all logs; no per-pass GPU duration inferred.",
+    "first_skin_and_clip_cpu_isolated": false,
+    "pose_traffic_measured_period_aggregate_available": false,
+    "fidelity_claim": "Fixture validity and deterministic motion validated; this task does not establish a new candidate RGBA/target equivalence claim."
+  },
+  "legs": [
+    {
+      "leg": 0,
+      "kind": "baseline",
+      "candidate_control": null,
+      "acceptance_pass": true,
+      "checks": {
+        "footer_zero_failures": true,
+        "population_count_checks": true,
+        "ordinary_selection_80": true,
+        "no_order_mismatch_or_offscreen": true,
+        "ordinary_move_target": true,
+        "active_enhanced_asset_header": true,
+        "all_snapshots_80_3d_no_fallback": true,
+        "full_detail_every_snapshot": true,
+        "no_forced_lod_control": true,
+        "infantry_shadow_live": true,
+        "pose_hits_and_gpu_draws": true,
+        "no_pose_arena_overflow_or_observed_bad": true,
+        "moving_population_at_least_40": true,
+        "gait_phase_changes_at_least_40": true,
+        "watched_object_cells_change": true,
+        "exactly_120_timed_render_frames": true,
+        "four_subtick_phases_present": true,
+        "private_output_and_save_paths": true,
+        "no_reveal_or_noshroud_cheat": true
+      },
+      "log_sha256": "7874f5da2a764b816866cf95877dc896e75c694041cca93497411a85b60e207c",
+      "source_script_sha256": "6bf0e71931f08ba136880459cb418c6bbfd5e2592e0844bd6d5fd2972af86e98",
+      "exit_status_provenance": "Parent crowd-run.py asserts process returncode=0 before persisting this record; all six accepted records present.",
+      "timing": {
+        "frames": 120,
+        "median_ms": 2.91,
+        "p95_ms": 3.81,
+        "mean_cpu_section_ms_not_gpu_execution": null,
+        "median_cpu_section_ms": {
+          "sun shadow map": 0.15,
+          "infantry": 0.33,
+          "post: ground normals": 0.23,
+          "post: light": 0.04,
+          "post: atmosphere": 0.02,
+          "post chain": 0.31,
+          "gpu finish": 0.77,
+          "prep + shroud corners": 0.08
+        }
+      },
+      "motion": {
+        "before_running_count": 80,
+        "after_running_count": 80,
+        "changed_gait_phases": 80,
+        "before_cells": {
+          "E1#0": [
+            26,
+            27
+          ],
+          "E1#39": [
+            35,
+            30
+          ],
+          "E1#79": [
+            35,
+            34
+          ]
+        },
+        "after_cells": {
+          "E1#0": [
+            27,
+            27
+          ],
+          "E1#39": [
+            36,
+            30
+          ],
+          "E1#79": [
+            36,
+            33
+          ]
+        },
+        "changed_watched_objects": [
+          "E1#0",
+          "E1#39",
+          "E1#79"
+        ]
+      },
+      "pose_snapshot_counters": [
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "5",
+          "hits": "235",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "5",
+          "gpudraws": "240"
+        }
+      ],
+      "rest_snapshot_counters": [
+        {
+          "enabled": "1",
+          "entries": "79",
+          "bytes": "2405392",
+          "gpubytes": "2354832",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "5",
+          "hits": "0",
+          "uploads": "0",
+          "gpudraws": "0",
+          "admit": "0",
+          "evict": "0"
+        }
+      ],
+      "pose_traffic_scope": {
+        "snapshot_after_movement_unique_skin_uploads": 5,
+        "logical_float_position_normal_bytes_for_that_snapshot": 149040,
+        "basis": "Active full-detail E1:1242 vertices \u00d76 floats \u00d74 bytes per unique uploaded pose. Counter is last screenshot frame, not aggregate measured-period traffic.",
+        "aggregate_measured_frame_pose_bytes": null,
+        "first_skin_cpu_ms": null,
+        "clip_sample_blend_cpu_ms": null,
+        "timing_limitation": "No dedicated first-skin or clip timers and no M3POSE dumps per measured frame. First skin can be charged to the shared sun-shadow CPU bucket because own infantry map runs first; it cannot be isolated from its other work."
+      },
+      "physics_scope": "All PHYSICSCAPTURE snapshots report 0 ragdoll bodies; their equal hash is not full living-unit simulation proof. Motion is independently evidenced by object cells and80 gait/state witnesses."
+    },
+    {
+      "leg": 1,
+      "kind": "baseline",
+      "candidate_control": null,
+      "acceptance_pass": true,
+      "checks": {
+        "footer_zero_failures": true,
+        "population_count_checks": true,
+        "ordinary_selection_80": true,
+        "no_order_mismatch_or_offscreen": true,
+        "ordinary_move_target": true,
+        "active_enhanced_asset_header": true,
+        "all_snapshots_80_3d_no_fallback": true,
+        "full_detail_every_snapshot": true,
+        "no_forced_lod_control": true,
+        "infantry_shadow_live": true,
+        "pose_hits_and_gpu_draws": true,
+        "no_pose_arena_overflow_or_observed_bad": true,
+        "moving_population_at_least_40": true,
+        "gait_phase_changes_at_least_40": true,
+        "watched_object_cells_change": true,
+        "exactly_120_timed_render_frames": true,
+        "four_subtick_phases_present": true,
+        "private_output_and_save_paths": true,
+        "no_reveal_or_noshroud_cheat": true
+      },
+      "log_sha256": "08f82dd7298f85c102eb67303e4f4d33ad9b9192a99263963d4149476f3a4fba",
+      "source_script_sha256": "56e8a65f2a38c5791592a179d02987ed1b21189d6f680b5507bdbbc16a223d5f",
+      "exit_status_provenance": "Parent crowd-run.py asserts process returncode=0 before persisting this record; all six accepted records present.",
+      "timing": {
+        "frames": 120,
+        "median_ms": 3.2350000000000003,
+        "p95_ms": 4.73,
+        "mean_cpu_section_ms_not_gpu_execution": null,
+        "median_cpu_section_ms": {
+          "sun shadow map": 0.17,
+          "infantry": 0.34,
+          "post: ground normals": 0.24,
+          "post: light": 0.05,
+          "post: atmosphere": 0.02,
+          "post chain": 0.32,
+          "gpu finish": 0.94,
+          "prep + shroud corners": 0.1
+        }
+      },
+      "motion": {
+        "before_running_count": 80,
+        "after_running_count": 80,
+        "changed_gait_phases": 80,
+        "before_cells": {
+          "E1#0": [
+            26,
+            27
+          ],
+          "E1#39": [
+            35,
+            30
+          ],
+          "E1#79": [
+            35,
+            34
+          ]
+        },
+        "after_cells": {
+          "E1#0": [
+            27,
+            27
+          ],
+          "E1#39": [
+            36,
+            30
+          ],
+          "E1#79": [
+            36,
+            33
+          ]
+        },
+        "changed_watched_objects": [
+          "E1#0",
+          "E1#39",
+          "E1#79"
+        ]
+      },
+      "pose_snapshot_counters": [
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "5",
+          "hits": "235",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "5",
+          "gpudraws": "240"
+        }
+      ],
+      "rest_snapshot_counters": [
+        {
+          "enabled": "1",
+          "entries": "79",
+          "bytes": "2405392",
+          "gpubytes": "2354832",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "5",
+          "hits": "0",
+          "uploads": "0",
+          "gpudraws": "0",
+          "admit": "0",
+          "evict": "0"
+        }
+      ],
+      "pose_traffic_scope": {
+        "snapshot_after_movement_unique_skin_uploads": 5,
+        "logical_float_position_normal_bytes_for_that_snapshot": 149040,
+        "basis": "Active full-detail E1:1242 vertices \u00d76 floats \u00d74 bytes per unique uploaded pose. Counter is last screenshot frame, not aggregate measured-period traffic.",
+        "aggregate_measured_frame_pose_bytes": null,
+        "first_skin_cpu_ms": null,
+        "clip_sample_blend_cpu_ms": null,
+        "timing_limitation": "No dedicated first-skin or clip timers and no M3POSE dumps per measured frame. First skin can be charged to the shared sun-shadow CPU bucket because own infantry map runs first; it cannot be isolated from its other work."
+      },
+      "physics_scope": "All PHYSICSCAPTURE snapshots report 0 ragdoll bodies; their equal hash is not full living-unit simulation proof. Motion is independently evidenced by object cells and80 gait/state witnesses."
+    },
+    {
+      "leg": 2,
+      "kind": "uniform",
+      "candidate_control": 0,
+      "acceptance_pass": true,
+      "checks": {
+        "footer_zero_failures": true,
+        "population_count_checks": true,
+        "ordinary_selection_80": true,
+        "no_order_mismatch_or_offscreen": true,
+        "ordinary_move_target": true,
+        "active_enhanced_asset_header": true,
+        "all_snapshots_80_3d_no_fallback": true,
+        "full_detail_every_snapshot": true,
+        "no_forced_lod_control": true,
+        "infantry_shadow_live": true,
+        "pose_hits_and_gpu_draws": true,
+        "no_pose_arena_overflow_or_observed_bad": true,
+        "moving_population_at_least_40": true,
+        "gait_phase_changes_at_least_40": true,
+        "watched_object_cells_change": true,
+        "exactly_120_timed_render_frames": true,
+        "four_subtick_phases_present": true,
+        "private_output_and_save_paths": true,
+        "no_reveal_or_noshroud_cheat": true
+      },
+      "log_sha256": "73c99ce9ddcc047b2f2f48bd76d71a2a8eb2fce2ac7a712fc89cbf2860c17841",
+      "source_script_sha256": "c7e40e3c90b9d28b756fed4af2f28bf101180cd748a380458b7a908d840057e1",
+      "exit_status_provenance": "Parent crowd-run.py asserts process returncode=0 before persisting this record; all six accepted records present.",
+      "timing": {
+        "frames": 120,
+        "median_ms": 2.85,
+        "p95_ms": 3.91,
+        "mean_cpu_section_ms_not_gpu_execution": null,
+        "median_cpu_section_ms": {
+          "sun shadow map": 0.15,
+          "infantry": 0.35,
+          "post: ground normals": 0.24,
+          "post: light": 0.04,
+          "post: atmosphere": 0.02,
+          "post chain": 0.32,
+          "gpu finish": 0.77,
+          "prep + shroud corners": 0.08
+        }
+      },
+      "motion": {
+        "before_running_count": 80,
+        "after_running_count": 80,
+        "changed_gait_phases": 80,
+        "before_cells": {
+          "E1#0": [
+            26,
+            27
+          ],
+          "E1#39": [
+            35,
+            30
+          ],
+          "E1#79": [
+            35,
+            34
+          ]
+        },
+        "after_cells": {
+          "E1#0": [
+            27,
+            27
+          ],
+          "E1#39": [
+            36,
+            30
+          ],
+          "E1#79": [
+            36,
+            33
+          ]
+        },
+        "changed_watched_objects": [
+          "E1#0",
+          "E1#39",
+          "E1#79"
+        ]
+      },
+      "pose_snapshot_counters": [
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "5",
+          "hits": "235",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "5",
+          "gpudraws": "240"
+        }
+      ],
+      "rest_snapshot_counters": [
+        {
+          "enabled": "1",
+          "entries": "79",
+          "bytes": "2405392",
+          "gpubytes": "2354832",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "5",
+          "hits": "0",
+          "uploads": "0",
+          "gpudraws": "0",
+          "admit": "0",
+          "evict": "0"
+        }
+      ],
+      "pose_traffic_scope": {
+        "snapshot_after_movement_unique_skin_uploads": 5,
+        "logical_float_position_normal_bytes_for_that_snapshot": 149040,
+        "basis": "Active full-detail E1:1242 vertices \u00d76 floats \u00d74 bytes per unique uploaded pose. Counter is last screenshot frame, not aggregate measured-period traffic.",
+        "aggregate_measured_frame_pose_bytes": null,
+        "first_skin_cpu_ms": null,
+        "clip_sample_blend_cpu_ms": null,
+        "timing_limitation": "No dedicated first-skin or clip timers and no M3POSE dumps per measured frame. First skin can be charged to the shared sun-shadow CPU bucket because own infantry map runs first; it cannot be isolated from its other work."
+      },
+      "physics_scope": "All PHYSICSCAPTURE snapshots report 0 ragdoll bodies; their equal hash is not full living-unit simulation proof. Motion is independently evidenced by object cells and80 gait/state witnesses."
+    },
+    {
+      "leg": 3,
+      "kind": "uniform",
+      "candidate_control": 1,
+      "acceptance_pass": true,
+      "checks": {
+        "footer_zero_failures": true,
+        "population_count_checks": true,
+        "ordinary_selection_80": true,
+        "no_order_mismatch_or_offscreen": true,
+        "ordinary_move_target": true,
+        "active_enhanced_asset_header": true,
+        "all_snapshots_80_3d_no_fallback": true,
+        "full_detail_every_snapshot": true,
+        "no_forced_lod_control": true,
+        "infantry_shadow_live": true,
+        "pose_hits_and_gpu_draws": true,
+        "no_pose_arena_overflow_or_observed_bad": true,
+        "moving_population_at_least_40": true,
+        "gait_phase_changes_at_least_40": true,
+        "watched_object_cells_change": true,
+        "exactly_120_timed_render_frames": true,
+        "four_subtick_phases_present": true,
+        "private_output_and_save_paths": true,
+        "no_reveal_or_noshroud_cheat": true
+      },
+      "log_sha256": "eb13d5056c7e3ddd1513ba4c941132fe48948ebee35be4743006fe3e4029c037",
+      "source_script_sha256": "6c25166f39e08efefa6f1fbc0272c777549530084d7dd16413bf1f9181f18683",
+      "exit_status_provenance": "Parent crowd-run.py asserts process returncode=0 before persisting this record; all six accepted records present.",
+      "timing": {
+        "frames": 120,
+        "median_ms": 3.13,
+        "p95_ms": 4.1,
+        "mean_cpu_section_ms_not_gpu_execution": null,
+        "median_cpu_section_ms": {
+          "sun shadow map": 0.17,
+          "infantry": 0.31,
+          "post: ground normals": 0.22,
+          "post: light": 0.05,
+          "post: atmosphere": 0.02,
+          "post chain": 0.32,
+          "gpu finish": 0.895,
+          "prep + shroud corners": 0.1
+        }
+      },
+      "motion": {
+        "before_running_count": 80,
+        "after_running_count": 80,
+        "changed_gait_phases": 80,
+        "before_cells": {
+          "E1#0": [
+            26,
+            27
+          ],
+          "E1#39": [
+            35,
+            30
+          ],
+          "E1#79": [
+            35,
+            34
+          ]
+        },
+        "after_cells": {
+          "E1#0": [
+            27,
+            27
+          ],
+          "E1#39": [
+            36,
+            30
+          ],
+          "E1#79": [
+            36,
+            33
+          ]
+        },
+        "changed_watched_objects": [
+          "E1#0",
+          "E1#39",
+          "E1#79"
+        ]
+      },
+      "pose_snapshot_counters": [
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "5",
+          "hits": "235",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "5",
+          "gpudraws": "240"
+        }
+      ],
+      "rest_snapshot_counters": [
+        {
+          "enabled": "1",
+          "entries": "79",
+          "bytes": "2405392",
+          "gpubytes": "2354832",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "5",
+          "hits": "0",
+          "uploads": "0",
+          "gpudraws": "0",
+          "admit": "0",
+          "evict": "0"
+        }
+      ],
+      "pose_traffic_scope": {
+        "snapshot_after_movement_unique_skin_uploads": 5,
+        "logical_float_position_normal_bytes_for_that_snapshot": 149040,
+        "basis": "Active full-detail E1:1242 vertices \u00d76 floats \u00d74 bytes per unique uploaded pose. Counter is last screenshot frame, not aggregate measured-period traffic.",
+        "aggregate_measured_frame_pose_bytes": null,
+        "first_skin_cpu_ms": null,
+        "clip_sample_blend_cpu_ms": null,
+        "timing_limitation": "No dedicated first-skin or clip timers and no M3POSE dumps per measured frame. First skin can be charged to the shared sun-shadow CPU bucket because own infantry map runs first; it cannot be isolated from its other work."
+      },
+      "physics_scope": "All PHYSICSCAPTURE snapshots report 0 ragdoll bodies; their equal hash is not full living-unit simulation proof. Motion is independently evidenced by object cells and80 gait/state witnesses."
+    },
+    {
+      "leg": 4,
+      "kind": "uniform",
+      "candidate_control": 1,
+      "acceptance_pass": true,
+      "checks": {
+        "footer_zero_failures": true,
+        "population_count_checks": true,
+        "ordinary_selection_80": true,
+        "no_order_mismatch_or_offscreen": true,
+        "ordinary_move_target": true,
+        "active_enhanced_asset_header": true,
+        "all_snapshots_80_3d_no_fallback": true,
+        "full_detail_every_snapshot": true,
+        "no_forced_lod_control": true,
+        "infantry_shadow_live": true,
+        "pose_hits_and_gpu_draws": true,
+        "no_pose_arena_overflow_or_observed_bad": true,
+        "moving_population_at_least_40": true,
+        "gait_phase_changes_at_least_40": true,
+        "watched_object_cells_change": true,
+        "exactly_120_timed_render_frames": true,
+        "four_subtick_phases_present": true,
+        "private_output_and_save_paths": true,
+        "no_reveal_or_noshroud_cheat": true
+      },
+      "log_sha256": "6ab8a30ef71f650304eeee8bb815b24d3b1a6722768b17ec88ab2144199127f1",
+      "source_script_sha256": "ac42fcd3523c289d80c68a51f7d7f93f9bc0b17f20a7cfc6cc29c6496644cb88",
+      "exit_status_provenance": "Parent crowd-run.py asserts process returncode=0 before persisting this record; all six accepted records present.",
+      "timing": {
+        "frames": 120,
+        "median_ms": 2.825,
+        "p95_ms": 3.58,
+        "mean_cpu_section_ms_not_gpu_execution": null,
+        "median_cpu_section_ms": {
+          "sun shadow map": 0.16,
+          "infantry": 0.31,
+          "post: ground normals": 0.21,
+          "post: light": 0.05,
+          "post: atmosphere": 0.02,
+          "post chain": 0.305,
+          "gpu finish": 0.755,
+          "prep + shroud corners": 0.09
+        }
+      },
+      "motion": {
+        "before_running_count": 80,
+        "after_running_count": 80,
+        "changed_gait_phases": 80,
+        "before_cells": {
+          "E1#0": [
+            26,
+            27
+          ],
+          "E1#39": [
+            35,
+            30
+          ],
+          "E1#79": [
+            35,
+            34
+          ]
+        },
+        "after_cells": {
+          "E1#0": [
+            27,
+            27
+          ],
+          "E1#39": [
+            36,
+            30
+          ],
+          "E1#79": [
+            36,
+            33
+          ]
+        },
+        "changed_watched_objects": [
+          "E1#0",
+          "E1#39",
+          "E1#79"
+        ]
+      },
+      "pose_snapshot_counters": [
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "5",
+          "hits": "235",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "5",
+          "gpudraws": "240"
+        }
+      ],
+      "rest_snapshot_counters": [
+        {
+          "enabled": "1",
+          "entries": "79",
+          "bytes": "2405392",
+          "gpubytes": "2354832",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "5",
+          "hits": "0",
+          "uploads": "0",
+          "gpudraws": "0",
+          "admit": "0",
+          "evict": "0"
+        }
+      ],
+      "pose_traffic_scope": {
+        "snapshot_after_movement_unique_skin_uploads": 5,
+        "logical_float_position_normal_bytes_for_that_snapshot": 149040,
+        "basis": "Active full-detail E1:1242 vertices \u00d76 floats \u00d74 bytes per unique uploaded pose. Counter is last screenshot frame, not aggregate measured-period traffic.",
+        "aggregate_measured_frame_pose_bytes": null,
+        "first_skin_cpu_ms": null,
+        "clip_sample_blend_cpu_ms": null,
+        "timing_limitation": "No dedicated first-skin or clip timers and no M3POSE dumps per measured frame. First skin can be charged to the shared sun-shadow CPU bucket because own infantry map runs first; it cannot be isolated from its other work."
+      },
+      "physics_scope": "All PHYSICSCAPTURE snapshots report 0 ragdoll bodies; their equal hash is not full living-unit simulation proof. Motion is independently evidenced by object cells and80 gait/state witnesses."
+    },
+    {
+      "leg": 5,
+      "kind": "uniform",
+      "candidate_control": 0,
+      "acceptance_pass": true,
+      "checks": {
+        "footer_zero_failures": true,
+        "population_count_checks": true,
+        "ordinary_selection_80": true,
+        "no_order_mismatch_or_offscreen": true,
+        "ordinary_move_target": true,
+        "active_enhanced_asset_header": true,
+        "all_snapshots_80_3d_no_fallback": true,
+        "full_detail_every_snapshot": true,
+        "no_forced_lod_control": true,
+        "infantry_shadow_live": true,
+        "pose_hits_and_gpu_draws": true,
+        "no_pose_arena_overflow_or_observed_bad": true,
+        "moving_population_at_least_40": true,
+        "gait_phase_changes_at_least_40": true,
+        "watched_object_cells_change": true,
+        "exactly_120_timed_render_frames": true,
+        "four_subtick_phases_present": true,
+        "private_output_and_save_paths": true,
+        "no_reveal_or_noshroud_cheat": true
+      },
+      "log_sha256": "fbd551de5cecd3335f9cacac9ea5d79487dc87fc6482a447ab5bc31f2827dae3",
+      "source_script_sha256": "fb8c65f0eef9bf0a01513b947c186ec2c60c370ade87e2f1169aec1da40c2ff4",
+      "exit_status_provenance": "Parent crowd-run.py asserts process returncode=0 before persisting this record; all six accepted records present.",
+      "timing": {
+        "frames": 120,
+        "median_ms": 3.135,
+        "p95_ms": 3.97,
+        "mean_cpu_section_ms_not_gpu_execution": null,
+        "median_cpu_section_ms": {
+          "sun shadow map": 0.17,
+          "infantry": 0.36,
+          "post: ground normals": 0.25,
+          "post: light": 0.05,
+          "post: atmosphere": 0.02,
+          "post chain": 0.31,
+          "gpu finish": 0.865,
+          "prep + shroud corners": 0.09
+        }
+      },
+      "motion": {
+        "before_running_count": 80,
+        "after_running_count": 80,
+        "changed_gait_phases": 80,
+        "before_cells": {
+          "E1#0": [
+            26,
+            27
+          ],
+          "E1#39": [
+            35,
+            30
+          ],
+          "E1#79": [
+            35,
+            34
+          ]
+        },
+        "after_cells": {
+          "E1#0": [
+            27,
+            27
+          ],
+          "E1#39": [
+            36,
+            30
+          ],
+          "E1#79": [
+            36,
+            33
+          ]
+        },
+        "changed_watched_objects": [
+          "E1#0",
+          "E1#39",
+          "E1#79"
+        ]
+      },
+      "pose_snapshot_counters": [
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "0",
+          "hits": "240",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "0",
+          "gpudraws": "240"
+        },
+        {
+          "skins": "5",
+          "hits": "235",
+          "full": "0",
+          "check": "0",
+          "bad": "0",
+          "uploads": "5",
+          "gpudraws": "240"
+        }
+      ],
+      "rest_snapshot_counters": [
+        {
+          "enabled": "1",
+          "entries": "79",
+          "bytes": "2405392",
+          "gpubytes": "2354832",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "0",
+          "hits": "79",
+          "uploads": "0",
+          "gpudraws": "240",
+          "admit": "0",
+          "evict": "0"
+        },
+        {
+          "enabled": "1",
+          "entries": "128",
+          "bytes": "3897344",
+          "gpubytes": "3815424",
+          "observed": "5",
+          "hits": "0",
+          "uploads": "0",
+          "gpudraws": "0",
+          "admit": "0",
+          "evict": "0"
+        }
+      ],
+      "pose_traffic_scope": {
+        "snapshot_after_movement_unique_skin_uploads": 5,
+        "logical_float_position_normal_bytes_for_that_snapshot": 149040,
+        "basis": "Active full-detail E1:1242 vertices \u00d76 floats \u00d74 bytes per unique uploaded pose. Counter is last screenshot frame, not aggregate measured-period traffic.",
+        "aggregate_measured_frame_pose_bytes": null,
+        "first_skin_cpu_ms": null,
+        "clip_sample_blend_cpu_ms": null,
+        "timing_limitation": "No dedicated first-skin or clip timers and no M3POSE dumps per measured frame. First skin can be charged to the shared sun-shadow CPU bucket because own infantry map runs first; it cannot be isolated from its other work."
+      },
+      "physics_scope": "All PHYSICSCAPTURE snapshots report 0 ragdoll bodies; their equal hash is not full living-unit simulation proof. Motion is independently evidenced by object cells and80 gait/state witnesses."
+    }
+  ]
+}

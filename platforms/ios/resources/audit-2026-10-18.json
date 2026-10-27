@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-18",
+  "status": "Resource staging and desktop baseline verified; this is not iOS runtime proof",
+  "source_main_commit": "71fa4e2154a37c4c76f326d48b2a4a04b5867c14",
+  "resource_profile": "first-mission.json",
+  "staged_files": 26,
+  "staged_bytes": 35255323,
+  "staged_mib": 33.62,
+  "stage_manifest_sha256": "00edba451c954a865c53b95907f9bdb1b2b86c3d8d6d5f3aff27250ec565778e",
+  "missing_optional": [
+    "n64infantry.pack"
+  ],
+  "tests": {
+    "stager_boundary_tests_passed": 9,
+    "desktop_script_lines": 7,
+    "desktop_script_failures": 0,
+    "simulation_ticks": 60,
+    "objects_after_tick": 60,
+    "fallback_boxes": 0,
+    "invisible_terrain": 0,
+    "shroud": {
+      "enabled": true,
+      "valid": true,
+      "hidden": 541,
+      "dark": 46,
+      "clear": 113
+    },
+    "audio": {
+      "channels": 2,
+      "rate": 44100,
+      "frames": 174636,
+      "seconds": 3.96,
+      "peak_from_mixer": 31690,
+      "rms_from_mixer": 8389.1,
+      "hard_clipped_samples_from_mixer": 0
+    }
+  },
+  "desktop_verification": {
+    "binary": "playable/cnc_eyes",
+    "binary_sha256": "c47a790c1e612140cdb5e3ea2be680b9bc1371dfe5bb72c7b61d6482847b29cf",
+    "brain_sha256": "a6cb492cd1cc22ad521eda878d95775b2006ab73e4cc1bb5c00499f7dbd20811",
+    "mode": "Hidden background SDL window, recorded audio; no visible window or speaker output",
+    "log_path": "local-audit/cnc3d-ios-stage-audit-script.log",
+    "log_sha256": "da9c2eb27a36f79b0a96640f8f0d8a68556d6553081af84f0bcae4f91e3bf942",
+    "screenshots": {
+      "original_hud": "local-audit/cnc3d-ios-stage-audit-original.png",
+      "current_hud": "local-audit/cnc3d-ios-stage-audit-current-hud.png"
+    }
+  }
+}

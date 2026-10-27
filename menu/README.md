@@ -79,7 +79,7 @@ Nothing here is eyeballed.
 
 ## The one substitution: the title plate
 
-The current legal notice is the user's exact text in `DM_COPYRIGHT_DEFAULT`
+The current legal notice is the exact text in `DM_COPYRIGHT_DEFAULT`
 (`dosmenu.h`). It is painted with the same `GRAD6FNT` face and native spacing as
 the main-menu buttons. A 640-wide presentation layer fits both complete sentences
 in the existing footer seat without resizing the approved logo or altering hits.
@@ -94,7 +94,7 @@ hygiene hook; decoded RGBA pixels and the runtime menu pack remain byte-identica
 The original generated file is preserved in the source archive. The
 portable prompt records the input filename and SHA-256 instead of a machine path.
 
-As of 8 October 2026, the user-approved `art/opencnc-3d-logo-v01.png`
+As of 8 October 2026, the approved `art/opencnc-3d-logo-v01.png`
 replaces the legacy wordmark. The original `art/title.png`
 is preserved as the backdrop source. The baker retains its flames, removes the
 old wordmark, crops only transparent padding from the approved logo and fits it

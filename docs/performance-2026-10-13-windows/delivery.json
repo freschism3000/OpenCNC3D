@@ -1,0 +1,70 @@
+{
+  "source_revision": "60b0bb5497d45b73f50131f9b1e374aba1af238a",
+  "runtime_source_matches_commit": true,
+  "builds": {
+    "Windows": "cross-compiled cooked PE32 i386 LAA; native execution pending",
+    "Mac": "cooked universal arm64 + x86_64"
+  },
+  "Dock_shortcut_preserved": true,
+  "protected_runtime_files_checked": 1968,
+  "protected_game_assets_settings_and_wrappers_unchanged": true,
+  "refreshed_canonical_test_helpers": [
+    "cnc_twobrain",
+    "netcheck"
+  ],
+  "canonical_test_helper_sources_unchanged_from_release": true,
+  "protected_user_files_checked": 6,
+  "user_files_changed": [],
+  "hidden_checks": {
+    "app_harness_exit": 0,
+    "app_rounds": 1,
+    "app_failures": 0,
+    "hidden": true,
+    "renderer_real_loop_exit": 0,
+    "trace_files": [
+      "frames-mission-001.csv"
+    ],
+    "shots": 4
+  },
+  "deployed_fidelity": {
+    "deployed_matches_released_HUD_fog": true,
+    "PNG_equal": true,
+    "complete_float_targets_equal": 6,
+    "deployed_real_loop_rows": 361,
+    "column_count": 119,
+    "canonical_test_helper_sources_unchanged_from_release": true,
+    "source_revision": "60b0bb5497d45b73f50131f9b1e374aba1af238a"
+  },
+  "installed_public_binaries": {
+    "opencnc3d": {
+      "sha256": "a1ccb4755c80c8f17c67be0e44bffe5a950a2604bc787ed3f1ea71b29f23e55e",
+      "build_marks": [
+        "OPENCNC3D|build|v0.8.4+60b0bb5-dirty|cooked"
+      ],
+      "architectures": [
+        "x86_64",
+        "arm64"
+      ]
+    },
+    "cnc3d": {
+      "sha256": "a1ccb4755c80c8f17c67be0e44bffe5a950a2604bc787ed3f1ea71b29f23e55e",
+      "build_marks": [
+        "OPENCNC3D|build|v0.8.4+60b0bb5-dirty|cooked"
+      ],
+      "architectures": [
+        "x86_64",
+        "arm64"
+      ]
+    },
+    "cnc_eyes": {
+      "sha256": "ba77f35b4dc17fecedabaeb9b733b8a6492c2608481d0d71ba6be7780acac49c",
+      "build_marks": [
+        "OPENCNC3D|build|v0.8.4+60b0bb5-dirty|cooked"
+      ],
+      "architectures": [
+        "x86_64",
+        "arm64"
+      ]
+    }
+  }
+}

@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Appends one event type, POWER_SWITCH (a building's power toggled on or off
+// by its owner), after the last original type, so every original type keeps
+// its number on the wire.
+// It does not change the game simulation; event.cpp executes the new type.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/EVENT.H 1     3/03/97 10:24a Joe_bostic $ */
 /***********************************************************************************************
@@ -99,6 +108,8 @@ public:
         PROPOSE_DRAW,  //	Players proposes that 2-player game be called a stalemate.
         RETRACT_DRAW,  //	Player retracts proposed draw offer.
 #endif
+
+        POWER_SWITCH, // OpenCNC3D: a building's power toggled by its owner, appended for wire compatibility.
 
         LAST_EVENT, // one past the last event
     } EventType;

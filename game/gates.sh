@@ -56,7 +56,7 @@ LABEL="${1:-run}"
 mkdir -p shots
 OUT="../gates/$LABEL.log"
 : > "$OUT" || { echo "FAIL: cannot write $RUNDIR/$OUT" >&2; exit 1; }
-BASE="--cameos cameos.pack --dospack dossidebar.pack --dosinf dosinfantry.pack --dylib TiberianDawn.dylib --dir missions/ --content content/"
+BASE="--cameos cameos.pack --dospack dossidebar.pack --dosinf dosinfantry.pack --dylib TiberianDawn.dylib --dir missions/ --content content/ --dist 3000"
 PASS=0; FAIL=0
 # EVERY VERDICT GOES INTO THE LOG AS WELL AS ONTO THE TERMINAL, and it did not used to.
 # These two lines echoed to stdout only. The gates write their own log ($OUT) as they go,
@@ -104,6 +104,16 @@ INTERACTIVE="${OPENCNC3D_GATES_INTERACTIVE:-0}"
 # (game/fullscreen.h). --edgeplay, the one run whose subject IS the window, ignores it.
 OPENCNC3D_BACKGROUND=1
 export OPENCNC3D_BACKGROUND
+
+# THE 1995 MENUS, FOR THE GATES THAT SCRIPT THEM. Under Enhanced the shell draws the
+# Enhanced menu over the same controllers with a layout of its own, so a gate that clicks
+# the 1995 lobby, game browser, save screen or briefing at their 1995 rectangles lands on
+# nothing there. OPENCNC3D_MENU_1995=1 keeps the 1995 screens for the runs of those gates,
+# the screens Classic and N64 draw in any case. They are switched on around exactly those
+# gates and off again after; G6 and G59 walk the shell through the Enhanced menu itself,
+# and G325 drives every Enhanced screen against the controllers underneath.
+menu1995_on()  { OPENCNC3D_MENU_1995=1; export OPENCNC3D_MENU_1995; }
+menu1995_off() { unset OPENCNC3D_MENU_1995; }
 
 # =====================================================================================
 # THE STALE-SHOT WRAPPER. Every gate that measures a PNG must go through this.
@@ -2054,7 +2064,7 @@ rm -f shots/jukebox.png shots/g48.log
 JBRC=$?
 cat shots/g48.log >> "$OUT"
 JBL=$(cat shots/g48.log)
-JBPAGE=$(echo "$JBL" | grep -c "click|Sound Controls|.*page=4")
+JBPAGE=$(echo "$JBL" | grep -c "click|Audio|.*page=4")
 JBPLAY=$(echo "$JBL" | grep -cE "^MUSIC\|play\|")
 if [ "$JBRC" != "0" ]; then
   bad "G48 jukebox: the run itself failed (exit $JBRC)"
@@ -2115,6 +2125,8 @@ JB3RC=$?
 cat shots/g48b.log shots/g48c.log >> "$OUT"
 JBTRACKS=$(grep -E '^MUSIC\|play\|' shots/g48b.log)
 JBCLICKS=$(grep -cE '^OPTIONS\|script\|click\|' shots/g48b.log)
+JBROUTE=$(grep -E '^OPTIONS\|script\|click\|' shots/g48b.log | cut -d'|' -f4 | tr '\n' '|')
+JBSTOPROUTE=$(grep -E '^OPTIONS\|script\|click\|' shots/g48c.log | cut -d'|' -f4 | tr '\n' '|')
 JBN=$(echo "$JBTRACKS" | grep -cE '^MUSIC\|play\|')
 JBNAMES=$(echo "$JBTRACKS" | cut -d'|' -f3 | tr '\n' ' ')
 JBOPEN=$(echo "$JBTRACKS" | sed -n 1p | cut -d'|' -f3)
@@ -2125,9 +2137,11 @@ JBSN=$(grep -cE '^MUSIC\|play\|' shots/g48c.log)
 JBSRMS=$(python3 "$GATEDIR/gate_rms.py" shots/g48c.wav 10 | cut -d'|' -f2)
 if [ "$JB2RC" != "0" ] || [ "$JB3RC" != "0" ]; then
   bad "G48b jukebox advance: the run itself failed (exit $JB2RC / $JB3RC)"
-elif [ "${JBCLICKS:-0}" != "4" ] || [ "$JBOPEN" != "TARGET" ] || [ -z "$JBPICK" ] \
+elif [ "${JBCLICKS:-0}" != "3" ] || [ "$JBROUTE" != "Audio|Track List|Play|" ] \
+     || [ "$JBSTOPROUTE" != "Audio|Track List|Stop|" ] \
+     || [ "$JBOPEN" != "TARGET" ] || [ -z "$JBPICK" ] \
      || [ "$JBPICK" = "TARGET" ]; then
-  bad "G48b jukebox advance: COULD NOT TEST -- dialog clicks=$JBCLICKS(want 4) opening track=$JBOPEN(want TARGET) hand-picked track=$JBPICK(want any other one)"
+  bad "G48b jukebox advance: COULD NOT TEST -- dialog clicks=$JBCLICKS(want 3) play-route=[$JBROUTE] stop-route=[$JBSTOPROUTE](want Audio|Track List|Play/Stop|) opening track=$JBOPEN(want TARGET) hand-picked track=$JBPICK(want any other one)"
 elif [ $((${JBPICKD:-999} + 10)) -gt 60 ]; then
   bad "G48b jukebox advance: COULD NOT TEST -- the row this click lands on is now $JBPICK at ${JBPICKD}s and the run is 60s, so it cannot reach an end of track. Move the click or lengthen the run."
 elif [ "${JBN:-0}" -ge 3 ] && [ "${JBRMS:--1}" -gt 500 ] && [ "${JBSN:-0}" = "1" ] \
@@ -2873,8 +2887,11 @@ CFG
 # than itself. Left on, this gate read 133961 darkened pixels at 40 degrees and only
 # 117566 at 18 -- the low sun appearing to SHORTEN the shadows, which is the opposite of
 # what it does and would have been a convincing bug report about the sun.
+# Isolate the legacy shadow toggle: unified daylight deliberately suppresses
+# cartridge shadow plates even when shadow_on is zero.
 cat > gfx_g36_sun.cfg <<'CFG'
 enabled 1
+unified_lighting 0
 gamma_on 0
 ss_scale 1.0
 shadow_on 1
@@ -2998,14 +3015,14 @@ fi
 # run folder and outlast the run, so a save that fails leaves the previous run's pair
 # standing, and two files from a good run compare byte identical whatever this build does.
 # The exit status, the three GFX lines and a clean script end are what tie the pair to
-# this run.
+# this run. Supersampling is not among the dials set: it is retired, and every load takes
+# 1x by design, so a saved 2.75 would come back as 1 and the pair would differ.
 rm -f gfx_rt_a.cfg gfx_rt_b.cfg
 cat > gate_gfx_rt.txt <<'TXT'
 tick 5
 gfx bilinear 1
 gfx sun_az 137.5
 gfx shadow_bias 0.0375
-gfx ss_scale 2.75
 gfx shadow_res 3072
 gfx crt_on 1
 gfx saturation 1.42
@@ -3340,36 +3357,30 @@ fi
 #               the three modes and their tabs)
 #   ENHANCED    back on
 #   Bloom       one checkbox, one element, both off
-#   Supersample the float follows the checkbox down to 1.00
+#   Supersample retired: the row is gone, so the click finds nothing and the float
+#               stays at 1.00 (every preset load also takes 1x)
 #
 # The seventh pause-menu button and the grown dialog are covered by G13 already passing.
-G42L=$(./cnc_eyes --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
-           --script "$GATEDIR/gate_visuals.txt" --gfx 2>&1 | tee -a "$OUT" | grep '^OPTVIS|')
+G42ALL=$(./cnc_eyes --noshroud --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
+           --script "$GATEDIR/gate_visuals.txt" --gfx 2>&1 | tee -a "$OUT")
+G42L=$(echo "$G42ALL" | grep '^OPTVIS|')
 g42() { echo "$G42L" | sed -n "$1p"; }
 G42OK=1
 echo "$(g42 1)" | grep -q 'enhanced=1|advdisabled=0|.*fx_enabled=1' || G42OK=0
 echo "$(g42 2)" | grep -q 'enhanced=0|advdisabled=0|.*fx_enabled=0' || G42OK=0
 echo "$(g42 3)" | grep -q 'enhanced=1|advdisabled=0|.*fx_enabled=1' || G42OK=0
 echo "$(g42 4)" | grep -q 'page=3|.*bloom=0|.*fx_bloom=0'           || G42OK=0
-# SUPERSAMPLING: assert the PAIRING and the MOVEMENT, not a fixed direction.
-# This line used to read `grep -q 'ss=0|.*fx_ss=1.00'`, which silently assumed the box
-# starts TICKED because the shipped ss_scale was 2.0. On the original dials
-# became the defaults and ss_scale is 1.0, so the box now starts clear and the click
-# turns it ON. The dialog and the chain agreed perfectly in both directions the whole
-# time -- the gate was asserting an accident of the default, not the thing it claims in
-# its own header ("a checkbox moves its element").
-#
-# What replaces it is STRICTLY STRONGER, not looser. Two claims instead of one:
-#   PAIRING   ss=0 must come with fx_ss=1.00 and ss=1 with fx_ss=2.00, either way round
-#   MOVEMENT  line 5's ss must DIFFER from line 4's, so a checkbox that does nothing at
-#             all fails here. The old form could not make that claim: with the old
-#             default it passed on the state alone and never proved the click did it.
-G42SS4=$(g42 4 | sed -n 's/.*|ss=\([01]\)|.*/\1/p')
-G42SS5=$(g42 5 | sed -n 's/.*|ss=\([01]\)|.*/\1/p')
-echo "$(g42 5)" | grep -qE 'ss=0\|.*fx_ss=1\.00|ss=1\|.*fx_ss=2\.00'  || G42OK=0
-[ -n "$G42SS4" ] && [ -n "$G42SS5" ] && [ "$G42SS4" != "$G42SS5" ]        || G42OK=0
+# SUPERSAMPLING IS RETIRED. The game draws at the screen's own resolution: the Visuals
+# screen has no Supersampling row and every preset load takes 1x. So the click on it must
+# find nothing and move nothing, and all five lines must pair ss=0 with fx_ss=1.00. A row
+# that came back, or a load that let a saved 2x through, shows here as ss=1 or a float
+# above 1.00.
+for n in 1 2 3 4 5; do
+  echo "$(g42 $n)" | grep -q '|ss=0|.*|fx_ss=1\.00' || G42OK=0
+done
+echo "$G42ALL" | grep -q '^SCRIPT|optclick|Supersampling has no rectangle' || G42OK=0
 if [ "$G42OK" = "1" ] && [ "$(echo "$G42L" | wc -l | tr -d ' ')" = "5" ]; then
-  ok "G42 the Visuals screen drives the chain: CLASSIC switches the chain off with ADVANCED still live, ENHANCED brings it back, and a checkbox moves its element -- supersampling's float included, down to 1.00"
+  ok "G42 the Visuals screen drives the chain: CLASSIC switches the chain off with ADVANCED still live, ENHANCED brings it back, a checkbox moves its element, and supersampling stays retired at 1.00"
 else
   bad "G42 Visuals screen: the dialog and the chain disagree. Lines: $G42L"
 fi
@@ -5331,6 +5342,8 @@ fi
 fi
 
 # ---- THE SKIRMISH LOBBY ---------------------------------------------------------------
+# G86 and G87 click the 1995 lobby by its own rectangles (menu1995_on, at the top).
+menu1995_on
 # G86 and G87 start at 86 on purpose: G79 to G85 are allocated to the player bug board.
 #
 # G86 THE SCREEN. Opens the lobby and works every control on it with synthetic events,
@@ -5466,6 +5479,7 @@ elif [ -n "$LPSIDE" ] && [ "$LPSIDE" = "$LPGOTSIDE" ] \
 else
   bad "G87 lobby route: what the screen sent and what the engine got disagree. screen side=$LPSIDE ai=$LPAI credits=$LPCR blocked-seat-4=$LPBLK(want >=1); engine players=$LPPLAYERS side=$LPGOTSIDE credits=$LPGOTCR seat-4-lines=$LPSEAT4(want 0) seat-5-colour=$LPSEAT5C(want 5)"
 fi
+menu1995_off
 
 # G88 CONTROL GROUPS GO THROUGH THE ENGINE, AND COME BACK.
 #
@@ -5966,10 +5980,12 @@ TTNAME=$(echo "$TTLOG" | grep -c '^SBTIP|hover=1|.*|name=Med\. Tank|cost=800$')
 TTCHROME=$(echo "$TTLOG" | grep -c '^SBTIP|hover=[0-9]*|col=-1|slot=-1|name=Sell Structure|cost=-1$')
 # 3. off the panel, nothing. This is the leg that fails if the hover is never cleared.
 TTNONE=$(echo "$TTLOG" | grep -c '^SBTIP|hover=0|col=-1|slot=-1|name=-|cost=-1$')
-# 4. THE WHOLE TABLE, not one lucky lookup. 118 rows, and -- the real assertion -- not one
+# 4. THE WHOLE TABLE, not one lucky lookup. 119 rows, and -- the real assertion -- not one
 #    of them fell back to its own ident. "MTNK" as a title would mean the bake's join
 #    silently failed for that row and nothing else would show it.
-TTCOUNT=$(echo "$TTLOG" | grep -c '^SBTIPNAMES|count=118$')
+TTCOUNT=$(echo "$TTLOG" | grep -c '^SBTIPNAMES|count=119$')
+TTDEMOLISH=$(echo "$TTLOG" | grep -c '^SBTIPNAME|SB_DEMOLISH|Demolish Structure$')
+TT6DEMOLISH=$(echo "$TTLOG6" | grep -c '^SBTIPNAME|SB_DEMOLISH|Demolish Structure$')
 TTIDENT=$(echo "$TTLOG" | python3 -c '
 import sys
 # THREE NAMES ARE LEGITIMATELY THEIR OWN IDENT and this list is why the leg is worth
@@ -5998,11 +6014,12 @@ TT6NONE=$(echo "$TTLOG6" | grep -c '^SBTIP|hover=0|col=-1|slot=-1|name=-|cost=-1
 if [ "$TTRC" != "0" ] || [ "$TTRC6" != "0" ]; then
   bad "G94 sidebar tooltip: a run failed (exit $TTRC / $TTRC6)"
 elif [ "${TTNAME:-0}" -ge 1 ] && [ "${TTCHROME:-0}" -ge 1 ] && [ "${TTNONE:-0}" -ge 1 ] \
-     && [ "${TTCOUNT:-0}" -ge 1 ] && [ "${TTIDENT:-1}" -eq 0 ] && [ "${TT6:-0}" -ge 1 ] \
+     && [ "${TTCOUNT:-0}" -ge 1 ] && [ "$TTDEMOLISH" = "1" ] && [ "$TT6DEMOLISH" = "1" ] \
+     && [ "${TTIDENT:-1}" -eq 0 ] && [ "${TT6:-0}" -ge 1 ] \
      && [ "${TT6CHROME:-0}" -ge 1 ] && [ "${TT6NONE:-0}" -ge 1 ]; then
-  ok "G94 sidebar tooltip: a cameo reads 'Med. Tank' and '\$800' from the game's own CONQUER.ENG and its own export, a chrome button reads 'Sell Structure' with no price line, off the panel reads nothing, all 118 baked names resolved with none falling back to its ident except the three the game itself calls A10, C17 and APC, and the Enhanced HUD gets the same three at its own geometry"
+  ok "G94 sidebar tooltip: a cameo reads 'Med. Tank' and '\$800' from the game's own CONQUER.ENG and its own export, a chrome button reads 'Sell Structure' with no price line, off the panel reads nothing, all 119 baked names including 'Demolish Structure' resolved with none falling back to its ident except the three the game itself calls A10, C17 and APC, and the Enhanced HUD gets the same three at its own geometry"
 else
-  bad "G94 sidebar tooltip: cameo=$TTNAME(want >=1) chrome=$TTCHROME(want >=1) offpanel=$TTNONE(want >=1; zero means the hover is never cleared) table=$TTCOUNT(want 1) idents-not-joined=$TTIDENT(want 0; counts rows whose title is its own ident EXCLUDING the three the game really does call A10/C17/APC, plus any of those three that went missing) enhanced-cameo=$TT6 enhanced-chrome=$TT6CHROME enhanced-offpanel=$TT6NONE(want >=1 each; zero means it works on the DOS bar only)"
+  bad "G94 sidebar tooltip: cameo=$TTNAME(want >=1) chrome=$TTCHROME(want >=1) offpanel=$TTNONE(want >=1; zero means the hover is never cleared) table=$TTCOUNT(want 1) demolish=$TTDEMOLISH/$TT6DEMOLISH(want 1 each) idents-not-joined=$TTIDENT(want 0; counts rows whose title is its own ident EXCLUDING the three the game really does call A10/C17/APC, plus any of those three that went missing) enhanced-cameo=$TT6 enhanced-chrome=$TT6CHROME enhanced-offpanel=$TT6NONE(want >=1 each; zero means it works on the DOS bar only)"
 fi
 
 # ==================================================================================
@@ -6281,7 +6298,7 @@ elif [ "${RFSET:-0}" -lt 1 ]; then
 elif [ "${RFDIFF:-0}" -ge 300 ] && [ "${RFDES:-99999}" -lt "${RFSEL:-0}" ]; then
   ok "G103 rally flag: with the Barracks selected and a rally point at 57,54 the flag stands there in the player's GOLD ($RFSEL gold pixels against $RFDES with nothing selected, so $RFDIFF of flag), and it goes away with the selection"
 else
-  bad "G103 rally flag: selected=$RFSEL deselected=$RFDES flag=$RFDIFF(want >=300). Zero or near-zero means either the flag is not being drawn at all, or it is drawn in the cartridge's own RED instead of the house colour -- the texture is a solid (132,16,8) and this test counts gold, so a red flag scores nothing. A NEGATIVE number means it is drawn when nothing is selected, which is the other half of what the requirement asked for"
+  bad "G103 rally flag: selected=$RFSEL deselected=$RFDES flag=$RFDIFF(want >=300). Zero or near-zero means either the flag is not being drawn at all, or it is drawn in the cartridge's own RED instead of the house colour -- the texture is a solid (132,16,8) and this test counts gold, so a red flag scores nothing. A NEGATIVE number means it is drawn when nothing is selected, which also verifies deselection"
 fi
 
 # G104. A NEW MISSION STARTS FRESH. See gate_missionreset.txt for the two defects.
@@ -6434,7 +6451,7 @@ elif [ -z "$BA_P0" ] || [ -z "$BA_P1" ]; then
 elif [ "$BA_HAVE" != "1" ]; then
   bad "G107 build anywhere: the switch never reached the brain (no CHEAT|buildanywhere|1 line) -- this TiberianDawn build may have no OpenCNC3D_Set_Build_Anywhere export"
 elif [ "${BA_C1:-99999}" -gt "${BA_C0:-0}" ]; then
-  bad "G107 build anywhere: the switch OPENED UP buildable ground (clear $BA_C0 -> $BA_C1). The cheat is only allowed to lift base adjacency; ground that will not take a foundation must still refuse one, which is the whole of what the requirement asked for."
+  bad "G107 build anywhere: the switch OPENED UP buildable ground (clear $BA_C0 -> $BA_C1). The cheat is only allowed to lift base adjacency; ground that will not take a foundation must still refuse one, which preserves placement legality."
 elif [ "${BA_P1:-0}" -ge $(( ${BA_P0:-0} * 2 )) ] && [ "${BA_L1:-0}" -gt "${BA_L0:-0}" ]; then
   ok "G107 build anywhere: the switch opens the map up -- proximity cells $BA_P0 -> $BA_P1 and legal origins $BA_L0 -> $BA_L1 -- while buildable ground does not gain a single cell ($BA_C0 -> $BA_C1)"
 else
@@ -8404,6 +8421,8 @@ else
   wait $GLPID 2>/dev/null
 fi
 
+# G231 to G234 click the 1995 game browser by its own rectangles (menu1995_on, at the top).
+menu1995_on
 # G231 THE BROWSER, PRESSED. G230 proves the game's half of the list against a real
 # service; it never touches the screen. --mpshot draws that screen from a state it was
 # handed and --mpaddr calls its pure functions, so neither one presses anything, and for
@@ -8993,6 +9012,8 @@ elif [ -n "$G234SKIP" ]; then
 else
   ok "G234 the game list sorts, scrolls and filters, and remembers how: $G234AN checks on the rules and $G234BN through the screen's own loop against a real service. Six arrival orders give one order under every column in both directions, joinable games always first; the selection is held by the game's key, so a game arriving above it moves the highlight with its game, a fetch without it leaves nothing selected and JOIN grey, and its return selects it again; HIDE LOCKED and HIDE GREYED hold back exactly those rows and count a locked grey row once; the thumb is flush at both ends, and with ten rows or none there is no thumb and a press or a drag on the track scrolls, holds and selects nothing; the track pages, a released thumb scrolls nothing, the wheel and the four keys stop at the ends; only the rows band selects; the status line names why a row is grey and what to type for a locked one; a LAN row's PING cell is empty and a PING sort on the LAN list is ordered by name. Pressed for real, PLAYERS sorted both ways kept the same game selected through a refetch, END and the track moved as asked, and HIDE LOCKED dropped and restored the selected game. The YOUR NAME box is modal: a press or a list key behind it moves nothing, its OK asks again whether JOIN still means the same game, ESC shuts it and drops the name nobody confirmed, and leaving the screen with it open does the same while the sort and HIDE boxes are still written; with the caret in ROOM CODE the list keys select nothing; a thumb whose release never came scrolls nothing. A visit that changed nothing wrote no settings file, one that did wrote the sort, a box and the name, a new process read them back, and a damaged file and a missing one both left the defaults. Ten pictures, nothing overflowing, and on the INTERNET list's picture the scroll thumb is a lighter plate than its well ($G234CONTRAST, want diff >=20). With nothing to scroll there is no thumb: the drawn track matches an empty one at ten games and at none and not at eleven ($G234TRACK), and on the hidden list's picture the track is one flat colour of the well's green ($G234EMPTY, want colours=1 and diff within 5). And $G234PN checks on the PING column through the screen's own loop against two live rooms and a relay stand-in: the relayed room read a round trip with nobody selecting it, rooms nobody holds read --, a full room was never asked, ten relayed rooms went through one relay registration and no more than eight were asked at once, PING sorted the unknowns last both ways, REFRESH asked again and a refetch did not; the direct room was not probed until it was selected, by its own log and by a quiet port that heard nothing, and was probed once when it was; arrow keys walked over both direct rooms without either being probed, and HOME in ROOM CODE neither selected nor probed anything, so Enter joined the typed address. BEYOND THE THUMB'S CONTRAST THIS SAYS NOTHING about how the list looks, which has to be judged by eye from shots/g234_mp_join-net.png and shots/g234_mp_join-net-live.png, nor about a round trip across a real network, since every number measured here is on loopback"
 fi
+
+menu1995_off
 
 if [ -x ./gate_roomcode ]; then
   RCOUT=$(./gate_roomcode 2>&1); RCRC=$?
@@ -11567,53 +11588,31 @@ CXGDI_V=$(printf '%s' "$CXGDI" | cut -d, -f3)
 CXSEEN_S=$(printf '%s\n' "$CXLOG" | grep -c "|house=GDI|cat=STRUCTURES|row=0|of=$CXGDI_S|")
 CXSEEN_V=$(printf '%s\n' "$CXLOG" | grep -c "|house=GDI|cat=VEHICLES|row=3|of=$CXGDI_V|")
 
-# THE STYLE LEG. The page has to match the game's other menus -- the same green, the same
-# font, the same borders and frames. That is a claim about every pixel, and it is exactly
-# the kind of claim that rots silently: one db_fill_rect
-# with a grey in it and the page is back to being a different program's screen.
-#
-# So: sample two rectangles that only the PAGE draws (the list box, and the stats block
-# under the model well -- neither contains the 3D model, the emblems or the DOS filigree
-# art) and require every pixel to be one of the nine colours the pause dialog itself
-# draws with. db_font_palette_grad turns out to be a FLAT palette, not a gradient (it is
-# dialog.cpp's TPF_NOSHADOW arm: ink classes to `fore`, the rest to `back`), so the set
-# really is exact and this can be a membership test rather than a hue test.
+# Enhanced Database chrome must use the same accepted native metal housing as menus.
+# Sample opaque frame pixels against the packed source, away from text and models.
 CXSTYLE=$(python3 - <<'G147STYLE'
 from PIL import Image
-# The pause dialog's own palette, resolved from dossidebar.pack's pal8 by index:
-#   12 BLACK  3 CC_GREEN  4 TEXT_BRIGHT  41 TEXT_MEDIUM
-#  140 GREEN_SHADOW  141 GREEN_BKGD  159 LIGHT_GREEN/GREEN_BOX  167 BRIGHT_GREEN
-ALLOWED = [(0, 0, 0), (0, 168, 0), (84, 252, 84), (84, 176, 36),
-           (40, 68, 36), (48, 84, 44), (60, 152, 56), (140, 200, 8)]
-# Two page-only rectangles at --w 1280 (HUD scale 2), as (x0, y0, x1, y1) in framebuffer
-# pixels. MEASURED off the page's own green borders rather than guessed: the list box's
-# frame runs down columns 22-23 and 292-293, the detail box's down 308-309 and 1256-1257,
-# and the model well's bottom edge is rows 440-441. So the interior of the list, and the
-# stats block below the well, are page and nothing else -- no 3D model, no spinning
-# emblem, no DOS filigree art. A rectangle that strays outside a box samples the
-# TRANSPARENT surface, where the darkened battlefield shows through as greys, and the
-# leg fails on the wash instead of on the style. That is how the first cut of it failed.
-RECTS = [(28, 160, 288, 694), (316, 448, 1250, 692)]
+import struct
 try:
-    im = Image.open('shots/g147_open.png').convert('RGB')
-except Exception as e:
-    print('G147STYLE|ERROR|%s' % e); raise SystemExit
-p = im.load()
-W, H = im.size
-bad = {}
-tot = 0
-for x0, y0, x1, y1 in RECTS:
-    for y in range(max(0, y0), min(H, y1)):
-        for x in range(max(0, x0), min(W, x1)):
-            c = p[x, y]
-            tot += 1
-            d = min((c[0]-a[0])**2 + (c[1]-a[1])**2 + (c[2]-a[2])**2 for a in ALLOWED)
-            if d > 144:                       # 12 levels, for any presentation chain
-                bad[c] = bad.get(c, 0) + 1
-nbad = sum(bad.values())
-worst = sorted(bad.items(), key=lambda kv: -kv[1])[:3]
-print('G147STYLE|sampled=%d|off=%d|frac=%.4f|worst=%s'
-      % (tot, nbad, (nbad / tot) if tot else 1.0, worst))
+    f=open('enhanced-menu.pack','rb');assert f.read(8)==b'ENMENU06'
+    count=struct.unpack('<I',f.read(4))[0];frame=None
+    for _ in range(count):
+        name=f.read(64).split(b'\0')[0].decode();w,h,n=struct.unpack('<III',f.read(12));data=f.read(n)
+        if name=='lobby-frame':frame=Image.frombytes('RGBA',(w,h),data)
+    assert frame is not None
+    im=Image.open('shots/g147_open.png').convert('RGB')
+    x0=(im.width-frame.width)//2;y0=(im.height-frame.height)//2
+    total=bad=0
+    for y in range(frame.height):
+        for x in range(frame.width):
+            if x>=14 and x<frame.width-14 and y>=16 and y<frame.height-28:continue
+            c=frame.getpixel((x,y))
+            if c[3]!=255:continue
+            p=im.getpixel((x+x0,y+y0));total+=1
+            if max(abs(p[k]-c[k])for k in range(3))>12:bad+=1
+    print('G147STYLE|sampled=%d|off=%d|frac=%.4f|source=accepted-metal-frame'%(total,bad,bad/max(1,total)))
+except Exception as e:print('G147STYLE|ERROR|%s'%e)
+
 G147STYLE
 )
 printf '%s\n' "$CXSTYLE" >> "$OUT"
@@ -11698,7 +11697,7 @@ elif [ "${CXOPEN:-0}" -lt 1 ] || [ "${CXAVAIL:-0}" -lt 1 ]; then
 elif [ "${CXHIT_OPT:-0}" != "1" ] || [ "${CXHIT_DB:-0}" != "1" ]; then
   bad "G147 the DATABASE tab: the tab strip's hit test does not answer DATABASE beside OPTIONS. options-at-80,16=$CXHIT_OPT database-at-240,16=$CXHIT_DB (want 1 each). The OPTIONS reading is the control: if BOTH are 0 the whole strip has moved and this gate is measuring the wrong rectangle"
 elif [ "$CXSTYLE_OK" != "ok" ]; then
-  bad "G147 the DATABASE tab: the page is not drawn in the pause dialog's palette. [$CXSTYLE]. Every pixel of the list box and the stats block must be one of the nine colours dosopt.c draws with (BLACK, CC_GREEN, TEXT_BRIGHT, TEXT_MEDIUM, GREEN_SHADOW, GREEN_BKGD, GREEN_BOX, BRIGHT_GREEN); more than 1% are not. The `worst` list names the intruders -- a grey or a gold there means a db_ call went back to the SIDEBAR's palette"
+  bad "G147 the DATABASE tab: its opaque outer frame differs from the accepted Enhanced menu housing. [$CXSTYLE]"
 elif [ "${CXTOPOK:-no}" != "ok" ]; then
   bad "G147 the DATABASE tab: the page starts INSIDE the tab strip [$CXTOPS]. boxtop must be at or below strip, both in framebuffer pixels; above it the page's green border and the faction emblem are drawn underneath the OPTIONS and DATABASE plates. The strip is drawn at the HUD scale and the page at its own, so the top edge has to be measured, not assumed equal"
 elif [ "${CXDUCKTO:-0}" != "0.60" ]; then
@@ -11714,7 +11713,7 @@ elif [ "${CXNOD:-0}" -lt 1 ] || [ "${CXCLOSED:-0}" -lt 1 ]; then
 elif [ -z "$CXDUCK" ]; then
   bad "G147 the DATABASE tab: the music never ducked. No duck=0.xx appeared anywhere in the run, so either cnc_audio_set_music_volume is not being driven or the fade is not running on the WALL CLOCK -- the world is stopped while the page is up, so a tick-driven fade would sit still and print 1.00 for ever"
 else
-  ok "G147 the DATABASE tab: the page is drawn entirely in the pause dialog's own nine colours (off-palette fraction $CXSTYLE_FRAC), the strip answers OPTIONS then DATABASE across its first two slots and the plate is really there (OPTIONS $CXP_OPT, DATABASE $CXP_DB, matching to $CXP_MATCH levels, against $CXP_CLASSIC for the same rectangle in Classic), the roster is codex_table.h's own ($CXGDI_S GDI structures, $CXGDI_V vehicles), the Minigunner, Orca and APC rows carry idata/aadata/udata's own numbers, the house switch and the close both take, the page clears the tab strip [$CXTOPS], the music floor is $CXDUCKTO and the fade has STARTED ($CXDUCK). It proves the duck is running, NOT that it lands on 0.75: the fade is 1.5 seconds of wall time and a script walks the whole screen in milliseconds, so no scripted run can reach the floor. The floor is code, not a measurement here"
+  ok "G147 the DATABASE tab: the page uses the accepted Enhanced metal housing (frame mismatch fraction $CXSTYLE_FRAC), the strip answers OPTIONS then DATABASE across its first two slots and the plate is really there (OPTIONS $CXP_OPT, DATABASE $CXP_DB, matching to $CXP_MATCH levels, against $CXP_CLASSIC for the same rectangle in Classic), the roster is codex_table.h's own ($CXGDI_S GDI structures, $CXGDI_V vehicles), the Minigunner, Orca and APC rows carry idata/aadata/udata's own numbers, the house switch and the close both take, the page clears the tab strip [$CXTOPS], the music floor is $CXDUCKTO and the fade has STARTED ($CXDUCK). It proves the duck is running, NOT that it lands on 0.75: the fade is 1.5 seconds of wall time and a script walks the whole screen in milliseconds, so no scripted run can reach the floor. The floor is code, not a measurement here"
 fi
 
 # =====================================================================================
@@ -13632,19 +13631,22 @@ fi
 # AHOVERLAY line follows it. The pre-open fit must be real or the leg proves nothing,
 # which is why the marked count is checked first.
 # =====================================================================================
+# Open the shipped first GDI mission, never a personal USER slot. Official and
+# user rows reach the same edit_request_open routine, whose request clears g_ah
+# before either reboot. A clean build must exercise this without local user maps.
 gbegin /tmp/g193.log
 # READ THE STATE, NOT THE ABSENCE OF A LINE. The first version of this leg asserted that
 # no AHOVERLAY followed the open. AHOVERLAY is printed only when its count CHANGES, so it
 # never appears there whether the report was dropped or not: mutation-tested, and the leg
 # passed with the fix removed. ahstate reads g_ah directly and can fail.
 { echo autohgt; echo autohgt; echo ahstate
-  echo "editopen USER07"; echo ahstate
+  echo "editopen SCG01EA"; echo ahstate
   echo quit; } > /tmp/g193.script
 grun /tmp/g193.log --edit --editmode 2 $BASE --nosound --w 1400 --h 900 \
      --scen SCB01EA --pack SCB01EA.pack --script /tmp/g193.script
 G193MARK=$(grep -a '^AUTOHGT|valid=1|' /tmp/g193.log | head -1 |
            sed -n 's/.*|marked=\([0-9]*\)|.*/\1/p')
-G193OPEN=$(grep -ac '^EDITOPEN|picked|USER07|' /tmp/g193.log)
+G193OPEN=$(grep -ac '^EDITOPEN|picked|SCG01EA|' /tmp/g193.log)
 # Every overlay line AFTER the open. sed prints from the open to the end, so a report that
 # survived the open is the only way one lands in that range.
 G193BEFORE=$(grep -a '^AHSTATE|' /tmp/g193.log | sed -n 1p | sed -n 's/^AHSTATE|valid=\([01]\)|.*/\1/p')
@@ -13652,7 +13654,7 @@ G193AFTER=$(grep -a '^AHSTATE|' /tmp/g193.log | sed -n 2p | sed -n 's/^AHSTATE|v
 if [ "$GRC" != "0" ]; then
   bad "G193 the report does not outlive its map: the run failed (exit $GRC), so nothing below means anything"
 elif [ "${G193OPEN:-0}" -lt 1 ]; then
-  bad "G193 the report does not outlive its map: the open of USER07 never happened, so the leg below had no map change to survive. Check that missions/user_maps/USER07 is in the run folder"
+  bad "G193 the report does not outlive its map: the open of shipped SCG01EA never happened, so the leg below had no map change to survive. Check that missions/SCG01EA.INI and .BIN are in the run folder"
 elif [ "${G193MARK:-0}" -lt 1 ]; then
   bad "G193 the report does not outlive its map: the fit before the open marked $G193MARK cells (want >=1). With nothing marked there is no report to leave behind and this gate proves nothing"
 elif [ "${G193BEFORE:-0}" != "1" ]; then
@@ -15007,6 +15009,8 @@ else
     "G210d the host hears the goodbye late: with the leaver's turns reaching the survivor 500 ms late and the host reading the goodbye only after it had run all of them, so the host learned the departure turn standing on it and the survivor learned it turns short of it, host and survivor both applied the departure on turn $G210DONT with takeover on and $G210DOFFT with it off, one hash on each of the $G210DONF and $G210DOFFF frames both hashed after it"
 fi
 
+# G211 clicks the 1995 lobby by its own rectangles (menu1995_on, at the top).
+menu1995_on
 # =====================================================================================
 # G211 A JOINER'S OWN ROW REACHES THE ROOM: a colour and a start, picked on the real screen.
 #
@@ -15132,6 +15136,8 @@ else
     ok "G211 a joiner's own row reaches the room: a host opened a four seat room on SCM01EA and held it; a joiner joined at 127.0.0.1, was seated as seat $G211SEAT holding colour $G211WASC and no start, and on the REAL lobby screen opened its own row and took colour $G211WANTC and start $G211WANTS in $G211CLICK clicks with no step skipped. The HOST'S own table then held colour $G211HC and start $G211HS for that seat, one of its change lines carries both picks together so they were seen arriving rather than found at the end, and the joiner's own copy of the room came back saying the same two numbers with $G211OVER strings overflowing"
   fi
 fi
+
+menu1995_off
 
 # ---------------------------------------------------------------------------
 # G212 THE PLAYERS CAN TALK TO EACH OTHER DURING A MATCH, and the pane obeys its rules.
@@ -15920,113 +15926,14 @@ else
   bad "G222 the wave step leaves the world's state alone: inland=${G222LAND}(want <=50) sea=${G222SEA}(want >=1000, else vacuous) wet_texels=${G222FIELD}(want >=1000) GRC=$GRC"
 fi
 
-# =====================================================================================
-# G223 THE LEAFY TREES PLAY THE RIG THEY WERE MADE WITH, AND THE CACTI ARE STILL CACTI
-#. Two things this gate holds down, and both of them have already gone
-# wrong once.
-#
-# THE RIG. Every one of the pack's sixteen models ships an armature and a hundred keys of
-# authored sway, and the pack now carries twenty of those keys per model plus a bone pair
-# and a weight per vertex. The shader skins the vertex against a palette uploaded per
-# tree. If the palette upload, the client array on texture unit one, or the uniform array
-# quietly fails, NOTHING SAYS SO: the skinning falls back to the bind pose and the tree
-# still draws, correctly lit, perfectly still. glTexCoordPointer already refuses
-# GL_UNSIGNED_BYTE this way, with GL_INVALID_ENUM and no visible effect. So the gate
-# toggles tree3d_anim at ONE tick and requires the picture to change: same frame, same
-# clock, only the rig different.
-#
-# AND IT MUST NOT CHANGE WHEN NOTHING CHANGED. The third shot puts the dial back to nought
-# and must reproduce the first EXACTLY. That is what stops the first test passing on a
-# frame that merely moved on its own, and it is the same determinism the shot digests
-# depend on.
-#
-# THE CACTI. tree3d_is_tree matches T01..T18 on the name, and T04 and T09 are CACTI on
-# desert maps, kept deliberately as the cartridge's own model, so neither is in the
-# pack's name map. The first build claimed them anyway and fell through to a hash: a
-# random one of sixteen temperate species grew in the sand, on 61 cells across eight
-# campaign scenarios, and nothing in the picture said it was a fallback. So the gate
-# stands at a T04 and requires tree3d on and tree3d off to be the SAME PICTURE.
-#
-# A SAME PICTURE IS ALSO WHAT AN EMPTY FRAME GIVES, so the T04 is proven to be in it:
-# drawpos must report the map's one T04 on cell 18,45, and probecell must project that
-# cell onto the frame the cactus shots were taken with. The T08 half is shot from a
-# DIFFERENT camera and cannot prove that; what it does prove is that the tree setting
-# changes a leafy tree, so a pack that failed to load cannot pass as a cactus left alone.
-# Not covered: a cactus that stands in the frame and draws in neither shot.
-#
-# RUN WITH --noebld, so the rebuilt-tree pack is what draws the trees here. Under Enhanced the
-# approved tree remasters (ebld_terr.h) stand in for the photogrammetry tree type by type and
-# theater by theater (the desert's T04, T08 and T09 among them), and with them on this map's
-# T08 would no longer be the pack's tree at all, so its rig could not be measured: measured,
-# mapped=0 and rig=0 with the remasters on. The remasters' own drawing is G307's.
-# =====================================================================================
-cat > /tmp/g223.txt <<'G223EOF'
-cam 18 45
-zoom max
-tick 12
-gfx tree3d 1
-shot shots/g223_cac_on.png
-gfx tree3d 0
-shot shots/g223_cac_off.png
-drawpos T04 0
-probecell 18 45
-gfx tree3d 1
-cam 23 16
-shot shots/g223_tree_on.png
-gfx tree3d 0
-shot shots/g223_tree_off.png
-gfx tree3d 1
-gfx tree3d_anim 0
-shot shots/g223_rig_off.png
-gfx tree3d_anim 2.5
-shot shots/g223_rig_on.png
-gfx tree3d_anim 0
-shot shots/g223_rig_off2.png
-quit
-G223EOF
-gbegin shots/g223_cac_on.png shots/g223_cac_off.png shots/g223_tree_on.png \
-       shots/g223_tree_off.png shots/g223_rig_off.png shots/g223_rig_on.png \
-       shots/g223_rig_off2.png shots/g223.log
-grun shots/g223.log --noshroud --scen SCB22EB --pack SCB22EB.pack $BASE --w 1280 --h 800 \
-     --script /tmp/g223.txt --enhanced --noebld
-gshots shots/g223_cac_on.png shots/g223_cac_off.png shots/g223_tree_on.png \
-       shots/g223_tree_off.png shots/g223_rig_off.png shots/g223_rig_on.png \
-       shots/g223_rig_off2.png
-G223RIGGED=$(sed -n 's/^trees: tree3d.pack v4 -- \([0-9]*\) model.*/\1/p' shots/g223.log | head -1)
-# THE CACTUS IS PROVEN TO BE IN ITS OWN FRAME, not assumed. drawpos says where the map's
-# one T04 stands, and it must stand on cell 18,45; probecell projects that cell's centre
-# through the camera of the cactus shots, and the point must land on the 1280x800 frame.
-# Without both, "the pack changes 0 px at a T04" is also what bare ground reports.
-G223T04=$(sed -n 's/^DRAWPOS|T04|[0-9]*|ex=\([-0-9.]*\)|ez=\([-0-9.]*\)|.*/\1 \2/p' shots/g223.log | head -1)
-G223AT=$(sed -n 's/^PROBE|at=\([-0-9.]*\),\([-0-9.]*\)|.*/\1 \2/p' shots/g223.log | head -1)
-G223INFRAME=$(echo "$G223T04 $G223AT" | awk 'NF == 4 { print (int($1) == 18 && int($2) == 45 && $3 >= 0 && $3 < 1280 && $4 >= 0 && $4 < 800) ? 1 : 0; next } { print 0 }')
-G223R="-1 -1 -1 -1"
-if [ "$GRC" = "0" ]; then
-  G223R=$(python3 - <<'PY'
-import numpy as np
-from PIL import Image
-def diff(x, y):
-    a = np.asarray(Image.open(x).convert('RGB')).astype(int)
-    b = np.asarray(Image.open(y).convert('RGB')).astype(int)
-    return int((np.abs(a - b).sum(axis=2) > 24).sum())
-print(diff('shots/g223_cac_on.png',  'shots/g223_cac_off.png'),
-      diff('shots/g223_tree_on.png', 'shots/g223_tree_off.png'),
-      diff('shots/g223_rig_off.png', 'shots/g223_rig_on.png'),
-      diff('shots/g223_rig_off.png', 'shots/g223_rig_off2.png'))
-PY
-)
-fi
-set -- $G223R
-G223CAC="$1"; G223TREE="$2"; G223RIG="$3"; G223SAME="$4"
-if [ -z "$G223T04" ]; then
-  bad "G223 the leafy trees play their rig and the cacti are still cacti: the run printed no DRAWPOS line for a T04 ($(grep -a -m1 '^DRAWPOS|MISSING' shots/g223.log 2>/dev/null) exit $GRC), so no cactus was shown to stand where the cactus frame is shot, and a 0 px change there is what bare ground reports"
-elif [ "$G223INFRAME" != "1" ]; then
-  bad "G223 the leafy trees play their rig and the cacti are still cacti: the T04 stands at ${G223T04} (want cell 18,45) and cell 18,45 projects to ${G223AT:-nothing} through the cactus shots' camera (want inside 1280x800), so the cactus is not in its own frame and a 0 px change there proves nothing about it"
-elif [ "$GRC" = "0" ] && [ "${G223CAC:--1}" = "0" ] && [ "${G223TREE:-0}" -ge 5000 ] \
-   && [ "${G223RIG:-0}" -ge 3000 ] && [ "${G223SAME:--1}" = "0" ]; then
-  ok "G223 the leafy trees play their rig and the cacti are still cacti: at a T04 standing on cell 18,45 inside its frame (projected to $G223AT) the pack changes $G223CAC px, at a T08 on the same map it changes $G223TREE, the authored sway moves $G223RIG px of one frame at one tick, and putting the dial back reproduces that frame to $G223SAME px, over ${G223RIGGED:-?} models"
+# G223's imported-tree rig asset was explicitly retired.
+# The replacement gate checks the accepted Enhanced models and the Visuals switch.
+gbegin shots/g223-enhanced/trees.log
+python3 "$GATEDIR/gate_enhanced_trees.py" shots/g223-enhanced > shots/g223-enhanced.log 2>&1
+if [ "$?" = "0" ]; then
+  ok "G223 accepted Enhanced trees: $(tail -1 shots/g223-enhanced.log)"
 else
-  bad "G223 the leafy trees play their rig and the cacti are still cacti: cactus=${G223CAC}(want 0, else an unmapped name is drawing a hash-picked species) mapped=${G223TREE}(want >=5000, else the first number is vacuous) rig=${G223RIG}(want >=3000, else the skin never reached the shader) reproduce=${G223SAME}(want 0) GRC=$GRC"
+  bad "G223 accepted Enhanced trees: $(tail -3 shots/g223-enhanced.log | tr '\n' ' ')"
 fi
 
 # =====================================================================================
@@ -16333,6 +16240,194 @@ quit
 G224EOF
 sed -e 's#^gfx rain_drops 1.0$#gfx rain_drops 0#' -e 's#g226_don#g226_dof#' \
     /tmp/g226d.txt > /tmp/g226e.txt
+# Keep this measuring rig on the photometric defaults it was authored against
+# (0210f43bd, 9 October). The scene camera, all sixteen floors and the original
+# one-term-at-a-time scripts stay fixed; later player lighting is independent.
+cat > /tmp/g226-light.txt <<'G226LIGHT'
+gfx gamma_on 0
+gfx gamma 1
+gfx shadow_on 1
+gfx sun_az 67.5
+gfx sun_el 28.714279
+gfx shadow_strength 1
+gfx shadow_soft 0.64286
+gfx shadow_bias 0.03043
+gfx shadow_span 1.41429
+gfx shadow_ox 11.57143
+gfx shadow_oz 7.7142801
+gfx shadow_res 4096
+gfx shadow_r 0.49107
+gfx shadow_g 0.57999998
+gfx shadow_b 0.6875
+gfx shadow_terrain 1
+gfx terrain_normals 1
+gfx sun_lambert 1
+gfx sun_floor 0.55000001
+gfx contact_on 1
+gfx contact_len 0.30000001
+gfx contact_steps 8
+gfx contact_thick 0.60000002
+gfx contact_bias 0.02
+gfx contact_strength 1
+gfx spr_shadow_scale 1.7
+gfx shadow_noff 1.5
+gfx shadow_pen 0.079999998
+gfx shadow_terrain_rise 0
+gfx terrain_shadow_strength 1
+gfx terrain_brightness 1
+gfx terrain_contrast 1
+gfx cloud_on 1
+gfx cloud_strength 0.47299999
+gfx cloud_cover 0.34799999
+gfx cloud_sharp 0.035999998
+gfx cloud_scale 20
+gfx cloud_speed 0.57099998
+gfx cloud_rot 67.5
+gfx cloud_height 12
+gfx fog_fx 1
+gfx fog_density 0.0625
+gfx fog_height 2.3125
+gfx fog_scale 2
+gfx fog_speed 0.57143003
+gfx fog_wind 64.285713
+gfx fog_light 4.4285698
+gfx water_fx 1
+gfx water_flow 0.34999999
+gfx water_flow_rate 0.25
+gfx water_current 67.5
+gfx water_foam 0
+gfx water_foam_width 0.89999998
+gfx water_wave_len 0.5
+gfx water_wave_speed 0.34999999
+gfx water_shallow 0.30000001
+gfx water_deep 0.30000001
+gfx water_edge 0.44999999
+gfx water_fade 0.89999998
+gfx water_fade_width 0.89999998
+gfx water_foam_cross 0.30000001
+gfx water_pan 0.34999999
+gfx water_river_width 3
+gfx water_river_speed 1.5
+gfx water_bump 0.14732
+gfx water_spec 0.85000002
+gfx water_refract 0.02
+gfx water_natural 0.88393003
+gfx water_dark 0.16
+gfx water_wake 0.03571
+gfx water_wake_width 1.2
+gfx water_wake_sim 1
+gfx water_wake_bump 1.2
+gfx water_wake_ring 0.12
+gfx water_wake_speed 0.02
+gfx rain_fx 0
+gfx rain_amount 0.76786
+gfx rain_streaks 0.84820998
+gfx rain_speed 17.25
+gfx rain_len 0.44999999
+gfx rain_width 0.02
+gfx rain_height 6.9910698
+gfx rain_slant 0.25
+gfx rain_wind 154.28572
+gfx rain_wet 0.74106997
+gfx rain_dark 0.49107
+gfx rain_gloss 26.5
+gfx rain_spec 0.48214
+gfx rain_ripple 0.53570998
+gfx rain_ripple_scale 6.9910698
+gfx rain_ripple_rate 1.2
+gfx rain_puddle 0.375
+gfx rain_haze 0
+gfx rain_overcast 0.38393
+gfx rain_splash 0
+gfx rain_splash_size 0.050000001
+gfx rain_splash_rate 0.5
+gfx rain_sea 0.69643003
+gfx rain_drops 0
+gfx rain_drop_force 0
+gfx rain_water_ripple 0
+gfx rain_ripple_density 0.071429998
+gfx rain_ripple_shade 0
+gfx rain_sheen 0.071429998
+gfx rain_puddle_size 34.910709
+gfx rain_fog 0.071429998
+gfx rain_fog_height 1.0803601
+gfx rain_fog_scale 21.160709
+gfx rain_fog_speed 1
+gfx rain_fog_detail 1
+gfx rain_relief 0.0625
+gfx rain_relief_body 0.080360003
+gfx rain_puddle_mirror 0.24107
+gfx rain_puddle_edge 0.26049
+gfx rain_puddle_flat 0.80355
+gfx rain_puddle_ssr 0.625
+gfx dfog_on 1
+gfx dfog_t_amount 0.33036
+gfx dfog_t_start 2
+gfx dfog_t_depth 22.24107
+gfx dfog_t_r 0.69999999
+gfx dfog_t_g 0.74106997
+gfx dfog_t_b 0.76999998
+gfx bloom_on 1
+gfx bloom_threshold 0.68000001
+gfx bloom_knee 0.15000001
+gfx bloom_intensity 1.16071
+gfx bloom_radius 1.6
+gfx bloom_passes 4
+gfx ssao_on 1
+gfx ssao_radius 0.2067
+gfx ssao_intensity 0.51786
+gfx ssao_bias 0.01384
+gfx ssao_power 1.3125
+gfx ssao_samples 18
+gfx ssao_ground 0.5
+gfx ssao_object 1
+gfx ssao_foliage 0.79464
+gfx light_intensity 0.39286
+gfx light_radius 2.74107
+gfx light_falloff 1.88393
+gfx light_fade 0.26786
+gfx light_fade_muzzle 0.15000001
+gfx light_r 1
+gfx light_g 0.72000003
+gfx light_b 0.36000001
+gfx light_explosions 1
+gfx light_muzzle 1
+gfx light_fire 1
+gfx light_tiberium 1
+gfx grade_on 1
+gfx exposure -0.17857
+gfx contrast 1.15625
+gfx saturation 0.91070998
+gfx temperature -0.03571
+gfx tint 0
+gfx lift -0.071429998
+gfx gain 1.50446
+gfx hdr_on 1
+gfx tonemap 1
+gfx tone_knee 0.85000002
+gfx bloom_clamp 8.875
+gfx m3_env 1
+gfx m3_sun 0.69643003
+gfx m3_ambient 3
+gfx m3_normal 0.76786
+gfx m3_ao 0.51786
+gfx m3_roughmin 0.11607
+gfx m3_specamb 0.76786
+gfx st_gamma 1
+gfx st_bright 0.80356997
+gfx st_contrast 1
+gfx st_sat 1
+gfx st_shade 1.0178601
+gfx st_sun 1
+gfx st_glow 1
+gfx st_ao 0.94643003
+gfx unified_lighting 0
+gfx object_shadow_fill 0
+G226LIGHT
+for g226_script in /tmp/g226.txt /tmp/g226d.txt /tmp/g226e.txt; do
+  cat /tmp/g226-light.txt "$g226_script" > "$g226_script.pinned" \
+    && mv "$g226_script.pinned" "$g226_script" || exit 1
+done
 G224T="pudssr pudmir puddle spec sheen ripple relief dark haze overcast fog streaks watring sea splash wet"
 gbegin shots/g226_ref.png shots/g226_ref2.png shots/g226_alldead.png shots/g226_rainoff.png \
        shots/g226_don6.png shots/g226_dof6.png shots/g226.log shots/g226d.log shots/g226e.log
@@ -16850,9 +16945,9 @@ tick 10
 shot shots/g232_after.png
 quit
 G232EOF
-# The supersample memory, in a run of its own. 3x is standing before the dialog opens, so
-# the seed records it; the press must clear the memory as well as the scale, and the box
-# ticked afterwards must give the shipped 2x rather than handing the 3x back.
+# The render scale, in a run of its own. Supersampling is retired: the page has no row for
+# it and the game draws at the screen's own resolution, so with 3x standing before the
+# dialog opens the press must leave 1x, and there is no box to tick it back.
 cat > /tmp/g232_ss.txt <<'G232EOF'
 tick 5
 gfx ss_scale 3
@@ -16861,8 +16956,6 @@ optclick Visuals
 optclick Enhanced
 optclick Advanced...
 optclick Reset to defaults
-optvis
-optclick Supersampling
 optvis
 quit
 G232EOF
@@ -16923,18 +17016,14 @@ echo "$G232G" | grep -q 'swap=1|fx_swap=1|push=0|fx_push=0|cash=0|fx_cash=0' || 
 # the way in, reading mode=0.
 G232DISP=$(grep -c 'DISPLAY|' shots/g232_reset.log)
 G232DISPLAST=$(grep 'DISPLAY|' shots/g232_reset.log | tail -1)
-# THE SUPERSAMPLE MEMORY, from the run of its own: the press clears the scale AND what the
-# tick box remembers, so ticking it again gives the shipped 2x. This cannot be read from the
-# preset file at all, because the memory is a static outside the state struct.
+# THE RENDER SCALE, from the run of its own: the press leaves the retired supersampling at
+# 1x, with no row on the page for it.
 G232SSN=$(grep -c '^OPTVIS|' shots/g232_ss.log)
 G232SSOFF=$(grep '^OPTVIS|' shots/g232_ss.log | head -1)
-G232SSON=$(grep '^OPTVIS|' shots/g232_ss.log | tail -1)
 G232SSOK=1
-[ "${G232SSN:-0}" = "2" ] || G232SSOK=0
+[ "${G232SSN:-0}" = "1" ] || G232SSOK=0
 echo "$G232SSOFF" | grep -q '|ss=0|' || G232SSOK=0
 echo "$G232SSOFF" | grep -q '|fx_ss=1.00|' || G232SSOK=0
-echo "$G232SSON"  | grep -q '|ss=1|' || G232SSOK=0
-echo "$G232SSON"  | grep -q '|fx_ss=2.00|' || G232SSOK=0
 if [ "$GRC" != "0" ]; then
   bad "G232 Reset to defaults: a run failed (GRC=$GRC). Nothing below was measured"
 elif [ "${G232BEFORE:-0}" -lt 40 ]; then
@@ -16946,11 +17035,11 @@ elif [ "${G232DISP:-0}" != "1" ] || ! echo "$G232DISPLAST" | grep -q 'DISPLAY|de
 elif [ "$G232OK" != "1" ]; then
   bad "G232 Reset to defaults: the page and the dials disagree after the press. [$G232V] [$G232D] [$G232P] [$G232G], before the press [$G232DPRE] ($G232DN OPTDISP readbacks, want 2). The things applied through a FUNCTION are what fail here first: sb_hud is the sidebar actually being drawn, sb_div the UI scale that reached it, and yaw the camera"
 elif [ "$G232SSOK" != "1" ]; then
-  bad "G232 Reset to defaults: the supersample memory survived the press. After the reset [$G232SSOFF] and after ticking the box again [$G232SSON] ($G232SSN readbacks, want 2): want ss=0 fx_ss=1.00 then ss=1 fx_ss=2.00. The scale the box remembers is a static outside the state struct, so the whole-struct copy cannot reach it and one click hands the player back the picture the press just cleared"
+  bad "G232 Reset to defaults: the render scale is not back at 1x after the press. After the reset [$G232SSOFF] ($G232SSN readbacks, want 1): want ss=0 fx_ss=1.00, since supersampling is retired and the game draws at the screen's own resolution"
 elif [ "$G232SAME" != "1" ]; then
   bad "G232 Reset to defaults: the frame after the press stands $G232PX px away from a fresh Enhanced frame of the same scenario, camera and tick. The dials read right and the picture does not, so something the dials reach only through a function was not applied"
 else
-  ok "G232 Reset to defaults puts the whole Enhanced picture back: $G232BEFORE dials moved off their defaults, and after one press the only ones still standing off them are the two input switches, the credit tick, the master switch and the Global display rows; the page and the dials agree row for row, the sidebar, the UI scale and the camera followed, the window was left where the player put it, ticking the render scale again gives the shipped 2x rather than the 3x the press cleared, and the frame is byte identical to a fresh Enhanced frame"
+  ok "G232 Reset to defaults puts the whole Enhanced picture back: $G232BEFORE dials moved off their defaults, and after one press the only ones still standing off them are the two input switches, the credit tick, the master switch and the Global display rows; the page and the dials agree row for row, the sidebar, the UI scale and the camera followed, the window was left where the player put it, the render scale is back at 1x with supersampling retired, and the frame is byte identical to a fresh Enhanced frame"
 fi
 
 # =====================================================================================
@@ -17151,11 +17240,11 @@ G233PIC=1
 [ "$(g233dial new_hud)" = "1" ] || G233PIC=0
 [ "$(g233dial texset)" = "3.00000" ] || G233PIC=0   # the Enhanced textures, Enhanced's default
 [ "$(g233dial ss_scale)" = "1.00000" ] || G233PIC=0
-[ "$(g233dial sun_az)" = "67.50000" ] || G233PIC=0
-[ "$(g233dial sun_el)" = "28.71428" ] || G233PIC=0
+[ "$(g233dial sun_az)" = "57.85714" ] || G233PIC=0
+[ "$(g233dial sun_el)" = "28.00000" ] || G233PIC=0
 [ "$(g233dial inf_scale)" = "0.76786" ] || G233PIC=0   # the tuned panel's Enhanced infantry size
 [ "$(g233dial decal_soft)" = "0.60000" ] || G233PIC=0
-[ "$(g233dial grass)" = "0" ] || G233PIC=0
+[ "$(g233dial grass)" = "1" ] || G233PIC=0
 [ "$(g233dial rain_fx)" = "0" ] || G233PIC=0
 G233PICSAW="smooth_anim=$(g233dial smooth_anim) enabled=$(g233dial enabled) bilinear=$(g233dial bilinear) new_hud=$(g233dial new_hud) texset=$(g233dial texset) ss_scale=$(g233dial ss_scale) sun_az=$(g233dial sun_az) sun_el=$(g233dial sun_el) inf_scale=$(g233dial inf_scale) decal_soft=$(g233dial decal_soft) grass=$(g233dial grass) rain_fx=$(g233dial rain_fx)"
 G233CTLLINE=$(grep -c '^controls: no opencnc3d-controls.cfg yet' /tmp/g233_shell.log)
@@ -17197,6 +17286,9 @@ else
   ok "G233 shipped defaults, in a folder holding neither settings file ($G233LINKS files linked into $G233DIRS real directories, none of them a link back): the shipped block a new player gets is speed $G233SHSPEED, scroll $G233SHSCROLL, and music, sound and speech all at $G233SHMUSIC, the top of the travel and not 255; the tick rate is $G233TPRE before the pause dialog is opened and $G233TPOST after, so the first mission does not change pace the first time ESC is pressed; the two sliders seeded from that block agree with it, and the three volume sliders read 239 as the mixer's own level scaled onto the travel, REPORTED rather than asserted as a default; all $G233ROWS picture rows stand on their compiled defaults with smooth animation ON and the chain's master switch OFF whatever the tuned file says; and the shell reports both files absent and mints neither; the process killed at the end was the game itself ($G233COMM) and not a wrapper"
 fi
 
+# G237 and G238 click the 1995 briefing and save screens by their own rectangles
+# (menu1995_on, at the top).
+menu1995_on
 # G237 RESTATE. "Implement Restate in the Options menu." goptions.cpp:373 hands the
 # player the mission objective as text with a Video button beside it; this build drew the
 # button disabled because nothing had read the mission briefing. Four legs, and the last one is
@@ -17417,6 +17509,8 @@ else
   bad "G238 the save system: open=$G238OPEN1 empty-greys=$G238EMPTY typed=$G238TYPED save1=$G238SAVE1 rows2=$G238ROWS2/$G238ROWS2B pick=$G238PICK save2=$G238SAVE2 loadrow=$G238LOADROW load=$G238LOAD delq=$G238DELQ del=$G238DEL left=$G238LEFT closed=$G238CLOSED end=$G238END lines=$G238LINES same=$G238SAME pngs=$G238PNGS(want 4) | flow: save1=$G238FSAVE1 save2=$G238FSAVE2 done=$G238FDONE camp=[$G238CAMP](want [SCG01EA=1/0/1 SCG02EA=1/0/2]) | menu: rows=$G238CROWS pick=$G238CPICK boot=$G238CBOOT load=$G238CLOAD end=$G238CEND | in-game: handover=$G238DHAND reason7=$G238DREASON boot=$G238DBOOT load=$G238DLOAD end=$G238DEND (want 1 each)"
 fi
 
+menu1995_off
+
 # =====================================================================================
 # G239 THE PAD NEVER BURIES A BUILDING, and a building placed beside a taller neighbour
 # rises to its level.
@@ -17518,8 +17612,8 @@ fi
 # and the box is the standing vehicle's own silhouette read back from the on run, widened
 # by 60 points so the launch stays inside it.
 #
-# WHY IT CANNOT PASS ON A BROKEN BUILD. Measured on the build this catches: the on/off box
-# differs by 149 sampled pixels while the harvester stands and by 0 on every frame from
+# WHY IT CANNOT PASS ON A BROKEN BUILD. Originally measured on the build this catches:
+# the on/off box differs by 149 quarter-sampled pixels standing and by 0 on every frame from
 # the death on, because the pieces bind slot 1 in both runs. A build whose SHATTERUNIT
 # line carries no house, or a house other than the seat's own slot, fails the readout leg;
 # a build that prints the right slot and binds the wrong texture fails the pixel leg. The
@@ -17569,24 +17663,42 @@ WKONPASS=$(grep -c '^CLICKOBJ|PASS$' /tmp/g241_on.log)
 WKOFFPASS=$(grep -c '^CLICKOBJ|PASS$' /tmp/g241_off.log)
 # The pixel leg: the standing vehicle's own silhouette from the on run, widened to hold
 # the launch, compared on/off at all four frames.
+# Count every pixel: the old single-quarter lattice read 45/48/56/55 on the same death
+# frame, depending on its phase, while the complete red livery difference is 204 pixels.
+# The floor is now 200 full pixels, the nominal coverage of the previous 50-per-quarter
+# floor. This changes the measurement and its acceptance; it removes the lattice bias.
+wk_pixels() {
+  python3 - "$@" <<'PY'
+import sys
+from PIL import Image
+a = Image.open(sys.argv[1]).convert('RGB')
+b = Image.open(sys.argv[2]).convert('RGB')
+assert a.size == b.size
+W, H = a.size
+x0, y0, x1, y1 = (int(v) for v in sys.argv[3].replace('..', ',').split(','))
+x0 = max(0, x0); y0 = max(0, y0); x1 = min(W - 1, x1); y1 = min(H - 1, y1)
+pa, pb = a.load(), b.load()
+print(sum(1 for y in range(y0, y1 + 1) for x in range(x0, x1 + 1) if pa[x, y] != pb[x, y]))
+PY
+}
 WKSIL=$(sed -n 's/^CLICKOBJ|want=.*|silhouette=\([0-9]*\),\([0-9]*\)\.\.\([0-9]*\),\([0-9]*\)|.*/\1 \2 \3 \4/p' /tmp/g241_on.log | head -1)
 WKBOX=$(echo "$WKSIL" | awk 'NF == 4 { printf "%d,%d,%d,%d", $1 - 60, $2 - 60, $3 + 60, $4 + 60 }')
 WKD0=-1; WKD1=-1; WKD2=-1; WKD3=-1
 if [ "$GRC" = "0" ] && [ -n "$WKBOX" ]; then
-    WKD0=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_stand.png shots/g241_off_stand.png "$WKBOX")
-    WKD1=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_dead.png  shots/g241_off_dead.png  "$WKBOX")
-    WKD2=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_fly1.png  shots/g241_off_fly1.png  "$WKBOX")
-    WKD3=$(python3 "$GATEDIR/gate_pixdiff.py" shots/g241_on_fly2.png  shots/g241_off_fly2.png  "$WKBOX")
+    WKD0=$(wk_pixels shots/g241_on_stand.png shots/g241_off_stand.png "$WKBOX")
+    WKD1=$(wk_pixels shots/g241_on_dead.png  shots/g241_off_dead.png  "$WKBOX")
+    WKD2=$(wk_pixels shots/g241_on_fly1.png  shots/g241_off_fly1.png  "$WKBOX")
+    WKD3=$(wk_pixels shots/g241_on_fly2.png  shots/g241_off_fly2.png  "$WKBOX")
 fi
 if [ "$GRC" != "0" ]; then
   bad "G241 the wreck keeps its livery: a run failed (exit $GRC) or wrote no shot, so nothing below means anything"
 elif [ "${WKSLOT:--1}" -ge 2 ] && [ -n "$WKHOUSE" ] && [ -n "$WKTYPE" ] && [ -n "$WKID" ] \
      && [ "${WKF:-0}" -gt 1506 ] && [ "${WKONPASS:-0}" -ge 1 ] && [ "${WKOFFPASS:-0}" -ge 1 ] \
      && [ "${WKONH:-x}" = "$WKSLOT" ] && [ "${WKOFFSIDE:-0}" = "1" ] \
-     && [ "${WKD0:--1}" -ge 50 ] && [ "${WKD1:--1}" -ge 50 ] && [ "${WKD2:--1}" -ge 50 ] && [ "${WKD3:--1}" -ge 50 ]; then
-  ok "G241 the wreck keeps its livery: seat 2 is $WKHOUSE on colour $WKCOL (slot $WKSLOT), its $WKTYPE#$WKID dies at $WKX,$WKZ on frame $WKF and its pieces print house=$WKONH with team colours on and house=$WKOFFH without; inside the silhouette box $WKBOX the on/off pair differs by $WKD0 sampled pixels standing, then $WKD1 on the death frame, $WKD2 and $WKD3 in flight"
+     && [ "${WKD0:--1}" -ge 200 ] && [ "${WKD1:--1}" -ge 200 ] && [ "${WKD2:--1}" -ge 200 ] && [ "${WKD3:--1}" -ge 200 ]; then
+  ok "G241 the wreck keeps its livery: seat 2 is $WKHOUSE on colour $WKCOL (slot $WKSLOT), its $WKTYPE#$WKID dies at $WKX,$WKZ on frame $WKF and its pieces print house=$WKONH with team colours on and house=$WKOFFH without; inside the silhouette box $WKBOX the on/off pair differs by $WKD0 full pixels standing, then $WKD1 on the death frame, $WKD2 and $WKD3 in flight"
 else
-  bad "G241 the wreck keeps its livery: seat2-house=$WKHOUSE colour=$WKCOL slot=$WKSLOT(want >=2; a default colour on seat 2 means the lobby's colour order changed and the pair is indecisive) victim=$WKTYPE#$WKID at=$WKX,$WKZ frame=$WKF(want >1506; empty means no vehicle of the blown-up seat shattered) clickobj-pass on=$WKONPASS off=$WKOFFPASS(want >=1 each; 0 means the victim was not standing in frame on the frame before its death, so the box and the shots are about nothing) pieces-house on=$WKONH(want $WKSLOT; EMPTY IS THE READOUT MISSING, 1 or 0 is the side alone: the snapshot still carries obj_is_gdi) off=$WKOFFH(want 0 or 1) box=$WKBOX on/off-differs standing=$WKD0 death=$WKD1 fly=$WKD2,$WKD3(want >=50 each, measured 149/150/182/188; ZERO FROM THE DEATH ON IS THE BUG: the pieces bind the faction's default texture)"
+  bad "G241 the wreck keeps its livery: seat2-house=$WKHOUSE colour=$WKCOL slot=$WKSLOT(want >=2; a default colour on seat 2 means the lobby's colour order changed and the pair is indecisive) victim=$WKTYPE#$WKID at=$WKX,$WKZ frame=$WKF(want >1506; empty means no vehicle of the blown-up seat shattered) clickobj-pass on=$WKONPASS off=$WKOFFPASS(want >=1 each; 0 means the victim was not standing in frame on the frame before its death, so the box and the shots are about nothing) pieces-house on=$WKONH(want $WKSLOT; EMPTY IS THE READOUT MISSING, 1 or 0 is the side alone: the snapshot still carries obj_is_gdi) off=$WKOFFH(want 0 or 1) box=$WKBOX on/off-differs full pixels standing=$WKD0 death=$WKD1 fly=$WKD2,$WKD3(want >=200 each, measured 259/204/440/568; ZERO FROM THE DEATH ON IS THE BUG: the pieces bind the faction's default texture)"
 fi
 
 # =====================================================================================
@@ -17922,6 +18034,31 @@ wrenchdump
 quit
 EOS
 cat > gate_wrenchlit.txt <<'EOS'
+gfx sun_az 67.50000
+gfx sun_el 28.71428
+gfx shadow_strength 1.00000
+gfx shadow_soft 0.64286
+gfx shadow_bias 0.03043
+gfx shadow_span 1.41429
+gfx sun_floor 0.55
+gfx contact_len 0.30
+gfx contact_steps 8.0
+gfx contact_thick 0.60
+gfx contact_bias 0.020
+gfx contact_strength 1.0
+gfx cloud_strength 0.47300
+gfx ssao_intensity 0.51786
+gfx light_intensity 0.39286
+gfx light_radius 2.74107
+gfx exposure -0.25000
+gfx contrast 1.15625
+gfx saturation 1.03571
+gfx temperature 0.12500
+gfx lift 0.00357
+gfx gain 1.59821
+gfx bloom_intensity 0.28571
+gfx bloom_radius 1.60000
+gfx unified_lighting 0
 tick 20
 cam 55 51
 repairmode 1
@@ -18523,6 +18660,8 @@ else
   bad "G249 exit before rally: ${EXP_N:-0} of 8 legs hold (want A B C D E F and the two controls all 1) [$EXP_RES]"
 fi
 
+# G253 walks the 1995 menu to its mission starts (menu1995_on, at the top).
+menu1995_on
 # G253 A MISSION THAT CANNOT START SAYS WHY. A report that every mission start closed the
 # game after the mission briefing movie could not be worked, because a refused or crashed start
 # left nothing behind: the window vanished, or the menu came back untouched with one line
@@ -18616,6 +18755,8 @@ elif [ "$G253DRC" = "0" ] || [ "$G253DLINE" != "1" ] || [ "$G253DFATAL" != "0" ]
 else
   ok "G253 a mission that cannot start says why: an empty content folder, a zero-length and a junk TEMPERAT.MIX all boot SCG90EA (exit 0, $G253ALINE theater lines, E1 counts $G253AE1); a library that cannot be loaded is reported as BOOTFAIL|SCG90EA|... naming it, HARNESS|end counts 1 failure and the menu digest $G253BM1 stands; the Unable to start mission box is drawn at $G253CRECT with $G253CINK sampled pixels of ink and $G253CBELOW below it; a missing mission file is refused by name (exit $G253DRC)"
 fi
+
+menu1995_off
 
 # =====================================================================================
 # G250 THE SCREEN EDGES SCROLL OVER THE UNIT CARD.
@@ -18863,6 +19004,8 @@ else
   ok "G252 the credits tick: the readout steps 5000 to 7860 in twenty ticks of 143 with twenty TONE15 tones and arrives at 30000 ($CT_UPALL up-ticks in all), a power plant's drip payment sounds $CT_DN TONE16 tones in forty ticks ($CT_DNALL in all), none SILENT; the recording reads RMS $CT_UPRMS over the count-up and $CT_DNRMS of tick over the count-down, and with the Gameplay switch off the same run prints no cash line and the count-up window is silent (peak $CT_OFFPK, RMS $CT_OFFRMS) while the readout still reaches 7860 on schedule"
 fi
 
+# G251's pixel leg reads the 1995 Resolution list at its own rectangle (menu1995_on, at the top).
+menu1995_on
 # =====================================================================================
 # G251 THE RESOLUTION LIST FITS THE DISPLAY. The Advanced page's Resolution row used to
 # keep the first seven distinct sizes in the driver's largest-first order, with no desktop
@@ -19088,6 +19231,7 @@ elif [ "$G251OK" = "1" ]; then
 else
   bad "G251 the Resolution list fits the display:$G251WHY"
 fi
+menu1995_off
 
 # G254 SELLING AND REPAIRING IN A MATCH ARE ORDERS, NOT ACTS. The first online playtest
 # ended three matches with the desync alarm, and the players named three triggers:
@@ -19288,10 +19432,14 @@ G256EOF
 gbegin shots/g256_on.png shots/g256_on2.png shots/g256_dist.png shots/g256_life.png \
        shots/g256_off.png shots/g256_classic.png \
        shots/g256.log shots/g256b.log shots/g256c.log
+# THE VEHICLES' LAMPS STAY OUT (--novehiclelights): a lamp adds light in proportion to the
+# ground's own colour, so in the buggy's headlight pool a mark darkens the lit ground too and
+# the counts below would measure the lamps as much as the marks. This gate is about the
+# marks; G339 is the lamps'.
 grun shots/g256.log  --noshroud --scen SCB01EA --pack SCB01EA.pack $BASE --w 1280 --h 800 \
-     --script /tmp/g256.txt --enhanced
+     --script /tmp/g256.txt --enhanced --novehiclelights
 grun shots/g256b.log --noshroud --scen SCB01EA --pack SCB01EA.pack $BASE --w 1280 --h 800 \
-     --script /tmp/g256b.txt --enhanced
+     --script /tmp/g256b.txt --enhanced --novehiclelights
 grun shots/g256c.log --noshroud --scen SCB01EA --pack SCB01EA.pack $BASE --w 1280 --h 800 \
      --script /tmp/g256c.txt
 gshots shots/g256_on.png shots/g256_on2.png shots/g256_dist.png shots/g256_life.png \
@@ -19372,12 +19520,15 @@ fi
 #   (1) THE CHAIN IS ACTUALLY RUNNING. FX|chain must report usable=1 with all six
 #       programs linked. Everything below is meaningless without it, which is exactly
 #       the trap this gate was written after falling into.
-#   (2) EACH OF THE FOUR MOVES THE PICTURE ON ITS OWN, switched on one at a time against
-#       the frame with all four off.
+#   (2) EACH OF THE THREE STILL SHIPPING MOVES THE PICTURE ON ITS OWN, switched on one at
+#       a time against the frame with all four off. HIGH DYNAMIC RANGE IS RETIRED, so its
+#       leg asks for it by name and must come out byte identical to the all-off frame.
 #   (3) THE SKY IS REALLY LOADED. m3dump reports env=1 and the level count, because a
 #       missing sky pack falls back to the two-colour fill and looks perfectly fine.
-#   (4) THE ROLLOFF RESCUES CLIPPED HIGHLIGHTS. In ONE run with one dial moved, the
-#       number of pixels pinned at white must FALL when the curve is switched on. It is
+#   (4) THE ROLLOFF IS RETIRED WITH IT. It bends what a float target holds above white,
+#       and there is no float target now, so in ONE run with one dial moved the number of
+#       pixels pinned at white must be the SAME with the curve on and off. (While HDR
+#       shipped, the count had to FALL when the curve was switched on.) It is
 #       tested that way and not against the old chain because the bloom is scene
 #       referred now as well, and a brighter bloom pushes pixels up to white while the
 #       curve pulls the scene's own highlights down -- two features in opposite
@@ -19466,7 +19617,20 @@ G258B="--noshroud --scen USER30 --pack SCG01EA.pack --dir missions/user_maps/ --
 # swinging the sun moves them as well, which is not what claim (5) measures: they took the
 # mean drift over its limit with the four additions exactly as before.
 for g258f in /tmp/g258*.txt; do
-  { printf 'gfx fol_on 0\ngfx rock_on 0\ngfx mottle_on 0\n'; cat "$g258f"; } > "$g258f.pin" && mv "$g258f.pin" "$g258f"
+  { printf 'gfx unified_lighting 0\ngfx fol_on 0\ngfx rock_on 0\ngfx mottle_on 0\n'; cat "$g258f"; } > "$g258f.pin" && mv "$g258f.pin" "$g258f"
+done
+# HDR IS ASKED FOR BY NAME in every leg that used to have it on, so that retiring it is
+# measured rather than assumed: a settings file from a build that shipped it on carries
+# hdr_on 1, and that must change nothing. Only the all-off leg and the second Classic leg
+# go without. THE SKY'S BAR IS ITS OWN NOW: it was 2000 px while the sky leg ran with HDR
+# on and the all-off frame without, so it counted HDR's change as well. Alone, the sky
+# moves 765 px of this frame (the lit models' ambient), and claim (3) proves it loaded.
+for g258f in /tmp/g258_hdr.txt /tmp/g258_sky.txt /tmp/g258_contact.txt /tmp/g258_relight.txt \
+             /tmp/g258_clip.txt /tmp/g258_swing.txt /tmp/g258_rswing.txt /tmp/g258_cl.txt; do
+  { printf 'gfx hdr_on 1\n'; cat "$g258f"; } > "$g258f.hdr" && mv "$g258f.hdr" "$g258f"
+done
+for g258f in /tmp/g258*.txt; do
+  { printf 'gfx gamma_on 0\ngfx gamma 1.00000\ngfx shadow_on 1\ngfx sun_az 67.50000\ngfx sun_el 28.71428\ngfx shadow_strength 1.00000\ngfx shadow_soft 0.64286\ngfx shadow_bias 0.03043\ngfx shadow_span 1.41429\ngfx shadow_ox 11.57143\ngfx shadow_oz 7.71428\ngfx shadow_res 4096.0\ngfx shadow_r 0.49107\ngfx shadow_g 0.58000\ngfx shadow_b 0.68750\ngfx shadow_terrain 1\ngfx terrain_shadow_strength 0.69643\ngfx terrain_brightness 1.14286\ngfx terrain_contrast 1.03571\ngfx sun_lambert 1\ngfx sun_floor 0.54464\ngfx contact_len 0.30\ngfx contact_steps 8.0\ngfx contact_thick 0.60\ngfx contact_bias 0.020\ngfx contact_strength 1.0\ngfx shadow_noff 1.5\ngfx shadow_pen 0.08\ngfx shadow_terrain_rise 0.0\ngfx ssao_foliage 0.79464\ngfx cloud_on 1\ngfx cloud_strength 0.30357\ngfx cloud_cover 0.34800\ngfx cloud_sharp 0.03600\ngfx cloud_scale 20.00000\ngfx cloud_speed 0.57100\ngfx cloud_rot 67.50000\ngfx cloud_height 12.00000\ngfx fog_fx 1\ngfx fog_density 0.05357\ngfx fog_height 1.46964\ngfx fog_scale 2.00000\ngfx fog_speed 0.57143\ngfx fog_wind 64.28571\ngfx fog_light 4.50000\ngfx water_fx 1\ngfx water_flow 0.35000\ngfx water_flow_rate 0.25000\ngfx water_current 67.50000\ngfx water_foam 0.00000\ngfx water_foam_width 0.90000\ngfx water_wave_len 0.50000\ngfx water_wave_speed 0.35000\ngfx water_shallow 0.30000\ngfx water_deep 0.30000\ngfx water_edge 0.45000\ngfx water_fade 0.90000\ngfx water_fade_width 0.90000\ngfx water_foam_cross 0.30000\ngfx water_pan 0.35000\ngfx water_river_width 3.00000\ngfx water_river_speed 1.50000\ngfx water_bump 0.14732\ngfx water_spec 0.85000\ngfx water_refract 0.02000\ngfx water_natural 0.88393\ngfx water_dark 0.16000\ngfx water_wake 0.03571\ngfx water_wake_width 1.20000\ngfx water_wake_sim 1\ngfx water_wake_bump 1.20000\ngfx water_wake_ring 0.12000\ngfx water_wake_speed 0.02000\ngfx bloom_on 1\ngfx bloom_threshold 0.68000\ngfx bloom_knee 0.15000\ngfx bloom_intensity 0.92857\ngfx bloom_radius 1.93750\ngfx bloom_passes 4.0\ngfx ssao_on 1\ngfx ssao_radius 0.20670\ngfx ssao_intensity 0.51786\ngfx ssao_bias 0.01384\ngfx ssao_power 1.31250\ngfx ssao_samples 18.0\ngfx ssao_ground 0.5\ngfx ssao_object 1.0\ngfx light_intensity 0.96429\ngfx light_radius 2.87500\ngfx light_falloff 1.88393\ngfx light_fade 0.26786\ngfx light_fade_muzzle 0.15000\ngfx light_r 1.00000\ngfx light_g 0.72000\ngfx light_b 0.36000\ngfx light_explosions 1\ngfx light_muzzle 1\ngfx light_fire 1\ngfx light_tiberium 1\ngfx exposure -0.10714\ngfx contrast 1.22321\ngfx saturation 0.94643\ngfx temperature -0.01786\ngfx tint 0.0\ngfx lift -0.03571\ngfx gain 1.45089\ngfx grass 0\ngfx einf_scale 1.07143\ngfx m3inf_sun 0.30357\ngfx m3inf_fill 0.16071\ngfx m3inf_paint 0.55\ngfx m3_sun 0.69643\ngfx m3_ambient 3.00000\ngfx m3_normal 0.76786\ngfx m3_ao 0.51786\ngfx m3_roughmin 0.11607\ngfx m3_specamb 0.76786\ngfx tonemap 1.0\ngfx tone_knee 0.85\ngfx bloom_clamp 8.875\ngfx st_gamma 1.0\ngfx st_bright 0.73214\ngfx st_contrast 1.0\ngfx st_sat 1.0\ngfx st_shade 1.01786\ngfx st_sun 1.0\ngfx st_glow 1.0\ngfx st_ao 0.94643\n'; cat "$g258f"; } > "$g258f.historic" && mv "$g258f.historic" "$g258f"
 done
 gbegin shots/g258_off.png shots/g258_hdr.png shots/g258_clip.png shots/g258_sky.png shots/g258_contact.png \
        shots/g258_relight.png shots/g258_swA.png shots/g258_swB.png \
@@ -19517,18 +19681,18 @@ G258CLIP0="$5"; G258CLIP1="$6"; G258SWO="$7"; G258SWR="$8"; G258DRIFT="$9"
 G258CL=0
 cmp -s shots/g258_classic.png shots/g258_classic2.png && G258CL=1
 if [ "$GRC" != "0" ]; then
-  bad "G258 the four lighting additions: a run failed or wrote no shot (GRC=$GRC). A MISSING sky.pack in the run folder is the first thing to check"
+  bad "G258 the lighting additions, HDR retired: a run failed or wrote no shot (GRC=$GRC). A MISSING sky.pack in the run folder is the first thing to check"
 elif [ "${G258CHAIN:-0}" != "1" ] || [ "${G258PROGS:-0}" -lt 1 ]; then
-  bad "G258 the four lighting additions: the post chain did not come up (usable=${G258CHAIN:-none}, all-six-programs lines=${G258PROGS:-0}). Every pixel number below would be the CLASSIC picture and would read as four features doing nothing. Look in the log for a shader that failed to compile"
-elif [ "${G258H:-0}" -ge 10000 ] && [ "${G258S:-0}" -ge 2000 ] \
+  bad "G258 the lighting additions, HDR retired: the post chain did not come up (usable=${G258CHAIN:-none}, all-six-programs lines=${G258PROGS:-0}). Every pixel number below would be the CLASSIC picture and would read as four features doing nothing. Look in the log for a shader that failed to compile"
+elif [ "${G258H:-1}" = "0" ] && [ "${G258S:-0}" -ge 400 ] \
      && [ "${G258C:-0}" -ge 1000 ] && [ "${G258R:-0}" -ge 20000 ] \
      && [ "${G258ENV:-0}" = "1" ] && [ "${G258LOD:-0}" -ge 5 ] \
-     && [ "$G258CLIP1" -lt "$G258CLIP0" ] \
+     && [ -n "$G258CLIP1" ] && [ "$G258CLIP1" = "$G258CLIP0" ] \
      && [ "$G258SWR" -gt "$G258SWO" ] && [ "${G258DRIFT:-999}" -le 400 ] \
      && [ "$G258CL" = "1" ]; then
-  ok "G258 the four lighting additions: the chain is up with all six programs linked, and each feature moves the picture on its own -- HDR $G258H px, the sky $G258S, contact shadows $G258C, the relight $G258R. The sky really loaded, $G258LOD roughness levels rather than the two-colour fallback. HDR rescues highlights rather than merely changing them: in one run with one dial moved, pixels pinned at white fall from $G258CLIP0 to $G258CLIP1. The relight re-aims the light instead of re-grading it: swinging the sun 180 degrees moves the cartridge buildings $G258SWR hundredths of a level against $G258SWO without it, while the frame's mean drifts $G258DRIFT hundredths. Under CLASSIC all four switches together change nothing"
+  ok "G258 the lighting additions, HDR retired: the chain is up with all six programs linked; asking for HDR by name changes 0 pixels and the rolloff leaves $G258CLIP0 clipped channels where they were, while the sky moves $G258S px, contact shadows $G258C and the relight $G258R; the sky really loaded ($G258LOD roughness levels), the relight re-aims a sun swing ($G258SWR against $G258SWO) with a mean drift of $G258DRIFT, and Classic is untouched"
 else
-  bad "G258 the four lighting additions: hdr-px=$G258H(want >=10000) sky-px=$G258S(want >=2000) contact-px=$G258C(want >=1000) relight-px=$G258R(want >=20000) env=${G258ENV:-none}(want 1) envlod=${G258LOD:-none}(want >=5) clipped-with-the-curve-off=$G258CLIP0 with-it-on=$G258CLIP1(want fewer) sun-swing-relit=$G258SWR(want more than $G258SWO) mean-drift=$G258DRIFT(want <=400) classic-untouched=$G258CL(want 1)"
+  bad "G258 the lighting additions, HDR retired: hdr-px=$G258H(want 0, retired) sky-px=$G258S(want >=400) contact-px=$G258C(want >=1000) relight-px=$G258R(want >=20000) env=${G258ENV:-none}(want 1) envlod=${G258LOD:-none}(want >=5) clipped-with-the-curve-off=$G258CLIP0 with-it-on=$G258CLIP1(want the same, retired) sun-swing-relit=$G258SWR(want more than $G258SWO) mean-drift=$G258DRIFT(want <=400) classic-untouched=$G258CL(want 1)"
 fi
 
 # G259 THE DIAL PANEL'S TABLE: no two rows drive the same setting.
@@ -20068,6 +20232,9 @@ G267D=$(grep -a '^FOLDUMP|' shots/g267.log | head -1)
 G267OFFS=$(grep -a '^FOLDUMP|' shots/g267.log | sed -n '2,3p' | grep -ac '|on=0|')
 G267C=$(grep -a '^FOLDUMP|' shots/g267c.log | head -1)
 G267DS=$(grep -a '^FOLDUMP|' shots/g267d.log | head -1)
+# Desert grass stays absent; approved source-template bushes use this same pass.
+# Bind that separate capability to its native placement table.
+G267DD=$(grep -ac '^DESERTDETAIL|loaded|placements=77|templates=24|families=2$' shots/g267d.log)
 G267CHK=$(python3 - <<'PY' 2>>"$OUT"
 import re
 bin_ = open("missions/SCG01EA.BIN", "rb").read()
@@ -20127,8 +20294,9 @@ if [ "$GRC" = "0" ] && echo "$G267D" | grep -q '|on=1|' \
    && [ "${G267N:-0}" -gt 0 ] && [ "${G267BAD:-1}" = "0" ] \
    && [ "${G267PX:-0}" -ge 2000 ] && [ "${G267SB:-1}" = "0" ] && [ "${G267SAME:-0}" = "1" ] \
    && [ "${G267OFFS:-0}" = "2" ] \
-   && echo "$G267C" | grep -q '|bushes=0|clumps=0|' && echo "$G267DS" | grep -q '|on=0|.*|bushes=0|clumps=0|'; then
-  ok "G267 the scattered foliage: at a measuring grass density (0.8) and every other dial at its default, $G267N grass clumps and no bushes on SCG01EA, every one on a clear-template cell of the mission's own .BIN that no terrain, overlay, smudge or structure entry names; $G267PX map pixels change and no sidebar pixel does; its row off, Enhanced off, the run without --enhanced and the desert build none; two runs are one picture"
+   && echo "$G267C" | grep -q '|bushes=0|clumps=0|' && [ "$G267DD" = "1" ] \
+   && echo "$G267DS" | grep -qE '^FOLDUMP\|on=1\|have=1\|theater=DESERT\|bushes=[1-9][0-9]*\|clumps=0\|'; then
+  ok "G267 the scattered foliage: at a measuring grass density (0.8) and every other dial at its default, $G267N grass clumps and no bushes on SCG01EA, every one on a clear-template cell of the mission's own .BIN that no terrain, overlay, smudge or structure entry names; $G267PX map pixels change and no sidebar pixel does; its row off, Enhanced off and the run without --enhanced build none; Desert loads its 77 native-template placements across 24 templates and two bush families, drawing bushes and no grass clumps; two runs are one picture"
 else
   bad "G267 the scattered foliage: rc=$GRC dump=[$G267D](on=1, bushes=0, clumps and drawn >0) plants=${G267N:-?}(>0) offgrass=${G267BAD:-?}(0) [$G267WHY] px=${G267PX:-?}(>=2000) sidebar=${G267SB:-?}(0) same=${G267SAME:-?}(1) offs=${G267OFFS:-?}(2) classic=[$G267C] desert=[$G267DS]"
 fi
@@ -20328,8 +20496,8 @@ fi
 # G273 THE ENHANCED POWER PLANT (ebld_mod.h; game/ebld/NUKE.ebld, baked by
 # tools/art/remaster/bake_ebld.py). Under ENHANCED the Power Plant is drawn from its
 # remastered model and comes apart hit by hit: a chip off the struck side for every 5% of
-# strength lost, its loose pieces broken off at half strength, and about two hundred
-# shards blasted, sunk and faded over a scorch mark when it dies. Classic keeps the
+# strength lost, its loose pieces broken off at half strength, and its destroyed stage,
+# broken by material, blasted, sunk and faded over a scorch mark when it dies. Classic keeps the
 # cartridge model, its damage overlay and the old shatter.
 #
 # FOUR RUNS OF ONE SCRIPT (gate_ebld.txt: five rounds of force fire from the Medium Tank,
@@ -20353,8 +20521,10 @@ fi
 #       plate_5, small_pipe, vent); the dump says DAMAGED, every zone at full, and one
 #       body per chip thrown plus one per loose piece. (The cut before the hand-painted
 #       method had 28 chips and 10 loose pieces; the gate follows the approved art.)
-#   (5) DEATH WRECKS IT ON THE TICK THE ENGINE KILLS IT. Exactly one EBLD|wreck with at
-#       least 150 shards, within two ticks of the frame Classic shatters the same kill
+#   (5) DEATH WRECKS IT ON THE TICK THE ENGINE KILLS IT. Exactly one EBLD|wreck with more
+#       pieces than the 9 of the Classic shatter for the same kill, so it is the Enhanced
+#       wreck and not the old one (the destroyed stage remade by material holds 80 on the
+#       Power Plant, down from about two hundred, and may be cut further), within two ticks of the frame Classic shatters the same kill
 #       (hurtobj lands between ticks: the shatter's refresh sees the death at once, the
 #       tick-edge step on the next tick); one EBLD|sink 3.5 s after it, where 3.5 s is
 #       52.5 ticks; one EBLD|gone 34 s (510 ticks) after it, when the scorch has faded,
@@ -20556,8 +20726,8 @@ wr, sk, gn = events(A, "wreck", key), events(A, "sink", key), events(A, "gone", 
 cid = hurt_id(C)
 cs = shatter(C, cid)
 wf = int(wr[0].group(2)) if len(wr) == 1 else -1
-need(len(wr) == 1 and int(wr[0].group(3)) >= 150,
-     "want exactly one EBLD|wreck with >=150 shards, got %s" % ([m.group(0) for m in wr] or "none"))
+need(len(wr) == 1 and int(wr[0].group(3)) > 9,
+     "want exactly one EBLD|wreck with more than the Classic shatter's 9 pieces, got %s" % ([m.group(0) for m in wr] or "none"))
 need(cs is not None, "the Classic run printed no SHATTER|NUKE|id=%d|pieces=9|tris=132 line" % cid)
 if wf >= 0 and cs is not None:
     need(abs(wf - int(cs.group(1))) <= 2, "the wreck began on frame %d, Classic shatters the same kill on %s"
@@ -20744,9 +20914,13 @@ h = [m for m in h if m]
 # files: T01 T02 T05 T06 T07 T17, each _TEM) are loaded beside the 25 structures. They are
 # named one by one here and allowed only as terrain objects; every structure still has to
 # be loaded and attached, and nothing else may be.
+# SCG90EA's native TERRAIN section also places these four tree-clump types, registered
+# as terrain in tdata.cpp and ebld_mod.h. Other clump names and theaters stay unlisted.
+map_clumps = {"TC01_TEM", "TC02_TEM", "TC04_TEM", "TC05_TEM"}
 extra = sorted(l.split("|")[1] for l in f if l.startswith("EBLDART|")
                and l.split("|")[1] not in TYPES)
-odd = [x for x in extra if not re.match(r"^(T\d\d|ROCK\d|SPLIT\d)(_TEM|_DES|_WIN)?$", x)]
+odd = [x for x in extra if x not in map_clumps
+       and not re.match(r"^(T\d\d|ROCK\d|SPLIT\d)(_TEM|_DES|_WIN)?$", x)]
 need(not odd, "models loaded that are neither a structure nor a terrain object: %s" % odd)
 want = str(25 + len(extra))
 need(len(h) == 1 and h[0].group(1) == want and h[0].group(2) == want and h[0].group(3) == "1",
@@ -20824,8 +20998,10 @@ need(any(l.startswith("SHATTER|FACT|id=%d|" % idn) for l in N),
 
 # (6) TWO RUNS ARE ONE RUN
 ours = ("EBLD", "EBLDMESH|", "EBLDART|", "EBLDPOSE|", "EBLDOBJ|")
-la = [l for l in A if l.startswith(ours)]
-lb = [l for l in B if l.startswith(ours)]
+# Preparation telemetry includes nondeterministic wall-clock durations and has
+# independent performance tests. Retain every geometry/gameplay EBLD family here.
+la = [l for l in A if l.startswith(ours) and not l.startswith("EBLDPREPARE|")]
+lb = [l for l in B if l.startswith(ours) and not l.startswith("EBLDPREPARE|")]
 need(la == lb and la, "the two Enhanced runs printed different EBLD lines")
 same = 0
 for s_ in "abcd":
@@ -21071,7 +21247,7 @@ elif [ "$G276OK" = "1" ]; then ok "G276 Classic, N64 and Enhanced profiles and f
 else bad "G276 modes:$G276WHY"; fi
 
 # =====================================================================================
-# G277: SPACE cycles through the new three-mode order with a deterministic wipe.
+# G277: SPACE cycles through the new three-mode order with a deterministic tile rip.
 # =====================================================================================
 cat > /tmp/g277.txt <<'G277EOF'
 tick 30
@@ -21103,7 +21279,7 @@ gshots shots/g277_old.png shots/g277_mid.png shots/g277_new.png shots/g277_mid2.
 G277OK=1; G277WHY=""
 g277bad() { G277OK=0; G277WHY="$G277WHY [$1]"; }
 grep -a '^GFXMODE|enhanced|space' shots/g277.log >/dev/null || g277bad switch
-grep -a '^GFXWIPE|whoosh|playing' shots/g277.log >/dev/null || g277bad whoosh
+grep -a '^GFXWIPE|rumble|playing' shots/g277.log >/dev/null || g277bad rumble
 grep -a '^OPTMODE|' shots/g277.log | tail -1 | grep -q 'mode=2|fx_mode=2|.*fx_enabled=1|fx_exp=0' || g277bad target
 cmp -s shots/g277_mid.png shots/g277_mid2.png || g277bad nondeterministic
 G277PX=$(python3 - <<'PYPIX'
@@ -21121,7 +21297,7 @@ set -- $G277PX
 [ "${2:--1}" -ge 1000 ] || g277bad "mid-new=$2"
 [ "${3:--1}" -ge 10000 ] || g277bad "old-new=$3"
 if [ "$GRC" != "0" ]; then bad "G277 wipe run failed (GRC=$GRC)";
-elif [ "$G277OK" = "1" ]; then ok "G277 SPACE wipes from N64 to Enhanced, deterministically, with whoosh";
+elif [ "$G277OK" = "1" ]; then ok "G277 SPACE rips from N64 to Enhanced, deterministically, with rumble";
 else bad "G277 wipe:$G277WHY"; fi
 
 # =====================================================================================
@@ -21366,7 +21542,7 @@ G283OK=1
 [ "${G283PART:-0}" -ge 1 ] || G283OK=0
 [ "${G283PX:-0}" -ge 1000 ] || G283OK=0
 [ "${G283GREEN:-999999}" -le 2 ] || G283OK=0
-grep -a '^DOS2D|loaded 269 original SHP shapes' shots/g283.log >/dev/null || G283OK=0
+grep -a '^DOS2D|loaded 300 original SHP shapes' shots/g283.log >/dev/null || G283OK=0
 if [ "$GRC" != "0" ]; then bad "G283 original DOS shroud run failed (GRC=$GRC)";
 elif [ "$G283OK" = "1" ]; then ok "G283 SHADOW.SHP draws $G283PART original edge cells; fog changes $G283PX pixels; no green unit shadows";
 else bad "G283 original shroud edge or coverage missing (partial=$G283PART changed=$G283PX)"; fi
@@ -21520,7 +21696,7 @@ G287FRAMES=$(grep -a '^DOSDRAW|layer|FACT|asset=FACTMAKE|frame=' shots/g287.log 
 G287OK=1
 [ "$(printf '%s' "$G287FRAMES" | awk '{print NF}')" -ge 2 ] || G287OK=0
 [ "$(printf '%s' "$G287FRAMES" | awk '{print $1}')" != "$(printf '%s' "$G287FRAMES" | awk '{print $2}')" ] || G287OK=0
-grep -a '^DOS2D|loaded 269 original SHP shapes' shots/g287.log >/dev/null || G287OK=0
+grep -a '^DOS2D|loaded 300 original SHP shapes' shots/g287.log >/dev/null || G287OK=0
 if [ "$GRC" != "0" ]; then bad "G287 Classic MCV deployment run failed (GRC=$GRC)";
 elif [ "$G287OK" = "1" ]; then ok "G287 MCV unfolds through original FACTMAKE frames $G287FRAMES";
 else bad "G287 FACTMAKE stages or source sprite pack missing (frames=$G287FRAMES)"; fi
@@ -21598,7 +21774,7 @@ except Exception: print(0)
 PYPIX
 )
 G289OK=1
-grep -a '^DOS2D|loaded 269 original SHP shapes' shots/g289.log >/dev/null || G289OK=0
+grep -a '^DOS2D|loaded 300 original SHP shapes' shots/g289.log >/dev/null || G289OK=0
 grep -a '^DOSDRAW|anim|ART-EXP1|' shots/g289.log >/dev/null || G289OK=0
 grep -a '^DOSDRAW|anim|VEH-HIT3|' shots/g289.log >/dev/null || G289OK=0
 [ "${G289PX:-0}" -ge 100 ] || G289OK=0
@@ -21763,7 +21939,7 @@ else bad "G292 targeted structure does not flash with engine blush (white $1 -> 
 #       emitters spawned something.
 #   (3) THE DIAL IS WHAT DOES IT, PARTICLE FOR PARTICLE. With efx_enh off the same run
 #       reports on=0, 0 Enhanced draws and some cartridge draws, sees the same engine
-#       anims, and spawns exactly Enhanced's count less Enhanced's extras: the remastered
+#       anims, and emits exactly Enhanced's recipe count less Enhanced's extras: the remastered
 #       set changes the art and adds its own emitters, and moves nothing of the
 #       cartridge's. On the glass, the pixels within 80 of each explosion's projected cell
 #       differ between the two runs by at least 300 each.
@@ -21830,6 +22006,30 @@ gshots shots/g293_enh_a.png shots/g293_enh_b.png shots/g293_off_a.png shots/g293
 g293_f() { grep -a '^EFXENH|' "shots/g293_$1.log" | tail -1 | tr '|' '\n' | sed -n "s/^$2=//p"; }
 g293_seen() { sed -n "s/^EFXSEEN|$2|\([0-9]*\)$/\1/p" "shots/g293_$1.log" | tail -1; }
 g293_spawned() { sed -n 's/^EFXPART|pool=live|.*|spawned=\([0-9]*\)|.*/\1/p' "shots/g293_$1.log" | tail -1; }
+# Recipe counters are cumulative snapshots. Use only the final dump, and keep the pool's
+# mode-specific chunk trails separate from the recipe-emission conservation assertion.
+g293_recipes() {
+  python3 - "shots/g293_$1.log" <<'PYRECIPES'
+import re, sys
+lines = open(sys.argv[1], errors='replace').read().splitlines()
+headers = [i for i, line in enumerate(lines) if line.startswith('EFXPART|pool=')]
+if not headers: raise SystemExit('G293COUNTER|missing final pool header')
+rows = {}
+pattern = r'EFXSPAWN\|([A-Z0-9:_-]+)\|recipe=(ANIM_[A-Za-z0-9_]+)\|particles=([0-9]+)\|chunks=([0-9]+)'
+for line in lines[headers[-1] + 1:]:
+    if not line.startswith('EFXSPAWN|'): continue
+    match = re.fullmatch(pattern, line)
+    if not match: raise SystemExit('G293COUNTER|malformed recipe counter')
+    key = match.group(1), match.group(2)
+    if key in rows: raise SystemExit('G293COUNTER|duplicate recipe counter')
+    rows[key] = int(match.group(3))
+required = {'ART-EXP1', 'FBALL1', 'GUNFIRE', 'SMOKEY', 'SMOKLAND', 'VEH-HIT3'}
+if not required <= {key[0] for key in rows}: raise SystemExit('G293COUNTER|missing required recipe counter')
+total = sum(rows.values())
+if total <= 0: raise SystemExit('G293COUNTER|empty recipe particle total')
+print(total, ','.join(name + '=' + recipe for name, recipe in sorted(rows)))
+PYRECIPES
+}
 g293_slot() { sed -n "s/^EFXDRAWSEQ|slot=$2|[A-Z]*|enh=\([0-9]*\)|cart=\([0-9]*\)$/\1 \2/p" "shots/g293_$1.log" | tail -1; }
 # (1) the pack's own count, read from its header rather than written into this gate
 G293PACKN=$(python3 -c "import struct,sys; f=open('efx_enh.pack','rb'); m=f.read(8); print(struct.unpack('<II',f.read(8))[1] if m==b'CNC3DEFX' else 0)" 2>/dev/null)
@@ -21857,6 +22057,8 @@ G293OK2=1
 # (3)
 G293OFFE=$(g293_f off drawn_enh); G293OFFC=$(g293_f off drawn_cart)
 G293SPE=$(g293_spawned enh); G293SPO=$(g293_spawned off)
+set -- $(g293_recipes enh); G293RPE="${1:-}"; G293RKEYE="${2:-}"
+set -- $(g293_recipes off); G293RPO="${1:-}"; G293RKEYO="${2:-}"
 G293OK3=1
 grep -a '^GFX|efx_enh=0$' shots/g293_off.log >/dev/null || G293OK3=0
 [ "$(g293_f off on)" = "0" ] || G293OK3=0
@@ -21864,7 +22066,8 @@ grep -a '^GFX|efx_enh=0$' shots/g293_off.log >/dev/null || G293OK3=0
 [ "${G293OFFC:-0}" -ge 100 ] || G293OK3=0
 [ "$(grep -a '^EFXSEEN|' shots/g293_enh.log | sort -u)" = "$(grep -a '^EFXSEEN|' shots/g293_off.log | sort -u)" ] || G293OK3=0
 [ -n "$G293SPE" ] && [ -n "$G293SPO" ] && [ -n "$G293EXTRA" ] \
-  && [ "$((G293SPE - G293EXTRA))" = "$G293SPO" ] || G293OK3=0
+  && [ -n "$G293RPE" ] && [ -n "$G293RPO" ] && [ "$G293RKEYE" = "$G293RKEYO" ] \
+  && [ "$((G293RPE - G293EXTRA))" = "$G293RPO" ] || G293OK3=0
 G293AT=$(sed -n 's/^PROBE|at=\([-0-9.]*\),\([-0-9.]*\)|.*/\1 \2/p' shots/g293_enh.log | head -2 | tr '\n' ' ')
 G293PX=$(G293AT="$G293AT" python3 - <<'PYPIX'
 import os
@@ -21902,8 +22105,8 @@ G293NP=$(grep -ac '^EFXP|' shots/g293_enh.log)
 [ "$(grep -a '^EFXP|' shots/g293_enh.log)" = "$(grep -a '^EFXP|' shots/g293_enh2.log)" ] || G293OK5=0
 if [ "$GRC" != "0" ]; then bad "G293 remastered-effects runs failed (GRC=$GRC)";
 elif [ "$G293OK1$G293OK2$G293OK3$G293OK4$G293OK5" = "11111" ]; then
-  ok "G293 remastered effects: efx_enh.pack loads its $G293PACKN sequences; under Enhanced an engine FBALL1, ART-EXP1 and landing-zone smoke plus the fight's own hits draw $G293ENH particles from the remastered art and 0 from the cartridge's (fireball sheet $G293FB, the remastered set's own sheets $G293OWN, $G293EXTRA particles from Enhanced's own emitters); with the dial off 0 remastered and $G293OFFC cartridge draws, $G293SPO spawned = $G293SPE less the extras; $G293PXF and $G293PXA pixels differ at the two explosions; Classic draws none; two runs identical to the pixel and over $G293NP particles"
-else bad "G293 remastered effects (loads=$G293OK1 enhanced=$G293OK2 control=$G293OK3 classic=$G293OK4 determinism=$G293OK5): pack=$G293PACKN loaded=$G293LOADN enh=$G293ENH cart=$G293ENHC fireball=$G293FB/$G293FBC own=[$G293OWN] extras=$G293EXTRA off=$G293OFFE/$G293OFFC spawned=$G293SPE/$G293SPO px=$G293PXF,$G293PXA at=[$G293AT] particles=$G293NP"; fi
+  ok "G293 remastered effects: efx_enh.pack loads its $G293PACKN sequences; under Enhanced an engine FBALL1, ART-EXP1 and landing-zone smoke plus the fight's own hits draw $G293ENH particles from the remastered art and 0 from the cartridge's (fireball sheet $G293FB, the remastered set's own sheets $G293OWN, $G293EXTRA particles from Enhanced's own emitters); with the dial off 0 remastered and $G293OFFC cartridge draws, recipe emissions $G293RPO = $G293RPE less the extras (global pools $G293SPE/$G293SPO include their mode-specific chunk trails); $G293PXF and $G293PXA pixels differ at the two explosions; Classic draws none; two runs identical to the pixel and over $G293NP particles"
+else bad "G293 remastered effects (loads=$G293OK1 enhanced=$G293OK2 control=$G293OK3 classic=$G293OK4 determinism=$G293OK5): pack=$G293PACKN loaded=$G293LOADN enh=$G293ENH cart=$G293ENHC fireball=$G293FB/$G293FBC own=[$G293OWN] extras=$G293EXTRA off=$G293OFFE/$G293OFFC recipe-emissions=$G293RPE/$G293RPO recipe-keys=[$G293RKEYE]/[$G293RKEYO] global-pools=$G293SPE/$G293SPO px=$G293PXF,$G293PXA at=[$G293AT] particles=$G293NP"; fi
 
 # G294 THE REMASTERED CURSORS (ecur/ecur.bin; cursor3d_mod.h ecur_*). Under Enhanced every
 # cartridge cursor is drawn as its remastered model, a quarter smaller (ecur_scale 0.75), with
@@ -22106,7 +22309,30 @@ fi
 #       draws the remastered MCV; the harvester is drawn in the refinery's dock, and
 #       before that its arms work through a lift (clip off frame 0) and rest;
 #   (10) with --noevhc and in Classic nothing of it draws or claims, and the old shatter
-#       takes the Mammoth; (11) two Enhanced runs give identical pictures.
+#       takes the Mammoth; (11) two Enhanced runs give identical pictures;
+#   (12) THE SMOOTH NORMALS: all 21 files are format 2 and carry smooth normals (EVHCART
+#       fmt, smooth; the engine still reads version 1, flat); every vehicle in view draws its
+#       normals into the light pass's normal target
+#       (EVHCNRM objects), the Mammoth's wreck too; the same frame drawn again with them
+#       out (evhcnormals 0, the run-time --noevhcnormals) differs on at least 1500 pixels
+#       by more than eight levels, every one of them within 60 pixels of a remastered
+#       vehicle; with --noevhc and in Classic the switch draws nothing and changes nothing.
+#   (13) THE HARVESTER'S CLAWS (EVHCHARV, run c): lowered with the mouth's lower jaw open
+#       while it harvests, raised with the jaw shut otherwise, at least one draw part way
+#       through a change; every drawn phase gives the lift and the jaw the schedule's
+#       angles (40 degrees over the first 60% of the change, 56.7 shut over the last 60%);
+#       the phase only ever moves toward what the harvest test says; the lift rams' rods
+#       keep their eyes on the booms' pins; the hub caps roll; docked, the rig draws the
+#       claws raised; and the same frame with them switched off (harvlift 0, the run-time
+#       --noharvlift) is the model at rest and differs on 100 to 20000 pixels.
+#       PROVEN TO FAIL: the renderer before the claws were driven prints no EVHCHARV line.
+#   (14) THE HARVESTER'S HOOP (EVHCART HARV's hoop fields, run c, drawn every tick through the
+#       docking at about tick 980 and the undocking at about 1570): with a Harvester file that
+#       declares the hoop's swing, the dock draws it over the tank on arrival, then swung over
+#       the cab with the tank still at its rest, and the tank leaves its rest only with the hoop
+#       fully over; undocking, the tank comes down before the hoop swings back. With a file
+#       that declares no hoop the check says so rather than passing it.
+#       PROVEN TO FAIL: the renderer before the hoop was driven prints no hoop field.
 # NOT COVERED: the Chinook's ramp (no scripted way to board a landed Chinook), the
 # hovercraft's bow ramp (a campaign mission's reinforcement; it is driven by the unit's
 # own unload state), and how any of it looks to a person.
@@ -22115,6 +22341,8 @@ python3 "$GATEDIR/gate_evhc.py" missions missions "$G296M" >>"$OUT" 2>&1
 g296_a() {   # $1 = tag
   {
     echo "tick 3"; echo "cam 43 41"; echo "shot shots/g296_$1_1.png"; echo "evhcdump"
+    echo "evhcscreen"; echo "evhcnormals 0"; echo "shot shots/g296_$1_1n.png"; echo "evhcdump"
+    echo "evhcnormals 1"
     echo "lclickobj JEEP 1"; echo "order 41 38"; echo "lclickobj MTNK 4"; echo "order 45 38"
     echo "lclickobj HTNK 0"; echo "actcell 39 36 c"
     echo "cam 54 41"; echo "lclickobj E1 10"; echo "actclickobj APC 0"; echo "cam 43 41"
@@ -22124,6 +22352,7 @@ g296_a() {   # $1 = tag
     echo "shot shots/g296_$1_2.png"
     for i in 1 2 3 4 5; do echo "hurtobj HTNK:BadGuy 0"; done
     echo "tick 2"; echo "shot shots/g296_$1_3.png"; echo "evhcdump"
+    echo "evhcnormals 0"; echo "shot shots/g296_$1_3n.png"; echo "evhcnormals 1"
     echo "tick 60"; echo "evhcdump"; echo "tick 90"; echo "evhcdump"; echo "quit"
   } > "/tmp/g296_$1.txt"
 }
@@ -22140,10 +22369,23 @@ for t in a a2 n cl; do g296_a $t; done
 } > /tmp/g296_b.txt
 {
   echo "tick 200"
-  for i in $(seq 1 46); do echo "cam 54 43"; echo "tick 3"; echo "shot shots/g296_c_t.png"; echo "evhcdump"; done
-  echo "tick 647"; echo "cam 51 47"; echo "shot shots/g296_c_t.png"; echo "evhcdump"
+  for i in $(seq 1 46); do
+    echo "cam 54 43"; echo "tick 3"; echo "shot shots/g296_c_t.png"; echo "evhcdump"
+    # the claws' A/B, the same tick: driven, then at the model's rest
+    if [ "$i" = 30 ]; then
+      echo "shot shots/g296_c_lift.png"; echo "harvlift 0"; echo "shot shots/g296_c_rest.png"
+      echo "evhcdump"; echo "harvlift 1"
+    fi
+  done
+  # the docking, a draw a tick from 970 to 985 (the hoop swings over the cab, then the tank tips)
+  echo "tick 632"
+  for i in $(seq 1 15); do echo "cam 51 47"; echo "tick 1"; echo "shot shots/g296_c_t.png"; echo "evhcdump"; done
   echo "cam 59 50"; echo "lclickobj MCV:@me"; echo "actclickobj MCV:@me"
-  echo "tick 30"; echo "shot shots/g296_c_t.png"; echo "evhcdump"; echo "eplcdump"; echo "quit"
+  echo "tick 30"; echo "shot shots/g296_c_t.png"; echo "evhcdump"; echo "eplcdump"
+  # the undocking, a draw a tick from 1560 to 1580 (the tank comes down, then the hoop goes back)
+  echo "tick 545"
+  for i in $(seq 1 20); do echo "cam 51 47"; echo "tick 1"; echo "shot shots/g296_c_t.png"; echo "evhcdump"; done
+  echo "quit"
 } > /tmp/g296_c.txt
 {
   echo "tick 30"; echo "cam 31 16"; echo "hurtunit BOAT 0 5000"; echo "tick 3"; echo "evhcdump"
@@ -22151,8 +22393,10 @@ for t in a a2 n cl; do g296_a $t; done
 } > /tmp/g296_w.txt
 gbegin shots/g296_a_1.png shots/g296_a_2.png shots/g296_a_3.png shots/g296_a2_1.png \
        shots/g296_a2_2.png shots/g296_a2_3.png shots/g296_a.log shots/g296_a2.log \
+       shots/g296_a_1n.png shots/g296_a_3n.png shots/g296_a2_1n.png shots/g296_a2_3n.png \
+       shots/g296_n_1.png shots/g296_n_1n.png shots/g296_cl_1.png shots/g296_cl_1n.png \
        shots/g296_n.log shots/g296_cl.log shots/g296_b.log shots/g296_c.log shots/g296_c2.log \
-       shots/g296_w.log
+       shots/g296_w.log shots/g296_c_lift.png shots/g296_c_rest.png
 G296ARGS="--scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound --w 1280 --h 720"
 grun shots/g296_a.log  $G296ARGS --dir "$G296M/all/" --enhanced --script /tmp/g296_a.txt
 grun shots/g296_a2.log $G296ARGS --dir "$G296M/all/" --enhanced --script /tmp/g296_a2.txt
@@ -22163,14 +22407,15 @@ grun shots/g296_c.log  $G296ARGS --enhanced --script /tmp/g296_c.txt
 grun shots/g296_c2.log $G296ARGS --enhanced --noeplc --script /tmp/g296_c.txt
 grun shots/g296_w.log  --scen SCB07EC --pack SCB07EC.pack $BASE --noshroud --nosound --w 1280 \
      --h 720 --enhanced --script /tmp/g296_w.txt
-gshots shots/g296_a_1.png shots/g296_a_3.png shots/g296_a2_1.png shots/g296_a2_3.png
+gshots shots/g296_a_1.png shots/g296_a_3.png shots/g296_a2_1.png shots/g296_a2_3.png \
+       shots/g296_a_1n.png shots/g296_a_3n.png shots/g296_n_1n.png shots/g296_cl_1n.png
 rm -rf "$G296M"
 G296V=$(python3 "$GATEDIR/gate_evhc.py" check 2>&1 | tail -1)
 if [ "$GRC" != "0" ]; then
   bad "G296 remastered vehicles: a run did not finish (GRC=$GRC); $G296V"
 else
   case "$G296V" in
-    OK*) ok "G296 remastered vehicles: ${G296V#OK }; turret, tracks, wheels, recoil, the harvester's arms, the APC door, a ground death, a gunboat sunk on the sea, an aircraft shot down in flight, the deploy and dock rigs all move as the engine says; --noevhc and Classic draw none of it; two runs identical" ;;
+    OK*) ok "G296 remastered vehicles: ${G296V#OK }; turret, tracks, wheels, recoil, the harvester's arms, its claws' lift and its hoop's swing in the dock, the APC door, a ground death, a gunboat sunk on the sea, an aircraft shot down in flight, the deploy and dock rigs all move as the engine says; the smooth normals are carried and drawn into the light pass's target, wrecks included; --noevhc and Classic draw none of it; two runs identical" ;;
     *)   bad "G296 remastered vehicles: $G296V" ;;
   esac
 fi
@@ -22578,7 +22823,8 @@ def section(L, name):
         if on: out.append(l)
     return out
 HDR = r"^EPLC\|loaded=(\d+)\|attached=(\d+)\|on=([01])\|enhanced=([01])$"
-MODEL = r"^EPLCMODEL\|([A-Z0-9]+)\|attached=([01])\|rigs=(\d+)\|actors=(\d+)\|matched=(\d+)\|unmatched=(\d+)\|runs=(\d+)\|grow=(\d+)\|companion=(\d+)\|seconds=([0-9.]+)\|drawn=(\d+)$"
+# (the normal target's coverage follows drawn on the line: normal_runs, companion_normal_runs)
+MODEL = r"^EPLCMODEL\|([A-Z0-9]+)\|attached=([01])\|rigs=(\d+)\|actors=(\d+)\|matched=(\d+)\|unmatched=(\d+)\|runs=(\d+)\|grow=(\d+)\|companion=(\d+)\|seconds=([0-9.]+)\|drawn=(\d+)(?:\|normal_runs=\d+\|companion_normal_runs=\d+)?$"
 OBJ = (r"^EPLCOBJ\|([A-Z0-9]+)\|key=(-?\d+)\|id=(\d+)\|mode=(PLACE|SELL|REST)\|start=(\d+)\|t=(-?[0-9.]+)\|len=([0-9.]+)"
        r"\|moving=(\d+)\|slab_y=(-?[0-9.]+)\|main_y=(-?[0-9.]+)\|cut=([01])\|mine=([01])\|str=(-?\d+)\|str0=(\d+)"
        r"\|bstate=(-?\d+)\|spin_deg=(-?[0-9.]+)\|spin_piece=(-?\d+)$")
@@ -22917,6 +23163,7 @@ fi
 # =====================================================================================
 rm -rf g305m && python3 "$GATEDIR/gate_structs.py" maps g305m 2>>"$OUT"
 gbegin shots/g305e.log shots/g305x.log shots/g305k.log shots/g305_n0.png shots/g305_n1.png \
+       shots/g305_fill_on.png shots/g305_fill_reset.png \
        shots/g305_nb_n.png shots/g305_nb_bare.png shots/g305_nb_mask.png \
        shots/g305x_n.png shots/g305x_bare.png shots/g305x_mask.png \
        shots/g305k_n.png shots/g305k_bare.png shots/g305k_mask.png
@@ -22926,6 +23173,7 @@ if [ -s g305m/SCG95EA.INI ]; then
   grun shots/g305x.log $G305ARGS --enhanced --texset 1 --noebld --script g305m/x.txt
   grun shots/g305k.log $G305ARGS --script g305m/k.txt
   gshots shots/g305_n0.png shots/g305_n1.png shots/g305_nb_mask.png shots/g305x_mask.png \
+         shots/g305_fill_on.png shots/g305_fill_reset.png \
          shots/g305k_mask.png
   G305CHK=$(python3 "$GATEDIR/gate_structs.py" check shots g305m 2>>"$OUT")
 else
@@ -23222,10 +23470,11 @@ fi
 #   (6) Classic drew nothing remastered; (7) two Enhanced runs are one picture;
 #   (8) a jeep driven onto the wooden crate opens it and the remaster goes with it, the
 #       steel crate stays;
-#   (2b) the remastered trees: the temperate T01 and T16 drawn whole from T01_TEM (T16
-#       through the alias), T02, T03, T05, T06, T07, T10 to T15, T17 from their _TEM files,
+#   (2b) the remastered trees: the temperate T01, T16 (its own spruce), T02, T03, T05, T06,
+#       T07, T08 (its temperate look), T10 to T15, T17 drawn whole from their _TEM files,
 #       the desert cacti T04, T09 and acacias T08, T18 from their _DES files, each with its
-#       wind on; the desert's T01 and the winter's T16, T02, T13 from no remastered file;
+#       wind on; the desert's T01 from no remastered file; the winter's T16, T02, T13 from
+#       their winter looks (T16_WIN, T02_WIN, T13_WIN), wind on;
 #   (9) every blossom tree has its ground stain (the Tiberium crystals' crack, spread from
 #       its roots): one per tree, all six quads, centred inside its blocked cell, lit; the
 #       frame differs from the same frame with --noeterrstain by at least 300 pixels a tree,
@@ -23417,7 +23666,9 @@ fi
 # and the terrain shadow strength had moved too. Every run therefore loads this preset,
 # which holds the whole look the bars were set under as far as a retune has moved it:
 # grade, mist, bloom, terrain shading, cloud shadows, dynamic light and the sea. It
-# carries no switches, and it has to apply in full, or the verdict says so.
+# carries no switches, and it has to apply in full, or the verdict says so. A later retune
+# moved the snag to 1058 pixels again through the ground patches (much fainter), the sun's
+# shadow, the occlusion and the clear ground's saturation, so those are pinned too (1720).
 cat > gfx_g312.cfg <<'CFG'
 exposure -0.17857
 contrast 1.15625
@@ -23451,12 +23702,15 @@ water_edge 0.45000
 water_fade 0.90000
 water_fade_width 0.90000
 water_foam_cross 0.30000
-water_reflect 0.26000
 water_spec 0.85000
 water_refract 0.02000
-water_fresnel 0.13000
 water_natural 0.88393
 water_dark 0.16000
+mottle_strength 0.41071
+mottle_density 0.06250
+shadow_strength 1.00000
+ssao_intensity 0.51786
+clear_saturation 0.70000
 CFG
 rm -rf g312m
 python3 "$GATEDIR/gate_treefire.py" maps g312m 2>>"$OUT"
@@ -23470,7 +23724,7 @@ if [ -f g312m/plan.json ]; then
 else
   G312CHK="0 the tree fire test mission was not made"
 fi
-G312PRE="$(grep -ac '^FX|preset|gfx_g312.cfg: 38 applied, 0 unknown$' g312m/TF.log)$(grep -ac '^FX|preset|gfx_g312.cfg: 38 applied, 0 unknown$' g312m/TFr.log)$(grep -ac '^FX|preset|gfx_g312.cfg: 38 applied, 0 unknown$' g312m/TFn.log)"
+G312PRE="$(grep -ac '^FX|preset|gfx_g312.cfg: 41 applied, 0 unknown$' g312m/TF.log)$(grep -ac '^FX|preset|gfx_g312.cfg: 41 applied, 0 unknown$' g312m/TFr.log)$(grep -ac '^FX|preset|gfx_g312.cfg: 41 applied, 0 unknown$' g312m/TFn.log)"
 if [ "$GRC" != "0" ]; then
   bad "G312 tree burning: a run failed (GRC=$GRC)"
 elif [ "$G312PRE" != "111" ]; then
@@ -23634,6 +23888,9 @@ else
   skip "G315 automated runs stay in the background: lsappinfo is not on this machine, so the activation policy cannot be read"
 fi
 
+# G316 reads the 1995 main menu's Intro button at its own rectangle (menu1995_on, at the top);
+# G325 asserts the Enhanced menu greys the same button.
+menu1995_on
 # G316 AN INSTALL WITH NO MOVIES AND NO MUSIC PLAYS CLEANLY. No package carries the 1995
 # movies or the score: the Windows installer and the launcher's Setup screen download
 # them, and a player can untick both. The game finds them by file presence alone, so the
@@ -23753,7 +24010,7 @@ G316PIXOK=$(echo "$G316PIX" | sed -n 's/.*|ok=\([0-9]\).*/\1/p')
 G316CTLI=$(grep '^DMBTN|' shots/g316_menu_ctl.log | grep '|label=Intro & Sneak Peek|' | head -1 \
            | sed -n 's/.*|disabled=\([0-9]*\)|.*/\1/p')
 # c and d. The jukebox page, reached through the labels a player clicks, there and here.
-printf 'tick 10\noptions\noptclick Game Controls\noptclick Sound Controls\nshot shots/g316_jb.png\nquit\n' \
+printf 'tick 10\noptions\noptclick Audio\nshot shots/g316_jb.png\nquit\n' \
   > "$G316D/shots/g316_jb.txt"
 ( cd "$G316D" && exec ./cnc_eyes --scen SCG01EC --pack SCG01EA.pack $BASE --w 1280 --h 800 \
     --script shots/g316_jb.txt ) > shots/g316_jb.log 2>&1 || GRC=$?
@@ -23785,7 +24042,12 @@ elif [ "$G316RC" = "0" ] && [ "$G316DONE" = "1" ] && [ "$G316MISS" = "4" ] \
 else
   bad "G316 no media install: $G316SAID"
 fi
+menu1995_off
 
+# G317 aims at the 1995 Options dialog's controls by their own rectangles, and asserts the
+# HUD stays silent over it; the Enhanced dialogs play the menu's own sounds instead
+# (menu1995_on, at the top).
+menu1995_on
 # =====================================================================================
 # G317 THE HUD SOUNDS BELONG TO THE SIDEBAR'S BUTTONS, AND THE TWO ARE CROSSED. Under
 # Enhanced the pointer arriving on a sidebar button plays hud_click.wav and a press on
@@ -23885,6 +24147,7 @@ if [ "$GRC" = "0" ] && [ "$G317SAID" = "ok" ]; then
 else
   bad "G317 HUD sounds: GRC=$GRC $G317SAID"
 fi
+menu1995_off
 
 # =====================================================================================
 # G318 THE PRODUCTION QUEUE STRIP (game/cnc_sidebar_enhanced.h, ehq_*; the cards are
@@ -24002,6 +24265,7 @@ fi
 # or the verdict says so.
 # =====================================================================================
 cat > gfx_g320.cfg <<'CFG'
+unified_lighting 0
 exposure -0.17857
 contrast 1.15625
 saturation 0.91071
@@ -24034,17 +24298,20 @@ water_edge 0.45000
 water_fade 0.90000
 water_fade_width 0.90000
 water_foam_cross 0.30000
-water_reflect 0.26000
 water_spec 0.85000
 water_refract 0.02000
-water_fresnel 0.13000
 water_natural 0.88393
 water_dark 0.16000
 CFG
 rm -rf g320m && python3 "$GATEDIR/gate_laser.py" maps g320m 2>>"$OUT"
 gbegin shots/g320find.log shots/g320.log shots/g320_a0_classic_on.png \
        shots/g320_a0_n64_on.png shots/g320_a0_enhanced_on.png shots/g320_a5_n64_on.png
-G320ARGS="--scen SCG96EA --pack SCG01EA.pack $BASE --dir g320m/ --noshroud --nosound --w 1280 --h 720 --gfx gfx_g320.cfg"
+# THE VEHICLES' LAMPS STAY OUT (--novehiclelights): the light pass adds a lamp's light in
+# proportion to the colour already on screen, the beam's own glow included, so a lamp on
+# the Mammoth beside the beam's line would be measured with the beam. This gate is about
+# the beam. (The pale markings on the remastered Mammoth, which the beam's own light takes
+# to white, are told from the core by what they were before it: gate_laser.py.)
+G320ARGS="--scen SCG96EA --pack SCG01EA.pack $BASE --dir g320m/ --noshroud --nosound --w 1280 --h 720 --gfx gfx_g320.cfg --novehiclelights"
 if [ -s g320m/SCG96EA.INI ]; then
   grun shots/g320find.log $G320ARGS --script g320m/find.txt
   G320S=$(python3 "$GATEDIR/gate_laser.py" script g320m shots/g320find.log 2>>"$OUT")
@@ -24061,7 +24328,7 @@ else
 fi
 G320V=$(echo "$G320CHK" | head -1 | cut -d' ' -f1)
 G320MSG=$(echo "$G320CHK" | head -1 | cut -d' ' -f2-)
-G320PRE="$(grep -ac '^FX|preset|gfx_g320.cfg: 38 applied, 0 unknown$' shots/g320find.log)$(grep -ac '^FX|preset|gfx_g320.cfg: 38 applied, 0 unknown$' shots/g320.log)"
+G320PRE="$(grep -ac '^FX|preset|gfx_g320.cfg: 37 applied, 0 unknown$' shots/g320find.log)$(grep -ac '^FX|preset|gfx_g320.cfg: 37 applied, 0 unknown$' shots/g320.log)"
 if [ "$GRC" != "0" ]; then
   bad "G320 the Obelisk's beam: a run failed (GRC=$GRC)"
 elif [ "$G320PRE" != "11" ]; then
@@ -24122,15 +24389,17 @@ fi
 # each shot as drawn now (`bibhue 1`), by the old three passes (`bibhue 0`) and bare; the
 # claims, against the pictures and the renderer's `bibdump` state and scene read-back:
 # no apron pixel in the pink band at the Temple or on the grass base, the road under the
-# Temple's apron goes to dirt-coloured hue 25..60, the apron over grass and on the desert
-# sand within 3 levels of the old drawing, and nothing away from an apron changes.
+# Temple's apron goes to dirt-coloured hue 25..60, and nothing away from an apron changes.
+# A source-extracted hidden GL helper separately checks all six pack-calibrated grounds
+# within the original 3-level bound and witnesses the old grey-road pink cast. The
+# current world grass/sand no longer serve as historical calibration colours.
 # PROVEN TO FAIL: the renderer before this change, run on a folder holding the version 3
 # pack it read, fails every run (no `bibhue`, no `bibdump`) and every picture arm: 7086 of
 # the Temple apron's 32840 pixels (21.6%) in the pink band, the road under it at
 # (54.9, 46.8, 43.7), hue 16.7, and 3204 of 42308 (7.6%) on the grass base. The same
 # arms on this change: 33 (0.1%), hue 38, and 26 (0.06%); the bare ground holds 45 and 36.
 # =====================================================================================
-gbegin shots/g322_tmpl.log shots/g322_grass.log shots/g322_desert.log \
+gbegin shots/g322_calibration/RESULTS.json shots/g322_tmpl.log shots/g322_grass.log shots/g322_desert.log \
        shots/g322_tmpl_new.png shots/g322_tmpl_old.png shots/g322_tmpl_ground.png \
        shots/g322_grass_new.png shots/g322_grass_old.png shots/g322_grass_ground.png \
        shots/g322_desert_new.png shots/g322_desert_old.png shots/g322_desert_ground.png
@@ -24147,11 +24416,14 @@ done
 gshots shots/g322_tmpl_new.png shots/g322_tmpl_old.png shots/g322_tmpl_ground.png \
        shots/g322_grass_new.png shots/g322_grass_old.png shots/g322_grass_ground.png \
        shots/g322_desert_new.png shots/g322_desert_old.png shots/g322_desert_ground.png
+G322CAL=$(python3 "$GATEDIR/gate_bibhue_calibration.py" shots/g322_calibration --pack bibenh.pack 2>>"$OUT")
+G322CRC=$?
+printf '%s\n' "$G322CAL" >> "$OUT"
 G322CHK=$(python3 "$GATEDIR/gate_bibhue.py" shots 2>>"$OUT")
 echo "$G322CHK" >> "$OUT"
 G322OK=$(echo "$G322CHK" | head -1 | cut -d' ' -f1)
 G322MSG=$(echo "$G322CHK" | head -1 | cut -d' ' -f2-)
-if [ "$GRC" != "0" ]; then
+if [ "$GRC" != "0" ] || [ "$G322CRC" != "0" ]; then
   bad "G322 Enhanced aprons take no pink from the ground: a run failed (GRC=$GRC)"
 elif [ "$G322OK" = "1" ]; then
   ok "G322 Enhanced aprons take no pink from the ground: $G322MSG"
@@ -24244,6 +24516,2041 @@ elif [ "$G324OK" = "1" ]; then
   ok "G324 the Weapons Factory's door: $G324MSG"
 else
   bad "G324 the Weapons Factory's door: ${G324MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G325 THE ENHANCED MENU, DRAWN AND PRESSED. gate_enhanced_menu (menu/gate_enhanced_menu.cpp)
+# draws every Enhanced screen in a hidden window -- the main menu, the database, options
+# and all of Visuals, the mission briefing, save slots, skirmish, the lobby and its map picker,
+# multiplayer -- and presses its controls through the entry points the shell uses. It
+# asserts that each seat reaches the 1995 controller item it stands for, that nothing
+# overlaps or leaves the dialog, that the faction badges' animation stays in their own
+# seats, and that vertical sync's three states read apart. The gates that script the
+# 1995 screens run under menu1995_on; this is the Enhanced half of the same controllers.
+# The harness aborts at its first broken claim, so its exit status is the verdict, and
+# its last line names what it walked. With Red Alert's module and its Enhanced kit staged
+# (ra3d/enhanced-menu.pack) it then walks the same screens in Red Alert's kit: red at the
+# title, blue in a mission, Red Alert's art, words and emblems, the side choice, the save
+# notice and its way back to the pause page, and the rows Red Alert greys.
+# =====================================================================================
+rm -rf shots/g325 && mkdir -p shots/g325
+if [ ! -x ./gate_enhanced_menu ]; then
+  bad "G325 the Enhanced menu: ./gate_enhanced_menu was not built (game/build.sh makes it, game/make-build.sh stages it)"
+else
+  G325LOG=$(SDL_MAC_BACKGROUND_APP=1 ./gate_enhanced_menu shots/g325 2>&1); G325RC=$?
+  echo "$G325LOG" >> "$OUT"
+  G325N=$(echo "$G325LOG" | grep -c '^ENMENU|')
+  G325PNG=$(ls shots/g325/*.png 2>/dev/null | wc -l | tr -d ' ')
+  # Red Alert's pass runs when its module and kit are staged here, and must then pass too
+  G325RA=$(echo "$G325LOG" | grep -E '^ENMENU\|ra\|(PASS|SKIP)\|' | tail -1)
+  if [ -f ra3d/enhanced-menu.pack ] && ! echo "$G325RA" | grep -q '^ENMENU|ra|PASS|'; then
+    bad "G325 the Enhanced menu: Red Alert's kit is staged but its pass did not complete: exit=$G325RC last=[$(echo "$G325LOG" | tail -2 | tr '\n' ' ')]"
+  elif [ "$G325RC" = "0" ] && echo "$G325LOG" | grep -q '^ENMENU|PASS|' && [ "${G325PNG:-0}" -ge 30 ]; then
+    ok "G325 the Enhanced menu: every screen drawn and pressed against its 1995 controllers, $G325N checks over $G325PNG screens: $(echo "$G325LOG" | grep '^ENMENU|PASS|' | cut -d'|' -f3); Red Alert: $(echo "$G325RA" | cut -d'|' -f3-)"
+  else
+    bad "G325 the Enhanced menu: exit=$G325RC(want 0) screens=$G325PNG(want >=30) last=[$(echo "$G325LOG" | tail -2 | tr '\n' ' ')]"
+  fi
+fi
+
+# =====================================================================================
+# G341 RED ALERT'S ENHANCED MENUS, WALKED (tools/ra3d/gate-ra-enhanced-menu.sh). The Red
+# Alert module started through the launcher with the shipped Enhanced look named on the
+# command line (an automated Red Alert run otherwise starts Classic): its main menu in Red
+# Alert's own kit, Start New Game, the Enhanced side choice pressed as a hand presses it
+# (Allies, then Start), Allied 1 started, the pause dialog drawn blue, Save Mission
+# opening Red Alert's own slot list and Back returning, Resume Mission, and the main menu after the
+# mission the same picture as before it (the harness's own menu digest); then Skirmish,
+# the lobby's own seats pressed (the map picker, Play), and the match it asked for started:
+# Red Alert's first map, eight seats, each its own country in its own colour; Load Mission
+# from the main menu loading a Red Alert slot; Multiplayer opening the room screens, not a
+# notice; a room whose host's own lobby screen presses Start, both ends starting the same
+# room on its seed and rules; a lost skirmish ending on the debrief. Every step is read
+# from the runs' logs and the pictures are measured: red panels at the title, the
+# emblems' gold on the side choice, blue dialogs in the mission, the red debrief. Hidden
+# throughout.
+# Without a Red Alert module with its Enhanced kit in this folder it does not run.
+# =====================================================================================
+if [ ! -f ra3d/enhanced-menu.pack ] || [ ! -f ra3d/RedAlert.dylib ]; then
+  skip "G341 Red Alert's Enhanced menus walked: no Red Alert module with its Enhanced kit is staged in this folder"
+else
+  G341LOG=$(sh "$GATEDIR/../tools/ra3d/gate-ra-enhanced-menu.sh" "$RUNDIR" 2>&1); G341RC=$?
+  echo "$G341LOG" >> "$OUT"
+  if [ "$G341RC" = "0" ] && echo "$G341LOG" | grep -q ': PASS$'; then
+    ok "G341 Red Alert's Enhanced menus walked: $(echo "$G341LOG" | grep '^RAENH|pictures|' | cut -d'|' -f3-)"
+  else
+    bad "G341 Red Alert's Enhanced menus walked: exit=$G341RC $(echo "$G341LOG" | grep '^FAIL' | head -1)"
+  fi
+fi
+
+# =====================================================================================
+# G326 ENHANCED SOLDIERS IN THE SHROUD'S SOFT EDGE ARE AS DARK AS THE GROUND UNDER THEM
+# (model3d_mod.h, the lit fragment's last lines; m3inf_draw_as's env sample in
+# cnc_eyes.cpp). The soldier shader multiplied the shroud into its light before the gamma
+# encode, so a soldier deep in the feather came out at (1 - e)^(1/2.2) where the blanket,
+# the ground and every draw_mesh object take (1 - e) in display values: Nod riflemen in
+# unexplored ground beside the reveal edge showed as grey figures on black. The env term
+# is now applied after the encode, and sampled where the soldier is drawn rather than
+# where the engine has him. gate_infshroud.txt walks a GDI Minigunner up to the Nod guard
+# on SCG01EA and shoots one frame as drawn, with the shroud lifted, and without soldiers;
+# gate_infshroud.py holds the claims: a soldier in the feather is no brighter than the
+# ground round his feet, and one in the open is unchanged.
+# PROVEN TO FAIL: the renderer before this change, with the `infshroud` verb added, draws
+# the two Nod riflemen at env 0.784 at luminance 12.0 and 15.4 on ground at 0.0 and 0.2.
+# This change draws them at 0.1 and 0.0; the GDI man in the open is unchanged.
+# =====================================================================================
+gbegin shots/g326.log shots/g326_shroud.png shots/g326_lit.png shots/g326_bare.png
+grun shots/g326.log --scen SCG01EA --pack SCG01EA.pack $BASE --enhanced --texset 3 --nosound \
+     --w 1280 --h 800 --script "$GATEDIR/gate_infshroud.txt"
+gshots shots/g326_shroud.png shots/g326_lit.png shots/g326_bare.png
+G326CHK=$(python3 "$GATEDIR/gate_infshroud.py" shots shots/g326.log 2>>"$OUT")
+echo "$G326CHK" >> "$OUT"
+G326OK=$(echo "$G326CHK" | head -1 | cut -d' ' -f1)
+G326MSG=$(echo "$G326CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G326 Enhanced soldiers in the shroud's edge: a run failed (GRC=$GRC). A binary without the infshroud verb is the first thing to check"
+elif [ "$G326OK" = "1" ]; then
+  ok "G326 Enhanced soldiers in the shroud's edge: $G326MSG"
+else
+  bad "G326 Enhanced soldiers in the shroud's edge: ${G326MSG:-the check did not run (see the python error in the log)}"
+fi
+
+
+# =====================================================================================
+# G327 THE CROWD LIMIT ON ENHANCED FOOTSTEPS (game/infantry_audio_math.h, applied in
+# infantry_audio.h). Every soldier's step used to play, into a 64-voice pool, so a crowd's
+# steps grew with every man until they drowned the battle. Now at most 4 steps ring at
+# once, at most 1 starts in a tick (the loudest), and past 3 walkers in earshot each step
+# plays at sqrt(3 / walkers), floored at a half. gate_footsteps.py writes the run (GDI's
+# first mission: one Minigunner walks alone, then the landing party of seven marches,
+# `infantryaudio` every tick) and holds the claims: the lone man untouched, the party
+# limited and still heard. --audiowav is part of the assertion: without a sink the voices
+# never finish and the ringing count would mean nothing. tools/gate-infantry-audio.cpp
+# checks the same three rules as arithmetic.
+# PROVEN TO FAIL: the renderer before this change prints no limit line; over the same
+# march it started 92 steps in 150 ticks with up to 7 ringing, all at full level. This
+# change starts 55, at most 4 ringing and 1 a tick, at level 0.655 to 0.707; the lone
+# man's 9 steps are the same in both.
+# =====================================================================================
+gbegin shots/g327.log
+python3 "$GATEDIR/gate_footsteps.py" script shots/g327.txt
+export OPENCNC3D_AUDIO_SEED=7
+grun shots/g327.log --scen SCG01EA --pack SCG01EA.pack $BASE --enhanced --texset 3 \
+     --musicvol 0 --audiowav shots/g327.wav --w 1280 --h 800 --script shots/g327.txt
+unset OPENCNC3D_AUDIO_SEED
+G327CHK=$(python3 "$GATEDIR/gate_footsteps.py" check shots/g327.log 2>>"$OUT")
+echo "$G327CHK" >> "$OUT"
+G327OK=$(echo "$G327CHK" | head -1 | cut -d' ' -f1)
+G327MSG=$(echo "$G327CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G327 the footstep crowd limit: a run failed (GRC=$GRC)"
+elif [ "$G327OK" = "1" ]; then
+  ok "G327 the footstep crowd limit: $G327MSG"
+else
+  bad "G327 the footstep crowd limit: ${G327MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G328 THE REMASTERED CRATERS AND SCORCH MARKS (game/decalenh_mod.h; decalenh.pack from
+# tools/art/remaster/decals/bake_decalenh.py; claims in gate_decalenh.py). Enhanced drew the
+# cartridge's 24-texel decals on ground painted at 144 texels a cell, laid over it like
+# stickers. It now draws each decal in two layers: a burn (the ground times twice a texel,
+# so the grass or sand keeps its grain under it) over the 3 x 3 cells round the decal's
+# cell, and for a crater a soil body over its own cell, its edge faded. Two views, the
+# authored decals of SCG05EB (temperate) and SCB08EB (desert), each one frame with the
+# remaster on and off, the same in N64, and with no decals (--nosmudge) for the ground. The
+# claims: the pass draws from the pack at 144 texels only under Enhanced with the dial on;
+# every frame in the pack is its committed final, the burn through the theater's own burn;
+# no burn and no body is cut off at the edge of what the game draws it over; inside the
+# decals the ground's own grain carries through at a correlation of 0.5 or more; nothing
+# away from a decal moves; N64 is untouched.
+# PROVEN TO FAIL: the renderer before this change has no `decalenh` or `decaldump` verb and
+# draws the cartridge's decals, through which the ground's grain carries at 0.23 on the
+# grass and 0.12 on the sand. The first remaster (one opaque layer on its own cell) has no
+# burn layer in its pack, and 37 of its crater frames reach their cell's border opaque.
+# =====================================================================================
+gbegin shots/g328_tem.log shots/g328_des.log shots/g328_tem_none.log shots/g328_des_none.log \
+       shots/g328_tem_on.png shots/g328_tem_off.png shots/g328_tem_n64on.png shots/g328_tem_n64off.png \
+       shots/g328_tem_none.png shots/g328_des_on.png shots/g328_des_off.png shots/g328_des_n64on.png \
+       shots/g328_des_n64off.png shots/g328_des_none.png
+for G328T in tem des; do
+  case "$G328T" in
+    tem) G328M=SCG05EB; G328C="26 12" ;;
+    *)   G328M=SCB08EB; G328C="57 44" ;;
+  esac
+  sed -e "s/TAG/$G328T/g" -e "s/VIEW/$G328C/" "$GATEDIR/gate_decalenh.txt" > "shots/g328_$G328T.txt"
+  printf 'tick 5\ncam %s\nzoom max\nshot shots/g328_%s_none.png\nquit\n' "$G328C" "$G328T" > "shots/g328_${G328T}_none.txt"
+  grun "shots/g328_$G328T.log" --scen "$G328M" --pack "$G328M.pack" $BASE --enhanced --texset 3 --noshroud \
+       --nosound --w 1280 --h 800 --script "shots/g328_$G328T.txt"
+  grun "shots/g328_${G328T}_none.log" --scen "$G328M" --pack "$G328M.pack" $BASE --enhanced --texset 3 \
+       --noshroud --nosound --nosmudge --w 1280 --h 800 --script "shots/g328_${G328T}_none.txt"
+done
+gshots shots/g328_tem_on.png shots/g328_tem_off.png shots/g328_tem_n64on.png shots/g328_tem_n64off.png \
+       shots/g328_tem_none.png shots/g328_des_on.png shots/g328_des_off.png shots/g328_des_n64on.png \
+       shots/g328_des_n64off.png shots/g328_des_none.png
+G328CHK=$(python3 "$GATEDIR/gate_decalenh.py" shots decalenh.pack "$GATEDIR/../art/remaster/decals/final" 2>>"$OUT")
+echo "$G328CHK" >> "$OUT"
+G328OK=$(echo "$G328CHK" | head -1 | cut -d' ' -f1)
+G328MSG=$(echo "$G328CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G328 remastered craters and scorch marks: a run failed (GRC=$GRC)"
+elif [ "$G328OK" = "1" ]; then
+  ok "G328 remastered craters and scorch marks: $G328MSG"
+else
+  bad "G328 remastered craters and scorch marks: ${G328MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G329 THE PLACEMENT PREVIEW IN CLASSIC AND N64, WHATEVER LOOK CAME BEFORE
+# (dosclassic_mod.h dos2d_place_cursor; the TRANS record in bake_dosclassic.py;
+# cnc_sidebar.h sb_draw_placement). A building held over the map showed its footprint in
+# Enhanced and N64 and nothing at all in Classic: Classic draws its whole picture in
+# dos2d_scene, which never reaches the sidebar's overlay, and the 1995 hash stamps it draws
+# instead (CellClass::Draw_It: TRANS.ICN frame 0 on a clear cell, 2 on a blocked one) were
+# Red Alert's only, with no TRANS in Tiberian Dawn's pack. One run on SCG01EC starts in
+# Enhanced, readies a Power Plant and holds it over a legal origin (50,44) and a blocked
+# one (45,45), first in Classic and then in N64, and cancels for a control frame in each.
+# The claims, each against the same look with nothing held: Classic paints the 1995 white
+# (252,252,252) over the legal footprint and the 1995 red (168,0,0) over the blocked one;
+# N64 paints its green and red cells over the same two. Each wants 3072 pixels more than
+# its control, one whole 24x24 stamp at the 4x a 1280x800 window gives Classic.
+# PROVEN TO FAIL: the renderer and pack before this change paint nothing in Classic, white
+# +32 and red +0 over the control, while N64 measures green +17408 and red +22878. This
+# change: Classic white +11584 and red +12688, N64 the same as before (N64 was never
+# broken; it is held here so that it stays drawn).
+# =====================================================================================
+cat > shots/g329.txt <<'G329EOF'
+gfxmode 2
+tick 60
+cheatset money 1
+cheatset instant 1
+tick 20
+build NUKE
+ready NUKE
+cam 50 46
+startplace NUKE
+hover 50 44
+shot shots/g329_enh.png
+gfxmode 0
+shot shots/g329_cla_ok.png
+hover 45 45
+shot shots/g329_cla_no.png
+gfxmode 1
+shot shots/g329_n64_no.png
+hover 50 44
+shot shots/g329_n64_ok.png
+cancelplace
+shot shots/g329_n64_off.png
+gfxmode 0
+shot shots/g329_cla_off.png
+quit
+G329EOF
+gbegin shots/g329.log shots/g329_enh.png shots/g329_cla_ok.png shots/g329_cla_no.png \
+       shots/g329_cla_off.png shots/g329_n64_ok.png shots/g329_n64_no.png shots/g329_n64_off.png
+grun shots/g329.log --scen SCG01EC --pack SCG01EA.pack $BASE --noshroud --nosound \
+     --w 1280 --h 800 --script shots/g329.txt
+gshots shots/g329_enh.png shots/g329_cla_ok.png shots/g329_cla_no.png shots/g329_cla_off.png \
+       shots/g329_n64_ok.png shots/g329_n64_no.png shots/g329_n64_off.png
+# Four gains over the control, in the tactical view only (left of the sidebar at x 960):
+# Classic white, Classic red, N64 green, N64 red.
+G329PX=$(python3 - <<'PYPIX'
+import numpy as np
+from PIL import Image
+def px(name):
+    a = np.asarray(Image.open('shots/g329_%s.png' % name).convert('RGB')).astype(int)[:, :960]
+    r, g, b = a[:, :, 0], a[:, :, 1], a[:, :, 2]
+    return (int(np.count_nonzero((r == 252) & (g == 252) & (b == 252))),
+            int(np.count_nonzero((r == 168) & (g == 0) & (b == 0))),
+            int(np.count_nonzero((g >= 140) & (g - r >= 90) & (g - b >= 90))),
+            int(np.count_nonzero((r >= 110) & (r - g >= 50) & (r - b >= 50))))
+try:
+    co, cn, cf = px('cla_ok'), px('cla_no'), px('cla_off')
+    no, nn, nf = px('n64_ok'), px('n64_no'), px('n64_off')
+    print(co[0] - cf[0], cn[1] - cf[1], no[2] - nf[2], nn[3] - nf[3])
+except Exception:
+    print(0, 0, 0, 0)
+PYPIX
+)
+echo "G329|gains|classic white,red|n64 green,red|$G329PX" >> "$OUT"
+set -- $G329PX
+G329OK=1
+grep -a '^SCRIPT|hover|50,44|legal=1' shots/g329.log >/dev/null || G329OK=0
+grep -a '^SCRIPT|hover|45,45|legal=0' shots/g329.log >/dev/null || G329OK=0
+grep -a '^SCRIPT|end .* 0 failures' shots/g329.log >/dev/null || G329OK=0
+if [ "$GRC" != "0" ]; then
+  bad "G329 the placement preview in Classic and N64: the run failed (GRC=$GRC)"
+elif [ "$G329OK" != "1" ]; then
+  bad "G329 the placement preview in Classic and N64: the Power Plant was never held over the legal 50,44 and the blocked 45,45 (see shots/g329.log)"
+elif grep -a '^DOS2D|missing original SHP TRANS' shots/g329.log >/dev/null; then
+  bad "G329 the placement preview in Classic and N64: dosclassic.pack carries no TRANS record, so Classic has no stamps to draw (bake_dosclassic.py placement_stamps)"
+elif [ "${1:-0}" -ge 3072 ] && [ "${2:-0}" -ge 3072 ] && [ "${3:-0}" -ge 3072 ] && [ "${4:-0}" -ge 3072 ]; then
+  ok "G329 the placement preview in Classic and N64, after starting in Enhanced: Classic paints +$1 white pixels on a legal footprint and +$2 red on a blocked one, N64 +$3 green and +$4 red"
+else
+  bad "G329 the placement preview in Classic and N64: a held building is not drawn (gains over the control: Classic white $1, red $2; N64 green $3, red $4; each wants 3072)"
+fi
+
+# =====================================================================================
+# G331 THE BATCH CACHE KEEPS REMASTERED BUILDINGS NEAR THE SHROUD AND WITH WAVING CLOTH
+# (cnc_eyes.cpp draw_mesh: mesh_shroud_sig and the per-draw `deformed`; ebld_wave records
+# the triangles that move; claims in gate_meshcache.py). A building piece the shroud touched
+# was never cached (its per-vertex darkening had no place in the key), nor was any piece of
+# a building with a waving flag or awning (the flag marked the whole mesh deformed), so
+# early in a mission, with every base ringed by unexplored ground, each building was walked
+# triangle by triangle and re-sent in every pass of every frame: the sun's depth, the
+# reflection, the normal target and the picture. That cost tens of milliseconds a frame
+# on Windows. The shroud under a piece is now hashed into its key and only draws holding a
+# waved triangle count as deformed. Two bases measured in steady state through MESHPERF,
+# and ten frames of one of them (ticks, a reclassified shroud, the shroud lifted and put
+# back, a zoom) drawn through the cache and without it (OPENCNC3D_MESH_GPU=0).
+# PROVEN TO FAIL: the renderer before this change uploads 672 and 941 batches a frame on
+# the two bases (95 and 106 with it), and draws the same ten frames, pixel for pixel.
+# =====================================================================================
+# The reference deliberately submits the empty generated passes: its unchanged hit
+# floor still tests the cache under that stress. Production eliminates those calls,
+# and must retain identical pixels/geometry without extra uploads or cache misses.
+gbegin shots/g331_rim.log shots/g331_base.log shots/g331_rim_reference.log shots/g331_base_reference.log \
+       shots/g331_seq_cached.log shots/g331_seq_uncached.log
+rm -rf shots/g331 && python3 "$GATEDIR/gate_meshcache.py" script shots/g331
+export OPENCNC3D_GENERATED_MODE_MASK=1 OPENCNC3D_MESH_GPU=1
+grun shots/g331_rim.log --scen SCG05EA --pack SCG05EA.pack $BASE --enhanced --texset 3 --noshroud \
+     --nosound --w 1280 --h 800 --gfxsave shots/g331/rim.cfg --savedir shots/g331/saves --script shots/g331/rim.txt
+grun shots/g331_base.log --scen SCG08EA --pack SCG08EA.pack $BASE --enhanced --texset 3 \
+     --nosound --w 1280 --h 800 --gfxsave shots/g331/base.cfg --savedir shots/g331/saves --script shots/g331/base.txt
+export OPENCNC3D_GENERATED_MODE_MASK=0 OPENCNC3D_MESH_GPU=1
+grun shots/g331_rim_reference.log --scen SCG05EA --pack SCG05EA.pack $BASE --enhanced --texset 3 --noshroud \
+     --nosound --w 1280 --h 800 --gfxsave shots/g331/rim_reference.cfg --savedir shots/g331/saves --script shots/g331/rim_reference.txt
+grun shots/g331_base_reference.log --scen SCG08EA --pack SCG08EA.pack $BASE --enhanced --texset 3 \
+     --nosound --w 1280 --h 800 --gfxsave shots/g331/base_reference.cfg --savedir shots/g331/saves --script shots/g331/base_reference.txt
+export OPENCNC3D_GENERATED_MODE_MASK=1 OPENCNC3D_MESH_GPU=1
+grun shots/g331_seq_cached.log --scen SCG08EA --pack SCG08EA.pack $BASE --enhanced --texset 3 \
+     --nosound --w 1280 --h 800 --gfxsave shots/g331/seq_cached.cfg --savedir shots/g331/saves --script shots/g331/seq_cached.txt
+export OPENCNC3D_GENERATED_MODE_MASK=1 OPENCNC3D_MESH_GPU=0
+grun shots/g331_seq_uncached.log --scen SCG08EA --pack SCG08EA.pack $BASE --enhanced --texset 3 \
+     --nosound --w 1280 --h 800 --gfxsave shots/g331/seq_uncached.cfg --savedir shots/g331/saves --script shots/g331/seq_uncached.txt
+# POSIX sh retains assignments prefixed to a shell function. Clear both A/B
+# controls explicitly before later renderer gates run in this same shell.
+unset OPENCNC3D_GENERATED_MODE_MASK OPENCNC3D_MESH_GPU
+cp shots/g331_rim.log shots/g331/rim.log; cp shots/g331_base.log shots/g331/base.log
+cp shots/g331_rim_reference.log shots/g331/rim_reference.log; cp shots/g331_base_reference.log shots/g331/base_reference.log
+G331CHK=$(python3 "$GATEDIR/gate_meshcache.py" check shots/g331 2>>"$OUT")
+echo "$G331CHK" >> "$OUT"
+G331OK=$(echo "$G331CHK" | head -1 | cut -d' ' -f1)
+G331MSG=$(echo "$G331CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G331 batch cache near the shroud and with waving cloth: a run failed (GRC=$GRC)"
+elif [ "$G331OK" = "1" ]; then
+  ok "G331 batch cache near the shroud and with waving cloth: $G331MSG"
+else
+  bad "G331 batch cache near the shroud and with waving cloth: ${G331MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G330 THE CARTRIDGE INFANTRY ART SHOWS SOLDIERS FIRING (game/n64inf_mod.h, draw_sprite;
+# n64infantry.pack from game/bake_n64infantry.py; claims in gate_n64inffire.py). With
+# the infantry art set to the cartridge's, a soldier who fired stayed in his standing
+# frame: the scenario pack carries only stand, run and death strips, and the rifle's
+# muzzle flash is painted into the firing frames, so a firefight showed nobody shooting.
+# The cartridge's own SHOOT, CSHOT and CRAWL strips now draw for the engine's fire, prone
+# fire, prone and crawl Dos, picked by the cartridge's own table and stepped by its own
+# stage rule. SCG02EA opens with a firefight; one script runs with the cartridge art and
+# with the DOS art, and the check pairs the two tick by tick: every DOS FIRE, FPRONE,
+# PRONE and CRAWL pick is a cartridge SHOOT, CSHOT, CRAWL and CRAWL pick on the stage the
+# rule gives, every other Do keeps the pack's own strips, and over eight frames shot with
+# and without the soldiers the soldiers' pixels carry the flashes.
+# PROVEN TO FAIL: the renderer before this change draws 0 of the window's 95 standing-
+# fire, 0 of 32 prone-fire and 0 of 86 prone picks from the cartridge's combat strips
+# (every one of them STAND) and 0 flash-coloured pixels on the soldiers; so does this
+# renderer with n64infantry.pack taken out of the folder. This change pairs all 213, on
+# the rule's stages, with 4406 flash pixels against the DOS art's 5343.
+# =====================================================================================
+gbegin shots/g330_c.log shots/g330_d.log
+G330SHOTS=""
+for G330T in c d; do
+  for G330K in 3 4 5 6 7 8 9 10; do
+    G330SHOTS="$G330SHOTS shots/g330_${G330T}_${G330K}_on.png shots/g330_${G330T}_${G330K}_off.png"
+  done
+done
+rm -f $G330SHOTS
+python3 "$GATEDIR/gate_n64inffire.py" script shots/g330_c.txt c 0
+python3 "$GATEDIR/gate_n64inffire.py" script shots/g330_d.txt d 1
+for G330T in c d; do
+  grun "shots/g330_$G330T.log" --scen SCG02EA --pack SCG02EA.pack $BASE --nosound \
+       --w 1280 --h 800 --script "shots/g330_$G330T.txt"
+done
+gshots $G330SHOTS
+G330CHK=$(python3 "$GATEDIR/gate_n64inffire.py" check shots shots/g330_c.log shots/g330_d.log 2>>"$OUT")
+echo "$G330CHK" >> "$OUT"
+G330OK=$(echo "$G330CHK" | head -1 | cut -d' ' -f1)
+G330MSG=$(echo "$G330CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G330 the cartridge infantry art shows soldiers firing: a run failed (GRC=$GRC)"
+elif [ "$G330OK" = "1" ]; then
+  ok "G330 the cartridge infantry art shows soldiers firing: $G330MSG"
+else
+  bad "G330 the cartridge infantry art shows soldiers firing: ${G330MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G332 EVERY MODEL GOES THROUGH THE BATCH, AND EVERY POSED SOLDIER IS DRAWN FROM THE CARD
+# (cnc_eyes.cpp draw_mesh: the batch for every model, a model other than a remastered
+# building kept only when its key comes back on the next frame; model3d_mod.h m3_pose_gpu
+# and m3_skin_buffers; infdeath_mod.h infdeath_torn_begin through the pose cache; claims
+# in gate_meshall.py). The batch had stayed with the remastered buildings, so sandbag
+# walls, vehicles and every other model were sent a vertex at a time in every pass, about
+# 43,000 vertices a frame on a base, and each posed soldier, living or dead, was drawn from
+# system memory, which a driver copies to the card again on every draw: four passes a frame
+# for every body on the ground, and a torn body was skinned again in each of them. All of
+# that is cheap on macOS and dear on Windows. SCG08EA's base is measured as shipped and
+# with the batch held to the buildings (OPENCNC3D_MESH_ALL=0) and drawn both ways for ten
+# frames; the "dead" example map is drawn after its fight with poses on the card and with
+# them in system memory, every cached skin checked against a fresh one.
+# PROVEN TO FAIL: the renderer before this change prints no imm_verts and no gpudraws. Under
+# OPENCNC3D_MESH_ALL=0 and OPENCNC3D_POSE_GPU=0 this one draws as it did: the base sends
+# 43,389 vertices a frame one at a time (0 as shipped) and no soldier comes from the card.
+# =====================================================================================
+gbegin shots/g332_base_all.log shots/g332_base_bld.log shots/g332_seq_all.log shots/g332_seq_bld.log \
+       shots/g332_bodies_gpu.log shots/g332_bodies_cpu.log
+rm -rf shots/g332 && python3 "$GATEDIR/gate_meshall.py" script shots/g332
+G332B="--scen SCG08EA --pack SCG08EA.pack $BASE --enhanced --texset 3 --nosound --w 1280 --h 800"
+G332D="--reskin --noshroud --scen USER93 --pack SCG01EA.pack $BASE --dir missions/user_maps/ --nosound --w 1280 --h 800 --enhanced --texset 1"
+grun shots/g332_base_all.log $G332B --script shots/g332/base.txt
+grun shots/g332_seq_all.log $G332B --script shots/g332/seq_all.txt
+grun shots/g332_bodies_gpu.log $G332D --script shots/g332/bodies_gpu.txt
+export OPENCNC3D_MESH_ALL=0
+grun shots/g332_base_bld.log $G332B --script shots/g332/base.txt
+grun shots/g332_seq_bld.log $G332B --script shots/g332/seq_bld.txt
+unset OPENCNC3D_MESH_ALL
+export OPENCNC3D_POSE_GPU=0 OPENCNC3D_POSECHECK=1
+grun shots/g332_bodies_cpu.log $G332D --script shots/g332/bodies_cpu.txt
+unset OPENCNC3D_POSE_GPU OPENCNC3D_POSECHECK
+for G332L in base_all base_bld bodies_gpu bodies_cpu; do cp shots/g332_$G332L.log shots/g332/$G332L.log; done
+G332CHK=$(python3 "$GATEDIR/gate_meshall.py" check shots/g332 2>>"$OUT")
+echo "$G332CHK" >> "$OUT"
+G332OK=$(echo "$G332CHK" | head -1 | cut -d' ' -f1)
+G332MSG=$(echo "$G332CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G332 every model batched, every posed soldier from the card: a run failed (GRC=$GRC)"
+elif [ "$G332OK" = "1" ]; then
+  ok "G332 every model batched, every posed soldier from the card: $G332MSG"
+else
+  bad "G332 every model batched, every posed soldier from the card: ${G332MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G333 A FULLY CLOAKED ENEMY STEALTH TANK IS NOT DRAWN IN CLASSIC, AND A CLOAKING ONE IS
+# DRAWN AS THE 1995 ENGINE DRAWS IT (the CLOAKING block, dos2d_visual and dos2d_shimmer in
+# dosclassic_mod.h; scene and claims in gate_cloak.py). Techno_Draw_Object hands the layer
+# export a hidden unit's layers as if it were only shadowy (FADING|PREDATOR, then
+# PREDATOR), and Classic drew every one of them as the tank itself, so a cloaked Nod tank
+# stood on the screen as two copies with light-green fringes.
+#
+# ONE RUN on SCG99EA (a copy of SCM01EA: a Nod Stealth Tank and one of the player's
+# own, both in one Classic view, both cloaking on their own from frame 2 and fully cloaked
+# from frame 40). Frames 1 to 46, each shot with both tanks and with every STNK layer left out
+# (`dosomit STNK`), so what was drawn for each tank is the difference. Claims:
+#   (1) ENGINE TRUTH: both tanks in the view on every frame, each UNCLOAKED, CLOAKING with
+#       its stage rising one a frame, then CLOAKED; on every frame the engine's layers are
+#       exactly the ones Techno_Draw_Object gives the visual character Classic works out
+#       (so the ladder is the engine's), drawn in its order; a hidden tank still exported;
+#   (2) HIDDEN DRAWS NOTHING: on every frame the Nod tank is fully cloaked, the picture
+#       is the picture without it, byte for byte, round the tank;
+#   (3) THE CYCLE: the tank (its hull brighter than the grass), then darkened over itself
+#       (under 0.75 of its brightness), then a dark silhouette (nothing brighter than the
+#       grass, darker on average), then the shimmer alone (grass moved, no new colour);
+#   (4) THE PLAYER'S OWN fully cloaked tank, and its tank from stage 19 on, is a dark
+#       silhouette with the shimmer through it, never the tank, never nothing;
+#   (5) NOTHING ELSE on the picture changes.
+# PROVEN TO FAIL: with the old rules (FADING|PREDATOR a shadow on sub-objects only, no
+# shimmer, no hidden test, the darkening left under the tank) 72 claims go red, among them
+# the fully cloaked Nod tank drawn on all 7 of its frames (1548 to 1755 pixels).
+# NOT COVERED: Red Alert's cloaking submarines and mines, which take the same code; the
+# frame an uncloaking tank spends hidden (one frame, needs a fired shot to stage).
+# =====================================================================================
+rm -rf g333m && python3 "$GATEDIR/gate_cloak.py" maps g333m 2>>"$OUT"
+rm -f shots/g333_f*.png   # every frame is scored, so none may survive from an older run
+gbegin shots/g333.log shots/g333_f01_on.png shots/g333_f40_on.png shots/g333_f40_off.png \
+       shots/g333_f46_on.png shots/g333_f46_off.png
+if [ -s g333m/SCG99EA.INI ]; then
+  grun shots/g333.log --scen SCG99EA --pack SCG01EA.pack $BASE --dir g333m/ --noshroud \
+       --nosound --w 1280 --h 720 --script g333m/cloak.txt
+  gshots shots/g333_f01_on.png shots/g333_f40_on.png shots/g333_f40_off.png \
+         shots/g333_f46_on.png shots/g333_f46_off.png
+  G333CHK=$(python3 "$GATEDIR/gate_cloak.py" check shots/g333.log shots 2>>"$OUT")
+else
+  G333CHK="0 the test mission was not made (missions/SCM01EA is not in the run folder)"
+fi
+echo "$G333CHK" >> "$OUT"
+G333V=$(echo "$G333CHK" | head -1 | cut -d' ' -f1)
+G333MSG=$(echo "$G333CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G333 Classic stealth tank: a run failed (GRC=$GRC)"
+elif [ "$G333V" = "1" ]; then
+  ok "G333 Classic stealth tank: $G333MSG"
+else
+  bad "G333 Classic stealth tank: ${G333MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G334 RED ALERT'S GROUND KEPT ON THE GPU (game/ra3d_terrain.h, its cache). Under Enhanced
+# the Red Alert ground, its sea floor, its join strips and its normal pass are drawn from
+# buffers built once per sheet, each cell's light sent again only when it changes, instead
+# of every corner of every cell in view in immediate mode every frame. What can go wrong
+# with that is silent: a stale light draws a frame that looks right until the shroud moves,
+# and a change made to one path and not the other draws two different grounds.
+#
+# FIVE RUNS, all hidden, the ore left out (G310 says why), every compared picture at tick
+# 0: Allied 1 (snow) with the shroud from the buffers and through the per-frame loops
+# (OPENCNC3D_TERRAIN_CACHE=0), six pictures each: the start view, the shroud's light off
+# and on, the synthetic dark pass, the sea off, another view zoomed out; Allied 5
+# (temperate, its coast) the same way, three pictures, the last on the 1995 set switched
+# to at run time; and Allied 1 played, a Ranger driven into the shroud with frames between
+# the ticks and the screen revealed and covered again, with the instrument
+# OPENCNC3D_RA3DCACHE_VERIFY=1 comparing every record each frame draws, bit for bit, with
+# the per-frame computation of it, from what the GPU holds. Claims (gate_ra3dcache.py):
+#   (1) the buffers are built (and rebuilt with the sheet), and not when switched off;
+#   (2) all nine pairs are byte-identical;
+#   (3) the steps compared each change the picture, and the light comes back exactly;
+#   (4) over at least twenty played frames no record is stale, cells are recoloured as the
+#       shroud moves, and at least half the frames send nothing.
+# NOT COVERED: the frame time, which a suite run on a busy machine cannot hold to a bar, and a
+# driver without buffers (the loops then draw, which (2) shows are the same picture).
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -f ra3d/3d/SCG01EA.pack ] || [ ! -f ra3d/3d/SCG05EA.pack ]; then
+  skip "G334 Red Alert's ground from the GPU: no Red Alert module is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g334m && mkdir -p g334m
+  G334RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dir ra3d/missions/ --dosdata ra3d/audio --nosound --w 1280 --h 720 --enhanced --texset 3"
+  for g334n in a b; do
+    printf 'tick 0\nframeperf 1\nshot g334m/%s1.png\nshroudlight 0\nshot g334m/%s2.png\nshroudlight 1\nshot g334m/%s3.png\nshrouddarktest\nshot g334m/%s4.png\ngfx water_fx 0\nshot g334m/%s5.png\ncam 54 56\nzoom min\nshot g334m/%s6.png\nquit\n' \
+      $g334n $g334n $g334n $g334n $g334n $g334n > g334m/$g334n.txt
+  done
+  for g334n in c d; do
+    printf 'tick 0\ncam 58 60\nframeperf 1\nshot g334m/%s1.png\nzoom min\nshot g334m/%s2.png\ngfx texset 1\nshot g334m/%s3.png\nquit\n' \
+      $g334n $g334n $g334n > g334m/$g334n.txt
+  done
+  {
+    printf 'tick 30\ncam 62 50\ntick 1\nlclickobj JEEP 0\norder 61 53\n'
+    for g334k in 1 2 3 4 5 6 7 8 9 10 11 12; do printf 'tick 12\nframeperf 2\nshroudstat\n'; done
+    printf 'zoom min\nframeperf 2\nreveal 1\nframeperf 2\nreveal 0\nframeperf 2\ntick 30\nframeperf 2\nshroudstat\nquit\n'
+  } > g334m/e.txt
+  gbegin
+  export OPENCNC3D_RA3DORE=off
+  grun g334m/a.log $G334RA --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g334m/a.txt
+  grun g334m/c.log $G334RA --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --noshroud --script g334m/c.txt
+  export OPENCNC3D_TERRAIN_CACHE=0
+  grun g334m/b.log $G334RA --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g334m/b.txt
+  grun g334m/d.log $G334RA --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --noshroud --script g334m/d.txt
+  unset OPENCNC3D_TERRAIN_CACHE OPENCNC3D_RA3DORE
+  # the played run's order may not land exactly where it was aimed (the engine routes it),
+  # so its script's own count is not this gate's verdict; the instrument's lines are
+  OPENCNC3D_RA3DCACHE_VERIFY=1 ./cnc_eyes $G334RA --scen SCG01EA --pack ra3d/3d/SCG01EA.pack \
+    --script g334m/e.txt > g334m/e.log 2>&1
+  cat g334m/e.log >> "$OUT"
+  if [ "$GRC" != "0" ]; then
+    bad "G334 Red Alert's ground from the GPU: a run failed (GRC=$GRC)"
+  elif ! gshots g334m/a1.png g334m/a6.png g334m/b1.png g334m/b6.png g334m/c3.png g334m/d3.png; then
+    bad "G334 Red Alert's ground from the GPU: a picture was not written"
+  else
+    G334CHK=$(python3 "$GATEDIR/gate_ra3dcache.py" check g334m 2>>"$OUT")
+    G334V=$(echo "$G334CHK" | head -1 | cut -d' ' -f1)
+    G334MSG=$(echo "$G334CHK" | head -1 | cut -d' ' -f2-)
+    if [ "$G334V" = "1" ]; then
+      ok "G334 $G334MSG"
+    else
+      bad "G334 Red Alert's ground from the GPU: ${G334MSG:-the check did not run (see the python error in the log)}"
+    fi
+  fi
+fi
+
+# =====================================================================================
+# G335 RED ALERT 3D CATCHES UP WITH TIBERIAN DAWN'S ENHANCED (game/ra3d_sprites_mod.h,
+# game/cnc_eyes.cpp, game/atmosphere_mod.h, the audio tables). Five hidden runs of the
+# original missions on their own 3D scenes, claims in game/gate_ra3dparity.py:
+#   (1) the Tesla Coil's bolt is drawn while the coil fires, at least 150 pixels against
+#       the same frame without it (ra3dzap 0, the drawing before), and it leaves from the
+#       source the engine fires from (its nearest piece one step of the walk away);
+#   (2) the trees and the ore mine stand on their own cells (TerrainClass draws them
+#       from their top left, not their centre);
+#   (3) a click on Allied 7's gunboat selects it (K_VESSEL) and it takes a move;
+#   (4) the Rangers lay tracks on Allied 1's snow; Allied 5's cliffs are known to the
+#       softening;
+#   (5) Soviet 2's dog is heard running and its RATEMP ground has the temperate bed;
+#   (6) Soviet 6's heavy tank drives with tank_drive;
+#   (7) every vehicle, ship, aircraft, tree and wall card stands on the ground: measured
+#       by occlusion queries (ra3dcardvis), the median card on Allied 5, Allied 7 and
+#       Soviet 6 shows at least 0.95 of its own picture, against at most 0.7 for the same
+#       frame drawn the old way (ra3dstand 0: centred on its point, its lower half under
+#       the terrain);
+#   (8) in the 3D view without Enhanced, every building card on Allied 5 has its foot row
+#       within 3 pixels of the ground row the 2D game lays it on (the old way stood it at
+#       the sprite's centre row, at least 8 pixels off);
+#   (9) every Red Alert building model on Allied 5 stands at its size on the plot
+#       (art/remaster-ra/scale.json, baked into game/ebld_ra): its drawn height and plan
+#       (footdump's FOOTMODEL) are the approved model's times its scale within 0.01 of a
+#       cell, with at least five types shrunk far enough that an unscaled model would miss.
+# PROVEN TO FAIL: the renderer before these changes leaves the bolt out under an imported
+# coil, centres every tree half a sprite north west, cannot select a ship, draws no track,
+# plays no dog step, no Red Alert drive sound and no temperate bed. (7) and (8) carry their
+# own control: the old placement on the same frame must fail them, or the gate fails. (9)
+# fails on the buildings as approved (the bake before scale.json): every shrunk type
+# stands its full height, FACT 1.55 cells against 1.245.
+# NOT COVERED: how the bolt, the tracks and the blood look (looked at by eye), and the
+# cliff softening's effect on pixels (Allied 5's ridges change, Allied 1's pale snow rock
+# by design does not). The Red Alert engine is not identical run to run, so the bolt is
+# looked for over 100 ticks rather than at a fixed one. Without a staged Red Alert module
+# the gate does not run and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG01EA.pack ]; then
+  skip "G335 Red Alert 3D parity: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g335m && mkdir -p g335m
+  python3 "$GATEDIR/gate_ra3dparity.py" script g335m 2>>"$OUT"
+  G335RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dir ra3d/missions/ --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud"
+  gbegin
+  grun g335m/zap.log  $G335RA --nosound --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g335m/zap.txt
+  grun g335m/tree.log $G335RA --nosound --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g335m/tree.txt
+  grun g335m/ship.log $G335RA --nosound --scen SCG07EA --pack ra3d/3d/SCG07EA.pack --script g335m/ship.txt
+  export OPENCNC3D_AUDIO_SEED=7
+  grun g335m/dog.log  $G335RA --musicvol 0 --audiowav g335m/dog.wav --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g335m/dog.txt
+  grun g335m/tank.log $G335RA --musicvol 0 --audiowav g335m/tank.wav --scen SCU06EA --pack ra3d/3d/SCU06EA.pack --script g335m/tank.txt
+  unset OPENCNC3D_AUDIO_SEED
+  gshots g335m/zap_a00.png g335m/tree.png g335m/ship.png
+  G335CHK=$(python3 "$GATEDIR/gate_ra3dparity.py" check g335m 2>>"$OUT")
+  echo "$G335CHK" >> "$OUT"
+  G335V=$(echo "$G335CHK" | head -1 | cut -d' ' -f1)
+  G335MSG=$(echo "$G335CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G335 Red Alert 3D parity: a run failed (GRC=$GRC)"
+  elif [ "$G335V" = "1" ]; then
+    ok "G335 Red Alert 3D parity: $G335MSG"
+  else
+    bad "G335 Red Alert 3D parity: ${G335MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G336 EVERY ARGUMENT AFTER "--" REACHES THE GAME (launcher/lcmdline.h, the forwarding in
+# launcher/launcher.c). The launcher kept the game's arguments in a list of 16 that stopped
+# copying when it was full, without a word: a Red Alert skirmish run with 17 handed the
+# game "--script" without its file, and the game printed its usage and exited 2.
+# tools/launcher/forward-check.sh, with this folder's own launcher:
+#   (1) a stand-in game handed twenty forwarded arguments, the last "--script FILE" and one
+#       holding a space, receives exactly those twenty in order; the longest list the
+#       launcher carries arrives whole; one more is REFUSED, naming what would be dropped,
+#       and the game is never started;
+#   (2) the Windows command line, built by the launcher's own quoting, reads back as the
+#       C runtime would split it, checked against strings worked from its rules;
+#   (3) with a Red Alert module staged, the real game started by the launcher, hidden,
+#       with twenty forwarded arguments ending "--script FILE", runs that script to its end
+#       on the 10000 credits asked for in the middle of the list (a skirmish starts on
+#       5000 without them).
+# NOT COVERED: the Windows launcher itself starting the game, which cannot run here; (2)
+# covers the string it hands CreateProcess.
+# =====================================================================================
+if [ ! -x ./opencnc3d-launcher ]; then
+  skip "G336 forwarded arguments: no opencnc3d-launcher in this folder (game/make-build.sh copies it)"
+else
+  if [ -x ra3d/opencnc3d ] && [ -f ra3d/RedAlert.dylib ]; then G336PLAY=.; else G336PLAY=; fi
+  G336OUT=$("$GATEDIR/../tools/launcher/forward-check.sh" ./opencnc3d-launcher $G336PLAY 2>&1)
+  G336RC=$?
+  echo "$G336OUT" >> "$OUT"
+  G336N=$(echo "$G336OUT" | grep -c '^FWD|ok|')
+  if [ "$G336RC" = "0" ] && [ -n "$G336PLAY" ] && [ "$G336N" = "5" ]; then
+    ok "G336 forwarded arguments: twenty after -- reach a stand-in game in order, the longest list arrives whole and one more is refused by name before anything starts, the Windows command line quotes as its runtime reads back, and the Red Alert game started by the launcher runs --script to its end on the 10000 credits from the middle of the list"
+  elif [ "$G336RC" = "0" ] && [ -z "$G336PLAY" ] && [ "$G336N" = "4" ]; then
+    ok "G336 forwarded arguments: twenty after -- reach a stand-in game in order, the longest list arrives whole and one more is refused by name before anything starts, and the Windows command line quotes as its runtime reads back. The real-game leg did not run: no Red Alert module is staged in this folder"
+  else
+    bad "G336 forwarded arguments: exit=$G336RC passed=$G336N $(echo "$G336OUT" | grep '^FWD|FAIL' | head -3 | tr '\n' ' ')"
+  fi
+fi
+
+# G337 AN INSTALL WITHOUT THE MOVIES AND MUSIC SHOWS RED ALERT AND STARTS IT (launcher/lmodule.c,
+# lmod_ra_needs). The launcher's test for an installed Red Alert asked for its two title movies
+# and its score as well, none of which any package carries, so a folder without them drew
+# Red Alert's slot as "Coming soon" and `--module ra3d --play` refused it, while the game
+# itself plays without them. tools/launcher/module-check.sh, with this folder's own launcher:
+#   (1) every file the test asks for, on both platforms, is one a package carries: none on
+#       tools/media/media-paths.txt or under a folder on it, none a movie or a score;
+#   with a Red Alert module staged, a scratch folder of links to this one, leaving out every
+#   path on the media list, and asked to hold no movie and no score under ra3d/;
+#   (2) the launcher's module grid drawn from it (--shot) reads Red Alert installed;
+#   (3) --module ra3d --play there runs the real game, hidden, to the end of a script,
+#       finding no movie and no theme but its sound effects, past the missing title movie;
+#   (4) the control: without the Red Alert brain the slot is drawn empty, naming it, and
+#       --play refuses before the game starts.
+# NOT COVERED: the Windows launcher, which cannot run here; (1) reads its half of the table.
+# =====================================================================================
+if [ ! -x ./opencnc3d-launcher ]; then
+  skip "G337 Red Alert without media: no opencnc3d-launcher in this folder (game/make-build.sh copies it)"
+else
+  if [ -x ra3d/opencnc3d ] && [ -f ra3d/RedAlert.dylib ]; then G337PLAY=.; else G337PLAY=; fi
+  G337OUT=$("$GATEDIR/../tools/launcher/module-check.sh" ./opencnc3d-launcher $G337PLAY 2>&1)
+  G337RC=$?
+  echo "$G337OUT" >> "$OUT"
+  G337N=$(echo "$G337OUT" | grep -c '^MOD|ok|')
+  if [ "$G337RC" = "0" ] && [ -n "$G337PLAY" ] && [ "$G337N" = "5" ]; then
+    ok "G337 Red Alert without media: in a folder shaped like a package, with no movie and no score, the launcher's grid draws Red Alert installed and --module ra3d --play runs the game to the end of its script past the missing title movie; its test asks for nothing a package leaves out, and without the brain the slot is empty and --play refuses by name"
+  elif [ "$G337RC" = "0" ] && [ -z "$G337PLAY" ] && [ "$G337N" = "1" ]; then
+    ok "G337 Red Alert without media: the launcher's test asks for nothing a package leaves out. The folder legs did not run: no Red Alert module is staged in this folder"
+  else
+    bad "G337 Red Alert without media: exit=$G337RC passed=$G337N $(echo "$G337OUT" | grep '^MOD|FAIL' | head -3 | tr '\n' ' ')"
+  fi
+fi
+
+# =====================================================================================
+# G338 RED ALERT 3D DRAWS THE ART IT SHARES WITH OPENCNC3D AS OPENCNC3D'S REMASTERS
+# (game/ra3d_sprites_mod.h, game/ebld_mod.h, game/ebld_terr.h, game/decalenh_mod.h,
+# tools/ra3d/stage-reuse.py). Five hidden runs of the original missions on their own 3D
+# scenes, claims in game/gate_ra3dreuse.py:
+#   (1) Allied 5B's civilian buildings are their reused models, and its village frame
+#       differs from the same frame without the remasters (ebld 0);
+#   (2) every such model stands inside its own footprint;
+#   (3) Soviet 1's houses first seen hurt are worn or broken; Allied 5B's church, hit to
+#       death, goes to its wreck, sinks and is gone, its engine's death craters held back;
+#   (4) on temperate ground the reused tree types (the reuse manifest's) are models and every other tree
+#       its 1996 card, each model on the engine's trunk point in its own cells; a T12 hit
+#       to death is its snag, outlives its tree and goes;
+#   (5) on snow every house of Soviet 1's village and every tree of a reused type is drawn
+#       from its winter look (<T>_WIN.ebld, the file Tiberian Dawn's winter draws), no summer
+#       tree file is read there, and every other tree is its 1996 card;
+#   (6) Soviet 9's eight craters and scorch marks are remastered and none with the dial
+#       off; Allied 3B's snow crater is remastered with a grey burn (fewer than 300
+#       changed pixels peach, where the temperate burn on snow made 1976);
+#   (7) Soviet 9's sandbags, chain-link fence and concrete walls and Soviet 1's wooden
+#       fence are their reused pieces (frames against `walls 0`); a hit fence cell wears
+#       before it is wrecked, a sandbag cell is wrecked, both leave the map's count;
+#   (8) Soviet 1's steel crate and field overlays reach the reused-cell lists.
+# PROVEN TO FAIL: the renderer before these changes draws every one of them as its 1996
+# card or decal (no model line, no remastered mark, the wall pass empty under Red Alert);
+# claim (5) with the winter files taken out of the module (0 of 31 snow trees models).
+# NOT COVERED: a tree burning (no gate run sets one alight; Tiberian Dawn's G312 covers
+# the stage logic both games share), the oil pump's beam moving (looked at by eye), and
+# the wall line's preview under Red Alert (G302 covers it for Tiberian Dawn). The Red Alert
+# engine is not identical run to run, so every A/B is two frames of one run. Without a
+# staged Red Alert module the gate does not run and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG05EB.pack ]; then
+  skip "G338 Red Alert 3D reuse: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/ebld/reuse-manifest.json ]; then
+  bad "G338 Red Alert 3D reuse: the module has no reused remasters staged (tools/ra3d/stage-reuse.py)"
+else
+  rm -rf g338m && mkdir -p g338m
+  python3 "$GATEDIR/gate_ra3dreuse.py" script g338m 2>>"$OUT"
+  G338RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dir ra3d/missions/ --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  export OPENCNC3D_RA3DORE=off
+  grun g338m/vil.log   $G338RA --scen SCG05EB --pack ra3d/3d/SCG05EB.pack --script g338m/vil.txt
+  grun g338m/snow.log  $G338RA --scen SCU01EA --pack ra3d/3d/SCU01EA.pack --script g338m/snow.txt
+  grun g338m/marks.log $G338RA --scen SCU09EA --pack ra3d/3d/SCU09EA.pack --script g338m/marks.txt
+  grun g338m/smark.log $G338RA --scen SCG03EB --pack ra3d/3d/SCG03EB.pack --script g338m/smark.txt
+  grun g338m/trees.log $G338RA --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g338m/trees.txt
+  unset OPENCNC3D_RA3DORE
+  gshots g338m/vil_on.png g338m/vil_off.png g338m/snow_on.png g338m/marks_on.png g338m/smark_on.png
+  G338CHK=$(python3 "$GATEDIR/gate_ra3dreuse.py" check g338m 2>>"$OUT")
+  echo "$G338CHK" >> "$OUT"
+  G338V=$(echo "$G338CHK" | head -1 | cut -d' ' -f1)
+  G338MSG=$(echo "$G338CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G338 Red Alert 3D reuse: a run failed (GRC=$GRC)"
+  elif [ "$G338V" = "1" ]; then
+    ok "G338 $G338MSG"
+  else
+    bad "G338 Red Alert 3D reuse: ${G338MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G339 THE VEHICLES' LAMPS (evhc_mod.h's lamps, the FxSpot slots and lamp term of the
+# light pass in fx_post.h, the vlight dials in fx_state.h; scene and claims in
+# gate_vlights.py). Under Enhanced every headlight, tail light, marker and beacon a
+# remastered vehicle's export names is a cone of light on what stands in front of it, its
+# lens glowing; headlights are stopped by what stands between; a lamp rides its piece.
+# FIVE RUNS of SCG90EA at 1280x720 on private copies of its INI: e (the lamp scene: a
+# Medium Tank facing the Weapons Factory, a Light Tank, a Hum-vee, a Mammoth, a harvester,
+# an APC and a buggy beside the GDI base, the houses allied) and e2, its replay; n, e's
+# first view with --novehiclelights; cl, Classic; air, a helipad's Orca flown. Claims:
+#   (1) the sixteen types the lab lit carry their lamps in format 2 files, the other five
+#       none (EVHCART);
+#   (2) the lamps are posed, ten or more lit within the slots, some casting shadows, the
+#       lenses glowing (EVHCLAMP);
+#   (3) the same frame with the lamps out (evhclamps 0) differs on 20000 pixels or more of
+#       two views, 98 per cent of them brighter with the lamps, and red behind the tails;
+#   (4) the headlights' shadows (vlight_shadows) only darken;
+#   (5) the Light Tank's searchlight points with its headlights at rest and turns away
+#       from them when the turret turns to fire; (6) a Hum-vee's lamps drive with it;
+#   (7) an APC taken to half strength puts its lamps out and the others keep theirs;
+#   (8) --novehiclelights draws byte for byte the frame the lamps switched out draw, and
+#       Classic poses none; (9) the Orca's lamps fly with it; (10) two runs are one picture.
+# NOT COVERED: how the light looks against the lab, which is for a person; the cost, which
+# is measured by hand (docs: the vehicles' handoff).
+# =====================================================================================
+rm -rf g339m && python3 "$GATEDIR/gate_vlights.py" missions missions g339m >>"$OUT" 2>&1
+g339_e() {   # $1 = tag
+  {
+    echo "tick 3"; echo "evhcdump"; echo "zoom max"
+    echo "cam 54 48"; echo "shot shots/vl_$1_a_on.png"; echo "evhclampdump"
+    echo "evhclamps 0"; echo "shot shots/vl_$1_a_off.png"; echo "evhclamps 1"
+    echo "gfx vlight_shadows 0"; echo "shot shots/vl_$1_a_nosh.png"; echo "gfx vlight_shadows 1"
+    echo "cam 48 41"; echo "shot shots/vl_$1_b_on.png"; echo "evhclampdump"
+    echo "evhclamps 0"; echo "shot shots/vl_$1_b_off.png"; echo "evhclamps 1"
+    echo "cam 45 41"; echo "lclickobj LTNK:GoodGuy 0"; echo "actcell 45 38 c"; echo "tick 15"
+    echo "frames 1"; echo "evhclampdump"
+    echo "lclickobj JEEP:GoodGuy 1"; echo "order 42 41"; echo "tick 20"; echo "frames 1"
+    echo "evhclampdump"
+    echo "hurtunit APC:GoodGuy 0 600"; echo "tick 2"; echo "hurtunit APC:GoodGuy 0 1"
+    echo "frames 1"; echo "evhclampdump"; echo "quit"
+  } > "g339m/$1.txt"
+}
+g339_e e; g339_e e2
+{ echo "tick 3"; echo "zoom max"; echo "cam 54 48"; echo "shot shots/vl_n_a.png"; echo "evhclampdump"; echo "quit"; } > g339m/n.txt
+{ echo "tick 3"; echo "zoom max"; echo "cam 54 48"; echo "frames 1"; echo "evhclampdump"; echo "quit"; } > g339m/cl.txt
+{
+  echo "tick 5"; echo "cheatset money 1"; echo "cheatset instant 1"; echo "tick 3"
+  echo "build HPAD"; echo "ready HPAD 200"; echo "startplace HPAD"; echo "place auto"
+  echo "tick 110"; echo "cam 47 38"; echo "lclickobj ORCA 0"; echo "actcell 50 38"; echo "tick 40"
+  echo "frames 1"; echo "evhclampdump"; echo "quit"
+} > g339m/air.txt
+gbegin shots/vl_e.log shots/vl_e2.log shots/vl_n.log shots/vl_cl.log shots/vl_air.log \
+       shots/vl_e_a_on.png shots/vl_e_a_off.png shots/vl_e_a_nosh.png shots/vl_e_b_on.png \
+       shots/vl_e_b_off.png shots/vl_e2_a_on.png shots/vl_e2_b_on.png shots/vl_n_a.png
+G339ARGS="--scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound --w 1280 --h 720"
+if [ -s g339m/lamps/SCG90EA.INI ]; then
+  grun shots/vl_e.log   $G339ARGS --dir g339m/lamps/ --enhanced --script g339m/e.txt
+  grun shots/vl_e2.log  $G339ARGS --dir g339m/lamps/ --enhanced --script g339m/e2.txt
+  grun shots/vl_n.log   $G339ARGS --dir g339m/lamps/ --enhanced --novehiclelights --script g339m/n.txt
+  grun shots/vl_cl.log  $G339ARGS --dir g339m/lamps/ --script g339m/cl.txt
+  grun shots/vl_air.log $G339ARGS --dir g339m/air/ --enhanced --script g339m/air.txt
+  gshots shots/vl_e_a_on.png shots/vl_e_a_off.png shots/vl_e_a_nosh.png shots/vl_e_b_on.png \
+         shots/vl_e_b_off.png shots/vl_e2_a_on.png shots/vl_e2_b_on.png shots/vl_n_a.png
+  G339CHK=$(python3 "$GATEDIR/gate_vlights.py" check shots 2>>"$OUT")
+else
+  G339CHK="FAIL the lamp scene was not made (missions/SCG90EA.INI is not in the run folder)"
+fi
+echo "$G339CHK" >> "$OUT"
+G339V=$(echo "$G339CHK" | tail -1)
+if [ "$GRC" != "0" ]; then
+  bad "G339 vehicle lamps: a run failed (GRC=$GRC); $G339V"
+else
+  case "$G339V" in
+    OK*) ok "G339 vehicle lamps: ${G339V#OK }; the light only adds, the shadows only take away, a searchlight turns with its turret, lamps drive and fly with their vehicle and go out at half strength; --novehiclelights is the frame with them out, Classic has none; two runs identical" ;;
+    *)   bad "G339 vehicle lamps: $G339V" ;;
+  esac
+fi
+rm -rf g339m
+
+# G340 RED ALERT'S MOVIES AND SCORE ARE DOWNLOADED EXACTLY WHERE ITS MODULE IS (launcher/lmedia.c,
+# launcher/lmodule.c). The movies and music boxes cover both games, and Red Alert's own, about
+# 724 MB from its two 1996 discs, sit under the manifest's `module ra3d` line, so a Tiberian
+# Dawn install must never fetch them and a Red Alert one must. Its score is written as the
+# plain header the manifest pins followed by the disc's range, because the game's audio
+# reader takes no encrypted header. tools/launcher/media-module-check.sh, with this folder's
+# own launcher and a stand-in mirror on 127.0.0.1 serving disc images made of random bytes:
+#   (1) the shipped manifest has the module line, every ra3d/ file under it, the score with
+#       its head, and Setup's sizes count Red Alert's files only with --module ra3d;
+#   (2) with no module, --media-install fetches Tiberian Dawn's files and asks nothing of
+#       Red Alert's disc;
+#   (3) with the module's files present, the same run fetches Red Alert's movie and score,
+#       the score the head and then the range, and leaves no part file;
+#   (4) unticked, Red Alert's files go too and the module's own stay;
+#   (5) the control: a manifest with ra3d/ files and no module line is refused by name.
+# NOT COVERED: the real mirrors (tools/media/probe-sources.py, before every release) and the
+# Windows launcher, which cannot run here.
+# =====================================================================================
+if [ ! -x ./opencnc3d-launcher ]; then
+  skip "G340 Red Alert media by module: no opencnc3d-launcher in this folder (game/make-build.sh copies it)"
+else
+  G340OUT=$("$GATEDIR/../tools/launcher/media-module-check.sh" ./opencnc3d-launcher 2>&1)
+  G340RC=$?
+  echo "$G340OUT" >> "$OUT"
+  G340N=$(echo "$G340OUT" | grep -c '^MMOD|ok|')
+  if [ "$G340RC" = "0" ] && [ "$G340N" = "5" ]; then
+    ok "G340 Red Alert media by module: an install without Red Alert fetches none of its movies or score and asks nothing of its disc, one with the module fetches them, the score as its pinned header and then the disc's range, unticking removes them, a manifest without the module line is refused, and Setup counts Red Alert's sizes only for a package carrying it"
+  else
+    bad "G340 Red Alert media by module: exit=$G340RC passed=$G340N $(echo "$G340OUT" | grep '^MMOD|FAIL' | head -3 | tr '\n' ' ')"
+  fi
+fi
+
+# =====================================================================================
+# G342 RED ALERT 3D DRAWS OPENCNC3D'S OWN EFFECTS UNDER ENHANCED (game/ra3d_effects_mod.h,
+# game/effects_mod.h's host hooks, game/ra3d_sprites_mod.h, the Red Alert brain's EFX|FIRE
+# and EFX|BULLET lines). Two hidden runs of the original missions on their own 3D scenes,
+# with a fight staged by the engine's own debug spawn (`spawnobj`) and `forcefire`, claims
+# in game/gate_ra3deffects.py:
+#   (1) every Red Alert anim drawn as particles took its Tiberian Dawn counterpart's recipe
+#       (FIRE3 FIRE_SMALL, GUNFIRE the cannon flash, MINIGUN a GUN_ facing, a dying
+#       building's FBALL1 FRAG3 ...), at least six kinds of them;
+#   (2) no anim with a counterpart is a card while Enhanced effects draw, and the same
+#       frame with them off (gfx efx_enh 0) draws the cards and differs;
+#   (3) effects start on the card of the object they ride, on a model's roof, at a dying
+#       building's plot and at a rocket's height;
+#   (4) one blast per dead structure (barrels and reused civilian buildings apart);
+#   (5) the ore silo below half strength smokes from its roof;
+#   (6) the brain prints EFX|FIRE and EFX|BULLET, and a V2 in the air is drawn at its height;
+#   (7) the modelled riflemen's rifles flash;
+#   (8) a drawn Tesla bolt glows at both ends.
+# PROVEN TO FAIL: the renderer before this work prints no RA3DPROBE|efx line and fired the
+# wrong recipes for Red Alert's anims (FIRE3 as PIFFPIFF); the brain before it prints no
+# EFX|FIRE or EFX|BULLET line.
+# NOT COVERED: how the effects look (frame sheets, by eye); the Red Alert engine is not
+# identical run to run, so the coil is waited for over 120 ticks and nothing compares two
+# runs. Without a staged Red Alert module the gate does not run and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG05EA.pack ] || [ ! -f ra3d/3d/SCG01EA.pack ]; then
+  skip "G342 Red Alert 3D effects: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g342m && mkdir -p g342m
+  python3 "$GATEDIR/gate_ra3deffects.py" script g342m 2>>"$OUT"
+  G342RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dir ra3d/missions/ --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  export OPENCNC3D_RA3DORE=off
+  grun g342m/temp.log $G342RA --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g342m/temp.txt
+  grun g342m/snow.log $G342RA --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g342m/snow.txt
+  unset OPENCNC3D_RA3DORE
+  gshots g342m/temp_08.png g342m/temp_off.png g342m/snow_00.png
+  G342CHK=$(python3 "$GATEDIR/gate_ra3deffects.py" check g342m 2>>"$OUT")
+  echo "$G342CHK" >> "$OUT"
+  G342V=$(echo "$G342CHK" | head -1 | cut -d' ' -f1)
+  G342MSG=$(echo "$G342CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G342 Red Alert 3D effects: a run failed (GRC=$GRC)"
+  elif [ "$G342V" = "1" ]; then
+    ok "G342 $G342MSG"
+  else
+    bad "G342 Red Alert 3D effects: ${G342MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G343 RED ALERT 3D DRAWS OPENCNC3D'S REMASTERED VEHICLES AND AIRCRAFT (game/evhc_mod.h,
+# game/ra3d_sprites_mod.h, game/cnc_eyes.cpp, tools/ra3d/stage-vehicles.py). Four hidden
+# runs, claims in game/gate_ra3dvehicles.py: on private copies of Allied 5 (temperate) and
+# Soviet 1 (snow) with an Allied and a Soviet row of every staged ground type and both
+# aircraft, every one is its model and its card stands down (a type with no file keeps
+# its card), the frame differs from the same frame with the cards, the Soviets are red and
+# the Allies light blue, every file is OpenCNC3D's own with its type renamed and every
+# model OpenCNC3D's size, a Light Tank drives on its tracks, turrets turn, shots recoil,
+# rotors spin with their discs up, an APC opens its door for a rifleman boarding it, a click
+# selects a model, an APC and a Light Tank break
+# into their wrecks and a Longbow is shot down and breaks where it lands, a Soviet Mammoth
+# (OpenCNC3D's round-9 model, reused) is red, turns its turret, fires both guns with recoil
+# and leaves its wreck, Classic draws
+# none of it; Soviet 9's wooden crates are OpenCNC3D's crate and Soviet 2's T06 trees
+# their reused models; the Radar Jammer is the Mobile HQ's model close up in both theaters,
+# its dish turning.
+# PROVEN TO FAIL: the renderer before this work draws every Red Alert vehicle as its card
+# and the wooden crate as its 1996 picture.
+# NOT COVERED: the Chinook's ramp (no scripted way to board a landed Chinook), the Phase
+# Transport's cloak (the 1996 rules give the type none), Red Alert's own remasters (the
+# Heavy Tank, the V2, the Ore Truck's scoop and dump, the Gun Boat: G345), and how the
+# models look (the proof sheets). Without a staged Red Alert module the gate does not run
+# and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG05EA.pack ]; then
+  skip "G343 Red Alert 3D vehicles: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/evhc/manifest.json ]; then
+  bad "G343 Red Alert 3D vehicles: the module has no remastered vehicles staged (tools/ra3d/stage-vehicles.py)"
+else
+  rm -rf g343m && mkdir -p g343m
+  python3 "$GATEDIR/gate_ra3dvehicles.py" script g343m 2>>"$OUT"
+  G343RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g343m/t.log $G343RA --dir g343m/mt/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g343m/t.txt
+  grun g343m/s.log $G343RA --dir g343m/ms/ --scen SCU01EA --pack ra3d/3d/SCU01EA.pack --script g343m/s.txt
+  grun g343m/c.log $G343RA --dir ra3d/missions/ --scen SCU09EA --pack ra3d/3d/SCU09EA.pack --script g343m/c.txt
+  grun g343m/w.log $G343RA --dir ra3d/missions/ --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g343m/w.txt
+  grun g343m/jt.log $G343RA --dir g343m/mt/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g343m/jt.txt
+  grun g343m/js.log $G343RA --dir g343m/ms/ --scen SCU01EA --pack ra3d/3d/SCU01EA.pack --script g343m/js.txt
+  gshots g343m/t_on.png g343m/t_off.png g343m/s_on.png g343m/s_off.png g343m/c_on.png g343m/w.png \
+         g343m/jt_a.png g343m/jt_b.png g343m/js_a.png g343m/js_b.png
+  G343CHK=$(python3 "$GATEDIR/gate_ra3dvehicles.py" check g343m 2>>"$OUT")
+  echo "$G343CHK" >> "$OUT"
+  G343V=$(echo "$G343CHK" | head -1 | cut -d' ' -f1)
+  G343MSG=$(echo "$G343CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G343 Red Alert 3D vehicles: a run failed (GRC=$GRC)"
+  elif [ "$G343V" = "1" ]; then
+    ok "G343 $G343MSG"
+  else
+    bad "G343 Red Alert 3D vehicles: ${G343MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G344 THE TREE CLUMPS DRAWN WHOLE (game/ebld_terr.h eterr_clump_whole, clump_draw_whole;
+# the per-cell clump branches of cnc_eyes.cpp's passes; game/ebld/TC01_TEM..TC05_TEM, made
+# by tools/art/remaster/foliage/compose_clump.py and bake_ebld.py), AND T16'S AND T08'S OWN
+# TEMPERATE TREES (T16_TEM, T08_TEM). Under Enhanced a tree clump with a model of its own is
+# that one model at the clump's centre coordinate, where each blocked cell used to be a
+# single tree. Three hidden runs on the original missions, claims in game/gate_clumps.py:
+#   (1) every clump on Nod 4A's and GDI 1's maps is drawn whole once the camera visits it,
+#       its model anchored (read back out of draw_mesh) on the engine's centre coordinate,
+#       which is its top-left cell plus the type's centre base (tdata.cpp);
+#   (2) none is composed of single trees, and each of the five types is drawn from its own
+#       file with its wind;
+#   (3) --noclumptrees draws no clump, and its frame differs by 3000 pixels or more;
+#   (4) T16 draws from its own file (no longer T01's) and T08 from its temperate look;
+#   (5) a clump's textures are its members' own, put on the card once (ebld_share_key):
+#       GDI 1's remastered textures under 60 per cent of --noebldshare's (61.8 MB against
+#       126.4 MB when made), its frames byte for byte the same.
+# PROVEN TO FAIL: the renderer before the change composes every clump of single trees
+# (no CLUMP line, the clumps' files never drawn). NOT COVERED: how a clump looks against
+# the lab and the 1995 art, which is judged by eye (the clumps' review sheets); Red Alert's
+# clumps, which G338 holds with its trees (every tree of Allied 5 a model).
+# =====================================================================================
+if [ ! -f ebld/TC01_TEM.ebld ]; then
+  bad "G344 the tree clumps: the play folder has no clump files (game/ebld/TC0N_TEM.ebld)"
+else
+  rm -rf g344m && python3 "$GATEDIR/gate_clumps.py" script g344m 2>>"$OUT"
+  G344B="$BASE --nosound --noshroud --w 1280 --h 720 --enhanced --texset 3"
+  gbegin g344m/e_first.png g344m/n_first.png g344m/t_first.png g344m/s_first.png
+  grun g344m/e.log --scen SCG04EA --pack SCG04EA.pack $G344B --script g344m/e.txt
+  grun g344m/n.log --scen SCG04EA --pack SCG04EA.pack $G344B --noclumptrees --script g344m/n.txt
+  grun g344m/t.log --scen SCG01EA --pack SCG01EA.pack $G344B --script g344m/t.txt
+  grun g344m/s.log --scen SCG01EA --pack SCG01EA.pack $G344B --noebldshare --script g344m/s.txt
+  gshots g344m/e_first.png g344m/n_first.png g344m/t_first.png g344m/s_first.png
+  G344CHK=$(python3 "$GATEDIR/gate_clumps.py" check g344m 2>>"$OUT")
+  echo "$G344CHK" >> "$OUT"
+  G344V=$(echo "$G344CHK" | head -1 | cut -d' ' -f1)
+  G344MSG=$(echo "$G344CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G344 the tree clumps: a run failed (GRC=$GRC)"
+  elif [ "$G344V" = "1" ]; then
+    ok "G344 $G344MSG"
+  else
+    bad "G344 the tree clumps: ${G344MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G345 RED ALERT 3D DRAWS ITS OWN REMASTERED VEHICLES AND SHIPS (game/evhc_mod.h: the
+# vessels in evhc's rule, the V2's erector, rocket and rams; game/ra3d_sprites_mod.h,
+# game/cnc_eyes.cpp; the Red Alert brain's doing= 3 and ammo=; game/evhc_ra/*.evhc staged
+# by tools/ra3d/stage-vehicles.py once the lab approves them). Nine hidden runs, claims in
+# game/gate_ra3downvehicles.py: on private copies of Allied 5 (temperate) and Soviet 3
+# (snow), an Allied and a Soviet Heavy Tank, V2 Rocket, Ore Truck, Ranger, Mobile Gap
+# Generator, Supply Truck and Mine Layer in two rows and a Gun
+# Boat of each side at sea are each drawn by its model with its card stood down, Soviets
+# red and Allies not, the frames differing from the same frames with the cards; the boat
+# stands on the sea, its bow gun turns and kicks, it sails when ordered and a click on its
+# model selects it; the Heavy Tank's turret turns and its guns kick; the Ranger's gun turns
+# and kicks and the ordered one drives, its wheels rolling; the V2's erector rises
+# to its lift while the engine has it standing to fire and its rocket goes when the engine
+# says the rail is empty; the boat hurt is still its model, sunk breaks into its wreck,
+# which lies on the water and goes down, and the tank and launcher break into theirs;
+# Allied 5's own Ore Truck lifts its scoop at the ore and raises and tips its body at the
+# refinery; a V2 ordered at a building fires twice from the top of its lift, lowering empty
+# and rising again for the reload, each rocket flying as the model's own up, level and down
+# onto the target with no projectile card; Allied 5's opening Transport is drawn at its heading as
+# it turns and lowers its ramps far one first and near one last while the engine has its
+# door open, closing them after; every Gap Generator's fork turns 22.5 degrees a tick
+# counterclockwise seen from above (the 1996 frames' rate and way), close up a whole turn
+# every sixteen ticks, and the ordered one drives with its wheels rolling and its front pair
+# steering; with the shroud on, an Allied Gap Generator hides the cells round it from the
+# Soviet player and they are drawn black, and without it they stay; the player's own Supply
+# Truck drives with its wheels rolling and front pair steering, the Mine Layer with its tracks
+# running, and the Mine Layer lays a mine; an Allied Destroyer at sea beside a Soviet Gun
+# Boat, on both theaters, is its model with its card stood down, floats, turns its missile
+# launcher astern exactly as the engine turns its turret and onto the boat, fires, is hurt
+# and sunk into a wreck that goes down, and on Allied 5 is selected by a click with no
+# health bar standing beside it, sails when ordered and is drawn rolling as it sails
+# (draw_mesh's lean witness); Classic draws none of it.
+# PROVEN TO FAIL: the renderer before this work draws every Gun Boat as its card and has
+# no erector (no EVHCV2 line), no Transport ramps (no EVHCLST line) and no flying rocket
+# (no EVHCFLY line), and turns the Gap Generator's fork clockwise (EVHCSPIN fails on the
+# file baked before its axis was turned down); before the Destroyer's work, a selected
+# Destroyer stood a health bar two cells tall and no lean was dumped. The Cruiser (runs ca,
+# cs, once staged) takes the Destroyer's claims, and its file carries both its turrets, the
+# after one turned half a turn more so both point along the one turret facing, firing fore
+# and aft in turn.
+# NOT COVERED: how the models look (the proof sheets); the submarine's dive (G352); the
+# Destroyer's depth charges (no submarine in its runs); the
+# erector's rams against the girder (looked at by eye). Without a staged Red Alert module
+# the gate does not run and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG05EA.pack ] \
+   || [ ! -f ra3d/3d/SCU03EA.pack ]; then
+  skip "G345 Red Alert 3D's own vehicles: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/evhc/manifest.json ]; then
+  bad "G345 Red Alert 3D's own vehicles: the module has no remastered vehicles staged (tools/ra3d/stage-vehicles.py)"
+else
+  rm -rf g345m && mkdir -p g345m
+  python3 "$GATEDIR/gate_ra3downvehicles.py" script g345m 2>>"$OUT"
+  G345RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g345m/t.log $G345RA --dir g345m/mt/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g345m/t.txt
+  grun g345m/s.log $G345RA --dir g345m/ms/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g345m/s.txt
+  grun g345m/v.log $G345RA --dir g345m/mv/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g345m/v.txt
+  grun g345m/h.log $G345RA --dir ra3d/missions/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g345m/h.txt
+  grun g345m/l.log $G345RA --dir ra3d/missions/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g345m/l.txt
+  grun g345m/ft.log $G345RA --dir g345m/mft/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g345m/ft.txt
+  grun g345m/fs.log $G345RA --dir g345m/mfs/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g345m/fs.txt
+  G345SH="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --nosound"
+  grun g345m/g.log $G345SH --dir g345m/mg/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g345m/g.txt
+  grun g345m/g0.log $G345SH --dir g345m/mg0/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g345m/g0.txt
+  if [ -f g345m/d.txt ]; then
+    grun g345m/d.log $G345RA --dir g345m/md/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g345m/d.txt
+    grun g345m/e.log $G345RA --dir g345m/me/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g345m/e.txt
+  fi
+  if [ -f g345m/ca.txt ]; then
+    grun g345m/ca.log $G345RA --dir g345m/mca/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g345m/ca.txt
+    grun g345m/cs.log $G345RA --dir g345m/mcs/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g345m/cs.txt
+  fi
+  gshots g345m/t_rows_on.png g345m/t_rows_off.png g345m/t_sea_on.png g345m/s_rows_on.png g345m/s_sea_on.png g345m/h_dump.png g345m/l_land48.png g345m/ft_20.png g345m/fs_20.png g345m/g_5.png g345m/g0_5.png g345m/t_more_on.png g345m/s_more_on.png g345m/t_mine.png g345m/s_mine.png
+  G345CHK=$(python3 "$GATEDIR/gate_ra3downvehicles.py" check g345m 2>>"$OUT")
+  echo "$G345CHK" >> "$OUT"
+  G345V=$(echo "$G345CHK" | head -1 | cut -d' ' -f1)
+  G345MSG=$(echo "$G345CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G345 Red Alert 3D's own vehicles: a run failed (GRC=$GRC)"
+  elif [ "$G345V" = "1" ]; then
+    ok "G345 $G345MSG"
+  else
+    bad "G345 Red Alert 3D's own vehicles: ${G345MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G346 RED ALERT 3D'S CONSTRUCTION YARD DEPLOYS OUT OF ITS MCV (game/ebld_place.h: the
+# placements read from ra3d/eplc under Red Alert, one attached the tick its building is first
+# read, a structure its placement owns drawn by it and its 1996 build-up card stood down,
+# game/ebld_mod.h, game/ra3d_sprites_mod.h; game/eplc_ra/FACT.eplc by
+# tools/ra3d/bake-placements.py, staged by tools/ra3d/stage-structures.py beside the MCV).
+# Four hidden runs, claims in game/gate_ra3ddeploy.py: a Soviet MCV on Soviet 5 (temperate)
+# and Soviet 4 (snow), an Allied one on Allied 9 (temperate) and Allied 2 (snow), each clicked
+# to deploy: drawn by its model, it turns to the south-west, and the yard's placement starts
+# the tick it goes, with the MCV it deploys from, and plays to its end with no build-up card
+# drawn; then a Power Plant built and placed from each new yard.
+# PROVEN TO FAIL: the renderer before this work reads Tiberian Dawn's placements under Red
+# Alert (none attaches) and draws the yard's 1996 build-up card.
+# NOT COVERED: how it looks (the proof sheets, beside the approved lab strip); selling the
+# yard; Classic. Without a staged Red Alert module with the placement the gate does not run
+# and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCU05EA.pack ] \
+   || [ ! -f ra3d/3d/SCU04EB.pack ] || [ ! -f ra3d/3d/SCG09EA.pack ] || [ ! -f ra3d/3d/SCG02EA.pack ]; then
+  skip "G346 Red Alert 3D's MCV deploy: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/eplc/FACT.eplc ] || [ ! -f ra3d/evhc/MCV.evhc ]; then
+  bad "G346 Red Alert 3D's MCV deploy: the module has no Construction Yard placement or MCV staged (tools/ra3d/stage-structures.py)"
+else
+  rm -rf g346m && mkdir -p g346m
+  python3 "$GATEDIR/gate_ra3ddeploy.py" script g346m 2>>"$OUT"
+  G346RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g346m/st.log $G346RA --dir g346m/mst/ --scen SCU05EA --pack ra3d/3d/SCU05EA.pack --script g346m/st.txt
+  grun g346m/ss.log $G346RA --dir g346m/mss/ --scen SCU04EB --pack ra3d/3d/SCU04EB.pack --script g346m/ss.txt
+  grun g346m/at.log $G346RA --dir g346m/mat/ --scen SCG09EA --pack ra3d/3d/SCG09EA.pack --script g346m/at.txt
+  grun g346m/as.log $G346RA --dir g346m/mas/ --scen SCG02EA --pack ra3d/3d/SCG02EA.pack --script g346m/as.txt
+  gshots g346m/st_24.png g346m/ss_24.png g346m/at_20.png g346m/as_20.png
+  G346CHK=$(python3 "$GATEDIR/gate_ra3ddeploy.py" check g346m 2>>"$OUT")
+  echo "$G346CHK" >> "$OUT"
+  G346V=$(echo "$G346CHK" | head -1 | cut -d' ' -f1)
+  G346MSG=$(echo "$G346CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G346 Red Alert 3D's MCV deploy: a run failed (GRC=$GRC)"
+  elif [ "$G346V" = "1" ]; then
+    ok "G346 $G346MSG"
+  else
+    bad "G346 Red Alert 3D's MCV deploy: ${G346MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G347 RED ALERT 3D'S AIRCRAFT, THEIR MODELS WITH THEIR LANDING GEAR AND ROTORS (game/evhc_mod.h:
+# the gear driver EVD_GEAR, evhc_step's THE LANDING GEAR and THE ROTORS; game/cnc_eyes.cpp:
+# RED ALERT'S AIRFIELD, the runway or landing plate as the deck a parked aircraft stands on;
+# game/evhc_ra/MIG.evhc, YAK.evhc, HIND.evhc, U2.evhc staged by tools/ra3d/stage-vehicles.py
+# once the lab approves them). Six hidden runs, claims in game/gate_ra3dmig.py: on private
+# copies of Soviet 2 (temperate) and Soviet 1 (snow) with an Allied Power Plant added beside
+# the base, a MiG and a Yak each land on an Airfield and a Hind sits on a Helipad added for it,
+# and each is ordered at the Power Plant; a Spy Plane is added in flight. Each one: its model
+# with its card stood down (a card again with `evhc 0`, the frames differing round it); parked
+# it stands on the runway or the plate with its gear down; taking off, the gear swings up in
+# steps and is stowed before Altitude 13; at flight level it is stowed on every tick, every
+# hinge at its full angle; it fires; it comes back, the gear swinging down in steps, and lands
+# with it down. The Yak's propeller and the Hind's rotors idle on the ground with no disc and
+# run at full rate in flight with the disc up. The Spy Plane flies over as its model.
+# PROVEN TO FAIL: the renderer before this work refuses MIG.evhc (its gear driver unknown),
+# draws the aircraft as their cards and gives a parked aircraft on a Red Alert Airfield or
+# Helipad no deck.
+# The Badger (no gear: it flies only) is added in flight beside the Spy Plane and must fly
+# over as its model too.
+# NOT COVERED: how the gear looks (the lab's gear sheets, the proof pictures); the deaths, the shared aircraft death G343 holds for the Longbow; the Spy
+# Plane's own mission. Without a staged Red Alert module with the aircraft the gate does not
+# run and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCU02EA.pack ] \
+   || [ ! -f ra3d/3d/SCU01EA.pack ]; then
+  skip "G347 Red Alert 3D's aircraft: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/evhc/MIG.evhc ] || [ ! -f ra3d/evhc/YAK.evhc ] || [ ! -f ra3d/evhc/HIND.evhc ] \
+     || [ ! -f ra3d/evhc/U2.evhc ] || [ ! -f ra3d/evhc/BADR.evhc ]; then
+  bad "G347 Red Alert 3D's aircraft: the module has not got the MiG, the Yak, the Hind, the Spy Plane and the Badger staged (tools/ra3d/stage-vehicles.py)"
+else
+  rm -rf g347m && mkdir -p g347m
+  python3 "$GATEDIR/gate_ra3dmig.py" script g347m 2>>"$OUT"
+  G347RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  for G347T in t yt ht; do
+    grun g347m/$G347T.log $G347RA --dir g347m/m$G347T/ --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g347m/$G347T.txt
+  done
+  for G347T in s ys hs; do
+    grun g347m/$G347T.log $G347RA --dir g347m/m$G347T/ --scen SCU01EA --pack ra3d/3d/SCU01EA.pack --script g347m/$G347T.txt
+  done
+  gshots g347m/t_parked.png g347m/t_cards.png g347m/s_parked.png g347m/s_cards.png \
+         g347m/yt_parked.png g347m/ys_parked.png g347m/ht_parked.png g347m/hs_parked.png \
+         g347m/ht_u2.png g347m/hs_u2.png g347m/ht_badr.png g347m/hs_badr.png
+  G347CHK=$(python3 "$GATEDIR/gate_ra3dmig.py" check g347m 2>>"$OUT")
+  echo "$G347CHK" >> "$OUT"
+  G347V=$(echo "$G347CHK" | head -1 | cut -d' ' -f1)
+  G347MSG=$(echo "$G347CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G347 Red Alert 3D's aircraft: a run failed (GRC=$GRC)"
+  elif [ "$G347V" = "1" ]; then
+    ok "G347 $G347MSG"
+  else
+    bad "G347 Red Alert 3D's aircraft: ${G347MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G348 RED ALERT 3D'S STRUCTURES: THEIR PLACEMENTS AND THEIR ENGINE-DRIVEN CLIPS, and
+# G349 RED ALERT 3D'S STRUCTURES DRAWN BY THEIR STAGES (game/ebld_mod.h: ebld_ra_staged,
+# ebld_ra_entry and RA_DRIVE; game/ebld_place.h; the files by tools/ra3d/bake-structures.py and
+# tools/ra3d/bake-placements.py, staged by tools/ra3d/stage-structures.py). Five hidden runs,
+# claims in game/gate_ra3dstructs.py: private copies of Soviet 5 (temperate) and Soviet 4
+# (snow) with blocks of Soviet structures, Allied 9 (temperate) and Allied 2 (snow) with blocks
+# of Allied ones, the types dealt round them; every placement the module has plays on its
+# standing structure and one is sold backwards; a fifth run on Soviet 2 builds a Barracks from
+# the sidebar and sells it; on Allied 2 a Missile Silo's nuclear missile is fired and its cover opens,
+# holds and closes with the engine; every structure is hit below half strength and then to
+# its death; and on Allied 2 and Soviet 5 two Ore Silos show the house's stored ore (put in by
+# the brain's OpenCNC3D_Store_Ore) at empty, half and full, intact and damaged; and on Soviet 8 a
+# Heavy Tank rolls out of a War Factory, its door opening and shutting.
+# G348 holds what every build ships (the approved placements, the silo's cover). G349 holds the
+# stages, and skips (saying so) in a folder with no structure staged with them: tonight's
+# stages are in review, and only a test folder staged with --include-review carries them.
+# PROVEN TO FAIL: the renderer before this work plays no Red Alert placement but the yard's,
+# loops the silo's cover on its own clock, and draws a staged structure as its 1996 sprite.
+# NOT COVERED: how they look (the proof sheets); the War Factory's door and the other driven
+# clips until their models carry them; Classic, which keeps the 1996 states.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCU02EA.pack ] \
+   || [ ! -f ra3d/3d/SCU05EA.pack ] || [ ! -f ra3d/3d/SCU04EB.pack ] || [ ! -f ra3d/3d/SCG09EA.pack ] \
+   || [ ! -f ra3d/3d/SCG02EA.pack ] || [ ! -f ra3d/3d/SCU08EA.pack ]; then
+  skip "G348 Red Alert 3D's structures: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+  skip "G349 Red Alert 3D's structures' stages: no Red Alert module with 3D scenes is staged in this folder"
+elif [ ! -f ra3d/ebld/MSLO.ebld ] || [ ! -f ra3d/eplc/BARR.eplc ]; then
+  bad "G348 Red Alert 3D's structures: the module has no Missile Silo or Barracks placement staged (tools/ra3d/stage-structures.py)"
+else
+  rm -rf g348m && mkdir -p g348m
+  python3 "$GATEDIR/gate_ra3dstructs.py" script g348m 2>>"$OUT"
+  G348RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g348m/st.log $G348RA --dir g348m/mst/ --scen SCU05EA --pack ra3d/3d/SCU05EA.pack --script g348m/st.txt
+  grun g348m/sb.log $G348RA --dir g348m/msb/ --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g348m/sb.txt
+  grun g348m/ss.log $G348RA --dir g348m/mss/ --scen SCU04EB --pack ra3d/3d/SCU04EB.pack --script g348m/ss.txt
+  grun g348m/at.log $G348RA --dir g348m/mat/ --scen SCG09EA --pack ra3d/3d/SCG09EA.pack --script g348m/at.txt
+  grun g348m/as.log $G348RA --dir g348m/mas/ --scen SCG02EA --pack ra3d/3d/SCG02EA.pack --script g348m/as.txt
+  grun g348m/so.log $G348RA --dir g348m/mso/ --scen SCG02EA --pack ra3d/3d/SCG02EA.pack --script g348m/so.txt
+  grun g348m/su.log $G348RA --dir g348m/msu/ --scen SCU05EA --pack ra3d/3d/SCU05EA.pack --script g348m/su.txt
+  grun g348m/wd.log $G348RA --dir g348m/mwd/ --scen SCU08EA --pack ra3d/3d/SCU08EA.pack --script g348m/wd.txt
+  # (the sea run, written only where the Naval Yard or the Sub Pen is staged with its stages)
+  if [ -f g348m/sw.txt ]; then
+    grun g348m/sw.log $G348RA --dir g348m/msw/ --scen SCG06EA --pack ra3d/3d/SCG06EA.pack --script g348m/sw.txt
+  fi
+  gshots g348m/st_damaged.png g348m/ss_damaged.png g348m/at_damaged.png g348m/as_damaged.png
+  G348CHK=$(python3 "$GATEDIR/gate_ra3dstructs.py" check g348m 2>>"$OUT")
+  echo "$G348CHK" >> "$OUT"
+  G348L=$(echo "$G348CHK" | grep '^G348 ')
+  G349L=$(echo "$G348CHK" | grep '^G349 ')
+  G348V=$(echo "$G348L" | cut -d' ' -f2); G348MSG=$(echo "$G348L" | cut -d' ' -f3-)
+  G349V=$(echo "$G349L" | cut -d' ' -f2); G349MSG=$(echo "$G349L" | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G348 Red Alert 3D's structures: a run failed (GRC=$GRC)"
+    bad "G349 Red Alert 3D's structures' stages: a run failed (GRC=$GRC)"
+  else
+    if [ "$G348V" = "1" ]; then ok "G348 $G348MSG"
+    else bad "G348 Red Alert 3D's structures: ${G348MSG:-the check did not run (see the python error in the log)}"; fi
+    if [ "$G349V" = "1" ]; then ok "G349 $G349MSG"
+    elif [ "$G349V" = "-" ]; then skip "G349 Red Alert 3D's structures' stages: $G349MSG"
+    else bad "G349 Red Alert 3D's structures' stages: ${G349MSG:-the check did not run (see the python error in the log)}"; fi
+  fi
+fi
+
+# =====================================================================================
+# G350 THE REMASTERED VEHICLES' AND BUILDINGS' SPECULAR MAPS (evhc_mod.h evhc_draw_spec,
+# ebld_mod.h ebld_spec_read, fx_post.h's specular target; the maps from
+# tools/art/remaster/spec_map.py, carried beside each model as game/evhc/<TYPE>.spec and
+# game/ebld/<TYPE>.spec by tools/art/remaster/bake_spec.py). Under Enhanced a vehicle or
+# building whose file has a map beside it is drawn a second time into the light pass's
+# specular target, and the light pass adds the sun's highlight on its smooth normal, outside
+# the sun's shadow, and a sky sheen at grazing angles: strongest on bare metal, weak on
+# concrete, none on wood, cloth or earth. Three runs of stock SCG90EA at 1280x720, the two
+# Harvesters harvesting by the GDI base, six frames each drawn with the maps and again the
+# same tick without them (evhcspec 0, the run-time --noevhcspec), in game/gate_evhcspec.py:
+#   (1) every remastered vehicle type and at least ten building types carry maps, and the
+#       target draws vehicles and buildings (EVHCSPEC);
+#   (2) every pair differs by added light only (at most 1% of differing pixels darker by
+#       more than rounding), on 500 to 80000 pixels, and the differing pixels change from
+#       frame to frame as the Harvesters move;
+#   (3) the F5 switch (gfx vspec_on 0) draws the run-time switch's frame;
+#   (4) with --noevhc --noebld and in Classic the switch changes nothing.
+# PROVEN TO FAIL: the renderer before the maps prints no EVHCSPEC line and has no evhcspec
+# verb, so (1) fails and (2) finds the pairs identical; with --noevhcspec on the e run, (1)
+# and (2) fail.
+# NOT COVERED: how much shine looks right, which is a judgement made in play with the F5
+# group's dials (vspec_sun, vspec_sky, vspec_gloss).
+G350D=$(mktemp -d "${TMPDIR:-/tmp}/gate_evhcspec.XXXXXX")
+g350_s() {   # $1 = tag
+  {
+    echo "tick 200"; echo "cam 54 43"
+    for k in 1 2 3 4 5 6; do
+      echo "tick 3"; echo "shot $G350D/$1_on_$k.png"; echo "evhcspec 0"
+      echo "shot $G350D/$1_off_$k.png"; echo "evhcspec 1"
+    done
+    echo "evhcdump"
+    echo "gfx vspec_on 0"; echo "shot $G350D/$1_panel.png"; echo "gfx vspec_on 1"
+    echo "evhcspec 0"; echo "shot $G350D/$1_sw.png"; echo "evhcspec 1"; echo "quit"
+  } > "$G350D/$1.txt"
+}
+for t in e n cl; do g350_s $t; done
+gbegin
+G350ARGS="--scen SCG90EA --pack SCG01EA.pack $BASE --noshroud --nosound --w 1280 --h 720"
+grun "$G350D/e.log"  $G350ARGS --enhanced --script "$G350D/e.txt"
+grun "$G350D/n.log"  $G350ARGS --enhanced --noevhc --noebld --script "$G350D/n.txt"
+grun "$G350D/cl.log" $G350ARGS --script "$G350D/cl.txt"
+gshots "$G350D/e_on_1.png" "$G350D/e_off_6.png" "$G350D/n_on_1.png" "$G350D/cl_off_6.png"
+G350V=$(python3 "$GATEDIR/gate_evhcspec.py" "$G350D" 2>&1 | tail -1)
+rm -rf "$G350D"
+if [ "$GRC" != "0" ]; then
+  bad "G350 specular maps: a run did not finish (GRC=$GRC); $G350V"
+else
+  case "$G350V" in
+    OK*) ok "G350 specular maps: ${G350V#OK }" ;;
+    *)   bad "G350 specular maps: $G350V" ;;
+  esac
+fi
+
+# G351 RED ALERT'S SNOW HILLSIDES KEEP THEIR PAINTING AT THE SHIPPED SUN (ra3d_terrain.h:
+# ra3d_one_sun, ra3d_corner_light; fx_post.h: the slope's rolloff, uSlopeWhite and
+# fx_grade_white_in). Soviet 1 and Allied 3, both snow with their auto heightmaps, one camera
+# over a sun-facing hillside each, three frames of the same tick: the shipped dials, the bloom
+# off, and the highlight rolloff off. Claims in game/gate_ra3dsnowslope.py: at most 5% of the
+# view pure white with the shipped dials and 1% without the bloom, while the same view with
+# the rolloff off clips more than 2% and more than twice as much (the control).
+# PROVEN TO FAIL: the renderer before this work leaves 22% and 30% of these views pure white
+# (it lit Red Alert's ground twice on a slope, by the console's baked shade and by the post
+# chain's sun, and let the sun's boost take pale snow through the grade's white).
+# NOT COVERED: the Interior, which is flat; how the hillsides look (the proof sheets).
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCU01EA.pack ] \
+   || [ ! -f ra3d/3d/SCG03EA.pack ]; then
+  skip "G351 Red Alert's snow slopes: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g351m && mkdir -p g351m
+  for G351M in "u SCU01EA 56 76" "a SCG03EA 78 64"; do
+    set -- $G351M
+    { echo "tick 30"; echo "cam $3 $4"; echo "tick 3"; echo "shot g351m/$1_on.png"
+      echo "gfx bloom_on 0"; echo "tick 3"; echo "shot g351m/$1_nobloom.png"
+      echo "gfx bloom_on 1"; echo "gfx tonemap 0"; echo "tick 3"; echo "shot g351m/$1_off.png"
+      echo "quit"; } > g351m/$1.txt
+  done
+  G351RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound --dir ra3d/missions/"
+  gbegin
+  grun g351m/u.log $G351RA --scen SCU01EA --pack ra3d/3d/SCU01EA.pack --script g351m/u.txt
+  grun g351m/a.log $G351RA --scen SCG03EA --pack ra3d/3d/SCG03EA.pack --script g351m/a.txt
+  gshots g351m/u_on.png g351m/u_nobloom.png g351m/u_off.png g351m/a_on.png g351m/a_nobloom.png g351m/a_off.png
+  G351CHK=$(python3 "$GATEDIR/gate_ra3dsnowslope.py" g351m 2>>"$OUT")
+  echo "$G351CHK" >> "$OUT"
+  G351L=$(echo "$G351CHK" | grep '^G351 [01] ')
+  G351V=$(echo "$G351L" | cut -d' ' -f2); G351MSG=$(echo "$G351L" | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G351 Red Alert's snow slopes: a run failed (GRC=$GRC)"
+  elif [ "$G351V" = "1" ]; then ok "G351 $G351MSG"
+  else bad "G351 Red Alert's snow slopes: ${G351MSG:-the check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G352 RED ALERT 3D'S SUBMARINE DIVES THROUGH THE SEA AS ITS MODEL (game/evhc_mod.h:
+# evhc_dive, evhc_draw_dived_ghosts; game/evhc_ra/SS.evhc and its dive from painter.submerge,
+# tools/art/remaster/bake_evhc.py). Two hidden runs, claims in game/gate_ra3dsub.py: the
+# player's own Submarine on Soviet 3 (snow) goes down through the sea on every sample as the
+# engine cloaks it, past awash and periscope depth to fully under, drawn faintly through the
+# sea while under, and ordered at an Allied Destroyer comes up on every sample to fire its
+# torpedoes surfaced; on Allied 5 (temperate) the Soviets' Submarine goes down the same way
+# and, once under, is not drawn at all.
+# PROVEN TO FAIL: the renderer before this work draws the Submarine at the surface whatever
+# the engine's cloak (no EVHCDIVE line; its file had no dive) and hides even the player's own
+# once cloaked under the sea.
+# NOT COVERED: how it looks (the proof pictures); its death at sea (G345's ships). Without
+# a staged Red Alert module with the Submarine the gate does not run and says so.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCU03EA.pack ] \
+   || [ ! -f ra3d/3d/SCG05EA.pack ]; then
+  skip "G352 Red Alert 3D's Submarine: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/evhc/SS.evhc ]; then
+  skip "G352 Red Alert 3D's Submarine: the Submarine is not staged in this folder (tools/ra3d/stage-vehicles.py)"
+else
+  rm -rf g352m && mkdir -p g352m
+  python3 "$GATEDIR/gate_ra3dsub.py" script g352m 2>>"$OUT"
+  G352RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g352m/u.log $G352RA --dir g352m/mu/ --scen SCU03EA --pack ra3d/3d/SCU03EA.pack --script g352m/u.txt
+  grun g352m/g.log $G352RA --dir g352m/mg/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g352m/g.txt
+  gshots g352m/u_under.png g352m/g_under.png
+  G352CHK=$(python3 "$GATEDIR/gate_ra3dsub.py" check g352m 2>>"$OUT")
+  echo "$G352CHK" >> "$OUT"
+  G352L=$(echo "$G352CHK" | grep '^G352 [01-] ')
+  G352V=$(echo "$G352L" | cut -d' ' -f2); G352MSG=$(echo "$G352L" | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G352 Red Alert 3D's Submarine: a run failed (GRC=$GRC)"
+  elif [ "$G352V" = "1" ]; then ok "G352 $G352MSG"
+  else bad "G352 Red Alert 3D's Submarine: ${G352MSG:-the check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G353 RED ALERT 3D'S ATOM BOMB DRAWS ITS OWN BLAST UNDER ENHANCED (game/ra3d_atom_mod.h;
+# effects_mod.h's g_efxRecipeOf, g_efxOwnMeshes and g_efxHostMeshes; the ATOM_BLAST_RA rows of
+# game/efx_enhanced.h; ra3d/efx/ATOMSFX.efxm, written by tools/art/remaster/ra/nuke3d_ATOMSFX.py --efxm
+# when tools/ra3d/stage-structures.py stages the module).
+# Three hidden runs, claims in game/gate_ra3datom.py: an atom bomb raised by the engine on
+# Allied 5 (temperate) and Allied 1 (snow), and a Missile Silo's real launch on Allied 2
+# (snow), each sampled every tick: the 13 parts drawn on every frame 0 to 110 exactly as
+# the staged file has them visible, Tiberian Dawn's mushroom and fire ring stood down (no
+# EFXNUKE, the anim's recipe ATOM_BLAST_RA, its particles spawned), the flash 0.85 one tick in
+# and gone by the eighth, one shake at frame 19, and the frame 1 shot flashed.
+# PROVEN TO FAIL: the renderer before this work prints no RA3DATOM line and draws Tiberian
+# Dawn's NUKEFX mushroom and ATOM_BLAST ring for Red Alert's atom bomb.
+# NOT COVERED: how it looks (the frame strips); Tiberian Dawn's ATOM_BLAST, which G97 holds.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG05EA.pack ] \
+   || [ ! -f ra3d/3d/SCG01EA.pack ] || [ ! -f ra3d/3d/SCG02EA.pack ]; then
+  skip "G353 Red Alert 3D's atom bomb: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/efx/ATOMSFX.efxm ]; then
+  bad "G353 Red Alert 3D's atom bomb: the module has no efx/ATOMSFX.efxm staged (tools/ra3d/stage-structures.py)"
+else
+  rm -rf g353m && mkdir -p g353m
+  python3 "$GATEDIR/gate_ra3datom.py" script g353m 2>>"$OUT"
+  G353RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g353m/t.log $G353RA --dir g353m/mt/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g353m/t.txt
+  grun g353m/s.log $G353RA --dir g353m/ms/ --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g353m/s.txt
+  grun g353m/n.log $G353RA --dir g353m/mn/ --scen SCG02EA --pack ra3d/3d/SCG02EA.pack --script g353m/n.txt
+  gshots g353m/t_f001.png g353m/t_f030.png g353m/s_f030.png
+  G353CHK=$(python3 "$GATEDIR/gate_ra3datom.py" check g353m 2>>"$OUT")
+  echo "$G353CHK" >> "$OUT"
+  G353V=$(echo "$G353CHK" | head -1 | cut -d' ' -f1)
+  G353MSG=$(echo "$G353CHK" | head -1 | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G353 Red Alert 3D's atom bomb: a run failed (GRC=$GRC)"
+  elif [ "$G353V" = "1" ]; then ok "G353 $G353MSG"
+  else bad "G353 ${G353MSG:-the atom bomb check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G354 RED ALERT 3D DRAWS ITS REMASTERED CURSORS UNDER ENHANCED (game/cursor3d_mod.h:
+# c3d_ra_row, Red Alert's state table; ecur_ra_load and ecur_ra_attach, its six models with
+# their own flipbooks, turn and tracks; c3d_ra_overlay, the radar frame over the radar map;
+# NO_SCROLL at the map's edge in c3d_draw_body. game/cursors.h: Red Alert's mouse states and
+# cur_mouse_for_action_ra. ra3d/ecur/ecur_ra.bin, baked by tools/art/remaster/ra/bake_ecur_ra.py
+# and staged by tools/ra3d/stage-structures.py).
+# Two hidden runs, claims in game/gate_ra3dcursors.py, the pointer moved by script alone:
+# Soviet 2 (temperate) and Allied 3 (snow). Every one of the 25 mouse states drawn on the
+# ground takes its approved model, the six refused ones under the no-entry sign, the
+# animated ones on the clock; the heal, damage and chronosphere flipbooks step, the gold
+# spanner turns, the chronosphere target's rings close half a cycle apart; the west-edge
+# arrow is plain while the view can scroll and refused once it cannot; over the radar map
+# the radar frame is drawn; on the snow run the engine's own HEAL and GREPAIR answers reach
+# the pointer.
+# PROVEN TO FAIL: the renderer before this work prints no ECURRA line, has no cursor3dmouse
+# verb, and shows the plain pointer for the probe's HEAL and GREPAIR.
+# NOT COVERED: how the models look (the contact sheets); Tiberian Dawn (G294, and its
+# pictures compared byte for byte by hand).
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCU02EA.pack ] \
+   || [ ! -f ra3d/3d/SCG03EA.pack ]; then
+  skip "G354 Red Alert 3D's cursors: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/ecur/ecur_ra.bin ]; then
+  bad "G354 Red Alert 3D's cursors: the module has no ecur/ecur_ra.bin staged (tools/ra3d/stage-structures.py)"
+else
+  rm -rf g354m && mkdir -p g354m
+  python3 "$GATEDIR/gate_ra3dcursors.py" script g354m 2>>"$OUT"
+  G354RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound --forceradar"
+  gbegin
+  grun g354m/t.log $G354RA --dir g354m/mt/ --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g354m/t.txt
+  grun g354m/s.log $G354RA --dir g354m/ms/ --scen SCG03EA --pack ra3d/3d/SCG03EA.pack --script g354m/s.txt
+  gshots g354m/t_heal.png g354m/s_chrono-dest.png g354m/s_no-scroll.png
+  G354CHK=$(python3 "$GATEDIR/gate_ra3dcursors.py" check g354m 2>>"$OUT")
+  echo "$G354CHK" >> "$OUT"
+  G354V=$(echo "$G354CHK" | head -1 | cut -d' ' -f1)
+  G354MSG=$(echo "$G354CHK" | head -1 | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G354 Red Alert 3D's cursors: a run failed (GRC=$GRC)"
+  elif [ "$G354V" = "1" ]; then ok "G354 $G354MSG"
+  else bad "G354 ${G354MSG:-the cursor check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G355 RED ALERT 3D PLAYS ITS OWN EFFECTS UNDER ENHANCED (game/ra3d_efxm_mod.h; the recipes
+# of its own in game/efx_enhanced.h; ra3d/efx/<ANIM>.efxm and efx_ra.pack, written by the
+# effects' own generators when tools/ra3d/stage-structures.py stages the module).
+# Four hidden runs, claims in game/gate_ra3dfx.py: on Allied 5 (temperate) and Allied 1
+# (snow) the 18 crate and power-up pick-ups, the move flash, the GPS rocket and the flag,
+# the five reuses, the thirteen particle effects (the water explosions on open water) and a
+# rifleman's real corpse, every tick drawn; on Soviet 2 (temperate) and Soviet 1 (snow) a
+# real paratrooper drop and a real parabomb drop. Every particle effect fired its own
+# recipe, every reuse its Tiberian Dawn one, the own sheets drew, every one-shot form drew
+# every frame of its file part for part, no card stayed but the electrocutions' (kept on
+# purpose) and the corpse's stood down on the 3D body, the canopies came down over their
+# loads, and each phase changed the picture.
+# PROVEN TO FAIL: the renderer before this work prints no RA3DEFXM line and draws these
+# anims as their 1996 cards.
+# NOT COVERED: how they look (the frame strips); Tiberian Dawn, compared byte for byte by
+# hand; a crate picked up by a unit and a clicked move order (the anims are the engine's own
+# raised by efxanim).
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG05EA.pack ] \
+   || [ ! -f ra3d/3d/SCG01EA.pack ] || [ ! -f ra3d/3d/SCU01EA.pack ] || [ ! -f ra3d/3d/SCU02EA.pack ]; then
+  skip "G355 Red Alert 3D's own effects: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/efx/efx_ra.pack ] || [ ! -f ra3d/efx/ARMOR.efxm ]; then
+  bad "G355 Red Alert 3D's own effects: the module has no efx/efx_ra.pack or forms staged (tools/ra3d/stage-structures.py)"
+else
+  rm -rf g355m && mkdir -p g355m
+  python3 "$GATEDIR/gate_ra3dfx.py" script g355m 2>>"$OUT"
+  G355RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g355m/t.log $G355RA --dir ra3d/missions/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g355m/t.txt
+  grun g355m/s.log $G355RA --dir ra3d/missions/ --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g355m/s.txt
+  grun g355m/pt.log $G355RA --dir g355m/mpt/ --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g355m/pt.txt
+  grun g355m/ps.log $G355RA --dir g355m/mps/ --scen SCU01EA --pack ra3d/3d/SCU01EA.pack --script g355m/ps.txt
+  gshots g355m/t_crates_016.png g355m/s_crates_016.png g355m/t_part_006.png g355m/s_water_005.png
+  G355CHK=$(python3 "$GATEDIR/gate_ra3dfx.py" check g355m 2>>"$OUT")
+  echo "$G355CHK" >> "$OUT"
+  G355V=$(echo "$G355CHK" | head -1 | cut -d' ' -f1)
+  G355MSG=$(echo "$G355CHK" | head -1 | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G355 Red Alert 3D's own effects: a run failed (GRC=$GRC)"
+  elif [ "$G355V" = "1" ]; then ok "G355 $G355MSG"
+  else bad "G355 ${G355MSG:-the own effects check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G356 RED ALERT'S SPECIAL WEAPONS PLAY END TO END (game/cnc_sidebar.h: sb_super_engine_arm,
+# sb_super_settle and the held shot in sb_super_fire; game/cnc_eyes.cpp: ev_cb's
+# CALLBACK_EVENT_SPECIAL_WEAPON_TARGETTING case, ra_chrono_dest_ok; the Red Alert brain's
+# OpenCNC3D_Probe_Object_At, which answers the destination by the 1996 cursor rule).
+# Two hidden runs, claims in game/gate_ra3dsuper.py, every click made through the sidebar's
+# own button and the map's own left click: Allied 8 (its own Chronosphere and Advanced Tech
+# centre, an airfield and a missile silo added) and Soviet 2 (an Iron Curtain, an airfield
+# and power added), tech level 15, every special charged by the brain's own debug request.
+# The Chronosphere misses on bare ground and stays armed; a soldier it chooses is refused
+# every destination (NO_MOVE, the click not sent, he stays alive); the click on a tank makes
+# the ENGINE ask for the destination, CHRONO_SELECT then CHRONO_DEST, and the tank is on the
+# destination cell with the charge spent; the GPS satellite launches itself; the nuke
+# destroys what stands on its target; the Iron Curtain misses, stays armed, then covers a
+# tank that takes no damage from three hits while its twin loses strength; the spy plane,
+# paratroopers (landed) and parabombs on both sides.
+# PROVEN TO FAIL: the renderer before this work disarms after the Chronosphere's first
+# click, never arms SW_Chrono2, shows the move cursor over the destination and leaves the
+# tank on 28,64 with the Chronosphere charged. This renderer on the brain before this work
+# shows CHRONO_DEST for the soldier and sends the click, and the engine teleports him to his
+# death (0/45).
+# NOT COVERED: the destination's no-move cursor under the shroud and over ground a tank
+# cannot enter (both runs reveal the map; the same probe answer as the soldier's); how any
+# of it looks; Tiberian Dawn, whose brain never raises the targeting event (G66 holds its
+# three specials).
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG08EA.pack ] \
+   || [ ! -f ra3d/3d/SCU02EA.pack ]; then
+  skip "G356 Red Alert's special weapons: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g356m && mkdir -p g356m
+  python3 "$GATEDIR/gate_ra3dsuper.py" script g356m 2>>"$OUT"
+  G356RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g356m/a.log $G356RA --dir g356m/ma/ --scen SCG08EA --pack ra3d/3d/SCG08EA.pack --script g356m/a.txt
+  grun g356m/s.log $G356RA --dir g356m/ms/ --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g356m/s.txt
+  gshots g356m/a_chrono_dest.png g356m/a_chrono_after.png g356m/a_nuke_after.png
+  G356CHK=$(python3 "$GATEDIR/gate_ra3dsuper.py" check g356m 2>>"$OUT")
+  echo "$G356CHK" >> "$OUT"
+  G356V=$(echo "$G356CHK" | head -1 | cut -d' ' -f1)
+  G356MSG=$(echo "$G356CHK" | head -1 | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G356 Red Alert's special weapons: a run failed (GRC=$GRC)"
+  elif [ "$G356V" = "1" ]; then ok "G356 $G356MSG"
+  else bad "G356 ${G356MSG:-the special weapons check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G357 RED ALERT'S OWN PROPS ARE THEIR REMASTERED MODELS UNDER ENHANCED (game/ra3d_props_mod.h;
+# the files baked by tools/ra3d/bake-props.py into game/ebld_ra_props, staged by
+# tools/ra3d/stage-structures.py). Hidden runs, claims in game/gate_ra3dprops.py: the barrels
+# on Allied 1 (snow) and Allied 5 (temperate) with their specular maps, each map's fence worn
+# and wrecked by two hits, water crates put on each sea bobbing on their own frames and
+# ringing the sea's own wave field (no ripple geometry of their own), a barrel shot bursting with its
+# own FBALL1 and pieces and setting off a neighbour; the interior crate stacks (Allied 10B);
+# the ice floes (Allied 11); the other sides' mines hidden, the player's own drawn, and a mine
+# set off by a tank gone with the engine's explosion (Allied 14, snow; Soviet 9, temperate);
+# the flag location in capture-the-flag skirmishes (SCM04EA temperate, SCM08EA snow) and a
+# fence cell built by the Soviets raised by its placement; the props on and off differ.
+# PROVEN TO FAIL: a renderer without the props answers no `raprops`, draws every prop as its
+# 1996 card and draws the other sides' mines.
+# NOT COVERED: how they look (the shots, by eye).
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG01EA.pack ] \
+   || [ ! -f ra3d/3d/SCM04EA.pack ] || [ ! -f ra3d/3d/SCG10EB.pack ]; then
+  skip "G357 Red Alert's props: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/ebld/BARL.ebld ] || [ ! -f ra3d/ebld/FENC.ebld ] || [ ! -f ra3d/eplc/FENC.eplc ]; then
+  bad "G357 Red Alert's props: the module has no props staged (tools/ra3d/stage-structures.py)"
+else
+  rm -rf g357m && mkdir -p g357m
+  python3 "$GATEDIR/gate_ra3dprops.py" script g357m 2>>"$OUT"
+  G357RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g357m/bs.log $G357RA --dir g357m/mbs/ --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g357m/bs.txt
+  grun g357m/bt.log $G357RA --dir g357m/mbt/ --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g357m/bt.txt
+  grun g357m/in.log $G357RA --dir g357m/min/ --scen SCG10EB --pack ra3d/3d/SCG10EB.pack --script g357m/in.txt
+  grun g357m/ic.log $G357RA --dir g357m/mic/ --scen SCG11EA --pack ra3d/3d/SCG11EA.pack --script g357m/ic.txt
+  grun g357m/ms.log $G357RA --dir g357m/mms/ --scen SCG14EA --pack ra3d/3d/SCG14EA.pack --script g357m/ms.txt
+  grun g357m/mt.log $G357RA --dir g357m/mmt/ --scen SCU09EA --pack ra3d/3d/SCU09EA.pack --script g357m/mt.txt
+  grun g357m/ft.log $G357RA --dir g357m/mft/ --scen SCM04EA --pack ra3d/3d/SCM04EA.pack --skirmish --seed 4242 --ctf --side soviet --script g357m/ft.txt
+  grun g357m/fs.log $G357RA --dir g357m/mfs/ --scen SCM08EA --pack ra3d/3d/SCM08EA.pack --skirmish --seed 4242 --ctf --script g357m/fs.txt
+  grun g357m/off.log $G357RA --dir g357m/mbs/ --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g357m/off.txt
+  grun g357m/on.log $G357RA --dir g357m/mbs/ --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g357m/on.txt
+  gshots g357m/bs_barrels.png g357m/bs_burst6.png g357m/in_look.png g357m/ic_look.png g357m/ms_mines.png g357m/ft_fence9.png
+  G357CHK=$(python3 "$GATEDIR/gate_ra3dprops.py" check g357m 2>>"$OUT")
+  echo "$G357CHK" >> "$OUT"
+  G357V=$(echo "$G357CHK" | head -1 | cut -d' ' -f1)
+  G357MSG=$(echo "$G357CHK" | head -1 | cut -d' ' -f3-)
+  if [ "$GRC" != "0" ]; then
+    bad "G357 Red Alert's props: a run failed (GRC=$GRC)"
+  elif [ "$G357V" = "1" ]; then ok "G357 $G357MSG"
+  else bad "G357 ${G357MSG:-the props check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G358 RED ALERT'S ORE, GEMS AND ORE MINE ARE THEIR REMASTERED MODELS UNDER ENHANCED
+# (game/ra3d_ore_mod.h; the files baked by tools/ra3d/bake-ore.py into data/ra3d_ore, staged
+# by tools/ra3d/stage-structures.py). Hidden runs, claims in game/gate_ra3dore.py: Allied 5
+# (temperate) and Allied 1 (snow), Soviet 9 (temperate) and Soviet 4 (snow): the theater's
+# pack read, the ore and gem cells in view drawn as their models and no 1996 decal under
+# them (`raore 0` brings the decals back and the pictures differ), the cells at several
+# density frames, the ore mines their theater's model with no card left; 2,100 ticks
+# watched on Allied 5 and Soviet 4 and 1,200 on Allied 1: a harvester takes cells down and
+# away and the models follow, the field grows and spreads; the nuggets and stones draw
+# their normals and specular maps into the light pass's targets (the sun's highlight).
+# PROVEN TO FAIL: a renderer without the ore models answers no `raore`, draws the 1996
+# decals and the mine's card; one without the shine reports no maps or no pieces drawn.
+# NOT COVERED: how they look (the shots, by eye); Tiberian Dawn's Tiberium (compared byte
+# for byte outside the suite).
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG05EA.pack ] \
+   || [ ! -f ra3d/3d/SCU04EA.pack ]; then
+  skip "G358 Red Alert's ore: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+elif [ ! -f ra3d/ore/ore3d_TEM.pack ] || [ ! -f ra3d/ore/ore3d_WIN.pack ] || [ ! -f ra3d/ebld/MINE_TEM.ebld ]; then
+  bad "G358 Red Alert's ore: the module has no ore models staged (tools/ra3d/stage-structures.py)"
+else
+  rm -rf g358m && mkdir -p g358m
+  python3 "$GATEDIR/gate_ra3dore.py" script g358m 2>>"$OUT"
+  G358RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --dir ra3d/missions/ --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g358m/at.log $G358RA --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g358m/at.txt
+  grun g358m/as.log $G358RA --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g358m/as.txt
+  grun g358m/st.log $G358RA --scen SCU09EA --pack ra3d/3d/SCU09EA.pack --script g358m/st.txt
+  grun g358m/ss.log $G358RA --scen SCU04EA --pack ra3d/3d/SCU04EA.pack --script g358m/ss.txt
+  gshots g358m/at_on.png g358m/at_off.png g358m/as_gems.png g358m/st_on.png g358m/ss_on.png g358m/ss_after.png
+  G358CHK=$(python3 "$GATEDIR/gate_ra3dore.py" check g358m 2>>"$OUT")
+  echo "$G358CHK" >> "$OUT"
+  G358V=$(echo "$G358CHK" | head -1 | cut -d' ' -f1)
+  G358MSG=$(echo "$G358CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G358 Red Alert's ore: a run failed (GRC=$GRC)"
+  elif [ "$G358V" = "1" ]; then ok "G358 $G358MSG"
+  else bad "G358 ${G358MSG:-the ore check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G359 RED ALERT'S GROUND IS FINISHED ON THE MISSION'S FIRST FRAME (game/ra3d_terrain.h,
+# ra3d_ground_normals). The symptom: on a snow mission, hard-edged patches of differently lit
+# snow with a dark seam stood over the slopes for the first seconds and all vanished on one
+# frame, because the ground's corner normals were built only when something first asked for
+# the shade (an apron, about tick 91 on Allied 1) while the relief surface drew its true
+# slope from the start. Hidden runs, claims in game/gate_ra3dfirstframe.py: Allied 1 (snow,
+# shroud on), Allied 5 (temperate), Soviet 1 (snow), Soviet 2 (temperate); in each the first
+# normal pass draws the corner normals, the tick-1 picture is the one drawn once the shade
+# grid surely exists (`cmdump` builds it) byte for byte, and 150 ticks later only units have
+# moved (not on Soviet 1, whose opening air raid fills the view).
+# PROVEN TO FAIL: the renderer before the fix prints no first-pass line, and Allied 1's tick-1
+# picture differs from its settled one by about 256,000 pixels.
+# NOT COVERED: Tiberian Dawn (compared byte for byte outside the suite); the look, by eye.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG01EA.pack ] \
+   || [ ! -f ra3d/3d/SCU02EA.pack ]; then
+  skip "G359 Red Alert's first frame: no Red Alert module with 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g359f && mkdir -p g359f
+  python3 "$GATEDIR/gate_ra3dfirstframe.py" script g359f 2>>"$OUT"
+  G359RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --dir ra3d/missions/ --w 1280 --h 720 --enhanced --texset 3 --nosound"
+  gbegin
+  grun g359f/as.log $G359RA --scen SCG01EA --pack ra3d/3d/SCG01EA.pack --script g359f/as.txt
+  grun g359f/at.log $G359RA --noshroud --scen SCG05EA --pack ra3d/3d/SCG05EA.pack --script g359f/at.txt
+  grun g359f/us.log $G359RA --noshroud --scen SCU01EA --pack ra3d/3d/SCU01EA.pack --script g359f/us.txt
+  grun g359f/ut.log $G359RA --noshroud --scen SCU02EA --pack ra3d/3d/SCU02EA.pack --script g359f/ut.txt
+  gshots g359f/as_early.png g359f/as_settled.png g359f/as_late.png g359f/at_early.png \
+         g359f/us_early.png g359f/ut_early.png
+  G359CHK=$(python3 "$GATEDIR/gate_ra3dfirstframe.py" check g359f 2>>"$OUT")
+  echo "$G359CHK" >> "$OUT"
+  G359V=$(echo "$G359CHK" | head -1 | cut -d' ' -f1)
+  G359MSG=$(echo "$G359CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G359 Red Alert's first frame: a run failed (GRC=$GRC)"
+  elif [ "$G359V" = "1" ]; then ok "$G359MSG"
+  else bad "${G359MSG:-G359 the first-frame check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G360 THE DAMAGE OVERLAY CREEPS IN WITHOUT A SEAM (ebld_mod.h: ebld_overlay_begin and the
+# overlay draw in ebld_draw_entry; scene and claims in gate_ebldseam.py). Under Enhanced a
+# remastered structure hit above half strength shows its damaged look creeping into the
+# struck side, blended by each corner's zone weight times the zone's progress through the
+# overlay's patch noise. It used to be cut in with an alpha test on the same product, and on
+# a slab's large triangles the test's pass line was the straight iso-line of the linearly
+# interpolated weight: where a zone's sector edge crossed the slab, a perfectly straight
+# seam between sooted and clean concrete with the whole step of the soot across it.
+#
+# ONE RUN at 2560 x 1440: gate_ebldboom.py's SCG88EA. The Construction Yard's two Medium
+# Tanks are sent round to its south-east and force-fire until it is at 80 percent (three
+# hits in the south-east zone, one in the east; the south-east zone's sector edge runs due
+# south across the open concrete in front of the hangar door), are stopped, and the yard is
+# shot 45 ticks later; then the same to below half for the damaged stage's shot. Claims,
+# from the shots' pixels and the dump lines:
+#   (1) the dumps say HELD with a zone at 0.75 or more, then DAMAGED;
+#   (2) the held yard is sooted in the open slab window (200 or more pixels darker by 18);
+#   (3) NO SEAM: the median over the window's scanlines of the largest 4 px rise of the
+#       darkening (intact minus held, after a 5 px running mean) stays under 12. The alpha
+#       test measured 20.7 on this scene, the whole step of the soot on every scanline at
+#       one x; the blend measures 6.7, patch edges only;
+#   (4) the damaged stage's shot matches ../gates/g360-damaged-ref.png, a crop of the yard
+#       in the approved damaged look, which the overlay never touches (mean luminance
+#       difference under 1.5 and under 0.5 percent of the pixels beyond 24).
+# Measured once on the binary before the blend: (3) failed at 20.7 with (1), (2) and (4)
+# passing, so the claim is the seam and nothing else. The reference is the damaged yard as
+# that binary drew it on the same main, and the blended binary's is identical to it, pixel
+# for pixel. Like G5's facewatch reference it goes stale when the Enhanced look changes on
+# purpose; the check's message says how to re-cut it.
+# =====================================================================================
+rm -f shots/g360_*.png
+rm -rf g360m && python3 "$GATEDIR/gate_ebldseam.py" maps g360m 2>>"$OUT"
+gbegin shots/g360.log shots/g360_intact.png shots/g360_held.png shots/g360_damaged.png
+if [ -s g360m/SCG88EA.INI ] && [ -s g360m/seam.txt ]; then
+  grun shots/g360.log --scen SCG88EA --pack SCG01EA.pack $BASE --dir g360m/ --noshroud --nosound \
+       --w 2560 --h 1440 --enhanced --texset 3 --script g360m/seam.txt
+  gshots shots/g360_intact.png shots/g360_held.png shots/g360_damaged.png
+  G360CHK=$(python3 "$GATEDIR/gate_ebldseam.py" check shots/g360.log shots ../gates/g360-damaged-ref.png 2>>"$OUT")
+else
+  G360CHK="0 the test mission was not made (missions/SCM01EA is not in the run folder)"
+fi
+G360V=$(echo "$G360CHK" | head -1 | cut -d' ' -f1)
+G360MSG=$(echo "$G360CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G360 the damage overlay's seam: a run failed (GRC=$GRC)"
+elif [ "$G360V" = "1" ]; then
+  ok "G360 the damage overlay creeps in without a seam: $G360MSG"
+else
+  bad "G360 the damage overlay's seam: ${G360MSG:-the check did not run (see the python error in the log)}"
+fi
+
+# =====================================================================================
+# G361 A PLACEMENT IS NOT REBUILT EVERY FRAME (game/ebld_place.h: eplc_draw_run, the rigid
+# parts drawn at rest and moved on the card; claims in game/gate_eplcperf.py). Under Enhanced a
+# structure's placement animation (the slab rising, the parts coming up through it) used to
+# cost up to twice the frame for as long as it played: every moving part's run was rebuilt on
+# the CPU and uploaded again in every pass that drew it, each frame. One hidden run of the Red
+# Alert snow skirmish (SCM03EA, Allied, seeded) at 1280 x 720 with the frame profiler on: a
+# Power Plant, an Ore Refinery and a War Factory are built from the sidebar and placed at known
+# cells with the camera on them, 30 frames of the base standing profiled before each (one frame
+# an engine tick) and the frames of the animation after. Claims, per type, from the engine's
+# own counts:
+#   (1) the placement plays and is drawn on the frames of its window, the normal target too;
+#   (2) the mesh batch's vertex uploads per frame during the animation exceed the standing
+#       window's by at most 60, and the bytes uploaded by at most half a megabyte a frame (each
+#       run is still sent once as the placement starts, and the ring of broken earth every
+#       frame);
+#   (3) the animation's mean frame time is at most twice the standing window's.
+# The draw calls are not claimed: they are the model's own runs in its own order, the order its
+# faces were approved in (G364).
+# Measured in this scene, the binary before the card path: the Power Plant 528 uploads a frame
+# against 6 standing and 6.2 ms more a frame, the War Factory 110 against 30 and 2.9 ms more.
+# With the card path: the Power Plant 32 uploads and 4.0 ms more, the War Factory 38 and 2.7 ms
+# more.
+# NOT COVERED: how the placement looks (G364, G348 and the proof sheets); Tiberian Dawn's
+# placements, which share the code; Classic, which has no placement.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -f ra3d/3d/SCM03EA.pack ] || [ ! -f ra3d/eplc/POWR.eplc ] \
+   || [ ! -f ra3d/eplc/PROC.eplc ] || [ ! -f ra3d/eplc/WEAP.eplc ]; then
+  skip "G361 a placement is not rebuilt every frame: no Red Alert module with the snow skirmish map and the Power Plant's, Refinery's and War Factory's placements is staged in this folder"
+else
+  rm -rf g361m && mkdir -p g361m
+  python3 "$GATEDIR/gate_eplcperf.py" script g361m 2>>"$OUT"
+  GRC=0
+  env OPENCNC3D_FRAMEPROF=1 OPENCNC3D_PERFDETAIL=1 ./cnc_eyes --ra3d --dylib ra3d/RedAlert.dylib \
+      --content ra3d/data --dosdata ra3d/audio --dir ra3d/missions/ --w 1280 --h 720 --enhanced \
+      --texset 3 --noshroud --nosound --skirmish --scen SCM03EA --pack ra3d/3d/SCM03EA.pack \
+      --side allies --starts 0,1 --credits 10000 --seed 4242 --script g361m/run.txt \
+      > g361m/run.log 2>&1 || GRC=$?
+  cat g361m/run.log >> "$OUT"
+  env OPENCNC3D_FRAMEPROF=1 OPENCNC3D_PERFDETAIL=1 ./cnc_eyes --ra3d --dylib ra3d/RedAlert.dylib \
+      --content ra3d/data --dosdata ra3d/audio --dir ra3d/missions/ --w 1280 --h 720 --enhanced \
+      --texset 3 --noshroud --nosound --skirmish --scen SCM03EA --pack ra3d/3d/SCM03EA.pack \
+      --side allies --starts 0,1 --credits 10000 --seed 4242 --script g361m/proc-standing.txt \
+      > g361m/proc-standing.log 2>&1 || GRC=$?
+  cat g361m/proc-standing.log >> "$OUT"
+  G361CHK=$(python3 "$GATEDIR/gate_eplcperf.py" check g361m/run.log 2>>"$OUT")
+  G361V=$(echo "$G361CHK" | head -1 | cut -d' ' -f1)
+  G361MSG=$(echo "$G361CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G361 a placement's frame cost: the run failed (GRC=$GRC)"
+  elif [ "$G361V" = "1" ]; then
+    ok "G361 a placement is not rebuilt every frame: $G361MSG"
+  else
+    bad "G361 a placement's frame cost: ${G361MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G362 RED ALERT'S SNOW SHORE CARRIES NO HARD-EDGED SEAMS (the daylight processing as
+# tools/bakery/terrain_daylight.py compiles it into the snow terrain packs; scene and claims
+# in gate_ra3dshoreseams.py). Two places of Soviet 4 drew with dead-straight edges: the shore
+# templates SH08 and SH53 meeting along x=59 down a cliff, and the beach cell 60,62 (SH17
+# icon 0) as a square with four hard edges. The processing brightened wet shallows inside
+# templates whose rock footprint covered them (not in the beach icon, whose footprint was
+# empty) and gave the join strips at its templates' edges no opacity. Shore templates now
+# keep their approved painting and strips; every other processed snow template returns to
+# its approved painting at its edge.
+# ONE hidden run at 1920 x 1080, the map revealed, the camera on cell 60,60, the clouds, the
+# trees and the sea's motion held still; the cells' corners asked of the renderer (cursorat).
+# Claims, on the shot's pixels, the signed colour step 1 to 3 px either side of an edge
+# averaged along it: the cliff edge over the rock of row 60 at most 8; the beach cell's
+# north, south and east edges at most 14 each; its inner half not snow (luminance at most
+# 170). The same step on lines 8 and 12 px beside each edge is printed as the scene's level.
+# Measured on the packs before the fix: cliff 10.8, north 20.6, south 26.1, east 46.3 (it
+# fails); after: 5.1, 9.2, 7.1, 5.7, each at the level beside it; two runs agree.
+# NOT COVERED: other maps and other joins (G363 checks every bank's template borders in the
+# packs); the look, by eye.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCU04EB.pack ]; then
+  skip "G362 Red Alert's snow shore: no Red Alert module with Soviet 4's 3D scene is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g362s && mkdir -p g362s
+  python3 "$GATEDIR/gate_ra3dshoreseams.py" script g362s 2>>"$OUT"
+  G362RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --dir ra3d/missions/ --w 1920 --h 1080 --enhanced --texset 3 --noshroud --nosound"
+  gbegin
+  grun g362s/shore.log $G362RA --scen SCU04EB --pack ra3d/3d/SCU04EB.pack --script g362s/shore.txt
+  gshots g362s/shore.png
+  G362CHK=$(python3 "$GATEDIR/gate_ra3dshoreseams.py" check g362s 2>>"$OUT")
+  echo "$G362CHK" >> "$OUT"
+  G362V=$(echo "$G362CHK" | head -1 | cut -d' ' -f1)
+  G362MSG=$(echo "$G362CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G362 Red Alert's snow shore seams: the run failed (GRC=$GRC)"
+  elif [ "$G362V" = "1" ]; then ok "G362 Red Alert's snow shore carries no hard-edged seams: $G362MSG"
+  else bad "G362 Red Alert's snow shore seams: ${G362MSG:-the check did not run (see the python error in the log)}"; fi
+fi
+
+# =====================================================================================
+# G363 THE ENHANCED TERRAIN KEEPS EVERY TEMPLATE'S BORDER AS APPROVED in the four banks whose
+# daylight processing fades at template edges: Red Alert's snow and temperate, Tiberian
+# Dawn's winter and the editor's snow (tools/bakery/terrain_daylight.py: SHORE_BANKS,
+# EDGE_BANKS; claims in gate_terrainedges.py). The processing re-exposed each template on its
+# own and gave the join strips at its edges no opacity, so a processed template met its
+# neighbour on a straight cell-edge line: a beach cell drew as a dark square, two cliff
+# templates stepped in brightness down their shared edge. No run: the packs game/build.sh
+# wrote are read back. Claims: a shore template is its approved painting; every other
+# processed template's outermost texels are its approved painting under the bank's own
+# material pass (the temperate rock grade), within 2 levels on average; every join strip at a
+# template's edge whose authored painting has opacity keeps opacity.
+# Measured on the packs before the fix: Red Alert temperate 80 templates' edges off and 181
+# strips with no opacity, Tiberian Dawn winter 22 shores, 39 edges, 132 strips, the editor's
+# snow 22, 38, 126 (it fails); after, none.
+# NOT COVERED: how the joins look in the game (G362 on Red Alert's snow; the shots taken for
+# the fix on Red Alert's temperate missions); Tiberian Dawn's winter and snow have no shipped
+# map with cliffs or shores, so their joins were seen only in flat renders of the paintings.
+# =====================================================================================
+gbegin
+G363CHK=$(python3 "$GATEDIR/gate_terrainedges.py" "$GATEDIR/.." 2>>"$OUT")
+echo "$G363CHK" >> "$OUT"
+G363V=$(echo "$G363CHK" | head -1 | cut -d' ' -f1)
+G363MSG=$(echo "$G363CHK" | head -1 | cut -d' ' -f2-)
+if [ "$G363V" = "1" ]; then ok "G363 the Enhanced terrain keeps every template's border as approved: $G363MSG"
+else bad "G363 the Enhanced terrain's template borders: ${G363MSG:-the check did not run (see the python error in the log)}"; fi
+
+# =====================================================================================
+# G364 A PLACEMENT DRAWS THE PICTURE ITS APPROVED VERSION DREW, EVERY FRAME TO ITS LAST
+# (game/ebld_place.h: the runs in the model's own order, the card path for rigid runs only;
+# scenes and claims in gate_eplcref.py). G361's speed-up, as first pushed, drew a placement's
+# parts gathered part by part and moved every part on the card, and two placements then drew
+# a few frames differently from the approved ones: Red Alert's Construction Yard (its MCV's
+# gantry, squashed flat onto the bed, lost to the bed in the depth test) and the Temple of Nod
+# (its spine slides along the ridge over the roof blades, faces in one plane, where the one
+# drawn last shows). THREE HIDDEN RUNS at 1280 x 720 on a pinned preset: Tiberian Dawn's yard
+# deploying out of its MCV, Red Alert's the same, the Temple's placement played again; shots
+# at fixed moments to each placement's last frame, and at rest. Claims:
+#   (1) every shot is at its moment by the building's own placement clock (EPLCOBJ);
+#   (2) every shot's crop matches its tile of ../gates/g364-<scene>.png, cut from the binary
+#       before the speed-up, to within 24 pixels that changed as an area (a part's edge moved
+#       by a fraction of a pixel changes a line of pixels, which does not count).
+# Measured: the binary before the speed-up and this one, 0 changed pixels in every shot; the
+# speed-up as first pushed, Red Alert's yard up to 139 (ticks 21 to 30 of its placement) and
+# the Temple up to 300 (ticks 13 to 26); Tiberian Dawn's yard 0 on all three.
+# The references go stale when a placement's look changes on purpose: the check says how to
+# re-cut them, from a binary that draws the approved look.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -f ra3d/3d/SCM03EA.pack ] || [ ! -f ra3d/eplc/FACT.eplc ] \
+   || [ ! -f eplc/FACT.eplc ] || [ ! -f eplc/TMPL.eplc ]; then
+  skip "G364 placements draw as approved: no Red Alert module with the snow skirmish map and the yards' and Temple's placements is staged in this folder"
+else
+  rm -rf g364m && mkdir -p g364m
+  python3 "$GATEDIR/gate_eplcref.py" script g364m 2>>"$OUT"
+  printf 'enabled 1\n' > g364m/gfx.cfg
+  gbegin
+  grun g364m/td.log --scen SCM01EA --pack SCM01EA.pack $BASE --skirmish --side gdi --credits 10000 \
+       --seed 4242 --enhanced --texset 3 --nosound --noshroud --gfx g364m/gfx.cfg --w 1280 --h 720 \
+       --script g364m/td.txt
+  grun g364m/ra.log --ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio \
+       --dir ra3d/missions/ --w 1280 --h 720 --enhanced --texset 3 --noshroud --nosound --skirmish \
+       --scen SCM03EA --pack ra3d/3d/SCM03EA.pack --side allies --starts 0,1 --credits 10000 \
+       --seed 4242 --gfx g364m/gfx.cfg --script g364m/ra.txt
+  grun g364m/tmpl.log --scen SCG63EA --pack SCG01EA.pack $BASE --dir g364m/ --noshroud --nosound \
+       --w 1280 --h 720 --enhanced --texset 3 --gfx g364m/gfx.cfg --script g364m/tmpl.txt
+  G364CHK=$(python3 "$GATEDIR/gate_eplcref.py" check g364m ../gates 2>>"$OUT")
+  G364V=$(echo "$G364CHK" | head -1 | cut -d' ' -f1)
+  G364MSG=$(echo "$G364CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G364 placements draw as approved: a run failed (GRC=$GRC)"
+  elif [ "$G364V" = "1" ]; then
+    ok "G364 placements draw the approved picture to their last frame: $G364MSG"
+  else
+    bad "G364 placements draw as approved: ${G364MSG:-the check did not run (see the python error in the log)}"
+  fi
+fi
+
+# =====================================================================================
+# G365 A PLACEMENT PLAYS TO ITS END WHEN THE BUILDING IS HIT WHILE IT GOES UP
+# (game/ebld_place.h: a hit no longer ends a placement, only the building's destruction does;
+# game/ebld_mod.h: the damaged stage waits for a hit building's placement; scene and claims in
+# gate_eplchit.py). The 1995 build-up runs on when the building is damaged. A Construction
+# Yard hit while it deployed out of its MCV used to stand finished at once, the rest of its
+# placement skipped. TWO HIDDEN RUNS of a Tiberian Dawn skirmish, identical but that in one a
+# Medium Tank force-fires on the yard 0.4 s into its placement. Claims: the hit is seen
+# (EPLC|hit); the placement ends why=done on the calm run's frame, its clock running on to its
+# length; from 1 s after the hit every shot of the yard matches the calm run's within 3 percent
+# of the yard's area. Measured on the build before the fix: it ended why=hit 1.73 s into its
+# 6.55 s and differed on up to 14 percent (it fails); after: why=done on the same frame, at
+# most 1.3 percent.
+# NOT COVERED: a Red Alert placement hit while it goes up (the same code); a hit that destroys
+# the building, which ends the placement as before (checked once: unchanged pixel for pixel).
+# =====================================================================================
+rm -rf g365m && mkdir -p g365m
+python3 "$GATEDIR/gate_eplchit.py" script g365m 2>>"$OUT"
+printf 'enabled 1\n' > g365m/gfx.cfg
+gbegin
+for g365r in hit calm; do
+  grun g365m/$g365r.log --scen SCM01EA --pack SCM01EA.pack $BASE --skirmish --side gdi --credits 10000 \
+       --seed 4242 --enhanced --texset 3 --nosound --noshroud --gfx g365m/gfx.cfg --w 1280 --h 720 \
+       --script g365m/$g365r.txt
+done
+G365CHK=$(python3 "$GATEDIR/gate_eplchit.py" check g365m 2>>"$OUT")
+echo "$G365CHK" >> "$OUT"
+G365V=$(echo "$G365CHK" | head -1 | cut -d' ' -f1)
+G365MSG=$(echo "$G365CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G365 a placement hit while it goes up: a run failed (GRC=$GRC)"
+elif [ "$G365V" = "1" ]; then ok "G365 a placement plays to its end when the building is hit: $G365MSG"
+else bad "G365 a placement hit while it goes up: ${G365MSG:-the check did not run (see the python error in the log)}"; fi
+
+# =====================================================================================
+# G366 TIBERIAN DAWN'S WINTER AND SNOW SEAS DRAW THROUGH THE ENHANCED WATER, with no square
+# seams (game/coast_mask.h and game/water_mod.h: the winter and snow banks take their sea cut
+# from saved coast coverage, coastmask_WINTER.pack and coastmask_SNOW.pack, and their sea's
+# base and floor from their own painted open water, waterbase_WINTER.pack and
+# waterbase_SNOW.pack, all from tools/bakery/pack_coast_masks.py; scene and claims in
+# gate_winterwater.py). These banks' 1995 tiles paint their water and the console has no
+# winter theater, so no cell was wet, the water field was never built, and the sea drew as
+# the painted tiles with a square seam at every tile's edge and no wash at the shore.
+# TWO HIDDEN RUNS, GDI 1's map painted as a winter map and as a snow map (made in the run
+# folder from the shipped donors and SCG01EA.BIN, played --reskin as the User Maps menu plays
+# them), 1920 x 1080, Enhanced on the Enhanced terrain, the map revealed, the camera over the
+# open sea, the motion held still; the cells' corners asked of the renderer (cursorat).
+# Claims, each run: the coast coverage loaded for its theater, the water field built from wet
+# cells, the sea's plane, the base its own bank's painting; on the pixels, across every edge
+# between two wholly-water cells in frame, the signed colour step 1 to 3 px either side,
+# averaged along the edge, above the same measure 8 and 12 px beside it, at most 6.
+# Measured before the fix: none of the engine lines, and edges stepping 9.2 (winter) and 13.6
+# (snow) above their level (it fails); after: every line, at most 4.0 and 3.9; two runs agree.
+# NOT COVERED: other maps; the shoreline's look, by eye; the editor's live repaint to water.
+# =====================================================================================
+rm -rf g366m && mkdir -p g366m
+python3 "$GATEDIR/gate_winterwater.py" maps g366m 2>>"$OUT"
+printf 'enabled 1\nwater_fx 1\n' > g366m/gfx.cfg
+gbegin g366m/SCW95EA.png g366m/SCS95EA.png
+for g366r in SCW95EA:SCW01EA SCS95EA:SCS01EA; do
+  g366n=${g366r%:*}; g366p=${g366r#*:}
+  grun g366m/$g366n.log --scen $g366n --pack $g366p.pack $BASE --dir g366m/ --reskin --enhanced --texset 3 \
+       --nosound --noshroud --gfx g366m/gfx.cfg --w 1920 --h 1080 --script g366m/$g366n.txt
+done
+gshots g366m/SCW95EA.png g366m/SCS95EA.png
+G366CHK=$(python3 "$GATEDIR/gate_winterwater.py" check g366m 2>>"$OUT")
+echo "$G366CHK" >> "$OUT"
+G366V=$(echo "$G366CHK" | head -1 | cut -d' ' -f1)
+G366MSG=$(echo "$G366CHK" | head -1 | cut -d' ' -f2-)
+if [ "$GRC" != "0" ]; then
+  bad "G366 winter and snow seas: a run failed (GRC=$GRC)"
+elif [ "$G366V" = "1" ]; then ok "G366 winter and snow seas draw through the Enhanced water, no square seams: $G366MSG"
+else bad "G366 winter and snow seas: ${G366MSG:-the check did not run (see the python error in the log)}"; fi
+
+# G367 THE WATER DRAWS NOTHING OVER LAND AND LEAVES NO HOLE THROUGH ITS FLOOR (game/water_plane.h:
+# water_plane_lay_heights; scene and claims in gate_waterland.py). A body of water is drawn at
+# one plane, and the scene's heights can put its bank below that plane. The floor under the
+# water was laid at the plane over every wet cell, so where the bank was lower it stood above
+# the land and drew the cell's painting as a flat raised plate with straight edges (white snow
+# and brown shore rectangles on Red Alert's snow shores, flat sand plates over Tiberian Dawn's
+# rocks and riverbanks), and neighbouring cells' floors stepped at their shared edge, so the
+# frame's black background showed through clear texels of the ground (the dark squares across
+# a ford). Now the floor is one height per corner and never above the land, and the surface
+# comes down to a bank that lies below the plane, easing back up to it across the water.
+# TWO HIDDEN RUNS at 1920 x 1080, Red Alert, Enhanced, the map revealed, the motion held still,
+# a fixed seed: Allied 8 with the camera on the land beside its low bay (cell 53,75) and
+# Allied 14 on the land beside its ford (cell 84,79), each shot with the water on, then with
+# gfx water_fx 0; a grid of world points asked of the renderer (cursorat) after each shot and
+# the water field dumped (OPENCNC3D_WATER_DUMP) to say which points are land. Claims, each run:
+# the camera did not move between the two pictures; of the points at least half a cell inland
+# of the cut at most 1 percent differ by more than 24 levels; at most 20 pixels inside the
+# play area are the black background with the water on and not with it off.
+# Measured before the fix: Allied 8 20 of 1072 land points (1.9 percent) and 297 background
+# pixels, Allied 14 4 of 1153 and 846 background pixels (it fails); after: 0 of 1072 and 0,
+# 3 of 1153 (the wash on the ford's far bank, there before too) and 0; two runs agree.
+# NOT COVERED: other maps (Tiberian Dawn shares the code and had the same plates); the water's
+# own look, by eye; the surface's height under ships on a low bank.
+# =====================================================================================
+if [ ! -f ra3d/RedAlert.dylib ] || [ ! -d ra3d/missions ] || [ ! -f ra3d/3d/SCG08EA.pack ] || [ ! -f ra3d/3d/SCG14EA.pack ]; then
+  skip "G367 the water draws nothing over land: no Red Alert module with Allied 8's and Allied 14's 3D scenes is staged in this folder (tools/ra3d/stage-frontend.py)"
+else
+  rm -rf g367w && mkdir -p g367w
+  python3 "$GATEDIR/gate_waterland.py" script g367w 2>>"$OUT"
+  G367RA="--ra3d --dylib ra3d/RedAlert.dylib --content ra3d/data --dosdata ra3d/audio --dir ra3d/missions/ --w 1920 --h 1080 --enhanced --texset 3 --noshroud --nosound --seed 4242"
+  gbegin
+  for g367s in SCG08EA SCG14EA; do
+    export OPENCNC3D_WATER_DUMP="g367w/$g367s.field"
+    grun g367w/$g367s.log $G367RA --scen $g367s --pack ra3d/3d/$g367s.pack --script g367w/$g367s.txt
+    unset OPENCNC3D_WATER_DUMP
+  done
+  gshots g367w/SCG08EA_on.png g367w/SCG08EA_off.png g367w/SCG14EA_on.png g367w/SCG14EA_off.png
+  G367CHK=$(python3 "$GATEDIR/gate_waterland.py" check g367w 2>>"$OUT")
+  echo "$G367CHK" >> "$OUT"
+  G367V=$(echo "$G367CHK" | head -1 | cut -d' ' -f1)
+  G367MSG=$(echo "$G367CHK" | head -1 | cut -d' ' -f2-)
+  if [ "$GRC" != "0" ]; then
+    bad "G367 the water draws nothing over land: a run failed (GRC=$GRC)"
+  elif [ "$G367V" = "1" ]; then ok "G367 the water draws nothing over land and leaves no hole through its floor: $G367MSG"
+  else bad "G367 the water draws nothing over land: ${G367MSG:-the check did not run (see the python error in the log)}"; fi
 fi
 
 # THE SKIP COUNT IS PART OF THE SUMMARY, never left off it. A run that quietly dropped a

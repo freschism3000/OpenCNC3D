@@ -1,0 +1,64 @@
+{
+  "catalog": [
+    "td"
+  ],
+  "choices": {
+    "movies": false,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "cancel-download",
+      "kind": "button",
+      "label": "CANCEL",
+      "w": 160,
+      "x": 206,
+      "y": 418
+    }
+  ],
+  "installed": [],
+  "page": "progress",
+  "progress": 0.42,
+  "scenario": "public",
+  "target": "td",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "INSTALLING DAWN3D",
+      "width": 200,
+      "x": 408,
+      "y": 190
+    },
+    {
+      "height": 16,
+      "t": "DOWNLOADING MODULE",
+      "width": 212,
+      "x": 392,
+      "y": 250
+    },
+    {
+      "height": 16,
+      "t": "42%",
+      "width": 36,
+      "x": 754,
+      "y": 334
+    },
+    {
+      "height": 16,
+      "t": "BASE GAME / MUSIC",
+      "width": 192,
+      "x": 392,
+      "y": 367
+    },
+    {
+      "height": 16,
+      "t": "CANCEL",
+      "width": 72,
+      "x": 250,
+      "y": 430
+    }
+  ]
+}

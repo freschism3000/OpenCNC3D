@@ -1,0 +1,57 @@
+[
+  {
+    "name": "cnc_eyes.exe",
+    "sha256": "a9103dc13aacedc4ebf6687dc444a1341e4958d02ea1dd7c62817e0be6885a29",
+    "machine": "0x14c",
+    "optional_header_magic": "0x10b",
+    "coff_characteristics": "0x126",
+    "large_address_aware": true,
+    "image_base": "0x400000",
+    "size_of_image": 52834304,
+    "subsystem": 3
+  },
+  {
+    "name": "opencnc3d-game.exe",
+    "sha256": "07d1eb765a249e6c15370af3e7b37fd4eac33afc5baa0e615cd8e5fef4378114",
+    "machine": "0x14c",
+    "optional_header_magic": "0x10b",
+    "coff_characteristics": "0x126",
+    "large_address_aware": true,
+    "image_base": "0x400000",
+    "size_of_image": 54657024,
+    "subsystem": 3
+  },
+  {
+    "name": "OpenCNC3D.exe",
+    "sha256": "74a83b7157dc7364e8921961c9cf8584dbf05e3ebcc6cf12a06fa5083f82261a",
+    "machine": "0x14c",
+    "optional_header_magic": "0x10b",
+    "coff_characteristics": "0x106",
+    "large_address_aware": false,
+    "image_base": "0x400000",
+    "size_of_image": 454656,
+    "subsystem": 2
+  },
+  {
+    "name": "TiberianDawn.dll",
+    "sha256": "db5f35c428aac460dbc25b57170e54ad4e32aaac772500437778d2b36a9ff019",
+    "machine": "0x14c",
+    "optional_header_magic": "0x10b",
+    "coff_characteristics": "0x2106",
+    "large_address_aware": false,
+    "image_base": "0x62d00000",
+    "size_of_image": 21323776,
+    "subsystem": 3
+  },
+  {
+    "name": "SDL2.dll",
+    "sha256": "06fd117e3eebd18940edddf240838f128a12443e1405bf3af0d660ade28c012e",
+    "machine": "0x14c",
+    "optional_header_magic": "0x10b",
+    "coff_characteristics": "0x230e",
+    "large_address_aware": false,
+    "image_base": "0x6c940000",
+    "size_of_image": 1953792,
+    "subsystem": 3
+  }
+]

@@ -59,6 +59,10 @@
 
 struct EfxAnim {
     int  id, type, stage, start, stages, loops, size, ground, attref, attkind, owner;
+    /* The engine's own AnimType number as the dump gave it. `type` is the same number
+       under Tiberian Dawn and its Tiberian Dawn counterpart under Red Alert (g_efxTypeOf);
+       every table here is indexed by `type`. */
+    int  etype;
     /* AnimTypeClass::Biggest, the frame at which the anim is at its largest (adata.cpp),
        exported by the brain on the EFX|ANIM line. It is the only stage count we have for
        an ART-LESS anim, whose Stages resolves through Get_Build_Frame_Count(NULL) to 0.
@@ -75,7 +79,17 @@ struct EfxAnim {
 struct EfxBullet {
     int  id, type, face, alt, invis, arcing, homing;
     char name[16];
+    /* The picture it flies as (BulletTypeClass's graphic, "120MM", "DRAGON"), from a brain
+       whose bullet names are not their pictures (Red Alert's "Cannon", "HeatSeeker"); "?"
+       from one that prints none, whose names are (Tiberian Dawn's). */
+    char img[16];
     float wx, wz;
+    /* where its fuse is set to go off, world cells (Red Alert's brain says; NAN where a
+       brain does not) */
+    float tx, tz;
+    /* the engine's own point, as dumped: wx, wz and alt are where it is DRAWN, which is the
+       same for every projectile but one fired from the air (efx_air_shots in cnc_eyes.cpp) */
+    float ewx, ewz;
 };
 
 static std::vector<EfxAnim>   g_efxAnims;
@@ -96,6 +110,9 @@ struct EfxFire {
 };
 static void (*g_efxOnFire)(const EfxFire& f) = NULL;
 static int g_efxFiresSeen = 0;
+/* This dump's shots that launched a projectile, kept for efx_air_shots (cnc_eyes.cpp), which
+   draws the ones fired from the air from the aircraft rather than from the 2D point. */
+static std::vector<EfxFire> g_efxFiresNow;
 
 /* A LASER LINE, as the engine reports it (EFX|LINE, written by TechnoClass::Fire_At through
    OpenCNC3D_Note_Line in the block that sets up the Obelisk's beam). The 1995 engine draws
@@ -131,6 +148,36 @@ static void efx_bullet_draw_model(int mi, float wx, float ylift, float wz, int f
    leaves the barrel its flash played at and its trail runs through it. NULL, or false for
    a bullet it knows nothing of: drawn where the engine says, as always. */
 static bool (*g_efxBulletOffset)(int id, int type, float wx, float wz, float out[3]) = NULL;
+
+/* RED ALERT'S ANIMS IN TIBERIAN DAWN'S NUMBERS. Every table in this file (the recipes, the
+   ghost clock, the Enhanced extras) is indexed by Tiberian Dawn's AnimType, and the Red
+   Alert engine numbers the same effects its own way (its ANIM_GUN_N is 33, Tiberian Dawn's
+   50; its ANIM_FIRE_SMALL is 13, Tiberian Dawn's 30). Under Red Alert the host turns each
+   anim, as it is parsed, into the Tiberian Dawn anim that is the same effect, or into
+   EFX_TYPE_HOST: an anim this module has no counterpart for, which the host keeps drawing
+   itself (Red Alert's 1996 card) and which is left alone here. NULL under Tiberian Dawn,
+   where a type is its own. The engine's number stays in EfxAnim::etype. */
+#define EFX_TYPE_HOST (-2)
+static int (*g_efxTypeOf)(int type, const char* name) = NULL;
+static std::map<std::string, int> g_efxHostDrawn;      /* anims left to the host, by name */
+/* WHERE AN ANIM'S EMITTERS START, when the host knows better than the ground under the
+   anim's point: a Red Alert anim riding an object drawn as its 1996 card (the point lies on
+   the card, as high as the 2D picture puts it) or a building's model (on its roof), and a
+   building's death blast at the middle of its plot. Fills out[] in world cells and answers
+   true; NULL, or false, keeps the ground under the anim, as always. */
+static bool (*g_efxBaseOf)(const EfxAnim& an, float out[3]) = NULL;
+/* ONE DEATH BLAST PER BUILDING, however many ticks its cells' fireballs straddle. The engine
+   puts a fireball on every cell of a dead building, and each is an anim of its own: on one
+   step only the first of a footprint takes the blast, but when that one ends the next would
+   take it again. Off unless the host turns it on (Red Alert, whose building deaths are
+   Enhanced's rebuilt blast with its smoke column). */
+static bool g_efxBlastPerFootprint = false;
+static std::map<int, std::pair<int, int> > g_efxFootBlast;   /* footprint -> (anim key, last tick) */
+static long g_efxFootBlasts = 0;                             /* footprints that took one, a mission */
+/* Whether the bullets in flight are drawn here, as the cartridge's little models. Red
+   Alert's scenes carry no bullet models and its sprite pass draws every projectile as its
+   own 1996 card, so the host turns this off there. */
+static bool g_efxDrawBullets = true;
 
 /* THE NUCLEAR STRIKE's mushroom, same split and the same reason: the mesh side needs
    draw_mesh and g_pack, which this header is included before. */
@@ -205,6 +252,26 @@ static int (*g_efxCellHidden)(int cellx, int celly) = 0;
 static int (*g_efxDeadFootprint)(int cellx, int celly) = 0;
 /* Same map, the HOUSE half: 1 = GDI, 0 = Nod/neutral, -1 = no dead building here. */
 static int (*g_efxDeadHouse)(int cellx, int celly) = 0;
+/* WHICH PLOT A FIREBALL BELONGS TO: the dead footprint under it (g_efxDeadFootprint), or -1.
+   Where the host asks for one blast a building (g_efxBlastPerFootprint) the answer is the
+   one its fireball had when it was first seen, for its whole life: the plot is let go a few
+   ticks after its building leaves the dump, and a fireball still burning then would change
+   recipe halfway, a second explosion where the first was. Asked once per fireball a step. */
+static std::map<int, std::pair<int, int> > g_efxFbPlot;      /* anim key -> (plot, last tick) */
+static int efx_fb_footprint(const EfxAnim& an, int frame)
+{
+    if (!g_efxDeadFootprint) return -1;
+    if (!g_efxBlastPerFootprint) return g_efxDeadFootprint((int)an.wx, (int)an.wz);
+    const int key = (an.type << 16) | (an.id & 0xFFFF);
+    std::map<int, std::pair<int, int> >::iterator it = g_efxFbPlot.find(key);
+    if (it == g_efxFbPlot.end() || frame - it->second.second > 2) {
+        if (g_efxFbPlot.size() > 1024) g_efxFbPlot.clear();
+        it = g_efxFbPlot.insert(std::make_pair(key, std::make_pair(-1, frame))).first;
+        it->second.first = g_efxDeadFootprint((int)an.wx, (int)an.wz);
+    }
+    it->second.second = frame;
+    return it->second.first;
+}
 static int efx_hidden(float wx, float wz)
 {
     return g_efxCellHidden && g_efxCellHidden((int)wx, (int)wz);
@@ -482,6 +549,7 @@ static void efx_begin(void)
 {
     g_efxAnims.clear();
     g_efxBullets.clear();
+    g_efxFiresNow.clear();
     g_efxDying.clear();
     g_efxLivePrev.swap(g_efxLiveNow);
     g_efxLiveNow.clear();
@@ -525,6 +593,8 @@ static void efx_parse_line(char* line)
         a.biggest = efx_field(f, nf, "biggest", 0);
         a.chunkHouse = -2;
         efx_str_field(f, nf, "name", a.name, sizeof(a.name));
+        a.etype = a.type;
+        if (g_efxTypeOf) a.type = g_efxTypeOf(a.type, a.name);
         a.wx = (float)efx_field(f, nf, "lx", 0) / 256.0f;
         a.wz = (float)efx_field(f, nf, "ly", 0) / 256.0f;
         g_efxAnims.push_back(a);
@@ -546,6 +616,7 @@ static void efx_parse_line(char* line)
         s.wx = (float)efx_field(f, nf, "lx", 0) / 256.0f;
         s.wz = (float)efx_field(f, nf, "ly", 0) / 256.0f;
         g_efxFiresSeen++;
+        if (s.bullet >= 0) g_efxFiresNow.push_back(s);
         if (g_efxOnFire) g_efxOnFire(s);
     } else if (!strcmp(f[1], "LINE")) {
         EfxLine l;
@@ -582,8 +653,13 @@ static void efx_parse_line(char* line)
         b.arcing = efx_field(f, nf, "arcing", 0);
         b.homing = efx_field(f, nf, "homing", 0);
         efx_str_field(f, nf, "name", b.name, sizeof(b.name));
+        efx_str_field(f, nf, "img", b.img, sizeof(b.img));
         b.wx = (float)efx_field(f, nf, "lx", 0) / 256.0f;
         b.wz = (float)efx_field(f, nf, "ly", 0) / 256.0f;
+        b.ewx = b.wx; b.ewz = b.wz;
+        const int tlx = efx_field(f, nf, "tlx", -1), tly = efx_field(f, nf, "tly", -1);
+        b.tx = tlx >= 0 && tly >= 0 ? (float)tlx / 256.0f : NAN;
+        b.tz = tlx >= 0 && tly >= 0 ? (float)tly / 256.0f : NAN;
         g_efxBullets.push_back(b);
 
         char key[24];
@@ -719,6 +795,9 @@ static EfxClass efx_classify(const char* n)
         !strcmp(n, "SMOKE_M"))                                return EFXC_SMOKE;
     return EFXC_UNKNOWN;
 }
+
+static bool efx_is_muzzle_flash(const char* n)
+{ return !strcmp(n,"GUNFIRE") || !strcmp(n,"MINIGUN") || !strcmp(n,"SAMFIRE"); }
 
 /* Progress through the anim's life, 0..1. The honest denominator is the engine's
    Stages, BUT with no SHP art loaded (this build has none) the engine cannot count
@@ -1074,6 +1153,8 @@ struct EfxPart {
        building's sparks, which fall). Only ebld_mod.h's emitters set it, so every other
        particle integrates exactly as it did. */
     unsigned char bounce = 0;
+    bool muzzleFlash = false;
+    bool explosionBloom = false; /* retained from the spawning anim, independent of heap reuse */
     /* A CHUNK TRAIL'S EMBER: the step back to where its chunk was one tick before, which
        is where the ember before it lies (cells). Set at the ember's birth in the chunk
        integrator and nowhere else, 0 on every other particle; only the Enhanced draw reads
@@ -1136,6 +1217,7 @@ static void efx_loop_spawn(int frame)
         memset(&a, 0, sizeof a);
         a.id     = g_efxLoopId--;          /* negative: never an engine heap id */
         a.type   = g_efxLoopType;
+        a.etype  = a.type;
         a.stage  = 0;
         a.start  = 0;
         a.stages = 1;
@@ -1341,6 +1423,10 @@ static void efx_pool_clear(void)
     g_efxRecipeName.clear();
     g_efxEmpty.clear();
     g_efxNoRecipe.clear();
+    g_efxHostDrawn.clear();
+    g_efxFootBlast.clear();
+    g_efxFbPlot.clear();
+    g_efxFootBlasts = 0;
     g_efxStepFrame = -1;
 }
 
@@ -1374,7 +1460,7 @@ static void efx_push(const EfxPart& p)
    place of the one the source's name looks up; -1, the default, looks it up. */
 static void efx_emit(const EfxSourceRec& s, float ex, float ey, float ez,
                      int n, unsigned key, int bornFrame, int slot, int k,
-                     unsigned char flat = 0, int sheet = -1)
+                     unsigned char flat = 0, int sheet = -1, bool explosionBloom = false, bool muzzleFlash = false)
 {
     const EfxSeq* seq = efx_seq(EFX_SYS[s.sys].seq);
     for (int i = 0; i < n; i++) {
@@ -1431,6 +1517,7 @@ static void efx_emit(const EfxSourceRec& s, float ex, float ey, float ez,
         p.seed = h2;
         p.sheet = sheet >= 0 ? (unsigned char)sheet : efx_src_sheet(s.name);
         p.flat = flat;
+        p.explosionBloom = explosionBloom; p.muzzleFlash = muzzleFlash;
         efx_push(p);
     }
 }
@@ -1532,8 +1619,11 @@ static void efx_emit_chunks(const EfxSourceRec& s, float ex, float ey, float ez,
 }
 
 /* Fire one recipe slot for one anim at one stage. */
+/* `base`, when the host gave one (g_efxBaseOf), is where the slot's offsets start instead of
+   the ground under the anim. */
 static void efx_fire_slot(const EfxAnim& an, const EfxSlot& sl, int slotIdx,
-                          unsigned key, int bornFrame, const char* rname)
+                          unsigned key, int bornFrame, const char* rname,
+                          const float* base = NULL)
 {
     if (!sl.src)
         return;                                  /* empty slot: the console skips it */
@@ -1580,6 +1670,7 @@ static void efx_fire_slot(const EfxAnim& an, const EfxSlot& sl, int slotIdx,
        adds dy to its result (disassembly RAM 0x801FC8F0-0x801FC92C). g_efxGroundY is
        the renderer's heightfield sampler, so this lands on the drawn ground. */
     float bx = an.wx, by = efx_ground(an.wx, an.wz), bz = an.wz;
+    if (base) { bx = base[0]; by = base[1]; bz = base[2]; }
 
     /* A FLAMETHROWER'S TONGUE STARTS AT THE NOZZLE, NOT UNDER HIS BOOTS. Every FLAME_*
        recipe carries dy 0, so all eight of them took that base unchanged and lit their
@@ -1598,7 +1689,7 @@ static void efx_fire_slot(const EfxAnim& an, const EfxSlot& sl, int slotIdx,
        A firer the host cannot place -- it died inside the tongue's own ten-tick life, or
        it is a vehicle with no weapon geometry -- keeps the ground-level base, so the
        fallback is the old behaviour rather than a new one. */
-    if (g_efxMuzzleAt && an.attref >= 0 && !strncmp(rname, "FLAME_", 6))
+    if (!base && g_efxMuzzleAt && an.attref >= 0 && !strncmp(rname, "FLAME_", 6))
         g_efxMuzzleAt(an.attref, an.attkind, &bx, &by, &bz);
 
     const float ex = bx + (float)sl.dx * EFX_U;
@@ -1615,7 +1706,7 @@ static void efx_fire_slot(const EfxAnim& an, const EfxSlot& sl, int slotIdx,
         efx_emit_chunks(s, ex, ey, ez, n, key, bornFrame, slotIdx, k, g_efxSpawnHouse);
         g_efxRecipeChunks[an.name] += n;
     } else {
-        efx_emit(s, ex, ey, ez, n, key, bornFrame, slotIdx, k);
+        efx_emit(s, ex, ey, ez, n, key, bornFrame, slotIdx, k, 0, -1, efx_classify(an.name) == EFXC_EXPLOSION, efx_is_muzzle_flash(an.name));
         g_efxRecipeParts[an.name] += n;
     }
 }
@@ -1672,7 +1763,7 @@ static void efx_linger_step(int frame)
                     efx_emit_chunks(s, L.x, L.y, L.z, n, L.key, L.born, L.slot, k, g_efxSpawnHouse);
                     g_efxRecipeChunks[L.anim] += n;
                 } else {
-                    efx_emit(s, L.x, L.y, L.z, n, L.key, L.born, L.slot, k, x.flat);
+                    efx_emit(s, L.x, L.y, L.z, n, L.key, L.born, L.slot, k, x.flat, -1, efx_classify(L.anim.c_str()) == EFXC_EXPLOSION, efx_is_muzzle_flash(L.anim.c_str()));
                     g_efxRecipeParts[L.anim] += n;
                 }
                 g_efxExtraParts += n;
@@ -1681,6 +1772,16 @@ static void efx_linger_step(int frame)
         g_efxLinger[w++] = L;
     }
     g_efxLinger.resize(w);
+}
+
+/* NO EMBERS IN A BUILDING'S EXPLOSION. The lab's FRAG3 rows (and every remastered
+   building's baked explosion recipe, ebld_mod.h) scatter BldgEmber_ENH coals that glow on
+   the ground for ten to fifteen seconds; they are not fired. The source itself stays: a
+   damaged building's own burning embers wear its sheet. Skipped where they would fire, so
+   every other row keeps its slot and its particles their hashes. */
+static bool efx_explosion_ember(const char* source, const char* sheet)
+{
+    return (source && !strcmp(source, "BldgEmber_ENH")) || (sheet && !strcmp(sheet, "COAL"));
 }
 
 static void efx_fire_extras(const EfxAnim& an, const char* rname, int first,
@@ -1696,6 +1797,7 @@ static void efx_fire_extras(const EfxAnim& an, const char* rname, int first,
         const size_t n = strlen(x.recipe);
         if (x.prefix ? strncmp(rname, x.recipe, n) != 0 : strcmp(rname, x.recipe) != 0)
             continue;
+        if (efx_explosion_ember(x.src.name, NULL)) continue;
         const EfxSourceRec& s = x.src;
         const int k = an.stage - (int)x.stage;
         /* ON ITS OWN CLOCK: an emitter with a hold, and EVERY emitter of a recipe Enhanced
@@ -1751,7 +1853,7 @@ static void efx_fire_extras(const EfxAnim& an, const char* rname, int first,
             efx_emit_chunks(s, ex, ey, ez, cnt, key, bornFrame, first + j, k, g_efxSpawnHouse);
             g_efxRecipeChunks[an.name] += cnt;
         } else {
-            efx_emit(s, ex, ey, ez, cnt, key, bornFrame, first + j, k, x.flat);
+            efx_emit(s, ex, ey, ez, cnt, key, bornFrame, first + j, k, x.flat, -1, efx_classify(an.name) == EFXC_EXPLOSION, efx_is_muzzle_flash(an.name));
             g_efxRecipeParts[an.name] += cnt;
         }
         g_efxExtraParts += cnt;
@@ -1762,6 +1864,8 @@ static void efx_fire_extras(const EfxAnim& an, const char* rname, int first,
    recipe is now drawn by the pool and by nothing else; the -1 rows split in two. */
 static bool efx_proc_fallback(const EfxAnim& a)
 {
+    if (a.type == EFX_TYPE_HOST)
+        return false;                   /* the host draws it as its own picture */
     if (a.type < 0 || a.type >= EFX_ANIM2RECIPE_N)
         return true;                    /* an anim we have never seen: show it, loudly */
     const int r = efx_recipe_index(a.type);
@@ -1814,8 +1918,39 @@ static void efx_integrate_once(void)
         }
         /* THE TRAIL. One ember per tick at the chunk's own position, with no
            velocity of its own, so the chain marks out the arc the chunk flew and
-           stays behind after it has gone. This is the orange trail in p084. */
-        if (c.age < c.life) {
+           stays behind after it has gone. This is the orange trail in p084.
+           UNDER ENHANCED IT IS SMOKE: a soft grey puff every other tick that drifts up,
+           swells and thins away, on the remastered smoke sheet. Drawn as Enhanced's
+           streak, the embers' chain was a solid ribbon behind every piece. The puff is
+           keyed on the same (seed, age) hash, so a run's particles stay deterministic. */
+        if (c.age < c.life && g_efxEnhOn) {
+            if ((c.age & 1) == 0) {
+                const unsigned h = efx_hash(c.seed, (unsigned)c.age, 0u, 0u);
+                EfxPart e;
+                memset(&e, 0, sizeof e);
+                e.x = c.x; e.y = c.y; e.z = c.z;
+                e.sx = c.x; e.sy = c.y; e.sz = c.z;
+                e.vx = (efx_r8(h >> 8) - 0.5f) * 0.6f * EFX_U;
+                e.vy = (0.8f + 0.6f * efx_r8(h >> 16)) * EFX_U;
+                e.vz = (efx_r8(h >> 24) - 0.5f) * 0.6f * EFX_U;
+                e.ay = 0.05f * EFX_U;
+                /* (sized by the piece, as the ember was: half again its size at birth,
+                   swelling to some four and a half times it) */
+                e.hw = c.hw * (1.3f + 0.4f * efx_r8(h)) * g_efxSmokeScale;
+                e.grow = c.hw * 0.10f * g_efxSmokeScale;
+                e.life = (short)(24 + (int)(efx_r8(h >> 4) * 12.0f));
+                e.age = 0;
+                e.sys = 6;
+                e.arate = 12;
+                e.a = 190;
+                e.r = 92; e.g = 88; e.b = 84;
+                e.seed = h;
+                e.sheet = (unsigned char)efx_sheet_slot("LZSMOKE", 6);
+                e.flat = 0;
+                efx_push(e);
+            }
+            g_efxChunk[w++] = c;
+        } else if (c.age < c.life) {
             const unsigned h = efx_hash(c.seed, (unsigned)c.age, 0u, 0u);
             EfxPart e;
             e.x = c.x; e.y = c.y; e.z = c.z;
@@ -1899,6 +2034,22 @@ static void (*g_efxBeforeIntegrate)(int frame) = NULL;
 /* Set by the host. True for a live anim the host already took, so parts drawn straight
    from the anim list (the nuke's mushroom) stand down too. */
 static bool (*g_efxIsClaimed)(const EfxAnim& an) = NULL;
+/* Set by the host: the recipe an anim fires under Enhanced, given the one its type names
+   (Red Alert's atom bomb fires a recipe of its own, ra3d_atom_mod.h). NULL, or the name
+   handed back, is the type's own recipe. */
+static const char* (*g_efxRecipeOf)(const EfxAnim& an, const char* rname) = NULL;
+static const char* efx_recipe_of(const EfxAnim& an, const char* rname)
+{
+    return g_efxRecipeOf ? g_efxRecipeOf(an, rname) : rname;
+}
+/* Set by the host. True for a live anim whose meshes the host draws itself, so the nuke's
+   mushroom stands down for it (Red Alert's atom bomb, ra3d_atom_mod.h). */
+static bool (*g_efxOwnMeshes)(const EfxAnim& an) = NULL;
+/* Set by the host: meshes of its own drawn with the effects, phase 0 before the particles
+   and phase 1 after them, in the state efx_draw leaves (each draw sets and restores its
+   own). Called even on a frame with nothing else to draw, since the host's meshes may
+   outlive every anim and particle. */
+static void (*g_efxHostMeshes)(int phase) = NULL;
 
 static void efx_step(int frame)
 {
@@ -1928,6 +2079,12 @@ static void efx_step(int frame)
     std::set<int> fbFired;          /* footprints that already got their one FRAG3 */
     for (size_t i = 0; i < g_efxAnims.size(); i++) {
         EfxAnim& an = g_efxAnims[i];      /* mutable: chunkHouse caches on first burst */
+        /* AN ANIM THE HOST DRAWS AS ITS OWN PICTURE (Red Alert's anims with no counterpart
+           here, g_efxTypeOf): no recipe, nothing to emit, counted for efxdump. */
+        if (an.type == EFX_TYPE_HOST) {
+            g_efxHostDrawn[an.name]++;
+            continue;
+        }
         /* AN ANIM SOMETHING ELSE DRAWS. The host's Unity explosion (unityvfx_mod.h)
            takes the anims it replaces here, and a taken anim fires no recipe at all, so
            the two explosions are never drawn on top of each other. */
@@ -1942,8 +2099,7 @@ static void efx_step(int frame)
            anim the console actually spawns. See g_efxDeadFootprint above. */
         int fbKey = -1;
         if (an.type == 0) {
-            fbKey = g_efxDeadFootprint
-                  ? g_efxDeadFootprint((int)an.wx, (int)an.wz) : -1;
+            fbKey = efx_fb_footprint(an, frame);
             r = (fbKey >= 0) ? 4 : 3;    /* 4 = ANIM_FRAG3 rubble, 3 = ANIM_FRAG2 */
         }
         /* Whose wreckage is this? A dead BUILDING owns its footprint cells (the same
@@ -1979,8 +2135,13 @@ static void efx_step(int frame)
         }
         la.lastStage = an.stage;
         seen[key] = la;
+        /* where the host puts this anim's emitters, when it knows (g_efxBaseOf) */
+        float hostBase[3];
+        const float* base = (g_efxBaseOf && g_efxBaseOf(an, hostBase)) ? hostBase : NULL;
 
-        if (rec.nslot == 0) {
+        /* (an empty recipe the host gives a recipe of its own goes on to fire it below:
+           g_efxRecipeOf) */
+        if (rec.nslot == 0 && !strcmp(efx_recipe_of(an, rec.name), rec.name)) {
             /* ANIM_MUZZLE_FLASH is empty on the cartridge; one is drawn anyway.
                Fired through efx_emit directly rather than through efx_fire_slot,
                because a slot indexes the ROM's source table and this source is not in
@@ -2015,19 +2176,21 @@ static void efx_step(int frame)
                            position stands, because a flash at the vehicle is still better
                            than no flash at all. */
                         float mx = an.wx, my = efx_ground(an.wx, an.wz) + 0.10f, mz = an.wz;
-                        if (g_efxMuzzleAt && an.attref >= 0)
+                        if (base) { mx = base[0]; my = base[1]; mz = base[2]; }
+                        else if (g_efxMuzzleAt && an.attref >= 0)
                             g_efxMuzzleAt(an.attref, an.attkind, &mx, &my, &mz);
                         efx_emit(cs, mx, my, mz,
-                                 n, (unsigned)key, la.bornFrame, 0, k);
+                                 n, (unsigned)key, la.bornFrame, 0, k, 0, -1, false, true);
                         g_efxRecipeParts[an.name] += n;
                     }
                 }
                 {   /* and under Enhanced, a real flash at the same muzzle */
                     float mx = an.wx, my = efx_ground(an.wx, an.wz) + 0.10f, mz = an.wz;
-                    if (g_efxMuzzleAt && an.attref >= 0)
+                    if (base) { mx = base[0]; my = base[1]; mz = base[2]; }
+                    else if (g_efxMuzzleAt && an.attref >= 0)
                         g_efxMuzzleAt(an.attref, an.attkind, &mx, &my, &mz);
-                    const float base[3] = { mx, my, mz };
-                    efx_fire_extras(an, rec.name, 1, (unsigned)key, la.bornFrame, base);
+                    const float at[3] = { mx, my, mz };
+                    efx_fire_extras(an, rec.name, 1, (unsigned)key, la.bornFrame, at);
                 }
                 g_efxRecipeName[an.name] = "CannonFlash_OURS";
             } else {
@@ -2040,6 +2203,17 @@ static void efx_step(int frame)
         if (fbKey >= 0) {
             if (fbFired.find(fbKey) != fbFired.end()) continue;
             fbFired.insert(fbKey);
+            /* (and, where the host asks, one per building over the whole death: the anim
+               that took the footprint first keeps it while it is seen, any other is
+               skipped, and the claim lapses a few seconds after its anim is gone) */
+            if (g_efxBlastPerFootprint) {
+                std::map<int, std::pair<int, int> >::iterator fb = g_efxFootBlast.find(fbKey);
+                if (fb != g_efxFootBlast.end() && frame - fb->second.second > 90)
+                    { g_efxFootBlast.erase(fb); fb = g_efxFootBlast.end(); }
+                if (fb != g_efxFootBlast.end() && fb->second.first != key) continue;
+                if (fb == g_efxFootBlast.end()) g_efxFootBlasts++;
+                g_efxFootBlast[fbKey] = std::make_pair(key, frame);
+            }
         }
 
         /* ARM OR DISARM THE GHOST CLOCK (see EfxGhost for the whole account and for why
@@ -2068,10 +2242,13 @@ static void efx_step(int frame)
             g_efxGhost.erase(std::make_pair(key, an.attref));
         }
 
-        if (!efx_enh_replaces(rec.name))
+        /* (the host may give it a recipe of its own, whose emitters then fire in place of
+           the type's: g_efxRecipeOf) */
+        const char* rname = efx_recipe_of(an, rec.name);
+        if (!efx_enh_replaces(rname))
             for (int sI = 0; sI < (int)rec.nslot; sI++)
-                efx_fire_slot(an, rec.slot[sI], sI, (unsigned)key, la.bornFrame, rec.name);
-        efx_fire_extras(an, rec.name, (int)rec.nslot, (unsigned)key, la.bornFrame, NULL);
+                efx_fire_slot(an, rec.slot[sI], sI, (unsigned)key, la.bornFrame, rec.name, base);
+        efx_fire_extras(an, rname, (int)rec.nslot, (unsigned)key, la.bornFrame, base);
     }
     g_efxAnimLive.swap(seen);
     efx_linger_step(frame);
@@ -2098,7 +2275,7 @@ static void efx_step(int frame)
                the engine's stage 0 and is left exactly as it was, truncated; see EfxGhost
                for the measurement that decided this; the evidence that would settle it
                has not been gathered. */
-            if (!efx_slot_continuous(rec.slot[sI]) || efx_enh_replaces(rec.name))
+            if (!efx_slot_continuous(rec.slot[sI]) || efx_enh_replaces(efx_recipe_of(an, rec.name)))
                 continue;
             /* The ANIM key, not the map key: the particle hash must stay the same pure
                function of (anim, bornFrame, slot, tick) it is on the engine path. Two
@@ -2162,8 +2339,19 @@ static void efx_quad_tex(const EfxSeq* s, int frame, const float* R, const float
    in practice -- so it costs ~20 glBindTexture and ~10 glBlendFunc for the whole
    frame instead of one of each per particle. GL 1.1 immediate mode, GL_CLAMP,
    power-of-two textures, no extensions: the same rules as the rest of this file. */
+static void efx_particle_colour(const EfxPart& p,float alpha,bool bloomMask)
+{
+    if (bloomMask) {
+        const float peak=(float)(p.r>p.g?(p.r>p.b?p.r:p.b):(p.g>p.b?p.g:p.b))/255.0f;
+        glColor4f(p.explosionBloom?peak:0.0f,p.muzzleFlash?peak:0.0f,0.0f,alpha);
+    } else {
+        const float gain=g_efxEnhOn && p.muzzleFlash ? g_fx.muzzle_flash_gain : 1.0f;
+        glColor4f(gain*(float)p.r/255.0f,gain*(float)p.g/255.0f,gain*(float)p.b/255.0f,alpha);
+    }
+}
+
 static void efx_quad_batched(const EfxPart& p, const float* R, const float* U,
-                             float u1, float v1, float alpha)
+                             float u1, float v1, float alpha, bool bloomMask = false)
 {
     /* SQUARE. The cartridge scales both corner axes by the same size and stretches the
        texture onto that square, whatever the art's own proportions are: the FireBall
@@ -2173,7 +2361,7 @@ static void efx_quad_batched(const EfxPart& p, const float* R, const float* U,
     const float hw = p.hw, hh = p.hw;
     const float rx = R[0] * hw, ry = R[1] * hw, rz = R[2] * hw;
     const float ux = U[0] * hh, uy = U[1] * hh, uz = U[2] * hh;
-    glColor4f((float)p.r / 255.0f, (float)p.g / 255.0f, (float)p.b / 255.0f, alpha);
+    efx_particle_colour(p,alpha,bloomMask);
     glTexCoord2f(0.0f, v1);   glVertex3f(p.x - rx - ux, p.y - ry - uy, p.z - rz - uz);
     glTexCoord2f(u1,   v1);   glVertex3f(p.x + rx - ux, p.y + ry - uy, p.z + rz - uz);
     glTexCoord2f(u1,   0.0f); glVertex3f(p.x + rx + ux, p.y + ry + uy, p.z + rz + uz);
@@ -2196,7 +2384,7 @@ static void efx_quad_batched(const EfxPart& p, const float* R, const float* U,
    Tier 1 draws it as it stands. */
 static const float EFX_STREAK_CAP = 0.4f, EFX_STREAK_ROW = 0.47f, EFX_STREAK_MIN = 0.2f;
 static bool efx_streak_batched(const EfxPart& p, const float* R, const float* U,
-                               float u1, float v1, float alpha)
+                               float u1, float v1, float alpha, bool bloomMask = false)
 {
     /* the tail across the screen: its part along the billboard's right and up */
     const float ta = p.tx * R[0] + p.ty * R[1] + p.tz * R[2];
@@ -2213,7 +2401,7 @@ static bool efx_streak_batched(const EfxPart& p, const float* R, const float* U,
     const float a0[3] = { p.x - A[0] * e, p.y - A[1] * e, p.z - A[2] * e };
     const float a1[3] = { p.x + p.tx + A[0] * e, p.y + p.ty + A[1] * e, p.z + p.tz + A[2] * e };
     const float v = EFX_STREAK_ROW * v1;
-    glColor4f((float)p.r / 255.0f, (float)p.g / 255.0f, (float)p.b / 255.0f, alpha);
+    efx_particle_colour(p,alpha,bloomMask);
     glTexCoord2f(0.0f, v); glVertex3f(a0[0] - W[0], a0[1] - W[1], a0[2] - W[2]);
     glTexCoord2f(u1,   v); glVertex3f(a0[0] + W[0], a0[1] + W[1], a0[2] + W[2]);
     glTexCoord2f(u1,   v); glVertex3f(a1[0] + W[0], a1[1] + W[1], a1[2] + W[2]);
@@ -2312,6 +2500,8 @@ static void efx_draw_nuke_meshes(void)
         if (strcmp(a.name, "ATOMSFX"))
             continue;
         if (g_efxIsClaimed && g_efxIsClaimed(a))
+            continue;
+        if (g_efxOwnMeshes && g_efxOwnMeshes(a))
             continue;
         /* NO SHROUD CULL ON A SUPERWEAPON. Every other effect in this file is hidden
            when its cell is under shroud, which is right: an explosion in the fog is
@@ -2414,7 +2604,84 @@ static void efx_draw_ion_meshes(void)
 }
 
 
-static void efx_draw_particles(const float* R, const float* U)
+/* Effects-only grade. Native meshes opt in for the duration of their effect draw;
+   ordinary objects, normals, shadows and terrain never enter this program. */
+static GLuint g_efxGradeProg = 0;
+static bool g_efxGradeTried = false;
+static bool g_efxMeshGrade = false;
+static long g_efxGradeDraws = 0;
+static void efx_grade_textured(bool textured)
+{
+    if (g_efxGradeProg) fx_set1i(g_efxGradeProg,"uTextured",textured ? 1 : 0);
+}
+static void efx_grade_scale(float scale)
+{
+    if (g_efxGradeProg) fx_set1f(g_efxGradeProg,"uTextureScale",scale);
+}
+static void efx_grade_alpha(bool useTextureAlpha)
+{
+    if (g_efxGradeProg) fx_set1i(g_efxGradeProg,"uTextureAlpha",useTextureAlpha ? 1 : 0);
+}
+static void efx_grade_uniforms(GLuint program)
+{
+    const FxObjectGrade grade=fx_effect_grade(&g_fx);
+    const float a[4]={grade.bright,grade.contrast,grade.exposure,grade.gamma};
+    const float b[4]={grade.sat,grade.warmth,grade.tint,
+        g_efxEnhOn && fx_object_grade_active(grade) ? 1.0f : 0.0f};
+    fx_set4fv(program,"uObjectGrade0",1,a);
+    fx_set4fv(program,"uObjectGrade1",1,b);
+    fx_set3f(program,"uObjectGradeRGB",grade.red,grade.green,grade.blue);
+}
+static bool efx_grade_begin(bool textured = true)
+{
+    const FxObjectGrade grade=fx_effect_grade(&g_fx);
+    if (!g_efxEnhOn || !fx_object_grade_active(grade)) return false;
+    if (!g_efxGradeTried) {
+        g_efxGradeTried = true;
+        static const char* VS =
+            "varying vec4 vCol;\n"
+            "void main() { gl_Position = ftransform(); gl_TexCoord[0] = gl_MultiTexCoord0; vCol = gl_Color; }\n";
+        static const char* FS =
+            "uniform sampler2D uTex;\n"
+            "uniform int uTextured, uTextureAlpha;\n"
+            "uniform float uTextureScale;\n"
+            "varying vec4 vCol;\n"
+            FX_OBJECT_GRADE_GLSL
+            "void main() {\n"
+            "    vec4 c=(uTextured == 1 ? texture2D(uTex,gl_TexCoord[0].xy) : vec4(1.0))*vCol;\n"
+            "    gl_FragColor=vec4(objectGrade(c.rgb*uTextureScale),uTextureAlpha == 1 ? c.a : vCol.a);\n"
+            "}\n";
+        if (fx_gl_ready) {
+            const GLuint vs = fx_compile(GL_VERTEX_SHADER, VS, "efx grade");
+            const GLuint fs = vs ? fx_compile(GL_FRAGMENT_SHADER, FS, "efx grade") : 0;
+            if (vs && fs) {
+                GLuint p = fx_glCreateProgram();
+                fx_glAttachShader(p, vs); fx_glAttachShader(p, fs); fx_glLinkProgram(p);
+                GLint ok = 0; fx_glGetProgramiv(p, GL_LINK_STATUS, &ok);
+                if (ok) g_efxGradeProg = p; else fx_glDeleteProgram(p);
+            }
+            if (vs) fx_glDeleteShader(vs);
+            if (fs) fx_glDeleteShader(fs);
+        }
+    }
+    if (!g_efxGradeProg) return false;
+    fx_glUseProgram(g_efxGradeProg);
+    fx_set1i(g_efxGradeProg,"uTex",0); efx_grade_textured(textured); efx_grade_scale(1.0f);
+    efx_grade_alpha(true); efx_grade_uniforms(g_efxGradeProg);
+    g_efxGradeDraws++;
+    return true;
+}
+static void efx_host_meshes_draw(int phase)
+{
+    if (!g_efxHostMeshes) return;
+    const bool graded=efx_grade_begin(false);
+    g_efxMeshGrade=graded;
+    g_efxHostMeshes(phase);
+    g_efxMeshGrade=false;
+    if (graded) fx_glUseProgram(0);
+}
+
+static void efx_draw_particles(const float* R, const float* U, bool explosionOnly = false)
 {
     const int nTot = g_efxNPart + g_efxNChunk;
     if (nTot <= 0) { g_efxDrawn = 0; return; }
@@ -2437,6 +2704,9 @@ static void efx_draw_particles(const float* R, const float* U)
            nothing: the particles existed and the draw dropped them. */
         const bool isChunk = (i >= g_efxNPart);
         const EfxPart& p = isChunk ? g_efxChunk[i - g_efxNPart] : g_efxPart[i];
+        // The bloom isolation draw reuses actual posed, depth-tested particle quads.
+        // Muzzle flashes, smoke, debris meshes, lamps and other emitters never enter it.
+        if (explosionOnly && (isChunk || (!p.explosionBloom && !p.muzzleFlash) || p.sys == 6)) continue;
         /* A chunk that RESOLVES to a mesh is drawn after the sprites instead. One that
            does not -- a pack from before the chunk bake -- must stay in this bucket and
            keep the ember sprite, or it would simply vanish. Getting that wrong made
@@ -2454,7 +2724,7 @@ static void efx_draw_particles(const float* R, const float* U)
         const EfxSeq* s = efx_slot_seq(sysIdx);
         if (!s || s->frames <= 0)
             continue;
-        g_efxSlotDrawn[sysIdx][efx_seq_is_enh(s) ? 1 : 0]++;
+        if (!explosionOnly) g_efxSlotDrawn[sysIdx][efx_seq_is_enh(s) ? 1 : 0]++;
         /* THE CARTRIDGE STRETCHES THE WHOLE STRIP ACROSS THE PARTICLE'S LIFE. There is
            no per-template frame RATE: the byte we used to read as one (+0x31) is the
            ALPHA RAMP SLOPE, see the alpha law below. Both the triangle path
@@ -2484,6 +2754,10 @@ static void efx_draw_particles(const float* R, const float* U)
         sorted[cursor[g_efxBKey[i]]++] = g_efxOrder[i];
 
     glEnable(GL_TEXTURE_2D);
+    /* The isolation target is semantic coverage: red=explosion, green=muzzle.
+       Its channels must never receive RGB/saturation/tint grading. The bloom's
+       bright pass reads its radiance from the already-graded visible scene. */
+    const bool graded = !explosionOnly && efx_grade_begin();
     int lastAdditive = -1;
     /* Each system in the cartridge's order, and right after it any Enhanced source sheet
        drawing with that system. */
@@ -2540,13 +2814,14 @@ static void efx_draw_particles(const float* R, const float* U)
                 const bool flat = g_efxEnhOn && p.flat;
                 /* a chunk trail's ember under Enhanced: a streak (efx_streak_batched) */
                 if (g_efxEnhOn && i < g_efxNPart && p.sys == 8 && (p.tx != 0.0f || p.ty != 0.0f || p.tz != 0.0f)
-                    && efx_streak_batched(p, R, U, u1, v1, (float)ai / 255.0f))
+                    && efx_streak_batched(p, R, U, u1, v1, (float)ai / 255.0f, explosionOnly))
                     continue;
-                efx_quad_batched(p, flat ? FLAT_R : R, flat ? FLAT_U : U, u1, v1, (float)ai / 255.0f);
+                efx_quad_batched(p, flat ? FLAT_R : R, flat ? FLAT_U : U, u1, v1, (float)ai / 255.0f, explosionOnly);
             }
             glEnd();
         }
     }
+    if (graded) fx_glUseProgram(0);
     glDisable(GL_TEXTURE_2D);
 }
 
@@ -2651,8 +2926,13 @@ static void efx_draw(const float* bbRight, const float* bbUp)
                     "N64 DETH strips).\n");
     }
     if (g_efxAnims.empty() && g_efxBullets.empty() &&
-        g_efxNPart == 0 && g_efxNChunk == 0)
+        g_efxNPart == 0 && g_efxNChunk == 0) {
+        if (g_efxHostMeshes && g_efxPoolLive && g_efxHaveArt) {
+            efx_host_meshes_draw(0);
+            efx_host_meshes_draw(1);
+        }
         return;
+    }
 
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
@@ -2667,12 +2947,22 @@ static void efx_draw(const float* bbRight, const float* bbUp)
            them the flamethrower's recipe. The loop stays because efx_proc_fallback is
            still the thing that decides, and because an anim this build has never seen
            must still be shown loudly rather than dropped. */
+        efx_host_meshes_draw(0);
         efx_draw_particles(bbRight, bbUp);
+        const bool meshGrade=efx_grade_begin(false);
+        g_efxMeshGrade=meshGrade;
         efx_draw_chunk_meshes();
         efx_draw_nuke_meshes();
         efx_draw_ion_meshes();
+        g_efxMeshGrade=false;
+        if (meshGrade) fx_glUseProgram(0);
+        efx_host_meshes_draw(1);
         for (size_t i = 0; i < g_efxAnims.size(); i++) {
             const EfxAnim& a = g_efxAnims[i];
+            if (a.type == EFX_TYPE_HOST) {
+                g_efxArtUsed[a.name] = "host";
+                continue;
+            }
             if (!efx_proc_fallback(a)) {
                 const int r = efx_recipe_index(a.type);
                 g_efxArtUsed[a.name] =
@@ -2688,6 +2978,7 @@ static void efx_draw(const float* bbRight, const float* bbUp)
         /* Legacy: one textured billboard per anim. See efx_draw_tex's header -- this
            is what runs when the pool has no engine-tick clock. */
         glEnable(GL_TEXTURE_2D);
+        const bool legacyGrade=efx_grade_begin(true);
         for (size_t i = 0; i < g_efxAnims.size(); i++) {
             const EfxAnim& a = g_efxAnims[i];
             if (efx_hidden(a.wx, a.wz))
@@ -2701,6 +2992,7 @@ static void efx_draw(const float* bbRight, const float* bbUp)
             }
         }
         glDisable(GL_TEXTURE_2D);
+        if (legacyGrade) fx_glUseProgram(0);
     } else {
         for (size_t i = 0; i < g_efxAnims.size(); i++) {
             const EfxAnim& a = g_efxAnims[i];
@@ -2710,6 +3002,8 @@ static void efx_draw(const float* bbRight, const float* bbUp)
     }
 
     /* Additive pass: sparks, muzzle flashes, explosion cores, fire. */
+    const bool procGrade=efx_grade_begin(false);
+    g_efxMeshGrade=procGrade;
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glBegin(GL_QUADS);
     for (size_t i = 0; i < leftovers.size(); i++) {
@@ -2772,7 +3066,7 @@ static void efx_draw(const float* bbRight, const float* bbUp)
        (they need draw_mesh and g_pack, which this header predates). A bullet name
        with no model in the pack falls back to the old procedural dart, loudly once,
        so an unexpected projectile is visible rather than missing. */
-    for (size_t i = 0; i < g_efxBullets.size(); i++) {
+    for (size_t i = 0; g_efxDrawBullets && i < g_efxBullets.size(); i++) {
         const EfxBullet& b = g_efxBullets[i];
         if (b.invis)
             continue;                 /* 50cal etc: the N64 table says -1, never drawn */
@@ -2842,6 +3136,8 @@ static void efx_draw(const float* bbRight, const float* bbUp)
     }
     glEnd();
 
+    g_efxMeshGrade=false;
+    if (procGrade) fx_glUseProgram(0);
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
     glColor3f(1.0f, 1.0f, 1.0f);
@@ -2860,9 +3156,9 @@ static void efx_dump(void)
     for (size_t i = 0; i < g_efxAnims.size(); i++) {
         const EfxAnim& a = g_efxAnims[i];
         printf("EFXDUMP|ANIM|%s|id=%d|type=%d|cell=%.1f,%.1f|stage=%d/%d|loops=%d|"
-               "attref=%d|owner=%d|class=%d|biggest=%d\n",
+               "attref=%d|owner=%d|class=%d|biggest=%d|etype=%d|attkind=%d\n",
                a.name, a.id, a.type, a.wx, a.wz, a.stage, a.stages, a.loops,
-               a.attref, a.owner, (int)efx_classify(a.name), a.biggest);
+               a.attref, a.owner, (int)efx_classify(a.name), a.biggest, a.etype, a.attkind);
     }
     /* The art-less anims the renderer is still clocking after the engine dropped them.
        stage=k/biggest here is SYNTHETIC (frame - bornFrame); the engine's own stage on
@@ -2880,9 +3176,16 @@ static void efx_dump(void)
        long axis along the travel, 0 means the console's upright box. */
     for (size_t i = 0; i < g_efxBullets.size(); i++) {
         const EfxBullet& b = g_efxBullets[i];
-        printf("EFXDUMP|BULLET|%s|id=%d|cell=%.1f,%.1f|face=%d|alt=%d|invis=%d|flat=%d\n",
+        /* (img= only from a brain that names the picture apart: Tiberian Dawn's line is
+           matched to its end by gates) */
+        printf("EFXDUMP|BULLET|%s|id=%d|cell=%.1f,%.1f|face=%d|alt=%d|invis=%d|flat=%d%s%s\n",
                b.name, b.id, b.wx, b.wz, b.face, b.alt, b.invis,
-               efx_bullet_lays_flat(b.name) ? 1 : 0);
+               efx_bullet_lays_flat(b.name) ? 1 : 0, strcmp(b.img, "?") ? "|img=" : "",
+               strcmp(b.img, "?") ? b.img : "");
+        /* a shot from the air is drawn off the engine's point (efx_air_shots): both */
+        if (b.wx != b.ewx || b.wz != b.ewz)
+            printf("EFXDUMP|AIRSHOT|%s|id=%d|engine=%.2f,%.2f|drawn=%.2f,%.2f|lift=%.3f\n",
+                   b.name, b.id, b.ewx, b.ewz, b.wx, b.wz, efx_bullet_lift(b));
     }
     for (size_t i = 0; i < g_efxDying.size(); i++) {
         const EfxDying& d = g_efxDying[i];
@@ -2968,6 +3271,10 @@ static void efx_dump(void)
     for (std::map<std::string, int>::const_iterator it = g_efxNoRecipe.begin();
          it != g_efxNoRecipe.end(); ++it)
         printf("EFXNOREC|%s|no cartridge counterpart|ticks=%d\n",
+               it->first.c_str(), it->second);
+    for (std::map<std::string, int>::const_iterator it = g_efxHostDrawn.begin();
+         it != g_efxHostDrawn.end(); ++it)
+        printf("EFXHOST|%s|drawn by the host as its own picture|ticks=%d\n",
                it->first.c_str(), it->second);
     /* The per-particle listing rides the existing verb rather than a new one, so a
        gate can prove motion and determinism with the script vocabulary that is

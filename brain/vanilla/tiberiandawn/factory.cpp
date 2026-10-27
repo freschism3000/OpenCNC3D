@@ -23,6 +23,10 @@
 // and NOTICE.md lists every modified file.
 //
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Enforces paid, current-prerequisite skirmish production and the normal shared category queue.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\factory.cpv   2.18   16 Oct 1995 16:51:26   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***              C O N F I D E N T I A L  ---  W E S T W O O D  S T U D I O S               ***
@@ -242,7 +246,7 @@ void FactoryClass::AI(void)
         **	units on a building by building basis -- quantity of building
         **	factory types doesn't affect individual factories.
         */
-        if (Object && House->IsHuman) {
+        if (Object && (House->IsHuman || GameToPlay != GAME_NORMAL)) {
             switch (Object->What_Am_I()) {
             case RTTI_AIRCRAFT:
                 stages = House->AircraftFactories;

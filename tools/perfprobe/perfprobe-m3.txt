@@ -1,0 +1,9 @@
+echo PROBE|m3|v4
+gfxsave perfprobe-fx.cfg
+tick 30
+echo SECTION|baseline
+framebench 60
+framebench 300
+meshperfdump
+echo PROBE|m3|done
+quit

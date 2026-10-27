@@ -1,0 +1,63 @@
+--- a/game/cnc_eyes.cpp
++++ b/game/cnc_eyes.cpp
+@@ -13768,0 +13769,2 @@
++static void mesh_range_modes_clear(void);
++static void mesh_range_modes_dump(void);
+@@ -13769,0 +13772,49 @@
++
++/* PRIVATE RESEARCH PROTOTYPE: subrange pass membership is immutable between pack
++   generations. Unlike a rendered batch, it depends on no time, camera or shroud.
++   Preserve the anchor/yaw witnesses, then avoid walking a range with no triangles
++   in this pass. Editors retain the original path. */
++struct MeshRangeModesKey {
++    const PackTri* tris;
++    size_t count, first, last;
++    bool operator==(const MeshRangeModesKey& b) const {
++        return tris==b.tris && count==b.count && first==b.first && last==b.last;
++    }
++};
++struct MeshRangeModesHash {
++    size_t operator()(const MeshRangeModesKey& k) const {
++        size_t h=std::hash<const void*>()(k.tris);
++        h ^= k.count+0x9e3779b9u+(h<<6)+(h>>2);
++        h ^= k.first+0x9e3779b9u+(h<<6)+(h>>2);
++        h ^= k.last+0x9e3779b9u+(h<<6)+(h>>2);
++        return h;
++    }
++};
++static std::unordered_map<MeshRangeModesKey,unsigned,MeshRangeModesHash> g_meshRangeModes;
++static unsigned g_meshRangeModesGen=~0u;
++static unsigned long g_meshRangeModesHits=0,g_meshRangeModesMisses=0,g_meshRangeModesSkipped=0;
++static void mesh_range_modes_clear(void) {
++    g_meshRangeModes.clear();g_meshRangeModesGen=~0u;
++}
++static bool mesh_range_modes_absent(const std::vector<PackTri>& tris,size_t first,size_t last,int pass) {
++    if(g_meshBatchEditor || pass<0 || pass>=32 || !mesh_perf_switch("OPENCNC3D_RANGE_MODES"))return false;
++    if(g_meshRangeModesGen!=g_groundGen) {
++        g_meshRangeModes.clear();g_meshRangeModesGen=g_groundGen;
++    }
++    if(first==0 && last==tris.size())return false; /* whole-mesh modeMask already answered */
++    const MeshRangeModesKey key={tris.data(),tris.size(),first,last};
++    auto found=g_meshRangeModes.find(key);
++    unsigned mask=0;
++    if(found!=g_meshRangeModes.end()) {mask=found->second;g_meshRangeModesHits++;}
++    else {
++        g_meshRangeModesMisses++;
++        for(size_t i=first;i<last;i++)if(tris[i].mode<32)mask|=1u<<tris[i].mode;
++        if(g_meshRangeModes.size()<8192)g_meshRangeModes.emplace(key,mask);
++    }
++    if(!(mask&(1u<<pass))) {g_meshRangeModesSkipped++;return true;}
++    return false;
++}
++static void mesh_range_modes_dump(void) {
++    printf("RANGEMODES|hits=%lu|misses=%lu|skipped=%lu|entries=%zu|cap=8192\n",
++      g_meshRangeModesHits,g_meshRangeModesMisses,g_meshRangeModesSkipped,g_meshRangeModes.size());
++}
+@@ -13882,0 +13934 @@
++    if (mesh_range_modes_absent(tris,triFirst,tri_limit,pass)) return;
+--- a/game/mesh_batch.h
++++ b/game/mesh_batch.h
+@@ -204,0 +205 @@
++    mesh_range_modes_clear();
+@@ -695,0 +697 @@
++    mesh_range_modes_dump();

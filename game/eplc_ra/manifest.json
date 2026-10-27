@@ -1,0 +1,828 @@
+{
+ "what": "Red Alert's structure placements under Enhanced, carried onto the building as the game draws it (turned and sized on its plot) by tools/ra3d/bake-placements.py; EPLC files, layout in tools/art/remaster/bake_eplc.py",
+ "models": {
+  "AFLD": {
+   "file": "AFLD.eplc",
+   "bytes": 139636,
+   "sha256": "16df4f82c676f1f28a92e1552d45934aea50eed0362aae793671cba75f0279ef",
+   "export": "build-native/remaster-ra/AFLD/viewer",
+   "sources": {
+    "AFLD/viewer/place_AFLD.json": "6ea123401e1f927287b40b53144e7c31f455f7192a11a49474dd1a159b0ca46f",
+    "AFLD/viewer/remaster.json": "a61966786ea6e54ba9e41aff36f603918e6f002ae9150cf4fde364ac3f5c70e8"
+   },
+   "rigs": 1,
+   "triangles": 2472,
+   "seconds": 3.64,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    96,
+    71,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.91,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "AGUN": {
+   "file": "AGUN.eplc",
+   "bytes": 88008,
+   "sha256": "f9c2f983c54e3529a290efbb4abe87bec4ff69b573ee0b2f2821476771a2a89d",
+   "export": "build-native/remaster-ra/AGUN/viewer",
+   "sources": {
+    "AGUN/viewer/place_AGUN.json": "c205293757a572015a4f204bdfcf0ca1f98b4c11ecab3c2e964e8054cef2b54a",
+    "AGUN/viewer/remaster.json": "99ac875f08f4f1c1e7880355e9b64452739f0f64e6ce2e284e0f2a909d0c5882"
+   },
+   "rigs": 1,
+   "triangles": 2866,
+   "seconds": 3.7,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    30,
+    30,
+    32,
+    32
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.775,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "APWR": {
+   "file": "APWR.eplc",
+   "bytes": 115148,
+   "sha256": "b062a87e11e5c278ba7274375841f78843340641b3aa1b100342c902829fda1c",
+   "export": "build-native/remaster-ra/APWR/viewer",
+   "sources": {
+    "APWR/viewer/place_APWR.json": "cec58f070f3ff9070275a39ef7593fc2de4ffc98ec98609ff61d9a9f1c8087d0",
+    "APWR/viewer/remaster.json": "7874b22a599c0e6387dc9c2cf6a94782ed09cf716b967c521208e225e2386733"
+   },
+   "rigs": 1,
+   "triangles": 1590,
+   "seconds": 3.65,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    109,
+    90,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -23.0,
+    "scale": 1.0,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "ATEK": {
+   "file": "ATEK.eplc",
+   "bytes": 111144,
+   "sha256": "744367e5216e259247ad8c3f2bc6a6e652a6eb9377001bf4de92518677348018",
+   "export": "build-native/remaster-ra/ATEK/viewer",
+   "sources": {
+    "ATEK/viewer/place_ATEK.json": "62a4fe28a19e9fc194614f5aa2ce72c5cf5db47d36821690e28ee36ec523e4bd",
+    "ATEK/viewer/remaster.json": "d461cf6e17e8ee8fba8c5bfdaad0ce55bf89c6dfdc79ea5cc3ff7158c23fe00a"
+   },
+   "rigs": 1,
+   "triangles": 1144,
+   "seconds": 3.6,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    81,
+    80,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -40.0,
+    "scale": 0.935,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "BARR": {
+   "file": "BARR.eplc",
+   "bytes": 130096,
+   "sha256": "34515fd75e523bb1f0aaf5babc92f4cd33222f428908abd988b9b2ee9a0c7642",
+   "export": "build-native/remaster-ra/BARR/viewer",
+   "sources": {
+    "BARR/viewer/place_BARR.json": "5cf05bd46aa45f70b832eca2999c8d071dc0fb2547554116f81440b0262721bd",
+    "BARR/viewer/remaster.json": "fdd51ed0d1b62982a439ee84c4d5fa5275ac9a3d6cb97f5832f3f3e85866fba7"
+   },
+   "rigs": 1,
+   "triangles": 1924,
+   "seconds": 2.95,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    81,
+    83,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -43.0,
+    "scale": 1.0,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "DOME": {
+   "file": "DOME.eplc",
+   "bytes": 103960,
+   "sha256": "1dce55de7694c88aa154c7643a47b6e43f2d14e8846671d141857f56d73bb473",
+   "export": "build-native/remaster-ra/DOME/viewer",
+   "sources": {
+    "DOME/viewer/place_DOME.json": "b219dbddf2751a0a404881c7dff531dddf7867b6de01b16478e9090b63ee32ef",
+    "DOME/viewer/remaster.json": "f0edb4d438c162e3255aa89bd271c4d7e96d2a85214282b61312eab91683515b"
+   },
+   "rigs": 1,
+   "triangles": 1106,
+   "seconds": 3.6,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    69,
+    69,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -22.0,
+    "scale": 1.0,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "FACT": {
+   "file": "FACT.eplc",
+   "bytes": 275196,
+   "sha256": "d5575a0583856586eec2061cc34546e97c6556734fe96def7746e1d45d74f31c",
+   "export": "build-native/remaster-ra/FACT/viewer",
+   "sources": {
+    "FACT/viewer/place_FACT.json": "fb2e76217d3f61401eb6f96ab03856bebfb8b813a904024078ed4330fb83492a",
+    "FACT/viewer/remaster.json": "4b8d48c241070212eb6704d394c2da0a391212963f4031bf340823361aeaec27",
+    "vehicles/MCV/viewer/remaster.json": "5da1f4e6fd57884339d7190ce91c7167b4d91f8687712f5ebde4344924ea8d07"
+   },
+   "rigs": 1,
+   "triangles": 3291,
+   "seconds": 3.9,
+   "companion": 3848,
+   "templates": 6,
+   "ring": [
+    98,
+    111,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -37.0,
+    "scale": 0.803,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "companion_model": "MCV",
+   "companion_travel": {
+    "mcv_gantry": [
+     0.5,
+     1.7
+    ],
+    "mcv_drum": [
+     1.05,
+     2.4
+    ]
+   },
+   "placement": "approved"
+  },
+  "FCOM": {
+   "file": "FCOM.eplc",
+   "bytes": 44292,
+   "sha256": "9c7ed3d3f3e42395b9538c5b6f28ca611160b8abdad8909da906281f5d1a33ec",
+   "export": "build-native/remaster-ra/FCOM/viewer",
+   "sources": {
+    "FCOM/viewer/place_FCOM.json": "a25026177b466229e89dc690d0e59a1cfa9df1bd3aa619043cbfcee6520d6178",
+    "FCOM/viewer/remaster.json": "b6f9d9b37a477ec86f7f9bef0aef41f643eb433294414783d91445649f15c3fa"
+   },
+   "rigs": 1,
+   "triangles": 718,
+   "seconds": 3.55,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    63,
+    57,
+    64,
+    64
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -30.0,
+    "scale": 1.0,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "FIX": {
+   "file": "FIX.eplc",
+   "bytes": 33696,
+   "sha256": "c09c5177a5a8990094941787f9ddea201f4aac641de37e655eabd2a7aa1ee8f8",
+   "export": "build-native/remaster-ra/FIX/viewer",
+   "sources": {
+    "FIX/viewer/place_FIX.json": "9f2bee9b49c42cb541ec4620b58bb0a1ee5022b105855900aaffc35bf5ae86db",
+    "FIX/viewer/remaster.json": "3fb18887bcbe2c6305790f82a4db71117f54dd6c637e8534e085d31b38dd6abb"
+   },
+   "rigs": 1,
+   "triangles": 250,
+   "seconds": 2.99,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    61,
+    61,
+    64,
+    64
+   ],
+   "commit": "d0fc6a9c3532cd4ca73a94f4b94ca83a260ca255",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "a4477ec8b7cdc51875ecab9e2024549267ea4281",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.564,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "FTUR": {
+   "file": "FTUR.eplc",
+   "bytes": 76884,
+   "sha256": "b5e540ef466f5a904b9c225c2e005aed10aa7b520f7fa1ec7ff150b1fb268121",
+   "export": "build-native/remaster-ra/FTUR/viewer",
+   "sources": {
+    "FTUR/viewer/place_FTUR.json": "0222b98a6500a66768eb9749ccf61957d6f8cf9f91124094e384babd492f7c92",
+    "FTUR/viewer/remaster.json": "1a31a0a61f34b79f73e66d660492704eb8aa1494a59085c71a5f065561b1645f"
+   },
+   "rigs": 1,
+   "triangles": 1936,
+   "seconds": 3.55,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    35,
+    35,
+    64,
+    64
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.925,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "GAP": {
+   "file": "GAP.eplc",
+   "bytes": 94064,
+   "sha256": "82626a68e268a44c26a1ea201f773b99c7363d7036da8f84afb105b85b6e0ed0",
+   "export": "build-native/remaster-ra/GAP/viewer",
+   "sources": {
+    "GAP/viewer/place_GAP.json": "0fec7b14cdd19b9c8f6bba5f868b27040962a9fd9ae44b13f0e337fcefcb20e0",
+    "GAP/viewer/remaster.json": "43fcfdc456e9e4025e43349c10b5b3f6b70eefdc95054f6d95c911006e58e985"
+   },
+   "rigs": 1,
+   "triangles": 3038,
+   "seconds": 3.5,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    27,
+    27,
+    32,
+    32
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "version": 2,
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.795,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "HBOX": {
+   "file": "HBOX.eplc",
+   "bytes": 53976,
+   "sha256": "0a086b95c78c5625b5c922ccd60fb1a30666826b7fdfa9196a7ae85d7c2e43c2",
+   "export": "build-native/remaster-ra/HBOX/viewer",
+   "sources": {
+    "HBOX/viewer/place_HBOX.json": "7c4c1f2ce9b26aa44b1bff9e79164d3363c22eaa4164f93eda1d131e099f34a9",
+    "HBOX/viewer/remaster.json": "27e35856a193d4b94bd8c4b80f920b31ca54c0807a6edbb9a1d25530bb852d5d"
+   },
+   "rigs": 1,
+   "triangles": 1494,
+   "seconds": 3.15,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    32,
+    30,
+    32,
+    32
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.8,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "IRON": {
+   "file": "IRON.eplc",
+   "bytes": 183384,
+   "sha256": "371bc40a677959602e8beb2cc277516ef757e2283bdf73134574cf1ecb8ebc0c",
+   "export": "build-native/remaster-ra/IRON/viewer",
+   "sources": {
+    "IRON/viewer/place_IRON.json": "8eec91fdb2c7673544061cf1f7236d866779f7143841d1b34ea194776e8f8755",
+    "IRON/viewer/remaster.json": "aa0266bf1dd190f37d0bfa82e64001daee32f5b6982520a06d4d4ca5cd2afc66"
+   },
+   "rigs": 1,
+   "triangles": 5706,
+   "seconds": 3.7,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    52,
+    55,
+    64,
+    64
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 22.0,
+    "scale": 0.929,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "KENN": {
+   "file": "KENN.eplc",
+   "bytes": 31360,
+   "sha256": "cb27afde960b5e4e86568233fa52bb1785c6eead1fa815e0918f6a618d9465d5",
+   "export": "build-native/remaster-ra/KENN/viewer",
+   "sources": {
+    "KENN/viewer/place_KENN.json": "4b2412bc4aae1dcce0f614a294a7841cae3453d8f6bc99e10951f81262d0e52f",
+    "KENN/viewer/remaster.json": "92ee9060bf29206e66c8e405e15d1e0b51d293b445c19eeaf808a7f872529430"
+   },
+   "rigs": 1,
+   "triangles": 394,
+   "seconds": 2.6,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    35,
+    35,
+    64,
+    64
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -50.0,
+    "scale": 0.775,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "MSLO": {
+   "file": "MSLO.eplc",
+   "bytes": 72924,
+   "sha256": "5f3032bbc191bed034d77ef28e35300c8571de0c79242e3f1c45943cc892db9c",
+   "export": "build-native/remaster-ra/MSLO/viewer",
+   "sources": {
+    "MSLO/viewer/place_MSLO.json": "902e85243d0c8b379a782e9fb3766bf3a62b2a328c9e89ab4e69804f284094ce",
+    "MSLO/viewer/remaster.json": "76e437d979ef37492c9e6e83f2af4c3003c5c991cdd92439f56d8749b46e334a"
+   },
+   "rigs": 1,
+   "triangles": 1130,
+   "seconds": 3.9,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    65,
+    38,
+    128,
+    64
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.925,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "PBOX": {
+   "file": "PBOX.eplc",
+   "bytes": 31088,
+   "sha256": "cd921bab3960f8ebe99ab07af4df6a5f685c7e3cc2287ff088d19b3e60caa9d0",
+   "export": "build-native/remaster-ra/PBOX/viewer",
+   "sources": {
+    "PBOX/viewer/place_PBOX.json": "b1daf5cea57614b6c3ce677eccbfc6a853d54fec88ecd55466acba375c422086",
+    "PBOX/viewer/remaster.json": "09c7bf26de8ef479e4b320c8a51b2a5dc637355ea68752892a8f9e9b22971541"
+   },
+   "rigs": 1,
+   "triangles": 704,
+   "seconds": 3.75,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    31,
+    31,
+    32,
+    32
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.825,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "PDOX": {
+   "file": "PDOX.eplc",
+   "bytes": 191076,
+   "sha256": "a97b622f549302e7be941b8b68270325946faf19bc50c0c4bea4f89d7c1a6aef",
+   "export": "build-native/remaster-ra/PDOX/viewer",
+   "sources": {
+    "PDOX/viewer/place_PDOX.json": "c08645e622650baa1a9c7feafe73084984ed7332cf19f85c82db50ca87c49f93",
+    "PDOX/viewer/remaster.json": "b733b71b7997d4545b3a73fb071abbefa892390cd187a6350126631e50ffec6c"
+   },
+   "rigs": 1,
+   "triangles": 4167,
+   "seconds": 3.4,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    74,
+    80,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -45.0,
+    "scale": 0.979,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "POWR": {
+   "file": "POWR.eplc",
+   "bytes": 103624,
+   "sha256": "275aa7655494d389a79748eae2d3d6db8ee5482fa77fa980e79dafbb745d2813",
+   "export": "build-native/remaster-ra/POWR/viewer",
+   "sources": {
+    "POWR/viewer/place_POWR.json": "3fa635707d0e2e1ad4c02d95d708925fb2faf116d25eae64a0ce702a1a641cc6",
+    "POWR/viewer/remaster.json": "4ec84f909dea4438c133668dd05a82cf850264fc0a9c25ae11fe87615c8015c6"
+   },
+   "rigs": 1,
+   "triangles": 1145,
+   "seconds": 3.45,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    66,
+    74,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 65.0,
+    "scale": 0.886,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "PROC": {
+   "file": "PROC.eplc",
+   "bytes": 124304,
+   "sha256": "0a4b7b89f748b302868a99209965eab24d3cda51f9f153c3a3c9930cfbc8ee9e",
+   "export": "build-native/remaster-ra/PROC/viewer",
+   "sources": {
+    "PROC/viewer/place_PROC.json": "8af431311f93c4dbbc0769778fc6b80f3de8a3ba948d441793e333448c0b425d",
+    "PROC/viewer/remaster.json": "226a43dfcb72ac44515c1bfc4adc10e67fc0f9f3f6a5e0ea70b05651e5588637"
+   },
+   "rigs": 1,
+   "triangles": 1778,
+   "seconds": 3.85,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    91,
+    91,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.855,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "SAM": {
+   "file": "SAM.eplc",
+   "bytes": 85032,
+   "sha256": "f6e8a4225d9e51425e7f6f6e692343c324cb8dc5ab4d6663243f2cad716c25b9",
+   "export": "build-native/remaster-ra/SAM/viewer",
+   "sources": {
+    "SAM/viewer/place_SAM.json": "5cfb6a41b285fd98debc5bb75d8d125c616343aaf0cedecbc41796e216a1d4c0",
+    "SAM/viewer/remaster.json": "594c6142469aa2c1522d4b63f86d1a4ce96c235457e4148de3e5e2f9614a337e"
+   },
+   "rigs": 1,
+   "triangles": 2520,
+   "seconds": 3.75,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    44,
+    25,
+    64,
+    32
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.593,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "SILO": {
+   "file": "SILO.eplc",
+   "bytes": 72700,
+   "sha256": "ed953df919e32ea56b45bb8ecbdd50efecc19f30bc7b31fea9da79952d6700d7",
+   "export": "build-native/remaster-ra/SILO/viewer",
+   "sources": {
+    "SILO/viewer/place_SILO.json": "e184e33a07e84a0b07a7b65f23d059e87d82d7c2b969128600f8ac7223d8ca5f",
+    "SILO/viewer/remaster.json": "529027d930fb5212f14900c2b41a491e6aa78f86103eb241473f0ab27db085fb"
+   },
+   "rigs": 1,
+   "triangles": 1834,
+   "seconds": 3.45,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    34,
+    33,
+    64,
+    64
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -47.0,
+    "scale": 0.94,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "SPEN": {
+   "file": "SPEN.eplc",
+   "bytes": 117884,
+   "sha256": "a7300a1972d27b4a036e5b8d63418c63a55250f1ef64c65a55d874ee7ac47c3f",
+   "export": "build-native/remaster-ra/SPEN/viewer",
+   "sources": {
+    "SPEN/viewer/place_SPEN.json": "e4140053122ce4f53f0f334b259d9b076dca562ff6519b596ecee6c1828d433c",
+    "SPEN/viewer/remaster.json": "9e6ae0c5522784bda28617bf80b1347a059cefa4c8070f340ec0b7b2dc3ffca8"
+   },
+   "rigs": 1,
+   "triangles": 1430,
+   "seconds": 2.98,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    109,
+    109,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -45.0,
+    "scale": 0.859,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "STEK": {
+   "file": "STEK.eplc",
+   "bytes": 135384,
+   "sha256": "c5fa66c53832e45de36f2495c1999b4afe5b5794454bb75888734f1fcbe6a9b9",
+   "export": "build-native/remaster-ra/STEK/viewer",
+   "sources": {
+    "STEK/viewer/place_STEK.json": "8de9d908ae4017e6772edaaf1fde692b0be340ae44f0cfe40211ecb5b841583c",
+    "STEK/viewer/remaster.json": "71d1bddb38eb9a81ee4d3f9ecf15a01c87589f93c4465316066eae4b510eac7b"
+   },
+   "rigs": 1,
+   "triangles": 2052,
+   "seconds": 3.5,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    90,
+    89,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -43.0,
+    "scale": 0.825,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "SYRD": {
+   "file": "SYRD.eplc",
+   "bytes": 163820,
+   "sha256": "b124efa704ab5c8fd9830c66b9ceaa8feca0d9a0843cc99f1f54b48afeef46fc",
+   "export": "build-native/remaster-ra/SYRD/viewer",
+   "sources": {
+    "SYRD/viewer/place_SYRD.json": "10ca73f2de4fdf7b05627b21ac209ad98c0ef67a77af54046720d07af40c2017",
+    "SYRD/viewer/remaster.json": "1686c9e5412ae3a1e0c2b6c5b20c991d3c37653746212cc4cf9868ec920a4e42"
+   },
+   "rigs": 1,
+   "triangles": 3081,
+   "seconds": 3.1,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    119,
+    119,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 45.0,
+    "scale": 0.931,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "TENT": {
+   "file": "TENT.eplc",
+   "bytes": 191900,
+   "sha256": "51705b61dda8aabbefcc1600f3d720728503256631206c93bde0c88a973acf10",
+   "export": "build-native/remaster-ra/TENT/viewer",
+   "sources": {
+    "TENT/viewer/place_TENT.json": "f00277ad7676ec2ffa7611cce15fb74ee5aa64539f11588cc7573a0ec1851ffa",
+    "TENT/viewer/remaster.json": "6d8094ffbeb1b119b8003bc38a48aeafb31c6579df527224945dc03393eeb5dc"
+   },
+   "rigs": 1,
+   "triangles": 3686,
+   "seconds": 3.55,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    79,
+    79,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -55.0,
+    "scale": 1.0,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "TSLA": {
+   "file": "TSLA.eplc",
+   "bytes": 188924,
+   "sha256": "63a616c370af90b16f346bedbb6e26c665cc73187be3c8b89517e3fbbf0f8c49",
+   "export": "build-native/remaster-ra/TSLA/viewer",
+   "sources": {
+    "TSLA/viewer/place_TSLA.json": "31683c2f7a2f980adc15d978425fe99925212410e27e4d5acc8c6ab6d73ad20b",
+    "TSLA/viewer/remaster.json": "82ec06811393d33c4eae4804ecb4ba12f3e17b37ca1cc2737c22328c00375199"
+   },
+   "rigs": 1,
+   "triangles": 6518,
+   "seconds": 2.36,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    27,
+    27,
+    32,
+    32
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": 0.0,
+    "scale": 0.87,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  },
+  "WEAP": {
+   "file": "WEAP.eplc",
+   "bytes": 127688,
+   "sha256": "1b41afff5cfd28f797307dfb63bb68ee3ce60c17baf603b1f7d01de611b392ae",
+   "export": "build-native/remaster-ra/WEAP/viewer",
+   "sources": {
+    "WEAP/viewer/place_WEAP.json": "d23df9685a56a77d30aeddb77a4540312fe103f919e40b6c005d86106d3c896e",
+    "WEAP/viewer/remaster.json": "dc215a741962a3a5073ae4eaad44aa9e6070c6cb90dfce2ee3f7a9b916af81d9"
+   },
+   "rigs": 1,
+   "triangles": 1890,
+   "seconds": 3.75,
+   "companion": 0,
+   "templates": 6,
+   "ring": [
+    101,
+    81,
+    128,
+    128
+   ],
+   "commit": "31220b0d5884ca4117de46ee4c3b48923ea0ae44",
+   "baker": "tools/ra3d/bake-placements.py (tools/art/remaster/bake_eplc.py)",
+   "baker_commit": "ab8ebc18b390ef6239f2ca7e3bb38ba7d8cbcbb4",
+   "plot": {
+    "yaw": -13.0,
+    "scale": 0.855,
+    "source": "tools/ra3d/structure-inputs.json"
+   },
+   "placement": "approved"
+  }
+ }
+}

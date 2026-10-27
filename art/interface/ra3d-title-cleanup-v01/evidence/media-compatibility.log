@@ -1,0 +1,6 @@
+MMOD|ok|the shipped manifest: 95 Red Alert files under the module line, 1 of them with a head; Setup's movies figure is 449271208 bytes without the module and 1109256082 with it
+MMOD|ok|without the Red Alert module the download fetched Tiberian Dawn's movie and nothing of Red Alert's (no ra3d/ folder, no request to its disc), and recorded both boxes complete
+MMOD|ok|with the module installed the same run fetched Red Alert's movie and its score, the score the pinned 258-byte head and then the disc's range, every file matching its SHA-256, and left no part file
+MMOD|ok|unticked, Red Alert's movie and score went with Tiberian Dawn's, and the module's own files are as they were
+MMOD|ok|the control: a manifest with Red Alert's files and no module line is refused (exit 1), naming the first, and nothing was fetched
+MMOD|end|0 failures

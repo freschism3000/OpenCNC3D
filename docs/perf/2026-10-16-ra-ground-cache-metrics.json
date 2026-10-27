@@ -1,0 +1,31 @@
+{
+ "date": "2026-10-16",
+ "subject": "Red Alert's ground kept on the GPU (game/ra3d_terrain.h), old renderer (main 4b7958ea7) against new, same play folder, same staged Red Alert module",
+ "machine": "Apple M5 Max, 40 GPU cores, 64 GB RAM",
+ "size": [2560, 1440],
+ "settings_sha256": "a6fd56f99f92d5b20f8e7ec795b23a5dfcdc1d9bcadc5166a5cbc307e0e7ff96",
+ "settings_note": "a player's saved Enhanced settings (texset 3, water_fx 1, shadow_res 4096), vsync off, stats off; hidden window",
+ "method": "Each run: frameperf 1 as the mission's first draw (the cold first frame), tick 5, the camera, then livebench 16 (the real tick/present loop; FRAMEPROF every 5 s, the first window dropped) and framebench 240. Old and new alternated, three rounds of four missions. FRAMEPROF is CPU submission and wall time, not GPU time (this GL has no timer queries). The machine had other work running (load average 3 to 8), so the frame times move between windows by up to 1 ms; the section times move far less. The ore is left out (OPENCNC3D_RA3DORE=off) as the pixel gates leave it out.",
+ "sections": "Old: the whole Red Alert ground pass is one section, 'terrain' (floor, sea surface, ground, strips, coast). New: 'seabed' is the floor, 'water' the sea surface (water_mod.h, still immediate mode, shared with Tiberian Dawn), 'terrain' the ground, its strips and the coast. 'post: ground normals' includes other objects' normals as well as the ground's.",
+ "steady_live_frame_ms_median": {
+  "SCG05EA Allied 5, temperate, cam 58,60, no shroud": {"old": 5.94, "new": 5.40},
+  "SCG01EA Allied 1, snow, cam 54,56, no shroud": {"old": 4.02, "new": 3.93},
+  "SCU11EA Soviet 11, snow, naval, start view, no shroud": {"old": 5.02, "new": 4.82},
+  "SCU02EA Soviet 2, temperate, start view, shroud on": {"old": 4.99, "new": 4.81}
+ },
+ "ground_section_cpu_ms_median": {
+  "SCG05EA": {"old_terrain": 0.75, "new_seabed": 0.05, "new_water": 0.21, "new_terrain": 0.07, "new_total": 0.33},
+  "SCG01EA": {"old_terrain": 0.35, "new_seabed": 0.04, "new_water": 0.15, "new_terrain": 0.04, "new_total": 0.23},
+  "SCU11EA": {"old_terrain": 1.02, "new_seabed": 0.05, "new_water": 0.17, "new_terrain": 0.11, "new_total": 0.33},
+  "SCU02EA": {"old_terrain": 0.71, "new_seabed": 0.04, "new_water": 0.18, "new_terrain": 0.07, "new_total": 0.29}
+ },
+ "cold_first_frame_ms_median_of_3": {
+  "SCG05EA": {"old": 1594, "new": 1336, "sheet_old": 308, "sheet_new": 151, "buffers_built_new": 1.9},
+  "SCG01EA": {"old": 1559, "new": 1312, "sheet_old": 311, "sheet_new": 83, "buffers_built_new": 0.6},
+  "SCU11EA": {"old": 1387, "new": 1286, "sheet_old": 314, "sheet_new": 203, "buffers_built_new": 7.0},
+  "SCU02EA": {"old": 1283, "new": 1151, "sheet_old": 277, "sheet_new": 141, "buffers_built_new": 0.9}
+ },
+ "cold_first_frame_note": "The sheet now gives the sea's soft coast only to the wet slots the map draws (58 to 383 of about 745). What else the first frame spends, estimated from the first FRAMEPROF window against the next on the old renderer: the sun shadow map 100 to 600 ms by mission (not traced here; the ground's depth in that pass was already a static buffer), and the sea's first field and shaders about 440 ms (water_mod.h).",
+ "gpu_store_mb": {"SCG01EA": 1.4, "SCU02EA": 2.3, "SCG05EA": 4.7, "SCU11EA": 16.8},
+ "pictures": "Every Enhanced picture compared old against new at tick 0 is byte-identical: 42 shots over Allied 1, Allied 5, Soviet 2, Soviet 11 (snow and temperate, the shroud on and off, its light switched, the rim, the dark pass, the hard shroud, the sea off and on, the 1995 set at boot and switched to at run time, zoomed in and out) and Allied 13 and Soviet 7 (interior). Classic differs only in its ore field, which two runs of the old renderer also draw differently. Tiberian Dawn: 27 shots (GDI 1, Nod 2, GDI 10; Enhanced, Enhanced on the 1995 art, Classic; tick 0 and tick 30) byte-identical."
+}

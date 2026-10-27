@@ -434,11 +434,12 @@ int sk_row_mode(const SK_State *st, int seat)
 {
     if (!st || seat < 0 || seat >= SK_ROSTER_ROWS)
         return SK_SEAT_BLOCK;
-    /* A SKIRMISH: seat 0 is the human and every other seat a computer unless the player
-     * BLOCKed it through its SEAT row. OPEN is not a skirmish answer. */
+    /* A skirmish has one human; Empty and Blocked seats contain no opponent.
+     * A network Empty seat remains available for somebody to join. */
     if (!st->net)
         return seat == 0 ? SK_SEAT_HUMAN
-             : (st->mode[seat] == SK_SEAT_BLOCK ? SK_SEAT_BLOCK : SK_SEAT_BOT);
+             : (st->mode[seat] == SK_SEAT_OPEN || st->mode[seat] == SK_SEAT_BLOCK
+                    ? st->mode[seat] : SK_SEAT_BOT);
     if (seat == 0 || st->net_taken[seat])
         return SK_SEAT_HUMAN;
     if (st->mode[seat] == SK_SEAT_BOT || st->mode[seat] == SK_SEAT_BLOCK)
@@ -562,13 +563,14 @@ static int sk_set_row_start(SK_State *st, int seat, int start)
     return 1;
 }
 
-/* THE SEATS THAT WILL PLAY: everything in the roster that is not blocked. It is what the
- * map has to have starts for, and what START counts. */
+/* Network capacity includes joinable Empty seats. Offline Empty seats are unused
+ * and do not satisfy the two-player minimum. */
 static int sk_active_seats(const SK_State *st)
 {
     int i, n = 0, players = sk_players(st);
     for (i = 0; i < players; i++)
-        if (sk_row_mode(st, i) != SK_SEAT_BLOCK)
+        if (sk_row_mode(st, i) != SK_SEAT_BLOCK
+            && (st->net || sk_row_mode(st, i) != SK_SEAT_OPEN))
             n++;
     return n;
 }
@@ -641,6 +643,86 @@ static int sk_set_row_colour(SK_State *st, int seat, int c)
     return other;
 }
 
+const char *sk_level_name(int level)
+{
+    static const char *const names[4] = { "Easy", "Normal", "Hard", "Expert" };
+    return names[level >= 0 && level <= 3 ? level : 1];
+}
+
+int sk_row_level(const SK_State *st, int seat)
+{
+    return st && seat >= 0 && seat < SK_ROSTER_ROWS && st->ai_levels[seat] <= 3
+        ? st->ai_levels[seat] : 1;
+}
+
+void sk_enh_set_level(SK_State *st, int seat, int level)
+{
+    if (!st || seat < 0 || seat >= sk_players(st) || st->net == 2
+        || sk_row_mode(st, seat) != SK_SEAT_BOT || level < 0 || level > 3) return;
+    st->ai_levels[seat] = (unsigned char)level;
+}
+
+static int sk_country_soviet(int country) { return country == 2 || country == 4; }
+
+void sk_set_red_alert(SK_State *st)
+{
+    /* the person plays Greece, then the USSR, England, Ukraine, Germany, France, Turkey
+       and Spain, each in the colour with its own number (Red Alert's 1996 pairing) */
+    static const int order[SK_ROSTER_ROWS] = { 1, 2, 3, 4, 5, 6, 7, 0 };
+    int i;
+    if (!st) return;
+    st->countries = 8;
+    st->build_max = 10;
+    st->build = 10;
+    st->credits = 10000;
+    st->super = 1;          /* Red Alert's rooms open with superweapons on */
+    st->ai_difficulty = 1;  /* normal computers */
+    for (i = 0; i < SK_ROSTER_ROWS; i++) {
+        st->country[i] = order[i];
+        st->colour[i] = order[i];
+        if (i == 0) st->side = sk_country_soviet(order[i]);
+        else { st->house[i] = sk_country_soviet(order[i]); st->house_set[i] = 1; }
+    }
+}
+
+int sk_row_country(const SK_State *st, int seat)
+{
+    if (!st || !st->countries || seat < 0 || seat >= SK_ROSTER_ROWS) return -1;
+    return st->country[seat];
+}
+
+void sk_enh_set_country(SK_State *st, int seat, int country)
+{
+    if (!st || !st->countries || seat < 0 || seat >= SK_ROSTER_ROWS) return;
+    if (country < 0 || country >= st->countries) return;
+    st->country[seat] = country;
+    if (seat == 0) st->side = sk_country_soviet(country);
+    else { st->house[seat] = sk_country_soviet(country); st->house_set[seat] = 1; }
+}
+
+int sk_ra_rule_disabled(const SK_State *st)
+{
+    return !st || !st->countries || st->net == 2;
+}
+
+void sk_enh_ra_rule(SK_State *st, int rule, int value)
+{
+    if (sk_ra_rule_disabled(st)) return;
+    switch (rule) {
+    case SK_RA_SHROUD: st->shroud = value ? 1 : 0; break;
+    case SK_RA_CTF: st->ctf = value ? 1 : 0; break;
+    case SK_RA_DIFFICULTY: st->ai_difficulty = value < 0 ? 0 : value > 3 ? 3 : value; break;
+    default: break;
+    }
+}
+
+int sk_ra_rule(const SK_State *st, int rule)
+{
+    if (!st) return 0;
+    return rule == SK_RA_SHROUD ? st->shroud : rule == SK_RA_CTF ? st->ctf
+         : rule == SK_RA_DIFFICULTY ? st->ai_difficulty : 0;
+}
+
 static void sk_set_row_house(SK_State *st, int seat, int house)
 {
     if (!st || seat < 0 || seat >= SK_ROSTER_ROWS)
@@ -665,7 +747,7 @@ static void sk_gauge_range(const SK_State *st, int ctrl, int *lo, int *hi, int *
     switch (ctrl) {
     case SK_I_BUILD:
         *lo = SK_BUILD_MIN;
-        *hi = SK_BUILD_MAX;
+        *hi = st && st->build_max ? st->build_max : SK_BUILD_MAX;
         break;
     case SK_I_CREDITS:
         *lo = SK_CREDITS_MIN;
@@ -751,6 +833,7 @@ void sk_init(SK_State *st, const SK_Map *maps, int count, const SK_Prev *prev)
     st->aitake = 0;
     st->shortgame = 0;
     st->units = SK_UNITS_MIN;
+    st->ai_difficulty = 1;
     st->selected = SK_I_CHANGEMAP;
     st->pressed = SK_HIT_NONE;
     st->drag = -1;
@@ -765,6 +848,7 @@ void sk_init(SK_State *st, const SK_Map *maps, int count, const SK_Prev *prev)
      * picker then keeps. */
     for (i = 0; i < SK_ROSTER_ROWS; i++) {
         st->team[i] = i;
+        st->ai_levels[i] = 1;
         st->colour[i] = i % SK_PLAYER_COLOUR_N;
         /* A HOSTED ROOM STARTS EMPTY: every seat but the host's is somebody's to take
          * until the host says otherwise. Not read in a skirmish. */
@@ -811,6 +895,13 @@ void sk_result(const SK_State *st, SK_Lobby *out)
     out->aitake = st->aitake;
     out->shortgame = st->shortgame;
     out->unit_count = st->units;
+    out->ai_difficulty = st->ai_difficulty;
+    /* Red Alert's shroud and flag rules; difficulty is shared by both games. */
+    if (st->countries) {
+        out->shroud = st->shroud;
+        out->ctf = st->ctf;
+        out->ai_difficulty = st->ai_difficulty;
+    }
     /* THE SCREEN'S ANSWER PER SEAT, -1 for a seat nobody picked a start for. It used to
      * be the identity, seat i on start i, and the engine's own random pick was avoided
      * because it "shuffles with a wall-clock seed". The brain now deals RANDOM seats
@@ -826,10 +917,12 @@ void sk_result(const SK_State *st, SK_Lobby *out)
     for (i = 0; i < SK_ROSTER_ROWS && i < 8; i++) {
         out->house[i] = sk_row_house(st, i);
         out->team[i] = sk_row_team(st, i);
+        out->ai_levels[i] = (unsigned char)sk_row_level(st, i);
         /* EVERY SEAT, not only the seated ones, and that is deliberate: the array is a
          * permutation, so writing all eight is what lets the caller assert distinctness
          * on its side without knowing how many players there are. */
         out->colour[i] = sk_row_colour(st, i);
+        out->country[i] = st->countries ? st->country[i] : 0;
         /* AND WHO IS SITTING THERE. This was the one link in the chain that dropped the
            name, so every player in the match was called PLAYER. The handles
            are learned from each peer's HELLO, travel in the room's setup, and the shell
@@ -895,6 +988,8 @@ void sk_seat_name(const SK_State *st, int seat, char *out, int outlen)
         snprintf(out, (size_t)outlen, "PLAYER");
     else if (sk_row_mode(st, seat) == SK_SEAT_BLOCK)
         snprintf(out, (size_t)outlen, "BLOCKED");
+    else if (sk_row_mode(st, seat) == SK_SEAT_OPEN)
+        snprintf(out, (size_t)outlen, "EMPTY");
     else
         snprintf(out, (size_t)outlen, "COMPUTER %d", seat);
 }
@@ -921,6 +1016,8 @@ const char *sk_item_label(const SK_State *st, int item)
     static char teamnum[4];
     static char colname[12];
     static char startnum[4];
+    if (SK_IS_LEVEL(item)) return sk_level_name(sk_row_level(st, item - SK_I_LEVEL0));
+    if (SK_IS_POP_LEVEL(item)) return sk_level_name(item - SK_I_POP_EASY);
     if (SK_IS_ROW(item)) {
         sk_seat_name(st, item - SK_I_ROW0, rowname, (int)sizeof rowname);
         return rowname;
@@ -1045,6 +1142,12 @@ int sk_item_disabled(const SK_State *st, int item)
        Everything the host owns is still DRAWN, so the joiner can read what they are
        being asked to agree to; it simply will not take a click. */
     if (st && st->net == 2 && !sk_net_mine(st, item)) return 1;
+    if (SK_IS_LEVEL(item))
+        return !st || st->net == 2 || item - SK_I_LEVEL0 >= sk_players(st)
+            || sk_row_mode(st, item - SK_I_LEVEL0) != SK_SEAT_BOT;
+    if (SK_IS_POP_LEVEL(item))
+        return !st || st->net == 2 || st->popup < 0
+            || sk_row_mode(st, st->popup) != SK_SEAT_BOT;
     /* A seat past the current opponent count is not drawn, so it is not reachable by the
      * walk either. It has no rectangle for the mouse (sk_item_rect returns 0), and this
      * is the same fact told to the keyboard. */
@@ -1074,6 +1177,9 @@ int sk_item_disabled(const SK_State *st, int item)
         int holder, starts;
         if (!st || st->popup < 0)
             return 1;
+        if (!st->net && (sk_row_mode(st, st->popup) == SK_SEAT_OPEN
+                         || sk_row_mode(st, st->popup) == SK_SEAT_BLOCK))
+            return 1;                           /* unused seats hold no start */
         starts = sk_map_starts(st);
         if (starts > 0 && n >= starts)
             return 1;
@@ -1090,12 +1196,13 @@ int sk_item_disabled(const SK_State *st, int item)
             return 1;                                   /* the human's own seat */
         if (st->net == 1 && st->net_taken[st->popup])
             return 1;                                   /* a person: DEL, not a mode */
-        if (st->net == 0 && item == SK_I_POP_OPEN)
-            return 1;                                   /* nobody joins a skirmish */
-        /* THE LAST OPPONENT CANNOT BE BLOCKED: the engine refuses a match of one, and a
-         * refused boot is the mystery the legibility rail forbids. Locked and dim. */
-        if (item == SK_I_POP_BLOCK && sk_row_mode(st, st->popup) != SK_SEAT_BLOCK
-            && sk_active_seats(st) <= 2)
+        /* Empty and Blocked both remove an offline opponent. Preserve the last
+         * computer; a joinable network Empty seat still contributes room capacity. */
+        if (sk_active_seats(st) <= 2
+            && (st->net
+                ? (item == SK_I_POP_BLOCK && sk_row_mode(st, st->popup) != SK_SEAT_BLOCK)
+                : ((item == SK_I_POP_OPEN || item == SK_I_POP_BLOCK)
+                   && sk_row_mode(st, st->popup) == SK_SEAT_BOT)))
             return 1;
         return 0;
     }
@@ -1189,11 +1296,20 @@ static int sk_pop_row(int item)
         return SK_POP_ROW_COLOUR;
     if (SK_IS_POP_MODE(item))
         return SK_POP_ROW_MODE;
+    if (SK_IS_POP_LEVEL(item))
+        return SK_POP_ROW_LEVEL;
     return SK_POP_ROW_TEAM;
 }
 
 int sk_item_rect(const SK_State *st, int item, int *x, int *y, int *w, int *h)
 {
+    if (SK_IS_LEVEL(item)) {
+        const int seat = item - SK_I_LEVEL0;
+        if (!st || seat >= sk_players(st)) { *x = *y = *w = *h = 0; return 0; }
+        *x = SK_ROSTER_X + SK_ROSTER_LEVEL;
+        *y = SK_ROSTER_Y + seat * SK_ROSTER_ROW_H;
+        *w = SK_ROSTER_LEVEL_W; *h = SK_ROSTER_ROW_H; return 1;
+    }
     if (SK_IS_ROW(item)) {
         const int seat = item - SK_I_ROW0;
         if (!st || seat >= sk_players(st)) {
@@ -1202,17 +1318,14 @@ int sk_item_rect(const SK_State *st, int item, int *x, int *y, int *w, int *h)
         }
         *x = SK_ROSTER_X;
         *y = SK_ROSTER_Y + seat * SK_ROSTER_ROW_H;
-        *w = SK_ROSTER_W;
+        *w = SK_ROSTER_LEVEL - 1;
         *h = SK_ROSTER_ROW_H;
         return 1;
     }
     if (SK_IS_POP(item)) {
         int bx, by, bw, bh;
-        /* A joiner sets nobody's seat; a skirmish offers BOT and BLOCK and never EMPTY,
-         * and BLOCK slides into EMPTY's slot so the strip has no hole. */
-        if (!st || st->popup < 0
-            || (SK_IS_POP_MODE(item) && (st->net == 2
-                                         || (st->net == 0 && item == SK_I_POP_OPEN)))) {
+        /* All three seat choices use distinct buttons. Joiners cannot set modes. */
+        if (!st || st->popup < 0 || (SK_IS_POP_MODE(item) && st->net == 2)) {
             *x = *y = *w = *h = 0;
             return 0;
         }
@@ -1225,14 +1338,18 @@ int sk_item_rect(const SK_State *st, int item, int *x, int *y, int *w, int *h)
                  ((item == SK_I_POP_NOD) ? (SK_POP_SIDE_W + SK_POP_SIDE_GAP) : 0);
             return 1;
         }
+        if (SK_IS_POP_LEVEL(item)) {
+            *w = SK_POP_LEVEL_W;
+            *x = bx + SK_POP_PAD + (item - SK_I_POP_EASY) * SK_POP_LEVEL_W;
+            return 1;
+        }
         if (SK_IS_POP_COL(item)) {
             *w = SK_POP_COL_W;
             *x = bx + SK_POP_PAD + SK_POP_LAB_W + (item - SK_I_POP_C1) * SK_POP_COL_W;
             return 1;
         }
         if (SK_IS_POP_MODE(item)) {
-            const int slot = st->net ? (item - SK_I_POP_BOT)
-                                     : (item == SK_I_POP_BLOCK ? 1 : 0);
+            const int slot = item - SK_I_POP_BOT;
             *w = SK_POP_MODE_W;
             *x = bx + SK_POP_PAD + SK_POP_LAB_W + slot * SK_POP_MODE_W;
             return 1;
@@ -1346,7 +1463,7 @@ int sk_hit_test(const SK_State *st, int mx, int my)
         return SK_HIT_NONE;
     }
     if (st && st->popup >= 0) {
-        for (i = SK_I_POP_GDI; i <= SK_I_POP_C8; i++)
+        for (i = SK_I_POP_GDI; i <= SK_I_POP_EXPERT; i++)
             if (sk_item_rect(st, i, &x, &y, &w, &h) && sk_in_rect(mx, my, x, y, w, h))
                 return i;
         return SK_HIT_NONE;
@@ -1705,7 +1822,7 @@ static void sk_say_sides(SK_State *st)
     }
     players = sk_players(st);
     for (i = 1; i < players; i++) {
-        if (sk_row_mode(st, i) == SK_SEAT_BLOCK)
+        if (sk_row_mode(st, i) != SK_SEAT_BOT)
             continue;
         if (st->house_set[i])
             custom++;
@@ -1750,6 +1867,15 @@ static int sk_activate(SK_State *st, int item)
        it. With the sentences gone by request, a refusal would sit on screen until the
        next refusal. Cleared here, it lives exactly one click, which is what it meant. */
     if (st) st->status = NULL;
+    if (SK_IS_LEVEL(item)) {
+        const int seat = item - SK_I_LEVEL0;
+        if (!sk_item_disabled(st, item)) {
+            sk_enh_set_level(st, seat, (sk_row_level(st, seat) + 1) % 4);
+            snprintf(st->statusbuf, sizeof st->statusbuf, "AI %d difficulty: %s", seat, sk_level_name(sk_row_level(st, seat)));
+            st->status = st->statusbuf;
+        }
+        return SK_ACT_NONE;
+    }
     if (SK_IS_ROW(item)) {
         const int seat = item - SK_I_ROW0;
         /* A second click on the row that is already open shuts it, which is the only
@@ -1765,6 +1891,10 @@ static int sk_activate(SK_State *st, int item)
         const int seat = st->popup;
         if (seat < 0)
             return SK_ACT_NONE;
+        if (SK_IS_POP_LEVEL(item)) {
+            sk_enh_set_level(st, seat, item - SK_I_POP_EASY);
+            return SK_ACT_NONE;
+        }
         if (SK_IS_POP_START(item)) {
             /* THE SEAT'S START. A locked cell says why -- taken, or not on this map --
              * rather than doing nothing; sk_hit_test still reports a disabled control so
@@ -1787,12 +1917,16 @@ static int sk_activate(SK_State *st, int item)
              * the next joiner knocks. It stays open like the rows above it. */
             if (sk_item_disabled(st, item))
                 return SK_ACT_NONE;
+            if (item == SK_I_POP_BOT && sk_row_mode(st, seat) != SK_SEAT_BOT)
+                st->ai_levels[seat] = (unsigned char)st->ai_difficulty;
             st->mode[seat] = (item == SK_I_POP_BOT) ? SK_SEAT_BOT
                            : (item == SK_I_POP_BLOCK) ? SK_SEAT_BLOCK : SK_SEAT_OPEN;
-            /* A BLOCKED SEAT IS IN NO MATCH and holds no start: left holding one, its
-             * marker would stay lit and that corner locked against everyone. */
-            if (st->mode[seat] == SK_SEAT_BLOCK)
+            /* Offline Empty seats, like Blocked seats, release their chosen start.
+             * Network Empty seats can reserve one for whoever joins. */
+            if (st->mode[seat] == SK_SEAT_BLOCK
+                || (!st->net && st->mode[seat] == SK_SEAT_OPEN))
                 st->start[seat] = -1;
+            if (!st->net) sk_say_sides(st);
             return SK_ACT_NONE;
         }
         if (SK_IS_POP_COL(item)) {
@@ -1993,7 +2127,7 @@ int sk_release(SK_State *st, int mx, int my)
  * Tab cannot wander off onto a gauge the player cannot see under the box. */
 static int sk_pop_walk(const SK_State *st, int item, int delta)
 {
-    const int n = SK_I_POP_C8 - SK_I_POP_GDI + 1;
+    const int n = SK_I_POP_EXPERT - SK_I_POP_GDI + 1;
     int k = SK_IS_POP(item) ? item - SK_I_POP_GDI : 0;
     int i;
     if (delta == 0)
@@ -2148,6 +2282,11 @@ int sk_key(SK_State *st, int key)
         return (sk_net_kick_seat(st) >= 0) ? SK_ACT_KICK : SK_ACT_NONE;
     case SK_KEY_LEFT:
     case SK_KEY_RIGHT:
+        if (SK_IS_LEVEL(st->selected) && !sk_item_disabled(st, st->selected)) {
+            const int seat = st->selected - SK_I_LEVEL0;
+            sk_enh_set_level(st, seat, (sk_row_level(st, seat) + (key == SK_KEY_LEFT ? 3 : 1)) % 4);
+            return SK_ACT_NONE;
+        }
         if (!sk_is_gauge(st->selected) || sk_item_disabled(st, st->selected))
             return SK_ACT_NONE;
         sk_gauge_range(st, st->selected, &lo, &hi, &step);
@@ -2387,11 +2526,19 @@ static void sk_draw_roster(DB_Surface *s, const DB_Font *f, const SK_State *st)
         sk_swatch(s, SK_ROSTER_X + SK_ROSTER_SW_X, y + 1, SK_ROSTER_SW, SK_ROSTER_SW,
                   col, 0, 0);
         db_font_palette_grad(fp, sk_colour_index(col), DB_TBLACK);
+        if (mode == SK_SEAT_BOT) snprintf(name, sizeof name, "CPU %d", i);
         sk_print_fit(s, f, name, SK_ROSTER_X + SK_ROSTER_NAME, y, SK_ROSTER_NAME_W, fp);
         sk_print_fit(s, f, side ? "NOD" : "GDI", SK_ROSTER_X + SK_ROSTER_TAB, y,
                      SK_ROSTER_SIDE_W, fp);
         snprintf(num, sizeof num, "%d", sk_row_team(st, i) + 1);
         sk_print_fit(s, f, num, SK_ROSTER_X + SK_ROSTER_TEAM, y, SK_ROSTER_TEAM_W, fp);
+        {
+            const char *mark = mode == SK_SEAT_BOT ? &"ENHX"[sk_row_level(st, i)] : "-";
+            char letter[2] = { *mark, 0 };
+            db_font_palette_grad(fp, sk_item_disabled(st, SK_I_LEVEL0 + i)
+                                      ? DM_TEXT_DISABLED : DM_TEXT_MEDIUM, DB_TBLACK);
+            sk_print_fit(s, f, letter, SK_ROSTER_X + SK_ROSTER_LEVEL, y, SK_ROSTER_LEVEL_W, fp);
+        }
         /* THE READY LIGHT, in the six pixels between the roster's right edge and the map
            panel. There is no column free INSIDE the roster -- name, side and team already
            spend all 94 of them -- and widening it would move the map panel and every
@@ -2470,7 +2617,7 @@ static void sk_draw_popup(DB_Surface *s, const DB_Font *f, const SK_State *st)
     /* All three rows are latched button strips: the chosen one is drawn held down, which
      * is Turn_On and the pressed colourway, the same grammar the GDI/Nod pair uses. The
      * colour row is the same button with a filled square where the caption would go. */
-    for (i = SK_I_POP_GDI; i <= SK_I_POP_C8; i++) {
+    for (i = SK_I_POP_GDI; i <= SK_I_POP_EXPERT; i++) {
         int lit;
         if (!sk_item_rect(st, i, &x, &y, &w, &h))
             continue;
@@ -2497,6 +2644,11 @@ static void sk_draw_popup(DB_Surface *s, const DB_Font *f, const SK_State *st)
             lit = (sk_row_start(st, st->popup) == i - SK_I_POP_S1);
             sk_button(s, f, sk_item_label(st, i), x, y, w, h, st->pressed == i, lit,
                       sk_item_disabled(st, i));
+            continue;
+        }
+        if (SK_IS_POP_LEVEL(i)) {
+            sk_button(s, f, sk_item_label(st, i), x, y, w, h, st->pressed == i,
+                      sk_row_level(st, st->popup) == i - SK_I_POP_EASY, sk_item_disabled(st, i));
             continue;
         }
         if (i == SK_I_POP_GDI || i == SK_I_POP_NOD)
@@ -2661,8 +2813,8 @@ static unsigned char sk_start_ink(const DB_Pack *p, const SK_State *st, int ix)
  * roster's own order, and the rest are the room the map has left. That is the whole
  * reason the baker writes two planes.
  */
-static void sk_draw_preview(DB_Surface *s, const DB_Pack *p, const DB_Font *f,
-                            const SK_State *st, int ix)
+static void sk_draw_preview_at(DB_Surface *s, const DB_Pack *p, const DB_Font *f,
+                            const SK_State *st, int ix, int ox, int oy, int ow, int oh)
 {
     unsigned char fpdim[16];
     const unsigned char *r, *plane;
@@ -2670,7 +2822,7 @@ static void sk_draw_preview(DB_Surface *s, const DB_Pack *p, const DB_Font *f,
     int rec = -1, sx, sy, dx, dy, starts, shown, i, players;
     int labx[26], laby[26], labw[26], nlab = 0;   /* the numbers already printed */
 
-    dm_green_dialog(s, SK_PREVBOX_X, SK_PREVBOX_Y, SK_PREVBOX_W, SK_PREVBOX_H);
+
 
     if (pv && ix >= 0 && ix < st->count)
         rec = sk_prev_find(pv, st->maps[ix].scen);
@@ -2679,24 +2831,24 @@ static void sk_draw_preview(DB_Surface *s, const DB_Pack *p, const DB_Font *f,
          * degrades to a silent grey rectangle, and it never stops the lobby. */
         if (f) {
             db_font_palette_grad(fpdim, DM_TEXT_DISABLED, DB_TBLACK);
-            sk_centre(s, f, "no map", SK_PREV_X + SK_PREV_W / 2,
-                      SK_PREV_Y + (SK_PREV_H / 2) - 8, fpdim);
-            sk_centre(s, f, "preview", SK_PREV_X + SK_PREV_W / 2,
-                      SK_PREV_Y + (SK_PREV_H / 2), fpdim);
+            sk_centre(s, f, "no map", ox + ow / 2,
+                      oy + (oh / 2) - 8, fpdim);
+            sk_centre(s, f, "preview", ox + ow / 2,
+                      oy + (oh / 2), fpdim);
         }
         return;
     }
 
     r = sk_prev_rec(pv, rec);
     plane = r + SK_PR_MARKS + (long)pv->max_starts * SK_PR_MARK_BYTES;
-    for (dy = 0; dy < SK_PREV_H; dy++) {
-        sy = dy * pv->fh / SK_PREV_H;
-        for (dx = 0; dx < SK_PREV_W; dx++) {
+    for (dy = 0; dy < oh; dy++) {
+        sy = dy * pv->fh / oh;
+        for (dx = 0; dx < ow; dx++) {
             unsigned char v;
-            sx = dx * pv->fw / SK_PREV_W;
+            sx = dx * pv->fw / ow;
             v = plane[(long)sy * pv->fw + sx];
             if (v)
-                db_put_pixel(s, SK_PREV_X + dx, SK_PREV_Y + dy, v);
+                db_put_pixel(s, ox + dx, oy + dy, v);
         }
     }
 
@@ -2715,8 +2867,8 @@ static void sk_draw_preview(DB_Surface *s, const DB_Pack *p, const DB_Font *f,
         const unsigned char *mk = r + SK_PR_MARKS + (long)i * SK_PR_MARK_BYTES;
         const int px = sk_rd16(mk + 4);
         const int py = sk_rd16(mk + 6);
-        const int cx = SK_PREV_X + px * SK_PREV_W / pv->fw;
-        const int cy = SK_PREV_Y + py * SK_PREV_H / pv->fh;
+        const int cx = ox + px * ow / pv->fw;
+        const int cy = oy + py * oh / pv->fh;
         /* THE HOLDER'S COLOUR, looked up, and no longer the seat whose index this is:
          * a start belongs to whoever picked it, and one nobody picked stays
          * the idle grey. The diamond and the number beside it are the same player as the
@@ -2744,10 +2896,10 @@ static void sk_draw_preview(DB_Surface *s, const DB_Pack *p, const DB_Font *f,
                 int clash = 0;
                 nx = (tries == 0) ? cx + 4 : (tries == 1) ? cx - 4 - nw : cx - nw / 2;
                 ny = (tries == 2) ? cy - 10 : (tries == 3) ? cy + 4 : cy - 3;
-                if (nx < SK_PREV_X) nx = SK_PREV_X;
-                if (nx + nw > SK_PREV_X + SK_PREV_W) nx = SK_PREV_X + SK_PREV_W - nw;
-                if (ny < SK_PREV_Y) ny = SK_PREV_Y;
-                if (ny + 6 > SK_PREV_Y + SK_PREV_H) ny = SK_PREV_Y + SK_PREV_H - 6;
+                if (nx < ox) nx = ox;
+                if (nx + nw > ox + ow) nx = ox + ow - nw;
+                if (ny < oy) ny = oy;
+                if (ny + 6 > oy + oh) ny = oy + oh - 6;
                 /* Its OWN diamond counts as taken too: a start on the panel's edge has
                  * its number clamped back onto the diamond otherwise. */
                 if (nx < cx + 4 && cx - 3 < nx + nw && ny < cy + 4 && cy - 3 < ny + 7)
@@ -2765,6 +2917,27 @@ static void sk_draw_preview(DB_Surface *s, const DB_Pack *p, const DB_Font *f,
         }
     }
 }
+
+static void sk_draw_preview(DB_Surface *s, const DB_Pack *p, const DB_Font *f, const SK_State *st, int ix)
+{
+    dm_green_dialog(s, SK_PREVBOX_X, SK_PREVBOX_Y, SK_PREVBOX_W, SK_PREVBOX_H);
+    sk_draw_preview_at(s, p, f, st, ix, SK_PREV_X, SK_PREV_Y, SK_PREV_W, SK_PREV_H);
+}
+
+int sk_preview_rgba(const SK_State *st, const DB_Pack *p, int ix, unsigned char *rgba, int w, int h)
+{
+    DB_Surface surface;
+    unsigned char *pixels;
+    if (!st || !p || !rgba || w < 1 || h < 1 || w > 512 || h > 512) return 0;
+    pixels = (unsigned char *)calloc((size_t)w*h, 1);
+    if (!pixels) return 0;
+    db_surface_init(&surface, w, h, pixels);
+    sk_draw_preview_at(&surface, p, db_font(p, "GRAD6FNT"), st, ix, 0, 0, w, h);
+    db_surface_to_rgba(&surface, p->pal8, rgba, 1);
+    free(pixels);
+    return st->prev && ix >= 0 && ix < st->count && sk_prev_find(st->prev, st->maps[ix].scen) >= 0;
+}
+
 
 /* gauge.cpp:205-240 Draw_Me: a GREEN_DOWN body, the travelled part filled bright, then
  * a 4 pixel raised thumb pulled back at the top of travel so it cannot hang off. */
@@ -3017,7 +3190,8 @@ void sk_draw(DB_Surface *s, const DB_Pack *p, const SK_State *st)
         sk_centre(s, grad, st->net_join, SK_DLG_X + (SK_DLG_W >> 1), SK_JOIN_Y, jp);
     }
 
-    sk_column_label(s, grad, "Players", (SK_ROSTER_X - 2) + ((SK_ROSTER_W + 4) >> 1));
+    sk_column_label(s, grad, "Players", SK_ROSTER_X + 38);
+    sk_column_label(s, grad, "AI", SK_ROSTER_X + SK_ROSTER_LEVEL);
     sk_draw_map_name(s, grad, st, st->sel);
 
     sk_draw_roster(s, grad, st);
@@ -3189,8 +3363,11 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
      * the three has its own box. */
     for (i = 0; i < SK_ROSTER_ROWS; i++) {
         sk_seat_name(st, i, line, (int)sizeof line);
-        bad += sk_fits(f, "roster.name", line, SK_ROSTER_NAME_W, &checked);
+        bad += sk_fits_abbrev(f, "roster.name", line, SK_ROSTER_NAME_W, &checked);
     }
+    bad += sk_fits(f, "roster.level", "X", SK_ROSTER_LEVEL_W, &checked);
+    for (i = 0; i < 4; i++)
+        bad += sk_fits(f, "popup.level", sk_level_name(i), SK_POP_LEVEL_W - 8, &checked);
     bad += sk_fits(f, "roster.side", "NOD", SK_ROSTER_SIDE_W, &checked);
     bad += sk_fits(f, "roster.side", "GDI", SK_ROSTER_SIDE_W, &checked);
     for (i = 1; i <= SK_POP_TEAMS; i++) {
@@ -3208,7 +3385,8 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
         if (used > SK_ROSTER_NAME ||
             SK_ROSTER_NAME + SK_ROSTER_NAME_W > SK_ROSTER_TAB ||
             SK_ROSTER_TAB + SK_ROSTER_SIDE_W > SK_ROSTER_TEAM ||
-            SK_ROSTER_TEAM + SK_ROSTER_TEAM_W > SK_ROSTER_W) {
+            SK_ROSTER_TEAM + SK_ROSTER_TEAM_W > SK_ROSTER_LEVEL
+            || SK_ROSTER_LEVEL + SK_ROSTER_LEVEL_W > SK_ROSTER_W) {
             printf("LOBBY|OVERFLOW|roster.row|swatch ends %d, name %d+%d, side %d+%d, "
                    "team %d+%d, row is %d wide\n",
                    used, SK_ROSTER_NAME, SK_ROSTER_NAME_W, SK_ROSTER_TAB,
@@ -3255,7 +3433,7 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
         }
         /* And every control inside it lands inside it. */
         probe.popup = SK_ROSTER_ROWS - 1;
-        for (i = SK_I_POP_GDI; i <= SK_I_POP_C8; i++) {
+        for (i = SK_I_POP_GDI; i <= SK_I_POP_EXPERT; i++) {
             int bx, by, bw, bh, cx, cy, cw, ch;
             sk_popup_box(&probe, &bx, &by, &bw, &bh);
             if (!sk_item_rect(&probe, i, &cx, &cy, &cw, &ch))
@@ -3352,7 +3530,7 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
          * box they actually print into rather than against a button's margin. */
         if (SK_IS_PICK(i) || sk_is_gauge(i) || (i >= SK_I_BASES && i <= SK_I_SHORTGAME))
             continue;
-        if (SK_IS_ROW(i) || SK_IS_POP(i))
+        if (SK_IS_ROW(i) || SK_IS_POP(i) || SK_IS_LEVEL(i))
             continue;
         if (!sk_item_rect(st, i, &x, &y, &w, &h))
             continue;
@@ -3554,4 +3732,24 @@ int sk_check_layout(const DB_Pack *p, const SK_State *st)
     }
     fflush(stdout);
     return bad;
+}
+
+int sk_enh_action(SK_State *st, int item)
+{
+    if (!st || item < 0 || item >= SK_I_COUNT || sk_item_disabled(st, item)) return SK_ACT_NONE;
+    st->selected = item; st->pressed = SK_HIT_NONE;
+    return sk_activate(st, item);
+}
+void sk_enh_control(SK_State *st, int item, int value)
+{
+    if (st && !sk_item_disabled(st, item) && item >= SK_I_BUILD && item <= SK_I_UNITS)
+        sk_set_value(st, item, value);
+}
+void sk_enh_pick_row(SK_State *st, int ix)
+{
+    if (st && st->picker && ix >= 0 && ix < st->count && st->maps[ix].user == st->tab) sk_pick_set(st, ix);
+}
+void sk_enh_random_start(SK_State *st)
+{
+    if (st && st->popup >= 0 && (st->net != 2 || st->popup == sk_local_seat(st))) sk_set_row_start(st, st->popup, -1);
 }

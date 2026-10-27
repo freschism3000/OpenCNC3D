@@ -18,8 +18,7 @@
 # confused with "the opening track was still playing".
 tick 10
 options
-optclick Game Controls
-optclick Sound Controls
+optclick Audio
 optclick Track List
 optclick Play
 tick 900

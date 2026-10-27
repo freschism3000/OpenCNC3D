@@ -118,6 +118,19 @@ typedef struct NmSetup {
     /* How many of those a PERSON sits in or will sit in (mode HUMAN or OPEN). Never
        decided by a caller on the lobby path: netmatch counts it off the modes. */
     int humans;
+    /* WHICH ENGINE THE ROOM PLAYS (v13): 0 Tiberian Dawn, 1 Red Alert. It decides what a
+       seat's house may be: Tiberian Dawn's is a side, 0 or 1; Red Alert's is a country,
+       0..7 (its HousesType). Shroud/CTF stay zero in a Tiberian Dawn room; behavioral difficulty
+       is carried for either game. */
+    int game;
+    int shroud;          /* v13, Red Alert: 1 the shroud grows back over unwatched ground */
+    int ctf;             /* v13, Red Alert: 1 capture the flag                            */
+    int ai_difficulty;   /* default for new AI seats: 0 Easy, 1 Normal, 2 Hard, 3 Expert */
+    unsigned char ai_levels[NM_MAX_SEATS]; /* v14: behavioral difficulty per seat */
+    /* THE MATCH'S RANDOM SEED (v13), the host's, so every peer's engine starts from the
+       same one and two matches are not the same match. 0 is "none agreed", the engine's
+       own lockstep rule; the Tiberian Dawn engine reads none of it. */
+    unsigned seed;
     unsigned char house[NM_MAX_SEATS];
     unsigned char colour[NM_MAX_SEATS];
     unsigned char team[NM_MAX_SEATS];

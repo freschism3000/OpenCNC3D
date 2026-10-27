@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Two changes in AnimClass. The constructor's drop-zone smoke reveal, which
+// reads PlayerPtr, is withheld in a lockstep network match, where one
+// machine's viewpoint must not decide another machine's missions. AI's kill
+// time compares a beacon's deadline against the frame counter rather than
+// the Windows wall clock, so a beacon expires on every platform.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/ANIM.CPP 1     3/03/97 10:24a Joe_bostic $ */
 /***********************************************************************************************
@@ -608,9 +619,18 @@ AnimClass::AnimClass(AnimType animnum, COORDINATE coord, unsigned char timedelay
     **	Drop zone smoke always reveals the map around itself.
     */
     if (*this == ANIM_LZ_SMOKE) {
-        // Added PlayerPtr here as Sight_From now needs to know who to perform the action for. This should be OK as long
-        // as it's not used in MP. ST - 8/2/2019 2:34PM
-        Map.Sight_From(Coord_Cell(coord), Rule.DropZoneRadius / CELL_LEPTON_W, PlayerPtr, false);
+        /*
+        **	OpenCNC3D lockstep: PlayerPtr is the house of whoever sits at THIS machine, and
+        **	Sight_From is not presentation: it maps cells for that house, and mapped cells are
+        **	read back by the simulation (discovery springs triggers and missions, threat scoring
+        **	reads visibility). So one machine's viewpoint would decide another machine's
+        **	missions. In a lockstep match the reveal is withheld; the campaign is unchanged.
+        */
+        if (!OpenCNC3D_Lockstep) {
+            // Added PlayerPtr here as Sight_From now needs to know who to perform the action for. This should be OK as
+            // long as it's not used in MP. ST - 8/2/2019 2:34PM
+            Map.Sight_From(Coord_Cell(coord), Rule.DropZoneRadius / CELL_LEPTON_W, PlayerPtr, false);
+        }
     }
 
     if (Class->Loops >= 0) {
@@ -768,19 +788,16 @@ void AnimClass::AI(void)
     }
 
     /*
-    **	Check the kill time.
+    **	Check the kill frame. KillTime holds a ::Frame number written by EventClass::Execute
+    **	(ANIMATION, ANIM_BEACON), not a wall clock, and the test now runs on every platform. A
+    **	save written before this change can hold only 0 or a FILETIME of about 1.3e17, which
+    **	::Frame never reaches, so a stale deadline degrades to "never expires", which is what
+    **	every platform but Windows did before.
     */
     if (KillTime > 0ULL) {
-#ifdef _WIN32
-        FILETIME ft;
-        GetSystemTimeAsFileTime(&ft);
-
-        unsigned long long now =
-            (unsigned long long)ft.dwLowDateTime + (((unsigned long long)ft.dwHighDateTime) << 32ULL);
-        if (now >= KillTime) {
+        if ((unsigned long long)::Frame >= KillTime) {
             IsToDelete = true;
         }
-#endif
     }
 
     /*

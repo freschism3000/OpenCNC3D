@@ -34,6 +34,14 @@
 /* _dup2 and _fileno, for pointing stdout at the same open file description as stderr
    when the log file is opened at the top of main. */
 #include <io.h>
+/* _mkdir, for Red Alert's own save folder inside the per-user one */
+#include <direct.h>
+#if defined(OPENCNC3D_DIAGNOSTIC_APP)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 #endif
 /* stat and a directory walk, for userdir_carry_over and settings_carry_over. mingw
    ships both headers, so neither is platform-specific. */
@@ -64,6 +72,7 @@
    headers manage their own linkage. Nesting them inside another extern "C" is the
    kind of thing one toolchain forgives and the next one does not. */
 #include "../game/brain_path.h"
+#include "../menu/enhanced_menu.h"
 #include "userdir.h"   /* the per-user folder's name, said once */
 extern "C" {
 #include "dosmenu_shell.h"
@@ -551,6 +560,9 @@ static const char* base_dir(const char* fallback)
  *  borrowed theater pack, the INI lives in user_maps/, and the pack is re-skinned from
  *  the map's own .BIN. The scenario name says which kind it is (USERnn).
  * ------------------------------------------------------------------------------ */
+/* The Red Alert module is running (--module ra3d): set once, by the argument pass. */
+static int g_ra3dPreview = 0;
+
 static int load_slot_prepare(GameOpts* opt, int slot)
 {
     DS_Slot tab[DS_SLOTS];
@@ -561,12 +573,43 @@ static int load_slot_prepare(GameOpts* opt, int slot)
         fprintf(stderr, "load: slot %d is empty\n", slot);
         return 0;
     }
+    /* Never the other game's slot: its mission name may well be one this game has too. */
+    if (!ds_slot_mine(&tab[slot])) {
+        fprintf(stderr, "load: slot %d was saved by %s\n", slot,
+                tab[slot].game == DS_GAME_RA ? "Red Alert" : "Tiberian Dawn");
+        return 0;
+    }
     snprintf(lscen, sizeof lscen, "%s", tab[slot].scen);
     snprintf(lpack, sizeof lpack, "%s", tab[slot].pack);
     opt->scen = lscen;
     opt->pack = lpack;
     opt->skirmish = 0;
     opt->reskin = 0;
+    if (g_ra3dPreview) {
+        /* A Red Alert slot boots its mission through the Red Alert engine and data, as
+           Start New Game does (the side follows from the mission's name), and the engine's
+           payload then replaces the world it booted. */
+        opt->ra3d = 1;
+#ifdef _WIN32
+        opt->dylib = "ra3d/RedAlert.dll";
+#else
+        opt->dylib = "ra3d/RedAlert.dylib";
+#endif
+        opt->content = "ra3d/data";
+        opt->dir = "ra3d/missions/";
+        opt->dosdata = "ra3d/audio";
+        opt->build = tab[slot].build;
+        opt->load_slot1 = slot + 1;
+        g_camp.active = tab[slot].camp_active;
+        g_camp.side = tab[slot].camp_side;
+        g_camp.scenario = tab[slot].camp_scenario;
+        g_camp.dir = tab[slot].camp_dir ? (char)tab[slot].camp_dir : 'E';
+        g_camp.var = tab[slot].camp_var ? (char)tab[slot].camp_var : 'A';
+        printf("APP|load|slot=%d|scen=%s|pack=%s|dir=%s|campaign=%d/%d/%d|game=ra3d\n", slot,
+               lscen, lpack, opt->dir, g_camp.active, g_camp.side, g_camp.scenario);
+        fflush(stdout);
+        return 1;
+    }
     opt->dir = base_dir(opt->dir);
     if (!strncmp(lscen, "USER", 4)) {
         snprintf(ldir, sizeof ldir, "%suser_maps/", base_dir(opt->dir));
@@ -775,6 +818,34 @@ static void usermaps_scan(const char* dir)
     fflush(stdout);
 }
 
+/* RED ALERT'S USER MAPS: the scenario files (.INI or .MPR) in ra3d/missions/user_maps/,
+   each row named by its file. The list is shown even when empty, because the empty screen
+   is the one that says where they go. */
+static std::vector<std::string> g_raUsermapNames;
+static std::vector<DO_Mission>  g_raUsermaps;
+static void ra_usermaps_scan(void)
+{
+    g_raUsermapNames.clear();
+    g_raUsermaps.clear();
+    if (DIR* d = opendir("ra3d/missions/user_maps")) {
+        while (struct dirent* e = readdir(d)) {
+            const char* dot = strrchr(e->d_name, '.');
+            if (!dot || (strcasecmp(dot, ".INI") && strcasecmp(dot, ".MPR"))) continue;
+            g_raUsermapNames.push_back(std::string(e->d_name, dot - e->d_name));
+        }
+        closedir(d);
+    }
+    std::sort(g_raUsermapNames.begin(), g_raUsermapNames.end());
+    for (size_t i = 0; i < g_raUsermapNames.size(); i++) {
+        DO_Mission r;
+        memset(&r, 0, sizeof r);
+        r.scen = g_raUsermapNames[i].c_str();
+        g_raUsermaps.push_back(r);
+    }
+    printf("APP|ra-usermaps|%d\n", (int)g_raUsermaps.size());
+    fflush(stdout);
+}
+
 /* EVERYTHING THE LOBBY PRINTS ABOUT ONE MAP, out of its INI in a single pass, and
    SECTION AWARE, which the mission list's Name= reader is not:
    Theater lives in [MAP] and not in [Basic], and reading it from the wrong section is a
@@ -980,9 +1051,10 @@ static void lobby_report_seats(const SK_Lobby* lob)
        in play are not a prefix, and a gate filters them by mode. */
     const int players = 8;
     for (int i = 0; i < players; i++)
-        printf("APP|lobby|player=%d|house=%s|team=%d|colour=%d|mode=%d|start=%d\n", i,
+        printf("APP|lobby|player=%d|house=%s|team=%d|colour=%d|mode=%d|start=%d|difficulty=%s\n", i,
                lob->house[i] ? "Nod" : "GDI", lob->team[i] + 1, lob->colour[i],
-               lob->mode[i], lob->start_wp[i]);
+               lob->mode[i], lob->start_wp[i],
+               lob->mode[i] == SK_SEAT_BOT ? sk_level_name(lob->ai_levels[i]) : "-");
     int seen[8], dup = 0;
     for (int i = 0; i < 8; i++) seen[i] = 0;
     for (int i = 0; i < 8; i++) {
@@ -1033,7 +1105,9 @@ static unsigned mp_brain_abi(const char* dylib)
                 unsigned slots[32];
                 memset(slots, 0, sizeof slots);
                 const int n = fn(slots, 32);
-                if (n > 10) cached = slots[10];
+                typedef unsigned (*policyfn)(void);
+                policyfn policy = (policyfn)dlsym(h, "OpenCNC3D_AI_Policy");
+                if (n > 10 && policy) cached = (slots[10] ^ policy()) * 16777619u;
             }
             dlclose(h);
         }
@@ -1104,9 +1178,25 @@ static void mp_install_map_hasher(const char* missiondir)
     nm_set_map_hasher(mp_map_hash_hook, NULL);
 }
 
+/* THE SEED A RED ALERT ROOM HOSTED BY THIS PROCESS OFFERS, drawn once and then kept, so
+   the setup the room keeps re-sending does not change under the people in it (a changed
+   setup clears every ready light). Never zero, which on the wire means "none agreed". */
+static unsigned ra_room_seed(void)
+{
+    static unsigned seed = 0;
+    if (!seed) {
+        const Uint64 pc = SDL_GetPerformanceCounter();
+        seed = ((unsigned)pc ^ (unsigned)(pc >> 32) ^ SDL_GetTicks() * 2654435761u) & 0x7FFFFFFFu;
+        if (!seed) seed = 1;
+    }
+    return seed;
+}
+
 /* Pack what the skirmish lobby answered into the wire's own setup, which is what a joiner
    adopts wholesale. The roster is people first and computers after, exactly as
-   net_match_prepare builds it for the command line, so the two paths cannot disagree. */
+   net_match_prepare builds it for the command line, so the two paths cannot disagree.
+   IN THE RED ALERT MODULE the room says it plays Red Alert, each seat's house is its
+   country, and Red Alert's own rules and the seed go with it. */
 static NmSetup* mp_build_setup(NmSetup* out, const SK_Lobby* lob, const MP_State* mp,
                                const char* missiondir, unsigned* scen_out)
 {
@@ -1125,6 +1215,14 @@ static NmSetup* mp_build_setup(NmSetup* out, const SK_Lobby* lob, const MP_State
     out->bases = lob->bases;
     out->unit_count = lob->unit_count;
     out->build = lob->build;
+    out->ai_difficulty = lob->ai_difficulty;
+    if (g_ra3dPreview) {
+        out->game = 1;
+        out->shroud = lob->shroud ? 1 : 0;
+        out->ctf = lob->ctf ? 1 : 0;
+        out->ai_difficulty = lob->ai_difficulty < 0 ? 0 : lob->ai_difficulty > 3 ? 3 : lob->ai_difficulty;
+        out->seed = lob->seed ? lob->seed : ra_room_seed();
+    }
     /* THE ROOM'S TICK RATE. There is no speed row on the skirmish screen, so the room
        opens on the wire's own default, which is the same slider index the Game Controls
        page ships: a player meets one pace in a campaign mission, a skirmish and a
@@ -1147,10 +1245,15 @@ static NmSetup* mp_build_setup(NmSetup* out, const SK_Lobby* lob, const MP_State
     (void)mp;
     out->humans = 0;
     for (i = 0; i < NM_MAX_SEATS; i++) {
-        out->house[i] = (unsigned char)(lob->house[i] ? 1 : 0);
+        /* A Red Alert room carries the seat's COUNTRY (SK_Lobby.country) where Tiberian
+           Dawn's carries the side. */
+        out->house[i] = (unsigned char)(g_ra3dPreview
+                                            ? ((lob->country[i] >= 0 && lob->country[i] <= 7) ? lob->country[i] : 1)
+                                            : (lob->house[i] ? 1 : 0));
         out->colour[i] = (unsigned char)((lob->colour[i] < 0 || lob->colour[i] > 7)
                                              ? (i & 7) : lob->colour[i]);
         out->team[i] = (unsigned char)lob->team[i];
+        out->ai_levels[i] = lob->ai_levels[i] <= 3 ? lob->ai_levels[i] : 1;
         out->start[i] = (unsigned char)((lob->start_wp[i] >= 0) ? lob->start_wp[i]
                                                                   : OPENCNC3D_START_RANDOM);
         /* A SKIRMISH ANSWER BECOMING A ROOM: this is the one place SET UP MATCH's screen
@@ -1182,6 +1285,7 @@ static void skirmish_apply(GameOpts* opt, const SK_Lobby* lob)
     opt->superweapons = lob->superweapons;
     opt->bases = lob->bases;
     opt->unit_count = lob->unit_count;
+    opt->ai_difficulty = (lob->ai_difficulty >= 0 && lob->ai_difficulty <= 3 ? lob->ai_difficulty : 1) + 1;
     for (int i = 0; i < 8; i++) opt->start_wp[i] = lob->start_wp[i];
     /* WHO EACH SEAT IS, carried the same way everything else on this screen is: by value,
        every entry, nothing inferred. The lobby's team is zero based and so is the field;
@@ -1189,6 +1293,7 @@ static void skirmish_apply(GameOpts* opt, const SK_Lobby* lob)
     for (int i = 0; i < 8; i++) {
         opt->player_house[i] = lob->house[i] ? 1 : 0;
         opt->player_team[i] = lob->team[i];
+        opt->ai_levels[i] = lob->ai_levels[i] <= 3 ? lob->ai_levels[i] : 1;
         opt->seat_mode[i] = lob->mode[i];
         /* The colour index the SQUARE on the screen was filled from, which is the same
            index the engine calls that colour. All eight are copied even when fewer seats
@@ -1206,14 +1311,464 @@ static void skirmish_apply(GameOpts* opt, const SK_Lobby* lob)
     fflush(stdout);
 }
 
+/* ==== RED ALERT'S SKIRMISH ==================================================================
+ *
+ * Everything a Red Alert skirmish screen needs, and the one call that turns its answers into
+ * a match. The screen itself is not here: it fills a RaSkirmish (start from
+ * ra_skirmish_defaults), hands it to ra_skirmish_apply with the GameOpts the shell boots
+ * from, and moves to APP_GAME. Nothing in Tiberian Dawn's lobby path changes.
+ *
+ * THE MAP LIST is ra3d/skirmish-maps.txt, written beside a picture of every map in
+ * ra3d/previews/ by tools/ra3d/bake-ra-map-previews.py: the disc's 24 multiplayer maps with
+ * their names, theaters, playable rectangles and start positions. Without the list the
+ * mission folder's own SCMnnEA.INI files are read for the same facts and the pictures are
+ * simply absent.
+ *
+ * THE SEATS ARE COUNTRIES. Red Alert's engine seats a country (HousesType) and takes its
+ * side from it; its colours are PlayerColorType, eight of them; its tech level runs 1 to 10.
+ * -------------------------------------------------------------------------------------------- */
+#define RA_SK_COUNTRIES 8
+static const char* const RA_SK_COUNTRY[RA_SK_COUNTRIES] = {
+    "Spain", "Greece", "USSR", "England", "Ukraine", "Germany", "France", "Turkey" };
+/* 1 when the country plays the Soviet side. */
+static int ra_sk_country_soviet(int country) { return country == 2 || country == 4; }
+/* Red Alert's eight player colours by the number the engine is handed (a seat's ColorIndex,
+   which picks that row of the disc's PALETTE.CPS remaps), named for what the row shows and
+   given as the RGB the radar paints that house in (game/cnc_eyes.cpp RA_RADAR_BAR). Each
+   country's own 1996 colour is the colour with its number: Spain gold, Greece light blue,
+   the USSR red, England green, Ukraine orange, Germany grey, France blue, Turkey brown. */
+#define RA_SK_COLOURS 8
+static const char* const RA_SK_COLOUR[RA_SK_COLOURS] = {
+    "Gold", "Light blue", "Red", "Green", "Orange", "Grey", "Blue", "Brown" };
+static const unsigned char RA_SK_COLOUR_RGB[RA_SK_COLOURS][3] = {
+    {144, 136, 76}, {104, 116, 160}, {176, 0, 0}, {120, 152, 100},
+    {212, 120, 16}, {148, 124, 112}, {64, 132, 116}, {152, 76, 56} };
+
+typedef struct RaSkMap {
+    std::string scen;      /* SCM01EA: what the engine is started on                 */
+    std::string name;      /* [Basic] Name=, "Coastal Influence (4-6)"                */
+    std::string theater;   /* SNOW or TEMPERATE                                       */
+    std::string preview;   /* ra3d/previews/SCM01EA.png, or empty                     */
+    int x, y, w, h;        /* the playable rectangle, in cells                        */
+    int starts;            /* start positions: the most players the map seats         */
+    /* Start k's cell (y * 128 + x), in the order the engine numbers starts, which is the
+       number a seat's start (RaSkSeat::start, GameOpts::start_wp) names. */
+    std::vector<int> start_cell;
+} RaSkMap;
+static std::vector<RaSkMap> g_raSkMaps;
+
+typedef struct RaSkSeat {
+    int country;           /* 0..7, RA_SK_COUNTRY                                     */
+    int colour;            /* 0..7, RA_SK_COLOUR; no two seats share one              */
+    int team;              /* zero based; seats on one team are allies                */
+    int mode;              /* exact lobby seat mode, preserving empty/blocked gaps */
+    int level;             /* per-seat behavior: Easy / Normal / Hard / Expert */
+    int ai;                /* 1 a computer player; seat 0 is the person at the screen */
+    int start;             /* a start position index, or -1 for the engine to deal one */
+    char name[12];         /* empty: PLAYER or COMPUTER                               */
+} RaSkSeat;
+
+typedef struct RaSkirmish {
+    int map;               /* index into g_raSkMaps                                   */
+    int players;           /* seats in play, 2..8, seat 0 first                       */
+    RaSkSeat seat[8];
+    int credits;           /* starting credits                                        */
+    int tech;              /* tech level, 1..10                                       */
+    int ore;               /* 1 ore and gems grow back                                */
+    int crates;            /* 1 bonus crates                                          */
+    int bases;             /* 1 everyone starts with an MCV                           */
+    int shroud_regrow;     /* 1 the shroud grows back over unwatched ground           */
+    int short_game;        /* 1 defences and walls do not keep a player alive         */
+    int superweapons;      /* 1 superweapons may be built                             */
+    int units;             /* starting units beside the MCV                           */
+    int seed;              /* the match's random seed; 0 lets the engine choose       */
+    int ctf;               /* 1 capture the flag                                      */
+    int ai_difficulty;     /* the computer players: 0 easy, 1 normal, 2 hard          */
+} RaSkirmish;
+
+/* The facts of one map from its INI, for when there is no baked list. */
+static void ra_sk_ini_facts(const char* dir, RaSkMap* m)
+{
+    char path[512];
+    snprintf(path, sizeof path, "%s%s.INI", dir, m->scen.c_str());
+    FILE* f = fopen(path, "rb");
+    if (!f) return;
+    int way[8];
+    for (int i = 0; i < 8; i++) way[i] = -1;
+    enum { S_NONE, S_BASIC, S_MAP, S_WAY } sec = S_NONE;
+    char line[256];
+    while (fgets(line, sizeof line, f)) {
+        char* nl = strpbrk(line, "\r\n");
+        if (nl) *nl = 0;
+        if (line[0] == '[') {
+            sec = !strncmp(line, "[Basic]", 7) ? S_BASIC : !strncmp(line, "[Map]", 5) ? S_MAP
+                : !strncmp(line, "[Waypoints]", 11) ? S_WAY : S_NONE;
+            continue;
+        }
+        const char* eq = strchr(line, '=');
+        if (!eq) continue;
+        if (sec == S_BASIC && !strncmp(line, "Name=", 5)) m->name = eq + 1;
+        else if (sec == S_MAP && !strncmp(line, "Theater=", 8)) m->theater = eq + 1;
+        else if (sec == S_MAP && !strncmp(line, "X=", 2)) m->x = atoi(eq + 1);
+        else if (sec == S_MAP && !strncmp(line, "Y=", 2)) m->y = atoi(eq + 1);
+        else if (sec == S_MAP && !strncmp(line, "Width=", 6)) m->w = atoi(eq + 1);
+        else if (sec == S_MAP && !strncmp(line, "Height=", 7)) m->h = atoi(eq + 1);
+        else if (sec == S_WAY && line[0] >= '0' && line[0] <= '9') {
+            const int k = atoi(line);
+            if (k >= 0 && k < 8) way[k] = atoi(eq + 1);
+        }
+    }
+    fclose(f);
+    /* The engine collects the waypoints that are set, in order, and start k is the k-th of
+       them; Red Alert's starts are waypoints 0 to 7. */
+    for (int i = 0; i < 8; i++)
+        if (way[i] >= 0) m->start_cell.push_back(way[i]);
+    m->starts = (int)m->start_cell.size();
+}
+
+/* Fill g_raSkMaps; answers how many maps it holds. `module` is the module folder, "ra3d/". */
+static int ra_skirmish_maps(const char* module)
+{
+    g_raSkMaps.clear();
+    char path[512];
+    snprintf(path, sizeof path, "%sskirmish-maps.txt", module);
+    FILE* f = fopen(path, "rb");
+    const int listed = f != NULL;
+    if (f) {
+        char line[1024];
+        while (fgets(line, sizeof line, f)) {
+            char* nl = strpbrk(line, "\r\n");
+            if (nl) *nl = 0;
+            if (!line[0] || line[0] == '#') continue;
+            char* field[8];
+            int n = 0;
+            char* p = line;
+            while (n < 8) {
+                field[n++] = p;
+                char* bar = strchr(p, '|');
+                if (!bar) break;
+                *bar = 0;
+                p = bar + 1;
+            }
+            if (n < 7) continue;
+            RaSkMap m;
+            m.scen = field[0];
+            m.name = field[1];
+            m.theater = field[2];
+            m.x = m.y = m.w = m.h = 0;
+            sscanf(field[3], "%d,%d,%d,%d", &m.x, &m.y, &m.w, &m.h);
+            m.starts = atoi(field[4]);
+            m.preview = std::string(module) + field[5];
+            for (char* c = field[6]; *c;) {
+                int cx = 0, cy = 0;
+                if (sscanf(c, "%d,%d", &cx, &cy) == 2) m.start_cell.push_back(cy * 128 + cx);
+                char* semi = strchr(c, ';');
+                if (!semi) break;
+                c = semi + 1;
+            }
+            g_raSkMaps.push_back(m);
+        }
+        fclose(f);
+    } else {
+        char dir[512];
+        snprintf(dir, sizeof dir, "%smissions/", module);
+        for (int n = 1; n <= 24; n++) {
+            RaSkMap m;
+            char code[16];
+            snprintf(code, sizeof code, "SCM%02dEA", n);
+            m.scen = code;
+            m.x = m.y = m.w = m.h = m.starts = 0;
+            ra_sk_ini_facts(dir, &m);
+            if (m.starts >= 2) g_raSkMaps.push_back(m);
+        }
+    }
+    for (size_t i = 0; i < g_raSkMaps.size(); i++) {
+        const RaSkMap& m = g_raSkMaps[i];
+        printf("APP|raskirmish|map|%s|%s|%s|%dx%d|%d starts|preview=%s\n", m.scen.c_str(),
+               m.name.c_str(), m.theater.c_str(), m.w, m.h, m.starts,
+               m.preview.empty() ? "-" : m.preview.c_str());
+    }
+    printf("APP|raskirmish|%d maps|%s\n", (int)g_raSkMaps.size(),
+           listed ? "listed" : "read from the INIs");
+    fflush(stdout);
+    return (int)g_raSkMaps.size();
+}
+
+/* A one-against-one on the first map: the person plays Greece, the computer the USSR, each
+   in its country's own colour, with 10000 credits, tech level 10, ore growing, bases on, no
+   crates and superweapons on. A screen that adds seats finds the next countries already
+   filled in, for all eight, each in its own colour. */
+static void ra_skirmish_defaults(RaSkirmish* s)
+{
+    static const int country[8] = { 1, 2, 3, 4, 5, 6, 7, 0 };
+    memset(s, 0, sizeof *s);
+    s->map = 0;
+    s->players = 2;
+    for (int i = 0; i < 8; i++) {
+        s->seat[i].country = country[i];
+        s->seat[i].colour = country[i];
+        s->seat[i].team = i;
+        s->seat[i].ai = i > 0;
+        s->seat[i].mode = i > 0 ? NM_SEAT_BOT : NM_SEAT_HUMAN;
+        s->seat[i].level = 1;
+        s->seat[i].start = i;
+    }
+    s->credits = 10000;
+    s->tech = 10;
+    s->ore = 1;
+    s->bases = 1;
+    s->superweapons = 1;
+    s->ai_difficulty = 1;
+}
+
+/* THE RED ALERT ENGINE AND ITS FOLDERS, for a match on map `scen`: the brain, the data,
+   the mission folder and the map's own 3D scene when the module carries one (otherwise
+   the placeholder the Classic picture runs on, the rule a campaign mission follows). The
+   skirmish and the network room both start through this. */
+static void ra_engine_opts(GameOpts* opt, const char* scen)
+{
+    static char sbuf[16], pack[48];
+    snprintf(sbuf, sizeof sbuf, "%s", scen ? scen : "");
+    snprintf(pack, sizeof pack, "ra3d/3d/%s.pack", sbuf);
+    FILE* pf = fopen(pack, "rb");
+    if (pf) fclose(pf);
+    else snprintf(pack, sizeof pack, "ra3d/SCG01EA.pack");
+    opt->ra3d = 1;
+#ifdef _WIN32
+    opt->dylib = "ra3d/RedAlert.dll";
+#else
+    opt->dylib = "ra3d/RedAlert.dylib";
+#endif
+    opt->content = "ra3d/data";
+    opt->dir = "ra3d/missions/";
+    opt->dosdata = "ra3d/audio";
+    opt->reskin = 0;
+    opt->scen = sbuf;
+    opt->pack = pack;
+}
+
+/* Turn a filled RaSkirmish into the match the shell boots: the Red Alert engine, its folders,
+   the map and its 3D scene, and every option. Answers 0, and changes nothing, when the
+   choices cannot start a match (no such map, fewer than two seats, more seats than the map
+   has starts, a country or colour out of range, two seats in one colour). */
+static int ra_skirmish_apply(GameOpts* opt, const RaSkirmish* s)
+{
+    if (s->map < 0 || s->map >= (int)g_raSkMaps.size()) return 0;
+    const RaSkMap& m = g_raSkMaps[s->map];
+    if (s->players < 2 || s->players > 8 || s->players > m.starts) return 0;
+    unsigned used = 0;
+    for (int i = 0; i < s->players; i++) {
+        const RaSkSeat& p = s->seat[i];
+        if (p.country < 0 || p.country >= RA_SK_COUNTRIES) return 0;
+        if (p.colour < 0 || p.colour >= RA_SK_COLOURS || (used & (1u << p.colour))) return 0;
+        if (p.start >= m.starts) return 0;
+        used |= 1u << p.colour;
+    }
+    ra_engine_opts(opt, m.scen.c_str());
+    const char* scen = opt->scen;
+    const char* pack = opt->pack;
+    opt->skirmish = 1;
+    opt->side = ra_sk_country_soviet(s->seat[0].country);
+    opt->ai_count = 0;
+    for (int i = 0; i < s->players; i++) if (s->seat[i].mode == NM_SEAT_BOT) opt->ai_count++;
+    opt->build = s->tech < 1 ? 1 : s->tech > 10 ? 10 : s->tech;
+    opt->credits = s->credits;
+    opt->tiberium = s->ore ? 1 : 0;
+    opt->crates = s->crates ? 1 : 0;
+    opt->bases = s->bases ? 1 : 0;
+    opt->shroud_regrow = s->shroud_regrow ? 1 : 0;
+    opt->short_game = s->short_game ? 1 : 0;
+    opt->superweapons = s->superweapons ? 1 : 0;
+    opt->unit_count = s->units;
+    opt->ai_takeover = 0;
+    opt->seed = s->seed;
+    opt->ctf = s->ctf ? 1 : 0;
+    opt->ai_difficulty = (s->ai_difficulty < 0 ? 0 : s->ai_difficulty > 3 ? 3 : s->ai_difficulty) + 1;
+    for (int i = 0; i < 8; i++) {
+        const RaSkSeat& p = s->seat[i];
+        const int in = i < s->players;
+        opt->player_house[i] = p.country;
+        opt->player_team[i] = p.team;
+        opt->ai_levels[i] = (unsigned char)(p.level >= 0 && p.level <= 3 ? p.level : 1);
+        opt->player_colour[i] = p.colour;
+        /* Seat by seat, so the engine roster is exactly these seats: the person, the
+           computers, and every seat past them blocked. */
+        opt->seat_mode[i] = !in ? NM_SEAT_BLOCK : p.mode;
+        opt->start_wp[i] = p.start >= 0 ? p.start : OPENCNC3D_START_UNPICKED;
+        snprintf(opt->player_name[i], sizeof opt->player_name[i], "%s", in ? p.name : "");
+    }
+    int active_players = 0;
+    for (int i = 0; i < s->players; i++)
+        if (opt->seat_mode[i] == NM_SEAT_HUMAN || opt->seat_mode[i] == NM_SEAT_BOT) active_players++;
+    printf("APP|raskirmish|start|%s|players=%d|tech=%d|credits=%d|ore=%d|crates=%d|bases=%d|"
+           "shroud=%d|short=%d|super=%d|units=%d|seed=%d|scene=%s|ctf=%d|difficulty=%d\n",
+           scen, active_players, opt->build, s->credits, opt->tiberium, opt->crates, opt->bases,
+           opt->shroud_regrow, opt->short_game, opt->superweapons, s->units, s->seed, pack,
+           opt->ctf, opt->ai_difficulty - 1);
+    for (int i = 0; i < s->players; i++) {
+        if (opt->seat_mode[i] != NM_SEAT_HUMAN && opt->seat_mode[i] != NM_SEAT_BOT) continue;
+        printf("APP|raskirmish|seat=%d|%s|country=%s|colour=%s (%d,%d,%d)|team=%d|start=%d\n",
+               i, opt->seat_mode[i] == NM_SEAT_BOT ? "computer" : "person",
+               RA_SK_COUNTRY[s->seat[i].country], RA_SK_COLOUR[s->seat[i].colour],
+               RA_SK_COLOUR_RGB[s->seat[i].colour][0], RA_SK_COLOUR_RGB[s->seat[i].colour][1],
+               RA_SK_COLOUR_RGB[s->seat[i].colour][2], s->seat[i].team + 1, s->seat[i].start);
+    }
+    fflush(stdout);
+    return 1;
+}
+
+/* --raskirmish SCMnnEA: the Red Alert module starts that map's skirmish straight from the
+   shell, from ra_skirmish_defaults and what the command line said (--ai N, --side soviet,
+   --seed N, --credits N, --build N, --notiberium, --crates, --shroudregrow). It is the path a
+   skirmish screen takes, driven headless. */
+static char g_raSkirmishScen[12];
+static int g_raSkirmishRan = 0;
+/* --rarounds N: play the --raskirmish match N times in a row (one by default), each through
+   the debrief, which is how its session table is driven. */
+static int g_raSkirmishRounds = 1;
+
+/* ==== RED ALERT'S NETWORK ROOM ==============================================================
+ *
+ * The room is Tiberian Dawn's machinery (netmatch's lobby, the headless --mphost / --mpjoin
+ * doors, the LAN browser, the relay), and these are what differ in the Red Alert module:
+ * the map list, the folder the map fingerprint is read from, the brain whose order wire is
+ * advertised, the opening match, and the start. The room's setup (mp_build_setup) says it
+ * plays Red Alert, carries each seat's country, Red Alert's rules and the seed;
+ * mp_lobby_from_match reads them back. A screen for the room fills an SK_Lobby the same
+ * way the skirmish screen does: country[] holds each seat's country (house[] its side),
+ * colour[] the eight colours, and shroud, ctf, ai_difficulty and seed the rest.
+ * -------------------------------------------------------------------------------------------- */
+
+/* The room's maps: g_skirmish and g_skirmishMaps filled with Red Alert's 24, so every
+   function the room calls reads them. */
+static void ra_lobby_scan(void)
+{
+    ra_skirmish_maps("ra3d/");
+    g_skirmish.clear();
+    g_skirmishMaps.clear();
+    for (size_t i = 0; i < g_raSkMaps.size(); i++) {
+        const RaSkMap& m = g_raSkMaps[i];
+        SpecOp so;
+        GameOpts tmp;
+        memset(&tmp, 0, sizeof tmp);
+        ra_engine_opts(&tmp, m.scen.c_str());
+        so.scen = m.scen;
+        so.pack = tmp.pack;
+        so.name = m.name;
+        so.theater = m.theater;
+        so.w = m.w;
+        so.h = m.h;
+        so.starts = m.starts;
+        g_skirmish.push_back(so);
+    }
+    g_skirmishUserFrom = g_skirmish.size();
+    for (size_t i = 0; i < g_skirmish.size(); i++) {
+        SK_Map r;
+        memset(&r, 0, sizeof r);
+        r.scen = g_skirmish[i].scen.c_str();
+        r.name = g_skirmish[i].name.c_str();
+        r.theater = g_skirmish[i].theater.c_str();
+        r.w = (short)g_skirmish[i].w;
+        r.h = (short)g_skirmish[i].h;
+        r.starts = (short)g_skirmish[i].starts;
+        g_skirmishMaps.push_back(r);
+    }
+}
+
+/* The room's map list for this module. */
+static void lobby_scan(const char* dir)
+{
+    if (g_ra3dPreview) ra_lobby_scan();
+    else skirmish_scan(dir);
+}
+
+/* Where this module's mission files are, for the map's fingerprint. */
+static const char* lobby_mission_dir(const char* dir)
+{
+    return g_ra3dPreview ? "ra3d/missions/" : dir;
+}
+
+/* The brain whose order wire this module's rooms advertise and are judged by. */
+static const char* lobby_brain(const char* dylib)
+{
+#ifdef _WIN32
+    return g_ra3dPreview ? "ra3d/RedAlert.dll" : dylib;
+#else
+    return g_ra3dPreview ? "ra3d/RedAlert.dylib" : dylib;
+#endif
+}
+
+/* A RED ALERT ROOM'S OPENING MATCH, over what the lobby module's own defaults made: every
+   seat a country in that country's colour (the host Greece, or the USSR with `o->side`),
+   tech level 10, and the rules. With `o` the command line's rules are taken (a headless
+   room); without it Red Alert's: 10000 credits, ore growing, bases on, superweapons on,
+   normal computers. */
+static void ra_lobby_defaults(SK_Lobby* lob, const GameOpts* o)
+{
+    static const int allied[8] = { 1, 2, 3, 4, 5, 6, 7, 0 };
+    static const int soviet[8] = { 2, 3, 5, 6, 7, 0, 1, 4 };
+    const int* c = (o && o->side) ? soviet : allied;
+    for (int i = 0; i < 8; i++) {
+        lob->country[i] = c[i];
+        lob->ai_levels[i] = o && o->ai_levels[i] <= 3 ? o->ai_levels[i] : 1;
+        lob->house[i] = ra_sk_country_soviet(c[i]);
+        lob->colour[i] = c[i];
+    }
+    lob->side = ra_sk_country_soviet(c[0]);
+    lob->build = (o && o->build > 1) ? (o->build > 10 ? 10 : o->build) : 10;
+    lob->credits = o ? o->credits : 10000;
+    lob->tiberium = o ? (o->tiberium ? 1 : 0) : 1;
+    lob->crates = o ? (o->crates ? 1 : 0) : 0;
+    lob->bases = o ? (o->bases ? 1 : 0) : 1;
+    lob->superweapons = o ? (o->superweapons ? 1 : 0) : 1;
+    lob->unit_count = o ? o->unit_count : 0;
+    lob->aitake = o ? (o->ai_takeover ? 1 : 0) : 0;
+    lob->shortgame = o ? (o->short_game ? 1 : 0) : 0;
+    lob->shroud = o ? (o->shroud_regrow ? 1 : 0) : 0;
+    lob->ctf = o ? (o->ctf ? 1 : 0) : 0;
+    lob->ai_difficulty = (o && o->ai_difficulty > 0) ? o->ai_difficulty - 1 : 1;
+    lob->seed = (o && o->seed > 0) ? (unsigned)o->seed : 0u;
+}
+
+/* THE ROOM'S MATCH STARTED IN THE RED ALERT ENGINE: its folders and the map's scene, then
+   every field the room agreed, with the houses as countries. */
+static void ra_lobby_apply(GameOpts* opt, const SK_Lobby* lob)
+{
+    if (lob->map >= 0 && lob->map < (int)g_skirmish.size())
+        ra_engine_opts(opt, g_skirmish[lob->map].scen.c_str());
+    skirmish_apply(opt, lob);
+    for (int i = 0; i < 8; i++)
+        opt->player_house[i] = (lob->country[i] >= 0 && lob->country[i] < RA_SK_COUNTRIES) ? lob->country[i] : 1;
+    opt->side = ra_sk_country_soviet(opt->player_house[0]);
+    opt->shroud_regrow = lob->shroud ? 1 : 0;
+    opt->ctf = lob->ctf ? 1 : 0;
+    opt->ai_difficulty = (lob->ai_difficulty < 0 ? 0 : lob->ai_difficulty > 3 ? 3 : lob->ai_difficulty) + 1;
+    opt->seed = (int)lob->seed;
+    printf("APP|raroom|start|%s|tech=%d|credits=%d|ore=%d|crates=%d|shroud=%d|ctf=%d|"
+           "difficulty=%d|seed=%u|scene=%s\n", opt->scen ? opt->scen : "-", opt->build,
+           opt->credits, opt->tiberium, opt->crates, opt->shroud_regrow, opt->ctf,
+           opt->ai_difficulty - 1, lob->seed, opt->pack ? opt->pack : "-");
+    for (int i = 0; i < 8; i++)
+        if (lob->mode[i] != NM_SEAT_BLOCK && lob->mode[i] != NM_SEAT_OPEN)
+            printf("APP|raroom|seat=%d|%s|country=%s|colour=%s\n", i,
+                   lob->mode[i] == NM_SEAT_BOT ? "computer" : "person",
+                   RA_SK_COUNTRY[opt->player_house[i]],
+                   RA_SK_COLOUR[(lob->colour[i] >= 0 && lob->colour[i] < 8) ? lob->colour[i] : 0]);
+    fflush(stdout);
+}
+
 /* THE MATCH DEBRIEF, or nothing at all. Answers 1 to carry on and 0 only when the window
    was closed, so both call sites read the same way; a campaign abort leaves the table
    empty and falls straight through. */
+static int ra_match_debrief(Camp* camp, const MatchStats* ms);   /* below shell_automated */
+
 static int app_match_score(Camp* camp, const MatchStats* ms)
 {
     CampMatch cm;
     int i;
     if (!ms || !ms->valid || ms->nrows <= 0) return 1;
+    /* A RED ALERT MATCH ENDS ON RED ALERT'S DEBRIEF, not this one. */
+    if (g_ra3dPreview) return ra_match_debrief(camp, ms);
     memset(&cm, 0, sizeof cm);
     cm.nrows = ms->nrows > 8 ? 8 : ms->nrows;
     cm.win = ms->win;
@@ -1245,7 +1800,32 @@ static int app_match_score(Camp* camp, const MatchStats* ms)
     return 1;
 }
 
-static int g_ra3dPreview = 0;
+/* The footer Red Alert's Enhanced main menu prints, where Tiberian Dawn prints
+   DM_COPYRIGHT_DEFAULT. */
+#define RA_ENHANCED_LEGAL \
+    "OpenCNC3D is an unofficial fan project, not affiliated with or endorsed by Electronic Arts.\n" \
+    "Command & Conquer: Red Alert is a trademark of Electronic Arts Inc. Created by freschism"
+/* Red Alert's expansions (Counterstrike, Aftermath) are not on the freeware discs; Special
+   Ops lists them when their missions are found, and is greyed on the Enhanced main menu
+   until then. Their missions number 20 and up, past the campaign's 14. */
+static bool ra_expansions_installed(void)
+{
+    for (int n = 20; n < 50; n++)
+        for (const char* side : {"G", "U"}) {
+            char path[64];
+            snprintf(path, sizeof path, "ra3d/missions/SC%s%02dEA.INI", side, n);
+            if (FILE* f = fopen(path, "rb")) { fclose(f); return true; }
+        }
+    return false;
+}
+/* Red Alert's Enhanced main menu greys Special Ops while no expansion is installed, and the
+   highlight then starts on Start New Game rather than on a button that cannot be pressed. */
+static void ra_menu_flags(DMS* menu)
+{
+    if (!g_ra3dPreview) return;
+    menu->st.special_missing = dms_enhanced_menu(menu) && !ra_expansions_installed();
+    if (menu->st.special_missing && menu->st.selected == DM_SPECIAL) menu->st.selected = DM_START;
+}
 static int g_raHarnessSide = 0;
 static int g_raFlowStart = 1;
 static int g_raFlowRealWin = 0;
@@ -1341,9 +1921,14 @@ static int camp_movie(SDL_Window* win, CncAudio* au, const char* name)
        Windows arrow sits on top of a full-screen VQA. Every campaign screen
        re-asserts DISABLE for itself the same way (camp_show_mouse). */
     SDL_ShowCursor(SDL_DISABLE);
-    char path[512];
+    char path[700];
     snprintf(path, sizeof path, "%s/movies/%s.VQA",
              g_ra3dPreview ? "ra3d" : "dosdata", name);
+    /* in the chosen language where its pack carries the movie (game/lang_mod.h) */
+    {
+        const char* lang = game_lang_movie(path);
+        if (lang != path) snprintf(path, sizeof path, "%s", lang);
+    }
     MOV_Opts o;
     MOV_Audio a;
     MOV_Sink sink;
@@ -1360,7 +1945,10 @@ static int camp_movie(SDL_Window* win, CncAudio* au, const char* name)
        mixed and never heard. */
     sink.restore_music = 1;
     movsnd_bind(&sink, &a);
+    const int diagnosticPreviousPhase=game_diagnostics_current_phase();
+    game_diagnostics_phase(3,0);
     const int r = mov_play(win, path, &o, &a, NULL);
+    game_diagnostics_phase(diagnosticPreviousPhase,r);
     printf("CAMPAIGN|movie|%s|%s\n", name,
            r == MOV_DONE ? "played" : r == MOV_SKIPPED ? "skipped"
            : r == MOV_QUIT ? "quit" : "missing");
@@ -1501,6 +2089,13 @@ static int g_mpPlay = 0;
    brain's lockstep switch never thrown -- G199 proves eight peers through the
    command-line handshake, which is a different door into the same engine. */
 static int g_mpHost = 0, g_mpJoin = 0;
+/* --mpmap SCEN: the map the headless room opens on (and the joiner fingerprints), SCM01EA
+   unless said. --mpbots N: the host makes the room's last N seats computers.
+   --mpmyseat HOUSE,COLOUR: the joiner asks for its own row before it readies, as the room
+   screen does; in a Red Alert room HOUSE is a country (0..7). */
+static const char* g_mpMap = "SCM01EA";
+static int g_mpBots = 0;
+static int g_mpMyHouse = -1, g_mpMyColour = -1;
 /* --mpscreenstart, beside --mphost: THE SAME HEADLESS ROOM, BUT START IS THE LOBBY SCREEN'S
    OWN BUTTON. The headless host presses START from this file, which is not the door a
    person uses. With this flag the host waits only until the room is full and everyone in
@@ -1610,12 +2205,26 @@ static int mp_lobby_from_match(SK_Lobby* out)
     out->tiberium = ns->tiberium ? 1 : 0;
     out->unit_count = ns->unit_count;
     out->build = ns->build;
+    out->ai_difficulty = ns->ai_difficulty;
     out->side = ns->house[0] ? 1 : 0;
+    /* A Red Alert room's own rules and seed; its houses are countries. */
+    if (ns->game) {
+        out->aitake = ns->aitake ? 1 : 0;
+        out->shortgame = ns->shortgame ? 1 : 0;
+        out->shroud = ns->shroud ? 1 : 0;
+        out->ctf = ns->ctf ? 1 : 0;
+        out->ai_difficulty = ns->ai_difficulty;
+        out->seed = ns->seed;
+        out->side = ra_sk_country_soviet(ns->house[0]);
+    }
     {
         int bots = 0, any = 0;
         for (i = 0; i < NM_MAX_SEATS; i++) {
-            out->house[i] = ns->house[i] ? 1 : 0;
+            /* A Red Alert room's house is the country; the side follows from it. */
+            out->house[i] = ns->game ? ra_sk_country_soviet(ns->house[i]) : (ns->house[i] ? 1 : 0);
+            if (ns->game) out->country[i] = ns->house[i];
             out->team[i] = ns->team[i];
+            out->ai_levels[i] = ns->ai_levels[i];
             out->colour[i] = ns->colour[i];
             /* Map the wire's RANDOM back to unpicked, and resolve NOTHING here: this
                runs on every peer independently, and a local draw is exactly the desync
@@ -1676,6 +2285,184 @@ static int shell_automated(void)
         || g_specopsShot != NULL || g_loadMenuShot != NULL || g_bootFailShot != NULL
         || g_mpShot != NULL || g_mpAddrTest || g_mpClickTest
         || g_mpSortTest || g_mpSortClick || g_mpPrefsRead != NULL;
+}
+
+/* ==== RED ALERT'S MATCH DEBRIEF: the data and the route ======================================
+ *
+ * A Red Alert skirmish or network match ends on Red Alert's own score screen, not Tiberian
+ * Dawn's match table. The 1996 screen (score.cpp, Multi_Score_Presentation) plays
+ * MLTIPLYR.WSA (CONQUER.MIX) over the score palette and lists, per commander in the house's
+ * colour, the battles won in this session and the kills in each of the session's last four
+ * games: a kill is a unit or a structure destroyed (house.cpp's tally adds both), a battle
+ * is won by every house still standing at the end. ra_match_score_build makes exactly that
+ * table, keeping the session across matches in this process as Session.Score does, and
+ * adds this match's own numbers beside it. The screen that draws it is the menu's to build:
+ * until it does, ra_match_debrief shows the table in a notice and says which way the match
+ * went, so the route is live and the numbers are on the glass.
+ * -------------------------------------------------------------------------------------------- */
+#define RA_SCORE_GAMES 4
+typedef struct RaScoreRow {
+    char name[16];
+    int country;                 /* 0..7, RA_SK_COUNTRY                                     */
+    int colour;                  /* 0..7, RA_SK_COLOUR                                      */
+    int soviet;                  /* 1 the Soviet side                                       */
+    int wins;                    /* battles won this session                                */
+    int kills[RA_SCORE_GAMES];   /* kills in each of the session's last games, oldest first; -1 not played */
+    int killed, razed, lost, harvested;   /* this match: units, structures, own losses, credits */
+    int defeated;                /* beaten in this match                                    */
+    int is_local;                /* the commander at this machine                           */
+} RaScoreRow;
+typedef struct RaMatchScore {
+    RaScoreRow row[8];
+    int nrows;
+    int games;                   /* how many kills[] columns hold a game, 1..4              */
+    int win;                     /* the commander at this machine won                       */
+    int decided;                 /* somebody was beaten (or this machine won); 0 when it was left */
+    int seconds;                 /* the match's length, game time                           */
+    int net;                     /* a network match                                         */
+    char scen[16];               /* SCM10EA                                                 */
+    char mapname[48];            /* First Come First Serve (4)                              */
+    char ended[96];              /* why it ended, when it broke rather than finished        */
+    const char* background;      /* "MLTIPLYR.WSA", in CONQUER.MIX                          */
+} RaMatchScore;
+
+/* THE SESSION, as Session.Score keeps it: a commander is known by name and country (the
+   computers are all called COMPUTER), and every match moves the columns along. */
+/* Set for a scripted run, which has no hand to press OK: the screen is drawn once. */
+static int g_raDebriefNoWait = 0;
+/* The menu, for the Enhanced debrief screen, which draws in its kit on its window. */
+static DMS* g_debriefMenu = NULL;
+static RaScoreRow g_raSession[16];
+static int g_raSessionN = 0;
+static int g_raSessionGames = 0;
+
+static int ra_match_score_build(RaMatchScore* out, const MatchStats* ms)
+{
+    memset(out, 0, sizeof *out);
+    if (!ms || !ms->valid || ms->nrows <= 0) return 0;
+    const int col = g_raSessionGames < RA_SCORE_GAMES ? g_raSessionGames : RA_SCORE_GAMES - 1;
+    if (g_raSessionGames >= RA_SCORE_GAMES)
+        for (int i = 0; i < g_raSessionN; i++)
+            for (int k = 0; k < RA_SCORE_GAMES - 1; k++)
+                g_raSession[i].kills[k] = g_raSession[i].kills[k + 1];
+    for (int i = 0; i < g_raSessionN; i++) g_raSession[i].kills[col] = -1;
+    /* A BATTLE IS WON BY EVERY HOUSE STILL STANDING when the match was decided, which is
+       when somebody was beaten or this machine won; a match left before that wins nobody
+       anything. */
+    int decided = ms->win;
+    for (int r = 0; r < ms->nrows && r < 8; r++) if (ms->row[r].defeated) decided = 1;
+    for (int r = 0; r < ms->nrows && r < 8; r++) {
+        const MatchStatRow* m = &ms->row[r];
+        int at = -1;
+        for (int i = 0; i < g_raSessionN; i++)
+            if (!strcmp(g_raSession[i].name, m->name) && g_raSession[i].country == m->country) { at = i; break; }
+        if (at < 0 && g_raSessionN < 16) {
+            at = g_raSessionN++;
+            memset(&g_raSession[at], 0, sizeof g_raSession[at]);
+            snprintf(g_raSession[at].name, sizeof g_raSession[at].name, "%s", m->name);
+            g_raSession[at].country = m->country;
+            for (int k = 0; k < RA_SCORE_GAMES; k++) g_raSession[at].kills[k] = -1;
+        }
+        if (at < 0) continue;
+        RaScoreRow* s = &g_raSession[at];
+        s->colour = m->colour;
+        s->soviet = ra_sk_country_soviet(m->country);
+        s->kills[col] = m->killed + m->razed;
+        if (decided && !m->defeated) s->wins++;
+        s->killed = m->killed;
+        s->razed = m->razed;
+        s->lost = m->lost;
+        s->harvested = m->harvested;
+        s->defeated = m->defeated;
+        s->is_local = m->is_local;
+        out->row[out->nrows++] = *s;
+    }
+    g_raSessionGames++;
+    out->games = col + 1;
+    out->win = ms->win;
+    out->decided = decided;
+    out->seconds = ms->seconds;
+    out->net = ms->net;
+    snprintf(out->scen, sizeof out->scen, "%s", ms->map);
+    for (size_t i = 0; i < g_raSkMaps.size(); i++)
+        if (g_raSkMaps[i].scen == ms->map) snprintf(out->mapname, sizeof out->mapname, "%s", g_raSkMaps[i].name.c_str());
+    snprintf(out->ended, sizeof out->ended, "%s", ms->ended);
+    out->background = "MLTIPLYR.WSA";
+    printf("APP|radebrief|%s|%s|win=%d|decided=%d|seconds=%d|net=%d|games=%d|rows=%d\n",
+           out->scen, out->mapname[0] ? out->mapname : "-", out->win, out->decided,
+           out->seconds, out->net, out->games, out->nrows);
+    for (int r = 0; r < out->nrows; r++) {
+        const RaScoreRow* s = &out->row[r];
+        printf("APP|radebrief|row=%d|%s|country=%s|colour=%s|wins=%d|kills=%d,%d,%d,%d|"
+               "killed=%d|razed=%d|lost=%d|harvested=%d|defeated=%d|me=%d\n", r, s->name,
+               RA_SK_COUNTRY[s->country & 7], RA_SK_COLOUR[s->colour & 7], s->wins,
+               s->kills[0], s->kills[1], s->kills[2], s->kills[3], s->killed, s->razed,
+               s->lost, s->harvested, s->defeated, s->is_local);
+    }
+    fflush(stdout);
+    return out->nrows;
+}
+
+/* THE ROUTE: the table, then the screen. Answers 1 to carry on, 0 when the window closed.
+   Automated runs draw the screen once (into the shot folder) and go on. */
+static int ra_match_debrief(Camp* camp, const MatchStats* ms)
+{
+    RaMatchScore sc;
+    if (!ra_match_score_build(&sc, ms)) return 1;
+    char text[1200];
+    int n = snprintf(text, sizeof text, "%s, %d:%02d. ", sc.mapname[0] ? sc.mapname : sc.scen,
+                     sc.seconds / 60, sc.seconds % 60);
+    if (sc.ended[0]) n += snprintf(text + n, sizeof text - n, "%s. ", sc.ended);
+    for (int r = 0; r < sc.nrows && n < (int)sizeof text - 80; r++) {
+        const RaScoreRow* s = &sc.row[r];
+        n += snprintf(text + n, sizeof text - n, "%s (%s): %d won, %d kills%s. ", s->name,
+                      RA_SK_COUNTRY[s->country & 7], s->wins, s->kills[sc.games - 1],
+                      s->defeated ? ", beaten" : "");
+    }
+    char shot[1024];
+    const char* shotp = NULL;
+    if (shell_automated() || g_raDebriefNoWait) {
+        snprintf(shot, sizeof shot, "%s/ra_debrief.png", g_shotDir ? g_shotDir : ".");
+        shotp = shot;
+    }
+    if (ms->net) g_backToBrowser = 1;
+    /* UNDER ENHANCED, RED ALERT'S OWN DEBRIEF SCREEN in its title kit (em_ra_debrief):
+       the session's table, the result and this machine's numbers. Classic Red Alert keeps
+       the notice below. */
+    if (g_debriefMenu && dms_enhanced_menu(g_debriefMenu)) {
+        EM_Debrief d;
+        memset(&d, 0, sizeof d);
+        d.nrows = sc.nrows < 8 ? sc.nrows : 8;
+        d.games = sc.games;
+        d.win = sc.win;
+        d.decided = sc.decided;
+        d.seconds = sc.seconds;
+        d.net = sc.net;
+        snprintf(d.mapname, sizeof d.mapname, "%s", sc.mapname[0] ? sc.mapname : sc.scen);
+        snprintf(d.ended, sizeof d.ended, "%s", sc.ended);
+        for (int r = 0; r < d.nrows; r++) {
+            const RaScoreRow* s = &sc.row[r];
+            EM_DebriefRow* o = &d.row[r];
+            snprintf(o->name, sizeof o->name, "%s", s->name);
+            o->country = s->country & 7;
+            o->colour = s->colour & 7;
+            o->wins = s->wins;
+            for (int k = 0; k < 4; k++) o->kills[k] = s->kills[k];
+            o->defeated = s->defeated;
+            o->is_local = s->is_local;
+            if (s->is_local) {
+                d.killed = s->killed; d.razed = s->razed; d.lost = s->lost;
+                d.harvested = s->harvested;
+            }
+        }
+        return dms_ra_debrief(g_debriefMenu, &d, shotp, shotp != NULL) == DMS_QUIT ? 0 : 1;
+    }
+    if (!camp || !camp->win) return 1;
+    const int r = game_notice_open(camp->win, "ra3d/sidebar-snow.pack",
+                                   sc.win ? "Mission accomplished"
+                                          : sc.decided ? "Mission failed" : "Match ended",
+                                   text, shotp);
+    return r == -2 ? 0 : 1;
 }
 /* The script both harness routes drive, in one place so the two cannot disagree about
    what was clicked. It touches every control the screen has, in the order a player
@@ -1775,8 +2562,25 @@ static const DMS_LobbyStep LOBBY_SCRIPT[] = {
        redraws the one line that has to change: with a computer now set by hand, "every
        computer plays Nod" is no longer true and the screen has to say the real split. */
     { SK_I_NOD,      500, 500, 0 },
+    /* Mixed behavior levels through the actual roster cells, on BOTH sides of the
+       blocked seat4. Seat1 Expert, seat2 Hard, seat3 Easy, seat5 Normal. */
+    { SK_I_LEVEL0+1, 500, 500, 0 }, { SK_I_LEVEL0+1, 500, 500, 0 },
+    { SK_I_LEVEL0+2, 500, 500, 0 },
+    { SK_I_LEVEL0+3, 500, 500, 0 }, { SK_I_LEVEL0+3, 500, 500, 0 }, { SK_I_LEVEL0+3, 500, 500, 0 },
+    { SK_I_LEVEL0+5, 500, 500, 0 }, { SK_I_LEVEL0+5, 500, 500, 0 }, { SK_I_LEVEL0+5, 500, 500, 0 }, { SK_I_LEVEL0+5, 500, 500, 0 },
     { 0, 0, 0, SDLK_RETURN }          /* Enter is Play                     */
 };
+/* Enhanced uses Player Setup field dropdowns before their choices are visible. Both
+   games drive this same popup-aware mixed-level trace through their actual controls. */
+static const DMS_LobbyStep ENHANCED_LOBBY_SCRIPT[] = {
+    { SK_I_CHANGEMAP, 500, 500, 0 }, { SK_I_PICK_CANCEL, 500, 500, 0 },
+    { SK_ROW_ITEM(4), 500, 500, 0 }, { -10, 500, 500, 0 },
+    { SK_I_POP_BLOCK, 500, 500, 0 }, { 0, 0, 0, SDLK_ESCAPE },
+    { SK_I_LEVEL0+1, 500, 500, 0 }, { SK_I_LEVEL0+1, 500, 500, 0 },
+    { SK_I_LEVEL0+2, 500, 500, 0 },
+    { SK_I_LEVEL0+3, 500, 500, 0 }, { SK_I_LEVEL0+3, 500, 500, 0 }, { SK_I_LEVEL0+3, 500, 500, 0 },
+    { SK_I_LEVEL0+5, 500, 500, 0 }, { SK_I_LEVEL0+5, 500, 500, 0 }, { SK_I_LEVEL0+5, 500, 500, 0 }, { SK_I_LEVEL0+5, 500, 500, 0 },
+    { SK_I_PLAY, 500, 500, 0 } };
 static DMS_LobbyProbe g_lobbyProbe;
 /* --mpscreenstart's script, filled in once: START GAME, then MP_SCREEN_IDLE frames of a
    key the lobby does not translate, then ESCAPE. A room that starts leaves the screen long
@@ -1811,6 +2615,12 @@ static long g_rssAfterRound[RSS_MAX_ROUNDS];
 static void harness_click(int x, int y)
 {
     SDL_Event e;
+    memset(&e, 0, sizeof e);
+    /* Exercise the same hover transition as moving the real pointer to this button. */
+    e.type = SDL_MOUSEMOTION;
+    e.motion.x = x;
+    e.motion.y = y;
+    SDL_PushEvent(&e);
     memset(&e, 0, sizeof e);
     e.type = SDL_MOUSEBUTTONDOWN;
     e.button.button = SDL_BUTTON_LEFT;
@@ -2032,6 +2842,38 @@ static int userdir_carry_over(const char* pref)
     return copied;
 }
 
+/* RED ALERT SLOTS SAVED BEFORE THE MODULE HAD A FOLDER OF ITS OWN. They sit in the
+   per-user folder beside Tiberian Dawn's, and dossave.c already tells them apart (their
+   pack is the module's, "ra3d/..."), so Tiberian Dawn never offers them; this copies them
+   into the module's folder once, the first time it has no index of its own, under the
+   same slot numbers. The originals are left where they are. Returns how many slots. */
+static int ra_saves_carry_over(const char* pref, const char* radir)
+{
+    char to[1100], from[1100];
+    struct stat sb;
+    snprintf(to, sizeof to, "%sOPENCNC.IDX", radir);
+    if (stat(to, &sb) == 0) return 0;
+    DS_Slot all[DS_SLOTS], mine[DS_SLOTS];
+    ds_set_dir(pref);
+    if (ds_read_index(all) <= 0) return 0;
+    memset(mine, 0, sizeof mine);
+    int n = 0;
+    for (int i = 0; i < DS_SLOTS; i++) {
+        if (!all[i].used || all[i].game != DS_GAME_RA) continue;
+        snprintf(from, sizeof from, "%s", ds_payload_path(all[i].slot));
+        snprintf(to, sizeof to, "%ssavegame.%03d", radir, all[i].slot);
+        if (carry_copy(from, to) <= 0) continue;
+        mine[i] = all[i];
+        n++;
+    }
+    if (n) {
+        ds_set_dir(radir);
+        ds_write_index(mine);
+    }
+    ds_set_dir("");
+    return n;
+}
+
 /* COPY SETTINGS FROM THE EARLIER FILE NAMES WHEN THE GAME FOLDER HAS NONE. Beside the
    game, where every settings file lives; copied once, while the new name is absent,
    and the earlier file is left where it is. Runs before anything reads a setting. */
@@ -2052,8 +2894,35 @@ int main(int argc, char** argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
     std::set_terminate(opencnc3d_terminate_handler);
+    /* --langget CODE: fetch a language pack (game/lang_mod.h) into this install and exit,
+       printing its progress; no window. The way to test a pack without the Settings box. */
+    for (int i = 1; i + 1 < argc; i++)
+        if (!strcmp(argv[i], "--langget")) return game_lang_fetch_cli(argv[i + 1]);
+#if defined(_WIN32) && defined(OPENCNC3D_DIAGNOSTIC_APP)
+    /* Double-click behaves like the normal frontend in its installed data folder.
+       Only this entry enables structured diagnostics; the renderer is shared. */
+    char* diagnosticBase=SDL_GetBasePath();
+    if(diagnosticBase){
+        const int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,diagnosticBase,-1,NULL,0);
+        if(n>0){std::vector<wchar_t> wide((size_t)n);if(MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,diagnosticBase,-1,wide.data(),n)>0)_wchdir(wide.data());}
+        SDL_free(diagnosticBase);
+    }
+    fprintf(stderr,"OPENCNC3D|diagnostics|1\n"); /* retained, entry-specific artifact marker */
+    const int diagnosticStarted=game_diagnostics_begin();
+    atexit(game_diagnostics_end);
+    if(diagnosticStarted){
+        /* Raw game stdout can contain local paths or multiplayer identity. It is
+           deliberately excluded from the structured, shareable report. */
+        freopen("NUL","w",stdout);freopen("NUL","w",stderr);
+    } else if(argc==1&&!fs_background_only()) {
+        MessageBoxW(NULL,L"Performance logging could not start. Neither the game Logs folder nor your local OpenCNC3D Logs folder is writable. The game will still run normally.",L"OpenCNC3D Diagnostics",MB_OK|MB_ICONWARNING);
+    }
+    game_diagnostics_phase(1,0);
+#endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(OPENCNC3D_DIAGNOSTIC_APP)
+    /* The dedicated entry owns structured logging above. */
+#elif defined(_WIN32)
     /* THE LOG THE READ-ME HAS ALWAYS ASKED FOR, and which nothing wrote until v0.6.0.
      *
      * The Windows READ-ME's troubleshooting section says "Send opencnc3d-log.txt" and lists
@@ -2148,8 +3017,9 @@ int main(int argc, char** argv)
     }
 #endif
 
-    /* Before the first setting is read: see settings_carry_over. */
-    {
+    /* Background probes read settings but do not migrate or arm implicit saves.
+       Explicit --visualscfg/--gfxsave and gfxsave actions remain opt-ins. */
+    if (!fs_background_only()) {
         const int carried = settings_carry_over();
         if (carried) printf("APP|settings|copied=%d\n", carried);
     }
@@ -2207,6 +3077,12 @@ int main(int argc, char** argv)
         else if (!strcmp(argv[i], "--rascen") && i + 1 < argc) {
             snprintf(g_raScen, sizeof g_raScen, "%s", argv[++i]);
         }
+        else if (!strcmp(argv[i], "--raskirmish") && i + 1 < argc) {
+            snprintf(g_raSkirmishScen, sizeof g_raSkirmishScen, "%s", argv[++i]);
+        }
+        else if (!strcmp(argv[i], "--rarounds") && i + 1 < argc) {
+            g_raSkirmishRounds = atoi(argv[++i]);
+        }
         else if (!strcmp(argv[i], "--hidden"))                   g_hiddenWin = 1;
         /* Handled HERE and not forwarded, because this is the file that creates the
            window. The standalone cnc_eyes takes the same flag through its own parser. */
@@ -2227,6 +3103,17 @@ int main(int argc, char** argv)
                 mcfg.music = "INTRO"; /* menus.cpp plays THEME_INTRO in the RA menu */
                 mcfg.logo = "ra3d/movies/REDINTRO.VQA";
                 intro_file = mcfg.intro = "ra3d/movies/PROLOG.VQA";
+                /* RED ALERT'S ENHANCED KIT (ra3d/enhanced-menu.pack) for every Enhanced
+                   screen this process draws, title and mission alike. The 1996 menu state
+                   above keeps its "RA3D" line and its empty notice for Classic. */
+                em_set_red_alert("OpenCNC3D " OPENCNC3D_BUILD, RA_ENHANCED_LEGAL);
+                /* Its saves are its own (ds_set_game below): Load opens the slot dialog;
+                   its skirmish starts through ra_skirmish_apply. */
+                em_set_route_ready(EM_ROUTE_SAVES, 1);
+                em_set_route_ready(EM_ROUTE_SKIRMISH, 1);
+                /* and its network room: the shared host, join, browser and lobby screens
+                   on Red Alert's maps and countries (the multiplayer arm below) */
+                em_set_route_ready(EM_ROUTE_NETWORK, 1);
             } else {
                 fprintf(stderr, "unknown module: %s\n", module);
                 return 2;
@@ -2314,6 +3201,15 @@ int main(int argc, char** argv)
             g_hiddenWin = 1;
             mcfg.logo = NULL;
             mcfg.intro = NULL;
+        } else if (!strcmp(argv[i], "--mpmap") && i + 1 < argc) {
+            g_mpMap = argv[++i];
+        } else if (!strcmp(argv[i], "--mpbots") && i + 1 < argc) {
+            g_mpBots = atoi(argv[++i]);
+        } else if (!strcmp(argv[i], "--mpmyseat") && i + 1 < argc) {
+            const char* v = argv[++i];
+            g_mpMyHouse = atoi(v);
+            const char* c = strchr(v, ',');
+            g_mpMyColour = c ? atoi(c + 1) : -1;
         } else if (!strcmp(argv[i], "--mprelay") && i + 1 < argc) {
             /* HOST or HOST:PORT, split here because every other address this program
                takes on the command line is written that way. */
@@ -2520,6 +3416,8 @@ int main(int argc, char** argv)
 
     GameOpts opt;
     memset(&opt, 0, sizeof opt);
+    /* Red Alert's own F5 defaults, before the arg pass gives the dials their values. */
+    if (g_ra3dPreview) game_use_red_alert_dials();
     if (game_parse_args(gargc, gargv, &opt))
         return 2;
     const char* fx_cfg = g_ra3dPreview ? "ra3d-fx.cfg" : "opencnc3d-fx.cfg";
@@ -2534,7 +3432,7 @@ int main(int argc, char** argv)
     }
 
     /* Before anything can host or join. See mp_install_map_hasher. */
-    mp_install_map_hasher(base_dir(opt.dir));
+    mp_install_map_hasher(lobby_mission_dir(base_dir(opt.dir)));
 
     /* AND DO NOT BECOME THE ACTIVE APPLICATION. A hidden window is not enough on macOS:
        SDL gives the process the Regular activation policy, so it takes the menu bar and
@@ -2552,6 +3450,13 @@ int main(int argc, char** argv)
        folder the game happened to be launched from. A NULL from SDL degrades to "no
        persistence" rather than guessing, exactly as camp_fame_path does. --savedir, parsed
        by the renderer's own arg pass, overrides it and is what a gate uses. */
+    /* RED ALERT'S SAVES ARE ITS OWN. Its mission names are Tiberian Dawn's (both have an
+       SCG01EA), and one game's payload in the other's engine is the wrong world, so the
+       module keeps its slots in a ra3d/ folder inside the per-user one and every record it
+       writes says which game wrote it (game/dossave.h). Tiberian Dawn's saves stay
+       exactly where they always were. */
+    if (g_ra3dPreview)
+        ds_set_game(DS_GAME_RA);
     if (!ds_get_dir()[0]) {
         char* pref = SDL_GetPrefPath(OPENCNC3D_PREF_ORG, OPENCNC3D_PREF_APP);
         if (pref) {
@@ -2560,7 +3465,21 @@ int main(int argc, char** argv)
                --savedir run is pointed somewhere else on purpose. */
             const int carried = userdir_carry_over(pref);
             if (carried) printf("APP|userdir|copied=%d\n", carried);
-            ds_set_dir(pref);
+            if (g_ra3dPreview) {
+                char radir[1024];
+                snprintf(radir, sizeof radir, "%sra3d", pref);
+#ifdef _WIN32
+                _mkdir(radir);
+#else
+                mkdir(radir, 0755);
+#endif
+                snprintf(radir, sizeof radir, "%sra3d/", pref);
+                const int moved = ra_saves_carry_over(pref, radir);
+                if (moved) printf("APP|userdir|ra-saves-copied=%d\n", moved);
+                ds_set_dir(radir);
+            } else {
+                ds_set_dir(pref);
+            }
             SDL_free(pref);
         } else {
             fprintf(stderr, "saves: SDL_GetPrefPath gave nothing; this session cannot "
@@ -2611,15 +3530,22 @@ int main(int argc, char** argv)
         flags |= fs_initial_flags(dispMode);
         if (dispMode == FS_MODE_WINDOWED && dispW > 0 && dispH > 0) { opt.w = dispW; opt.h = dispH; }
     }
-    SDL_Window* win = SDL_CreateWindow("OpenCNC3D", SDL_WINDOWPOS_CENTERED,
+#if defined(OPENCNC3D_DIAGNOSTIC_APP)
+    const char* appWindowTitle="OpenCNC3D Diagnostics";
+#else
+    const char* appWindowTitle="OpenCNC3D";
+#endif
+    SDL_Window* win = SDL_CreateWindow(appWindowTitle, SDL_WINDOWPOS_CENTERED,
                                        SDL_WINDOWPOS_CENTERED, opt.w, opt.h, flags);
     if (!win) { fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError()); return 1; }
-    /* A true fullscreen window is born borderless-sized and then switched, so the mode
-       change goes through the one function that knows how (fullscreen.h). */
+    fs_set_change_handler(win, game_display_changed);
+    /* Exclusive fullscreen begins only after the preferred display mode is installed.
+       The constructor size must not become the mode used for Desktop. */
     if (!shell_automated() && !fs_background_only() && dispMode == FS_MODE_FULLSCREEN)
         fs_apply_mode(win, dispMode, dispW, dispH);
     SDL_GLContext ctx = SDL_GL_CreateContext(win);
-    if (!ctx) { fprintf(stderr, "SDL_GL_CreateContext: %s\n", SDL_GetError()); return 1; }
+    if (!ctx) {game_diagnostics_phase(9,1); fprintf(stderr, "SDL_GL_CreateContext: %s\n", SDL_GetError()); return 1; }
+    game_diagnostics_graphics();
     SDL_GL_MakeCurrent(win, ctx);
     fprintf(stderr, "GL_VERSION  = %s\nGL_RENDERER = %s\n",
             glGetString(GL_VERSION), glGetString(GL_RENDERER));
@@ -2633,6 +3559,15 @@ int main(int argc, char** argv)
         game_visuals_default_ra(fx_cfg, "opencnc3d-fx.cfg", shell_automated());
     else if (!g_wantClassic)
         game_visuals_default_enhanced(fx_cfg);
+    /* Keep the dialog's display dial in step with the window we created. With no preset
+       startup remains windowed; the compiled visual default is borderless. This only
+       sets the live dial and never creates a settings file just for launching. */
+    if (!shell_automated() && !fs_background_only()) {
+        const int actualMode = fs_window_mode(win);
+        int actualW = dispW, actualH = dispH;
+        if (actualMode == FS_MODE_WINDOWED) SDL_GetWindowSize(win, &actualW, &actualH);
+        game_display_started(actualMode, actualW, actualH);
+    }
     /* WHAT WE ACTUALLY GOT, not what was asked for. Requesting a 24-bit depth buffer
        and a double-buffered visual does not mean the driver handed one over, and on a
        machine that falls back to a software GL the request is granted on paper and the
@@ -2732,14 +3667,19 @@ int main(int argc, char** argv)
        `automated` is reused rather than restated because it already names every entry
        point a gate drives, and a remembered SPEED is the engine's tick rate: no gate may
        inherit one from a file somebody left in the run folder. It sits after
-       game_set_audio because restoring the volumes pushes them at the mixer. */
-    if (!automated)
-        game_controls_remember(g_ra3dPreview ? "ra3d-controls.cfg" : "opencnc3d-controls.cfg");
+       game_set_audio because restoring the volumes pushes them at the mixer.
+       A bare background player probe still reads these settings; the restore
+       routine keeps its save path empty so no implicit write can follow. */
+    if (!automated) {
+        const char* controls = g_ra3dPreview ? "ra3d-controls.cfg" : "opencnc3d-controls.cfg";
+        if (fs_background_only()) game_controls_load_readonly(controls);
+        else game_controls_remember(controls);
+    }
     /* AND THE PLAYER'S PRESET IS WRITTEN BACK FROM THE PAUSE MENU TOO. Until this call
        existed, only the main menu's Visuals screen and the F5 panel ever wrote
        opencnc3d-fx.cfg, so a Swapped Mouse Buttons set from the in-mission pause dialog was
        lost on quit. It sits AFTER game_visuals_default_enhanced has loaded that file. */
-    if (!automated)
+    if (!automated && !fs_background_only())
         game_visuals_remember(fx_cfg);
 
     /* --visualsshot: the menu's Visuals screen, one frame, then out. Placed here on
@@ -2809,8 +3749,12 @@ int main(int argc, char** argv)
         SDL_Quit();
         return 1;
     }
+    g_debriefMenu = &menu;
     if (g_menuShot) {
         dms_redraw(&menu);
+        /* Red Alert's Enhanced menu as the player first sees it: Special Ops greyed when
+           nothing is installed, and the footer and pointer layer a drawn frame sets up. */
+        if (g_ra3dPreview) { ra_menu_flags(&menu); dms_draw(&menu); }
         const int wrote = dms_write_shot(&menu, g_menuShot);
         printf("MENUSHOT|module=%s|theme=%s|playing=%d|file=%s\n",
                g_ra3dPreview ? "ra3d" : "opencnc3d", cnc_music_current(au),
@@ -5163,7 +6107,9 @@ int main(int argc, char** argv)
                 dm_draw_plate(&menu.surf, menu.pack);
                 mp_draw(&menu.surf, menu.pack, &mp);
                 snprintf(path, sizeof path, "%s_%s.png", g_mpShot, NAMES[k]);
+                menu.browser = &mp;
                 if (dms_write_shot(&menu, path)) n++;
+                menu.browser = NULL;
                 /* WHERE THE SCROLL BAR AND ITS THUMB ARE on each list page, in menu pixels,
                    so a gate can measure the thumb against its well in the picture itself.
                    thumb_h=0 says no thumb is drawn, because every shown game fits. */
@@ -5275,7 +6221,9 @@ int main(int argc, char** argv)
                 dm_draw_plate(&menu.surf, menu.pack);
                 sk_draw(&menu.surf, menu.pack, &lob);
                 snprintf(path, sizeof path, "%s_%s.png", g_mpShot, NETNAMES[k]);
+                menu.lobby = &lob;
                 if (dms_write_shot(&menu, path)) n++;
+                menu.lobby = NULL;
             }
         }
         printf("MPSHOT|shots=%d|overflow=%d\n", n, bad);
@@ -5305,7 +6253,7 @@ int main(int argc, char** argv)
             menu.my = DM_SCREEN_H / 2;
             SDL_GL_GetDrawableSize(win, &dw, &dh);
             for (k = 0; k < 2; k++) {
-                if (k == 1) do_move_end(&ops);
+                if (k == 1) { if (game_enhanced_menu_enabled()) em_ops_filter(&ops,1); else do_move_end(&ops); }
                 dms_redraw(&menu);
                 dms_draw(&menu);          /* lays the letterbox out itself */
                 snprintf(path, sizeof path, "%s/specops_%s.png", g_specopsShot,
@@ -5315,6 +6263,7 @@ int main(int argc, char** argv)
                        path, ops.top, ops.selected);
                 SDL_GL_SwapWindow(win);
             }
+            if (game_enhanced_menu_enabled()) printf("SPECOPS|enhanced|Covert Ops,Special Ops|GDI-first|no-tests\n");
             menu.ops = NULL;
             /* The filing, as text, so a gate can read it without a picture. */
             {
@@ -5654,6 +6603,7 @@ int main(int argc, char** argv)
         menu.my = DM_SCREEN_H / 2;
         menu.st.pressed = -1;
         menu.st.selected = DM_SPECIAL;
+        ra_menu_flags(&menu);
         dms_redraw(&menu);
         dms_draw(&menu);
         gl_probe(win, "pristine-menu-frame");
@@ -5683,6 +6633,52 @@ int main(int argc, char** argv)
         fflush(stdout);
 
         if (state == APP_MENU) {
+            game_diagnostics_phase(2,0);
+            /* --raskirmish: the Red Alert skirmish, started once through the call a
+               skirmish screen makes; when the match ends the shell carries on as usual. */
+            if (g_ra3dPreview && g_raSkirmishScen[0]) {
+                RaSkirmish rs;
+                ra_skirmish_defaults(&rs);
+                ra_skirmish_maps("ra3d/");
+                rs.map = -1;
+                for (int i = 0; i < (int)g_raSkMaps.size(); i++)
+                    if (g_raSkMaps[i].scen == g_raSkirmishScen) rs.map = i;
+                /* Once, unless --rarounds asked for more: each round plays it again. */
+                if (round + 1 >= g_raSkirmishRounds) g_raSkirmishScen[0] = 0;
+                rs.players = opt.ai_count + 1 < 2 ? 2 : opt.ai_count + 1 > 8 ? 8 : opt.ai_count + 1;
+                if (opt.side) {
+                    /* The person plays the USSR and the computers take the Allied countries,
+                       then Ukraine, each in its own colour. */
+                    static const int against[7] = { 3, 5, 6, 7, 0, 1, 4 };
+                    rs.seat[0].country = rs.seat[0].colour = 2;
+                    for (int i = 1; i < 8; i++)
+                        rs.seat[i].country = rs.seat[i].colour = against[i - 1];
+                }
+                rs.credits = opt.credits;
+                rs.tech = opt.build > 1 ? opt.build : 10;
+                rs.ore = opt.tiberium;
+                rs.crates = opt.crates;
+                rs.bases = opt.bases;
+                rs.shroud_regrow = opt.shroud_regrow;
+                rs.short_game = opt.short_game;
+                rs.superweapons = opt.superweapons;
+                rs.units = opt.unit_count;
+                rs.seed = opt.seed;
+                rs.ctf = opt.ctf;
+                rs.ai_difficulty = opt.ai_difficulty > 0 ? opt.ai_difficulty - 1 : 1;
+                for (int i = 0; i < 8; i++) rs.seat[i].level = opt.ai_levels[i] <= 3 ? opt.ai_levels[i] : rs.ai_difficulty;
+                if (!ra_skirmish_apply(&opt, &rs)) {
+                    printf("APP|raskirmish|REFUSED|map=%d|players=%d\n", rs.map, rs.players);
+                    fflush(stdout);
+                    g_harnessFails++;
+                    state = APP_DONE;
+                    continue;
+                }
+                g_camp.active = 0;
+                g_raSkirmishRan = 1;
+                state = APP_GAME;
+                continue;
+            }
             if (g_flowTest && round > 0 && !g_camp.active) {
                 printf("FLOWTEST|campaign-ended|%d missions booted and final result handled\n",
                        round);
@@ -5703,6 +6699,7 @@ int main(int argc, char** argv)
                 menu.my = DM_SCREEN_H / 2;
                 menu.st.pressed = -1;
                 menu.st.selected = DM_SPECIAL;
+                ra_menu_flags(&menu);
                 dms_redraw(&menu);
                 dms_draw(&menu);
                 gl_probe(win, "after-menu-frame");
@@ -5737,7 +6734,7 @@ int main(int argc, char** argv)
                    Mission and the answer is RETURN on its dialog, pushed now so the
                    dialog's own loop finds it waiting. */
                 int bx, by, bw, bh;
-                if (g_ra3dPreview) {
+                if (g_ra3dPreview && !g_harnessLoad) {
                     dms_item_window_rect(&menu, DM_START, &bx, &by, &bw, &bh);
                     printf("HARNESS|click|RA START at window rect %d,%d %dx%d\n",
                            bx, by, bw, bh);
@@ -5838,15 +6835,115 @@ int main(int argc, char** argv)
                 choice = DM_MULTIPLAYER;
                 printf("APP|menu|after-match|to-multiplayer\n");
             } else {
+                ra_menu_flags(&menu);
                 choice = dms_run(&menu);
             }
             printf("APP|menu|choice=%d\n", choice);
             fflush(stdout);
             if (choice == DMS_QUIT || choice == DM_EXIT) {
                 state = APP_DONE;
-            } else if (g_ra3dPreview && choice != DM_VISUALS && choice != DM_INTRO
-                       && choice != DM_START) {
-                /* These menu routes still need their Red Alert equivalents. */
+            } else if (g_ra3dPreview && dms_enhanced_menu(&menu) && choice != DM_VISUALS
+                       && choice != DM_INTRO && choice != DM_START
+                       && !(choice == DM_LOAD && em_route_ready(EM_ROUTE_SAVES))
+                       && !(choice == DM_MULTIPLAYER && em_route_ready(EM_ROUTE_NETWORK))) {
+                /* RED ALERT'S ENHANCED ROUTES. Each opens its screen once its engine side is
+                   connected (em_set_route_ready); until then the button answers with a
+                   notice saying what it waits for. User Maps lists Red Alert's own folder,
+                   and an empty one says where scenario files go. */
+                const int route = choice == DM_LOAD ? EM_ROUTE_SAVES
+                                : choice == DM_SKIRMISH ? EM_ROUTE_SKIRMISH
+                                : choice == DM_MULTIPLAYER ? EM_ROUTE_NETWORK
+                                : choice == DM_USERMAPS ? EM_ROUTE_USERMAPS : -1;
+                int pick = DMS_CANCEL;
+                if (choice == DM_SKIRMISH && em_route_ready(EM_ROUTE_SKIRMISH)) {
+                    /* RED ALERT'S SKIRMISH: the shared lobby with Red Alert's 24 maps and
+                       its countries (sk_set_red_alert), its answers turned into the match
+                       by ra_skirmish_apply. */
+                    ra_skirmish_maps("ra3d/");
+                    std::vector<SK_Map> skmaps(g_raSkMaps.size());
+                    for (size_t i = 0; i < g_raSkMaps.size(); i++) {
+                        memset(&skmaps[i], 0, sizeof skmaps[i]);
+                        skmaps[i].scen = g_raSkMaps[i].scen.c_str();
+                        skmaps[i].name = g_raSkMaps[i].name.c_str();
+                        skmaps[i].theater = g_raSkMaps[i].theater.c_str();
+                        skmaps[i].w = (short)g_raSkMaps[i].w;
+                        skmaps[i].h = (short)g_raSkMaps[i].h;
+                        skmaps[i].starts = (short)g_raSkMaps[i].starts;
+                    }
+                    SK_Lobby lob;
+                    memset(&lob, 0, sizeof lob);
+                    /* --lobbyplay: the lobby pressed as a hand presses it: the map
+                       picker opened and closed, then Play on the defaults (every seat
+                       its own country on the first map); a picture of each frame into
+                       --shotdir */
+                    DMS_LobbyProbe raProbe;
+                    memset(&raProbe, 0, sizeof raProbe);
+                    raProbe.script = ENHANCED_LOBBY_SCRIPT;
+                    raProbe.steps = (int)(sizeof ENHANCED_LOBBY_SCRIPT / sizeof ENHANCED_LOBBY_SCRIPT[0]);
+                    raProbe.shotdir = g_shotDir;
+                    const int r = dms_lobby(&menu, skmaps.empty() ? NULL : &skmaps[0],
+                                            (int)skmaps.size(), NULL, &lob,
+                                            g_lobbyPlay ? &raProbe : NULL);
+                    if (r == DMS_QUIT) { state = APP_DONE; continue; }
+                    if (r != DMS_CANCEL && lob.map >= 0 && lob.map < (int)g_raSkMaps.size()) {
+                        RaSkirmish rs;
+                        ra_skirmish_defaults(&rs);
+                        rs.map = lob.map;
+                        rs.players = g_raSkMaps[lob.map].starts;
+                        for (int i = 0; i < 8; i++) {
+                            rs.seat[i].country = lob.country[i];
+                            rs.seat[i].colour = lob.colour[i];
+                            rs.seat[i].team = lob.team[i];
+                            rs.seat[i].level = lob.ai_levels[i];
+                            rs.seat[i].ai = lob.mode[i] == NM_SEAT_BOT;
+                            rs.seat[i].mode = lob.mode[i];
+                            rs.seat[i].start = lob.start_wp[i];
+                        }
+                        rs.tech = lob.build;
+                        rs.credits = lob.credits;
+                        rs.ore = lob.tiberium;
+                        rs.crates = lob.crates;
+                        rs.bases = lob.bases;
+                        rs.short_game = lob.shortgame;
+                        rs.superweapons = lob.superweapons;
+                        rs.units = lob.unit_count;
+                        rs.shroud_regrow = lob.shroud;
+                        rs.ctf = lob.ctf;
+                        rs.ai_difficulty = lob.ai_difficulty;
+                        lobby_report_seats(&lob);
+                        if (ra_skirmish_apply(&opt, &rs)) {
+                            g_camp.active = 0;   /* a skirmish is not the campaign */
+                            state = APP_GAME;
+                        } else if (game_notice_open(win, opt.dospack, "NOTICE",
+                                       "This skirmish cannot start: the map seats fewer players, "
+                                       "or two players share a colour.", NULL) == -2) {
+                            state = APP_DONE;
+                        }
+                    }
+                    continue;
+                }
+                if (choice == DM_USERMAPS) {
+                    ra_usermaps_scan();
+                    pick = dms_special(&menu, g_raUsermaps.empty() ? NULL : &g_raUsermaps[0],
+                                       (int)g_raUsermaps.size());
+                    if (pick == DMS_QUIT) { state = APP_DONE; continue; }
+                }
+                if (route >= 0 && (choice != DM_USERMAPS || pick >= 0) && !em_route_ready(route)) {
+                    printf("APP|menu|ra-route-notice|%s\n", dm_item_label(choice));
+                    fflush(stdout);
+                    char noticeshot[512] = "";
+                    if (g_harnessTicks > 0 && g_shotDir)
+                        snprintf(noticeshot, sizeof noticeshot, "%s/h_notice_%d.png", g_shotDir, choice);
+                    if (game_notice_open(win, opt.dospack, "NOTICE", em_route_notice(route),
+                                         noticeshot[0] ? noticeshot : NULL) == -2)
+                        state = APP_DONE;
+                }
+            } else if (g_ra3dPreview && !dms_enhanced_menu(&menu) && choice != DM_VISUALS
+                       && choice != DM_INTRO && choice != DM_START
+                       && !(choice == DM_MULTIPLAYER && (g_mpHost || g_mpJoin))) {
+                /* Classic Red Alert: these menu routes still need their Red Alert equivalents.
+                   (The headless room, --mphost / --mpjoin, goes through: the multiplayer arm
+                   below plays a Red Alert room in this module.) */
                 SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Red Alert 3D",
                                          "This Red Alert menu route is still being connected.", win);
             } else if (choice == DM_SPECIAL) {
@@ -6027,6 +7124,11 @@ int main(int argc, char** argv)
                     SK_Lobby lob;
                     memset(&lob, 0, sizeof lob);
                     SK_Prev* prev = skirmish_previews();
+                    if (g_lobbyPlay && dms_enhanced_menu(&menu)) {
+                        g_lobbyProbe.script = ENHANCED_LOBBY_SCRIPT;
+                        g_lobbyProbe.steps = (int)(sizeof ENHANCED_LOBBY_SCRIPT / sizeof ENHANCED_LOBBY_SCRIPT[0]);
+                        g_lobbyProbe.shotdir = g_shotDir;
+                    }
                     /* &v[0] on an empty vector is undefined and the list is now
                        allowed to be empty; sk_init takes a null list with count 0. */
                     const int r = dms_lobby(&menu,
@@ -6114,12 +7216,12 @@ int main(int argc, char** argv)
                        only for a player, for the reason the controls file gives: no gate
                        may inherit an order from a file somebody left in the run folder.
                        Beside the game, like opencnc3d-controls.cfg, and never packaged. */
-                    if (!automated)
+                    if (!automated && !fs_background_only())
                         dms_mp_remember("opencnc3d-multiplayer.cfg", &mp);
                     mp_ready = true;
                 }
 
-                skirmish_scan(base_dir(opt.dir));
+                lobby_scan(base_dir(opt.dir));
                 for (;;) {
                     NmSetup ns;
                     NmSetup* nsp = NULL;
@@ -6142,15 +7244,16 @@ int main(int argc, char** argv)
                         SK_State tmp;
                         sk_init(&tmp, &g_skirmishMaps[0], (int)g_skirmishMaps.size(), NULL);
                         sk_result(&tmp, &mplob);
+                        if (g_ra3dPreview) ra_lobby_defaults(&mplob, NULL);
                         mp_have_setup = (mplob.map >= 0);
                     }
                     if (mp_have_setup && mplob.map >= 0
                         && mplob.map < (int)g_skirmish.size()) {
-                        nsp = mp_build_setup(&ns, &mplob, &mp, base_dir(opt.dir), &scen);
+                        nsp = mp_build_setup(&ns, &mplob, &mp, lobby_mission_dir(base_dir(opt.dir)), &scen);
                         snprintf(mp.mapname, sizeof mp.mapname, "%s",
                                  g_skirmish[mplob.map].scen.c_str());
                     }
-                    abi = mp_brain_abi(opt.dylib);
+                    abi = mp_brain_abi(lobby_brain(opt.dylib));
                     int r = DMS_CANCEL;
                     if (g_mpHost || g_mpJoin) {
                         /* THE HEADLESS LOBBY. Every call here is one the screens make;
@@ -6163,8 +7266,8 @@ int main(int argc, char** argv)
                         /* Zero means "not yet", and the first pass therefore publishes at
                            once rather than after a beat's silence. */
                         unsigned lastBeat = 0;
-                        const int idx = mp_map_index("SCM01EA");
-                        if (idx < 0) { fprintf(stderr, "MPLOBBY|FAIL|no SCM01EA\n"); state = APP_DONE; break; }
+                        const int idx = mp_map_index(g_mpMap);
+                        if (idx < 0) { fprintf(stderr, "MPLOBBY|FAIL|no %s\n", g_mpMap); state = APP_DONE; break; }
                         if (g_mpHost) {
                             SK_State tmp;
                             NmSetup hs;
@@ -6173,6 +7276,11 @@ int main(int argc, char** argv)
                                     (int)g_skirmishMaps.size(), NULL);
                             tmp.sel = idx;
                             sk_result(&tmp, &mplob);
+                            /* A Red Alert room opens on Red Alert's match, with the command
+                               line's rules. */
+                            if (g_ra3dPreview) ra_lobby_defaults(&mplob, &opt);
+                            mplob.ai_difficulty = opt.ai_difficulty > 0 ? opt.ai_difficulty - 1 : 1;
+                            memcpy(mplob.ai_levels, opt.ai_levels, sizeof mplob.ai_levels);
                             /* THE ROOM IS AS WIDE AS THE MAP SEATS, left that way on
                                purpose: START waits for the people who are
                                HERE and nm_lobby_start closes the seats nobody took. This
@@ -6190,10 +7298,20 @@ int main(int argc, char** argv)
                                 }
                                 nm_relay_next(g_mpRelay, g_mpRelayPort, rid, 0ul);
                             }
-                            if (!mp_build_setup(&hs, &mplob, &mp, base_dir(opt.dir), &hscen)
+                            if (!mp_build_setup(&hs, &mplob, &mp, lobby_mission_dir(base_dir(opt.dir)), &hscen)
                                 || !nm_lobby_host(NM_PORT_DEFAULT, &hs, abi, hscen, 2, g_mpName, g_mpPass)) {
                                 fprintf(stderr, "MPLOBBY|FAIL|host|%s\n", nm_lobby_error());
                                 state = APP_DONE; break;
+                            }
+                            /* --mpbots N: the last N seats of the room are computers, which
+                               is what the room screen's BOT on a seat does. */
+                            if (g_mpBots > 0) {
+                                NmSetup bs = *nm_lobby_setup();
+                                for (int k = bs.seats - 1, n = 0; k >= 2 && n < g_mpBots; k--, n++)
+                                    bs.mode[k] = NM_SEAT_BOT;
+                                nm_lobby_set_setup(&bs);
+                                for (int k = 0; k < NM_MAX_SEATS; k++)
+                                    mplob.mode[k] = nm_lobby_setup()->mode[k];
                             }
                             printf("MPLOBBY|host|open|%s\n", hs.scenario); fflush(stdout);
                             /* THE ROOM'S OWN CODE, read back off the network rather than
@@ -6208,7 +7326,7 @@ int main(int argc, char** argv)
                                a port that nothing is listening on. */
                             if (g_mpWaitMs > 30000 && !nm_is_relayed()) nb_announce_open();
                         } else {
-                            const unsigned jscen = mp_scen_hash(base_dir(opt.dir), "SCM01EA");
+                            const unsigned jscen = mp_scen_hash(lobby_mission_dir(base_dir(opt.dir)), g_mpMap);
                             /* A ROOM CODE REPLACES THE ADDRESS, it does not accompany it:
                                a relayed joiner has nothing to resolve, because the code
                                names who to ask the relay for. */
@@ -6305,10 +7423,13 @@ int main(int argc, char** argv)
                                offered is a door that will not open. */
                             const bool mpOpen = !nm_lobby_start_pending() && !nm_lobby_starting();
                             if (g_mpHost && mpOpen && g_mpWaitMs > 30000 && !nm_is_relayed())
+                                /* With the room's order wire and map fingerprint, as the
+                                   screen's own advert carries them, so a browser can tell a
+                                   Red Alert room from a Tiberian Dawn one before it asks. */
                                 nb_announce(nm_lobby_name(), nm_lobby_setup()->scenario, NULL,
                                             NM_PORT_DEFAULT,
                                             nm_lobby_filled(), nm_lobby_wanted(),
-                                            nm_lobby_locked(), 0, 0);
+                                            nm_lobby_locked(), nm_abi(), nm_scen());
                             /* AND ONTO THE PUBLIC LIST, for a relayed room. The screen
                                does this from its own lobby; this path has no screen, so
                                it says the same thing here. It is what lets a whole
@@ -6357,11 +7478,26 @@ int main(int argc, char** argv)
                                    this loop counted for itself, which fixed this door and
                                    left both screens starting rooms on a lookahead nobody
                                    had measured. It lives behind the button now. */
-                                if (nm_lobby_all_ready()) {
+                                /* A room with computers in it is "ready" with nobody
+                                   but the host, so with --mpbots the headless host also
+                                   waits for its joiner to sit down. */
+                                if (nm_lobby_all_ready() && (g_mpBots == 0 || nm_lobby_filled() >= 2)) {
                                     if (g_mpScreenStart) { handed = 1; break; }
                                     nm_lobby_start();
                                 }
                             } else if (nm_lobby_seat() >= 0 && !nm_lobby_my_ready()) {
+                                /* --mpmyseat HOUSE,COLOUR: this joiner asks for its own
+                                   row first, the request the room screen sends. Once. */
+                                static int asked = 0;
+                                if (g_mpMyHouse >= 0 && !asked) {
+                                    asked = 1;
+                                    nm_lobby_set_my_seat(g_mpMyHouse, nm_lobby_seat(),
+                                                         g_mpMyColour, -1);
+                                    printf("MPLOBBY|join|seat=%d|asked house=%d colour=%d\n",
+                                           nm_lobby_seat(), g_mpMyHouse, g_mpMyColour);
+                                    SDL_Delay(400);
+                                    continue;
+                                }
                                 nm_lobby_set_ready(1);
                                 printf("MPLOBBY|join|seat=%d|ready\n", nm_lobby_seat()); fflush(stdout);
                             }
@@ -6473,6 +7609,14 @@ int main(int argc, char** argv)
                         }
                         if (r == DMS_MP_PLAY) {
                         mp_play:
+                            /* A RED ALERT ROOM STARTS ON THE ROOM'S OWN SETUP, the one the
+                               wire holds, on host and joiner alike: its countries, rules
+                               and seed are what every peer agreed, where the screen's own
+                               answer carries no seed. */
+                            if (g_ra3dPreview && nm_active()) {
+                                SK_Lobby agreed;
+                                if (mp_lobby_from_match(&agreed)) mplob = agreed;
+                            }
                             /* The lobby armed the match. Everything the engine needs is
                                already decided, so this is the skirmish path with the net
                                match already live: net_match_prepare sees nm_active() and
@@ -6496,14 +7640,17 @@ int main(int argc, char** argv)
                             snprintf(mppack, sizeof mppack, "%s",
                                      g_skirmish[mplob.map].pack.c_str());
                             snprintf(mpdir, sizeof mpdir, "%s", base_dir(opt.dir));
-                            opt.scen = mpscen;
-                            opt.pack = mppack;
-                            opt.dir = mpdir;
+                            if (!g_ra3dPreview) {
+                                opt.scen = mpscen;
+                                opt.pack = mppack;
+                                opt.dir = mpdir;
+                            }
                             opt.reskin = 0;
                             opt.skirmish = 1;
                             opt.net_mode = nm_lobby_is_host() ? 1 : 2;
                             opt.net_players = nm_lobby_wanted();
-                            skirmish_apply(&opt, &mplob);
+                            if (g_ra3dPreview) ra_lobby_apply(&opt, &mplob);
+                            else skirmish_apply(&opt, &mplob);
                             /* THIS MACHINE'S OWN SEAT. skirmish_apply takes the side from
                                the roster's seat 0, which is the HOST's; a joiner is in
                                another seat and plays that seat's house, exactly as the
@@ -6512,7 +7659,9 @@ int main(int argc, char** argv)
                                and two peers ran two different matches from tick one. */
                             if (!nm_lobby_is_host() && nm_lobby_setup()
                                 && nm_lobby_seat() >= 0 && nm_lobby_seat() < NM_MAX_SEATS)
-                                opt.side = nm_lobby_setup()->house[nm_lobby_seat()];
+                                opt.side = g_ra3dPreview
+                                    ? ra_sk_country_soviet(nm_lobby_setup()->house[nm_lobby_seat()])
+                                    : nm_lobby_setup()->house[nm_lobby_seat()];
                             g_camp.active = 0;
                             state = APP_GAME;
                             break;
@@ -6574,17 +7723,27 @@ int main(int argc, char** argv)
                              g_shotDir, round + 1);
                     difficulty_shot = difficulty_path;
                 }
+                const int auto_side = g_flowTest > 0 ? camp_autopilot_side
+                                    : (g_harnessTicks > 0 ? g_raHarnessSide : -1);
+                if (dms_enhanced_menu(&menu)) {
+                    /* Enhanced: side and difficulty in one box (dms_ra_enh_side). */
+                    int difficulty = 1;
+                    side = dms_ra_enh_side(&menu, auto_side,
+                            g_harnessTicks > 0 || g_flowTest > 0 ? 1 : -1, side_shot, &difficulty);
+                    if (side == DMS_CANCEL) { state = APP_MENU; continue; }
+                    if (side >= 0) opt.ra_difficulty = difficulty + 1;
+                } else {
                 const int difficulty = dms_ra_choose_difficulty(&menu,
                         g_harnessTicks > 0 || g_flowTest > 0 ? 1 : -1,
                         difficulty_shot);
                 if (difficulty == DMS_CANCEL) { state = APP_MENU; continue; }
                 if (difficulty < 0) { state = APP_DONE; continue; }
                 opt.ra_difficulty = difficulty + 1;
-                side = dms_ra_choose_side(&menu,
-                        g_flowTest > 0 ? camp_autopilot_side
-                        : (g_harnessTicks > 0 ? g_raHarnessSide : -1), side_shot);
+                side = dms_ra_choose_side(&menu, auto_side, side_shot);
                 if (side == DMS_CANCEL) { state = APP_MENU; continue; }
+                }
             } else {
+                /* Original CHOOSE TV/static screen in both Classic and Enhanced. */
                 side = camp_side_select(&camp);
             }
             if (side < 0) { state = APP_DONE; continue; }
@@ -6679,7 +7838,9 @@ int main(int argc, char** argv)
            neither was made, and every slot recorded a campaign of nothing. */
         game_set_campaign(g_camp.active, g_camp.side, g_camp.scenario, g_camp.dir,
                           g_camp.var);
+        game_diagnostics_phase(4,0);
         if (!game_boot(win, &opt)) {
+            game_diagnostics_phase(9,2);
             /* A REFUSED START SAYS WHY, in the log for the harness and on the glass for
                the player. Before this the menu simply came back, which reads as a Play
                button that does nothing, and the report that describes it cannot be
@@ -6808,6 +7969,17 @@ int main(int argc, char** argv)
                    "full flow\n", round);
             fflush(stdout);
             state = APP_DONE;
+        }
+        else if (g_raSkirmishRan && opt.script) {
+            /* A scripted --raskirmish run ends with its match, through the debrief: the
+               script is the player. Another round plays the match again when the harness
+               asked for rounds (see the --raskirmish route). */
+            printf("APP|raskirmish|done|reason=%d\n", reason);
+            fflush(stdout);
+            g_camp.active = 0;
+            g_raDebriefNoWait = 1;
+            if (!app_match_score(&camp, &mstats)) state = APP_DONE;
+            else state = g_raSkirmishScen[0] ? APP_MENU : APP_DONE;
         }
         else if (g_lobbyPlay) {
             /* THE ONE THING A SCREENSHOT CANNOT SHOW: whether the teams the drop down
@@ -6982,6 +8154,8 @@ int main(int argc, char** argv)
     }
     camp_close(&camp);
 
+    game_diagnostics_phase(8,0);
+    game_diagnostics_end();
     dms_close(&menu);
     game_set_audio(NULL);
     audio_boot_shutdown(au);

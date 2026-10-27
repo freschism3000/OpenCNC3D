@@ -1,0 +1,15 @@
+evidence/*
+!evidence/*.log
+!evidence/*.json
+!evidence/modules-ra3d.png
+!evidence/removal-confirmation.png
+!evidence/browser-review.png
+!evidence/native-menu/
+evidence/native-menu/*
+!evidence/native-menu/ra-main-720.png
+!evidence/native-menu/ra-main-1440.png
+!evidence/hidden-ui/
+evidence/hidden-ui/*
+!evidence/hidden-ui/module-removal-confirm.png
+!evidence/browser-all-installed.png
+!evidence/add-game-tiles.png

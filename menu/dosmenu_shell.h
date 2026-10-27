@@ -70,6 +70,7 @@ typedef struct DMS_Config {
     struct CncAudio* au;
 } DMS_Config;
 
+struct MP_State;
 struct DO_State;
 struct SK_State;
 struct SK_Map;
@@ -95,22 +96,35 @@ typedef struct DMS {
     /* When set, dms_redraw draws the SPECIAL OPS list over the plate instead of the
        main menu's buttons. Owned by dms_special for the length of its own loop and
        NULL everywhere else, so the ordinary menu path is untouched. */
-    const struct DO_State* ops;
+    struct DO_State* ops;
     /* The same seam again for the skirmish lobby, and a second pointer rather than a
        mode number for the same reason: whichever one is set is the screen, and with
        both NULL the ordinary menu path cannot be affected by either. */
     const struct SK_State* lobby;
+    const struct MP_State* browser;
 } DMS;
 
 int  dms_open(DMS* s, SDL_Window* win, const DMS_Config* cfg, char* err, int errlen);
 int  dms_logo(DMS* s);         /* 1 played/skipped, 0 the window was closed */
 int  dms_intro(DMS* s);        /* the same, for the Intro & Sneak Peek button */
+int dms_enh_choice(DMS *s, int which);
 int  dms_run(DMS* s);          /* DM_* item, or DMS_QUIT                    */
 /* Red Alert's original title-page new-game choice. Returns 0 Allies, 1 Soviet,
    DMS_CANCEL on Escape, or DMS_QUIT. auto_side is harness-only (-1 normally). */
 int  dms_ra_choose_side(DMS* s, int auto_side, const char* shot);
 /* Returns 0 Easy, 1 Normal or 2 Hard before the side choice. */
 int  dms_ra_choose_difficulty(DMS* s, int auto_difficulty, const char* shot);
+/* Red Alert's side and difficulty in one Enhanced box. Returns 0 Allies, 1 Soviet,
+   DMS_CANCEL or DMS_QUIT, the difficulty (0..2) through *difficulty. auto_side and
+   auto_difficulty are for automated runs (-1 normally); shot is written from the first frame. */
+int  dms_ra_enh_side(DMS* s, int auto_side, int auto_difficulty, const char* shot, int* difficulty);
+/* Red Alert's match debrief in its Enhanced kit (em_ra_debrief), until a click or a key;
+   with `nowait` it is drawn once (and written to `shot` when given) and returns at once.
+   Answers 1 to carry on, DMS_QUIT when the window was closed. */
+struct EM_Debrief;
+int  dms_ra_debrief(DMS* s, const struct EM_Debrief* d, const char* shot, int nowait);
+/* Whether this shell draws the Enhanced screens (the game's own kit, Enhanced on). */
+int  dms_enhanced_menu(const DMS* s);
 
 /* The SPECIAL OPS mission list. Returns the index of the mission the player chose,
    DMS_CANCEL for Cancel/ESC, or DMS_QUIT if the window was closed. The caller owns the list

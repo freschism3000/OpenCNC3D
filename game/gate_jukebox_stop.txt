@@ -11,8 +11,7 @@
 # are asserted together.
 tick 10
 options
-optclick Game Controls
-optclick Sound Controls
+optclick Audio
 optclick Track List
 optclick Stop
 tick 900

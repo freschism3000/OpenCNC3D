@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "case": "actual-ra",
+      "binary": "${DOCK_RUNTIME}/ra3d/opencnc3d",
+      "sha256": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+      "exit": 0,
+      "screenshots": 3,
+      "passed": true
+    },
+    {
+      "case": "actual-td",
+      "binary": "${DOCK_RUNTIME}/opencnc3d",
+      "sha256": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+      "exit": 0,
+      "screenshots": 4,
+      "passed": true
+    },
+    {
+      "case": "canonical-td",
+      "binary": "${SOURCE_ROOT}/playable/opencnc3d",
+      "sha256": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+      "exit": 0,
+      "screenshots": 4,
+      "passed": true
+    },
+    {
+      "case": "canonical-ra",
+      "binary": "${SOURCE_ROOT}/playable/ra3d/opencnc3d",
+      "sha256": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+      "exit": 0,
+      "screenshots": 12,
+      "passed": true
+    }
+  ]
+}

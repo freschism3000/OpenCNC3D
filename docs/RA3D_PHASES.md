@@ -1,6 +1,6 @@
 # Red Alert 3D roadmap
 
-Last updated: 3 October 2026
+Last updated: 17 October 2026
 
 ## Current position
 
@@ -202,11 +202,22 @@ Deliverables:
 - [ ] Export infantry, vehicle, vessel, aircraft, building, terrain, overlay and effect
   state.
 - [ ] Port input, selection, production and control-group requests.
-- [ ] Port save/load, rally points, debugging, scripting and editor exports.
-- [ ] Port multiplayer event posting, draining and ABI validation.
+- [ ] Port save/load, rally points, debugging, scripting and editor exports. Save/load
+  (its own folder and game tag, round trip exact, `tools/ra3d/gate-ra-save.sh`), rally
+  points, the cheat switches, the AI takeover, trigger queries and the proximity query are
+  ported; editor exports are not.
+- [x] Port multiplayer event posting, draining and ABI validation. `OpenCNC3D_Event_ABI`,
+  `Drain_Events`, `Post_Event`, `Set_Lockstep`, `Get_Lockstep` and `Set_Seed`; two brains in
+  one process agree for 6000 ticks of computer play and on all 24 multiplayer maps
+  (`tools/ra3d/gate-ra-lockstep.sh`, in CI), and two copies of the game play a match over
+  loopback with no desync (`tools/ra3d/gate-ra-net.sh`); a Tiberian Dawn copy is refused
+  for its order wire.
 - [ ] Introduce stable global object and event IDs.
 - [ ] Add explicit ABI and simulation-format versions.
-- [ ] Add deterministic state hashes and divergence diagnostics.
+- [x] Add deterministic state hashes and divergence diagnostics. The renderer's world hash
+  (NETSYNC every 15 frames, NETDESYNC naming the seats) runs on Red Alert's object dump,
+  which now carries every field Tiberian Dawn's does; the two-brain harness names the
+  first differing object and field.
 - [x] Decide how big-map capabilities are shared. The director chose one common
   implementation for map dimensions, coordinates, player limits and pathfinding,
   with TD and RA game rules remaining in their respective engines.
@@ -442,7 +453,16 @@ Deliverables:
   palettes and all 222 frames of `MOUSE.SHP` are staged, and the Red Alert cursor
   control table is active. Verify each action and transition against the original.
 - [ ] Add Red Alert names, descriptions and tooltips.
-- [ ] Reuse shared options, skirmish and multiplayer screens.
+- [x] Draw Red Alert's menus under Enhanced in its own approved kit
+  (`art/interface/ra-enhanced-menu-v01`, `menu/bake_ra_enhanced_menu.py`): main menu with
+  the lifted RA3D lettering and two 3D emblems, the Enhanced side and difficulty box, every
+  options page red at the title and blue in a mission, Load and Save on Red Alert's own
+  index, Restate on ALIPAPER or SOVPAPER. Gates G325 (Red Alert pass) and G341 (the walk).
+  Skirmish runs in the shared lobby with Red Alert's 24 maps, eight countries and tech to
+  10; Multiplayer opens the shared room screens on Red Alert's maps and countries; both
+  lobbies' rules carry Shroud Regrows, Capture The Flag and the computers' difficulty; a
+  match ends on Red Alert's Enhanced debrief (TOP SCORES).
+- [x] Reuse the shared multiplayer lobby with Red Alert's maps, countries and rules.
 - [x] Show N64 on RA3D Visuals in the disabled style and refuse activation by mouse
   and keyboard.
 - [ ] Reserve module and faction identities for later All Stars selection.
@@ -461,9 +481,28 @@ Goal: replace development placeholders with final Red Alert presentation.
 
 Deliverables:
 
-- [ ] Produce or import approved Red Alert structure models.
-- [ ] Produce Red Alert tanks and support vehicles.
-- [ ] Produce aircraft and naval vessels.
+- [ ] Produce or import approved Red Alert structure models. **The Construction Yard deploys
+  out of its MCV** under Enhanced (G346, 17 Oct): the approved placement baked onto the yard
+  as the game draws it (tools/ra3d/bake-placements.py, game/eplc_ra), started the tick the MCV
+  goes.
+- [ ] Produce Red Alert tanks and support vehicles. **The reused ones are in** (gate G343):
+  under Enhanced the Artillery, Phase Transport, Light Tank, APC and Medium Tank are
+  OpenCNC3D's remastered models (`ra3d/evhc`, `tools/ra3d/stage-vehicles.py`); a Red
+  Alert remaster of its own drops in as `game/evhc_ra/<TYPE>.evhc`. **Red Alert's own, first
+  three in** (gate G345, 17 Oct): the Heavy Tank, the V2 Rocket (its launch section raised
+  to 45 degrees on its telescopic rams while the engine has it standing to fire, the rocket
+  launched from the rail's tip and flying as the model's own rocket on an arc onto the
+  engine's fuse point, the empty section lowered while it reloads, by the brain's doing= 3,
+  dostage=, ammo= and the projectile's tlx=/tly=), the Ore Truck (its scoop and dump body)
+  and the Ranger (its gun turning and kicking, its wheels rolling and steering). Open: every
+  other type (own remasters).
+- [ ] Produce aircraft and naval vessels. The Chinook and the Longbow are OpenCNC3D's
+  (G343). **The Gun Boat is in** (G345, 17 Oct): ships are in evhc's rule, the Gun Boat at
+  sea from its own model, its bow gun the engine's turret with its kick, its twin turret
+  fixed astern, selected, hurt and sunk as a vehicle is. **The Transport is in** (G345, 17
+  Oct): it turns with its facing and lowers its four ramps in the 1996 order while the
+  engine has its door open (the brain's door= for ships), each resting on the beach where
+  the ground rises. Open: the other aircraft and every other ship (no file yet).
 - [ ] Produce terrain objects and the Interior theater.
 - [ ] Red Alert's own ground under Enhanced. **First slice in:** the placeholder pack's
   ground is replaced by the mission's own map (from the engine's static map export),
@@ -500,6 +539,20 @@ Deliverables:
   scenes cannot be seen until Red Alert has skirmish, the heightmaps want a map-by-map
   review, paintings for Red Alert's own templates, 3D models for the other objects, and
   water through the water shader.
+- [ ] Bring Tiberian Dawn's Enhanced presentation to the 3D scene. **First pass in**
+  (gate G335, `game/gate_ra3dparity.py`): the Tesla Coil's bolt draws under its model,
+  from the crown to the target; trees and the ore mine stand on their own cells
+  (TerrainClass draws from the top left); tread marks, blood, brass and spray; the cliff
+  softening on Red Alert's own cliff templates; footsteps for the spy, thief, general,
+  dog and civilians; drive sounds for Red Alert's own vehicles; the temperate ambience
+  bed on RATEMP; shader prewarm, building-texture preparation and the terrain sun cache.
+  Open: the remastered effects, the Enhanced menu and HUD, an ambience for snow and
+  interior, a paw recording, per-hull track gauges, the cold first frame's ground build
+  (see the progress history). The remastered decals, trees, civilian buildings and walls
+  the lab approved as reuse are in (gate G338, the progress history), and since 16 Oct
+  their snow looks too: the one winter file each shares with Tiberian Dawn's winter
+  (`<T>_WIN.ebld`, staged by stage-reuse.py); the haystacks' snowman and igloo wait on
+  their concepts' review.
 - [ ] Produce production icons and HUD art.
 - [ ] Wire original RA movies into intro, briefing, map and ending flows. The existing
   VQA decoder scanned REDINTRO.VQA end to end: 188 frames, 573436 PCM bytes at 15 fps.
@@ -619,7 +672,9 @@ Deliverables:
 - [ ] Run long-duration determinism and AI stress tests.
 - [ ] Support mixed-match save/resume and replays where in scope.
 - [ ] Harden disconnect, defeat and reconnect behavior.
-- [ ] Add content and version mismatch diagnostics.
+- [ ] Add content and version mismatch diagnostics. Red Alert rooms and matches refuse a
+  Tiberian Dawn copy (order wire), other map bytes and an older wire by name
+  (`tools/ra3d/gate-ra-net.sh`, `tools/ra3d/gate-ra-room.sh`); mixed matches do not exist.
 - [ ] Complete divergence logs and automated state comparisons.
 - [ ] Balance the four factions for combined play.
 - [ ] Classify maps by supported factions, theaters and economies.
@@ -883,6 +938,260 @@ It now stands on the mission's own map.
   made.
 - **Gaps**: those listed as open under Phase 10 above. Absent on Win98
   (`docs/tier1-gap.md`).
+
+### Red Alert's ground kept on the GPU
+
+Red Alert's Enhanced ground was drawn in immediate mode, every corner of every cell in
+view, every frame, in each pass that draws it; Tiberian Dawn's has been kept on the GPU
+since its own cache (`game/terrain_cache.h`). Red Alert's now is too.
+
+- **What is kept.** Per sheet (a mission, a set), in GPU buffers: the ground (one record
+  per map cell), the sea floor (one per wet cell, with the texture coordinates the sea's
+  source was built with), every join strip of both passes with an index list, and the
+  normal pass's colours. Each cell's light (corner shade times the shroud's corner light)
+  is recomputed once a frame for the cells drawn and sent again only when it changes, to
+  its ground, its floor and the strips it lays; the cells a pass admits go down in runs, in
+  the loops' order. The reflection pass uses the same buffers. Rebuilt with the sheet and
+  whenever the heights, the variants switch or the map rectangle move; the loops remain
+  for a driver without buffers and `OPENCNC3D_TERRAIN_CACHE=0`.
+- **The sheet's first build** gives the sea's soft coast only to the wet slots the map
+  draws: 308 to 151 ms on Allied 5, 311 to 83 ms on Allied 1.
+- **Measured** (2560x1440, a player's settings, old and new alternated): the ground's CPU
+  section on Allied 5 0.75 to 0.33 ms (of which 0.21 ms is the sea's surface, still
+  immediate mode in water_mod.h), the live frame 5.94 to 5.40 ms; Soviet 11 1.02 to
+  0.33 ms; the cold first frame about 100 to 250 ms shorter. Numbers:
+  `docs/perf/2026-10-16-ra-ground-cache-metrics.json`.
+- **Proof.** 42 Red Alert Enhanced shots (snow, temperate, interior, the 1995 set, the
+  shroud on, off, switched and darkened, the sea off and on, the set switched at run time)
+  and 27 Tiberian Dawn shots byte-identical old against new; Red Alert Classic differs
+  only in its clock-seeded ore. Gate G334: the buffers against the loops in one binary
+  (nine pairs byte-identical, each step shown to move the picture), and the instrument
+  `OPENCNC3D_RA3DCACHE_VERIFY=1` checking every drawn record against the per-frame
+  computation over a played stretch with the shroud moving; a build that never refreshes a
+  cell's light fails both. G310 and gate-ra-3d.sh pass; G311 fails identically with the
+  old renderer (its water_fx 0 control moves between two ticks; not traced).
+- **Gaps**: the sea's surface (`water_fx_draw`, both games) is still immediate mode; each
+  cell in view still has its light recomputed every frame, only the sending is saved;
+  the terrain-shadow target is not kept for Red Alert; the cold frame's first sun map and
+  first sea field are untouched. Windows cross-compiled, not run.
+
+### Catching up with Tiberian Dawn's Enhanced
+
+Work Tiberian Dawn's Enhanced gained after Red Alert 3D landed, brought to the module,
+each a commit of its own with pictures before and after on Red Alert maps (snow and
+temperate) and Tiberian Dawn's frames byte-identical (GDI 1, GDI 4 and Bad Neighborhood,
+Enhanced and Classic, at tick 0 and after 90 ticks):
+
+- **Ships can be selected**, in Enhanced and in Classic: the renderer had no kind for the
+  brain's VESSEL heap (K_VESSEL now). A gunboat on Allied 7 is selected and moves.
+- **The brain's selling-factory guard** (Update_Buildables offers nothing for a factory
+  being sold), ported from Tiberian Dawn. Red Alert's house scan already skipped such a
+  building, so play is unchanged; `tools/regressions/sale-options/test-sale-options-ra.py`
+  compiles the real function against counters. The bootstrap gate
+  (`tools/ra3d/gate-ra-bootstrap.sh`) fails on the brain both before and after this pass;
+  the mission and construction gates pass.
+- **Loading**: shaders are compiled and standing buildings' textures uploaded before the
+  first frame; Allied 5's first frame (2560 x 1440) falls from about 1.25 to 0.81 s, the
+  rest being the sea's and ground's first build and building textures past the shared
+  preparation budget. The steady frame is unchanged (about 5.6 ms); the terrain sun cache
+  reuses the ground's depth from the second frame on.
+- **Presentation**: the bolt, tree anchors, tread marks, blood and brass, cliff
+  softening, footsteps, drive sounds and the temperate bed, as listed under Phase 10.
+  Script verbs `ra3dprobe`, `ra3dzap 0|1` and `ra3danchor 0|1` show what the sprite pass
+  drew and restore the old drawing for a gate's control.
+
+### The sprite cards stand on their own feet
+
+Every 1996 sprite drawn in the 3D modes (all of them in the hidden N64 mode; in Enhanced
+the vehicles, ships, aircraft, the snow trees, the barbed-wire fence, the barrels and any
+building going up, being sold or with its door open, everything without a model) now stands its lowest drawn row on the ground where the 2D game lays that row
+(`ra3d_stand`, `game/ra3d_sprites_mod.h`), its parts on its own card. Before, a card was
+centred on its point and its lower half hidden under the terrain (a tank showed 0.45 of
+itself, a gunboat 0.17), and a building card stood at its footprint's centre row. G335
+claims 7 and 8 measure both with occlusion queries and the footprint grid (`ra3dcardvis`,
+`footdump`, control `ra3dstand 0`). Measured at the same time: the camera and the soldiers
+are already Tiberian Dawn's exactly; the Enhanced building models are larger than Tiberian
+Dawn's and than their 1996 sprites; their size is left as approved and is an open art
+decision (the scale would go into the structures bake). Tiberian Dawn byte-identical (GDI 1, GDI 4; Classic,
+N64, Enhanced; tick 0 and 90); Red Alert Classic byte-identical on the seeded skirmishes.
+
+### The art Red Alert shares with OpenCNC3D
+
+Under Enhanced, every asset the Red Alert lab approved as reuse of an OpenCNC3D remaster
+is drawn from that remaster (gate G338, `game/gate_ra3dreuse.py`):
+
+- **Civilian buildings** V01 to V19, BIO, HOSP and MISS stand as their models with their
+  turns, in every outdoor theater, and play all their stages: worn chip by chip, broken at
+  half strength (a house first seen hurt is shown as it would be), blown apart, sunk and
+  gone over their scorch, the engine's death craters held back under it. The oil pump's
+  beam runs on the engine's own idle stage.
+- **Trees** T01 T02 T03 T05 T07 T10 T12 T13 stand as their models on temperate maps, at
+  the engine's trunk point, with their burning stage and charred snag; snow keeps its 1996
+  frosted trees (no reused tree has a winter look; the temperate ones read wrong there).
+- **Walls and fences** (SBAG, CYCL, BRIK, BARB, WOOD) are their connection pieces, read
+  from the engine's map with their damage levels, and wear down and wreck cell by cell.
+  The steel crate and the field overlays are their models.
+- **Craters and scorch marks** are OpenCNC3D's remastered decals (snow with a grey burn).
+- `tools/ra3d/stage-reuse.py`, called by `stage-structures.py`, copies the approved files
+  from `game/ebld` into the module's `ebld/` with a manifest of their hashes. Script verb
+  `ebld 0|1` switches the remasters inside one run for a gate's A/B.
+
+Still short: no reused tree or building has a snow look (snow villages have bare roofs);
+Red Alert's 3D pass drew no particles, so a burning tree had no smoke and a dying house
+kept the 1996 explosions (since drawn: "OpenCNC3D's effects in place of the anim cards" below); Red Alert's own crater drawings, FENC, the wooden crate and
+the trees not approved for Red Alert keep their 1996 art, so a wood mixes models and
+cards; the Technology Center's model is half its sprite's width.
+
+### The engine under the menu's buttons
+
+Branch `ra-brain-parity`, landed on main a commit per step, each with its gate. What a menu
+calls: `ra_skirmish_maps`, `ra_skirmish_defaults` and `ra_skirmish_apply` in
+`app/opencnc3d.cpp` (the map list with a picture each, the seats and options, the start),
+and for Load the existing `game_load_menu_open` and `load_slot_prepare`, which already
+serve the module's own saves.
+
+- **Brain parity**: the lockstep order wire, the seed, rally points, the AI takeover and
+  blow-up, the cheat switches, wall fill, the proximity query, the build potential, trigger
+  queries and the power switch, ported from the Tiberian Dawn brain into the Red Alert
+  fork and its patch; a lockstep match resets its frame and queues at start and reseeds
+  from the agreed seed. `tools/ra3d/gate-ra-lockstep.sh` (CI).
+- **The object dump** carries Tiberian Dawn's remaining 17 fields (cloak, cstage,
+  poweroff, repairing, wrench, pips, harv, primary, flashme, act and the rest) with the
+  same meanings; the radar paints each Red Alert house in its own colour.
+- **Saves** are per game: Red Alert's in `ra3d/` inside the per-user folder, each record
+  tagged with its game, older untagged Red Alert records told apart by their pack; a slot
+  from another mission hands over to the shell. `tools/ra3d/gate-ra-save.sh`.
+- **Skirmish**: countries, eight colours, tech 1 to 10, ore and shroud regrowth, up to
+  seven computers, any of the 24 maps with a picture each; thirty minutes identical on one
+  seed with the computers building and fighting. `tools/ra3d/gate-ra-skirmish.sh`.
+- **Network**: two copies over loopback through the command-line handshake, people and
+  computers, five minutes in lockstep; the lobby room is still Tiberian Dawn's.
+  `tools/ra3d/gate-ra-net.sh`.
+
+- **The room** (later the same day): a network room in the Red Alert module plays Red
+  Alert: its maps, a country and colour per seat, computers in seats, its rules and tech
+  level, by address, off a game list and through a relay (`tools/ra3d/gate-ra-room.sh`).
+  The wire (version 13) carries the room's engine, the match seed, shroud regrowth,
+  capture the flag and the computers' difficulty.
+- **The seed**: every network match starts from the host's seed on every peer.
+- **Computer difficulty**: easy, normal and hard, Red Alert's skirmish slider; the brain
+  gives a computer player the computer's handicap.
+- **The debrief**: a Red Alert match ends on Red Alert's score data (battles won, kills per
+  game), shown in a notice until the menu's screen draws it.
+
+Still short: no screen calls any of it yet (the room's screens are Tiberian Dawn's); the
+LAN browser was not driven with Red Alert; nothing of it has been run on Windows. Tiberian Dawn's pictures byte-identical before and after (GDI 1, Nod 1, GDI 4; N64,
+Enhanced, Classic) and its lobby, lockstep and save gates green (G54, G194 to G201, G205,
+G237, G238).
+
+### The buildings at OpenCNC3D's size
+
+Every Red Alert building model stands on its cells as OpenCNC3D's remasters stand on theirs:
+one uniform factor per type about the footprint's centre on the ground, never grown
+(`art/remaster-ra/scale.json`, measured by `tools/art/remaster/ra/scale_fit.py` against the
+C&C building of the same kind, or against OpenCNC3D's buildings of the same footprint for
+Red Alert's own, the 1996 sprite as the check), baked into `game/ebld_ra` and shown in the
+lab by its As OpenCNC3D size switch. 22 types shrink (Construction Yard 0.803, Power Plant
+0.886, War Factory 0.855, SAM Site 0.593, Service Depot 0.564...), 7 stay 1. G335 claim 9
+asserts the drawn sizes. The rule and the 1996 sprite still differ by more than 0.1 on six
+types (the Service Depot most: Tiberian Dawn's Repair Facility is a small pad, so Red
+Alert's halves; also the Ore Refinery, Soviet Barracks, Tesla Coil, Gap Generator and
+Naval Yard), kept to the rule and open to a look in the game.
+
+### OpenCNC3D's effects in place of the anim cards
+
+Under Enhanced effects every Red Alert engine anim with a Tiberian Dawn counterpart is
+drawn as that anim's OpenCNC3D effect, through Tiberian Dawn's particle recipes, remastered
+art and Enhanced additions, and its 1996 card stands down (`game/ra3d_effects_mod.h`, gate
+G342): explosions and hits, fires and burns, smoke trails, the cannon, chain-gun and SAM
+fire, a dying structure's single rebuilt blast and smoke column at its plot's middle, a
+damaged structure's roof plume, burning trees' smoke, the Tesla bolt's glowing ends, the
+modelled riflemen's flashes. Effects riding a card start where the 2D picture puts them on
+it; fires on a model burn on its roof. The Red Alert brain prints EFX|FIRE and EFX|BULLET,
+and projectile cards fly at their height. Kept as cards: pickups, corpses, parachutes,
+electrocutions, water splashes, the move flash. Idle effects of Red Alert structures (the
+power plant's smoke, the Flame Tower's pilot flames) are not drawn yet: they need the
+structure bake to carry the lab's emitters into the game's structure files. Tiberian Dawn
+byte-identical, battles included.
+
+### Snow looks for the shared villages and trees
+
+- Snow villages and trees: Red Alert's snow draws OpenCNC3D's winter looks of the reused
+  civilian buildings (V01 to V18) and trees (T01 T02 T03 T05 T07 T10 T12 T13), one file each
+  shared with Tiberian Dawn's WINTER theater (no `_SNO` of their own). The 1996 snow sprites
+  and the 1995 winter ones are drawn alike, measured side by side. stage-reuse.py stages each
+  `_WIN` file beside its summer file; G338's claim (5) now asserts them. The pilot (Church,
+  Ricktor's House, T01) approved in review, the rest by the same method; the broadleaf trees bare
+  and frosted as both games' winter art draws them.
+
+### The Ore Truck and Red Alert's own trees
+
+- **The Ore Truck** (HARV) has a model of its own, its 3D concept approved: a six-wheeled
+  dump truck (the 1996 sprite's layout and house paint, the Remastered cameo's detail, the
+  approved Harvester's finish, tyres and scale), its charred stage and its wreck, its
+  lights; the Red Alert lab's row vehicles/HARV, rebuilt by
+  `tools/art/remaster/ra/run_HARV.sh`, baked into `game/evhc_ra/HARV.evhc`. It declares its
+  two motions as data (painter.moving: the scoop's swing over the cab, the dump body's
+  lift and tip) and the ore load as a part of its own; the game draws it at rest until the
+  engine drives them.
+- **Trees**: T11, T15 and T17 are Red Alert versions of OpenCNC3D's approved trees in the
+  1996 palette (greyer, darker, a little olive, measured per tree by
+  `tools/art/remaster/ra/tint_tree.py`), T14 a version with its crown filled out as the
+  1996 art redraws it (`build_broadleaf.py` row T14RA), recoloured by the palette shift
+  measured on T11 (T14's own crown is redrawn, so its own pixels compare different leaves
+  and gave a shift dark enough to lose the tree against the grass); their winter looks by
+  the winter method (T11, T15 and T17's bare winter trees come out byte for byte the
+  Tiberian Dawn ones). T16, T08's temperate look and the five clumps are made as one model
+  for both games, their concepts approved, in review in both labs.
+- **The versions' game files**: `tools/art/remaster/ra/bake_versions.py` bakes them into
+  `game/ebld_ra_versions` under the names of the type they stand in for, keeping only the
+  files a version changes (12: the four trees' temperate looks and burning stages, T14's
+  snag and winter look); `tools/ra3d/stage-reuse.py` stages a version once its row is
+  approved, the unchanged files (a recoloured tree's snag, the bare winter looks) from
+  `game/ebld`, and `--include-review` stages the ones in review for a look. Measured with
+  all four approved in a test copy of the reviews: G338's five runs hold every claim, 14 of
+  21 trees of Allied 5 drawn as models where 9 were, and on snow T14, T15 and T17 drawn from
+  their winter files.
+
+Since then (17 October): the four versions and their winter looks are approved and staged,
+and T16, T08 and the five clumps are approved, baked and drawn in both games, each clump
+whole from its own model at its centre coordinate (gate G344; G338 now counts every tree of
+Allied 5 a model, 21 of 21), their winter looks approved and drawn on snow (31 trees of
+Soviet 1 as winter models). Still short: the Ore Truck is being reworked in review.
+
+### OpenCNC3D's vehicles and aircraft
+
+Under Enhanced a Red Alert unit or aircraft whose type has a remastered model staged in
+`ra3d/evhc` is drawn, moved and broken apart by OpenCNC3D's vehicle system
+(`game/evhc_mod.h`) instead of its 1996 card: tracks, turret, recoil, lamps, rotors and
+discs, the sun's shadow, the light pass's normals, the pick volume, the wreck, a craft
+shot down in flight, in Red Alert's side colours. The seven reused types (ARTY, TRAN,
+HELI, STNK from the same art; 1TNK, APC, 2TNK by choice) are staged from the lab's reuse
+rows with their headers renamed; the Wood Crate and tree T06 joined the reused cell
+decorations and trees. Gate G343. The brain's dump now says a unit's door (the APC's
+door opens for a passenger) and the Ore Truck's harvest and dump frames, which drive its
+scoop, dump body and ore load (baker and runtime drivers 9 to 11). A build stages approved
+art only; `stage-structures.py --include-review` stages what is in review for the test
+folder. Open: ships, every type without a file.
+
+### Red Alert's own vehicles: the concept stage (16 and 17 October 2026)
+
+The eighteen vehicles, aircraft and ships whose 1996 art Red Alert does not share with an
+approved OpenCNC3D vehicle go to a real model through a Phase 0 proxy and a 3D concept, both
+reviewed in the Red Alert lab (Vehicles), by the method in `tools/art/remaster/ra/VEHICLES.md`.
+A first round of simple box proxies and concepts made from them was rejected for all eighteen;
+the method was redone on three pilots: each proxy now modelled after the Remastered
+Collection's in-game sprites and the 1996 frames in its real forms, its sizes fitted to the
+art's silhouettes and checked at every facing against the best any shape can score at the
+art's pixels (the 1996 model's own carved hull), and the concept taking its design from the
+Remastered and 1996 art and its finish from the approved OpenCNC3D redesigns. State: the V2
+Rocket's, the Gun Boat's and the Heavy Tank's concepts are approved and their real models are in
+review; the Ranger, the MCV and the Transport, the five aircraft (the MiG, Yak, Hind, Badger and
+Spy Plane, each built after the real aircraft its art is drawn after) and the Supply Truck, the
+Mine Layer, the Gap Generator, the Submarine, the Destroyer and the Cruiser have their faithful
+proxies and new concepts in review; the Radar Jammer's row proposes OpenCNC3D's approved Mobile
+HQ, whose art it is pixel for pixel. The game draws none of them yet; an own model stages
+from `game/evhc_ra/<T>.evhc` once its row is approved (`tools/ra3d/stage-vehicles.py`).
 
 ## Decisions of 2 October 2026
 

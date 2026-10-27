@@ -1,0 +1,6146 @@
+{
+ "format": "EVHC version 2, or the version a model's format_version names (a model without one is version 1); layout in tools/art/remaster/bake_evhc.py",
+ "what": "remastered vehicles and aircraft for Enhanced mode: the model, its moving parts and its wreck; made by tools/art/remaster/bake_evhc.py from the remaster viewer's export and the build's JSON",
+ "models": {
+  "3TNK": {
+   "file": "3TNK.evhc",
+   "format_version": 2,
+   "bytes": 8658692,
+   "sha256": "bda7b3beaf26b4f8d8fd6454f5d190507b08fe1eb9da9a0b5a9f58b5a668f662",
+   "export": "build-native/remaster-ra/vehicles/3TNK/viewer",
+   "sources": {
+    "../3TNK_rm.json": "f42590251710abf9b2bf1bd9153bc7ed5009aa58d96678eca9dfaf9ca0a2071c",
+    "3TNK_rm_0.png": "333edaf2680f2d5c5f05455e426a96acbb0f10eb975abaf33c2ab66b623a7f83",
+    "3TNK_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "3TNK_rm_broken_emit.png": "7e505ffab0f187a3042b644d81d0e1533a3a57b3c12159306f0f2bcd360701e2",
+    "3TNK_rm_dmg_0.png": "e8a52b702d706b88166d56ed36eb4f2b5467d94a3d21bfd411c89a25c502d5d5",
+    "3TNK_rm_dmg_1.png": "9a62e8fef9eb88dd0fa744608f8fd56bfeebeffa17ca896b558f31d182389576",
+    "3TNK_rm_dmg_emit_0.png": "7685ce87b2e323f6bef4ef90d80710f678733cf3afff09c4f233566adeba4201",
+    "3TNK_rm_dmg_emit_1.png": "02e6bffd936283b17fb5b8db678a6915945f6f0befc4a5f7a01bc80780a55896",
+    "3TNK_rm_dmg_house_0.png": "e311654354920acbcf5a5a5b05564c6258e3f7ef326d2b2a92ef3348423041e7",
+    "3TNK_rm_dmg_house_1.png": "5933d4c44ed2bc2f431e2698b41923a18d056b24b450540bb109e7592a547060",
+    "3TNK_rm_dmg_nod_0.png": "40eb36a29365c38f3b0327598ef1cea6bfc89f0a7cecde2a6ec88419cc2d3fd8",
+    "3TNK_rm_dmg_nod_1.png": "9a62e8fef9eb88dd0fa744608f8fd56bfeebeffa17ca896b558f31d182389576",
+    "3TNK_rm_house_0.png": "d5d75aaa13e168c13d0fb1d187ba68f52de61639773e3eddcb685fdbe5e16bf8",
+    "3TNK_rm_nod_0.png": "0e10f19f3676132700a9526c09a1bac0839693102159e275cc9a21b11164a99e",
+    "3TNK_rm_track.png": "489b1db27e38004335ef42c1219a62829dde2c11b4673d2e6009b864bf24f46e",
+    "3TNK_rm_wheels.png": "c7f884127b4534abb9de8914c0ccc55f585ccda8d2bc928d9e02bf1f8d38c0d5",
+    "destroyed.json": "ea8a794aed6750169cc8a6c4a288c684cae04319d634ca1bb1684dff55f432c8",
+    "lights.json": "e7a8968a943729a51ee65ee361708ece3c29e4429379b2f43382af89275e69e5",
+    "remaster.json": "58d8154802921574c7d832da85efb5b0c2598e43e99e5d3050e6e8b34015f800"
+   },
+   "vehicle_class": "tracked",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "turret",
+      "belt_r",
+      "wflip_r",
+      "belt_l",
+      "wflip_l",
+      "recoil0",
+      "recoil1"
+     ],
+     "triangles": 1594
+    },
+    "DESTROYED": {
+     "pieces": [
+      "hull#0",
+      "hull#1",
+      "hull#10",
+      "hull#11",
+      "hull#12",
+      "hull#13",
+      "hull#14",
+      "hull#15",
+      "hull#16",
+      "hull#17",
+      "hull#18",
+      "hull#19",
+      "hull#2",
+      "hull#3",
+      "hull#4",
+      "hull#5",
+      "hull#6",
+      "hull#7",
+      "hull#8",
+      "hull#9",
+      "track_l",
+      "track_r",
+      "turret"
+     ],
+     "triangles": 6578
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "turret",
+     "kind": "turret",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      3.7888,
+      184.32,
+      -33.9968,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "belt_r",
+     "kind": "belt",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      24.12743,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wflip_r",
+     "kind": "wflip",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      48.25486,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "belt_l",
+     "kind": "belt",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      24.12743,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wflip_l",
+     "kind": "wflip",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      48.25486,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "recoil0",
+     "kind": "recoil",
+     "parent": 0,
+     "driver": "apc_door",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      0.0,
+      1.0,
+      51.2,
+      0.4,
+      0.0,
+      1.0,
+      0.05,
+      0.0
+     ]
+    },
+    {
+     "piece": "recoil1",
+     "kind": "recoil",
+     "parent": 0,
+     "driver": "apc_door",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      0.0,
+      1.0,
+      51.2,
+      0.4,
+      1.0,
+      2.0,
+      0.05,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 0.0,
+    "gauge": 0.427,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "3TNK_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "3TNK_rm_nod_0.png",
+     "mask": "3TNK_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "3TNK_rm_track.png",
+     "role": "belt",
+     "w": 32,
+     "h": 8,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 2,
+     "name": "3TNK_rm_wheels.png",
+     "role": "anim",
+     "w": 1024,
+     "h": 256,
+     "grid": 4,
+     "frames": 8
+    },
+    {
+     "index": 3,
+     "name": "3TNK_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "3TNK_rm_dmg_nod_0.png",
+     "mask": "3TNK_rm_dmg_house_0.png"
+    },
+    {
+     "index": 4,
+     "name": "3TNK_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "3TNK_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "3TNK_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "3TNK_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 256,
+     "h": 256,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 8,
+     "name": "3TNK_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 256,
+     "h": 256,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 6578,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 1594,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "head_l",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "head_r",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "tail_l",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "marker_l",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "marker_r",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [],
+   "label_fallback": 203,
+   "notes": [
+    "3TNK_rm_0.png: its Nod decode differs on 1179 texels its mask leaves alone (kept as the lab made it)",
+    "3TNK_rm_wheels.png is 1152x140, a 4 x 4 flipbook: resampled to 1024x256",
+    "3TNK_rm_dmg_0.png: its Nod decode differs on 5526 texels its mask leaves alone (kept as the lab made it)",
+    "group 3TNK_rm_cut0_k1: 24 corners with a normal of no length, given their face's",
+    "3TNK_rm_dmg_1.png: its mask 3TNK_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "65964ad491a35469abdc1870a35bb1bbd3c5cd90"
+  },
+  "BADR": {
+   "file": "BADR.evhc",
+   "format_version": 2,
+   "bytes": 14056912,
+   "sha256": "7c68838c76b7140b91952c9db64946e18711a0ef8c9556b64ac6a5dccfcd6aea",
+   "export": "build-native/remaster-ra/vehicles/BADR/viewer",
+   "sources": {
+    "../BADR_rm.json": "92b5f44a971c69eba431edcfb161abeda2e28b7f0c782d8779071524903fa129",
+    "BADR_rm_0.png": "a3ade37adf8e0b5f218266c137819e11d3226ce7169043501b0219269b34bc75",
+    "BADR_rm_1.png": "0c1134c4f09a7aa425e4e13d31560386e2f209c9f88cb175ba194b45d0f1c411",
+    "BADR_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "BADR_rm_broken_emit.png": "684034c0180524ecdaa9964e3d4fb374e8a566fc4dbd187f8d1599d7612c3386",
+    "BADR_rm_dmg_0.png": "6088e9fa67a58eea2718475ed2be8b1ba6e639f197c164842a14392d4dc1ddba",
+    "BADR_rm_dmg_1.png": "88e7d0e417bfaa3da35860342b8798475579fead4edaaceb5df282c5ddaa4289",
+    "BADR_rm_dmg_emit_0.png": "27c98d0731fac1ee9a0cdfda5e4bcdf84c74207ad45ac49468f4b03dc52969ae",
+    "BADR_rm_dmg_emit_1.png": "1707efe457307d0a5e2f5a1ec1cff55b2a44286f3c4d8dda32bf394be8963b8b",
+    "BADR_rm_dmg_house_0.png": "f454533b06b4c073c0b301004ae62c484a1d94eb01c7948778975a7e68b5b494",
+    "BADR_rm_dmg_house_1.png": "2b72f79d35230c3a7df0d7c0f1c273484e6c12016cf27c2a9ad48794d5f74842",
+    "BADR_rm_dmg_nod_0.png": "b6d222fa11fed670f987ba6959aa87f613f7994e36875c6c66f0e0a58992800c",
+    "BADR_rm_dmg_nod_1.png": "0b82a8c393e3e172127965c4b3e6d1dab587ebdbebe9ca92f9486dc9a096ae18",
+    "BADR_rm_house_0.png": "8a5307992c4c3a480074ac486296cfa0efb1fccd5f730faffe36ea007439ebec",
+    "BADR_rm_house_1.png": "d1e4997f302b7ec5afd370738e1725e5753fee81774672b1f59531f511b62c8c",
+    "BADR_rm_nod_0.png": "8b4cc4108499e49f08817cc57ecc6a043f2fb886061a4a65260107aabfe6130a",
+    "BADR_rm_nod_1.png": "9de0575250a908e4686127feb2c30fed65744e3a69abaa71bc33897ee8bb20e1",
+    "destroyed.json": "7e5ce0bd8e313cc42384fd9e39b9d70efcc3de632c11606b14e7c655dc634b5d",
+    "remaster.json": "0d9075c9d96452451f6567bf8306b3d24c8a5f1e8588353a8b4f0714191c0d31"
+   },
+   "vehicle_class": "fixed wing",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull"
+     ],
+     "triangles": 6530
+    },
+    "DESTROYED": {
+     "pieces": [
+      "canopy",
+      "fin",
+      "middle#0",
+      "middle#1",
+      "middle#2",
+      "middle#3",
+      "middle#4",
+      "middle#5",
+      "middle#6",
+      "middle#7",
+      "nacelle_l",
+      "nacelle_r",
+      "nose#0",
+      "nose#1",
+      "nose#2",
+      "nose#3",
+      "nose#4",
+      "tail#0",
+      "tail#1",
+      "tail#2",
+      "tail#3",
+      "tail#4",
+      "tail#5",
+      "tail#6",
+      "tail_guns",
+      "tailplane_l",
+      "tailplane_r",
+      "turret_0",
+      "turret_1",
+      "wing_l",
+      "wing_r"
+     ],
+     "triangles": 17295
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [],
+   "params": {
+    "class": 4.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "BADR_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "BADR_rm_nod_0.png",
+     "mask": "BADR_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "BADR_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "BADR_rm_nod_1.png",
+     "mask": "BADR_rm_house_1.png"
+    },
+    {
+     "index": 2,
+     "name": "BADR_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "BADR_rm_dmg_nod_0.png",
+     "mask": "BADR_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "BADR_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "BADR_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "BADR_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "BADR_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "BADR_rm_dmg_nod_1.png",
+     "mask": "BADR_rm_dmg_house_1.png"
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 17295,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 6530,
+     "face_triangles": 0
+    }
+   },
+   "lights": [],
+   "turned": [],
+   "label_fallback": 266,
+   "notes": [
+    "BADR_rm_0.png: its Nod decode differs on 137 texels its mask leaves alone (kept as the lab made it)",
+    "BADR_rm_1.png: its Nod decode differs on 195 texels its mask leaves alone (kept as the lab made it)",
+    "BADR_rm_dmg_0.png: its Nod decode differs on 1776 texels its mask leaves alone (kept as the lab made it)",
+    "BADR_rm_dmg_1.png: its Nod decode differs on 1162 texels its mask leaves alone (kept as the lab made it)",
+    "BADR_rm_dmg_emit_1.png is black everywhere: no glow drawn from it",
+    "group BADR_rm_cut1_k0: 12 corners with a normal of no length, given their face's",
+    "group BADR_rm_cut1_k1: 51 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "b50711c7ab7e46f3db829231d318cf5d00ac0c9f"
+  },
+  "DD": {
+   "file": "DD.evhc",
+   "format_version": 2,
+   "bytes": 13437620,
+   "sha256": "31943f305de15789a65b62fec53757f8bcfebbda1d622c61625e583e7aaa58ef",
+   "export": "build-native/remaster-ra/vehicles-game/DD/viewer",
+   "sources": {
+    "../DD_rm.json": "e33dbbd7e6c1eeb880961065c25f9bb36bb0aabf940afe147e69155a654bb1a3",
+    "DD_rm_0.png": "3365ebb6c3c7052f113e5096103b60275a09a58d66628a0b9f2f854c0f2ee45f",
+    "DD_rm_1.png": "a0749db3552b1b4d2d0a9a02404392d8a0d9295519eb8db078f7d5a34d813c21",
+    "DD_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "DD_rm_broken_emit.png": "41d005de9f3663b4e01c0452931d93ba5a1ef70d2e81b03917f236a7d136f82e",
+    "DD_rm_dmg_0.png": "9459e99e3fa1883f19ba6e79d8c6ab6eef0f96f245fdd7157f955ef064c83e87",
+    "DD_rm_dmg_1.png": "db0726f15dbfb25c8969ebf4e226e4d3ac618c380174cffdf2e6bccc87d5b14a",
+    "DD_rm_dmg_emit_0.png": "01bda9e3490a39d45a5ce173e76d70656889232ddcba8d9ef881ace499f633c3",
+    "DD_rm_dmg_emit_1.png": "fc5636c18a3ce36185cabdcb379a3e02992cace428f46d46d083a534a9e6f201",
+    "DD_rm_dmg_house_0.png": "a99ef1c656a57b0eb7dacd89a62a6b1871020475a5e5c8f7135d027592c8edcd",
+    "DD_rm_dmg_house_1.png": "1a5c447450cf0bfefe73f4c78a742727b5ecc5ae2ac07ebc3b8b8e1e39b24c0d",
+    "DD_rm_dmg_nod_0.png": "2cff145cd6f43a8d2f6702c1d0d117da84ecf7fb6b3dfe7b3f98f22abb7e4ba6",
+    "DD_rm_dmg_nod_1.png": "8b93f21323c61a02810c78d3b1120eac33b32ff9753e5c42495edbca4e56a091",
+    "DD_rm_house_0.png": "b8e1b04cd5f0e334cd5820abe628f6c444311fea0b810ff2304e751c9f8cb3b5",
+    "DD_rm_house_1.png": "a2598adb0228a975a00662441ac3daf7e619f6c6f7fe6e5cf87da5d0aba42399",
+    "DD_rm_nod_0.png": "adcede5580fcc19a6298c68259a69fceb0e725fef6c7b149c9bdb244606c7328",
+    "DD_rm_nod_1.png": "4aa0ddd01456f6d1a2cb73b4135a7d7fd3bbb1d56cb3ffcf4bbd9ac7154d8d04",
+    "destroyed.json": "35abd091d0e56f408e0e3a62b33c27cfe324ce3729e773aa87812b6abe6e47da",
+    "lights.json": "b22d98f33b3e2d2ddf31cee4b3a732c3cf4570a655b0ff2ed704aeccf80ad922",
+    "remaster.json": "172b996b49767537c7741a92cfc607aa34c6021e69fe80ae1f022a32833a12e5"
+   },
+   "vehicle_class": "boat",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "turret"
+     ],
+     "triangles": 4256
+    },
+    "DESTROYED": {
+     "pieces": [
+      "afthouse#0",
+      "afthouse#1",
+      "anchor_0",
+      "anchor_1",
+      "bilge#0",
+      "bilge#1",
+      "bilge#2",
+      "bilge#3",
+      "bollard_0",
+      "bollard_1",
+      "bollard_2",
+      "bollard_3",
+      "bollard_4",
+      "bollard_5",
+      "bow#0",
+      "bow#1",
+      "bow#2",
+      "bow#3",
+      "bow#4",
+      "bow#5",
+      "bow#6",
+      "bridge#0",
+      "bridge#1",
+      "bridge#2",
+      "bridge#3",
+      "bridge#4",
+      "bridge_rail",
+      "capstan_0",
+      "capstan_1",
+      "chain_0",
+      "chain_1",
+      "funnel",
+      "gun_mount",
+      "hatch",
+      "ladder_0",
+      "ladder_1",
+      "ladder_2",
+      "ladder_3",
+      "launcher",
+      "mast",
+      "midhouse#0",
+      "midhouse#1",
+      "midhouse#2",
+      "midhouse#3",
+      "midhouse#4",
+      "midships#0",
+      "midships#1",
+      "midships#10",
+      "midships#2",
+      "midships#3",
+      "midships#4",
+      "midships#5",
+      "midships#6",
+      "midships#7",
+      "midships#8",
+      "midships#9",
+      "rack_0",
+      "rack_1",
+      "raft_0",
+      "raft_1",
+      "raft_2",
+      "raft_3",
+      "rail_pa",
+      "rail_pf",
+      "rail_sa",
+      "rail_sf",
+      "ring_0",
+      "searchlight_0",
+      "searchlight_1",
+      "stern#0",
+      "stern#1",
+      "stern#2",
+      "stern#3",
+      "stern#4",
+      "stern#5",
+      "stern#6"
+     ],
+     "triangles": 7894
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "turret",
+     "kind": "turret",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      187.392,
+      -264.25806,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 6.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "DD_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "DD_rm_nod_0.png",
+     "mask": "DD_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "DD_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "DD_rm_nod_1.png",
+     "mask": "DD_rm_house_1.png"
+    },
+    {
+     "index": 2,
+     "name": "DD_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "DD_rm_dmg_nod_0.png",
+     "mask": "DD_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "DD_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "DD_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "DD_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "DD_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "DD_rm_dmg_nod_1.png",
+     "mask": "DD_rm_dmg_house_1.png"
+    },
+    {
+     "index": 7,
+     "name": "DD_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 7894,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 4256,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "light_port",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "light_stbd",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    }
+   ],
+   "turned": [],
+   "label_fallback": 165,
+   "notes": [
+    "DD_rm_0.png: its Nod decode differs on 798 texels its mask leaves alone (kept as the lab made it)",
+    "DD_rm_1.png: its Nod decode differs on 56 texels its mask leaves alone (kept as the lab made it)",
+    "DD_rm_dmg_0.png: its Nod decode differs on 4637 texels its mask leaves alone (kept as the lab made it)",
+    "group DD_rm_cut0_k1: 12 corners with a normal of no length, given their face's",
+    "DD_rm_dmg_1.png: its Nod decode differs on 1237 texels its mask leaves alone (kept as the lab made it)"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "ec904d19fd0d1cc065a6e9e4c14fdbc3dbc7d50c"
+  },
+  "HARV": {
+   "file": "HARV.evhc",
+   "format_version": 2,
+   "bytes": 10826608,
+   "sha256": "75bea01d8672c7acfd214c89fa5372d7143de17a72d57e45af09e246dc0f3c7b",
+   "export": "build-native/remaster-ra/vehicles/HARV/viewer",
+   "sources": {
+    "../HARV_rm.json": "32042a2e9ebc3abf41cfcc361afaa26b93a86bba00720b924c8561e88086fb6a",
+    "HARV_rm_0.png": "5f6724b71a0f3987da72dfa42363ca58241362ba66baa20e4d9508e7de5ce666",
+    "HARV_rm_1.png": "08d5013af2411c6485b6f8560cda5628523d602a5f52f5a7a4e334f15aa0d4ad",
+    "HARV_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "HARV_rm_broken_emit.png": "3e070de1d4ba682ed8f4f1a98e1abfd33e049aa1ae89714633aa2eb453a45dd0",
+    "HARV_rm_dmg_0.png": "7c2ef3c0c3eeb1d0f0ff780a449be90928fd30b35d3f8ba05204d33a709d3bb4",
+    "HARV_rm_dmg_1.png": "fbd811729016975c4c2c527c8282e6f967c59cc1f49655f54c5e1e0c307422c7",
+    "HARV_rm_dmg_emit_0.png": "c800d0c8cdec36046dc621a1aa96373c9bf49bd611dec27f065a68efdad2abc9",
+    "HARV_rm_dmg_emit_1.png": "0da9cd43f74776f804910cf5afa73f5b950205fbe9c99f06f5b08cd1c679bbcf",
+    "HARV_rm_dmg_house_0.png": "fb4b17b2cbd386055f68c820fe6d39bc8f6d769fa718e16e24f521ecb5240f68",
+    "HARV_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "HARV_rm_dmg_nod_0.png": "df5b72e4b34af35f5ae8e2a1da5c491a139c97f53068effadfbb600a0ad11c2a",
+    "HARV_rm_dmg_nod_1.png": "fbd811729016975c4c2c527c8282e6f967c59cc1f49655f54c5e1e0c307422c7",
+    "HARV_rm_house_0.png": "e0800f53a3927f4cb6730275749c178fd168c3588734d2be0166cc4f8be2c5fa",
+    "HARV_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "HARV_rm_nod_0.png": "94d28dd3f5cd2de29ee5e1e9871c9d964224d3e2f59ef39caa1a025cf7f214b4",
+    "HARV_rm_nod_1.png": "08d5013af2411c6485b6f8560cda5628523d602a5f52f5a7a4e334f15aa0d4ad",
+    "HARV_rm_track.png": "2bfa74d82285d47c506de91a4a8de92427a8570db245fa5237fd2b5176c5c4be",
+    "HARV_rm_wheels.png": "4b337e618eed02f1cb3418f17375d7083f5294e84d4fe860ec3585e19bc37b2f",
+    "destroyed.json": "046b7b1bc9f9706e8cdfe3e08f329b60ab774e1287dea6feeff752f774b7919e",
+    "lights.json": "45de56eac929222f960379c81a36e146eda25e1d731678678eee066f2eecf857",
+    "remaster.json": "065f963a8b8dbb22f7149fd352a43d7cff240083842efd36e4003484a63e5c6b"
+   },
+   "vehicle_class": "wheeled",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "h_scoop",
+      "h_dump",
+      "belt_r",
+      "wflip_r",
+      "belt_l",
+      "wflip_l",
+      "h_ore_load"
+     ],
+     "triangles": 3478
+    },
+    "DESTROYED": {
+     "pieces": [
+      "cab#0",
+      "cab#1",
+      "cab#2",
+      "cab#3",
+      "cab#4",
+      "cab#5",
+      "cab#6",
+      "cab#7",
+      "cab#8",
+      "cab#9",
+      "dump#0",
+      "dump#1",
+      "dump#10",
+      "dump#11",
+      "dump#12",
+      "dump#13",
+      "dump#14",
+      "dump#2",
+      "dump#3",
+      "dump#4",
+      "dump#5",
+      "dump#6",
+      "dump#7",
+      "dump#8",
+      "dump#9",
+      "frame#0",
+      "frame#1",
+      "frame#2",
+      "frame#3",
+      "frame#4",
+      "ore_load",
+      "scoop",
+      "wheel_fl",
+      "wheel_fr",
+      "wheel_ml",
+      "wheel_mr",
+      "wheel_rl",
+      "wheel_rr"
+     ],
+     "triangles": 6969
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "h_scoop",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "ore_scoop",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      200.70399,
+      143.36,
+      -1.0,
+      0.0,
+      -0.0,
+      135.0,
+      0.0,
+      0.0,
+      3.0,
+      4.0,
+      7.0
+     ]
+    },
+    {
+     "piece": "h_dump",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "ore_dump",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -209.92,
+      256.0,
+      -0.0,
+      0.0,
+      0.0,
+      1.0,
+      55.0,
+      102.4,
+      5.0,
+      6.0,
+      14.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "belt_r",
+     "kind": "belt",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      39.67622,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wflip_r",
+     "kind": "wflip",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      79.35244,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "belt_l",
+     "kind": "belt",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      39.67622,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wflip_l",
+     "kind": "wflip",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      79.35244,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_ore_load",
+     "kind": "hinge",
+     "parent": 1,
+     "driver": "ore_load",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 1.0,
+    "gauge": 0.40213,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": -653.74208,
+    "dock_z": 487.76192,
+    "dock_yaw": -0.311555,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "HARV_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "HARV_rm_nod_0.png",
+     "mask": "HARV_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "HARV_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 2,
+     "name": "HARV_rm_track.png",
+     "role": "belt",
+     "w": 32,
+     "h": 16,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 3,
+     "name": "HARV_rm_wheels.png",
+     "role": "anim",
+     "w": 256,
+     "h": 256,
+     "grid": 4,
+     "frames": 8
+    },
+    {
+     "index": 4,
+     "name": "HARV_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "HARV_rm_dmg_nod_0.png",
+     "mask": "HARV_rm_dmg_house_0.png"
+    },
+    {
+     "index": 5,
+     "name": "HARV_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "HARV_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "HARV_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 8,
+     "name": "HARV_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 9,
+     "name": "HARV_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 6969,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 3478,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "head_l",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "head_r",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "tail_l",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [
+    "HARV_rm_spin back from mid-sweep (1920 of 1920 vertices on the build's faces)"
+   ],
+   "label_fallback": 0,
+   "notes": [
+    "HARV_rm_1.png: its mask HARV_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "HARV_rm_dmg_0.png: its Nod decode differs on 569 texels its mask leaves alone (kept as the lab made it)",
+    "group HARV_rm_cut0_k1: 12 corners with a normal of no length, given their face's",
+    "HARV_rm_dmg_1.png: its mask HARV_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "group HARV_rm_cut1_k1: 21 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "a9ea214d622fb6f37b18139edc455c18116afd82"
+  },
+  "HIND": {
+   "file": "HIND.evhc",
+   "format_version": 2,
+   "bytes": 14582020,
+   "sha256": "b7ab06c4aeea73a6ee6e1328e6621c89e00f8317a06e108e51e11f320451c092",
+   "export": "build-native/remaster-ra/vehicles/HIND/viewer",
+   "sources": {
+    "../HIND_rm.json": "f715a9a518f602b2a18791cb4d0711961d5980e30d624e712b56dafeb0690879",
+    "HIND_rm_0.png": "772e00b0d3046e7cff56e9bd3a0d947dd13e36aab38dc711ef1a897c65f48061",
+    "HIND_rm_1.png": "d7ac8b9cfa2ad538f7a0ec8693146bc791ee9368c5771873bc97f5fc13e9adf2",
+    "HIND_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "HIND_rm_broken_emit.png": "feba212d4291f4edc6bd2f1e9a5a27718f0da6dd8fa68c16b3952115f1a63bd9",
+    "HIND_rm_disc_main.png": "da69d2e9a9718190758cc7fdaee5a45f0263e43675a27813b668f5c01df94e45",
+    "HIND_rm_disc_tail.png": "49e64633876d22dbe33aaca659c9f59a729a48f8e2e0f34b3c19a2466881fe35",
+    "HIND_rm_dmg_0.png": "a4347ba09c9fc81b72bd51c65c50e5f3011c9b24081d72b0417d886d4cb450f0",
+    "HIND_rm_dmg_1.png": "4a12e6a1861e36e169018eb2c6817f800d1672b9cd0dd2c6dde447b9de1d0e64",
+    "HIND_rm_dmg_emit_0.png": "c29983e84ec4fbf0d130ed01f7d636bdbd58f7e30b1db187cfd949bfbcd9876d",
+    "HIND_rm_dmg_emit_1.png": "73e16d43e071ea07afde5d32f7892deabb78160797a413013065809eac468bce",
+    "HIND_rm_dmg_house_0.png": "2640f3f2a7e14c1ab2acc5263954403f7cf3a12ed69f0bb147bc2807a41f574e",
+    "HIND_rm_dmg_house_1.png": "1d8fa0d98025938aa19be0386c270f39e233b21efc7ab32e6e9a6137152d5281",
+    "HIND_rm_dmg_nod_0.png": "eda9e705403c73bbcee25b78c3e24b050edd7578f30c1a77bb646447398968e2",
+    "HIND_rm_dmg_nod_1.png": "8c26f5b3018f7448b9ea43072eb816a1776494b457f0794c725c6a36b5039154",
+    "HIND_rm_house_0.png": "3533ea9d0eadf8776279ff0c56d8fd68ca84f76fa167280e2eafc6a573d73eba",
+    "HIND_rm_house_1.png": "6330027de40bd971dbaf2d2a4fb53a78556eedb4e61790b72abd6c96f67b3519",
+    "HIND_rm_nod_0.png": "3e9780ac56ba07632d97a4a05701e15fae180f32a4b63b4ef0583bab73a9f1b7",
+    "HIND_rm_nod_1.png": "2d1d06634d9cdde8d9282303a583bb345318c632cbba7e5b158d1f0402d4a635",
+    "destroyed.json": "3709261da6064c2d89503beb83bf2d8c668dad07662dcfab570853ac72fba6fd",
+    "remaster.json": "956d07cb0a9b475c79775e475435e5aed410b0c6dae41be6bd1c5b76299eda6e"
+   },
+   "vehicle_class": "helicopter",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "rotor0",
+      "rotor1",
+      "h_gear_nose",
+      "h_gear_main_l",
+      "h_gear_main_r",
+      "disc0",
+      "disc1"
+     ],
+     "triangles": 5990
+    },
+    "DESTROYED": {
+     "pieces": [
+      "cabin#0",
+      "cabin#1",
+      "cabin#10",
+      "cabin#11",
+      "cabin#12",
+      "cabin#13",
+      "cabin#14",
+      "cabin#15",
+      "cabin#16",
+      "cabin#17",
+      "cabin#18",
+      "cabin#2",
+      "cabin#3",
+      "cabin#4",
+      "cabin#5",
+      "cabin#6",
+      "cabin#7",
+      "cabin#8",
+      "cabin#9",
+      "canopy",
+      "engine_l",
+      "engine_r",
+      "fin",
+      "gear_main_l",
+      "gear_main_r",
+      "gear_nose",
+      "gun",
+      "nose#0",
+      "nose#1",
+      "nose#10",
+      "nose#11",
+      "nose#12",
+      "nose#13",
+      "nose#14",
+      "nose#15",
+      "nose#16",
+      "nose#17",
+      "nose#18",
+      "nose#19",
+      "nose#2",
+      "nose#20",
+      "nose#21",
+      "nose#3",
+      "nose#4",
+      "nose#5",
+      "nose#6",
+      "nose#7",
+      "nose#8",
+      "nose#9",
+      "rotor",
+      "tail",
+      "tail_rotor",
+      "tailplane_l",
+      "tailplane_r",
+      "wing_l",
+      "wing_r"
+     ],
+     "triangles": 13224
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "rotor0",
+     "kind": "rotor",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      356.352,
+      168.3456,
+      0.0,
+      -1.0,
+      -0.0,
+      129.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "rotor1",
+     "kind": "rotor",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      49.152,
+      325.632,
+      -694.4256,
+      1.0,
+      0.0,
+      -0.0,
+      387.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_nose",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      90.112,
+      554.1376,
+      1.0,
+      0.0,
+      -0.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_main_l",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      75.776,
+      149.504,
+      98.2016,
+      1.0,
+      0.0,
+      -0.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_main_r",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -75.776,
+      149.504,
+      98.2016,
+      1.0,
+      0.0,
+      -0.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "disc0",
+     "kind": "rotor",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 1,
+     "values": [
+      0.0,
+      356.352,
+      168.3456,
+      0.0,
+      -1.0,
+      -0.0,
+      129.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "disc1",
+     "kind": "rotor",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 1,
+     "values": [
+      49.152,
+      325.632,
+      -694.4256,
+      1.0,
+      0.0,
+      -0.0,
+      387.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 3.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "HIND_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "HIND_rm_nod_1.png",
+     "mask": "HIND_rm_house_1.png"
+    },
+    {
+     "index": 1,
+     "name": "HIND_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "HIND_rm_nod_0.png",
+     "mask": "HIND_rm_house_0.png"
+    },
+    {
+     "index": 2,
+     "name": "HIND_rm_disc_main.png",
+     "role": "disc",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 3,
+     "name": "HIND_rm_disc_tail.png",
+     "role": "disc",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "HIND_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "HIND_rm_dmg_nod_0.png",
+     "mask": "HIND_rm_dmg_house_0.png"
+    },
+    {
+     "index": 5,
+     "name": "HIND_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "HIND_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "HIND_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 8,
+     "name": "HIND_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "HIND_rm_dmg_nod_1.png",
+     "mask": "HIND_rm_dmg_house_1.png"
+    },
+    {
+     "index": 9,
+     "name": "HIND_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 0,
+     "face_triangles": 13224
+    },
+    "INTACT": {
+     "smooth_triangles": 5960,
+     "face_triangles": 30
+    }
+   },
+   "lights": [],
+   "turned": [],
+   "label_fallback": 703,
+   "notes": [
+    "HIND_rm_1.png: its Nod decode differs on 8 texels its mask leaves alone (kept as the lab made it)",
+    "HIND_rm_0.png: its Nod decode differs on 172 texels its mask leaves alone (kept as the lab made it)",
+    "HIND_rm_dmg_0.png: its Nod decode differs on 8313 texels its mask leaves alone (kept as the lab made it)"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "ec904d19fd0d1cc065a6e9e4c14fdbc3dbc7d50c"
+  },
+  "JEEP": {
+   "file": "JEEP.evhc",
+   "format_version": 2,
+   "bytes": 10920616,
+   "sha256": "6220eb9db1c2547a7e5570411d4a31af1ae64094429bc52b01274811b9d51537",
+   "export": "art/remaster-ra/vehicles/JEEP/material_v03/JEEP/viewer",
+   "sources": {
+    "../JEEP_rm.json": "7f61e37452f1dcfae9c2af5820f19749f68f0d4cbe7728e3f689165298f207b0",
+    "JEEP_rm_0.png": "58d780943d0f8a4edf0574c343dbb12ec9f567feeaf96443b38587bb2bd80b59",
+    "JEEP_rm_1.png": "99821e63795bcf106e6c7c319b770a56584e13f788a2f696b2a452271da7746b",
+    "JEEP_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "JEEP_rm_broken_emit.png": "84b1ad0fe2c1bcae7a4b7eed733f92816d9fea346914df9f816f84536d4d3f23",
+    "JEEP_rm_dmg_0.png": "8661172ca5d1568cce35496dbbb4ce7ab1cb5e5bce4f951ea9e64042fce55e81",
+    "JEEP_rm_dmg_1.png": "972e0b0ae486d1ac8b0e97a6d4ec9e64fbb2d5c10c6a2ba7452a706b3a9805f2",
+    "JEEP_rm_dmg_emit_0.png": "645139a9739e0c4db1e9d025155636adabb2a36bb16a9589688830393a267bb4",
+    "JEEP_rm_dmg_emit_1.png": "33962a025169dbb24b0463331c99dcc510a3b4dee478121f130193c20374b26c",
+    "JEEP_rm_dmg_house_0.png": "4e91d8d08f94572c58d752af3baa3c5e6ea834af23ee163c8b06b5b94bd4e98e",
+    "JEEP_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "JEEP_rm_dmg_nod_0.png": "37df19e0d43cc418883a016ef6c66103e6c77414d66f61d358959bffc344f485",
+    "JEEP_rm_dmg_nod_1.png": "972e0b0ae486d1ac8b0e97a6d4ec9e64fbb2d5c10c6a2ba7452a706b3a9805f2",
+    "JEEP_rm_house_0.png": "75dcacb2b4cc339d7b4f9a305759516aa97702e7c6265bd43c1ed981a764f6c3",
+    "JEEP_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "JEEP_rm_nod_0.png": "958d69cdc85eb4d9328f69a9f17a94a8317b1896839db6b9b12de8819e597302",
+    "JEEP_rm_nod_1.png": "99821e63795bcf106e6c7c319b770a56584e13f788a2f696b2a452271da7746b",
+    "destroyed.json": "b328eb89f775f5ab9132ef576afd2d4e9b2f585223e6b0e2537e9027f73f0201",
+    "lights.json": "1e1b263df6793d2203f4ab2fa8c85b793893b6ea67eaf0e331e3b1c223e5e87d",
+    "remaster.json": "039f0df912227930ef894afcd6fca86aadc58f941ee8a91459a461c158567a09"
+   },
+   "vehicle_class": "wheeled",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "turret",
+      "wheel0",
+      "wheel1",
+      "wheel2",
+      "wheel3",
+      "recoil0"
+     ],
+     "triangles": 2972
+    },
+    "DESTROYED": {
+     "pieces": [
+      "body#0",
+      "body#1",
+      "body#10",
+      "body#11",
+      "body#12",
+      "body#13",
+      "body#14",
+      "body#15",
+      "body#16",
+      "body#17",
+      "body#18",
+      "body#19",
+      "body#2",
+      "body#20",
+      "body#21",
+      "body#22",
+      "body#23",
+      "body#3",
+      "body#4",
+      "body#5",
+      "body#6",
+      "body#7",
+      "body#8",
+      "body#9",
+      "can_l",
+      "can_r",
+      "frame",
+      "gun",
+      "mirror_l",
+      "mirror_r",
+      "rollbar_0",
+      "rollbar_1",
+      "seat_0",
+      "seat_1",
+      "seat_2",
+      "spare",
+      "tool_0",
+      "tool_1",
+      "tool_2",
+      "wheel_1l",
+      "wheel_1r",
+      "wheel_2l",
+      "wheel_2r",
+      "windscreen"
+     ],
+     "triangles": 9953
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "turret",
+     "kind": "turret",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      415.74399,
+      11.264,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel0",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      148.48,
+      102.4,
+      240.5376,
+      1.0,
+      0.0,
+      -0.0,
+      102.4,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel1",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -148.48,
+      102.4,
+      240.5376,
+      1.0,
+      0.0,
+      -0.0,
+      102.4,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel2",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      148.48,
+      102.4,
+      -220.7744,
+      1.0,
+      0.0,
+      -0.0,
+      102.4,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel3",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -148.48,
+      102.4,
+      -220.7744,
+      1.0,
+      0.0,
+      -0.0,
+      102.4,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "recoil0",
+     "kind": "recoil",
+     "parent": 0,
+     "driver": "c17_ramp",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      0.0,
+      1.0,
+      9.216,
+      0.06,
+      0.0,
+      0.0,
+      0.02,
+      0.1
+     ]
+    }
+   ],
+   "params": {
+    "class": 1.0,
+    "gauge": 0.30788,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "JEEP_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "JEEP_rm_nod_0.png",
+     "mask": "JEEP_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "JEEP_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 2,
+     "name": "JEEP_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "JEEP_rm_dmg_nod_0.png",
+     "mask": "JEEP_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "JEEP_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "JEEP_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "JEEP_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "JEEP_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "JEEP_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 9953,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 2972,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "head_l",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "head_r",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "park_l",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "park_r",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_l",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [],
+   "label_fallback": 220,
+   "notes": [
+    "JEEP_rm_1.png: its mask JEEP_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "JEEP_rm_dmg_0.png: its Nod decode differs on 1947 texels its mask leaves alone (kept as the lab made it)",
+    "group JEEP_rm_cut0_k1: 51 corners with a normal of no length, given their face's",
+    "JEEP_rm_dmg_1.png: its mask JEEP_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "group JEEP_rm_cut1_k1: 6 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "c45a8e392a8a7537a2f459ec58e873367b74640b",
+   "approval": "art/remaster-ra/vehicles/JEEP/material_v03/APPROVAL.json"
+  },
+  "LST": {
+   "file": "LST.evhc",
+   "format_version": 2,
+   "bytes": 10122748,
+   "sha256": "b9e87db99649963544c16b0ba4b54f536f0de8ea8df3dcc1c3d06552786dbf7c",
+   "export": "build-native/remaster-ra/vehicles-game/LST/viewer",
+   "sources": {
+    "../LST_rm.json": "2f7e05488fbf81e93a39b9808aa39033e5d85d93e3d49453b04beda44ec6cf5f",
+    "LST_rm_0.png": "a5bb5454ffbd96ee0e554723adaee527924cf3b26decb6218a600cc76d1edaba",
+    "LST_rm_1.png": "01786762b40712146f467d6bb737c3f241e3ef8a49e18fa828e7a143b517d326",
+    "LST_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "LST_rm_broken_emit.png": "9cd9d3ba69991cccdea29fd753152a2ea9c45d787a6dd9ff68c67074d42078a1",
+    "LST_rm_dmg_0.png": "d16f641d27cbbd3e5bd40f2232c09805f14ad1234e7cb8b85adf3164af2cacd6",
+    "LST_rm_dmg_1.png": "da85d129e579845f9983c1b74d222bffe93ae8e846c8ad0d9e7e6459824d8848",
+    "LST_rm_dmg_emit_0.png": "06d8d99b89aa683de69827bb10ea4392c7b708d4a6a54abf929aedfd0f93727a",
+    "LST_rm_dmg_emit_1.png": "23a15df4f52da78108f124834b7e7822e102a5b2a32d1100e8a4595880f5c8e9",
+    "LST_rm_dmg_house_0.png": "8019eb84f6cdcbcd955b8351376f196509e5f83dc08d02a5fe89e1a11ec51ca9",
+    "LST_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "LST_rm_dmg_nod_0.png": "ec9fbc0b6ef4b2d1748d2ba6e1ddc095bf12989c051a95c523fd3bf71b24c6a2",
+    "LST_rm_dmg_nod_1.png": "da85d129e579845f9983c1b74d222bffe93ae8e846c8ad0d9e7e6459824d8848",
+    "LST_rm_house_0.png": "9889f546440c282ad603b1286fd95ee4b2817bacbbf1fcf6d47e6281f50515fe",
+    "LST_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "LST_rm_nod_0.png": "ee00a2345586b74cd6bf418b6016a4d5d96809643fc871fb610bac97a127d41c",
+    "LST_rm_nod_1.png": "01786762b40712146f467d6bb737c3f241e3ef8a49e18fa828e7a143b517d326",
+    "destroyed.json": "0f24c7bd2103cbc72d07c3179e9f832fd40ade718fd1cba55068f7bc5602efcc",
+    "remaster.json": "d886871ff618b7982cb5907a0efe29efbe2c8a160eff094a52528a84514c0c9a"
+   },
+   "vehicle_class": "boat",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "h_ramp_e",
+      "h_ramp_n",
+      "h_ramp_w",
+      "h_ramp_s"
+     ],
+     "triangles": 1992
+    },
+    "DESTROYED": {
+     "pieces": [
+      "bilge#0",
+      "bilge#1",
+      "bilge#2",
+      "bilge#3",
+      "bilge#4",
+      "corner_ne",
+      "corner_nw",
+      "corner_se",
+      "corner_sw",
+      "deck_e#0",
+      "deck_e#1",
+      "deck_e#2",
+      "deck_e#3",
+      "deck_e#4",
+      "deck_n#0",
+      "deck_n#1",
+      "deck_n#2",
+      "deck_n#3",
+      "deck_n#4",
+      "deck_n#5",
+      "deck_n#6",
+      "deck_n#7",
+      "deck_n#8",
+      "deck_n#9",
+      "deck_s#0",
+      "deck_s#1",
+      "deck_s#2",
+      "deck_s#3",
+      "deck_s#4",
+      "deck_s#5",
+      "deck_s#6",
+      "deck_s#7",
+      "deck_s#8",
+      "deck_s#9",
+      "deck_w#0",
+      "deck_w#1",
+      "deck_w#2",
+      "deck_w#3",
+      "deck_w#4",
+      "deckhouse#0",
+      "deckhouse#1",
+      "deckhouse#10",
+      "deckhouse#11",
+      "deckhouse#12",
+      "deckhouse#2",
+      "deckhouse#3",
+      "deckhouse#4",
+      "deckhouse#5",
+      "deckhouse#6",
+      "deckhouse#7",
+      "deckhouse#8",
+      "deckhouse#9",
+      "fender_e",
+      "fender_n",
+      "fender_s",
+      "fender_w",
+      "hip_0",
+      "hip_1",
+      "hip_2",
+      "hip_3",
+      "knuckle_0",
+      "knuckle_1",
+      "knuckle_2",
+      "knuckle_3",
+      "knuckle_4",
+      "knuckle_5",
+      "knuckle_6",
+      "knuckle_7",
+      "ramp_e",
+      "ramp_n",
+      "ramp_s",
+      "ramp_w"
+     ],
+     "triangles": 5356
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "h_ramp_e",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "ra_ramp",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      488.448,
+      119.808,
+      -0.0,
+      0.0,
+      0.0,
+      -1.0,
+      191.2,
+      12.94879,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_ramp_n",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "ra_ramp",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      119.808,
+      -488.448,
+      -1.0,
+      0.0,
+      -0.0,
+      191.2,
+      12.94879,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_ramp_w",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "ra_ramp",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -488.448,
+      119.808,
+      -0.0,
+      0.0,
+      0.0,
+      1.0,
+      191.2,
+      12.94879,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_ramp_s",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "ra_ramp",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      119.808,
+      488.448,
+      1.0,
+      -0.0,
+      -0.0,
+      191.2,
+      12.94879,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 6.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "LST_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "LST_rm_nod_0.png",
+     "mask": "LST_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "LST_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 2,
+     "name": "LST_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "LST_rm_dmg_nod_0.png",
+     "mask": "LST_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "LST_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "LST_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "LST_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "LST_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "LST_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 5356,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 1992,
+     "face_triangles": 0
+    }
+   },
+   "lights": [],
+   "turned": [],
+   "label_fallback": 272,
+   "notes": [
+    "LST_rm_0.png: its Nod decode differs on 2349 texels its mask leaves alone (kept as the lab made it)",
+    "LST_rm_1.png: its mask LST_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "LST_rm_dmg_0.png: its Nod decode differs on 9693 texels its mask leaves alone (kept as the lab made it)",
+    "LST_rm_dmg_1.png: its mask LST_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "276cc0fc260067f3f31566173280ade4af67a64e"
+  },
+  "MCV": {
+   "file": "MCV.evhc",
+   "format_version": 2,
+   "bytes": 12032068,
+   "sha256": "c96e2f8ee7e13d5183129d533f45ce4f0ded20fc9b3f157d18118583bdfbd340",
+   "export": "build-native/remaster-ra/vehicles/MCV/viewer",
+   "sources": {
+    "../MCV_rm.json": "2d76f9951adf41be850207467c2a961bc66fb9aae496d60bace77ca53cb2a75f",
+    "MCV_rm_0.png": "77a1d769fc1a48125db526252702c3d77b79244a9364e4261c529826ab8c7066",
+    "MCV_rm_1.png": "266586ca7c95a92ac3806809bf2c120b7953945d422066a3a6276456df905342",
+    "MCV_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "MCV_rm_broken_emit.png": "a00dc4f284fbd735d7361432854de43bd63f0179098736c152900e6d78d0263d",
+    "MCV_rm_dmg_0.png": "961dbf433616ceb02a7a84c6991e278a407953dbccbda77b2287a182c7e65547",
+    "MCV_rm_dmg_1.png": "74c61eb030639bd13f051f381fe8d3e5fb366a17ae990b8fc5fd4df7d8e23ec0",
+    "MCV_rm_dmg_emit_0.png": "62f2ef11dcc326834913b68bdc89aecdda4a7326796083ef27e5e3c3db6ae468",
+    "MCV_rm_dmg_emit_1.png": "5a34ef86e249b6eb995a62116e1dfba4a7b6543220b8ba848449175cf261db65",
+    "MCV_rm_dmg_house_0.png": "fa705866e052a5eb8f16d28f9172f30484d9fbeb37fb6ebb61bca0687dba80cb",
+    "MCV_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "MCV_rm_dmg_nod_0.png": "72c3ab360388a6b4d674556dec886b964e0b468104a203d74053ca7d32033c82",
+    "MCV_rm_dmg_nod_1.png": "74c61eb030639bd13f051f381fe8d3e5fb366a17ae990b8fc5fd4df7d8e23ec0",
+    "MCV_rm_house_0.png": "ff027f4be9479dda1625dd26c8584fdfed09e9e01e2fbe2ae5040be0ce14bc50",
+    "MCV_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "MCV_rm_nod_0.png": "fdb40994981b83a8f367b84a03b4c79065e9bec36726dbb14fce64072c7b77d0",
+    "MCV_rm_nod_1.png": "266586ca7c95a92ac3806809bf2c120b7953945d422066a3a6276456df905342",
+    "destroyed.json": "7a95e01f329e491c663561f20ba716975baeda470f5d3aaf015e0e489f029b9b",
+    "lights.json": "b4bc472ab34dfb7ae2aef8993839b156348ccaa03fd7a33f719fa8a18a0499b1",
+    "remaster.json": "5da1f4e6fd57884339d7190ce91c7167b4d91f8687712f5ebde4344924ea8d07"
+   },
+   "vehicle_class": "wheeled",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "wheel0",
+      "wheel1",
+      "wheel2",
+      "wheel3",
+      "wheel4",
+      "wheel5"
+     ],
+     "triangles": 3848
+    },
+    "DESTROYED": {
+     "pieces": [
+      "bed#0",
+      "bed#1",
+      "bed#2",
+      "bed#3",
+      "bed#4",
+      "bed#5",
+      "bed#6",
+      "bed#7",
+      "bed#8",
+      "bonnet#0",
+      "bonnet#1",
+      "bonnet#10",
+      "bonnet#2",
+      "bonnet#3",
+      "bonnet#4",
+      "bonnet#5",
+      "bonnet#6",
+      "bonnet#7",
+      "bonnet#8",
+      "bonnet#9",
+      "cab#0",
+      "cab#1",
+      "cab#2",
+      "cab#3",
+      "cab#4",
+      "cab#5",
+      "cab#6",
+      "cab#7",
+      "cab#8",
+      "coil",
+      "drum#0",
+      "drum#1",
+      "drum#10",
+      "drum#11",
+      "drum#12",
+      "drum#13",
+      "drum#14",
+      "drum#15",
+      "drum#16",
+      "drum#2",
+      "drum#3",
+      "drum#4",
+      "drum#5",
+      "drum#6",
+      "drum#7",
+      "drum#8",
+      "drum#9",
+      "frame#0",
+      "frame#1",
+      "frame#2",
+      "frame#3",
+      "frame#4",
+      "frame#5",
+      "gantry#0",
+      "gantry#1",
+      "gantry#10",
+      "gantry#11",
+      "gantry#2",
+      "gantry#3",
+      "gantry#4",
+      "gantry#5",
+      "gantry#6",
+      "gantry#7",
+      "gantry#8",
+      "gantry#9",
+      "grille",
+      "ram_l",
+      "ram_r",
+      "stack_l",
+      "stack_r",
+      "tank_l",
+      "tank_r",
+      "wheel_1l",
+      "wheel_1r",
+      "wheel_2l",
+      "wheel_2r",
+      "wheel_3l",
+      "wheel_3r"
+     ],
+     "triangles": 16729
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "wheel0",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      173.14816,
+      117.76,
+      448.9216,
+      1.0,
+      0.0,
+      -0.0,
+      117.76,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel1",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -173.14816,
+      117.76,
+      448.9216,
+      1.0,
+      0.0,
+      -0.0,
+      117.76,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel2",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      173.14816,
+      117.76,
+      -238.48959,
+      1.0,
+      0.0,
+      -0.0,
+      117.76,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel3",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -173.14816,
+      117.76,
+      -238.48959,
+      1.0,
+      0.0,
+      -0.0,
+      117.76,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel4",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      173.14816,
+      117.76,
+      -491.008,
+      1.0,
+      0.0,
+      -0.0,
+      117.76,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel5",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -173.14816,
+      117.76,
+      -491.008,
+      1.0,
+      0.0,
+      -0.0,
+      117.76,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 1.0,
+    "gauge": 0.368527,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "MCV_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 1,
+     "name": "MCV_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MCV_rm_nod_0.png",
+     "mask": "MCV_rm_house_0.png"
+    },
+    {
+     "index": 2,
+     "name": "MCV_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MCV_rm_dmg_nod_0.png",
+     "mask": "MCV_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "MCV_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "MCV_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "MCV_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "MCV_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "MCV_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 16729,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 3848,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "head_l",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "head_r",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "tail_l",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [],
+   "label_fallback": 272,
+   "notes": [
+    "MCV_rm_1.png: its mask MCV_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "MCV_rm_0.png: its Nod decode differs on 399 texels its mask leaves alone (kept as the lab made it)",
+    "MCV_rm_dmg_0.png: its Nod decode differs on 4001 texels its mask leaves alone (kept as the lab made it)",
+    "group MCV_rm_cut0_k0: 6 corners with a normal of no length, given their face's",
+    "group MCV_rm_cut0_k1: 93 corners with a normal of no length, given their face's",
+    "group MCV_rm_cut0_k2: 36 corners with a normal of no length, given their face's",
+    "MCV_rm_dmg_1.png: its mask MCV_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "group MCV_rm_cut1_k1: 9 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "edf96d2dee2c3bdf2225cb617d305e130969e91d"
+  },
+  "MGG": {
+   "file": "MGG.evhc",
+   "format_version": 2,
+   "bytes": 14739584,
+   "sha256": "9d1276e85a46344fcb77bb437a71e5c7d786711d21bdaa947a833262ae28eab3",
+   "export": "build-native/remaster-ra/vehicles/MGG/viewer",
+   "sources": {
+    "../MGG_rm.json": "2e6fd35befdd5c9e3cca6750eaa1a81f88d5c43c53cb1218d6b9c4ebd3a3799a",
+    "MGG_rm_0.png": "2d10b9952057644c370410270e6b4250169237e2ae25b2c21e1b518c1d55057b",
+    "MGG_rm_1.png": "fa93de3b21347928a805ca7e0ffd0c7f1ffcf2a30862e1958aa82183baaf6b75",
+    "MGG_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "MGG_rm_broken_emit.png": "93191880654cb90a637d66b4320c6673a70f3fe6c2953bce3b07e4a7b1cfbf85",
+    "MGG_rm_dmg_0.png": "9ca0a71a72b1c3485257472aa5121671c875b7395e1bdb71adc244a6987a594c",
+    "MGG_rm_dmg_1.png": "09f74b9138ebed4723e90cc5e4e0b32e094faa973c3e624097f10df30fc5068f",
+    "MGG_rm_dmg_emit_0.png": "b78320cf60370b1246ee447be3bd3ba482704955edd77d319d63dce7cf2b145a",
+    "MGG_rm_dmg_emit_1.png": "20554903a3c1a56a02d577c1c371ec3c9eb423810d01bbf84b383b49f4a55aaf",
+    "MGG_rm_dmg_house_0.png": "6fe802f5b75557f8de11d620b9cc30163a45085e11a28201b6da01250a7e873f",
+    "MGG_rm_dmg_house_1.png": "7bbfcedd2ea4a5792ebc03fcab2dd4c90ab08cafc5544083fee17d3bab7abd22",
+    "MGG_rm_dmg_nod_0.png": "f3f4ae903062a0c158623a4004407949a1545337a586303ae2c3317e137f8c4c",
+    "MGG_rm_dmg_nod_1.png": "6f305439fcf1cf9eef3ea0f0a183a96268edc741163fac8ca0b361affc8c3f49",
+    "MGG_rm_house_0.png": "3f0482cb1fcba9ce4ec3a80c4083556c1232e701e7ffe34aa8024ce02a3cf29e",
+    "MGG_rm_house_1.png": "572ffd17f0fe82519c85535b135f04b0a27e0140afe837f6436062b060ccb4e9",
+    "MGG_rm_nod_0.png": "5ae308d82f6c10c6aed0fb0cdfbba706594394eb3065225ffccc3890aabea7ef",
+    "MGG_rm_nod_1.png": "d8626377f315d63d2b9f8a0be616ff0d07b42f2585f18f62d5c0746e4950e66a",
+    "destroyed.json": "331e002eb0bd0794b9a3cc26e93505fa86e21456f75d1ba4066f89f90a334e7b",
+    "lights.json": "122bff77405376aec22862d41fe9345e2df91185df4f204ae986eb91adb16d6e",
+    "remaster.json": "42dd548f750104fb555e92078cf519b24b6d4d98641c24d7fe2dc52c95e7098b"
+   },
+   "vehicle_class": "wheeled",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "spin0",
+      "wheel0",
+      "wheel1",
+      "wheel2",
+      "wheel3",
+      "wheel4",
+      "wheel5"
+     ],
+     "triangles": 4902
+    },
+    "DESTROYED": {
+     "pieces": [
+      "bed#0",
+      "bed#1",
+      "bed#2",
+      "bed#3",
+      "bed#4",
+      "bed#5",
+      "bed#6",
+      "bed#7",
+      "bed#8",
+      "bonnet#0",
+      "bonnet#1",
+      "bonnet#2",
+      "bonnet#3",
+      "bonnet#4",
+      "bonnet#5",
+      "bonnet#6",
+      "bonnet#7",
+      "bonnet#8",
+      "bonnet#9",
+      "cab#0",
+      "cab#1",
+      "cab#10",
+      "cab#2",
+      "cab#3",
+      "cab#4",
+      "cab#5",
+      "cab#6",
+      "cab#7",
+      "cab#8",
+      "cab#9",
+      "fork",
+      "frame#0",
+      "frame#1",
+      "frame#2",
+      "frame#3",
+      "frame#4",
+      "grille",
+      "housing#0",
+      "housing#1",
+      "housing#2",
+      "housing#3",
+      "housing#4",
+      "housing#5",
+      "housing#6",
+      "housing#7",
+      "housing#8",
+      "housing#9",
+      "mirror_l",
+      "mirror_r",
+      "stack_l",
+      "stack_r",
+      "wheel_1l",
+      "wheel_1r",
+      "wheel_2l",
+      "wheel_2r",
+      "wheel_3l",
+      "wheel_3r"
+     ],
+     "triangles": 16311
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "spin0",
+     "kind": "spin",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      435.20001,
+      -245.75999,
+      0.0,
+      -1.0,
+      -0.0,
+      56.25,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel0",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      209.408,
+      110.592,
+      409.94815,
+      1.0,
+      0.0,
+      -0.0,
+      110.592,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel1",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -209.408,
+      110.592,
+      409.94815,
+      1.0,
+      0.0,
+      -0.0,
+      110.592,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel2",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      209.408,
+      110.592,
+      -183.58272,
+      1.0,
+      0.0,
+      -0.0,
+      110.592,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel3",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -209.408,
+      110.592,
+      -183.58272,
+      1.0,
+      0.0,
+      -0.0,
+      110.592,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel4",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      209.408,
+      110.592,
+      -416.33792,
+      1.0,
+      0.0,
+      -0.0,
+      110.592,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel5",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -209.408,
+      110.592,
+      -416.33792,
+      1.0,
+      0.0,
+      -0.0,
+      110.592,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 1.0,
+    "gauge": 0.428918,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "MGG_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MGG_rm_nod_0.png",
+     "mask": "MGG_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "MGG_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MGG_rm_nod_1.png",
+     "mask": "MGG_rm_house_1.png"
+    },
+    {
+     "index": 2,
+     "name": "MGG_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MGG_rm_dmg_nod_0.png",
+     "mask": "MGG_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "MGG_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "MGG_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "MGG_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "MGG_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MGG_rm_dmg_nod_1.png",
+     "mask": "MGG_rm_dmg_house_1.png"
+    },
+    {
+     "index": 7,
+     "name": "MGG_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 16311,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 4902,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "head_l",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "head_r",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "marker_l",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "marker_r",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_l",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [],
+   "label_fallback": 150,
+   "notes": [
+    "MGG_rm_0.png: its Nod decode differs on 533 texels its mask leaves alone (kept as the lab made it)",
+    "MGG_rm_1.png: its Nod decode differs on 16 texels its mask leaves alone (kept as the lab made it)",
+    "MGG_rm_dmg_0.png: its Nod decode differs on 4237 texels its mask leaves alone (kept as the lab made it)",
+    "group MGG_rm_cut0_k1: 18 corners with a normal of no length, given their face's",
+    "MGG_rm_dmg_1.png: its Nod decode differs on 1726 texels its mask leaves alone (kept as the lab made it)",
+    "group MGG_rm_cut1_k1: 15 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "ab9b80db18aa0ea4f11775298e21740ed0347003"
+  },
+  "MIG": {
+   "file": "MIG.evhc",
+   "format_version": 2,
+   "bytes": 13514936,
+   "sha256": "dfa61f5cd76e8d0462ae9c9af091b6e6cd8507be02486a14af4a3849736bfdd1",
+   "export": "build-native/remaster-ra/vehicles/MIG/viewer",
+   "sources": {
+    "../MIG_rm.json": "f63ee9fe813e98393f5517ce56879e2a89542df907b0fc3ebae3ad06f25a9ef5",
+    "MIG_rm_0.png": "886c5bb457f99cff20ff3916ac36686c5bb1083b1175eb3fc69f1ac9125fc6bd",
+    "MIG_rm_1.png": "aefd613ba1a9a3a29b3551904b90152b3559f8eaa96a698086576db6ac1491a7",
+    "MIG_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "MIG_rm_broken_emit.png": "f80b2a525d1961bf9e0b9146ffea555309a3a64cd820cea0ebc1569ca4108859",
+    "MIG_rm_dmg_0.png": "a8b8652668ec33f2dccc17b247b0ceac90e146ec981f2b1a5905160a3bbb077b",
+    "MIG_rm_dmg_1.png": "3de45d18c11ea4f9ea0cc131be1b907faabd493be0e4d8210f4422941a084fee",
+    "MIG_rm_dmg_emit_0.png": "506a230570257bdaa5f16cedbc597203371ebecad860b162121b5a5d66d4c01b",
+    "MIG_rm_dmg_emit_1.png": "e05074c2d2fc6481b908d84eb968aaebb80fed08889dbf051fbfd71a0d577aff",
+    "MIG_rm_dmg_house_0.png": "16bb863d10af29832835ab9d6e4406159164d1ec3fa73a3dd63c117708c6c414",
+    "MIG_rm_dmg_house_1.png": "4463c6511a73f19097d8f0e15228fe6536e8bf94642b2a92e086cd048f939263",
+    "MIG_rm_dmg_nod_0.png": "e226f6ce96a273783c1a036b63afa72906d7a5619d47e1b26f8ff34dde7baa03",
+    "MIG_rm_dmg_nod_1.png": "f8e930c075e044eb5935c5b7a9c392668c157f5269eb12d8e6f81548bcf061f9",
+    "MIG_rm_house_0.png": "6af84d3cce156417c883b7814f0922e7e86222d5a1c7ddf5bd780b0ade41cf6b",
+    "MIG_rm_house_1.png": "01615ae5a89b81080f09ddb800d7002c73e03ced8317e33b8c743a6da109bfe8",
+    "MIG_rm_nod_0.png": "e3e5d74a07027cdb1a9e12036afba9bce627fa2c87f51f1000768ce74ad78907",
+    "MIG_rm_nod_1.png": "ce278c81ef27290388c9c35799bc7e9b45a7e37839c119c7b3dbe98a2c4dc661",
+    "destroyed.json": "90fbf1cbfab091a71d81a2083c21e62ed979080edd24a5b59e2dd50bedf4da83",
+    "remaster.json": "3984d532f25885dcc3db7c4debdbf55d3860f3e6a5fb38fc2f1ab96c932500ca"
+   },
+   "vehicle_class": "fixed wing",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "h_gear_nose",
+      "h_door_nose_l",
+      "h_door_nose_r",
+      "h_gear_main_l",
+      "h_door_main_l",
+      "h_gear_main_r",
+      "h_door_main_r"
+     ],
+     "triangles": 3347
+    },
+    "DESTROYED": {
+     "pieces": [
+      "canopy",
+      "door_main_l",
+      "door_main_r",
+      "door_nose_l",
+      "door_nose_r",
+      "fin",
+      "gear_main_l",
+      "gear_main_r",
+      "gear_nose",
+      "middle#0",
+      "middle#1",
+      "middle#2",
+      "middle#3",
+      "middle#4",
+      "middle#5",
+      "missile_l",
+      "missile_r",
+      "nose#0",
+      "nose#1",
+      "nose#2",
+      "nose#3",
+      "nose#4",
+      "nozzle",
+      "tail#0",
+      "tail#1",
+      "tail#2",
+      "tail#3",
+      "tail#4",
+      "tail#5",
+      "tail#6",
+      "tailplane_l",
+      "tailplane_r",
+      "wing_l",
+      "wing_r"
+     ],
+     "triangles": 9416
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "h_gear_nose",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      102.4,
+      235.8272,
+      1.0,
+      0.0,
+      -0.0,
+      92.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_door_nose_l",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      17.408,
+      91.99616,
+      250.2656,
+      0.0,
+      -0.16167,
+      -0.98684,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_door_nose_r",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -17.408,
+      91.99616,
+      250.2656,
+      -0.0,
+      0.16167,
+      0.98684,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_main_l",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      83.968,
+      102.4,
+      -110.6944,
+      0.0,
+      0.0,
+      -1.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_door_main_l",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      75.264,
+      68.8128,
+      -110.6944,
+      0.0,
+      0.0,
+      -1.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_main_r",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -83.968,
+      102.4,
+      -110.6944,
+      0.0,
+      0.0,
+      1.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_door_main_r",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -75.264,
+      68.8128,
+      -110.6944,
+      0.0,
+      0.0,
+      1.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 4.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "MIG_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MIG_rm_nod_0.png",
+     "mask": "MIG_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "MIG_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MIG_rm_nod_1.png",
+     "mask": "MIG_rm_house_1.png"
+    },
+    {
+     "index": 2,
+     "name": "MIG_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MIG_rm_dmg_nod_0.png",
+     "mask": "MIG_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "MIG_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "MIG_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "MIG_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "MIG_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MIG_rm_dmg_nod_1.png",
+     "mask": "MIG_rm_dmg_house_1.png"
+    },
+    {
+     "index": 7,
+     "name": "MIG_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 9416,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 3347,
+     "face_triangles": 0
+    }
+   },
+   "lights": [],
+   "turned": [],
+   "label_fallback": 555,
+   "notes": [
+    "MIG_rm_0.png: its Nod decode differs on 586 texels its mask leaves alone (kept as the lab made it)",
+    "MIG_rm_1.png: its Nod decode differs on 37 texels its mask leaves alone (kept as the lab made it)",
+    "MIG_rm_dmg_0.png: its Nod decode differs on 5845 texels its mask leaves alone (kept as the lab made it)",
+    "group MIG_rm_cut0_k1: 6 corners with a normal of no length, given their face's",
+    "MIG_rm_dmg_1.png: its Nod decode differs on 930 texels its mask leaves alone (kept as the lab made it)"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "40b9512afc5d52fd73aabae7db30d0abeeac2301"
+  },
+  "MNLY": {
+   "file": "MNLY.evhc",
+   "format_version": 2,
+   "bytes": 10680056,
+   "sha256": "6a9fef121325595b35ccb3abbf533047d602891bf4dcf4aca4e74866cf75685d",
+   "export": "build-native/remaster-ra/vehicles/MNLY/viewer",
+   "sources": {
+    "../MNLY_rm.json": "395bf62cb58e876d5673ecda5dbb497f32fc8893a2fd52368e883d77659521f9",
+    "MNLY_rm_0.png": "cbd77f6d2ff0fc9cad614232020037794a9a28502de1f898dd9634245160de53",
+    "MNLY_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "MNLY_rm_broken_emit.png": "72e4cc5eefe4daedb7a347f6b47d296cd517e85a2ffab35bb71df695e0468982",
+    "MNLY_rm_dmg_0.png": "a886d2e2d78db2890e8d415c38502224e1cf5f9d8d287981db972a49f385946b",
+    "MNLY_rm_dmg_1.png": "cd3e4e37f7f6e6d65e070e414004e9276b394644a36c1dfdea6c2cc369558e9c",
+    "MNLY_rm_dmg_emit_0.png": "a3a3bfa505af93aff2e97b403756246fbe8ac14594ecef2ca03cbb33f7c53fea",
+    "MNLY_rm_dmg_emit_1.png": "0807775d738cd3d402c21014d83691e7bdb15773fdb8e1b82924b0712a381814",
+    "MNLY_rm_dmg_house_0.png": "097929ca2ac13f03c16517e74404abea130389561d687c3805dba8771918f5ac",
+    "MNLY_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "MNLY_rm_dmg_nod_0.png": "68b1a41d4b83f28bd3f0b5d49fffc1976cbe085ba6d18f9f7b5e1055a273d7e7",
+    "MNLY_rm_dmg_nod_1.png": "cd3e4e37f7f6e6d65e070e414004e9276b394644a36c1dfdea6c2cc369558e9c",
+    "MNLY_rm_house_0.png": "d02d26d00d0b4dd4eac32c56a099ae9232196039729ce44e24e14367e512c40f",
+    "MNLY_rm_nod_0.png": "8a8fc2632af4579ea40ded291168694a0dd7912516e7f4d2d57d5ae674cde5a7",
+    "MNLY_rm_track.png": "e93e1fd3f8b6b20dd902ca4318e1bff2a74acef6bdc4e704cb91c9016acc57ff",
+    "MNLY_rm_wheels.png": "b77d6aa6472ce3f16c8666a7f0845c746c9d2baaa1e9ae33ee8fcd8d66c63707",
+    "destroyed.json": "2a8ce035a58c2dcc8059f52e8ea3d91870981ef4ef0292aff8aab53f60765193",
+    "lights.json": "82de10dae0f489d8c9d5f3a87886f737fe6010892f6b329f1d60097208553691",
+    "remaster.json": "066ffb8649fa60af3d91967852a9e68f0b714c38d10073f632bda43f84bf55fb"
+   },
+   "vehicle_class": "tracked",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "belt_r",
+      "wflip_r",
+      "belt_l",
+      "wflip_l"
+     ],
+     "triangles": 1962
+    },
+    "DESTROYED": {
+     "pieces": [
+      "box",
+      "chute",
+      "drum",
+      "hatch",
+      "hull#0",
+      "hull#1",
+      "hull#10",
+      "hull#11",
+      "hull#12",
+      "hull#13",
+      "hull#14",
+      "hull#15",
+      "hull#16",
+      "hull#17",
+      "hull#18",
+      "hull#19",
+      "hull#2",
+      "hull#20",
+      "hull#21",
+      "hull#22",
+      "hull#23",
+      "hull#24",
+      "hull#25",
+      "hull#26",
+      "hull#27",
+      "hull#28",
+      "hull#29",
+      "hull#3",
+      "hull#4",
+      "hull#5",
+      "hull#6",
+      "hull#7",
+      "hull#8",
+      "hull#9",
+      "rail_0",
+      "rail_1",
+      "rail_2",
+      "rail_3",
+      "track_l",
+      "track_r"
+     ],
+     "triangles": 9300
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "belt_r",
+     "kind": "belt",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      24.51151,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wflip_r",
+     "kind": "wflip",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      49.02303,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "belt_l",
+     "kind": "belt",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      24.51151,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wflip_l",
+     "kind": "wflip",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      49.02303,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 0.0,
+    "gauge": 0.458,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "MNLY_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MNLY_rm_nod_0.png",
+     "mask": "MNLY_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "MNLY_rm_track.png",
+     "role": "belt",
+     "w": 32,
+     "h": 8,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 2,
+     "name": "MNLY_rm_wheels.png",
+     "role": "anim",
+     "w": 1024,
+     "h": 256,
+     "grid": 4,
+     "frames": 8
+    },
+    {
+     "index": 3,
+     "name": "MNLY_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "MNLY_rm_dmg_nod_0.png",
+     "mask": "MNLY_rm_dmg_house_0.png"
+    },
+    {
+     "index": 4,
+     "name": "MNLY_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "MNLY_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "MNLY_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "MNLY_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 8,
+     "name": "MNLY_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 9300,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 1962,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "tail_l",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [],
+   "label_fallback": 155,
+   "notes": [
+    "MNLY_rm_0.png: its Nod decode differs on 319 texels its mask leaves alone (kept as the lab made it)",
+    "MNLY_rm_wheels.png is 1152x184, a 4 x 4 flipbook: resampled to 1024x256",
+    "MNLY_rm_dmg_0.png: its Nod decode differs on 4226 texels its mask leaves alone (kept as the lab made it)",
+    "group MNLY_rm_cut0_k1: 165 corners with a normal of no length, given their face's",
+    "group MNLY_rm_cut0_k2: 6 corners with a normal of no length, given their face's",
+    "MNLY_rm_dmg_1.png: its mask MNLY_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "40b9512afc5d52fd73aabae7db30d0abeeac2301"
+  },
+  "PT": {
+   "file": "PT.evhc",
+   "format_version": 2,
+   "bytes": 10023268,
+   "sha256": "39443b94c29e4622a4f1da090fc5e41d45c89ec5e1f9377fc4af8598bd7f4df7",
+   "export": "build-native/remaster-ra/vehicles-game/PT/viewer",
+   "sources": {
+    "../PT_rm.json": "94a4b78ed7abed110c7e419f296b06e251d0fc3adff5642b4d145ca1fb856d88",
+    "PT_rm_0.png": "754c3ba316ba3a7402754f6c8c6aeef3dd64ad1419de0f7d8e86f1df2543b8b6",
+    "PT_rm_1.png": "70e7b369d210cc420573a35710a1661e44d2bd383350fe73c1e03891d0d879c1",
+    "PT_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "PT_rm_broken_emit.png": "4fd10c8a207b7f772225188e5c3e55c639e6a055041f6d49884b30e4c47edf3b",
+    "PT_rm_dmg_0.png": "7faef23d096e32b0222f86aadeee198351c0dbe4f577561bee6a0601763b7ded",
+    "PT_rm_dmg_1.png": "6b43222faba4e1a1237698dbf611ba8a1424568de2d7ea28a464b58d2dbc6eb4",
+    "PT_rm_dmg_emit_0.png": "08d5d8300b959a4bffd90e453d3bfa67b761fd95745b644abf6b6e3d4d6391d7",
+    "PT_rm_dmg_emit_1.png": "8f0add75592bfbcdbcaf85ce0c4210426ec15a34542ea7ae8c74e37436a98151",
+    "PT_rm_dmg_house_0.png": "549f3cd538e240402616d7623a76c7326412739c1a05115088490f95948ce970",
+    "PT_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "PT_rm_dmg_nod_0.png": "fd4b12596f9b395dea3fb9c6d3d1da567932fe481cd02bfe8bb5969d4d87454c",
+    "PT_rm_dmg_nod_1.png": "6b43222faba4e1a1237698dbf611ba8a1424568de2d7ea28a464b58d2dbc6eb4",
+    "PT_rm_house_0.png": "dafb1f773453c877e7e7ef0a653fa7b577b0100559c64201ef55a34f9fd6eb67",
+    "PT_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "PT_rm_nod_0.png": "b7ac2f50397b00ffe85bfb44ea97ee16c26856b37775d4ff836e4b65bd3bd806",
+    "PT_rm_nod_1.png": "70e7b369d210cc420573a35710a1661e44d2bd383350fe73c1e03891d0d879c1",
+    "destroyed.json": "bb255d60b9bc4c8e9853afa36d978b1cb4ba51a56e8b15b74e35145768da9d73",
+    "lights.json": "03718e30270fd3904232aa9343da811d55928f445d57cd54a3224382de942b0d",
+    "remaster.json": "fbbed4920c909eb597bc37f567613893d1643764573cb97483502df270ec77e1"
+   },
+   "vehicle_class": "boat",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "turret",
+      "recoil0"
+     ],
+     "triangles": 1964
+    },
+    "DESTROYED": {
+     "pieces": [
+      "anchor_0",
+      "anchor_1",
+      "bilge#0",
+      "bilge#1",
+      "bilge#2",
+      "bollard_0",
+      "bollard_1",
+      "bollard_2",
+      "bollard_3",
+      "bollard_4",
+      "bollard_5",
+      "bow#0",
+      "bow#1",
+      "bow#2",
+      "bow#3",
+      "bridge#0",
+      "bridge#1",
+      "bridge#2",
+      "bridge#3",
+      "bridge#4",
+      "bridge#5",
+      "gun",
+      "hatch",
+      "ladder_0",
+      "ladder_1",
+      "locker_0",
+      "locker_1",
+      "locker_2",
+      "locker_3",
+      "locker_4",
+      "locker_5",
+      "midships#0",
+      "midships#1",
+      "midships#2",
+      "midships#3",
+      "midships#4",
+      "midships#5",
+      "midships#6",
+      "mount_0",
+      "mount_1",
+      "rail_pa",
+      "rail_pf",
+      "rail_sa",
+      "rail_sf",
+      "ring_0",
+      "ring_1",
+      "searchlight",
+      "stern#0",
+      "stern#1",
+      "stern#2",
+      "stern#3",
+      "stern#4",
+      "stern#5",
+      "turret_aft",
+      "uptake#0",
+      "uptake#1",
+      "uptake#2"
+     ],
+     "triangles": 4720
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "turret",
+     "kind": "turret",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      113.37875,
+      473.08801,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "recoil0",
+     "kind": "recoil",
+     "parent": 0,
+     "driver": "apc_door",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      0.0,
+      1.0,
+      10.24,
+      0.25,
+      0.0,
+      0.0,
+      0.04,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 6.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "PT_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "PT_rm_nod_0.png",
+     "mask": "PT_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "PT_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 2,
+     "name": "PT_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "PT_rm_dmg_nod_0.png",
+     "mask": "PT_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "PT_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "PT_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "PT_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "PT_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "PT_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 4720,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 1964,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "searchlight",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    }
+   ],
+   "turned": [],
+   "label_fallback": 104,
+   "notes": [
+    "PT_rm_0.png: its Nod decode differs on 855 texels its mask leaves alone (kept as the lab made it)",
+    "PT_rm_1.png: its mask PT_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "lights.json was placed on another remaster.json than this one (its model_sha1 54c18a9854d7)",
+    "PT_rm_dmg_0.png: its Nod decode differs on 3177 texels its mask leaves alone (kept as the lab made it)",
+    "PT_rm_dmg_1.png: its mask PT_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "a9ea214d622fb6f37b18139edc455c18116afd82"
+  },
+  "TRUK": {
+   "file": "TRUK.evhc",
+   "format_version": 2,
+   "bytes": 12802540,
+   "sha256": "4f416ae0a9c53f0ca608595c1482ac1153ec4a22894ea64cb7f70e3c698e0ea2",
+   "export": "build-native/remaster-ra/vehicles/TRUK/viewer",
+   "sources": {
+    "../TRUK_rm.json": "0f158098e2c29bdddaa189447a52f548ab3779177b301903203fe85c11e4ec6f",
+    "TRUK_rm_0.png": "c2c56afb82db1a3c55a3fa99d26eaa6a8aeb08b8d48ec285300280e4648ab76d",
+    "TRUK_rm_1.png": "228089db9e4cf416b12da09f9e02fb22e7270366cbaefaeae07efc197c39ee33",
+    "TRUK_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "TRUK_rm_broken_emit.png": "f70d3e548bf42d4e4847d059c88b8ff80f9d9d59a4cd20de507a0be1c16a00f7",
+    "TRUK_rm_dmg_0.png": "61b7e7f41802f11814a0d9d7aa06fcaf0b666d6cd31b4c8adcba928fbf80f48a",
+    "TRUK_rm_dmg_1.png": "5cf770b593c62d85b00bdb686fbf4c56ad0679a5a595be9446d86f15c81946e4",
+    "TRUK_rm_dmg_emit_0.png": "861ee22c20af8a5a07a3dba11caa704d68cb78a4add46ed98b8211761a949450",
+    "TRUK_rm_dmg_emit_1.png": "f2020439cae6ed60c1f155b2397105164378a0955325f1514748c9a15ce1e021",
+    "TRUK_rm_dmg_house_0.png": "4845c594d4e2ecc6158ea8504d8a857f07c9084b2e1aaa1046a9a1dbab07be15",
+    "TRUK_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "TRUK_rm_dmg_nod_0.png": "eecd4c6b7709acc38ee5dd02da984655f9a21285dd24326dd478b61f838e4cbd",
+    "TRUK_rm_dmg_nod_1.png": "5cf770b593c62d85b00bdb686fbf4c56ad0679a5a595be9446d86f15c81946e4",
+    "TRUK_rm_house_0.png": "a2864a048bb842e897bc9c5d15e67da3ab0a9d553295e4e60cb325a75f1e6a3e",
+    "TRUK_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "TRUK_rm_nod_0.png": "1406cb3f37f190dbe39d74abd22bf8600c1898bd270bad28de23b6919396a75b",
+    "TRUK_rm_nod_1.png": "228089db9e4cf416b12da09f9e02fb22e7270366cbaefaeae07efc197c39ee33",
+    "destroyed.json": "77c1bee29659e7483217e09defaa8841936f53c4bc18d45a8e973bdef0ba278e",
+    "lights.json": "da03ac85515388044c288e7e4ca4afffd8e8862490a604ff95a39b8057b30325",
+    "remaster.json": "afacd6a50f40d514a94f8e896a30081167fbe800a8c1079350a436499372beac"
+   },
+   "vehicle_class": "wheeled",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "wheel0",
+      "wheel1",
+      "wheel2",
+      "wheel3",
+      "wheel4",
+      "wheel5"
+     ],
+     "triangles": 5156
+    },
+    "DESTROYED": {
+     "pieces": [
+      "bed#0",
+      "bed#1",
+      "bed#10",
+      "bed#11",
+      "bed#12",
+      "bed#13",
+      "bed#14",
+      "bed#15",
+      "bed#16",
+      "bed#2",
+      "bed#3",
+      "bed#4",
+      "bed#5",
+      "bed#6",
+      "bed#7",
+      "bed#8",
+      "bed#9",
+      "bonnet#0",
+      "bonnet#1",
+      "bonnet#10",
+      "bonnet#2",
+      "bonnet#3",
+      "bonnet#4",
+      "bonnet#5",
+      "bonnet#6",
+      "bonnet#7",
+      "bonnet#8",
+      "bonnet#9",
+      "cab#0",
+      "cab#1",
+      "cab#10",
+      "cab#11",
+      "cab#12",
+      "cab#13",
+      "cab#14",
+      "cab#15",
+      "cab#2",
+      "cab#3",
+      "cab#4",
+      "cab#5",
+      "cab#6",
+      "cab#7",
+      "cab#8",
+      "cab#9",
+      "can_l",
+      "can_r",
+      "frame#0",
+      "frame#1",
+      "frame#2",
+      "frame#3",
+      "guard",
+      "intake",
+      "mirror_l",
+      "mirror_r",
+      "tank_l",
+      "tank_r",
+      "tilt",
+      "wheel_1l",
+      "wheel_1r",
+      "wheel_2l",
+      "wheel_2r",
+      "wheel_3l",
+      "wheel_3r"
+     ],
+     "triangles": 20799
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "wheel0",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      167.936,
+      94.208,
+      323.58401,
+      1.0,
+      0.0,
+      -0.0,
+      94.208,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel1",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -167.936,
+      94.208,
+      323.58401,
+      1.0,
+      0.0,
+      -0.0,
+      94.208,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel2",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      167.936,
+      94.208,
+      -76.8,
+      1.0,
+      0.0,
+      -0.0,
+      94.208,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel3",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -167.936,
+      94.208,
+      -76.8,
+      1.0,
+      0.0,
+      -0.0,
+      94.208,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel4",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      167.936,
+      94.208,
+      -286.72,
+      1.0,
+      0.0,
+      -0.0,
+      94.208,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel5",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -167.936,
+      94.208,
+      -286.72,
+      1.0,
+      0.0,
+      -0.0,
+      94.208,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 1.0,
+    "gauge": 0.341461,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "TRUK_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 1,
+     "name": "TRUK_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "TRUK_rm_nod_0.png",
+     "mask": "TRUK_rm_house_0.png"
+    },
+    {
+     "index": 2,
+     "name": "TRUK_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "TRUK_rm_dmg_nod_0.png",
+     "mask": "TRUK_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "TRUK_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "TRUK_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "TRUK_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "TRUK_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "TRUK_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 20799,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 5156,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "head_l",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "head_r",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "mark_l",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "mark_r",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_l",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_l_small",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "tail_r_small",
+     "kind": "tail",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [],
+   "label_fallback": 231,
+   "notes": [
+    "TRUK_rm_1.png: its mask TRUK_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "TRUK_rm_0.png: its Nod decode differs on 422 texels its mask leaves alone (kept as the lab made it)",
+    "TRUK_rm_dmg_0.png: its Nod decode differs on 1749 texels its mask leaves alone (kept as the lab made it)",
+    "group TRUK_rm_cut0_k1: 27 corners with a normal of no length, given their face's",
+    "group TRUK_rm_cut0_k2: 6 corners with a normal of no length, given their face's",
+    "TRUK_rm_dmg_1.png: its mask TRUK_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "group TRUK_rm_cut1_k1: 39 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "40b9512afc5d52fd73aabae7db30d0abeeac2301"
+  },
+  "U2": {
+   "file": "U2.evhc",
+   "format_version": 2,
+   "bytes": 13355372,
+   "sha256": "3d5df043cf25aac2c7406e127eaf9456052e6cde72221659d733c77633c35a68",
+   "export": "build-native/remaster-ra/vehicles/U2/viewer",
+   "sources": {
+    "../U2_rm.json": "e63507f99c46e881af03023d81d552e254d9ce6fd97319c05ea36f9eddc5ceb4",
+    "U2_rm_0.png": "8b779310dc0eba193d11fe922a3cd25b5fd215edf625d194a782ff0146dcc83f",
+    "U2_rm_1.png": "855c3aa8ba4a34d9aa05d7f7b2fea50c3b42161bbc802acab51598a64562bab9",
+    "U2_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "U2_rm_broken_emit.png": "2f51699ffafeabe008f3ad421039210c912d919b70feeb9e2045af95107f324a",
+    "U2_rm_dmg_0.png": "746d990a93c3d39f89ea18670851957f61e7b4cfbade7fcb705c3152ef6e5d2d",
+    "U2_rm_dmg_1.png": "e94874420996c196e79ab294f35f8e8439e776ca6a7bcdd1e93edd550b0c01d5",
+    "U2_rm_dmg_emit_0.png": "6e572dd9cf802b353324f949c3afb6022a92e82bb88ec01e4413829fa938b2d7",
+    "U2_rm_dmg_emit_1.png": "a30066dc3a97cdcfbaabaa3d16809aac4ed98473c52dbb649df7126e7c27de0f",
+    "U2_rm_dmg_house_0.png": "05a7e4fba0d99827f8622824ac49d817d6ada6e1c9046149263f1ee208c9b1d7",
+    "U2_rm_dmg_house_1.png": "6401bfbd744c06548a2eacecd8c8a3f659c0cc16bf4b334d5598e1d7094d5bb0",
+    "U2_rm_dmg_nod_0.png": "4523b960d9d277c3e82a11462b98df3934d134c7fd3f8b3a01b593cfc1bc2f1f",
+    "U2_rm_dmg_nod_1.png": "f6bb404f4967351e4a808bfa0ba0c00266f2d3f52c30b94ba46fe3a7416bf903",
+    "U2_rm_house_0.png": "520c446f396205deb6b9526e66d50d71a989845c7b471e0dd9e4c5389d77d8b0",
+    "U2_rm_house_1.png": "1dd6b44f25ef53ce18fa0060c7f33fc4e25fb1e692ba4f1eaa92867fed892d48",
+    "U2_rm_nod_0.png": "f89e2b212a6ca3dc70da10eba9ece92cf030102f427dc50eb78bdc68e9fca038",
+    "U2_rm_nod_1.png": "1c9c270f16bf41e6500597835bf431b9682f3e16ebe86d618cec0400d6a8b9e0",
+    "destroyed.json": "3ffac9c014c2e3d44ad455cbbc0c4fa1ace82712bac4547bc3871d23a6f7e183",
+    "remaster.json": "d537c2384a75aa2af69689e4eb2ffdd7b69a75a7532e0f911bd77d45f292fa97"
+   },
+   "vehicle_class": "fixed wing",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull"
+     ],
+     "triangles": 2170
+    },
+    "DESTROYED": {
+     "pieces": [
+      "canard_l",
+      "canard_r",
+      "canopy",
+      "fin_l",
+      "fin_r",
+      "middle#0",
+      "middle#1",
+      "middle#2",
+      "middle#3",
+      "middle#4",
+      "middle#5",
+      "middle#6",
+      "nose#0",
+      "nose#1",
+      "nose#10",
+      "nose#11",
+      "nose#12",
+      "nose#2",
+      "nose#3",
+      "nose#4",
+      "nose#5",
+      "nose#6",
+      "nose#7",
+      "nose#8",
+      "nose#9",
+      "nozzle_l",
+      "nozzle_r",
+      "tail#0",
+      "tail#1",
+      "tail#2",
+      "tail#3",
+      "tail#4",
+      "tailplane_l",
+      "tailplane_r",
+      "ventral_l",
+      "ventral_r",
+      "wing_l",
+      "wing_r"
+     ],
+     "triangles": 9490
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [],
+   "params": {
+    "class": 4.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "U2_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "U2_rm_nod_0.png",
+     "mask": "U2_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "U2_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "U2_rm_nod_1.png",
+     "mask": "U2_rm_house_1.png"
+    },
+    {
+     "index": 2,
+     "name": "U2_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "U2_rm_dmg_nod_0.png",
+     "mask": "U2_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "U2_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "U2_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "U2_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "U2_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "U2_rm_dmg_nod_1.png",
+     "mask": "U2_rm_dmg_house_1.png"
+    },
+    {
+     "index": 7,
+     "name": "U2_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 9490,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 2170,
+     "face_triangles": 0
+    }
+   },
+   "lights": [],
+   "turned": [],
+   "label_fallback": 218,
+   "notes": [
+    "U2_rm_0.png: its Nod decode differs on 429 texels its mask leaves alone (kept as the lab made it)",
+    "U2_rm_1.png: its Nod decode differs on 175 texels its mask leaves alone (kept as the lab made it)",
+    "U2_rm_dmg_0.png: its Nod decode differs on 4877 texels its mask leaves alone (kept as the lab made it)",
+    "group U2_rm_cut0_k1: 24 corners with a normal of no length, given their face's",
+    "group U2_rm_cut0_k2: 6 corners with a normal of no length, given their face's",
+    "U2_rm_dmg_1.png: its Nod decode differs on 455 texels its mask leaves alone (kept as the lab made it)",
+    "group U2_rm_cut1_k1: 3 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "b50711c7ab7e46f3db829231d318cf5d00ac0c9f"
+  },
+  "V2RL": {
+   "file": "V2RL.evhc",
+   "format_version": 2,
+   "bytes": 10804516,
+   "sha256": "5aeee7ef548515930beb3e1a61fa63935c83769e384dd46842e10fb7fe1ba80f",
+   "export": "build-native/remaster-ra/vehicles-game/V2RL/viewer",
+   "sources": {
+    "../V2RL_rm.json": "eb9e6ababb149385a1868828dceaac061342dfa2a65327981bc3b7a5cf46ba47",
+    "V2RL_rm_0.png": "26db39581ea12305a255e40ae7f442b3f4677b533e244ba6dd55c889b49773c0",
+    "V2RL_rm_1.png": "338031720b7058fbe66baf5f8747f149e334facd71ceda15b8115b6cbc94c4c8",
+    "V2RL_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "V2RL_rm_broken_emit.png": "632a098217e17fa19e605448a8d98c03656288d97acfecdb736a90354fb7ad24",
+    "V2RL_rm_dmg_0.png": "0290f394913ebde3f74723e8e64d4a56a1dcc3ea3a98e64f5f94a1aa86ec3a08",
+    "V2RL_rm_dmg_1.png": "794802b08cef28cd5f82b8f38495664c669647f5405b9abb52a7b110c0d965ba",
+    "V2RL_rm_dmg_emit_0.png": "0abe4ddc4bc14d1691a4cec28751d7a4407be64578b7622c302a23e223302ee7",
+    "V2RL_rm_dmg_emit_1.png": "14acd55c340e1c220f958865a7f746c2c6911e109c6b6d413c61ff02718e7f7c",
+    "V2RL_rm_dmg_house_0.png": "7d09ea92b5a3ca65852aebd881ae626ab9b949e72d8d98ea23f5b570cbb94ca3",
+    "V2RL_rm_dmg_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "V2RL_rm_dmg_nod_0.png": "733e87309ec252dda5a2f69fd7f13d931022e3886bc0544a47d8c0840e7a8e3f",
+    "V2RL_rm_dmg_nod_1.png": "794802b08cef28cd5f82b8f38495664c669647f5405b9abb52a7b110c0d965ba",
+    "V2RL_rm_house_0.png": "b4b8a9df3cb4463c950121eb114822c012a738f8c9576a1e4e2944b31a95ca84",
+    "V2RL_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "V2RL_rm_nod_0.png": "880b07655f82d0d9491ef1b579437acec9ab748497fed89c76ec299a7a37fc19",
+    "V2RL_rm_nod_1.png": "338031720b7058fbe66baf5f8747f149e334facd71ceda15b8115b6cbc94c4c8",
+    "destroyed.json": "56f618985c0c1bd8e40c274680e92d7d7711584bdf8d5eb2df6fdb6ae222bd38",
+    "lights.json": "dbd8847f0ef292c1af11bcfdc00315e79f7687a4b1b441e441ea61537003ba11",
+    "remaster.json": "18c1d3db396e5a3cfe714e98d01a916fc831db538bf8724a6b1b7b64baa07ec2"
+   },
+   "vehicle_class": "wheeled",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "h_erector",
+      "h_ram_l",
+      "h_ram_r",
+      "wheel0",
+      "wheel1",
+      "wheel2",
+      "wheel3",
+      "wheel4",
+      "wheel5",
+      "wheel6",
+      "wheel7",
+      "h_rod_l",
+      "h_rod_r",
+      "h_rocket"
+     ],
+     "triangles": 2722
+    },
+    "DESTROYED": {
+     "pieces": [
+      "body#0",
+      "body#1",
+      "body#2",
+      "body#3",
+      "body#4",
+      "body#5",
+      "cab#0",
+      "cab#1",
+      "cab#10",
+      "cab#2",
+      "cab#3",
+      "cab#4",
+      "cab#5",
+      "cab#6",
+      "cab#7",
+      "cab#8",
+      "cab#9",
+      "crate_0",
+      "crate_1",
+      "crate_2",
+      "erector",
+      "frame#0",
+      "frame#1",
+      "frame#2",
+      "frame#3",
+      "frame#4",
+      "frame#5",
+      "ram_l",
+      "ram_r",
+      "reel_l",
+      "reel_r",
+      "toolbox_0",
+      "toolbox_1",
+      "wheel_1l",
+      "wheel_1r",
+      "wheel_2l",
+      "wheel_2r",
+      "wheel_3l",
+      "wheel_3r",
+      "wheel_4l",
+      "wheel_4r"
+     ],
+     "triangles": 9387
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "h_erector",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "v2_erector",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      309.24799,
+      -501.76001,
+      -1.0,
+      0.0,
+      -0.0,
+      45.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_ram_l",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "v2_ram",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      86.016,
+      288.76801,
+      -307.20001,
+      -1.0,
+      0.0,
+      -0.0,
+      59.93,
+      92.3648,
+      86.016,
+      301.056,
+      102.4,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_ram_r",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "v2_ram",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -86.016,
+      288.76801,
+      -307.20001,
+      -1.0,
+      0.0,
+      -0.0,
+      59.93,
+      92.3648,
+      -86.016,
+      301.056,
+      102.4,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel0",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      148.48,
+      77.824,
+      314.16321,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel1",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -148.48,
+      77.824,
+      314.16321,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      12.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel2",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      148.48,
+      77.824,
+      88.3712,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel3",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -148.48,
+      77.824,
+      88.3712,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel4",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      148.48,
+      77.824,
+      -78.7456,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel5",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -148.48,
+      77.824,
+      -78.7456,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel6",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 1,
+     "flags": 0,
+     "values": [
+      148.48,
+      77.824,
+      -369.664,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "wheel7",
+     "kind": "wheel",
+     "parent": -1,
+     "driver": "none",
+     "side": 0,
+     "flags": 0,
+     "values": [
+      -148.48,
+      77.824,
+      -369.664,
+      1.0,
+      0.0,
+      -0.0,
+      77.824,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_rod_l",
+     "kind": "hinge",
+     "parent": 1,
+     "driver": "v2_rod",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      86.016,
+      288.76801,
+      -307.20001,
+      -1.0,
+      0.0,
+      -0.0,
+      59.93,
+      92.3648,
+      86.016,
+      301.056,
+      102.4,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_rod_r",
+     "kind": "hinge",
+     "parent": 2,
+     "driver": "v2_rod",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -86.016,
+      288.76801,
+      -307.20001,
+      -1.0,
+      0.0,
+      -0.0,
+      59.93,
+      92.3648,
+      -86.016,
+      301.056,
+      102.4,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_rocket",
+     "kind": "hinge",
+     "parent": 0,
+     "driver": "v2_rocket",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      0.0,
+      -0.0,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 1.0,
+    "gauge": 0.319474,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "V2RL_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "V2RL_rm_nod_0.png",
+     "mask": "V2RL_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "V2RL_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 2,
+     "name": "V2RL_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "V2RL_rm_dmg_nod_0.png",
+     "mask": "V2RL_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "V2RL_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "V2RL_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "V2RL_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "V2RL_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "V2RL_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 9387,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 2722,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "head_l",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "head_r",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "marker_l",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    },
+    {
+     "name": "marker_r",
+     "kind": "other",
+     "piece": "hull",
+     "shadows": false
+    }
+   ],
+   "turned": [],
+   "label_fallback": 140,
+   "notes": [
+    "V2RL_rm_0.png: its Nod decode differs on 554 texels its mask leaves alone (kept as the lab made it)",
+    "V2RL_rm_1.png: its mask V2RL_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "lights.json was placed on another remaster.json than this one (its model_sha1 02d143a5cd92)",
+    "V2RL_rm_dmg_0.png: its Nod decode differs on 1986 texels its mask leaves alone (kept as the lab made it)",
+    "group V2RL_rm_cut0_k1: 36 corners with a normal of no length, given their face's",
+    "group V2RL_rm_cut0_k2: 6 corners with a normal of no length, given their face's",
+    "V2RL_rm_dmg_1.png: its mask V2RL_rm_dmg_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "group V2RL_rm_cut1_k1: 9 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "5ef152c9e7ddac81100be9e496e9ce2179d04c16"
+  },
+  "YAK": {
+   "file": "YAK.evhc",
+   "format_version": 2,
+   "bytes": 13166244,
+   "sha256": "376e498d7fd28e905d091ac3c74de7e04d9d973420ef212d3c6bfb105f5133fb",
+   "export": "build-native/remaster-ra/vehicles/YAK/viewer",
+   "sources": {
+    "../YAK_rm.json": "107bca2f8a0254bfe53ab41ffc41c0eae6c561a82e6b83ce539c8c5fe52606f0",
+    "YAK_rm_0.png": "8855bd770ac7c3ac3125758d9329d013384f37640e1ec122c125be4c5053997e",
+    "YAK_rm_1.png": "91c186990dcc9c0a5c9757ef7a0473b83837e1e2fe83035ec589ca83d62f766e",
+    "YAK_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "YAK_rm_broken_emit.png": "b270e33e595b11b804823311653ddfc5bef2a0188f47d7d52afee923d76c9719",
+    "YAK_rm_disc_prop.png": "2730934e396b5dc4b830df73ad7546f64295f9c5c436e9edd950ab15077da3ac",
+    "YAK_rm_dmg_0.png": "2ff30ee5ade2627e3d2808e54541683889dc3a607592ae02dfb5bbdcf88a0a9d",
+    "YAK_rm_dmg_1.png": "86775bc60c0d3f7da80a62bc640f300d011f4b6e7d6b4add69bfa38a1d803c22",
+    "YAK_rm_dmg_emit_0.png": "f7380ee027068319a1d5b3a920810e543a7605837d31d47b19b9a805f2fe4444",
+    "YAK_rm_dmg_emit_1.png": "96620104e210ce8cb87486c020bbf79a41a0d4b804d0be15042a2a7a950f374c",
+    "YAK_rm_dmg_house_0.png": "0c75381f3b8f5d8e9373bbc140c05aa80c3d2185a49c58e4c6e55a4e114a6f69",
+    "YAK_rm_dmg_house_1.png": "fde8aae2717d951ea5bd6cf728e0e6675d708941d11157e9c0c94a0a0979397e",
+    "YAK_rm_dmg_nod_0.png": "e3d934915aee81c1114ff1cb1d64ce8acbf50ffd664af5fb34d5844ef17cc6e3",
+    "YAK_rm_dmg_nod_1.png": "aad697006eaf51ca81138a0f6c0c8f35aebab216f6be915e3f7a67fa3ef49f1e",
+    "YAK_rm_house_0.png": "1b5ec18b4f804c21c94e0a52bcf2605a9072a61f9b6f5caef3190de07b685ff0",
+    "YAK_rm_house_1.png": "8a925f3e3ce528dcebc9ae280eb1d4f0b963500c73dae977ad6973bf5dfdaa81",
+    "YAK_rm_nod_0.png": "87373657929a79bc7ec377e4c2a3afcd4ae4a5718621c002e2dcf82136c2a37e",
+    "YAK_rm_nod_1.png": "e0dd99b2a440f2a9c270d57ec5183260485b75130b4f0ec93657cf12e60940cd",
+    "destroyed.json": "206b9607dd887fa8c481b84ae20e18111003ce1fece1fc48f62c3a97231cd9e9",
+    "remaster.json": "102cd2341a018fb62ac86a872c2fd441849a11856dcb5c2826e991370d8c7c96"
+   },
+   "vehicle_class": "fixed wing",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "rotor0",
+      "h_gear_main_l",
+      "h_gear_main_r",
+      "h_gear_tail",
+      "h_door_tail_l",
+      "h_door_tail_r",
+      "disc0"
+     ],
+     "triangles": 3092
+    },
+    "DESTROYED": {
+     "pieces": [
+      "canopy",
+      "door_tail_l",
+      "door_tail_r",
+      "fin",
+      "gear_main_l",
+      "gear_main_r",
+      "gear_tail",
+      "mast",
+      "middle#0",
+      "middle#1",
+      "middle#2",
+      "middle#3",
+      "middle#4",
+      "nose#0",
+      "nose#1",
+      "nose#2",
+      "nose#3",
+      "nose#4",
+      "nose#5",
+      "propeller",
+      "radiator",
+      "tail#0",
+      "tail#1",
+      "tail#2",
+      "tail#3",
+      "tailplane_l",
+      "tailplane_r",
+      "wing_l",
+      "wing_r"
+     ],
+     "triangles": 6800
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "rotor0",
+     "kind": "rotor",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      128.0,
+      322.6624,
+      0.0,
+      0.0,
+      1.0,
+      240.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_main_l",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      112.64,
+      97.64864,
+      80.67072,
+      0.0,
+      0.0,
+      -1.0,
+      84.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_main_r",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -112.64,
+      97.64864,
+      80.67072,
+      0.0,
+      0.0,
+      1.0,
+      84.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_gear_tail",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      121.856,
+      -284.07808,
+      -1.0,
+      0.0,
+      -0.0,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_door_tail_l",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      8.8064,
+      103.43424,
+      -171.84768,
+      0.0,
+      0.1381,
+      -0.99042,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "h_door_tail_r",
+     "kind": "hinge",
+     "parent": -1,
+     "driver": "gear",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      -8.8064,
+      103.43424,
+      -171.84768,
+      -0.0,
+      -0.1381,
+      0.99042,
+      90.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "disc0",
+     "kind": "rotor",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 1,
+     "values": [
+      0.0,
+      128.0,
+      322.6624,
+      0.0,
+      0.0,
+      1.0,
+      240.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 4.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "YAK_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "YAK_rm_nod_1.png",
+     "mask": "YAK_rm_house_1.png"
+    },
+    {
+     "index": 1,
+     "name": "YAK_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "YAK_rm_nod_0.png",
+     "mask": "YAK_rm_house_0.png"
+    },
+    {
+     "index": 2,
+     "name": "YAK_rm_disc_prop.png",
+     "role": "disc",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 3,
+     "name": "YAK_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "YAK_rm_dmg_nod_0.png",
+     "mask": "YAK_rm_dmg_house_0.png"
+    },
+    {
+     "index": 4,
+     "name": "YAK_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "YAK_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "YAK_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 7,
+     "name": "YAK_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "YAK_rm_dmg_nod_1.png",
+     "mask": "YAK_rm_dmg_house_1.png"
+    },
+    {
+     "index": 8,
+     "name": "YAK_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 0,
+     "face_triangles": 6800
+    },
+    "INTACT": {
+     "smooth_triangles": 3076,
+     "face_triangles": 16
+    }
+   },
+   "lights": [],
+   "turned": [],
+   "label_fallback": 291,
+   "notes": [
+    "YAK_rm_1.png: its Nod decode differs on 71 texels its mask leaves alone (kept as the lab made it)",
+    "YAK_rm_0.png: its Nod decode differs on 186 texels its mask leaves alone (kept as the lab made it)",
+    "YAK_rm_dmg_0.png: its Nod decode differs on 4683 texels its mask leaves alone (kept as the lab made it)",
+    "YAK_rm_dmg_1.png: its Nod decode differs on 677 texels its mask leaves alone (kept as the lab made it)",
+    "group YAK_rm_cut1_k1: 12 corners with a normal of no length, given their face's"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "ec904d19fd0d1cc065a6e9e4c14fdbc3dbc7d50c"
+  },
+  "SS": {
+   "file": "SS.evhc",
+   "format_version": 2,
+   "bytes": 13261352,
+   "sha256": "e903a63c5c34375d3d868690f38fbc786b72f286349e3d23894f0068902485a8",
+   "export": "build-native/remaster-ra/vehicles-game/SS/viewer",
+   "sources": {
+    "../SS_rm.json": "d0698817fda952a57ceb2bc039e0b60e9561373b0a2520656d74810c1b25b813",
+    "SS_rm_0.png": "dd53766e91fdfd4c49e9588c26212ab3054922c8e93dcf69f24646d40ca1b89f",
+    "SS_rm_1.png": "7c96b28138176b6f92ae9036a110db647fee98d813ed87540be7d625c2cca944",
+    "SS_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "SS_rm_broken_emit.png": "be60f4f79ef2e99fbcb2a8a92f8ad2eddbcc67223bf4802f14dc7efcdffa6f30",
+    "SS_rm_dmg_0.png": "e431a0d05726e64d79d74b584d39eba605bbfc9e78e26505f9d93562199d605b",
+    "SS_rm_dmg_1.png": "a2439261ed2ffbd9e56e6e4fbc76a10db25fa0919d70dcc1c376c055917a6485",
+    "SS_rm_dmg_emit_0.png": "aaa8faabc97181ace91eb96158fbd071383989301cec2337c33e22251f65637a",
+    "SS_rm_dmg_emit_1.png": "8bac37c27c9420cda7bf441fabc9abb7a0ccdd9ad914807a0523b10407bf3480",
+    "SS_rm_dmg_house_0.png": "47094387b261a2abb649d11ee0bcac782c4a6fdaf2fc375e96df9e4a1123a629",
+    "SS_rm_dmg_house_1.png": "cc67bfc497bc60d1eec0b6f1fc461b4e5921fcd320f03fde386da1502e870831",
+    "SS_rm_dmg_nod_0.png": "ab6d530a2ab753e8ab8a825602b69d4c20200ce0885f2cafac1fd8f7c48ace54",
+    "SS_rm_dmg_nod_1.png": "2c43f516a26d0db6928721e78b6577c6dafc90ef2b14543ae6b82736b003213e",
+    "SS_rm_house_0.png": "9232c4f169c5f306b9fe975620c3ec32cd0becaaadef103e39c35ef018a1e4b9",
+    "SS_rm_house_1.png": "3cab765705880cc11240bc36a18b617b3706794784816b3a50d708e83e713db2",
+    "SS_rm_nod_0.png": "89c3c8f9066e84222b220f20dba1bc05a68607f6f6c43467009a67b94267cfbc",
+    "SS_rm_nod_1.png": "7d63d836080067339eb35d40ce09be7ce78102f4eec7431de88b8c793dc27c0e",
+    "destroyed.json": "be39aefaa2b13b6fd8305c0c957959307c1d3c75f2541844b12ceb80ab270416",
+    "remaster.json": "c76cc9c3394e34338a0c12fbb54244947eaf830d9d5c8a61962262707a1e7abd"
+   },
+   "vehicle_class": "boat",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull"
+     ],
+     "triangles": 2436
+    },
+    "DESTROYED": {
+     "pieces": [
+      "bilge#0",
+      "bilge#1",
+      "bilge#2",
+      "bilge#3",
+      "bilge#4",
+      "bow#0",
+      "bow#1",
+      "bow#2",
+      "bow#3",
+      "bow#4",
+      "hatch_0",
+      "hatch_1",
+      "hatch_2",
+      "hatch_3",
+      "hatch_4",
+      "mast_0",
+      "mast_1",
+      "midships#0",
+      "midships#1",
+      "midships#2",
+      "midships#3",
+      "midships#4",
+      "midships#5",
+      "plane_0",
+      "plane_1",
+      "rudder",
+      "rudder_low",
+      "sail#0",
+      "sail#1",
+      "sail#2",
+      "sail#3",
+      "sail#4",
+      "sail#5",
+      "sail_hatch",
+      "screw",
+      "stern#0",
+      "stern#1",
+      "stern#2",
+      "stern#3",
+      "stern#4",
+      "stern_plane_0"
+     ],
+     "triangles": 8566
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [],
+   "params": {
+    "class": 6.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "SS_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "SS_rm_nod_0.png",
+     "mask": "SS_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "SS_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "SS_rm_nod_1.png",
+     "mask": "SS_rm_house_1.png"
+    },
+    {
+     "index": 2,
+     "name": "SS_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "SS_rm_dmg_nod_0.png",
+     "mask": "SS_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "SS_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "SS_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "SS_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "SS_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "SS_rm_dmg_nod_1.png",
+     "mask": "SS_rm_dmg_house_1.png"
+    },
+    {
+     "index": 7,
+     "name": "SS_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 8566,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 2436,
+     "face_triangles": 0
+    }
+   },
+   "lights": [],
+   "turned": [],
+   "label_fallback": 366,
+   "notes": [
+    "SS_rm_0.png: its Nod decode differs on 46 texels its mask leaves alone (kept as the lab made it)",
+    "SS_rm_dmg_0.png: its Nod decode differs on 1512 texels its mask leaves alone (kept as the lab made it)",
+    "SS_rm_dmg_1.png: its Nod decode differs on 1388 texels its mask leaves alone (kept as the lab made it)"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "3e4130d13cc58553a9c57556bb03ab23bbaf7f2d"
+  },
+  "CA": {
+   "file": "CA.evhc",
+   "format_version": 2,
+   "bytes": 14191844,
+   "sha256": "2d2dd4e6472d3a50c2d11043acfd75f961ce83371ac7ab7d58ae96bcfbbbdfcd",
+   "export": "build-native/remaster-ra/vehicles-game/CA/viewer",
+   "sources": {
+    "../CA_rm.json": "05cccea2ca3d144d1769a3b3f2f7f1c4e321ff13bc95507f75f6c3b79241c80b",
+    "CA_rm_0.png": "116437cdc1e046cbbe101fe6342165e52a1bed59ad12d177dcaccc6c12278a9b",
+    "CA_rm_1.png": "cbeb115141debf7bc1b2199395f26ef63b9dd6b75466553bdf7981eb4e695851",
+    "CA_rm_broken.png": "4bb275e7d574f58dc85ebe1ddbabae7c8616531027355440299aca5b6b3ab254",
+    "CA_rm_broken_emit.png": "d7d9537e18c2198ca9cbd55ac733c9caa324a09df386bc1e4f09f752dfc18d92",
+    "CA_rm_dmg_0.png": "cd7e51fe64ab31274bbc3266fa11cbadfa3197fe9b6d23e38ddfa0c363bc361c",
+    "CA_rm_dmg_1.png": "faa75e0185d81d7596125f229fb691f477e5e422662f9282d25f29e5b6f8a79c",
+    "CA_rm_dmg_emit_0.png": "6729a3c0ee702222e567c3b2b4dc6cadb773eee0827f1f45f806a9d08d71f63f",
+    "CA_rm_dmg_emit_1.png": "33fc8bb5465f0b56ce79489d2182f8bee58c653a844fdc00c7c557a0951c02a5",
+    "CA_rm_dmg_house_0.png": "289231a804c9951c93868db2c5eb6eb8a9f682246ed8563141ace238c8b096dc",
+    "CA_rm_dmg_house_1.png": "7228793e4e13d5fcb90ed7bb4389d624c5e2b20bdd4e310f38b9ed5aacf54b60",
+    "CA_rm_dmg_nod_0.png": "da87f0ff9252fb2c1a8bfcacabe1ff52dcbb2ce24285286b1f2051433e61b4a7",
+    "CA_rm_dmg_nod_1.png": "ce5cac1360a3f81184e76bf274760e747400dae252a1a93db87cb97fef49e11e",
+    "CA_rm_house_0.png": "677fb92464b36fb9530d885feb68bb7715bbe842b51f338bf522458b4f20609d",
+    "CA_rm_house_1.png": "aa7fd94dce07d16af30dda99e85eb7ec01583f390c358c352ba9e6a4e87f2aa6",
+    "CA_rm_nod_0.png": "299c3cd35fd1a64cc6e28aa0541b27e229782a7adda143646afa62f5efc05c2a",
+    "CA_rm_nod_1.png": "0ff3994a16a1f6d928a27cad65a2698b2606f8f550dc4eaccab5502d006602fd",
+    "destroyed.json": "f6b93e3cefd9d8a38034972299fac4169c4659a3740f2acd9b50c4a5643020d6",
+    "lights.json": "dae2792d29c3af7d1ec51e69f4615de6a58a30d49b9928c57639d4a2bd210702",
+    "remaster.json": "484d4eff22a0b35844982eab1eec29ce38604266f2a1a47433c44f27acf6f76f"
+   },
+   "vehicle_class": "boat",
+   "sets": {
+    "INTACT": {
+     "pieces": [
+      "hull",
+      "turret",
+      "turret_a"
+     ],
+     "triangles": 6522
+    },
+    "DESTROYED": {
+     "pieces": [
+      "afthouse",
+      "anchor_0",
+      "anchor_1",
+      "barbette_0",
+      "barbette_1",
+      "bilge#0",
+      "bilge#1",
+      "bilge#2",
+      "bilge#3",
+      "bilge#4",
+      "boat_0",
+      "boat_1",
+      "bollard_0",
+      "bollard_1",
+      "bollard_2",
+      "bollard_3",
+      "bollard_4",
+      "bollard_5",
+      "bollard_6",
+      "bollard_7",
+      "bollard_8",
+      "bollard_9",
+      "bow#0",
+      "bow#1",
+      "bow#2",
+      "bow#3",
+      "bow#4",
+      "bow#5",
+      "bow#6",
+      "bow#7",
+      "bow#8",
+      "bow#9",
+      "bridge#0",
+      "bridge#1",
+      "bridge#2",
+      "bridge#3",
+      "bridge#4",
+      "bridge#5",
+      "bridge_rail",
+      "capstan_0",
+      "capstan_1",
+      "chain_0",
+      "chain_1",
+      "crane",
+      "director",
+      "funnel_0",
+      "funnel_1",
+      "fwdhouse",
+      "hatch_0",
+      "hatch_1",
+      "jackstaff",
+      "ladder_0",
+      "ladder_1",
+      "ladder_2",
+      "ladder_3",
+      "locker_0",
+      "locker_1",
+      "locker_2",
+      "locker_3",
+      "mast",
+      "midhouse#0",
+      "midhouse#1",
+      "midhouse#2",
+      "midships#0",
+      "midships#1",
+      "midships#10",
+      "midships#11",
+      "midships#2",
+      "midships#3",
+      "midships#4",
+      "midships#5",
+      "midships#6",
+      "midships#7",
+      "midships#8",
+      "midships#9",
+      "mount_0",
+      "mount_1",
+      "mount_2",
+      "mount_3",
+      "mount_4",
+      "rail_pa",
+      "rail_pf",
+      "rail_sa",
+      "rail_sf",
+      "searchlight_0",
+      "searchlight_1",
+      "stern#0",
+      "stern#1",
+      "stern#2",
+      "stern#3",
+      "stern#4",
+      "stern#5",
+      "stern#6",
+      "stern#7",
+      "stern#8",
+      "turret_a",
+      "turret_f",
+      "vent_0",
+      "vent_1",
+      "vent_2",
+      "vent_3"
+     ],
+     "triangles": 10817
+    }
+   },
+   "wreck": "the lab's destroyed.json",
+   "parts": [
+    {
+     "piece": "turret",
+     "kind": "turret",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      207.17368,
+      726.70966,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "piece": "turret_a",
+     "kind": "turret",
+     "parent": -1,
+     "driver": "none",
+     "side": 2,
+     "flags": 0,
+     "values": [
+      0.0,
+      193.536,
+      -726.70966,
+      0.0,
+      1.0,
+      -0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "params": {
+    "class": 6.0,
+    "gauge": 0.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.35,
+    "wreck_shade": 0.42,
+    "dock_x": 0.0,
+    "dock_z": 0.0,
+    "dock_yaw": 0.0,
+    "deck": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "CA_rm_0.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "CA_rm_nod_0.png",
+     "mask": "CA_rm_house_0.png"
+    },
+    {
+     "index": 1,
+     "name": "CA_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "CA_rm_nod_1.png",
+     "mask": "CA_rm_house_1.png"
+    },
+    {
+     "index": 2,
+     "name": "CA_rm_dmg_0.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "CA_rm_dmg_nod_0.png",
+     "mask": "CA_rm_dmg_house_0.png"
+    },
+    {
+     "index": 3,
+     "name": "CA_rm_dmg_emit_0.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 4,
+     "name": "CA_rm_broken.png",
+     "role": "broken",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 5,
+     "name": "CA_rm_broken_emit.png",
+     "role": "broken glow",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1
+    },
+    {
+     "index": 6,
+     "name": "CA_rm_dmg_1.png",
+     "role": "damaged",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "nod": "CA_rm_dmg_nod_1.png",
+     "mask": "CA_rm_dmg_house_1.png"
+    },
+    {
+     "index": 7,
+     "name": "CA_rm_dmg_emit_1.png",
+     "role": "glow",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1
+    }
+   ],
+   "normals": {
+    "DESTROYED": {
+     "smooth_triangles": 10817,
+     "face_triangles": 0
+    },
+    "INTACT": {
+     "smooth_triangles": 6522,
+     "face_triangles": 0
+    }
+   },
+   "lights": [
+    {
+     "name": "light_port",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    },
+    {
+     "name": "light_stbd",
+     "kind": "head",
+     "piece": "hull",
+     "shadows": true
+    }
+   ],
+   "turned": [],
+   "label_fallback": 360,
+   "notes": [
+    "CA_rm_0.png: its Nod decode differs on 942 texels its mask leaves alone (kept as the lab made it)",
+    "CA_rm_1.png: its Nod decode differs on 36 texels its mask leaves alone (kept as the lab made it)",
+    "CA_rm_dmg_0.png: its Nod decode differs on 5362 texels its mask leaves alone (kept as the lab made it)",
+    "group CA_rm_cut0_k1: 27 corners with a normal of no length, given their face's",
+    "CA_rm_dmg_1.png: its Nod decode differs on 417 texels its mask leaves alone (kept as the lab made it)"
+   ],
+   "baker": "tools/art/remaster/bake_evhc.py",
+   "baker_commit": "3e4130d13cc58553a9c57556bb03ab23bbaf7f2d"
+  }
+ }
+}

@@ -90,7 +90,7 @@ def main():
     work.name = 'PROC_FirstLow_ProxyDerived'
     work['source_proxy'] = str(proxy)
     work['source_sha256'] = hashlib.sha256(proxy.read_bytes()).hexdigest()
-    work['stage'] = 'first-low v01; user approval pending'
+    work['stage'] = 'first-low v01; design-review approval pending'
 
     archive = work.copy()
     archive.data = work.data.copy()
@@ -237,7 +237,7 @@ def main():
         raise RuntimeError(f'Structure ceiling exceeded: {triangles}')
 
     report = {
-        'stage': 'first-low v01; pending user approval',
+        'stage': 'first-low v01; pending design-review approval',
         'source_proxy': str(proxy),
         'source_proxy_sha256': hashlib.sha256(proxy.read_bytes()).hexdigest(),
         'first_low_is_proxy_derived': True,

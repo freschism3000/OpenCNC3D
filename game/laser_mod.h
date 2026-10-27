@@ -251,6 +251,7 @@ static const char* LASER_FS =
     "uniform float uI;\n"
     "uniform vec3  uCore, uGlow;\n"
     "uniform float uClass;\n"
+    FX_OBJECT_GRADE_GLSL
     "void main() {\n"
     "    float r = uRadial == 1 ? length(vUV) : abs(vUV.y);\n"
     "    float core = exp(-r * r * (uRadial == 1 ? 9.0 : 30.0));\n"
@@ -261,7 +262,7 @@ static const char* LASER_FS =
     "        return;\n"
     "    }\n"
     "    vec3 c = uCore * core + uGlow * glow;\n"
-    "    gl_FragColor = vec4(c * uI, 1.0);\n"
+    "    gl_FragColor = vec4(objectGrade(c * uI), 1.0);\n"
     "}\n";
 static GLuint g_laserProg = 0;
 static bool g_laserProgTried = false;
@@ -360,6 +361,7 @@ static void laser_draw_enhanced(void)
     glBlendFunc(GL_ONE, GL_ONE);
     fx_glUseProgram(g_laserProg);
     fx_set1f(g_laserProg, "uClass", 0.0f);
+    efx_grade_uniforms(g_laserProg);
     fx_set3f(g_laserProg, "uCore", 1.0f, 0.86f, 0.80f);
     fx_set3f(g_laserProg, "uGlow", 1.0f, 0.10f, 0.04f);
     for (size_t i = 0; i < g_lasers.size(); i++) {

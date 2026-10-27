@@ -342,7 +342,7 @@ static int lz_walk_cd(const char *zip, LZ_Walk fn, void *user, char *err, int er
             break;
         }
     }
-    if (eocd < 0) {
+    if (eocd < 0 || eocd + 22 > size) {
         snprintf(err, (size_t)errlen, "this is not a zip file");
         goto done;
     }
@@ -351,6 +351,9 @@ static int lz_walk_cd(const char *zip, LZ_Walk fn, void *user, char *err, int er
         entries = lz_u16(e + 10);
         cdsize = lz_u32(e + 12);
         cdoff = lz_u32(e + 16);
+    }
+    if ((unsigned long long)cdoff + cdsize > (unsigned long long)eocd || cdsize > 64u*1024u*1024u) {
+        snprintf(err,(size_t)errlen,"the archive has an invalid or oversized index");goto done;
     }
     if (cdoff == 0xFFFFFFFFu || cdsize == 0xFFFFFFFFu || entries == 0xFFFFu) {
         snprintf(err, (size_t)errlen,
@@ -388,9 +391,12 @@ static int lz_walk_cd(const char *zip, LZ_Walk fn, void *user, char *err, int er
         commentlen = lz_u16(cd + off + 32);
         e.attrs = lz_u32(cd + off + 38);
         e.lho = lz_u32(cd + off + 42);
-        if (namelen >= sizeof name) {
+        if (namelen >= sizeof name || (unsigned long long)off + 46 + namelen + extralen + commentlen > cdsize) {
             snprintf(err, (size_t)errlen, "the archive names a file with an absurd path");
             goto done;
+        }
+        if (memchr(cd + off + 46, 0, namelen)) {
+            snprintf(err, (size_t)errlen, "the archive names a file with an embedded NUL");goto done;
         }
         memcpy(name, cd + off + 46, namelen);
         name[namelen] = '\0';
@@ -515,6 +521,47 @@ static int lz_store(FILE *in, FILE *out, unsigned int csize, uLong *crc, unsigne
         csize -= (unsigned int)got;
     }
     return 1;
+}
+
+/* Bounded in-memory member read, sharing the ZIP central-directory validator. */
+typedef struct { const char *name; long cap; char *text; int found; } LZ_Text;
+static int lz_text_cb(void *user, FILE *f, const LZ_Entry *e, char *err, int len)
+{
+    LZ_Text *t = (LZ_Text *)user;
+    unsigned char *packed;
+    z_stream z;
+    int ok = 0;
+    if (strcmp(t->name, e->name)) return 1;
+    if (t->found++ || !e->usize || e->usize > (unsigned long)t->cap ||
+        e->csize > (unsigned long)t->cap * 2 || (e->method != 0 && e->method != 8)) goto bad;
+    t->text = (char *)malloc((size_t)e->usize + 1);
+    packed = (unsigned char *)malloc((size_t)e->csize + 1);
+    if (!t->text || !packed) {free(packed);goto bad;}
+    if (!lz_seek_data(f,e->lho,err,len) || fread(packed,1,e->csize,f)!=e->csize) {free(packed);goto bad;}
+    if (!e->method) {
+        ok=e->csize==e->usize;
+        if(ok)memcpy(t->text,packed,e->usize);
+    } else {
+        memset(&z,0,sizeof z);z.next_in=packed;z.avail_in=e->csize;
+        z.next_out=(unsigned char *)t->text;z.avail_out=e->usize+1;
+        if(inflateInit2(&z,-MAX_WBITS)==Z_OK){
+            ok=inflate(&z,Z_FINISH)==Z_STREAM_END && z.total_out==e->usize && z.total_in==e->csize;
+            inflateEnd(&z);
+        }
+    }
+    free(packed);
+    if(!ok || crc32(0,(const Bytef *)t->text,e->usize)!=e->crc || memchr(t->text,0,e->usize))goto bad;
+    t->text[e->usize]=0;return 1;
+bad:
+    snprintf(err,(size_t)len,"The module file manifest is missing, repeated, oversized or damaged.");return -1;
+}
+char *lz_read_text(const char *zip,const char *name,long cap,char *err,int len)
+{
+    LZ_Text t;memset(&t,0,sizeof t);t.name=name;t.cap=cap;
+    if(cap<=0 || !lz_walk_cd(zip,lz_text_cb,&t,err,len) || t.found!=1){
+        free(t.text);if(!t.found)snprintf(err,(size_t)len,"The module package has no file manifest.");return NULL;
+    }
+    return t.text;
 }
 
 /* ------------------------------------------------------------------------ *
@@ -872,10 +919,17 @@ static int lz_reserved(const char *rel)
 {
     static const char *const own[] = {LZ_JOURNAL, LZ_DONE, "opencnc3d-update.zip",
                                       "opencnc3d-update.zip.part", ".opencnc3d-launcher.lock",
-                                      LZ_MEDIA_RECORD, NULL};
+                                      LZ_MEDIA_RECORD, "opencnc3d-media-td.txt", "opencnc3d-media-ra.txt",
+                                      "opencnc3d-language-td-de.txt", "opencnc3d-language-ra-de.txt",
+                                      "opencnc3d-language-ra-fr.txt", NULL};
     const char *base = rel, *p;
     size_t n;
+    char cache_prefix[20];
     int i;
+    if (strlen(rel) >= 19) {
+        memcpy(cache_prefix, rel, 19); cache_prefix[19] = 0;
+        if (lz_same_name(cache_prefix, ".opencnc3d-modules/")) return 1;
+    }
 
     for (p = rel; *p; p++)
         if (*p == '/' || *p == '\\')
@@ -1243,6 +1297,31 @@ static int lz_is_record(const char *path)
 {
     struct stat st;
     return LZ_LSTAT(path, &st) == 0 && S_ISREG(st.st_mode) && !lz_is_link(path);
+}
+
+int lz_is_private_developer(const char *dir)
+{
+    char path[1200], line[256], key[64], value[64], extra;
+    FILE *f;
+    int found = 0, c;
+    if (!dir || !*dir || !lz_join(path, sizeof path, dir, LZ_RECORD) || !lz_is_record(path))
+        return 0;
+    f = fopen(path, "rb");
+    if (!f) return 0;
+    while (fgets(line, sizeof line, f)) {
+        /* A partial long line must not turn its continuation into a record key. */
+        if (!strchr(line, '\n') && !feof(f)) {
+            while ((c = fgetc(f)) != '\n' && c != EOF) {}
+            continue;
+        }
+        if (sscanf(line, "%63s %63s %c", key, value, &extra) == 2 &&
+            !strcmp(key, "private_developer") && !strcmp(value, "1")) {
+            found = 1;
+            break;
+        }
+    }
+    fclose(f);
+    return found;
 }
 
 int lz_is_install(const char *dir)
@@ -1863,6 +1942,53 @@ int lz_held_here(const char *dir)
             here = 1;
     lz_held_unlock();
     return here;
+}
+
+typedef struct {
+    const char *const *owned, *const *required;
+    int nowned, nrequired;
+    unsigned char *seen;
+} LZ_Owned;
+static int lz_owned_cb(void *user, FILE *f, const LZ_Entry *e, char *err, int len)
+{
+    LZ_Owned *v = (LZ_Owned *)user; int i;
+    (void)f;
+    for (i = 0; i < v->nowned; i++) if (!strcmp(e->name, v->owned[i])) break;
+    if (i == v->nowned || v->seen[i] || !lz_name_safe(e->name) ||
+        (((e->attrs>>16)&0170000)!=0 && ((e->attrs>>16)&0170000)!=0100000)) {
+        snprintf(err, (size_t)len, "Module package has an unowned or repeated path: %.120s", e->name);
+        return -1;
+    }
+    v->seen[i] = 1; return 1;
+}
+int lz_install_owned_extra(const char *dir, const char *zip, const char *const *owned,
+                           const char *const *required, int nrequired,
+                           const char *const *last, const LZ_File *extra,
+                           LZ_Progress cb, void *user, char *err, int len)
+{
+    LZ_Owned v; const LZ_Lock *lock = NULL; int i, j, ok;
+    lz_held_lock();
+    for (i = 0; i < LZ_HELD_MAX; i++)
+        if (lz_held[i] && lz_held[i]->held && lz_same_name(lz_held[i]->dir, dir)) {lock = lz_held[i]; break;}
+    lz_held_unlock();
+    if (!lock) {snprintf(err, (size_t)len, "The installation is not locked."); return 0;}
+    memset(&v, 0, sizeof v); v.owned = owned; v.required = required; v.nrequired = nrequired;
+    while (owned[v.nowned]) v.nowned++;
+    v.seen = (unsigned char *)calloc((size_t)v.nowned, 1);
+    if (!v.seen) {snprintf(err, (size_t)len, "Not enough memory to check the module package."); return 0;}
+    ok = lz_walk_cd(zip, lz_owned_cb, &v, err, len);
+    for (i = 0; ok && i < nrequired; i++) {
+        for (j = 0; j < v.nowned; j++) if (!strcmp(required[i], owned[j]) && v.seen[j]) break;
+        if (j == v.nowned) {snprintf(err, (size_t)len, "Module package is missing %.120s", required[i]); ok = 0;}
+    }
+    free(v.seen);
+    return ok && lz_extract(lock, zip, 0, last, extra, cb, user, err, len);
+}
+int lz_install_owned(const char *dir, const char *zip, const char *const *owned,
+                     const char *const *required, int nrequired,
+                     LZ_Progress cb, void *user, char *err, int len)
+{
+    return lz_install_owned_extra(dir, zip, owned, required, nrequired, NULL, NULL, cb, user, err, len);
 }
 
 /* A real folder, not a link to one and not a file: the one test lz_lock_new makes in

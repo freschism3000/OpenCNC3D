@@ -1,0 +1,75 @@
+--- a/game/cnc_eyes.cpp
++++ b/game/cnc_eyes.cpp
+@@ -28365,0 +28366 @@
++        mesh_fragment_coalesce_dump();
+--- a/game/mesh_batch.h
++++ b/game/mesh_batch.h
+@@ -165,0 +166,5 @@
++static unsigned long g_meshFragmentLogicalRuns=0,g_meshFragmentActualRuns=0;
++static void mesh_fragment_coalesce_dump() {
++    printf("FRAGMENTPERF|logical_runs=%lu|actual_runs=%lu|merged=%lu\n",g_meshFragmentLogicalRuns,g_meshFragmentActualRuns,
++           g_meshFragmentLogicalRuns-g_meshFragmentActualRuns);
++}
+@@ -526,0 +532,12 @@
++    const bool coalesce=mesh_perf_switch("OPENCNC3D_FRAGMENT_COALESCE");
++    struct State { int action=-1,tex=-1,house=0,wrap=0;const Pack* src=NULL;bool x2=false; };
++    State pendingState;bool pending=false;size_t pendingFirst=0,pendingCount=0;
++    auto drain=[&]() {
++        if(!pending)return;
++        glDrawArrays(GL_TRIANGLES,(GLint)pendingFirst,(GLsizei)pendingCount);
++        g_meshBatchDraws++;g_meshFragmentActualRuns++;pending=false;
++    };
++    auto same=[](const State& a,const State& b) {
++        if(a.action!=b.action||a.x2!=b.x2)return false;
++        return a.action!=1||(a.src==b.src&&a.tex==b.tex&&a.house==b.house&&a.wrap==b.wrap);
++    };
+@@ -528,2 +545,2 @@
+-        if(cmd.cull!=cull) { cull=cmd.cull; if(cull) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
+-        if(cmd.offset!=offset) { offset=cmd.offset; if(offset) glEnable(GL_POLYGON_OFFSET_FILL); else glDisable(GL_POLYGON_OFFSET_FILL); }
++        if(cmd.cull!=cull) {drain();cull=cmd.cull;if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);}
++        if(cmd.offset!=offset) {drain();offset=cmd.offset;if(offset)glEnable(GL_POLYGON_OFFSET_FILL);else glDisable(GL_POLYGON_OFFSET_FILL);}
+@@ -531 +548 @@
+-        if(outside) g_meshBatchCulled++;
++        if(outside){drain();g_meshBatchCulled++;}
+@@ -533,4 +550,11 @@
+-            if(r.tex==-3) glDisable(GL_TEXTURE_2D);
+-            else if(!cmd.depth) {
+-                const bool flash=g_meshFlash && cmd.pass!=MODE_SHADOW && cmd.pass!=MODE_XLU;
+-                if(r.tex>=0 && !flash) { glEnable(GL_TEXTURE_2D);
++            const bool flash=g_meshFlash&&cmd.pass!=MODE_SHADOW&&cmd.pass!=MODE_XLU;
++            State state;state.x2=r.x2;
++            state.action=r.tex==-3?0:cmd.depth?2:(r.tex>=0&&!flash)?1:0;
++            state.src=cmd.src;state.tex=r.tex;state.house=cmd.house;state.wrap=r.wrap;
++            const bool identical=pending&&same(pendingState,state);
++            if(!identical)drain();
++            /* Identical pending runs already own this exact texture/environment
++               state. A state change always drains before issuing any GL setter. */
++            if(!identical) {
++                if(state.action==0)glDisable(GL_TEXTURE_2D);
++                else if(state.action==1){glEnable(GL_TEXTURE_2D);
+@@ -538,2 +562,3 @@
+-                    set_wrap((unsigned char)r.wrap);
+-                } else glDisable(GL_TEXTURE_2D);
++                    set_wrap((unsigned char)r.wrap);}
++                if(r.x2!=x2){if(env<0)glGetTexEnviv(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,&env);
++                    mesh_batch_x2(r.x2,env);x2=r.x2;}
+@@ -541,3 +566,9 @@
+-            if(r.x2!=x2) {
+-                if(env<0) glGetTexEnviv(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,&env);
+-                mesh_batch_x2(r.x2,env); x2=r.x2;
++            if(!outside) {
++                g_meshFragmentLogicalRuns++;
++                if(coalesce) {
++                    if(identical&&r.first==pendingFirst+pendingCount)pendingCount+=r.count;
++                    else {drain();pending=true;pendingFirst=r.first;pendingCount=r.count;pendingState=state;}
++                } else {
++                    glDrawArrays(GL_TRIANGLES,(GLint)r.first,(GLsizei)r.count);
++                    g_meshBatchDraws++;g_meshFragmentActualRuns++;
++                }
+@@ -545,3 +576,3 @@
+-            if(!outside) { glDrawArrays(GL_TRIANGLES,(GLint)r.first,(GLsizei)r.count); g_meshBatchDraws++; }
+-        }
+-    }
++        }
++    }
++    drain();

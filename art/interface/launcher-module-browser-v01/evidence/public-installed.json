@@ -1,0 +1,83 @@
+{
+  "catalog": [
+    "td"
+  ],
+  "choices": {
+    "movies": false,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "status-back",
+      "kind": "button",
+      "label": "BACK",
+      "w": 160,
+      "x": 206,
+      "y": 418
+    },
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "status-next",
+      "kind": "button",
+      "label": "LAUNCH",
+      "w": 190,
+      "x": 620,
+      "y": 418
+    }
+  ],
+  "installed": [
+    "td"
+  ],
+  "page": "ready",
+  "progress": 1,
+  "scenario": "public",
+  "target": "td",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "DAWN3D INSTALLED",
+      "width": 188,
+      "x": 414,
+      "y": 190
+    },
+    {
+      "height": 16,
+      "t": "READY TO LAUNCH",
+      "width": 172,
+      "x": 392,
+      "y": 256
+    },
+    {
+      "height": 16,
+      "t": "TIBERIAN DAWN",
+      "width": 152,
+      "x": 392,
+      "y": 296
+    },
+    {
+      "height": 16,
+      "t": "ADDED TO YOUR MODULES.",
+      "width": 246,
+      "x": 392,
+      "y": 332
+    },
+    {
+      "height": 16,
+      "t": "BACK",
+      "width": 48,
+      "x": 262,
+      "y": 430
+    },
+    {
+      "height": 16,
+      "t": "LAUNCH",
+      "width": 72,
+      "x": 679,
+      "y": 430
+    }
+  ]
+}

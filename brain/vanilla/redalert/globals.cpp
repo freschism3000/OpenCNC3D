@@ -12,6 +12,17 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Defines OpenCNC3D_Lockstep, the lockstep match switch (default off),
+// OpenCNC3D_WallFill, the wall line fill reach read by BuildingClass::Unlimbo
+// (default 0, off), and OpenCNC3D_ShortGame, the match's short game rule read
+// by HouseClass::Check_Pertinent_Structures (default off). Only dllinterface.cpp
+// writes them.
+// It DOES change the game simulation when a host turns either on.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /counterstrike/GLOBALS.CPP 2     3/10/97 6:22p Steve_tall $ */
 /***********************************************************************************************
@@ -618,6 +629,10 @@ int Seed = 0;
 ** help reproduce some bugs.
 */
 int CustomSeed = 0;
+
+bool OpenCNC3D_Lockstep = false; /* see externs.h; only OpenCNC3D_Set_Lockstep writes this */
+int OpenCNC3D_WallFill = 0;      /* see externs.h; only OpenCNC3D_Set_Wall_Fill writes this */
+bool OpenCNC3D_ShortGame = false; /* see externs.h; the match options and a save write this */
 
 int WindowList[9][9];
 

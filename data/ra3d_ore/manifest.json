@@ -1,0 +1,131 @@
+{
+ "what": "Red Alert's ore, gems and ore mine for Enhanced, baked by tools/ra3d/bake-ore.py from the Red Alert lab's approved sets",
+ "approval": {
+  "resources/GOLD01": "2026-10-20 12:21",
+  "resources/GOLD02": "2026-10-20 12:21",
+  "resources/GOLD03": "2026-10-20 12:21",
+  "resources/GOLD04": "2026-10-20 12:21",
+  "resources/GEM01": "2026-10-20 12:21",
+  "resources/GEM02": "2026-10-20 12:21",
+  "resources/GEM03": "2026-10-20 12:21",
+  "resources/GEM04": "2026-10-20 12:21",
+  "resources/MINE": "2026-10-20 12:21"
+ },
+ "sources": {
+  "resources-rm/GEMPACK/GEMPACK_rm.json": "e47ba3a1745b1536dc03de207774a07dc300d56ad9480df7532971681b2b3f38",
+  "resources-rm/GEMPACK/final/GEMPACK_rm_0.png": "e04242352016842dae56cbf8e9a72020c62c1dfa8fe4133815a3906dd7f85cb5",
+  "resources-rm/GEMPACK/final/GEMPACK_rm_0_spec.png": "e17a5ff784d8f50c78e74e4cbd6c19a568b347e3f94cd6c4beb3a8a114b32d35",
+  "resources-rm/GEMPACK/final/GEMPACK_rm_snow_0.png": "dc3b2db33c0063c53b6795f410253bf71ba0f8fe2469af64c7c34ee1f5886f96",
+  "resources-rm/GEMPACK/final/GEMPACK_rm_snow_0_spec.png": "743437eccb6ba655e6c62fdb920c34df2c54d95fb382207e5019d5d66fcaaf0f",
+  "resources-rm/MINE/MINE_rm.json": "631f90077752621dc4440375fdda57d5a0ee8eaf54bc2f59f4094e67c80b8063",
+  "resources-rm/MINE/final/MINE_rm_0.png": "3d9c52d0d123369599094dc0eb09f4e51cbc291c3e7df675d2e274ba32dc137f",
+  "resources-rm/MINE/final/MINE_rm_snow_0.png": "418628d587702ef864cac3b1086681a99988a89df9548488c3c0b45135df4882",
+  "resources-rm/OREPACK/OREPACK_rm.json": "0d8bc5327cdcbc9530fa958e5e534b15cbdcb2590f608d6d1519fc48827a7de2",
+  "resources-rm/OREPACK/final/OREPACK_rm_0.png": "f038d9faa5fcff6fdf9202947e504f6a5e70f809ed6f027f274fc32b4172e095",
+  "resources-rm/OREPACK/final/OREPACK_rm_0_spec.png": "fb9774ada0431e65b010f2754265453428f58cac54a5503f611922e5a671381a",
+  "resources-rm/OREPACK/final/OREPACK_rm_snow_0.png": "57f1ba4f0f56dcc3d97c8f5c4ca2f1197e359cb4496c43cf3cc3fb5b5f4de3db",
+  "resources-rm/OREPACK/final/OREPACK_rm_snow_0_spec.png": "29abee9921549f07555f8e5140bcf89eea5fd4d66fdba83e1d100ac58c4a3521",
+  "resources-rm/ore_layout.json": "3d9dca98e0a7dc9936816b90724fa9948792e63f7bd3fe288397bfc53c8eff93",
+  "resources/MINE/viewer/remaster.json": "b99ce52de5dc744d1b9b0280294281b72169a07dc67efacb38d85c9ab5a3f3f8"
+ },
+ "files": {
+  "ore3d_TEM.pack": {
+   "theater": "temperate",
+   "bytes": 5018904,
+   "sha256": "0a0efc73e6597eebcfab10043ad000d0a445ba9fd3771cde23c7809e570740b9",
+   "sheet": 512,
+   "sets": {
+    "OREPACK": {
+     "clumps": 54,
+     "earths": 48,
+     "triangles": 11679,
+     "nuggets": [
+      28,
+      21,
+      24,
+      17
+     ],
+     "stones": null
+    },
+    "GEMPACK": {
+     "clumps": 35,
+     "earths": 12,
+     "triangles": 7069,
+     "nuggets": null,
+     "stones": [
+      6,
+      6,
+      5,
+      6
+     ]
+    }
+   }
+  },
+  "ore3d_WIN.pack": {
+   "theater": "snow",
+   "bytes": 5018904,
+   "sha256": "4959011ae76755d82c9566a603b8b92955b4a250db06f4a0ba7129a990ddce4a",
+   "sheet": 512,
+   "sets": {
+    "OREPACK": {
+     "clumps": 54,
+     "earths": 48,
+     "triangles": 11679,
+     "nuggets": [
+      28,
+      21,
+      24,
+      17
+     ],
+     "stones": null
+    },
+    "GEMPACK": {
+     "clumps": 35,
+     "earths": 12,
+     "triangles": 7069,
+     "nuggets": null,
+     "stones": [
+      6,
+      6,
+      5,
+      6
+     ]
+    }
+   }
+  },
+  "MINE_TEM.ebld": {
+   "theater": "temperate",
+   "bytes": 1148496,
+   "sha256": "6a31ee3c3ec633dcd1c20d9ef865049aa4175b05a3d0134cd390889277213fe1",
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 4718
+    }
+   },
+   "textures": [
+    "MINE_rm_0.png"
+   ],
+   "notes": [
+    "MINE_rm_0.png: resampled from 1152x1152 to 1024x1024"
+   ]
+  },
+  "MINE_WIN.ebld": {
+   "theater": "snow",
+   "bytes": 1248370,
+   "sha256": "acbefa7855944d646d9434ffa9e4d38f16d62a17e72d2e77e8b85ddd2d3b557f",
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 4718
+    }
+   },
+   "textures": [
+    "MINE_rm_snow_0.png"
+   ],
+   "notes": [
+    "MINE_rm_snow_0.png: resampled from 1152x1152 to 1024x1024"
+   ]
+  }
+ }
+}

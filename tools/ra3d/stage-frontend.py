@@ -63,6 +63,16 @@ def main() -> None:
                     if content is not None:
                         (module / "missions" / entry).write_bytes(content)
                         mission_count += 1
+    # THE 24 MULTIPLAYER MAPS, which a skirmish or a network match is started on, and the
+    # list a skirmish screen reads with a picture of each (bake-ra-map-previews.py).
+    for number in range(1, 25):
+        entry = f"SCM{number:02d}EA.INI"
+        content = general.read(entry)
+        if content is None:
+            raise RuntimeError(f"{entry} missing from GENERAL.MIX")
+        (module / "missions" / entry).write_bytes(content)
+    subprocess.run([sys.executable, str(HERE / "bake-ra-map-previews.py"), str(module),
+                    "--data", str(args.data)], check=True, stdout=subprocess.DEVNULL)
     for archive_name, archive, entry in (
         ("GENERAL.MIX", general, "TUTORIAL.INI"),
         ("LOCAL.MIX", local, "RULES.INI"),
@@ -87,6 +97,12 @@ def main() -> None:
     subprocess.run([sys.executable, str(HERE / "bake-menu.py"),
                     "--data", str(args.data), "--out",
                     str(module / "dosmenu.pack")], check=True)
+    # Red Alert's Enhanced menu kit (menu/bake_ra_enhanced_menu.py); it reads data/radata
+    subprocess.run([sys.executable, str(HERE.parents[1] / "menu" / "bake_ra_enhanced_menu.py"),
+                    str(module / "enhanced-menu.pack")], check=True)
+    (module / "enhanced-menu.json").unlink(missing_ok=True)
+    subprocess.run([sys.executable, str(HERE / "bake-enhanced-hud.py"),
+                    str(module / "enhanced-hud.pack")], check=True)
     subprocess.run([sys.executable, str(HERE / "bake-campaign.py"),
                     "--data", str(args.data), "--out",
                     str(module / "campaign.pack")], check=True)

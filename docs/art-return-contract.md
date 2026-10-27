@@ -32,11 +32,11 @@ and ORM is occlusion/roughness/metalness. Six 1024-square runtime textures occup
 24 MiB before driver mipmaps. The 2048-square source maps remain separate.
 
 For every new Blender-authored Enhanced model, start with the
-[canonical 3D model recipe](3d-model-recipe.md). Its shared-look section requires
+canonical 3D model recipe. Its shared-look section requires
 the material/chamfer starter, the C3M style audit and the fixed in-game
 comparison; this return contract covers the separate technical delivery gate.
 
-The user's first engine review found excessive brightness and shine beside the
+The first engine review found excessive brightness and shine beside the
 Mammoth. `finish_construction_yard.py` records the subsequent material-value and
 roughness correction. It changes the Yard maps, not the shared lighting. Actual
 engine views and checks remain separate from the approved Blender finish direction.

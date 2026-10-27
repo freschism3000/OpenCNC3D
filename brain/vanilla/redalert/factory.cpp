@@ -12,6 +12,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// One change in FactoryClass::AI: while every factory building of the kind an
+// object needs is switched off by its owner (BuildingClass::IsPowerOff), the
+// production of that object does not advance.
+// It DOES change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/FACTORY.CPP 1     3/03/97 10:24a Joe_bostic $ */
 /***********************************************************************************************
@@ -194,6 +203,51 @@ void FactoryClass::operator delete(void* ptr)
 void FactoryClass::AI(void)
 {
     assert(Factories.ID(this) == ID);
+
+    /*
+    **	OpenCNC3D: the building power switch. While every factory building of the kind this
+    **	object needs is switched off, the production does not advance; switched back on, it
+    **	carries on from where it stood. A house with no such building at all is left to the
+    **	1996 rules (a captured or scripted factory), and a super weapon is not an object.
+    **	Red Alert fixes its build speed from the number of factories when production starts,
+    **	so switching one of several off does not slow a build already under way.
+    */
+    if (!IsSuspended && Object != NULL && House != NULL) {
+        RTTIType needed = RTTI_NONE;
+        switch (Object->What_Am_I()) {
+        case RTTI_BUILDING:
+            needed = RTTI_BUILDINGTYPE;
+            break;
+        case RTTI_INFANTRY:
+            needed = RTTI_INFANTRYTYPE;
+            break;
+        case RTTI_UNIT:
+            needed = RTTI_UNITTYPE;
+            break;
+        case RTTI_AIRCRAFT:
+            needed = RTTI_AIRCRAFTTYPE;
+            break;
+        case RTTI_VESSEL:
+            needed = RTTI_VESSELTYPE;
+            break;
+        default:
+            break;
+        }
+        int standing = 0;
+        int off = 0;
+        for (int i = 0; needed != RTTI_NONE && i < Buildings.Count(); i++) {
+            BuildingClass const* b = Buildings.Ptr(i);
+            if (b != NULL && b->IsActive && !b->IsInLimbo && (HouseClass*)b->House == House && b->Class->ToBuild == needed) {
+                standing++;
+                if (b->IsPowerOff) {
+                    off++;
+                }
+            }
+        }
+        if (standing > 0 && off >= standing) {
+            return;
+        }
+    }
 
     if (!IsSuspended && (Object != NULL || SpecialItem)) {
         for (int index = 0; index < 1; index++) {

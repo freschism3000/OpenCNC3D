@@ -13,6 +13,10 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Applies the normal own-house sight radius to computer exploration in skirmish.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\map.cpv   2.17   16 Oct 1995 16:52:22   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -595,7 +599,7 @@ void MapClass::Sight_From(HouseClass* house, CELL cell, int sightrange, bool inc
     int count;      // Counter for number of offsets to process.
 #ifdef REMASTER_BUILD
     // Added. ST - 3/6/2019 1:50PM
-    if ((house == NULL || house->IsHuman == false) && !ShareAllyVisibility) {
+    if (house == NULL || (GameToPlay == GAME_NORMAL && house->IsHuman == false && !ShareAllyVisibility)) {
         return;
     }
 #endif

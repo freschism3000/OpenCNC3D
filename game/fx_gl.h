@@ -178,6 +178,49 @@ static FXPFNBINDFRAMEBUFFER         fx_glBindFramebuffer;
 static FXPFNFRAMEBUFFERTEXTURE2D    fx_glFramebufferTexture2D;
 static FXPFNCHECKFRAMEBUFFERSTATUS  fx_glCheckFramebufferStatus;
 
+/* PROGRAM BINDS GO THROUGH THE STATE CACHE (gl_state_cache.h, the bound program). The
+   macros below are function-like, so the loader's assignments and the pointers' own
+   names are untouched; every call in this file reaches the wrapper, and the wrapper calls
+   the real entry point through the parenthesised name. Linking and deleting (below) bump
+   the cache's program epoch. */
+static inline void gls_use_program(GLuint p)
+{
+    if (gls_program_shadow() && g_glsProgramKnown && g_glsProgram == p) {
+        if (gls_program_verify()) gls_program_check("bind");
+        g_glsProgramBindsSkipped++;
+        return;
+    }
+    (fx_glUseProgram)(p);
+    g_glsProgram = p; g_glsProgramKnown = true;
+}
+#define fx_glUseProgram(p)    gls_use_program(p)
+
+/* A UNIFORM'S LOCATION IS FIXED WHEN ITS PROGRAM LINKS, so it is asked for once per
+   program and name and then remembered. The fx_set* helpers below look a uniform up by
+   name every time they set it, about 300 lookups a frame under Enhanced, and on a driver
+   with its own worker thread each lookup can wait for that thread to drain. Relinking or
+   deleting a program forgets its names, so a reused program id never inherits them. */
+static std::map<GLuint, std::map<std::string, GLint> > g_fxUniformLoc;
+static GLint fx_uniform_location(GLuint p, const FxGLchar* n)
+{
+    std::map<std::string, GLint>& names = g_fxUniformLoc[p];
+    const std::string key(n);
+    std::map<std::string, GLint>::const_iterator it = names.find(key);
+    if (it != names.end()) return it->second;
+    const GLint l = (fx_glGetUniformLocation)(p, n);
+    names[key] = l;
+    return l;
+}
+static void fx_link_program(GLuint p)   { g_fxUniformLoc.erase(p); (fx_glLinkProgram)(p); g_glsProgramEpoch++; }
+static void fx_delete_program(GLuint p)
+{
+    g_fxUniformLoc.erase(p); (fx_glDeleteProgram)(p); g_glsProgramEpoch++;
+    if (p == g_glsProgram) g_glsProgramKnown = false;
+}
+#define fx_glGetUniformLocation(p, n) fx_uniform_location((p), (n))
+#define fx_glLinkProgram(p)           fx_link_program(p)
+#define fx_glDeleteProgram(p)         fx_delete_program(p)
+
 static int  fx_gl_ready = 0;      /* 1 = every required entry point resolved */
 static int  fx_gl_tried = 0;
 static int  fx_gl_missing = 0;    /* a REQUIRED entry point came back NULL */

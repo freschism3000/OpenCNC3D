@@ -327,7 +327,7 @@ All arms converge on `RAM 0x8003E204: jal 0x8004a420` (the ordinary MODEL comman
 | 41–58 V20–V37 | `0x8003E1F0` | Class->model | `0` |
 | 59–63 SBAG/CYCL/BRIK/BARB/WOOD | (guard) | Class->model | `0` |
 
-Cross-check that pins the indexing: the user's nine one-shot-clip buildings —
+Cross-check that pins the indexing: the nine one-shot-clip buildings —
 FACT, WEAP, ATWR, SAM, AFLD, NUKE, NUK2, HAND, V19 — **every single one** has a
 dedicated arm here. Nothing else would line up if the enum decode were wrong.
 
@@ -650,3 +650,10 @@ brain still runs, `_anims[]` and all), and the counter that walks a clip is ours
 
 Still **NOT FOUND**: the console's animation clock source (§8's last open item), and
 therefore the `ANIM_VIDEO_VS_TICK = 2` constant in the renderer remains a hypothesis.
+
+
+## Enhanced TD Harvester sprung chassis
+
+`game/vehicle_suspension.h` and `evhc_mod.h` add a render-only, native-tick spring for the Enhanced Tiberian Dawn HARV. The former N64 position-sine washboard rotated the whole vehicle; it did not articulate a chassis above the wheels. The new Harvester keeps the existing terrain contact lean, applies a damped heave/pitch/roll only to the static hull and body-mounted parts, and leaves wheel/belt/flipbook contact parts outside that body transform. Axle points and the body pivot are read from the installed wheel records. Collector/ram hierarchies, headlights and material/normal passes share the posed body matrices. Docked rendering receives the original native rig pose with no free-driving spring. Geometry, textures and masks are unchanged. N64, Classic, other vehicle classes and RA Ore Trucks retain their prior motion.
+
+The solver uses deterministic distance-driven road excitation plus acceleration/turn input, 1.6 Hz frequency and .62 damping, with four integration substeps per native 15 Hz tick. Render phases interpolate the last two states. A .012-cell conservative compression stop bounds motion at the actual axle mounts; it is an animation limit, not a measured replacement mesh clearance. Limbo and teleports reset history, and stopped motion settles. `harvsusp 0|1` is a hidden paired-render diagnostic; normal Enhanced launches enable it. `EVHCSUSP` reports the body pose last drawn. Native A/B renders, collector ram fit, stopping, N64 pixel parity and TD/RA installed-runtime checks are recorded in the v08 filming workspace. `tools/regressions/harvester-suspension.cpp` exercises deterministic response, stable bounds, stop settling and reset behavior without a renderer.

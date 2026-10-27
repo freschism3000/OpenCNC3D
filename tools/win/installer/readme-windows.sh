@@ -30,10 +30,11 @@ build $GITDESC
 WHAT TO DOUBLE CLICK
   OpenCNC3D.exe
 
-That is the launcher, and there is nothing else to choose. It tells you which
+That is the launcher for normal play. It tells you which
 build you have, shows what changed in it, and offers the next one when there is
-one. Press Play and the game boots the 1995 DOS main menu: START NEW GAME runs
-the GDI campaign, TEST MAP is the sandbox.
+one. Setup installs the launcher without a game. Open Add Game to download Dawn3D
+or RA3D, then select the installed module and press Play. Games download separately.
+Dawn3D opens the original C&C menu; RA3D opens Red Alert.
 
 The Editor button opens the map editor. It starts on the first GDI mission; MAP
 inside it makes a new map or opens another. Maps you save go into the
@@ -50,11 +51,9 @@ THE MOVIES AND THE MUSIC
   discs, which EA released as freeware in 2007, and the music from the Covert
   Operations disc image.
 
-    * OpenCNC3D-Setup asks on its Components page, with both ticked, and
-      downloads them while it installs.
-    * If you unzipped the game instead, the launcher asks the first time it
-      starts, with both ticked.
-    * The gear button in the launcher adds them later, or removes them again.
+    * The Module Browser offers movies and music independently for each game.
+    * The gear button adds them later, or removes them again.
+    * Setup itself downloads no game, movies or music.
 
   Without them the game plays as normal, with no cutscenes and no soundtrack.
 
@@ -119,6 +118,13 @@ WHAT IS AND IS NOT VERIFIED
   The game boots, loads its data and runs a mission on Windows.
   None of the 31 gates has been run on Windows, so "it starts and looks right"
   is the standard met here, not the one this project normally uses.
+
+PERFORMANCE REPORTS
+  Run OpenCNC3D-Diagnostics.exe beside the game, reproduce the problem, and exit.
+  Zip the newest Logs/session-... folder and attach it to your report. If the game
+  folder cannot be written, find it in %LOCALAPPDATA%\OpenCNC3D\Logs instead.
+  It uses your existing settings and saves, with unchanged graphics quality.
+  Nothing is uploaded automatically. Inspect the folder before sharing.
 
 IF SOMETHING IS WRONG
   Send opencnc3d-log.txt. It is written beside OpenCNC3D.exe every time the game starts, so

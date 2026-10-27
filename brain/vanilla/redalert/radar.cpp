@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Applies Gap Generator shrouding to fair AI houses.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -67,6 +68,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 
 // void const * RadarClass::CoverShape;
 RadarClass::RTacticalClass RadarClass::RadarButton;
@@ -1342,7 +1344,7 @@ bool RadarClass::Jam_Cell(CELL cell, HouseClass* house /*KO, bool shadeit*/)
 
         for (int i = 0; i < Session.Players.Count(); i++) {
             HouseClass* player_house = HouseClass::As_Pointer(Session.Players[i]->Player.ID);
-            if (player_house->IsHuman && player_house != house && !house->Is_Ally(player_house)) {
+            if ((player_house->IsHuman || FairAI_RA_Enabled(player_house)) && player_house != house && !house->Is_Ally(player_house)) {
                 Shroud_Cell(cell, player_house);
             }
         }

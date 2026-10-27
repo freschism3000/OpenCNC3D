@@ -1,0 +1,20 @@
+echo PROBE|base|v3
+gfxsave perfprobe-fx.cfg
+tick 60
+echo SECTION|baseline
+framebench 60
+framebench 200
+echo CAM|shroud_lifted
+reveal 1
+framebench 200
+meshperfdump
+echo SECTION|battle: the base is blown up
+blowup 1
+tick 15
+echo BATTLE|after_15_ticks
+framebench 10
+tick 15
+echo BATTLE|after_30_ticks
+framebench 10
+echo PROBE|base|done
+quit

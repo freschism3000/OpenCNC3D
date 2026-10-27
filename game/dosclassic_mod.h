@@ -9,6 +9,7 @@ struct Dos2DShape {
     char name[16];
     int w, h, frames, cols, tw, th;
     std::vector<unsigned char> zipped;
+    std::vector<unsigned char> raw;  /* the palette indices, unpacked on first use by dos2d_shimmer */
     GLuint tex[144]; /* normal/ghost/flash/shadow/translucent variants with player remaps */
     Dos2DShape() : w(0), h(0), frames(0), cols(0), tw(0), th(0) { name[0] = 0; memset(tex,0,sizeof tex); }
 };
@@ -29,6 +30,22 @@ static int g_dos2dShadowsOff = 0;
  * UnitShadow or MOVEFLSH's white table; trans: TranslucentTable). dosanimprobe prints it. */
 struct Dos2DAnimRec { char name[16]; int frame, ghost, trans; float x0, y0, x1, y1; };
 static std::vector<Dos2DAnimRec> g_dos2dAnimRecs;
+
+/* Every vehicle and vessel layer the last Classic frame met inside the view, with the
+ * engine's cloak state and draw flags, the 1995 visual character worked out from them
+ * (dos2d_visual) and what this renderer drew for it: the sprite, the darkening, the
+ * shimmer, or nothing (hidden, invisible to this player, or left out by the control).
+ * Script verb doscloakprobe prints it; dosomit TYPE leaves every layer of that type out
+ * of the frame, so a gate finds what was drawn for it by difference. */
+struct Dos2DCloakRec {
+    char type[16];
+    int id, sub, owner, ours, cloak, cstage, visual, flags;
+    const char* as;
+    float x0, y0, x1, y1;
+};
+static std::vector<Dos2DCloakRec> g_dos2dCloakRecs;
+static char g_dos2dOmit[16] = "";
+static GLuint g_dos2dShimmerTex = 0;
 static unsigned char g_dos2dRemap[8][16];
 static unsigned char g_dos2dBase[16];
 /* Red Alert: WINTER, TEMPERAT, INTERIOR. Tiberian Dawn: TEMPERAT, DESERT, and Temperate
@@ -489,6 +506,136 @@ static void dos2d_draw_shape(const char* name, int frame, int px, int py,
     if (ghost || shadow || trans) { glDisable(GL_BLEND); glAlphaFunc(GL_GREATER,0.5f); }
 }
 
+/* CLOAKING. TechnoClass::Visual_Character (techno.cpp; the same ladder in both games)
+ * says how the 1995 engine draws a cloaking unit, and Techno_Draw_Object turns that into
+ * these draws, in this order:
+ *
+ *   NORMAL      the unit                                FADING|GHOST
+ *   INDISTINCT  the unit, then the shimmer              FADING|GHOST, PREDATOR
+ *   DARKEN      the unit, darkened, then the shimmer    FADING|GHOST, FADING|PREDATOR, PREDATOR
+ *   SHADOWY     a dark silhouette, then the shimmer     FADING|PREDATOR, PREDATOR
+ *   RIPPLE      the shimmer alone                       PREDATOR
+ *   HIDDEN      nothing
+ *
+ * FADING|PREDATOR is Map.SpecialGhost, the darkening an aircraft's shadow is drawn with
+ * (dos2d_shadow_blend); PREDATOR alone is the shimmer (dos2d_shimmer), which draws none
+ * of the unit's own colours. Somebody else's fully cloaked unit is HIDDEN; the player's
+ * own is SHADOWY, as is anybody's between 19 and 28 of the 38 stages either way.
+ *
+ * THE LAYER EXPORT DRAWS HIDDEN AS SHADOWY. Techno_Draw_Object gives the export's virtual
+ * window a hidden unit's layers exactly as if it were shadowy, so nothing in the layers
+ * says it is hidden. Classic works the ladder out again from the unit's Cloak, its owner
+ * and its cloaking device's stage (the object dump's cstage) and draws no layer of a
+ * hidden unit. Without the stage the one frame an uncloaking unit spends hidden draws as
+ * shadowy; nothing else depends on it. */
+enum { D2V_NORMAL, D2V_INDISTINCT, D2V_DARKEN, D2V_SHADOWY, D2V_RIPPLE, D2V_HIDDEN };
+static const char* const D2V_NAME[] = {
+    "normal", "indistinct", "darken", "shadowy", "ripple", "hidden"
+};
+
+static int dos2d_visual(int cloak, int stage, bool ours)
+{
+    enum { UNCLOAKED, CLOAKING, CLOAKED, UNCLOAKING };
+    const int MAX_UNCLOAK_STAGE = 38;
+    if (cloak == UNCLOAKED) return D2V_NORMAL;
+    if (cloak == CLOAKED) return ours ? D2V_SHADOWY : D2V_HIDDEN;
+    if (stage < 0) return D2V_SHADOWY;          /* stage unknown: see above */
+    if (cloak == UNCLOAKING) stage = MAX_UNCLOAK_STAGE - stage;
+    if (stage <= 0) return D2V_NORMAL;
+    stage = (stage << 8) / MAX_UNCLOAK_STAGE;   /* Cardinal_To_Fixed */
+    if (stage < 0x40) return D2V_INDISTINCT;
+    if (stage < 0x80) return D2V_DARKEN;
+    if (stage < 0xC0) return D2V_SHADOWY;
+    if (ours) return D2V_SHADOWY;
+    if (stage < 0xFF) return D2V_RIPPLE;
+    return D2V_HIDDEN;
+}
+
+/* The cloaking device's stage for a layer's unit, from the object dump, or -1 when the
+   dump does not carry this unit or its cloak. A dump without the two cloak fields (Red
+   Alert's) reads UNCLOAKED with stage 0 for everything, so the stage is taken only where
+   the dump's cloak state is the layer's own. */
+static int dos2d_cloak_stage(const CNCObjectStruct& o)
+{
+    const int kind = o.Type == UNIT ? K_UNIT : o.Type == INFANTRY ? K_INFANTRY
+                   : o.Type == AIRCRAFT ? K_AIRCRAFT : o.Type == BUILDING ? K_BUILDING : -1;
+    if (kind < 0) return -1;
+    for (size_t i = 0; i < g_objects.size(); i++)
+        if (g_objects[i].id == o.ID && g_objects[i].kind == kind)
+            return g_objects[i].cloak == o.Cloak ? g_objects[i].cstage : -1;
+    return -1;
+}
+
+/* SHAPE_PREDATOR, the cloaking shimmer: BF_Predator_Trans (common/keybuff.cpp) as
+ * CC_Draw_Shape (conquer.cpp) sets it up. Every pixel under the shape takes the colour
+ * already on the screen a few pixels away: 1 3 2 5 2 3 4 1 to the right along its own
+ * row, the step moving on one place per pixel drawn and starting at the game frame modulo
+ * 8; when the shape's centre is right of the middle of the tactical view, the same steps
+ * to the left along the row below. A step that would leave the view keeps the pixel.
+ * Done on the 1995 pixel grid: the picture under the shape is read back, one sample per
+ * 1995 pixel, shifted, and drawn over itself. */
+static void dos2d_shimmer(const char* name, int frame, int px, int py, float ox, float oy,
+                          int scale, int viewW, int viewH, int fbh)
+{
+    Dos2DShape* s = dos2d_shape(name);
+    if (!s || scale < 1) return;
+    if (s->raw.empty()) {
+        const size_t rawbytes = (size_t)s->w * s->h * s->frames;
+        s->raw.resize(rawbytes);
+        uLongf outbytes = (uLongf)rawbytes;
+        if (uncompress(s->raw.data(), &outbytes, s->zipped.data(), (uLong)s->zipped.size()) != Z_OK
+            || outbytes != rawbytes) { s->raw.clear(); return; }
+    }
+    const int fr = frame < s->frames && frame >= 0 ? frame : 0;
+    const unsigned char* idx = &s->raw[(size_t)fr * s->w * s->h];
+    const int sx0 = px - s->w/2, sy0 = py - s->h/2;
+    /* the 1995 pixels the steps can read: five either side, one row below */
+    const int rx0 = std::max(0, sx0 - 5), rx1 = std::min(viewW, sx0 + s->w + 5);
+    const int ry0 = std::max(0, sy0),     ry1 = std::min(viewH, sy0 + s->h + 1);
+    if (rx1 <= rx0 || ry1 <= ry0) return;
+    const int rw = (rx1 - rx0) * scale, rh = (ry1 - ry0) * scale;
+    std::vector<unsigned char> under((size_t)rw * rh * 4);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels((int)lroundf(ox) + rx0*scale, fbh - ((int)lroundf(oy) + ry1*scale), rw, rh,
+                 GL_RGBA, GL_UNSIGNED_BYTE, under.data());
+    /* glReadPixels rows run bottom up; sample the middle of each 1995 pixel */
+    auto at = [&](int x, int y) -> const unsigned char* {
+        const int col = (x - rx0)*scale + scale/2, row = (ry1 - 1 - y)*scale + scale/2;
+        return &under[((size_t)row * rw + col) * 4];
+    };
+    static const int steps[8] = { 1, 3, 2, 5, 2, 3, 4, 1 };
+    const int engineFrame = g_engineFrame > 0 ? g_engineFrame : 0;
+    const bool left = px > viewW / 2;
+    unsigned step = left ? (unsigned)(-engineFrame) % 8u : (unsigned)engineFrame % 8u;
+    const int tw = dos2d_pow2(s->w), th = dos2d_pow2(s->h);
+    std::vector<unsigned char> rgba((size_t)tw * th * 4, 0);
+    for (int y = 0; y < s->h; y++)
+        for (int x = 0; x < s->w; x++) {
+            const int vx = sx0 + x, vy = sy0 + y;
+            if (!idx[y * s->w + x] || vx < 0 || vx >= viewW || vy < 0 || vy >= viewH) continue;
+            const int fx = left ? vx - steps[step] : vx + steps[step];
+            const int fy = left ? vy + 1 : vy;
+            step = (step + 1) % 8;
+            const bool inside = fx >= rx0 && fx < rx1 && fy >= ry0 && fy < ry1;
+            const unsigned char* c = inside ? at(fx, fy) : at(vx, vy);
+            unsigned char* p = &rgba[((size_t)y * tw + x) * 4];
+            p[0] = c[0]; p[1] = c[1]; p[2] = c[2]; p[3] = 255;
+        }
+    if (!g_dos2dShimmerTex) glGenTextures(1, &g_dos2dShimmerTex);
+    glBindTexture(GL_TEXTURE_2D, g_dos2dShimmerTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tw, th, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    const float x0 = ox + sx0*scale, y0 = oy + sy0*scale;
+    glColor4f(1,1,1,1);
+    glBegin(GL_QUADS);
+    dos2d_quad(x0, y0, x0 + s->w*scale, y0 + s->h*scale,
+               0.0f, 0.0f, (float)s->w/tw, (float)s->h/th);
+    glEnd();
+}
+
 /* TechnoClass::Draw_It in the 1995 source uses WHITE one-pixel corners sized
  * from Class_Of().Dimensions, and a four-row black-outlined health bar. */
 static void dos2d_solid(float x, float y, float w, float h, unsigned char colour)
@@ -628,7 +775,9 @@ static int dos2d_draw_anims(bool ground, int viewX, int viewY,
                  ra2d_theater_letter(),a.name);
         const char* art = g_dos2dRa && dos2d_shape(theater_name) ? theater_name : a.name;
         const Dos2DShape* shape=dos2d_shape(art);
-        if (a.type<0 || (!g_dos2dRa && a.type>=80)
+        /* (the engine's own number, etype: under Red Alert `type` is Tiberian Dawn's
+           counterpart for the 3D effects, ra3d_effects_mod.h, and -2 for none) */
+        if (a.etype<0 || (!g_dos2dRa && a.etype>=80)
             || (a.ground!=0)!=ground || a.stages<=0
             || a.stage<0 || a.stage>=a.stages || !shape
             || a.start+a.stage<0 || a.start+a.stage>=shape->frames) continue;
@@ -676,13 +825,21 @@ static int dos2d_draw_anims(bool ground, int viewX, int viewY,
 /* CellClass::Draw_It stamps TransIconset frame 0 or 2 into every occupied
  * foundation cell. The proximity verdict belongs to the cursor origin, while
  * clearance belongs to each cell. Draw these before units and buildings, as
- * the original tactical renderer does. */
-static void dos2d_ra_place_cursor(int viewX, int viewY,
-                                  float ox, float oy, int scale, int viewW, int viewH)
+ * the original tactical renderer does.
+ *
+ * BOTH GAMES, and Tiberian Dawn's is the same routine (cell.cpp, IsCursorHere:
+ * frame 0 when Map.ProximityCheck && Is_Generally_Clear(), else 2). This was Red
+ * Alert's only, and Classic is the one look that never reaches sb_draw_placement
+ * (draw_frame hands the whole picture to dos2d_scene), so a Tiberian Dawn building
+ * held over the map in Classic showed no footprint at all. No guard on the shape:
+ * a pack without TRANS says so through dos2d_draw_shape's missing line rather than
+ * drawing nothing in silence. */
+static void dos2d_place_cursor(int viewX, int viewY,
+                               float ox, float oy, int scale, int viewW, int viewH)
 {
-    if (!g_dos2dRa || !g_sbPlacing || g_sbPlaceIdx < 0
+    if (!g_sbPlacing || g_sbPlaceIdx < 0
         || g_sbPlaceIdx >= (int)g_sbState.entry.size()
-        || g_sbHoverX < 0 || g_sbHoverY < 0 || !dos2d_shape("TRANS")) return;
+        || g_sbHoverX < 0 || g_sbHoverY < 0) return;
     const int oi = sb_grid_index(g_sbHoverX, g_sbHoverY);
     const bool prox = oi >= 0 && g_sbPlaceProx[oi];
     const SbEntry& entry = g_sbState.entry[g_sbPlaceIdx];
@@ -788,7 +945,7 @@ static void dos2d_scene(int fbw, int fbh)
                                  (d.DrawFlags & 0x1000) != 0 /* SHAPE_GHOST */);
             }
         }
-        dos2d_ra_place_cursor(viewX,viewY,ox,oy,scale,viewW,viewH);
+        dos2d_place_cursor(viewX,viewY,ox,oy,scale,viewW,viewH);
         g_dos2dAnimRecs.clear();
         dos2d_draw_anims(true,viewX,viewY,ox,oy,scale,viewW,viewH);
         const bool layers_ok = BrainGetState(GAME_STATE_LAYERS, 0, bytes.data(),
@@ -818,6 +975,23 @@ static void dos2d_scene(int fbw, int fbh)
             std::stable_sort(order.begin(), order.end(), [list](int a,int b) {
                 return list->Objects[a].SortOrder < list->Objects[b].SortOrder;
             });
+            /* The export moves a FADING|PREDATOR sub-object under its unit, which is right
+               for an aircraft's shadow. A darkening unit's darkening is drawn over the unit
+               (Techno_Draw_Object), so it goes back above it. */
+            for (size_t j = 0; j < order.size(); j++) {
+                const CNCObjectStruct& d = list->Objects[order[j]];
+                if (!d.SubObject || (d.DrawFlags & 0x0300) != 0x0300 || d.Type == AIRCRAFT
+                    || d.Cloak == 0) continue;
+                for (size_t k = j + 1; k < order.size(); k++) {
+                    const CNCObjectStruct& u = list->Objects[order[k]];
+                    if (u.SubObject || u.CNCInternalObjectPointer != d.CNCInternalObjectPointer)
+                        continue;
+                    std::rotate(order.begin() + j, order.begin() + j + 1, order.begin() + k + 1);
+                    j--;
+                    break;
+                }
+            }
+            g_dos2dCloakRecs.clear();
             glEnable(GL_ALPHA_TEST); glAlphaFunc(GL_GREATER, 0.5f);
             for (size_t j = 0; j < order.size(); j++) {
                 const CNCObjectStruct& o = list->Objects[order[j]];
@@ -842,16 +1016,49 @@ static void dos2d_scene(int fbw, int fbh)
                  * red table; BadGuy's stored house colour is blue-grey for units. */
                 const bool rotor = g_dos2dRa && (!strcmp(o.AssetName,"RROTOR") ||
                                                    !strcmp(o.AssetName,"LROTOR"));
-                /* SHAPE_FADING | SHAPE_PREDATOR on a sub-object is what the engine
-                   asks for an aircraft's shadow and a flying rotor, and both games draw
-                   it as the shadow blend (dos2d_shadow_blend). The control toggle below
-                   reads the engine's flags, not `shadow`, so a gate still finds those
-                   layers by difference on a build where `shadow` misses some of them. */
-                const bool fadepred = o.SubObject && (o.DrawFlags & 0x0300) == 0x0300;
+                /* SHAPE_FADING | SHAPE_PREDATOR is what the engine asks for an aircraft's
+                   shadow, a flying rotor, a cloaking unit's darkening and a shadowy unit
+                   itself, and both games draw it as the shadow blend (dos2d_shadow_blend),
+                   as CC_Draw_Shape turns every one of them into Map.SpecialGhost. The
+                   control toggle below reads the engine's flags, not `shadow`, so a gate
+                   still finds those layers by difference on a build where `shadow` misses
+                   some of them. SHAPE_PREDATOR alone is the cloaking shimmer. */
+                const bool fadepred = (o.DrawFlags & 0x0300) == 0x0300;
                 const bool shadow = fadepred;
+                const bool shimmer = (o.DrawFlags & 0x0300) == 0x0200;
                 const int remap = flash || rotor || shadow ? -1 : (o.Type == BUILDING && o.Owner == 1
                                    ? 2 /* REMAP_RED */ : o.RemapColor);
                 const char* art = o.IsTheaterSpecific && dos2d_shape(key) ? key : o.AssetName;
+                /* A unit the 1995 engine would not draw at all: hidden by its cloak
+                   (dos2d_visual), or one the export marks invisible to this player (Red
+                   Alert's mines, IsInvisible). */
+                const bool techno = o.Type == UNIT || o.Type == INFANTRY || o.Type == AIRCRAFT
+                                 || o.Type == BUILDING || o.Type == VESSEL;
+                const bool ours = o.Owner >= 0 && o.Owner < 32
+                               && ((1u << o.Owner) & playerMask) != 0;
+                const int cstage = techno && (o.Cloak == 1 || o.Cloak == 3)
+                                 ? dos2d_cloak_stage(o) : -1;
+                const int visual = techno ? dos2d_visual(o.Cloak, cstage, ours) : D2V_NORMAL;
+                const bool invisible = !(o.VisibleFlags & playerMask);
+                const bool omitted = g_dos2dOmit[0] && !strcmp(o.TypeName, g_dos2dOmit);
+                if ((o.Type == UNIT || o.Type == VESSEL) && g_dos2dCloakRecs.size() < 256) {
+                    const Dos2DShape* s = dos2d_shape(art);
+                    Dos2DCloakRec r;
+                    memset(&r, 0, sizeof r);
+                    snprintf(r.type, sizeof r.type, "%s", o.TypeName);
+                    r.id = o.ID; r.sub = o.SubObject; r.owner = o.Owner; r.ours = ours;
+                    r.cloak = o.Cloak; r.cstage = cstage; r.visual = visual;
+                    r.flags = o.DrawFlags;
+                    r.as = omitted ? "omitted" : visual == D2V_HIDDEN ? "hidden"
+                         : invisible ? "invisible" : shimmer ? "shimmer"
+                         : shadow ? "darken" : "sprite";
+                    if (s) {
+                        r.x0 = ox + (px - s->w/2)*scale; r.y0 = oy + (py - s->h/2)*scale;
+                        r.x1 = r.x0 + s->w*scale;      r.y1 = r.y0 + s->h*scale;
+                    }
+                    g_dos2dCloakRecs.push_back(r);
+                }
+                if (omitted || visual == D2V_HIDDEN || invisible) continue;
                 if (o.Type == AIRCRAFT && g_dos2dAirRecs.size() < 256) {
                     const Dos2DShape* s = dos2d_shape(art);
                     Dos2DAirRec r;
@@ -866,9 +1073,12 @@ static void dos2d_scene(int fbw, int fbh)
                     g_dos2dAirRecs.push_back(r);
                 }
                 if (g_dos2dShadowsOff && fadepred) continue;
-                dos2d_draw_shape(art,
-                                 o.ShapeIndex,px,py,true,ox,oy,scale,remap,
-                                 (o.DrawFlags & 0x1000) != 0,flash,shadow);
+                if (shimmer)
+                    dos2d_shimmer(art,o.ShapeIndex,px,py,ox,oy,scale,viewW,viewH,fbh);
+                else
+                    dos2d_draw_shape(art,
+                                     o.ShapeIndex,px,py,(o.DrawFlags & 0x0020) != 0,ox,oy,scale,remap,
+                                     (o.DrawFlags & 0x1000) != 0,flash,shadow);
                 /* Draw_It draws the lines before the selection box */
                 if (!o.SubObject) dos2d_draw_lasers(o,viewX,viewY,ox,oy,scale);
                 if (!o.SubObject) dos2d_selection(o,px,py,ox,oy,scale);
@@ -972,6 +1182,7 @@ static void dos2d_free(void)
     dos2d_flush_textures();
     g_dos2dShapes.clear();
     g_dos2dTdPal = 0;
+    if (g_dos2dShimmerTex) { glDeleteTextures(1, &g_dos2dShimmerTex); g_dos2dShimmerTex = 0; }
     for (size_t i = 0; i < g_raTiles.size(); i++)
         if (g_raTiles[i].texture) glDeleteTextures(1, &g_raTiles[i].texture);
     g_raTiles.clear();

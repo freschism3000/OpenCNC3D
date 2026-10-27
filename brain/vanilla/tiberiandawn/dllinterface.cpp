@@ -1,3 +1,6 @@
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Assigns per-roster AI skill before house remapping and exports policy, state hash and read-only diagnostics.
+// This changes multiplayer simulation; campaign rules remain on their original path.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -59,8 +62,11 @@
 #include <stdio.h>
 
 #include "function.h"
+#include "fair_ai_td.h"
+#include "../../fair_ai.h"
 #include "externs.h"
 #include "dllinterface.h"
+#include "../../../game/sidebar_build_potential.h"
 #include "gadget.h"
 #include "defines.h" // VOC_COUNT, VOX_COUNT
 #include "sidebarglyphx.h"
@@ -1056,6 +1062,8 @@ void GlyphX_Assign_Houses(void)
         strncpy((char*)housep->Name, MPlayerNames[i], MPLAYER_NAME_MAX - 1);
         housep->IsHuman = MPlayerIsHuman[i];
         housep->Init_Data(color, pref_house, MPlayerCredits);
+        TD_Fair_AI_Assign(housep, i);
+        housep->Assign_Handicap(DIFF_NORMAL);
 
         /*
         **	Set the start location override
@@ -7414,7 +7422,25 @@ void DLLExportClass::Debug_Spawn_Unit(const char* object_name, int x, int y, boo
 
         UnitClass* unit = new UnitClass(unit_type, house);
         if (unit) {
-            unit->Unlimbo(Map.Pixel_To_Coord(x, y), DIR_N);
+            if (unit->Unlimbo(Map.Pixel_To_Coord(x, y), DIR_N) && enemy
+                && getenv("OPENCNC3D_FILM_ENEMY_HUNT")
+                && !strcmp(getenv("OPENCNC3D_FILM_ENEMY_HUNT"), "1")) {
+                // Private cinematic staging: attackers walk in under native Hunt AI.
+                const char* hero_type = getenv("OPENCNC3D_FILM_HERO");
+                UnitClass* hero = NULL;
+                for (int n = 0; hero_type && n < Units.Count(); ++n) {
+                    UnitClass* candidate = Units.Ptr(n);
+                    if (candidate && candidate != unit && candidate->House == PlayerPtr
+                        && !candidate->IsInLimbo
+                        && !stricmp(candidate->Class->IniName, hero_type)) {
+                        hero = candidate;
+                        break;
+                    }
+                }
+                unit->Assign_Mission(hero ? MISSION_ATTACK : MISSION_HUNT);
+                if (hero) unit->Assign_Target(hero->As_Target());
+                unit->Commence();
+            }
         }
 
         return;
@@ -9693,6 +9719,122 @@ static HousesType OpenCNC3D_House_Of_Player(uint64 player_id)
     return HOUSE_NONE;
 }
 
+/* AC4249: the Enhanced sidebar may show a grey cameo only when this mission's
+   actual rules can eventually unlock it. The display catalog's multiplayer level
+   cannot answer campaign Scenario gates or captured-factory restrictions.
+
+   Close the potential prerequisite tree through the SAME Can_Build predicate used
+   for production. A missing own factory is replaceable; its current presence or
+   busy radio contact must not erase grey future options. Other factions enter only
+   through an owned captured producer or construction yard. Existing prereqs count
+   even when their type cannot be newly built in this mission. No game state is
+   changed, and no technology level or faction restriction is bypassed. */
+static int OpenCNC3D_Production_Category(RTTIType type)
+{
+    switch (type) {
+    case RTTI_BUILDINGTYPE: return 0;
+    case RTTI_INFANTRYTYPE: return 1;
+    case RTTI_UNITTYPE: return 2;
+    case RTTI_AIRCRAFTTYPE: return 3;
+    default: return -1;
+    }
+}
+
+static unsigned int OpenCNC3D_Production_Faction(HousesType house)
+{
+    return house == HOUSE_GOOD ? 1u : house == HOUSE_BAD ? 2u : 0u;
+}
+
+extern "C" __declspec(dllexport) int __cdecl OpenCNC3D_Get_Build_Potential(
+    uint64 player_id, OpenCNC3D_BuildPotentialEntry* entries, int capacity)
+{
+    const HousesType owner = OpenCNC3D_House_Of_Player(player_id);
+    const HouseClass* house = owner != HOUSE_NONE ? HouseClass::As_Pointer(owner) : NULL;
+    if (!house || capacity < 0 || (capacity && !entries)) return -1;
+
+    unsigned int producers[4] = { OpenCNC3D_Production_Faction(house->ActLike), 0, 0, 0 };
+    unsigned int prerequisites = house->ActiveBScan;
+    for (int i = 0; i < Buildings.Count(); ++i) {
+        const BuildingClass* b = Buildings.Ptr(i);
+        if (!b || b->House != house || b->IsInLimbo || b->Mission == MISSION_DECONSTRUCTION)
+            continue;
+        const int category = OpenCNC3D_Production_Category(b->Class->ToBuild);
+        if (category >= 0) producers[category] |= OpenCNC3D_Production_Faction(b->ActLike);
+    }
+
+    bool changed;
+    do {
+        changed = false;
+        /* All building prerequisite bits are in the first 32 type slots; civilian
+           scenery beyond that is not buildable and must not be shifted into a mask. */
+        for (int i = STRUCT_FIRST; i < STRUCT_COUNT && i < 32; ++i) {
+            const BuildingTypeClass& type = BuildingTypeClass::As_Reference((StructType)i);
+            for (int faction = 0; faction < 2; ++faction) {
+                const unsigned int bit = 1u << faction;
+                if (!(producers[0] & bit) || !house->Can_Build_With_Prerequisites(
+                        &type, faction ? HOUSE_BAD : HOUSE_GOOD, prerequisites)) continue;
+                const unsigned int old = prerequisites;
+                prerequisites |= 1u << i;
+                changed = changed || old != prerequisites;
+                const int category = OpenCNC3D_Production_Category(type.ToBuild);
+                if (category >= 0) {
+                    /* BuildingClass's constructor fixes side-specific factories to
+                       their original side, even when built from a captured yard. */
+                    HousesType acts = house->ActLike;
+                    if (i == STRUCT_HAND || i == STRUCT_AIRSTRIP) acts = HOUSE_BAD;
+                    if (i == STRUCT_BARRACKS || i == STRUCT_WEAP) acts = HOUSE_GOOD;
+                    const unsigned int before = producers[category];
+                    producers[category] |= OpenCNC3D_Production_Faction(acts);
+                    changed = changed || before != producers[category];
+                }
+            }
+        }
+        /* Some campaign unlocks are earned by capturing a scenario prerequisite,
+           notably Nod mission 11's MISSION building for STNK. Include those only
+           when an engineer is already owned or can be unlocked by this same tree. */
+        bool can_capture = false;
+        for (int i = 0; i < Infantry.Count(); ++i) {
+            const InfantryClass* inf = Infantry.Ptr(i);
+            if (inf && inf->House == house && !inf->IsInLimbo && inf->Class->Type == INFANTRY_E7)
+                can_capture = true;
+        }
+        const InfantryTypeClass& engineer = InfantryTypeClass::As_Reference(INFANTRY_E7);
+        for (int faction = 0; faction < 2; ++faction)
+            if ((producers[1] & (1u << faction)) && house->Can_Build_With_Prerequisites(
+                    &engineer, faction ? HOUSE_BAD : HOUSE_GOOD, prerequisites)) can_capture = true;
+        if (can_capture) for (int i = 0; i < Buildings.Count(); ++i) {
+            const BuildingClass* b = Buildings.Ptr(i);
+            if (!b || b->IsInLimbo || b->Mission == MISSION_DECONSTRUCTION || !b->Class->IsCaptureable)
+                continue;
+            const int type = (int)b->Class->Type;
+            if (type >= 0 && type < 32) {
+                const unsigned int before = prerequisites;
+                prerequisites |= 1u << type;
+                changed = changed || before != prerequisites;
+            }
+        }
+    } while (changed);
+
+    const RTTIType kinds[4] = { RTTI_BUILDINGTYPE, RTTI_INFANTRYTYPE, RTTI_UNITTYPE, RTTI_AIRCRAFTTYPE };
+    const int counts[4] = { STRUCT_COUNT, INFANTRY_COUNT, UNIT_COUNT, AIRCRAFT_COUNT };
+    int count = 0;
+    for (int kind = 0; kind < 4; ++kind) for (int id = 0; id < counts[kind]; ++id) {
+        const TechnoTypeClass* type = Fetch_Techno_Type(kinds[kind], id);
+        bool possible = false;
+        for (int faction = 0; type && faction < 2; ++faction)
+            if ((producers[kind] & (1u << faction)) && house->Can_Build_With_Prerequisites(
+                    type, faction ? HOUSE_BAD : HOUSE_GOOD, prerequisites)) possible = true;
+        if (!possible) continue;
+        if (count < capacity) {
+            memset(&entries[count], 0, sizeof entries[count]);
+            strncpy(entries[count].name, type->IniName, sizeof entries[count].name - 1);
+        }
+        ++count;
+    }
+    return count;
+}
+
+
 /**************************************************************************************************
  * OpenCNC3D_Player_To_AI -- Hands one player's house to the computer (project OpenCNC3D).
  *
@@ -9785,6 +9927,7 @@ extern "C" __declspec(dllexport) bool __cdecl OpenCNC3D_Player_To_AI(uint64 play
 
     hptr->WasHuman = true;
     hptr->IsHuman = false;
+    TD_Fair_AI_Assign(hptr, -1);
     hptr->IsStarted = true;
     hptr->IQ = Rule.MaxIQ;
     hptr->IsBaseBuilding = true;
@@ -10454,3 +10597,9 @@ extern "C" __declspec(dllexport) bool __cdecl OpenCNC3D_Get_Rally(int building_i
     if (cell_y) *cell_y = Cell_Y(cell);
     return true;
 }
+
+/* Per-roster skill levels are separate from legacy handicap difficulty. */
+extern "C" __declspec(dllexport) void __cdecl OpenCNC3D_Set_AI_Difficulties(const unsigned char* levels, int count) { TD_Fair_AI_Set_Levels(levels,count); }
+extern "C" __declspec(dllexport) unsigned int __cdecl OpenCNC3D_AI_Policy() { return fair_ai::PolicyHash(); }
+extern "C" __declspec(dllexport) unsigned int __cdecl OpenCNC3D_AI_State_Hash() { return TD_Fair_AI_Hash(); }
+extern "C" __declspec(dllexport) int __cdecl OpenCNC3D_AI_Diagnostics(char* out,int size) { return TD_Fair_AI_Diagnostics(out,size); }

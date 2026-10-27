@@ -1,0 +1,26 @@
+{
+  "old_production_per_triangle_sincos_calls": 3,
+  "new_production_per_draw_sincos_calls": 1,
+  "new_sincos_lines": [
+    212
+  ],
+  "new_vertex_loop_line": [
+    284
+  ],
+  "sincos_before_vertex_loop": true,
+  "x86_64_result": {
+    "passed": true,
+    "cases": 24000,
+    "vertices": 151032,
+    "fallbacks": 87298,
+    "negative_controls": 61192,
+    "scratch_bytes": 756,
+    "upload_checks": 6,
+    "eligibility_checks": 8,
+    "inert_rotor_cases": 24000,
+    "matrix_cases": 20571,
+    "normal_cases": 96000
+  },
+  "full_source_assembly_build_passed": true,
+  "full_source_assembly_warnings": 10
+}

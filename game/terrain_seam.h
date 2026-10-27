@@ -97,6 +97,7 @@ static GLuint ts_sheet(const std::vector<const unsigned char*>& strips, int sw, 
    terrainseam_<TH>.pack beside the other packs, else in the repository (a repo run), the
    way the Enhanced terrain pack itself is found. Only with the high-resolution terrain
    drawing. */
+static void water_static_seam_alpha(int tid,int icon,int var,int side,unsigned char* rgba,int cell,int margin);
 static void terrain_seams_ensure(void)
 {
     if (g_seams.tried && !strcmp(g_seams.theater, g_pack.theater)) return;
@@ -146,6 +147,7 @@ static void terrain_seams_ensure(void)
         if (!feat) g_seams.cliffTmpl[tmpl] = 1;
         if (slot0 < 0 || slot0 >= nslots || var >= TS_VARS) continue;
         const int slot = slot0 * TS_VARS + var;
+        water_static_seam_alpha(tmpl,icon,var,side,&d[body+(size_t)k*C*M*4],C,M);
         if (side == 0) { g_seams.slotL[slot] = (int)L.size(); g_seams.featL[slot] = feat; L.push_back(px); }
         else           { g_seams.slotT[slot] = (int)T.size(); g_seams.featT[slot] = feat; T.push_back(px); }
     }
@@ -165,6 +167,28 @@ static int ts_slot_of_cell(const PackCell& c, int nslots)
     const int row = (int)(std::min(c.v0, c.v1) * (float)rows + 1e-4f);
     const int slot = row * TT_COLS + col;
     return (slot >= 0 && slot < nslots) ? slot : -1;
+}
+
+/* ---- ONE BLOCK OF TRIANGLES INSTEAD OF A CALL PER CORNER ----
+   The ground was sent to GL in immediate mode: a colour, one or two texture coordinates
+   and a position per corner, each its own call. Under Enhanced that was about 560,000
+   calls a frame on the GDI 1 map, 520,000 of them these strips, and on Windows drivers
+   a call costs enough that the strips alone measured 8 to 30 ms a frame. The same
+   corners, in the same order, now go into one array and are drawn with one
+   glDrawArrays (imm_draw_triangles, defined once the buffer entry points are loaded).
+   Client-side vertex arrays are GL 1.1, so Tier 1 keeps an answer for this. */
+struct ImmVert { float p[3], t0[2], t1[2], c[4]; };
+static std::vector<ImmVert> g_tsBatch;
+static void imm_draw_triangles(const std::vector<ImmVert>& v, bool unit1);
+static inline void imm_put(std::vector<ImmVert>& v, float x, float y, float z, float u, float t,
+                           float r, float g, float b, float a, float u1 = 0.0f, float t1 = 0.0f)
+{
+    ImmVert q;
+    q.p[0] = x; q.p[1] = y; q.p[2] = z;
+    q.t0[0] = u; q.t0[1] = t;
+    q.t1[0] = u1; q.t1[1] = t1;
+    q.c[0] = r; q.c[1] = g; q.c[2] = b; q.c[3] = a;
+    v.push_back(q);
 }
 
 /* ---- THE DRAWING, shared by both games' terrain (draw_terrain_seams for Tiberian Dawn,
@@ -224,47 +248,98 @@ static void ts_strips_begin(bool tinted, GLuint atGL)
     glPolygonOffset(-1.0f, -2.0f);
 }
 
+/* THE STRIP'S LATTICE. A strip is TS_NA segments along the edge by TS_NX across, so
+   (TS_NA + 1) x (TS_NX + 1) corners; the two triangles of each segment share them. Corner
+   (ai along, xi across) in cell fractions: fx along x, fz along z. */
+enum { TS_NA = 8, TS_NX = 2, TS_LAT = (TS_NA + 1) * (TS_NX + 1), TS_IDX = TS_NA * TS_NX * 6 };
+
+static inline void ts_corner_f(const TerrainSeams& S, int pass, int ai, int xi, float* fx, float* fz)
+{
+    const float mf = (float)S.margin / (float)S.cell;
+    const int NA = TS_NA, NX = TS_NX;
+    const float p = (float)ai / NA;
+    const float q = 1 - mf + mf * xi / NX;
+    if (!pass) { *fx = q; *fz = p; }
+    else       { *fx = p; *fz = q; }
+}
+
+/* A corner's position, its strip-sheet coordinate (unit 0) and its coordinate in the
+   cell's own atlas rectangle (unit 1): x y z u0 v0 u1 v1. */
+static inline void ts_corner_geo(const TerrainSeams& S, int pass, const TsPass& P, int k,
+                                 int ax, int ay, float au0, float au1, float av0, float av1,
+                                 float aus, float avs, float fx, float fz, float out[7])
+{
+    const float mf = (float)S.margin / (float)S.cell;
+    const int sw = P.sw, sh = P.sh;
+    const float W = P.W, H = P.H;
+    const float sx0 = (float)((k % P.cols) * (sw + 2) + 1), sy0 = (float)((k / P.cols) * (sh + 2) + 1);
+    float u, v;
+    if (!pass) { u = sx0 + (fx - (1 - mf)) / mf * (float)sw; v = sy0 + fz * (float)sh; }
+    else       { u = sx0 + fx * (float)sw; v = sy0 + (fz - (1 - mf)) / mf * (float)sh; }
+    const float wx = (float)ax + fx, wz = (float)ay + fz;
+    out[0] = wx; out[1] = terrain_y(wx, wz); out[2] = wz;
+    out[3] = u / W; out[4] = v / H;
+    out[5] = (au0 + (au1 - au0) * fx) * aus;
+    out[6] = (av0 + (av1 - av0) * fz) * avs;
+}
+
+/* A corner's colour: the cell's corner light s and tint t (NW, NE, SE, SW), blended at
+   the corner's position in the cell. */
+static inline void ts_corner_rgba(const float s[4], const unsigned char t[4][3], bool tinted,
+                                  float fx, float fz, float rgba[4])
+{
+    const float w00 = (1 - fx) * (1 - fz), w10 = fx * (1 - fz), w11 = fx * fz, w01 = (1 - fx) * fz;
+    const float sh_ = s[0] * w00 + s[1] * w10 + s[2] * w11 + s[3] * w01;
+    rgba[0] = rgba[1] = rgba[2] = sh_;
+    rgba[3] = 1.0f;                                   /* glColor3f's alpha is 1 */
+    if (tinted) {
+        for (int ch = 0; ch < 3; ch++)
+            rgba[ch] = (t[0][ch] * w00 + t[1][ch] * w10 + t[2][ch] * w11 + t[3][ch] * w01) / 255.0f;
+        rgba[3] = sh_;
+    }
+}
+
+/* The six corners of segment (ia, ix) in drawing order, two triangles, as lattice
+   indices ai * (TS_NX + 1) + xi. The left strips (pass 0) run along z, the top strips
+   (pass 1) along x, which swaps which neighbour is the second and third corner. */
+static inline void ts_quad_corners(int pass, int ia, int ix, int out[6])
+{
+    const int W = TS_NX + 1;
+    const int c0 = ia * W + ix, c3 = (ia + 1) * W + ix + 1;
+    const int c1 = pass ? (ia + 1) * W + ix : ia * W + ix + 1;
+    const int c2 = pass ? ia * W + ix + 1 : (ia + 1) * W + ix;
+    out[0] = c0; out[1] = c2; out[2] = c1; out[3] = c1; out[4] = c2; out[5] = c3;
+}
+
 /* Strip k of the pass laid over the cell at (ax, ay): its left strip along that cell's
    right edge, its top strip along its bottom edge. (au0..av1) is the cell's own rectangle
    in the ground's atlas, scaled by (aus, avs), for unit 1; s and t its corner light and
-   tint, NW, NE, SE, SW. Inside glBegin(GL_TRIANGLES). */
+   tint, NW, NE, SE, SW. Appended to g_tsBatch, which the caller draws per pass. The
+   cached ground (terrain_cache.h) lays the same corners through the same three helpers. */
 static void ts_strip_emit(const TerrainSeams& S, int pass, const TsPass& P, int k,
                           int ax, int ay, float au0, float au1, float av0, float av1,
                           float aus, float avs, const float s[4], const unsigned char t[4][3],
                           bool tinted)
 {
-    const float mf = (float)S.margin / (float)S.cell;
-    const int NA = 8, NX = 2;                 /* segments along the edge and across the strip */
-    const int sw = P.sw, sh = P.sh;
-    const float W = P.W, H = P.H;
-    const float sx0 = (float)((k % P.cols) * (sw + 2) + 1), sy0 = (float)((k / P.cols) * (sh + 2) + 1);
-    /* the strip region of the cell, in cell fractions: fx along x, fz along z */
-    auto vert = [&](float fx, float fz) {
-        const float w00 = (1 - fx) * (1 - fz), w10 = fx * (1 - fz), w11 = fx * fz, w01 = (1 - fx) * fz;
-        const float sh_ = s[0] * w00 + s[1] * w10 + s[2] * w11 + s[3] * w01;
-        if (tinted) {
-            float rgb[3];
-            for (int ch = 0; ch < 3; ch++)
-                rgb[ch] = (t[0][ch] * w00 + t[1][ch] * w10 + t[2][ch] * w11 + t[3][ch] * w01) / 255.0f;
-            glColor4f(rgb[0], rgb[1], rgb[2], sh_);
-        } else glColor3f(sh_, sh_, sh_);
-        float u, v;
-        if (!pass) { u = sx0 + (fx - (1 - mf)) / mf * (float)sw; v = sy0 + fz * (float)sh; }
-        else       { u = sx0 + fx * (float)sw; v = sy0 + (fz - (1 - mf)) / mf * (float)sh; }
-        glTexCoord2f(u / W, v / H);
-        glMultiTexCoord2f(GL_TEXTURE1, (au0 + (au1 - au0) * fx) * aus, (av0 + (av1 - av0) * fz) * avs);
-        const float wx = (float)ax + fx, wz = (float)ay + fz;
-        glVertex3f(wx, terrain_y(wx, wz), wz);
-    };
-    for (int ia = 0; ia < NA; ia++)
-        for (int ix = 0; ix < NX; ix++) {
-            const float p0 = (float)ia / NA, p1 = (float)(ia + 1) / NA;
-            const float q0 = 1 - mf + mf * ix / NX, q1 = 1 - mf + mf * (ix + 1) / NX;
-            float fx[4], fz[4];
-            if (!pass) { fx[0] = q0; fz[0] = p0; fx[1] = q1; fz[1] = p0; fx[2] = q0; fz[2] = p1; fx[3] = q1; fz[3] = p1; }
-            else       { fx[0] = p0; fz[0] = q0; fx[1] = p1; fz[1] = q0; fx[2] = p0; fz[2] = q1; fx[3] = p1; fz[3] = q1; }
-            vert(fx[0], fz[0]); vert(fx[2], fz[2]); vert(fx[1], fz[1]);
-            vert(fx[1], fz[1]); vert(fx[2], fz[2]); vert(fx[3], fz[3]);
+    float geo[TS_LAT][7], fxz[TS_LAT][2];
+    for (int ai = 0; ai <= TS_NA; ai++)
+        for (int xi = 0; xi <= TS_NX; xi++) {
+            const int c = ai * (TS_NX + 1) + xi;
+            ts_corner_f(S, pass, ai, xi, &fxz[c][0], &fxz[c][1]);
+            ts_corner_geo(S, pass, P, k, ax, ay, au0, au1, av0, av1, aus, avs,
+                          fxz[c][0], fxz[c][1], geo[c]);
+        }
+    for (int ia = 0; ia < TS_NA; ia++)
+        for (int ix = 0; ix < TS_NX; ix++) {
+            int q[6];
+            ts_quad_corners(pass, ia, ix, q);
+            for (int j = 0; j < 6; j++) {
+                const float* g = geo[q[j]];
+                float rgba[4];
+                ts_corner_rgba(s, t, tinted, fxz[q[j]][0], fxz[q[j]][1], rgba);
+                imm_put(g_tsBatch, g[0], g[1], g[2], g[3], g[4], rgba[0], rgba[1], rgba[2], rgba[3],
+                        g[5], g[6]);
+            }
         }
 }
 
@@ -290,5 +365,12 @@ static void ts_strips_end(bool tinted, bool softCoast, GLuint atlGl, GLuint atGL
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, atGL);
 }
+
+/* The ground kept on the GPU (terrain_cache.h, defined once the buffer entry points are
+   loaded): draw_terrain's cells and draw_terrain_seams' strips, false when the per-frame
+   loop has to run instead. */
+static bool tcache_cells_draw(bool tinted, float us, float vs, bool enhVar, int enhSlots);
+static bool tcache_strips_draw(int pass, bool tinted, float aus, float avs, int nslots, const TtSlot* tab);
+static void tcache_free(void);
 
 #endif /* OPENCNC3D_TERRAIN_SEAM_H */

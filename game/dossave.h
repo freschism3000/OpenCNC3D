@@ -52,6 +52,10 @@ typedef struct DS_Slot
     unsigned char camp_var;
     unsigned char build;         /* --build, the sidebar's build level */
     unsigned char cam_mode;
+    unsigned char game;          /* which game wrote it: DS_GAME_TD (0) or DS_GAME_RA (1).
+                                    Byte 103 of the record, which every record written
+                                    before the field existed holds as zero, so an old
+                                    slot reads as Tiberian Dawn's, which it is. */
     int camx_m, camz_m;          /* camera, in thousandths of a cell */
     int dist_m, zoom_m;
     int music;                   /* ThemeType playing, or -1 */
@@ -63,6 +67,22 @@ typedef struct DS_Slot
        that lives in the filesystem anyway does not need a second copy. 0 if unknown. */
     long mtime;
 } DS_Slot;
+
+/* WHICH GAME'S SAVES THIS PROCESS SEES. Tiberian Dawn and Red Alert are two modules of one
+ * program, and their mission names collide (both have an SCG01EA), so a slot must say which
+ * game wrote it: loading one game's payload into the other's engine boots the wrong world.
+ * Each module also keeps its saves in a folder of its own (the shell puts Red Alert's in a
+ * ra3d/ folder inside the per-user one), and the tag is the second line of defence for a
+ * folder that is shared anyway, a --savedir handed to both. The game is Tiberian Dawn until
+ * ds_set_game says otherwise, so every caller that predates it behaves as before. */
+#define DS_GAME_TD 0
+#define DS_GAME_RA 1
+void ds_set_game(int game);
+int ds_get_game(void);
+/* Is this record a slot of the running game? Lists, loads and the slot dialog offer only
+ * these; another game's slot keeps its number and is never written over by
+ * ds_first_free, because it is still somebody's save. */
+int ds_slot_mine(const DS_Slot *s);
 
 /* Where the two files live. Called once by the shell with SDL_GetPrefPath's answer, or
  * with --savedir so a gate owns a scratch directory and never touches the player's.

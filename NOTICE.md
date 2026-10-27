@@ -35,110 +35,110 @@ corresponds to is pinned in `brain/patches/UPSTREAM.txt`.
 **This program contains modified versions of EA's GPL source.** There are TWO
 modified copies in this repository and both are covered here.
 
-**1. `brain/vanilla/`, the source used by the standard brain builds.** 54 upstream
-files are modified:
+**1. `brain/vanilla/`, the source used by the standard brain builds.** The following 80 upstream files are modified:
 
-    common/CMakeLists.txt             common/load.cpp
+    common/CMakeLists.txt
+    common/load.cpp
     common/mixfile.h
-    redalert/CMakeLists.txt           redalert/display.cpp
-    redalert/dllinterface.cpp         redalert/dllinterface.h
-    redalert/idata.cpp                redalert/init.cpp
-    redalert/map.cpp                  redalert/rules.cpp
-    redalert/startup.cpp
-    tiberiandawn/CMakeLists.txt
-    tiberiandawn/aadata.cpp
-    tiberiandawn/aircraft.cpp         tiberiandawn/anim.cpp
-    tiberiandawn/anim.h               tiberiandawn/bbdata.cpp
-    tiberiandawn/bdata.cpp            tiberiandawn/building.cpp
-    tiberiandawn/building.h           tiberiandawn/bullet.cpp
-    tiberiandawn/bullet.h
-    tiberiandawn/const.cpp            tiberiandawn/defines.h
-    tiberiandawn/dialog.cpp           tiberiandawn/display.cpp
-    tiberiandawn/display.h            tiberiandawn/dllinterface.cpp
-    tiberiandawn/dllinterface.h       tiberiandawn/drive.cpp
-    tiberiandawn/event.cpp            tiberiandawn/event.h
-    tiberiandawn/externs.h
-    tiberiandawn/factory.cpp          tiberiandawn/globals.cpp
-    tiberiandawn/hdata.cpp            tiberiandawn/house.cpp
-    tiberiandawn/house.h              tiberiandawn/idata.cpp
-    tiberiandawn/infantry.cpp         tiberiandawn/infantry.h
-    tiberiandawn/ipxmgr.h
-    tiberiandawn/object.cpp           tiberiandawn/object.h
-    tiberiandawn/saveload.cpp         tiberiandawn/scenario.cpp
-    tiberiandawn/session.h            tiberiandawn/special.h
-    tiberiandawn/startup.cpp          tiberiandawn/techno.cpp
-    tiberiandawn/techno.h             tiberiandawn/udata.cpp
-    tiberiandawn/unit.cpp
-
-**All 54 now carry a dated modification block in the file itself**, and each
-one says what THAT file's change is rather than repeating a summary. 33 got
-theirs on 1 Sep 2026; before that date only 9 did, and those 9 all carried the
-sentence "the change is additive and does not alter the game simulation", which
-is false for some of them and is exactly the claim this notice had already
-retracted. They have been corrected individually. Seven more files (anim.cpp,
-event.cpp, event.h, infantry.cpp, scenario.cpp, special.h, unit.cpp) were in the
-patch but carried no block and were not listed here until 17 Sep 2026, when
-they got both, and aircraft.cpp and common/mixfile.h joined the patch the same day
-with their blocks. Seven Red Alert files joined the modified-source inventory on
-22 Sep 2026 with file-specific blocks for the Phase 2 bootstrap; two more
-(redalert/dllinterface.h, redalert/idata.cpp) and tiberiandawn/infantry.h, which
-were in the patch without a block, got theirs on 3 Oct 2026. tiberiandawn/factory.cpp,
-in the patch without a block since 7 Oct 2026, got its block and its line here
-on 8 Oct 2026.
-
-Two files copied into `brain/vanilla/` are project-authored additions rather
-than modifications of upstream files: `common/wwkeyboard_null.cpp` and
-`tiberiandawn/opencnc3d_compat.h`. They are not included in the 54-file count. The
-Phase 2 host `brain/host/ra_bootstrap.c`, the files in `brain/tests/ra3d/`, and
-the gate scripts in `tools/ra3d/` are also project-authored. `RA3DBOOT.mpr` is
-not a modified EA scenario and contains no original Red Alert game data.
-
-Every change is additive in the sense that nothing upstream was deleted, but it
-is NOT true that none of them touch the simulation and an earlier version of
-this notice said so wrongly: the changes add cheat-granted super weapons, widen
-the playable house set to eight, and export state the renderer reads.
-
-Read against the diff file by file, **31 of the 54 change what the engine
-computes** and 23 do not. The 31 that do:
-
+    redalert/CMakeLists.txt
+    redalert/aircraft.cpp
+    redalert/anim.cpp
+    redalert/building.cpp
+    redalert/building.h
+    redalert/bullet.cpp
+    redalert/bullet.h
     redalert/display.cpp
+    redalert/display.h
     redalert/dllinterface.cpp
+    redalert/dllinterface.h
+    redalert/event.cpp
+    redalert/event.h
+    redalert/externs.h
+    redalert/factory.cpp
+    redalert/factory.h
+    redalert/foot.cpp
+    redalert/globals.cpp
+    redalert/house.cpp
+    redalert/house.h
     redalert/idata.cpp
+    redalert/infantry.cpp
     redalert/init.cpp
+    redalert/logic.cpp
+    redalert/map.cpp
+    redalert/object.cpp
+    redalert/object.h
+    redalert/radar.cpp
     redalert/rules.cpp
+    redalert/saveload.cpp
+    redalert/startup.cpp
+    redalert/techno.cpp
+    redalert/unit.cpp
     tiberiandawn/CMakeLists.txt
     tiberiandawn/aadata.cpp
     tiberiandawn/aircraft.cpp
     tiberiandawn/anim.cpp
+    tiberiandawn/anim.h
+    tiberiandawn/bbdata.cpp
     tiberiandawn/bdata.cpp
     tiberiandawn/building.cpp
+    tiberiandawn/building.h
     tiberiandawn/bullet.cpp
+    tiberiandawn/bullet.h
+    tiberiandawn/const.cpp
     tiberiandawn/defines.h
+    tiberiandawn/dialog.cpp
     tiberiandawn/display.cpp
+    tiberiandawn/display.h
     tiberiandawn/dllinterface.cpp
+    tiberiandawn/dllinterface.h
     tiberiandawn/drive.cpp
     tiberiandawn/event.cpp
+    tiberiandawn/event.h
+    tiberiandawn/externs.h
     tiberiandawn/factory.cpp
+    tiberiandawn/foot.cpp
     tiberiandawn/globals.cpp
     tiberiandawn/hdata.cpp
     tiberiandawn/house.cpp
+    tiberiandawn/house.h
     tiberiandawn/idata.cpp
     tiberiandawn/infantry.cpp
+    tiberiandawn/infantry.h
+    tiberiandawn/ipxmgr.h
+    tiberiandawn/map.cpp
     tiberiandawn/object.cpp
     tiberiandawn/object.h
+    tiberiandawn/saveload.cpp
     tiberiandawn/scenario.cpp
+    tiberiandawn/session.h
     tiberiandawn/special.h
+    tiberiandawn/startup.cpp
     tiberiandawn/techno.cpp
     tiberiandawn/techno.h
     tiberiandawn/udata.cpp
     tiberiandawn/unit.cpp
 
-Those are the ones a reader checking whether this is still EA's game should
-start with (special.h only adds a switch, but the engine computes differently
-when it is on). The remaining 23 add build plumbing, read-only accessors,
-exported state the renderer consumes, portability shims, the network wire
-format (event.h), or a refusal of a damaged data file where the original
-dereferenced it (common/mixfile.h).
+Each modified upstream file carries a dated modification block describing its own
+changes. Earlier blocks and dates preserve the history of the renderer exports,
+portability, multiplayer and simulation work. The 19 October 2026 fair-skirmish
+blocks identify per-house skill selection, ordinary economic/production rules,
+computer exploration and observed-target filtering, and save/network state.
+These changes DO affect multiplayer simulation. Campaigns retain their existing
+AI and difficulty paths.
+
+Project-authored additions within this tree are `common/wwkeyboard_null.cpp`,
+`tiberiandawn/opencnc3d_compat.h`, `tiberiandawn/fair_ai_td.h`,
+`tiberiandawn/fair_ai_td.inc`, `redalert/fair_ai_ra.h` and `redalert/fair_ai_ra.cpp`.
+They are excluded from the modified-upstream count. `brain/fair_ai.h`, the host
+probes in `brain/host/`, the synthetic fixtures in `brain/tests/ra3d/` and the
+project's gate scripts are also project-authored. `RA3DBOOT.mpr` contains no
+original Red Alert game data.
+
+The source changes include both simulation changes and supporting exports/build
+plumbing. Do not interpret an older per-file statement about a read-only export as
+a claim that the program's complete diff leaves the simulation unchanged. In
+particular, the skirmish controller replaces the original computer planner and
+removes its privileged handicaps while respecting faction-specific rules.
 
 **2. `brain/xl/`, a maintained fork of the same source** used for the large-map
 mode. Its `common/` is asserted byte-identical to the unforked copy by

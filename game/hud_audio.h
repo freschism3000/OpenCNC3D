@@ -4,11 +4,11 @@
    entry, the scroll arrows, repair, sell, power, map and the category tabs. Empty
    panel, radar and credit surfaces are not buttons. The screen-edge plates along the
    top (OPTIONS, DATABASE, SIDEBAR) are menu buttons, not part of the bar, and stay
-   silent; so do the selected-unit card in the opposite corner and every control of
-   the in-game Options menu, which owns the pointer while it is up. */
+   silent; so does the selected-unit card. Enhanced menus own their separate
+   feedback route while Options or the Database is open. */
 static int hud_audio_hit(float x, float y, int w, int h)
 {
-    if (!g_fx.enabled || g_editOn || fxp_is_open() || g_optOpen) return -1;
+    if (!g_fx.enabled || g_editOn || fxp_is_open() || g_optOpen || g_cxOpen) return -1;
     sb_layout(w, h);
     int col = -1, slot = -1;
     const SbHit hit = sb_hit_at(x, y, &col, &slot);

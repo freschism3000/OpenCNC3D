@@ -15,7 +15,11 @@
 //
 // MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
 // Adds an IsBlushing flag to CNCObjectStruct, the exported object record the
-// renderer reads, so the blush an object shows when it is targeted can be drawn.
+// renderer reads, so the blush an object shows when it is targeted can be drawn,
+// and appends INPUT_STRUCTURE_POWER, the sidebar's building power switch, to
+// StructureRequestEnum after the last original request. Adds ShortGame to
+// CNCMultiplayerOptionsStruct in the place the Tiberian Dawn brain has it, so
+// one host struct fills either brain's match options.
 // It does not change the game simulation.
 // The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
 // and NOTICE.md lists every modified file.
@@ -438,6 +442,7 @@ enum StructureRequestEnum
     INPUT_STRUCTURE_SELL_START,
     INPUT_STRUCTURE_SELL,
     INPUT_STRUCTURE_CANCEL,
+    INPUT_STRUCTURE_POWER, // OpenCNC3D: switch one of the player's buildings off or back on
 };
 
 /**************************************************************************************
@@ -756,6 +761,7 @@ struct CNCMultiplayerOptionsStruct
     bool MPlayerAftermathUnits;
     bool CaptureTheFlag;
     bool DestroyStructures; // New early win condition via destroying all a player's structures
+    bool ShortGame;         // OpenCNC3D: defences and walls do not keep a player alive
     bool ModernBalance;
 };
 

@@ -22,12 +22,28 @@
  * legacy lines, and each one's .ocpart. Never a pattern, never a folder, and never a
  * path that runs through a link: a development folder whose dosdata is a link to the
  * repository's own data has nothing taken out of it.
+ *
+ * A MODULE'S FILES COUNT ONLY WHERE THE MODULE IS. The manifest's `module ra3d` line says
+ * that the files under ra3d/ are the Red Alert module's movies and score, so they are
+ * fetched, counted as missing and summed into the sizes only where lmodule.c says Red
+ * Alert is installed, the same test the module grid draws its tile by, asked again each
+ * time rather than once at start, because an update can bring the module into a folder
+ * the launcher is already running in. Unticking a box removes them wherever they are.
+ *
+ * A FILE WITH A HEAD is the head's bytes followed by its range of the disc. Red Alert's
+ * score is one: the game's audio reader takes plain MIX headers only, and the disc's
+ * archive has an encrypted one, so the manifest pins the plain header (258 bytes) and the
+ * range is the disc's data block as it is. The range arrives in its own part file,
+ * <name>.range.ocpart, resumable like any other, and the file is then written whole as
+ * <name>.ocpart, head first, and checked against its SHA-256 before it takes its name.
  */
 
 #include "lmedia.h"
+#include "lmodule.h"
 #include "lnet.h"
 #include "lpath.h"
 #include "lzip.h"
+#include "../game/lang_manifest.h"
 
 #include <SDL.h>
 
@@ -49,7 +65,13 @@ extern const char LMEDIA_MANIFEST[];
 #define LM_NCOMP 2
 
 #define LM_MAX_MIRRORS 32
+#define LM_MAX_MODULES 4
+#define LM_MAX_HEAD 2048 /* bytes; localized Red Alert SOUNDS.MIX needs 1422 */
 #define LM_ATTEMPTS 3
+
+/* Where a file with a head keeps its range while it arrives. It ends in LZ_PART, so
+ * everything that refuses a part file in a package refuses this one too. */
+#define LM_RANGE_PART ".range" LZ_PART
 
 /* Kept free beyond the download itself: a disk filled to its last byte is a machine
  * in trouble, whatever the game wanted. */
@@ -57,7 +79,7 @@ extern const char LMEDIA_MANIFEST[];
 
 static const char *const lm_comp_name[LM_NCOMP] = {"movies", "music"};
 static const char *const lm_comp_label[LM_NCOMP] = {"MOVIES", "MUSIC"};
-static const char *const lm_disc_name[] = {"GDI", "NOD", "COVERT", NULL};
+static const char *const lm_disc_name[] = {"GDI", "NOD", "COVERT", "RA_ALLIED", "RA_SOVIET", "DE_GDI", "DE_NOD", "DE_RA_ALLIED", "DE_RA_SOVIET", "FR_RA_SOVIET", NULL};
 
 typedef struct
 {
@@ -73,7 +95,10 @@ typedef struct
     long long size;
     char sha[65];
     int disc;
-    long long offset;
+    long long offset;      /* where the range starts in the disc image */
+    unsigned char *head;   /* written ahead of the range; NULL for most files */
+    int nhead;
+    int module;            /* the index of its module folder, or -1 for the game's own */
 } LM_File;
 
 typedef struct
@@ -87,6 +112,7 @@ struct LM_State
     SDL_mutex *mx;
     SDL_Thread *worker;
     char dir[1024];
+    char record[96];
 
     /* The manifest, read once by lm_create and never changed afterwards. */
     int ok;
@@ -97,12 +123,17 @@ struct LM_State
     int nfiles;
     LM_Legacy *legacy;
     int nlegacy;
-    long long sizes[LM_NCOMP];
+    char modules[LM_MAX_MODULES][32];
+    int nmodules;
 
     int stall;
 
     /* The job. Written by the worker under mx, read by anyone under mx. */
     int want[LM_NCOMP];
+    /* Install checkboxes request additions; unchecked content and its prior
+     * preference/state are retained. Settings continues to use replacement mode. */
+    int add_only, keep_record, keep_want[LM_NCOMP];
+    char keep_state[LM_NCOMP][32];
     LM_Phase phase;
     long long done, total;
     long long shown; /* the most `done` has been in this job: what lm_bytes reports */
@@ -205,6 +236,24 @@ static int lm_num(const char *s, long long *out)
     return 1;
 }
 
+/* An even run of lower-case hex digits, decoded into `out` when it is not NULL. */
+static int lm_hexbytes(const char *s, unsigned char *out)
+{
+    size_t i, n = strlen(s);
+    if (n == 0 || n % 2)
+        return 0;
+    for (i = 0; i < n; i += 2) {
+        int hi = (s[i] >= '0' && s[i] <= '9') ? s[i] - '0' : (s[i] >= 'a' && s[i] <= 'f') ? s[i] - 'a' + 10 : -1;
+        int lo = (s[i + 1] >= '0' && s[i + 1] <= '9') ? s[i + 1] - '0'
+                 : (s[i + 1] >= 'a' && s[i + 1] <= 'f') ? s[i + 1] - 'a' + 10 : -1;
+        if (hi < 0 || lo < 0)
+            return 0;
+        if (out)
+            out[i / 2] = (unsigned char)(hi * 16 + lo);
+    }
+    return 1;
+}
+
 static int lm_hex64(const char *s)
 {
     int i;
@@ -242,7 +291,8 @@ static int lm_parse(LM_State *m, const char *text)
 {
     const char *p = text;
     int lineno = 0, header = 0, capf = 0, capl = 0, i, j;
-    char line[4096];
+    char line[8192];
+    char g[2 * LM_MAX_HEAD + 8];
 
     while (*p) {
         const char *nl = strchr(p, '\n');
@@ -277,7 +327,7 @@ static int lm_parse(LM_State *m, const char *text)
             continue;
         }
 
-        got = sscanf(q, "%31s %2047s %2047s %63s %79s %31s %63s", kind, a, b, c, d, e, f);
+        got = sscanf(q, "%31s %2047s %2047s %63s %79s %31s %63s %4103s", kind, a, b, c, d, e, f, g);
         if (got >= 1 && !strcmp(kind, "mirror")) {
             LM_Mirror *mr;
             long long base = -1;
@@ -300,12 +350,33 @@ static int lm_parse(LM_State *m, const char *text)
             mr->base = base;
             continue;
         }
+        if (got >= 1 && !strcmp(kind, "module")) {
+            if (got != 2 || !lmod_known_folder(a) || strlen(a) >= sizeof m->modules[0]) {
+                snprintf(m->bad, sizeof m->bad, "line %d names a module this launcher does not know",
+                         lineno);
+                return 0;
+            }
+            for (j = 0; j < m->nmodules; j++)
+                if (!strcmp(m->modules[j], a)) {
+                    snprintf(m->bad, sizeof m->bad, "it names the module %.40s twice", a);
+                    return 0;
+                }
+            if (m->nmodules >= LM_MAX_MODULES) {
+                snprintf(m->bad, sizeof m->bad, "it names more than %d modules", LM_MAX_MODULES);
+                return 0;
+            }
+            memcpy(m->modules[m->nmodules++], a, strlen(a) + 1);
+            continue;
+        }
         if (got >= 1 && !strcmp(kind, "file")) {
             LM_File *fl;
             long long size = -1, off = -1;
-            if (got != 7 || lm_find_comp(a) < 0 || strlen(b) >= sizeof fl->rel || !lm_rel_ok(b)
-                || !lm_num(c, &size) || size <= 0
-                || !lm_hex64(d) || lm_find_disc(e) < 0 || !lm_num(f, &off)) {
+            size_t nhex = got == 8 ? strlen(g) : 0;
+            if ((got != 7 && got != 8) || lm_find_comp(a) < 0 || strlen(b) >= sizeof fl->rel
+                || !lm_rel_ok(b) || !lm_num(c, &size) || size <= 0
+                || !lm_hex64(d) || lm_find_disc(e) < 0 || !lm_num(f, &off)
+                || (got == 8 && (nhex % 2 || nhex > 2 * LM_MAX_HEAD || (long long)nhex / 2 >= size
+                                 || !lm_hexbytes(g, NULL)))) {
                 snprintf(m->bad, sizeof m->bad, "line %d is not a file line it can read", lineno);
                 return 0;
             }
@@ -327,6 +398,18 @@ static int lm_parse(LM_State *m, const char *text)
             fl->sha[64] = '\0';
             fl->disc = lm_find_disc(e);
             fl->offset = off;
+            fl->head = NULL;
+            fl->nhead = 0;
+            fl->module = -1;
+            if (nhex) {
+                fl->head = (unsigned char *)malloc(nhex / 2);
+                if (!fl->head) {
+                    snprintf(m->bad, sizeof m->bad, "out of memory");
+                    return 0;
+                }
+                lm_hexbytes(g, fl->head);
+                fl->nhead = (int)(nhex / 2);
+            }
             continue;
         }
         if (got >= 1 && !strcmp(kind, "legacy")) {
@@ -376,9 +459,42 @@ static int lm_parse(LM_State *m, const char *text)
                      m->files[i].rel, lm_disc_name[m->files[i].disc]);
             return 0;
         }
-        m->sizes[m->files[i].comp] += m->files[i].size;
+        /* Its module, by its first folder. A file in a module's folder with no module
+         * line for it would be fetched into every install, so that is refused. */
+        {
+            char top[40];
+            size_t k = strcspn(m->files[i].rel, "/");
+            if (m->files[i].rel[k] == '/' && k < sizeof top) {
+                memcpy(top, m->files[i].rel, k);
+                top[k] = '\0';
+                for (j = 0; j < m->nmodules; j++)
+                    if (!strcmp(m->modules[j], top))
+                        m->files[i].module = j;
+                if (m->files[i].module < 0 && lmod_known_folder(top)) {
+                    snprintf(m->bad, sizeof m->bad,
+                             "%.200s is in the %s folder and it names no module line for it",
+                             m->files[i].rel, top);
+                    return 0;
+                }
+            }
+        }
     }
     return 1;
+}
+
+/* Which of the manifest's modules are installed in the folder now. */
+static void lm_modules_now(const LM_State *m, int inst[LM_MAX_MODULES])
+{
+    int j;
+    for (j = 0; j < LM_MAX_MODULES; j++)
+        inst[j] = j < m->nmodules && lmod_folder_installed(m->dir, m->modules[j]);
+}
+
+/* Whether a file belongs to this install: the game's own always, a module's only where
+ * that module is installed. */
+static int lm_counts(const LM_File *f, const int inst[LM_MAX_MODULES])
+{
+    return f->module < 0 || inst[f->module];
 }
 
 static char *lm_read_text(const char *path)
@@ -421,6 +537,7 @@ LM_State *lm_create(const char *dir, const char *manifest_override_path)
     m->stall = 30;
     m->phase = LM_IDLE;
     snprintf(m->dir, sizeof m->dir, "%s", dir ? dir : ".");
+    snprintf(m->record, sizeof m->record, "%s", LZ_MEDIA_RECORD);
 
     if (manifest_override_path && *manifest_override_path) {
         char *text = lm_read_text(manifest_override_path);
@@ -441,13 +558,107 @@ LM_State *lm_create(const char *dir, const char *manifest_override_path)
     return m;
 }
 
+/* Settings owns a physically scoped manifest: reads, legacy cleanup, resumed parts,
+ * and removal all see exactly the same game's file set. The first-install/CLI
+ * combined manifest remains available through lm_create. */
+LM_State *lm_create_game(const char *dir, const char *override, int ra)
+{
+    LM_State *m = lm_create(dir, override);
+    int i, n = 0;
+    if (!m) return NULL;
+    for (i = 0; i < m->nfiles; i++) {
+        if ((!strncmp(m->files[i].rel, "ra3d/", 5)) == !!ra)
+            m->files[n++] = m->files[i];
+        else free(m->files[i].head);
+    }
+    m->nfiles = n; n = 0;
+    for (i = 0; i < m->nlegacy; i++)
+        if ((!strncmp(m->legacy[i].rel, "ra3d/", 5)) == !!ra)
+            m->legacy[n++] = m->legacy[i];
+    m->nlegacy = n;
+    snprintf(m->record, sizeof m->record, "opencnc3d-media-%s.txt", ra ? "ra" : "td");
+    return m;
+}
+
+int lm_language_pack(int ra, int index, char *code, int code_len, char *name, int name_len)
+{
+    const char *p = LANG_MANIFEST;
+    char c[16], game[16], label[80];
+    int count = 0;
+    while (*p) {
+        const char *nl = strchr(p, '\n');
+        if (sscanf(p, "pack %15s %15s %79[^\n]", c, game, label) == 3 &&
+            !strcmp(game, ra ? "ra" : "td") && count++ == index) {
+            snprintf(code, (size_t)code_len, "%s", c);
+            snprintf(name, (size_t)name_len, "%s", label);
+            return 1;
+        }
+        if (!nl) break;
+        p = nl + 1;
+    }
+    return 0;
+}
+
+/* Adapt the existing pinned language catalog to the same safe range downloader.
+ * Only the selected pack's exact paths may enter this manifest. */
+LM_State *lm_create_language(const char *dir, int ra, const char *code, const char *override)
+{
+    LM_State *m = (LM_State *)calloc(1, sizeof *m);
+    char *owned = override ? lm_read_text(override) : NULL;
+    const char *source = override ? owned : LANG_MANIFEST, *p;
+    char *text, prefix[80];
+    size_t used;
+    int files = 0;
+    if (!m) { free(owned); return NULL; }
+    m->mx = SDL_CreateMutex(); m->stall = 30; m->phase = LM_IDLE;
+    snprintf(m->dir, sizeof m->dir, "%s", dir ? dir : ".");
+    if (!code || (strcmp(code, "de") && (strcmp(code, "fr") || !ra)) || !source ||
+        strncmp(source, "OCLANG 1\n", 9)) {
+        snprintf(m->status, sizeof m->status, "The language catalog could not be read.");
+        free(owned); return m;
+    }
+    snprintf(m->record, sizeof m->record, "opencnc3d-language-%s-%s.txt", ra ? "ra" : "td", code);
+    snprintf(prefix, sizeof prefix, "%s%s/", ra ? "ra3d/lang/" : "dosdata/lang/", code);
+    text = (char *)malloc(2 * strlen(source) + 128);
+    if (!text) { free(owned); lm_destroy(m); return NULL; }
+    strcpy(text, ra ? "OCMEDIA 1\nmodule ra3d\n" : "OCMEDIA 1\n"); used = strlen(text);
+    p = source;
+    while (*p) {
+        const char *nl = strchr(p, '\n');
+        size_t n = nl ? (size_t)(nl - p) : strlen(p);
+        char c[16], game[16], rel[512], line[8192]; int rest = 0;
+        if (n >= sizeof line) { snprintf(m->bad, sizeof m->bad, "language catalog line too long"); break; }
+        memcpy(line, p, n); line[n] = 0;
+        if (!strncmp(line, "mirror ", 7)) {
+            memcpy(text + used, p, n); used += n; text[used++] = '\n';
+        } else if (sscanf(line, "file %15s %15s %511s %n", c, game, rel, &rest) == 3 && rest > 0 && (size_t)rest < n &&
+                   !strcmp(c, code) && !strcmp(game, ra ? "ra" : "td")) {
+            if (strncmp(rel, prefix, strlen(prefix))) {
+                snprintf(m->bad, sizeof m->bad, "language file outside its pack"); break;
+            }
+            used += (size_t)sprintf(text + used, "file movies %s ", rel);
+            memcpy(text + used, line + rest, n - (size_t)rest);
+            used += n - (size_t)rest; text[used++] = '\n'; files++;
+        }
+        if (!nl) break;
+        p = nl + 1;
+    }
+    text[used] = 0;
+    if (!m->bad[0] && files) m->ok = lm_parse(m, text);
+    if (!m->ok) snprintf(m->status, sizeof m->status, "The language pack cannot be managed (%.200s).", m->bad);
+    free(text); free(owned); return m;
+}
+
 void lm_destroy(LM_State *m)
 {
+    int i;
     if (!m)
         return;
     m->cancel = 1;
     if (m->worker)
         SDL_WaitThread(m->worker, NULL);
+    for (i = 0; i < m->nfiles; i++)
+        free(m->files[i].head);
     free(m->files);
     free(m->legacy);
     SDL_DestroyMutex(m->mx);
@@ -462,7 +673,7 @@ void lm_set_stall(LM_State *m, int seconds)
 
 void lm_installed(LM_State *m, int *movies, int *music)
 {
-    int have[LM_NCOMP] = {1, 1}, count[LM_NCOMP] = {0, 0}, i;
+    int have[LM_NCOMP] = {1, 1}, count[LM_NCOMP] = {0, 0}, i, inst[LM_MAX_MODULES];
     if (!m) {
         if (movies)
             *movies = 0;
@@ -470,9 +681,12 @@ void lm_installed(LM_State *m, int *movies, int *music)
             *music = 0;
         return;
     }
+    lm_modules_now(m, inst);
     for (i = 0; i < m->nfiles; i++) {
         char path[1600];
         const LM_File *f = &m->files[i];
+        if (!lm_counts(f, inst))
+            continue;
         count[f->comp]++;
         snprintf(path, sizeof path, "%s/%s", m->dir, f->rel);
         if (ln_file_size(path) != f->size)
@@ -493,15 +707,17 @@ void lm_present_any(LM_State *m, int *movies, int *music, long long *movies_byte
         for (i = 0; i < m->nfiles + m->nlegacy; i++) {
             const char *rel = i < m->nfiles ? m->files[i].rel : m->legacy[i - m->nfiles].rel;
             int comp = i < m->nfiles ? m->files[i].comp : m->legacy[i - m->nfiles].comp;
-            char path[1600], part[1640];
-            long long n, p;
+            char path[1600], part[1640], rpart[1660];
+            long long n, p, r;
             snprintf(path, sizeof path, "%s/%s", m->dir, rel);
             snprintf(part, sizeof part, "%s%s", path, LZ_PART);
+            snprintf(rpart, sizeof rpart, "%s%s", path, LM_RANGE_PART);
             n = ln_file_size(path);
             p = ln_file_size(part);
-            if (n >= 0 || p >= 0)
+            r = ln_file_size(rpart);
+            if (n >= 0 || p >= 0 || r >= 0)
                 any[comp] = 1;
-            bytes[comp] += (n > 0 ? n : 0) + (p > 0 ? p : 0);
+            bytes[comp] += (n > 0 ? n : 0) + (p > 0 ? p : 0) + (r > 0 ? r : 0);
         }
     }
     if (movies)
@@ -530,7 +746,7 @@ int lm_wanted(LM_State *m, int *movies, int *music, int *movies_pending, int *mu
         *music_pending = 0;
     if (!m)
         return 0;
-    snprintf(path, sizeof path, "%s/%s", m->dir, LZ_MEDIA_RECORD);
+    snprintf(path, sizeof path, "%s/%s", m->dir, m->record);
     f = fopen(path, "rb");
     if (!f)
         return 0;
@@ -563,10 +779,26 @@ int lm_wanted(LM_State *m, int *movies, int *music, int *movies_pending, int *mu
 
 void lm_sizes(LM_State *m, long long *movies_bytes, long long *music_bytes)
 {
+    long long sizes[LM_NCOMP] = {0, 0};
+    int i, inst[LM_MAX_MODULES];
+    if (m) {
+        lm_modules_now(m, inst);
+        for (i = 0; i < m->nfiles; i++)
+            if (lm_counts(&m->files[i], inst))
+                sizes[m->files[i].comp] += m->files[i].size;
+    }
     if (movies_bytes)
-        *movies_bytes = m ? m->sizes[LM_MOVIES] : 0;
+        *movies_bytes = sizes[LM_MOVIES];
     if (music_bytes)
-        *music_bytes = m ? m->sizes[LM_MUSIC] : 0;
+        *music_bytes = sizes[LM_MUSIC];
+}
+
+void lm_game_sizes(LM_State *m,long long *movies,long long *music)
+{
+    long long sizes[LM_NCOMP]={0,0};int i;
+    if(m)for(i=0;i<m->nfiles;i++)sizes[m->files[i].comp]+=m->files[i].size;
+    if(movies)*movies=sizes[LM_MOVIES];
+    if(music)*music=sizes[LM_MUSIC];
 }
 
 void lm_cancel(LM_State *m)
@@ -716,13 +948,48 @@ static int lm_remove(const char *path)
 
 /* The record, written whole and renamed over the old one, so a kill leaves the old
  * record or the new one and never half of either. Called with the install lock held. */
+static int lm_keep_record(LM_State *m)
+{
+    char path[1600], line[256], why[300];
+    FILE *f;
+    int k, ok;
+    m->keep_record = 0;
+    for (k = 0; k < LM_NCOMP; k++) {
+        m->keep_want[k] = 0;
+        snprintf(m->keep_state[k], sizeof m->keep_state[k], "none");
+    }
+    if (!lm_path(m, m->record, path, sizeof path, why, sizeof why)) return 0;
+    f = fopen(path, "rb");
+    if (!f) return !lm_exists(path);
+    m->keep_record = 1;
+    while (fgets(line, sizeof line, f)) {
+        char key[32], val[32];
+        if (line[0] == '#' || sscanf(line, "%31s %31s", key, val) != 2) continue;
+        for (k = 0; k < LM_NCOMP; k++) {
+            char state_key[40];
+            snprintf(state_key, sizeof state_key, "%s_state", lm_comp_name[k]);
+            if (!strcmp(key, lm_comp_name[k])) m->keep_want[k] = !strcmp(val, "yes");
+            else if (!strcmp(key, state_key))
+                snprintf(m->keep_state[k], sizeof m->keep_state[k], "%s", val);
+        }
+    }
+    ok = !ferror(f);
+    fclose(f);
+    return ok;
+}
+
 static int lm_write_record(LM_State *m, const char *state[LM_NCOMP])
 {
     char path[1600], part[1640], why[300];
     FILE *f;
     int ok;
 
-    if (!lm_path(m, LZ_MEDIA_RECORD, path, sizeof path, why, sizeof why))
+    /* An entirely unchecked reinstall is a genuine no-op, including comments
+     * and timestamps in an existing selection record. */
+    if (m->add_only && !m->want[LM_MOVIES] && !m->want[LM_MUSIC] && m->keep_record)
+        return 1;
+
+    if (!lm_path(m, m->record, path, sizeof path, why, sizeof why))
         return 0;
     snprintf(part, sizeof part, "%s%s", path, LZ_PART);
     remove(part);
@@ -733,7 +1000,8 @@ static int lm_write_record(LM_State *m, const char *state[LM_NCOMP])
                  "# Written by the OpenCNC3D launcher. Delete this file to see the setup screen "
                  "again.\n"
                  "movies %s\nmusic %s\nmovies_state %s\nmusic_state %s\n",
-                 m->want[LM_MOVIES] ? "yes" : "no", m->want[LM_MUSIC] ? "yes" : "no",
+                 (m->want[LM_MOVIES] || (m->add_only && m->keep_want[LM_MOVIES])) ? "yes" : "no",
+                 (m->want[LM_MUSIC] || (m->add_only && m->keep_want[LM_MUSIC])) ? "yes" : "no",
                  state[LM_MOVIES], state[LM_MUSIC])
          > 0;
     if (fflush(f) != 0)
@@ -812,14 +1080,51 @@ typedef struct
 /* One file: every mirror of its disc in order, each up to LM_ATTEMPTS times. Returns
  * 1 with the file on its name, 0 when no mirror gave it (why says the last reason),
  * -1 cancelled, -2 a failure no other host can help with (the disk). */
+/* A file with a head, written whole: the head, then the range that has arrived in
+ * `rpart`, into `part`. 1 when it is all there. */
+static int lm_join(const LM_File *f, const char *rpart, const char *part)
+{
+    FILE *in, *out;
+    char buf[16384]; /* on the worker's stack */
+    size_t n;
+    int ok;
+    remove(part);
+    in = fopen(rpart, "rb");
+    if (!in)
+        return 0;
+    out = fopen(part, "wb");
+    if (!out) {
+        fclose(in);
+        return 0;
+    }
+    ok = fwrite(f->head, 1, (size_t)f->nhead, out) == (size_t)f->nhead;
+    while (ok && (n = fread(buf, 1, sizeof buf, in)) > 0)
+        ok = fwrite(buf, 1, n, out) == n;
+    if (ferror(in))
+        ok = 0;
+    fclose(in);
+    if (fflush(out) != 0)
+        ok = 0;
+    if (fclose(out) != 0)
+        ok = 0;
+    if (!ok)
+        remove(part);
+    return ok;
+}
+
 static int lm_fetch_one(LM_State *m, LM_Job *job, const LM_File *f, const char *path,
                         long long before)
 {
-    char part[1640], err[400];
+    char part[1640], rpart[1660], err[400];
+    const char *into;
     int i;
     LM_Tick tick;
 
     snprintf(part, sizeof part, "%s%s", path, LZ_PART);
+    snprintf(rpart, sizeof rpart, "%s%s", path, LM_RANGE_PART);
+    /* A file with a head fetches its range into a part file of its own, so the part a
+     * resume reads is only ever the disc's bytes. */
+    into = f->nhead ? rpart : part;
     tick.m = m;
     tick.before = before;
 
@@ -837,14 +1142,20 @@ static int lm_fetch_one(LM_State *m, LM_Job *job, const LM_File *f, const char *
             job->tried[i] = 1;
             lm_set_phase(m, LM_FETCHING);
             err[0] = '\0';
-            rc = ln_get_range(mr->url, NULL, part, mr->base + f->offset, f->size, m->stall,
-                              &m->cancel, lm_tick, &tick, &status, err, sizeof err);
+            rc = ln_get_range(mr->url, NULL, into, mr->base + f->offset, f->size - f->nhead,
+                              m->stall, &m->cancel, lm_tick, &tick, &status, err, sizeof err);
             if (rc != LN_RANGE_NOCONNECT)
                 job->reached = 1;
 
             if (rc == LN_RANGE_OK) {
                 char hex[80], herr[256];
                 lm_set_phase(m, LM_CHECKING);
+                if (f->nhead && !lm_join(f, rpart, part)) {
+                    snprintf(job->why, sizeof job->why,
+                             "the disk would not take %.200s. Make some room, then try again",
+                             lm_base(f->rel));
+                    return -2;
+                }
                 if (!lz_sha256_file(part, hex, herr, sizeof herr)) {
                     snprintf(job->why, sizeof job->why, "%.200s could not be read back to check it",
                              lm_base(f->rel));
@@ -864,6 +1175,7 @@ static int lm_fetch_one(LM_State *m, LM_Job *job, const LM_File *f, const char *
                     memcpy(host, u, k);
                     host[k] = '\0';
                     remove(part);
+                    remove(rpart);
                     snprintf(job->why, sizeof job->why,
                              "%.200s did not match its checksum when it came from %.200s", lm_base(f->rel),
                              host);
@@ -879,6 +1191,8 @@ static int lm_fetch_one(LM_State *m, LM_Job *job, const LM_File *f, const char *
                              lm_base(f->rel));
                     return -2;
                 }
+                if (f->nhead)
+                    remove(rpart);
                 return 1;
             }
             if (rc == LN_RANGE_CANCEL)
@@ -932,10 +1246,10 @@ static int lm_thread(void *user)
 {
     LM_State *m = (LM_State *)user;
     LZ_Lock lk;
-    int own = 0, held = 0, rc, i, k, nfetch = 0;
+    int own = 0, held = 0, record_ready = 0, rc, i, k, nfetch = 0;
     const LM_File **order = NULL, **fetch = NULL;
     long long *parts = NULL;
-    int failed = 0, cancelled = 0, offline = 0;
+    int failed = 0, cancelled = 0, offline = 0, inst[LM_MAX_MODULES];
     int comp_ok[LM_NCOMP] = {1, 1};
     const char *state[LM_NCOMP];
     char why[512];
@@ -944,6 +1258,7 @@ static int lm_thread(void *user)
 
     memset(&job, 0, sizeof job);
     why[0] = '\0';
+    lm_modules_now(m, inst); /* asked once for the job, before the lock is taken */
 
     /* The lock: this process's own when it already has one on the folder, which is
      * the launcher's window, whose updater took it at start; otherwise a new one,
@@ -970,11 +1285,24 @@ static int lm_thread(void *user)
         }
     }
 
+    /* Snapshot only after taking the install lock, so another launcher cannot
+     * change a preference between the snapshot and this transaction. */
+    if (m->add_only && !lm_keep_record(m)) {
+        snprintf(why, sizeof why, "The existing media choice could not be read safely, so nothing was changed.");
+        failed = 1;
+        goto finish;
+    }
+    record_ready = 1;
+
     /* The choice goes on the disk before anything else does, as "pending" for each
      * component the disk may not match yet, so a job killed part way still says what
      * was chosen and that it is not finished. */
     for (k = 0; k < LM_NCOMP; k++) {
         int any = 0;
+        if (m->add_only && !m->want[k]) {
+            state[k] = m->keep_state[k];
+            continue;
+        }
         for (i = 0; i < m->nfiles; i++) {
             char path[1600];
             if (m->files[i].comp != k)
@@ -997,7 +1325,7 @@ static int lm_thread(void *user)
      *    the verdict, so one refusal does not stop the rest from going. */
     for (k = 0; k < LM_NCOMP; k++) {
         int n = 0, count = 0;
-        if (m->want[k])
+        if (m->want[k] || m->add_only)
             continue;
         for (i = 0; i < m->nfiles; i++)
             count += m->files[i].comp == k;
@@ -1020,6 +1348,15 @@ static int lm_thread(void *user)
             }
             snprintf(part, sizeof part, "%s%s", path, LZ_PART);
             if (!lm_remove(path) || !lm_remove(part)) {
+                comp_ok[k] = 0;
+                if (!why[0])
+                    snprintf(why, sizeof why,
+                             "%.200s could not be removed. Close the game, then try again",
+                             lm_base(rel));
+                continue;
+            }
+            snprintf(part, sizeof part, "%s%s", path, LM_RANGE_PART);
+            if (!lm_remove(part)) {
                 comp_ok[k] = 0;
                 if (!why[0])
                     snprintf(why, sizeof why,
@@ -1050,11 +1387,11 @@ static int lm_thread(void *user)
         if (!m->want[k])
             continue;
         for (i = 0; i < m->nfiles; i++)
-            count += order[i]->comp == k;
+            count += order[i]->comp == k && lm_counts(order[i], inst);
         for (i = 0; i < m->nfiles; i++) {
             const LM_File *f = order[i];
             char path[1600], pwhy[400];
-            if (f->comp != k)
+            if (f->comp != k || !lm_counts(f, inst))
                 continue;
             n++;
             if (m->cancel) {
@@ -1081,16 +1418,19 @@ static int lm_thread(void *user)
 
     /* 3. ROOM FOR IT, counted from what the part files already hold. */
     for (i = 0; i < nfetch; i++) {
-        char part[1640];
-        long long have;
-        snprintf(part, sizeof part, "%s/%s%s", m->dir, fetch[i]->rel, LZ_PART);
+        char part[1660];
+        long long have, range = fetch[i]->size - fetch[i]->nhead;
+        snprintf(part, sizeof part, "%s/%s%s", m->dir, fetch[i]->rel,
+                 fetch[i]->nhead ? LM_RANGE_PART : LZ_PART);
         have = ln_file_size(part);
-        if (have < 0 || have > fetch[i]->size)
+        if (have < 0 || have > range)
             have = 0;
         parts[i] = have;
         total += fetch[i]->size;
         have_parts += have;
-        need += fetch[i]->size - have;
+        need += range - have;
+        /* and, for a file with a head, the whole file written beside its range */
+        need += fetch[i]->nhead ? fetch[i]->size : 0;
     }
     if (nfetch) {
         long long free_bytes = 0;
@@ -1176,10 +1516,12 @@ finish:
     /* The record says where the disk got to. A wanted component is complete only when
      * every one of its files was checked or fetched in this job and nothing stopped
      * the job; an unwanted one is none only when every name it owns is gone. */
-    if (held) {
+    if (held && record_ready) {
         for (k = 0; k < LM_NCOMP; k++) {
             if (m->want[k])
                 state[k] = (comp_ok[k] && !failed && !cancelled) ? "complete" : "pending";
+            else if (m->add_only)
+                state[k] = m->keep_state[k];
             else
                 state[k] = comp_ok[k] ? "none" : "pending";
         }
@@ -1215,7 +1557,7 @@ finish:
     return 0;
 }
 
-int lm_apply(LM_State *m, int want_movies, int want_music)
+static int lm_apply_mode(LM_State *m, int want_movies, int want_music, int add_only)
 {
     LM_Phase p;
     if (!m)
@@ -1230,6 +1572,7 @@ int lm_apply(LM_State *m, int want_movies, int want_music)
         m->worker = NULL;
     }
     lm_lock(m);
+    m->add_only = add_only;
     m->want[LM_MOVIES] = want_movies ? 1 : 0;
     m->want[LM_MUSIC] = want_music ? 1 : 0;
     m->done = m->total = m->shown = 0;
@@ -1239,7 +1582,7 @@ int lm_apply(LM_State *m, int want_movies, int want_music)
     m->cancel = 0;
     /* The worker's first report, set before it exists, so a caller that asks at once
      * sees a job rather than the idle state it came from. */
-    m->phase = (want_movies || want_music) ? LM_CHECKING : LM_REMOVING;
+    m->phase = (want_movies || want_music || add_only) ? LM_CHECKING : LM_REMOVING;
     lm_unlock(m);
     m->worker = SDL_CreateThread(lm_thread, "opencnc3d-media", m);
     if (!m->worker) {
@@ -1250,4 +1593,14 @@ int lm_apply(LM_State *m, int want_movies, int want_music)
         return 0;
     }
     return 1;
+}
+
+int lm_apply(LM_State *m, int want_movies, int want_music)
+{
+    return lm_apply_mode(m, want_movies, want_music, 0);
+}
+
+int lm_apply_add_only(LM_State *m, int movies, int music)
+{
+    return lm_apply_mode(m, movies, music, 1);
 }

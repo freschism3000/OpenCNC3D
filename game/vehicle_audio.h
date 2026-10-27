@@ -53,7 +53,8 @@ static void vehicle_audio_update(int fbw, int fbh, bool running)
     if (running) for (size_t i = 0; i < g_objects.size(); ++i) {
         const SimObject& o = g_objects[i];
         if (o.kind != K_UNIT || o.id < 0 || o.str <= 0 || o.limbo || !visible(o)) continue;
-        const int clipIndex = vehicle_audio_clip_index(o.type);
+        const int clipIndex = g_raModule ? vehicle_audio_clip_index_ra(o.type)
+                                         : vehicle_audio_clip_index(o.type);
         if (clipIndex < 0 || unit_is_still(o.id)) continue;
         float x = o.ex, z = o.ez;
         if (g_smoothMove) {

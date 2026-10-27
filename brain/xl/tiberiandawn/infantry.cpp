@@ -13,6 +13,10 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Rejects hidden enemy object destinations for fair skirmish infantry.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\infantry.cpv   2.19   16 Oct 1995 16:50:30   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -79,6 +83,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_td.h"
 #include "ccini.h"
 
 int const InfantryClass::HumanShape[32] = {0, 0, 7, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 5, 5, 4,
@@ -954,6 +959,10 @@ void InfantryClass::Look(bool incremental)
  *=============================================================================================*/
 void InfantryClass::Assign_Destination(TARGET target)
 {
+    if (GameToPlay != GAME_NORMAL && !House->IsHuman) {
+        TechnoClass* destination=As_Techno(target);
+        if (destination && !House->Is_Ally(destination) && !TD_Fair_AI_Knows(House,destination)) target=TARGET_NONE;
+    }
     Validate();
     /*
     **	Special flag so that infantry will start heading in the right direction immediately.

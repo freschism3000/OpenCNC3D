@@ -1,0 +1,159 @@
+--- a/game/water_mod.h	2026-10-22 21:52:12
++++ b/game/water_mod.h	2026-10-22 21:53:19
+@@ -2808,6 +2808,138 @@
+ 
+ /* Called by the frame right after draw_terrain. Draws nothing unless the water pass
+    drew this frame, so the two can never disagree about which sea is on screen. */
++
++/* PERF PROTOTYPE (measurement only): the shore lattice kept on the GPU, per coast cell,
++   built lazily the first time the cell is visible after its inputs change. Same
++   vertices, attributes and order as the two immediate loops; colours are recomputed
++   only when a cell's corner light or shroud changes. */
++struct ShoreVert { float p[3], col[4], t5[2], t6[3], t7[3], pad; };
++struct ShoreCell { GLuint buf; int beach, crest; float L[8]; bool built; std::vector<ShoreVert> v; };
++struct ShoreProtoKey { unsigned long long a[16]; bool operator==(const ShoreProtoKey& o) const { return !memcmp(a,o.a,sizeof a); } };
++static std::vector<ShoreCell> g_shoreCells; static ShoreProtoKey g_shoreKey; static bool g_shoreKeyValid=false;
++static std::vector<ShoreVert> g_shoreTmp;
++static void water_shore_vbo_colour(const PackCell& c,std::vector<ShoreVert>& v,int beach,const float lights[4],const float visible[4],float crestLight,float crestVis)
++{
++    const int steps=8,ox[6]={0,0,1,1,0,1},oz[6]={0,1,0,0,1,1};int n=0;
++    for(int z=0;z<steps;z++)for(int x=0;x<steps;x++)for(int k=0;k<6;k++,n++) {
++        const float fx=(x+ox[k])/(float)steps,fz=(z+oz[k])/(float)steps;
++        const float light=(lights[0]*(1-fx)+lights[1]*fx)*(1-fz)+(lights[2]*(1-fx)+lights[3]*fx)*fz;
++        const float vis=(visible[0]*(1-fx)+visible[1]*fx)*(1-fz)+(visible[2]*(1-fx)+visible[3]*fx)*fz;
++        v[n].col[0]=vis;v[n].col[1]=vis;v[n].col[2]=vis;v[n].col[3]=light;
++    }
++    for(size_t m=beach;m<v.size();m++){v[m].col[0]=crestVis;v[m].col[1]=crestVis;v[m].col[2]=crestVis;v[m].col[3]=crestLight;}
++    (void)c;
++}
++static bool water_shore_vbo_draw(const std::vector<PackCell>& cells,GLuint prog,GLuint opaqueLand,bool oneSun,bool ra)
++{
++    if(!bed_gen) {
++        bed_gen=(BedGen)SDL_GL_GetProcAddress("glGenBuffers");bed_bind=(BedBind)SDL_GL_GetProcAddress("glBindBuffer");
++        bed_data=(BedData)SDL_GL_GetProcAddress("glBufferData");bed_sub=(BedSub)SDL_GL_GetProcAddress("glBufferSubData");
++    }
++    if(!bed_gen||!bed_bind||!bed_data||!bed_sub)return false;
++    water_shore_cache_prepare();
++    const bool painted=water_painted_base();const PackTex& at=water_atlas(water_atlas_index());
++    const bool crestOn=g_fx.water_swash && opaqueLand;
++    ShoreProtoKey key;memset(&key,0,sizeof key);
++    key.a[0]=g_groundGen;key.a[1]=g_padEpoch;key.a[2]=terrain_surface_generation();key.a[3]=water_plane_epoch();
++    key.a[4]=g_waterBedPlane;key.a[5]=g_waterBedSurface;key.a[6]=g_fx.water_swash;key.a[7]=painted;key.a[8]=ra;
++    key.a[9]=(unsigned long long)water_atlas_index();key.a[10]=at.gl;key.a[11]=((unsigned long long)at.uw<<32)|(unsigned)at.w;
++    key.a[12]=((unsigned long long)at.uh<<32)|(unsigned)at.h;key.a[13]=(unsigned long long)g_waterFieldAtlas*1000003ull+(unsigned long long)g_waterFieldW*131ull+g_waterFieldH;
++    key.a[14]=cells.size();key.a[15]=crestOn?1:0;
++    if(!g_shoreKeyValid || !(key==g_shoreKey) || g_shoreCells.size()!=cells.size()) {
++        std::vector<GLuint> old;for(auto& sc:g_shoreCells)if(sc.buf)old.push_back(sc.buf);
++        if(!old.empty()){typedef void (APIENTRY *BedDel)(GLsizei,const GLuint*);static BedDel del=(BedDel)SDL_GL_GetProcAddress("glDeleteBuffers");if(del)del((GLsizei)old.size(),old.data());}
++        g_shoreCells.clear();g_shoreCells.resize(cells.size());for(auto& sc:g_shoreCells){sc.buf=0;sc.beach=sc.crest=0;sc.built=false;}g_shoreKey=key;g_shoreKeyValid=true;
++    }
++    const int steps=8,ox[6]={0,0,1,1,0,1},oz[6]={0,1,0,0,1,1};
++    std::vector<int> visibleCells;
++    for(size_t i=0;i<cells.size();i++) {
++        const PackCell& c=cells[i];
++        if(c.x<0||c.y<0||c.x>=g_gridW||c.y>=g_gridH)continue;
++        if(!g_waterCoastCell[(size_t)c.y*g_gridW+c.x])continue;
++        if(!cell_shown(c.x,c.y)||!cell_in_view(c.x,c.y))continue;
++        visibleCells.push_back((int)i);
++        ShoreCell& sc=g_shoreCells[i];
++        float lights[4],visible[4],tint[3];const int cx[4]={c.x,c.x+1,c.x,c.x+1},cz[4]={c.y,c.y,c.y+1,c.y+1};
++        for(int q=0;q<4;q++)water_terrain_corner(cx[q],cz[q],false,oneSun,&lights[q],&visible[q],tint);
++        float crestLight,crestVis;water_terrain_corner(c.x,c.y,false,oneSun,&crestLight,&crestVis,tint);
++        const float L[8]={lights[0],lights[1],lights[2],lights[3],visible[0],visible[1],visible[2],visible[3]};
++        if(!sc.built) {
++            std::vector<ShoreVert>& v=g_shoreTmp;v.clear();
++            for(int z=0;z<steps;z++)for(int x=0;x<steps;x++)for(int k=0;k<6;k++) {
++                const float fx=(x+ox[k])/(float)steps,fz=(z+oz[k])/(float)steps;
++                const WaterShoreNode& node=water_shore_node(c.x,c.y,x+ox[k],z+oz[k]);
++                const float y=g_fx.water_swash?node.y:water_plane_surface_height(node.wx,node.wz,node.y);
++                const float lift=std::max(0.0f,y-water_plane_height(node.wx,node.wz,y));
++                ShoreVert sv;memset(&sv,0,sizeof sv);
++                if(painted){sv.t5[0]=(c.u0+(c.u1-c.u0)*fx)*(ra?1.f:(float)at.uw/at.w);sv.t5[1]=(c.v0+(c.v1-c.v0)*fz)*(ra?1.f:(float)at.uh/at.h);}
++                float bank[3];water_bank_attributes(node.wx,node.wz,bank);sv.t7[0]=bank[0];sv.t7[1]=bank[1];sv.t7[2]=bank[2];
++                sv.t6[0]=node.lift;sv.t6[1]=lift;sv.t6[2]=water_swash_coast_at(node.wx,node.wz);
++                sv.p[0]=node.wx;sv.p[1]=y;sv.p[2]=node.wz;v.push_back(sv);
++            }
++            sc.beach=(int)v.size();
++            if(crestOn && water_plane_covers(c)) {
++                for(int sz=0;sz<WATER_BANK_STEPS;sz++)for(int sx=0;sx<WATER_BANK_STEPS;sx++)for(int k=0;k<6;k++) {
++                    const float x=c.x+(float)(sx+ox[k])/WATER_BANK_STEPS,z=c.y+(float)(sz+oz[k])/WATER_BANK_STEPS;
++                    ShoreVert sv;memset(&sv,0,sizeof sv);
++                    float bank[3];water_bank_attributes(x,z,bank);sv.t7[0]=bank[0];sv.t7[1]=bank[1];sv.t7[2]=bank[2];
++                    sv.t6[0]=0.0f;sv.t6[1]=0.0f;sv.t6[2]=water_swash_coast_at(x,z);
++                    sv.p[0]=x;sv.p[1]=water_plane_surface_at(c.x,c.y,x,z);sv.p[2]=z;v.push_back(sv);
++                }
++            }
++            sc.crest=(int)v.size()-sc.beach;
++            water_shore_vbo_colour(c,v,sc.beach,lights,visible,crestLight,crestVis);memcpy(sc.L,L,sizeof L);sc.v=v;
++            if(!sc.buf)bed_gen(1,&sc.buf);
++            bed_bind(GL_ARRAY_BUFFER,sc.buf);bed_data(GL_ARRAY_BUFFER,(ptrdiff_t)(v.size()*sizeof(ShoreVert)),v.data(),GL_STATIC_DRAW);
++            sc.built=true;
++        } else if(memcmp(L,sc.L,sizeof L)) {
++            water_shore_vbo_colour(c,sc.v,sc.beach,lights,visible,crestLight,crestVis);memcpy(sc.L,L,sizeof L);
++            bed_bind(GL_ARRAY_BUFFER,sc.buf);bed_data(GL_ARRAY_BUFFER,(ptrdiff_t)(sc.v.size()*sizeof(ShoreVert)),sc.v.data(),GL_STATIC_DRAW);
++        }
++    }
++    g_glsArrayKnown=false;
++    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
++    const GLsizei st=sizeof(ShoreVert);
++    float last5[2]={0,0};bool have5=false;float last6[3],last7[3],lastCol[4];bool haveLast=false;
++    // Pass 1: the beach lattice of every visible coast cell, in cell order.
++    for(int i:visibleCells) {
++        ShoreCell& sc=g_shoreCells[i];if(!sc.beach)continue;
++        bed_bind(GL_ARRAY_BUFFER,sc.buf);
++        glEnableClientState(GL_VERTEX_ARRAY);glVertexPointer(3,GL_FLOAT,st,(const void*)offsetof(ShoreVert,p));
++        glEnableClientState(GL_COLOR_ARRAY);glColorPointer(4,GL_FLOAT,st,(const void*)offsetof(ShoreVert,col));
++        glClientActiveTexture(GL_TEXTURE7);glEnableClientState(GL_TEXTURE_COORD_ARRAY);glTexCoordPointer(3,GL_FLOAT,st,(const void*)offsetof(ShoreVert,t7));
++        glClientActiveTexture(GL_TEXTURE6);glEnableClientState(GL_TEXTURE_COORD_ARRAY);glTexCoordPointer(3,GL_FLOAT,st,(const void*)offsetof(ShoreVert,t6));
++        glClientActiveTexture(GL_TEXTURE5);if(painted){glEnableClientState(GL_TEXTURE_COORD_ARRAY);glTexCoordPointer(2,GL_FLOAT,st,(const void*)offsetof(ShoreVert,t5));}else glDisableClientState(GL_TEXTURE_COORD_ARRAY);
++        glClientActiveTexture(GL_TEXTURE0);
++        glDrawArrays(GL_TRIANGLES,0,sc.beach);
++        { const ShoreVert& lv=sc.v[sc.beach-1];if(painted){last5[0]=lv.t5[0];last5[1]=lv.t5[1];have5=true;}memcpy(last6,lv.t6,sizeof last6);memcpy(last7,lv.t7,sizeof last7);memcpy(lastCol,lv.col,sizeof lastCol);haveLast=true; }
++    }
++    glPopClientAttrib();
++    // The crest loop never sets TEXTURE5, so in immediate mode it inherits the last beach
++    // vertex's value: give the array path the same current value.
++    if(have5)glMultiTexCoord2f(GL_TEXTURE5,last5[0],last5[1]);
++    if(crestOn) {
++        fx_set1f(prog,"uShorePlane",1.0f);
++        glDisable(GL_POLYGON_OFFSET_FILL);
++        glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
++        for(int i:visibleCells) {
++            ShoreCell& sc=g_shoreCells[i];if(!sc.crest)continue;
++            bed_bind(GL_ARRAY_BUFFER,sc.buf);
++            glEnableClientState(GL_VERTEX_ARRAY);glVertexPointer(3,GL_FLOAT,st,(const void*)offsetof(ShoreVert,p));
++            glEnableClientState(GL_COLOR_ARRAY);glColorPointer(4,GL_FLOAT,st,(const void*)offsetof(ShoreVert,col));
++            glClientActiveTexture(GL_TEXTURE7);glEnableClientState(GL_TEXTURE_COORD_ARRAY);glTexCoordPointer(3,GL_FLOAT,st,(const void*)offsetof(ShoreVert,t7));
++            glClientActiveTexture(GL_TEXTURE6);glEnableClientState(GL_TEXTURE_COORD_ARRAY);glTexCoordPointer(3,GL_FLOAT,st,(const void*)offsetof(ShoreVert,t6));
++            glClientActiveTexture(GL_TEXTURE5);glDisableClientState(GL_TEXTURE_COORD_ARRAY);
++            glClientActiveTexture(GL_TEXTURE0);
++            glDrawArrays(GL_TRIANGLES,sc.beach,sc.crest);
++        }
++        glPopClientAttrib();
++    }
++    bed_bind(GL_ARRAY_BUFFER,0);g_glsArrayKnown=false;
++    if(haveLast){glMultiTexCoord3f(GL_TEXTURE6,last6[0],last6[1],last6[2]);glMultiTexCoord3f(GL_TEXTURE7,last7[0],last7[1],last7[2]);glColor4f(lastCol[0],lastCol[1],lastCol[2],lastCol[3]);}
++    return true;
++}
++
+ static void water_shore_draw(void)
+ {
+     /* Environment-only isolation of both legacy film and Enhanced swash. */
+@@ -2903,6 +3035,9 @@
+     glDisable(GL_ALPHA_TEST);
+ 
+     const std::vector<PackCell>& cells = water_cells();
++    static const bool shoreVbo=[](){const char* e=getenv("OPENCNC3D_PERFTEST_SHOREVBO");return !(e&&!strcmp(e,"0"));}();
++    if(shoreVbo && water_shore_vbo_draw(cells,prog,opaqueLand,oneSun,ra)) {}
++    else {
+     glBegin(GL_TRIANGLES);
+     water_shore_cache_prepare();
+     const int steps=8,ox[6]={0,0,1,1,0,1},oz[6]={0,1,0,0,1,1};
+@@ -2955,6 +3090,7 @@
+         }
+         glEnd();
+     }
++    }
+     glActiveTexture(GL_TEXTURE7);
+     if(opaqueLand){glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);}
+     glBindTexture(GL_TEXTURE_2D,0);glActiveTexture(GL_TEXTURE0);

@@ -1,0 +1,30 @@
+{
+  "shipped": false,
+  "reason": "No reliable frame-time improvement in same-binary ABBA; source patch reverted before delivery. All four decoded images identical.",
+  "runs": [
+    {
+      "skip": 0,
+      "median_ms": 19.86,
+      "p90_ms": 21.79,
+      "pixels": "9e3372c041a80ff5920acdef3c7b71224dc69cfa1d148147575c7088916d4686"
+    },
+    {
+      "skip": 1,
+      "median_ms": 20.78,
+      "p90_ms": 23.55,
+      "pixels": "9e3372c041a80ff5920acdef3c7b71224dc69cfa1d148147575c7088916d4686"
+    },
+    {
+      "skip": 1,
+      "median_ms": 21.54,
+      "p90_ms": 24.32,
+      "pixels": "9e3372c041a80ff5920acdef3c7b71224dc69cfa1d148147575c7088916d4686"
+    },
+    {
+      "skip": 0,
+      "median_ms": 21.76,
+      "p90_ms": 23.45,
+      "pixels": "9e3372c041a80ff5920acdef3c7b71224dc69cfa1d148147575c7088916d4686"
+    }
+  ]
+}

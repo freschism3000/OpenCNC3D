@@ -231,6 +231,9 @@ typedef struct
      * draws any button it cannot act on: disabled, never clicked, stepped over by the
      * arrow keys. 0 (what dm_state_init leaves) is the ordinary menu. */
     unsigned char intro_missing;
+    /* Non-zero when no Special Ops missions are installed (Red Alert's freeware discs carry
+     * none of its expansions): drawn disabled, never clicked, stepped over. */
+    unsigned char special_missing;
 } DM_State;
 
 /* Legal notice uses the same GRAD6FNT glyphs and native spacing as the menu

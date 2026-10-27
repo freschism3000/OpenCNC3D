@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Enables AI aircraft sight and delegates strategic hunting to the fair controller.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -92,6 +93,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 
 /***********************************************************************************************
  * _Counts_As_Civ_Evac -- Is the specified object a candidate for civilian evac logic?         *
@@ -985,7 +987,7 @@ void AircraftClass::AI(void)
     */
     // if (IsOwnedByPlayer && Class->SightRange && SightTimer == 0) {  // Changed to facilitate client/server
     // multiplayer. ST - 8/2/2019 2:29PM
-    if (House->IsHuman && Class->SightRange && SightTimer == 0) {
+    if ((House->IsHuman || FairAI_RA_Enabled(House)) && Class->SightRange && SightTimer == 0) {
         Look();
         SightTimer = TICKS_PER_SECOND;
     }
@@ -3924,7 +3926,7 @@ int AircraftClass::Mission_Guard(void)
     **	Perform a special check to hunt for harvesters that are outside of the protective
     **	shield of their base.
     */
-    if (House->State != STATE_ATTACKED) {
+    if (!FairAI_RA_Enabled(House) && House->State != STATE_ATTACKED) {
         TARGET target = House->Find_Juicy_Target(Coord);
 
         if (Target_Legal(target)) {

@@ -172,6 +172,14 @@ static char* brief_mission_ini(const char* dosdata, size_t* len)
     };
     unsigned k;
     *len = 0;
+    /* a language pack's briefings first (lang_mod.h): its MISSION.INI, loose */
+    {
+        char lp[700];
+        if (lang_path("MISSION.INI", lp, sizeof lp)) {
+            char* b = brief_slurp(lp, len);
+            if (b) return b;
+        }
+    }
     for (k = 0; k < sizeof places / sizeof places[0]; k++) {
         const char* d = (k == 0) ? dosdata : places[k];
         char path[600], err[128];
@@ -220,11 +228,26 @@ static void brief_load(const char* dir, const char* scen, const char* dosdata)
 
     snprintf(path, sizeof path, "%s%s%s.INI", dir ? dir : "",
              (dir && *dir && dir[strlen(dir) - 1] != '/') ? "/" : "", scen);
+    /* IN ANOTHER LANGUAGE THE PACK'S BRIEFING COMES FIRST: a mission file's own [Briefing]
+       block is English, and the language's MISSION.INI carries every campaign mission */
+    if (lang_dir()) {
+        char* mini = brief_mission_ini(dosdata, &len);
+        if (mini) {
+            /* (Red Alert's MISSION.INI names its blocks with the file's extension,
+               [SCG01EA.INI], as its scenario.cpp asks for them) */
+            char withExt[64];
+            snprintf(withExt, sizeof withExt, "%s.INI", scen);
+            if (brief_text_block(mini, len, scen, g_briefText, BRIEF_TEXT_MAX) > 0
+                || brief_text_block(mini, len, withExt, g_briefText, BRIEF_TEXT_MAX) > 0)
+                snprintf(g_briefFrom, sizeof g_briefFrom, "MISSION.INI");
+            free(mini);
+        }
+    }
     ini = brief_slurp(path, &len);
     if (ini) {
         brief_basic_key(ini, len, "Brief", g_briefMovie, sizeof g_briefMovie);
         brief_basic_key(ini, len, "Action", g_actionMovie, sizeof g_actionMovie);
-        if (brief_text_block(ini, len, "Briefing", g_briefText, BRIEF_TEXT_MAX) > 0)
+        if (!g_briefText[0] && brief_text_block(ini, len, "Briefing", g_briefText, BRIEF_TEXT_MAX) > 0)
             snprintf(g_briefFrom, sizeof g_briefFrom, "INI");
         free(ini);
     }
@@ -239,6 +262,8 @@ static void brief_load(const char* dir, const char* scen, const char* dosdata)
     /* "x" is how the INIs spell "no movie" */
     if (!strcmp(g_briefMovie, "x") || !strcmp(g_briefMovie, "X")) g_briefMovie[0] = 0;
     if (!strcmp(g_actionMovie, "x") || !strcmp(g_actionMovie, "X")) g_actionMovie[0] = 0;
+    if (lang_dir() && g_briefText[0])
+        printf("BRIEFLANG|%s|%s|%.70s\n", scen, g_langCode, g_briefText);
     printf("BRIEF|%s|from=%s|chars=%d|brief=%s|action=%s\n", scen,
            g_briefFrom[0] ? g_briefFrom : "none", (int)strlen(g_briefText),
            g_briefMovie[0] ? g_briefMovie : "-", g_actionMovie[0] ? g_actionMovie : "-");

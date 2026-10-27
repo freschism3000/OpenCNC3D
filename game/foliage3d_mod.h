@@ -132,7 +132,9 @@ static const char* rock3d_path_for_theater(void)
     static char path[64];
     if (g_rockPathGiven || !g_pack.theater[0])
         return g_rockPath;
-    const char* th = !strcmp(g_pack.theater, "SNOW") ? "WINTER" : g_pack.theater;
+    const char* th = !strcmp(g_pack.theater, "SNOW") ? "WINTER" :
+                     !strcmp(g_pack.theater, "SAND") ? "DESERT" : g_pack.theater;
+    if(g_raModule)th=ra3d_detail_rock_theater();
     snprintf(path, sizeof path, "rock3d_%s.pack", th);
     FILE* f = fopen(path, "rb");
     if (!f) return g_rockPath;
@@ -152,6 +154,11 @@ static bool g_rockPainted = false;
 static float rock_gain_now(void)
 {
     return g_fx.rock_gain * (g_rockPainted ? ROCK_PAINTED_EXPOSURE : 1.0f);
+}
+static bool rock_cliff_material(void)
+{
+    return fx_unified_lighting() && fx_texset_get()==FX_TEX_ENH && g_rockPainted
+        && (!strcmp(g_pack.theater,"DESERT") || !strcmp(g_pack.theater,"SAND"));
 }
 struct RockModel {
     int model;                  /* index into g_folModel                               */
@@ -231,6 +238,15 @@ struct FolChunk {
     bool     built;
     std::vector<FolBatch> batch;
     int      nbush, nclump, nrock;
+    /* where its plants stand at rest, and their lowest root, for the sun's receiver
+       window (fol_recv_outside); boxed is false until a build has measured them */
+    bool     boxed;
+    float    lo[3], hi[3], rootLo;
+    /* The pad epoch and ground stamp (g_groundSeq) it was last brought up to date at,
+       the water plane its plants were stood on, and what it read that neither its
+       signature nor the ground stamps cover. */
+    unsigned pad, rev, plane;
+    std::vector<unsigned> history;
 };
 /* One plant, kept for the dump and for nothing else. */
 struct FolInst { short cx, cy, model; float x, z, h; int id; };
@@ -265,7 +281,7 @@ static bool   g_folCrushDirty = false;
 static int fol_id_for(int x, int y, int kind, int k, float px, float pz)
 {
     const unsigned long long key = (((unsigned long long)(unsigned)x * 4096ull
-                                     + (unsigned)y) * 2ull + (unsigned)kind) * 256ull
+                                     + (unsigned)y) * 4ull + (unsigned)kind) * 256ull
                                    + (unsigned)(k & 255);
     std::map<unsigned long long, int>::iterator it = g_folIdOf.find(key);
     int id;
@@ -316,11 +332,13 @@ static int  g_folDrawInst = 0, g_folDrawTris = 0, g_folDrawBatches = 0;
 static int  g_folCastBatches = 0, g_folNrmBatches = 0;
 static int  g_folFrame = 0, g_folPrepFrame = -1;
 
+#include "desert_details.h"
+
 /* Whether the settings and the map ask for plants at all; the dump reports this, since
    outside the world pass g_fxActive is always false. */
 static bool fol_plants_on(void)
 {
-    return g_folHave && g_fx.fol_on && !strcmp(g_pack.theater, "TEMPERAT");
+    return g_folHave && g_fx.fol_on && (g_raModule ? ra3d_detail_plants() : !strcmp(g_pack.theater, "TEMPERAT"));
 }
 /* ROCKS ARE NOT TEMPERATE ONLY: a cliff is a cliff in the desert too. */
 static bool fol_rocks_on(void)
@@ -332,8 +350,8 @@ static bool fol_rocks_on(void)
    when that look was retired: bushes, clumps and rocks stand on any ground Enhanced draws. */
 static bool foliage3d_wanted(void)
 {
-    return g_fx.enabled && g_gridW > 0 && g_gridH > 0 && !g_raModule   /* placeholder ground */
-           && (fol_plants_on() || fol_rocks_on());
+    return g_fx.enabled && g_gridW > 0 && g_gridH > 0 && (!g_raModule || ra3d_detail_texels()>0)
+           && (fol_plants_on() || fol_rocks_on() || desert_detail_state());
 }
 
 static bool foliage3d_available(void)
@@ -341,8 +359,13 @@ static bool foliage3d_available(void)
     return g_fxActive && foliage3d_wanted() && grass_buf_load();
 }
 
+/* A desert detail landing outside its own chunk (fol_chunk_history): the partial refresh
+   stands down for the mission, since a chunk rebuilt alone would clear that plant's id
+   from a neighbour's cell where a whole rebuild puts it back. */
+static bool g_folSpill = false;
 static void foliage3d_free_chunks(void)
 {
+    g_folSpill = false;
     for (size_t i = 0; i < g_folChunks.size(); i++)
         for (size_t b = 0; b < g_folChunks[i].batch.size(); b++) {
             FolBatch& fb = g_folChunks[i].batch[b];
@@ -459,6 +482,14 @@ static void foliage3d_mark(void)
         g_folSlot[k] = row * 32 + col;
         if (row == 0 && col < 16) { g_folOk[k] = 1; g_folWhy[k] = 0; }
     }
+    if (g_raModule) {
+        // Classify RA's actual map, never the TD donor pack's atlas coordinates.
+        for (int y=0;y<g_gridH;y++) for(int x=0;x<g_gridW;x++) {
+            const size_t k=(size_t)y*g_gridW+x;
+            const int flags=ra3d_detail_cell(x,y,&g_folSlot[k]);
+            g_folOk[k]=(flags&1)?1:0;g_folWhy[k]=g_folOk[k]?0:1;
+        }
+    }
     for (int y = 0; y < g_gridH; y++)
         for (int x = 0; x < g_gridW; x++) {
             const size_t k = (size_t)y * g_gridW + x;
@@ -535,6 +566,10 @@ static void rock_face_update(void)
                engine's own enum (defines.h). */
             if (t == 1 || t == 2 || (t >= 136 && t <= 160) || t == 163 || t == 164)
                 g_rockWater[k] = 1;
+            if(g_raModule) {
+                int nativeSlot=-1;const int flags=ra3d_detail_cell(x,y,&nativeSlot);
+                face=(flags&2)!=0;g_rockWater[k]=(flags&4)?1:0;
+            }
             if (!face) {
                 float lo = 1e9f, hi = -1e9f;
                 for (int c = 0; c < 4; c++) {
@@ -611,7 +646,7 @@ static unsigned fol_layout_sig(void)
     return h;
 }
 
-static unsigned fol_chunk_sig(int cx, int cy, unsigned layout)
+static unsigned fol_chunk_sig(int cx, int cy, unsigned layout, bool withPad = true)
 {
     unsigned h = layout ^ 0x9e3779b9u;
     const int R = 2;              /* the margin reaches at most 1.5 cells past the chunk */
@@ -622,6 +657,7 @@ static unsigned fol_chunk_sig(int cx, int cy, unsigned layout)
             h ^= fol_ok(x, y) ? 1u : 0u;
             h *= 16777619u;
         }
+    h^=desert_detail_state() + g_groundGen*31u + (withPad ? g_padEpoch*7919u : 0u);
     /* and the ground under it, which a building pad reshapes */
     for (int y = cy * FOL_CHUNK; y <= cy * FOL_CHUNK + FOL_CHUNK && y <= g_gridH; y++)
         for (int x = cx * FOL_CHUNK; x <= cx * FOL_CHUNK + FOL_CHUNK && x <= g_gridW; x++) {
@@ -782,6 +818,7 @@ static void foliage3d_build_chunk(int cx, int cy)
     }
     ch.batch.clear();
     ch.nbush = ch.nclump = ch.nrock = 0;
+    ch.boxed = false;
     list.clear();
 
     const unsigned seed = 101u + (unsigned)g_fx.fol_seed * 7919u;
@@ -825,6 +862,7 @@ static void foliage3d_build_chunk(int cx, int cy)
             }
         }
 
+    desert_details_place_chunk(cx,cy,list,ch);
     /* one buffer pair per model that has any plants here */
     for (size_t mi = 0; mi < g_folModel.size(); mi++) {
         std::vector<FolVert> V;
@@ -859,6 +897,19 @@ static void foliage3d_build_chunk(int cx, int cy)
             count++;
         }
         if (!count) continue;
+        for (size_t i = 0; i < V.size(); i++) {
+            const FolVert& v = V[i];
+            if (!ch.boxed) {
+                for (int k = 0; k < 3; k++) ch.lo[k] = ch.hi[k] = v.p[k];
+                ch.rootLo = v.t1[2];
+                ch.boxed = true;
+            }
+            for (int k = 0; k < 3; k++) {
+                if (v.p[k] < ch.lo[k]) ch.lo[k] = v.p[k];
+                if (v.p[k] > ch.hi[k]) ch.hi[k] = v.p[k];
+            }
+            if (v.t1[2] < ch.rootLo) ch.rootLo = v.t1[2];
+        }
         FolBatch fb;
         fb.model = (int)mi; fb.count = count; fb.nidx = (int)I.size();
         gr_glGenBuffers(1, &fb.vbo);
@@ -914,7 +965,7 @@ static void fol_crush_scan(float now, bool instant)
                     const std::vector<int>& ids = g_folCellIds[(size_t)y * g_gridW + x];
                     for (size_t k = 0; k < ids.size(); k++) {
                         const int id = ids[k];
-                        if (g_folKindOf[id] == 2) continue;      /* rocks roll, see below */
+                        if (g_folKindOf[id] >= 2) continue;      /* rocks roll, see below */
                         if (g_folCrushT[id] >= 0.0f) continue;
                         const float dx = g_folRootX[id] - o.ex, dz = g_folRootZ[id] - o.ez;
                         const float along = dx * hx + dz * hz;
@@ -1357,7 +1408,7 @@ static void rock_tick(void)
                     const std::vector<int>& ids = g_folCellIds[(size_t)y * g_gridW + x];
                     for (size_t k = 0; k < ids.size(); k++) {
                         const int id = ids[k];
-                        if (g_folKindOf[id] == 2 || g_folCrushT[id] >= 0.0f) continue;
+                        if (g_folKindOf[id] >= 2 || g_folCrushT[id] >= 0.0f) continue;
                         const float ex = fabsf(g_folRootX[id] - P.cx) - P.hw;
                         const float ez = fabsf(g_folRootZ[id] - P.cz) - P.hh;
                         const float d = sqrtf((ex > 0 ? ex * ex : 0.0f) + (ez > 0 ? ez * ez : 0.0f));
@@ -1462,6 +1513,89 @@ static void foliage3d_crush_step(void)
     }
 }
 
+/* ---- A BUILDING REBUILDS THE CHUNKS AROUND IT, NOT THE MAP ----
+   The pad epoch in a chunk's signature used to rebuild every chunk on every placement,
+   sale or loss on the map. It stood for three things the signature does not hash: the
+   ground under the plants beyond the chunk's corners (the relief lift and the water
+   plane), the desert details (filtered by the shroud and blocked by buildings), and the
+   rocks a vehicle has woken, whose static copies a rebuild leaves out. With
+   OPENCNC3D_GROUND_PATCH the epoch leaves the signature; on a pad change a chunk is
+   rebuilt when the ground revision grid stamped a cell of it, the water plane moved
+   since it was built, or the history below changed, or anything moved the ground
+   between pad changes (the grid then says whole).
+   Otherwise its rebuild would lay the same plants with the same ids, so it is kept.
+   Chunks still rebuild in the same walk order, so new ids go out in the same order. */
+static void fol_chunk_history(int cx, int cy, std::vector<unsigned>& out)
+{
+    out.clear();
+    for (const auto& c : g_desertDetailCells) {
+        if (c.x / FOL_CHUNK != cx || c.z / FOL_CHUNK != cy) continue;
+        out.push_back((unsigned)c.x); out.push_back((unsigned)c.z); out.push_back(c.key);
+        auto it = g_desertDetails.find(c.key);
+        if (it == g_desertDetails.end()) continue;
+        for (const auto& d : it->second) {
+            const int model = g_folBush[d.model];
+            out.push_back((unsigned)model);
+            if (model < 0) continue;
+            const float x = c.x + d.x, z = c.z + d.z;
+            bool blocked = false;
+            for (const auto& o : g_objects)
+                if (o.kind == K_BUILDING && !o.limbo && fabsf(x - o.ex) < o.fw * .5f && fabsf(z - o.ez) < o.fh * .5f) { blocked = true; break; }
+            out.push_back(blocked ? 1u : 0u);
+            const int gx = (int)floorf(x), gz = (int)floorf(z);
+            if (gx >= 0 && gz >= 0 && gx < g_gridW && gz < g_gridH && (gx / FOL_CHUNK != cx || gz / FOL_CHUNK != cy))
+                g_folSpill = true;
+        }
+    }
+    out.push_back(0xFFFFFFFFu);
+    if (g_folCellIds.size() != (size_t)g_gridW * g_gridH) return;
+    for (int y = cy * FOL_CHUNK; y < cy * FOL_CHUNK + FOL_CHUNK && y < g_gridH; y++)
+        for (int x = cx * FOL_CHUNK; x < cx * FOL_CHUNK + FOL_CHUNK && x < g_gridW; x++)
+            for (int id : g_folCellIds[(size_t)y * g_gridW + x])
+                if (id >= 0 && (size_t)id < g_rockDynOf.size() && g_folKindOf[id] == 2 && g_rockDynOf[id] >= 0)
+                    out.push_back((unsigned)id);
+}
+/* OPENCNC3D_GROUND_PATCH_VERIFY: a chunk the patch keeps is rebuilt anyway, and its
+   batches, its cells' plant ids and the id count must come back byte for byte. */
+static bool fol_chunk_verify(int cx, int cy)
+{
+    FolChunk& ch = g_folChunks[(size_t)cy * g_folCW + cx];
+    struct Copy { int model, count, nidx; std::vector<unsigned char> v, i; };
+    const auto grab = [&](std::vector<Copy>& out) {
+        out.clear();
+        for (const FolBatch& fb : ch.batch) {
+            Copy c; c.model = fb.model; c.count = fb.count; c.nidx = fb.nidx;
+            GLint vb = 0, ib = 0;
+            gr_glBindBuffer(GL_ARRAY_BUFFER, fb.vbo); gr_glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &vb);
+            gr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fb.ibo); gr_glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &ib);
+            gr_glBindBuffer(GL_ARRAY_BUFFER, 0); gr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            c.v.resize(vb > 0 ? (size_t)vb : 0); c.i.resize(ib > 0 ? (size_t)ib : 0);
+            ground_read_buffer(GL_ARRAY_BUFFER, fb.vbo, c.v.size(), c.v.data());
+            ground_read_buffer(GL_ELEMENT_ARRAY_BUFFER, fb.ibo, c.i.size(), c.i.data());
+            out.push_back(c);
+        }
+    };
+    std::vector<Copy> before, after;
+    grab(before);
+    std::vector<std::vector<int> > idsBefore;
+    for (int y = cy * FOL_CHUNK; y < cy * FOL_CHUNK + FOL_CHUNK && y < g_gridH; y++)
+        for (int x = cx * FOL_CHUNK; x < cx * FOL_CHUNK + FOL_CHUNK && x < g_gridW; x++)
+            idsBefore.push_back(g_folCellIds[(size_t)y * g_gridW + x]);
+    const size_t nid = g_folCrushT.size();
+    const int nb = ch.nbush, nc = ch.nclump, nr = ch.nrock;
+    foliage3d_build_chunk(cx, cy);
+    grab(after);
+    bool same = before.size() == after.size() && nid == g_folCrushT.size() && nb == ch.nbush && nc == ch.nclump && nr == ch.nrock;
+    for (size_t b = 0; same && b < before.size(); b++)
+        same = before[b].model == after[b].model && before[b].count == after[b].count && before[b].nidx == after[b].nidx
+            && before[b].v == after[b].v && before[b].i == after[b].i;
+    size_t k = 0;
+    for (int y = cy * FOL_CHUNK; same && y < cy * FOL_CHUNK + FOL_CHUNK && y < g_gridH; y++)
+        for (int x = cx * FOL_CHUNK; same && x < cx * FOL_CHUNK + FOL_CHUNK && x < g_gridW; x++)
+            same = idsBefore[k++] == g_folCellIds[(size_t)y * g_gridW + x];
+    return same;
+}
+
 /* Once per frame, before the first pass that draws: bring every chunk up to date.
    g_folFrame is stepped where the world pass zeroes the trees' own per-frame counters,
    which is before the sun map draws its casters (g_folFrame and g_folPrepFrame are
@@ -1483,6 +1617,7 @@ static void foliage3d_prepare(int frame)
         g_folChunkInst.assign((size_t)cw * chh, std::vector<FolInst>());
     }
     foliage3d_mark();
+    desert_details_prepare();
     /* WHICH LEVEL OF DETAIL, from the dial: 0 the pack's LOD2, 2 its LOD0. A level the
        pack does not carry falls to the nearest one it does. */
     {
@@ -1512,18 +1647,45 @@ static void foliage3d_prepare(int frame)
     const bool budget = fxp_is_open();
     static int s_next = 0;
     const int nch = g_folCW * g_folCH;
+    static const bool patchOn = ground_patch_on();
+    const bool revNow = patchOn && ground_rev_current();
+    bool padSeen = false;
+    int kept = 0, verified = 0, verifyBad = 0;
+    static std::vector<unsigned> history;
     for (int k = 0; k < nch; k++) {
         const int ci = (s_next + k) % nch;
         const int cx = ci % g_folCW, cy = ci / g_folCW;
         FolChunk& ch = g_folChunks[(size_t)ci];
-        const unsigned sig = fol_chunk_sig(cx, cy, layout);
-        if (ch.built && ch.sig == sig) continue;
+        const unsigned sig = fol_chunk_sig(cx, cy, layout, !patchOn);
+        if (ch.built && ch.sig == sig) {
+            if (!patchOn || ch.pad == g_padEpoch) continue;
+            padSeen = true;
+            const int x0 = cx * FOL_CHUNK, z0 = cy * FOL_CHUNK;
+            if (revNow && !g_folSpill && ch.plane == water_plane_epoch()
+                && !ground_rev_moved(ch.rev, x0 - 1, z0 - 1, x0 + FOL_CHUNK, z0 + FOL_CHUNK)) {
+                fol_chunk_history(cx, cy, history);
+                if (!g_folSpill && history == ch.history) {
+                    ch.pad = g_padEpoch; ch.rev = g_groundSeq; kept++;
+                    if (ground_patch_verify()) { verified++; if (!fol_chunk_verify(cx, cy)) verifyBad++; }
+                    continue;
+                }
+            }
+        }
         if (budget && rebuilt > 0 && SDL_GetTicks() - t0 > 12u) { s_next = ci; break; }
         ch.sig = sig;
         foliage3d_build_chunk(cx, cy);
+        if (patchOn) {
+            ch.pad = g_padEpoch; ch.rev = revNow ? g_groundSeq : 0; ch.plane = water_plane_epoch();
+            fol_chunk_history(cx, cy, ch.history);
+        }
         rebuilt++;
     }
-    if (rebuilt && g_fx.fol_crush)
+    if (verified)
+        fprintf(stderr, "GROUNDPATCH|verify|foliage|%s|kept=%d|bad=%d\n", verifyBad ? "MISMATCH" : "ok", verified, verifyBad);
+    else if (kept)
+        fprintf(stderr, "GROUNDPATCH|foliage|kept=%d|rebuilt=%d\n", kept, rebuilt);
+    /* A pad change rebuilt every chunk before, and so always ran the instant scan. */
+    if ((rebuilt || padSeen) && g_fx.fol_crush)
         fol_crush_scan(engine_time() * (1.0f / 15.0f), true);
     foliage3d_crush_step();
     if (rebuilt) {
@@ -1539,13 +1701,55 @@ static void foliage3d_prepare(int frame)
 }
 
 /* ---- Drawing -------------------------------------------------------------------- */
-enum { FOL_LIT = 0, FOL_CAST = 1, FOL_NRM = 2 };
+enum { FOL_LIT = 0, FOL_CAST = 1, FOL_NRM = 2, FOL_LIGHT_SPLIT = 3 };
 
 static bool fol_chunk_in(int cx, int cy, float pad, float x0, float x1, float z0, float z1)
 {
     const float ax = (float)(cx * FOL_CHUNK), az = (float)(cy * FOL_CHUNK);
     return !(ax + FOL_CHUNK < x0 - pad || ax > x1 + pad ||
              az + FOL_CHUNK < z0 - pad || az > z1 + pad);
+}
+
+/* THE SUN'S RECEIVER WINDOW (fx_post.h): a chunk whose plants, as far as the vertex
+   stage can ever carry them, all fall outside every texel the light pass reads casts
+   nothing that is read, and is left out of the sun's map like a chunk outside its box.
+   The reach is TREE_VS's own with the placement this file gives it (identity origin,
+   scale and yaw, no rig, no lean): the wind and the flutter sideways, each at most its
+   amplitude since the sway weight and the material are at most one; the flutter's 0.35
+   up and down; and a crushed plant swung out from its root by at most 0.92 of its height
+   above that root. */
+static bool fol_recv_outside(const FolChunk& ch)
+{
+    if (!g_fxRecvArmed || !g_fxRecvArmed->on || !ch.boxed) return false;
+    const float flut = fabsf(g_fx.fol_flutter) * FOL_HREF;
+    const float up = 0.35f * flut + 0.01f;
+    const float splay = 0.92f * (ch.hi[1] + up - ch.rootLo);
+    const float side = fabsf(g_fx.fol_wind) * FOL_HREF + flut + (splay > 0.0f ? splay : 0.0f) + 0.01f;
+    const float lo[3] = { ch.lo[0] - side, (ch.lo[1] < ch.rootLo ? ch.lo[1] : ch.rootLo) - up,
+                          ch.lo[2] - side };
+    const float hi[3] = { ch.hi[0] + side, ch.hi[1] + up, ch.hi[2] + side };
+    g_fxRecvChunkTested++;
+    if (!fx_recv_box_outside(lo, hi, gls_clip())) return false;
+    g_fxRecvChunkCulled++;
+    return true;
+}
+/* A moving rock under the same window: a tumbled stone is its model turned and scaled
+   about its position, with no wind, flutter or crush, so the ball of its farthest
+   vertex holds it. */
+static bool rock_recv_outside(const Tree3dModel& M, const float p[3], float size)
+{
+    if (!g_fxRecvArmed || !g_fxRecvArmed->on) return false;
+    float r2 = 0.0f;
+    for (size_t i = 0; i + 2 < M.pos.size(); i += 3) {
+        const float d = M.pos[i] * M.pos[i] + M.pos[i + 1] * M.pos[i + 1] + M.pos[i + 2] * M.pos[i + 2];
+        if (d > r2) r2 = d;
+    }
+    const float r = sqrtf(r2) * fabsf(size) + 0.01f;
+    const float lo[3] = { p[0] - r, p[1] - r, p[2] - r }, hi[3] = { p[0] + r, p[1] + r, p[2] + r };
+    g_fxRecvChunkTested++;
+    if (!fx_recv_box_outside(lo, hi, gls_clip())) return false;
+    g_fxRecvChunkCulled++;
+    return true;
 }
 
 static void fol_bind_batch(const FolBatch& fb)
@@ -1622,7 +1826,7 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
     if (!foliage3d_available())
         return;
     const bool sunCast = (purpose == FOL_CAST && g_fxCasterPass == FXCAST_SUN);
-    if (sunCast && !g_fx.fol_shadows && !g_fx.fol_grass_shadows)
+    if (sunCast && !g_fx.fol_shadows && !g_fx.fol_grass_shadows && !g_fx.rock_shadows)
         return;
     foliage3d_prepare(g_folFrame);
 
@@ -1633,11 +1837,12 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
     const float pad = 1.0f + FOL_HREF;
 
     fx_glUseProgram(prog);
+    tfx_set1i(prog, TFX_uLightSplit, purpose==FOL_LIGHT_SPLIT?1:0);
     /* this call leaves its own values in the trees' program, so the next tree drawn
        sets the pass's constants again rather than trusting them */
     tree3d_pass_reset();
     if (purpose == FOL_NRM) {
-        tfx_set1i(prog, TFX_uAtlas, 0);
+        tfx_set1i(prog, TFX_uAtlas, 0);tfx_set1i(prog, TFX_uAtlasN, 1);tfx_set1i(prog, TFX_uBarkN, 3);
         tfx_set3f(prog, TFX_uCam, g_fxCamPos[0], g_fxCamPos[1], g_fxCamPos[2]);
         tfx_set1f(prog, TFX_uNormAlpha, 0.5f);
         tfx_set1f(prog, TFX_uCut, 0.34f);
@@ -1648,14 +1853,15 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
         tfx_set1i(prog, TFX_uBark,  2);  tfx_set1i(prog, TFX_uBarkN,  3);
         tfx_set3f(prog, TFX_uSun, -g_fxSunDir[0], -g_fxSunDir[1], -g_fxSunDir[2]);
         tfx_set3f(prog, TFX_uCam, g_fxCamPos[0], g_fxCamPos[1], g_fxCamPos[2]);
-        tfx_set3f(prog, TFX_uSunCol, 1.00f, 0.97f, 0.90f);
-        tfx_set3f(prog, TFX_uSkyCol, 0.52f, 0.62f, 0.78f);
-        tfx_set3f(prog, TFX_uGndCol, 0.30f, 0.31f, 0.22f);
+        tfx_set3f(prog, TFX_uSunCol, 1.00f*fx_sun_energy(), 0.97f*fx_sun_energy(), 0.90f*fx_sun_energy());
+        tfx_set3f(prog, TFX_uSkyCol, 0.52f*fx_sky_energy(), 0.62f*fx_sky_energy(), 0.78f*fx_sky_energy());
+        tfx_set3f(prog, TFX_uGndCol, 0.30f*fx_sky_energy(), 0.31f*fx_sky_energy(), 0.22f*fx_sky_energy());
         tfx_set1f(prog, TFX_uCut, 0.34f);
         tfx_set1f(prog, TFX_uBurn, 0.0f);
         tfx_set1f(prog, TFX_uAOAmt, g_fx.tree3d_ao);
         tfx_set1f(prog, TFX_uWrap, g_fx.tree3d_wrap);
         tfx_set1f(prog, TFX_uAoFloor, g_fx.tree3d_ao_floor);
+        tfx_set1f(prog, TFX_uObjectShadowFill, g_fx.object_shadow_fill);
         tfx_set1f(prog, TFX_uAoGamma, g_fx.tree3d_ao_gamma);
         tfx_set1f(prog, TFX_uAoDirect, g_fx.tree3d_ao_direct);
         /* uGain is set per batch below: a bush and a clump have separate exposures */
@@ -1681,8 +1887,9 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
             if (ch.batch.empty()) continue;
             if (purpose == FOL_CAST) {
                 if (boxOn && !fol_chunk_in(cx, cy, pad, bx0, bx1, bz0, bz1)) continue;
+                if (sunCast && fol_recv_outside(ch)) continue;
             } else if (g_cullOn && g_clip_to_map) {
-                if (purpose == FOL_LIT && g_treeCullValid &&
+                if ((purpose == FOL_LIT || purpose == FOL_LIGHT_SPLIT) && g_treeCullValid &&
                     !fol_chunk_in(cx, cy, pad, g_treeCullX0, g_treeCullX1,
                                   g_treeCullZ0, g_treeCullZ1)) continue;
                 if (purpose == FOL_NRM && g_cullValid &&
@@ -1696,23 +1903,20 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
                 for (int bi = 0; bi < 2; bi++)
                     for (int l = 0; l < 3; l++) bush = bush || fb.model == g_folBushLod[bi][l];
                 const bool rock = fb.model < (int)g_folModelKind.size()
-                                  && g_folModelKind[fb.model] == 2;
+                                  && g_folModelKind[fb.model] >= 2;
+                const bool stone=rock && rock_cliff_material();
+                if(purpose==FOL_NRM){tfx_set1f(prog,TFX_uNormAlpha,stone?0.875f:0.5f);tfx_set1f(prog,TFX_uStone,rock?1.0f:0.0f);}
+                else tfx_set1f(prog,TFX_uStone,stone?1.0f:0.0f);
                 if (sunCast && !(rock ? g_fx.rock_shadows
                                  : (bush ? g_fx.fol_shadows : g_fx.fol_grass_shadows))) continue;
                 if (purpose != FOL_NRM)
                     tfx_set1f(prog, TFX_uGain, rock ? rock_gain_now()
-                                            : (bush ? g_fx.fol_gain : g_fx.fol_grass_gain));
+                                            : (bush ? (desert_detail_state()?g_fx.tree3d_gain*(g_fx.fol_gain/.10f):g_fx.fol_gain) : g_fx.fol_grass_gain));
                 if (M.set < 0 || (size_t)M.set >= g_folSet.size()) continue;
                 if (M.set != lastSet) {
                     const Tree3dSet& ts = g_folSet[M.set];
-                    if (purpose == FOL_NRM) {
-                        glActiveTexture(GL_TEXTURE0);
-                        glBindTexture(GL_TEXTURE_2D, ts.tex[0]);
-                    } else {
-                        for (int u = 3; u >= 0; u--) {
-                            glActiveTexture(GL_TEXTURE0 + u);
-                            glBindTexture(GL_TEXTURE_2D, ts.tex[u]);
-                        }
+                    for (int u = 3; u >= 0; u--) {
+                        glActiveTexture(GL_TEXTURE0 + u);glBindTexture(GL_TEXTURE_2D, ts.tex[u]);
                     }
                     lastSet = M.set;
                 }
@@ -1733,6 +1937,8 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
     if (!g_rockDyn.empty() && !(sunCast && !g_fx.rock_shadows)) {
         tfx_set1f(prog, TFX_uFol, 0.0f);
         tfx_set1f(prog, TFX_uRock, 1.0f);
+        if(purpose==FOL_NRM){tfx_set1f(prog,TFX_uNormAlpha,rock_cliff_material()?0.875f:0.5f);tfx_set1f(prog,TFX_uStone,1.0f);}
+        else tfx_set1f(prog,TFX_uStone,rock_cliff_material()?1.0f:0.0f);
         tfx_set3f(prog, TFX_uWind, 0.0f, 0.0f, 0.0f);
         tfx_set3f(prog, TFX_uLean, 0.0f, 0.0f, 0.0f);
         tfx_set1f(prog, TFX_uFlutter, 0.0f);
@@ -1759,19 +1965,14 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
                 if (boxOn && !cell_in_box(cxl, czl, 1.0f, bx0, bx1, bz0, bz1)) continue;
             } else if (!tree3d_cell_in_view(cxl, czl)) continue;
             const Tree3dModel& M = g_folModel[g_rockModels[d.rm].model];
+            if (sunCast && rock_recv_outside(M, p, d.size)) continue;
             if (M.set < 0 || (size_t)M.set >= g_folSet.size()) continue;
             /* as the tree callers do: a model with nothing to draw is skipped rather than
                handed to the element draw, whose array path indexes its first element */
             if (M.pos.empty() || M.idx.empty()) continue;
             const Tree3dSet& ts = g_folSet[M.set];
-            if (purpose == FOL_NRM) {
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, ts.tex[0]);
-            } else {
-                for (int u = 3; u >= 0; u--) {
-                    glActiveTexture(GL_TEXTURE0 + u);
-                    glBindTexture(GL_TEXTURE_2D, ts.tex[u]);
-                }
+            for (int u = 3; u >= 0; u--) {
+                glActiveTexture(GL_TEXTURE0 + u);glBindTexture(GL_TEXTURE_2D, ts.tex[u]);
             }
             float m9[9];
             q_mat3(q, m9);
@@ -1789,6 +1990,7 @@ static void foliage3d_draw(int purpose, int boxOn, float bx0, float bx1, float b
     }
     /* THE PROGRAM IS THE TREES' TOO: hand it back with the foliage branch shut. */
     tfx_set1f(prog, TFX_uFol, 0.0f);
+    tfx_set1f(prog, TFX_uStone, 0.0f);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, 0);
     glActiveTexture(GL_TEXTURE0);

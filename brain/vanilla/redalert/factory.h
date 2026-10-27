@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Exposes remaining paid production balance for ordinary AI recovery budgeting.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -80,6 +81,8 @@ public:
     bool Start(void);
     bool Suspend(void);
     int Completion(void);
+    // Read-only balance for an AI to budget an ordinary economic replacement.
+    int Remaining_Cost(void) const { return Balance; }
     TechnoClass* Get_Object(void) const;
     int Get_Special_Item(void) const;
     void AI(void);

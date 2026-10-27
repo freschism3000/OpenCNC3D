@@ -1,0 +1,182 @@
+{
+  "catalog": [
+    "td",
+    "ra"
+  ],
+  "choices": {
+    "movies": true,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "close",
+      "kind": "button",
+      "label": "X",
+      "w": 44,
+      "x": 940,
+      "y": 30
+    },
+    {
+      "disabled": true,
+      "h": 166,
+      "id": "get-td",
+      "kind": "row",
+      "label": "DAWN3D installed",
+      "w": 900,
+      "x": 58,
+      "y": 184
+    },
+    {
+      "disabled": true,
+      "h": 166,
+      "id": "get-ra",
+      "kind": "row",
+      "label": "RA3D installed",
+      "w": 900,
+      "x": 58,
+      "y": 362
+    },
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "catalog-back",
+      "kind": "button",
+      "label": "BACK",
+      "w": 192,
+      "x": 58,
+      "y": 548
+    }
+  ],
+  "installed": [
+    "td",
+    "ra"
+  ],
+  "page": "catalog",
+  "progress": 0.42,
+  "scenario": "td",
+  "target": "ra",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "MODULE BROWSER",
+      "width": 164,
+      "x": 58,
+      "y": 144
+    },
+    {
+      "height": 16,
+      "t": "X",
+      "width": 12,
+      "x": 956,
+      "y": 42
+    },
+    {
+      "height": 16,
+      "t": "SELECT A MODULE TO ADD",
+      "width": 248,
+      "x": 710,
+      "y": 144
+    },
+    {
+      "height": 16,
+      "t": "DAWN3D",
+      "width": 72,
+      "x": 250,
+      "y": 206
+    },
+    {
+      "height": 16,
+      "t": "INSTALLED",
+      "width": 108,
+      "x": 828,
+      "y": 206
+    },
+    {
+      "height": 16,
+      "t": "TIBERIAN DAWN",
+      "width": 152,
+      "x": 250,
+      "y": 242
+    },
+    {
+      "height": 16,
+      "t": "THE ORIGINAL COMMAND & CONQUER (DOS AND N64 VERSIONS), IN",
+      "width": 630,
+      "x": 250,
+      "y": 272
+    },
+    {
+      "height": 16,
+      "t": "ENHANCED 3D",
+      "width": 128,
+      "x": 250,
+      "y": 294
+    },
+    {
+      "height": 16,
+      "t": "ALREADY IN YOUR LAUNCHER",
+      "width": 276,
+      "x": 250,
+      "y": 328
+    },
+    {
+      "height": 16,
+      "t": "RA3D",
+      "width": 48,
+      "x": 250,
+      "y": 384
+    },
+    {
+      "height": 16,
+      "t": "INSTALLED",
+      "width": 108,
+      "x": 828,
+      "y": 384
+    },
+    {
+      "height": 16,
+      "t": "RED ALERT",
+      "width": 104,
+      "x": 250,
+      "y": 420
+    },
+    {
+      "height": 16,
+      "t": "THE ORIGINAL COMMAND & CONQUER: RED ALERT (WIN95 VERSION) IN",
+      "width": 666,
+      "x": 250,
+      "y": 450
+    },
+    {
+      "height": 16,
+      "t": "3D",
+      "width": 24,
+      "x": 250,
+      "y": 472
+    },
+    {
+      "height": 16,
+      "t": "ALREADY IN YOUR LAUNCHER",
+      "width": 276,
+      "x": 250,
+      "y": 506
+    },
+    {
+      "height": 16,
+      "t": "BACK",
+      "width": 48,
+      "x": 130,
+      "y": 560
+    },
+    {
+      "height": 16,
+      "t": "MODULES SHARE ONE OPENCNC3D INSTALLATION.",
+      "width": 470,
+      "x": 278,
+      "y": 560
+    }
+  ]
+}

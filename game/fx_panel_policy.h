@@ -15,7 +15,15 @@ static int fxp_group_tab(const FxParam* group)
 static int fxp_row_visible(const FxParam* p, const FxParam* group, const FxState* state)
 {
     if (!group) return 0;
+    const char* modeOwned[] = { "einf_on", "m3inf_on", "m3_on", "uvfx_on", "curgreen_on",
+        "efx_enh", "ecur_on", "grass", "new_audio", 0 };
+    for (int index = 0; modeOwned[index]; index++) if (!strcmp(p->key,modeOwned[index])) return 0;
     const char* label = group->label;
+    if (strstr(label,"ENHANCED TREES") && !strncmp(p->key,"tree3d_",7)) {
+        const char* live[]={"tree3d_wind","tree3d_wind_speed","tree3d_wind_dir","tree3d_flutter",0};
+        bool supported=false;for(int i=0;live[i];i++)if(!strcmp(p->key,live[i]))supported=true;
+        if(!supported)return 0;
+    }
     if (strstr(label,"VI OUTPUT GAMMA") || strstr(label,"CRT") ||
         strstr(label," RAIN ") || strstr(label,"RELIGHT THE CARTRIDGE") ||
         strstr(label,"DEBUG") || !strcmp(label,"NEW AUDIO")) return 0;

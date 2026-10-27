@@ -1,0 +1,36 @@
+{
+  "settings_saves_bundles": {
+    "${SOURCE_ROOT}/playable": {
+      "count": 27,
+      "unchanged": true
+    },
+    "${DOCK_RUNTIME}": {
+      "count": 31,
+      "unchanged": true
+    }
+  },
+  "binaries": {
+    "${SOURCE_ROOT}/playable/opencnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${SOURCE_ROOT}/playable/cnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${SOURCE_ROOT}/playable/ra3d/opencnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${SOURCE_ROOT}/playable/ra3d/cnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${SOURCE_ROOT}/playable/cnc_eyes": "f0f2a5eb61a31b711cbd44a6ccc79e579e29f0e82a5f16c30821935426decd4e",
+    "${SOURCE_ROOT}/playable/libSDL2-2.0.0.dylib": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+    "${SOURCE_ROOT}/playable/libSDL3.dylib": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+    "${SOURCE_ROOT}/playable/ra3d/libSDL2-2.0.0.dylib": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+    "${SOURCE_ROOT}/playable/ra3d/libSDL3.dylib": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+    "${DOCK_RUNTIME}/opencnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${DOCK_RUNTIME}/cnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${DOCK_RUNTIME}/ra3d/opencnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${DOCK_RUNTIME}/ra3d/cnc3d": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+    "${DOCK_RUNTIME}/cnc_eyes": "f0f2a5eb61a31b711cbd44a6ccc79e579e29f0e82a5f16c30821935426decd4e",
+    "${DOCK_RUNTIME}/libSDL2-2.0.0.dylib": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+    "${DOCK_RUNTIME}/libSDL3.dylib": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946",
+    "${DOCK_RUNTIME}/ra3d/libSDL2-2.0.0.dylib": "e0a83828a869a5aff8e42ee15156510e6e6b0dc59a7d4068c321a448f922b6e8",
+    "${DOCK_RUNTIME}/ra3d/libSDL3.dylib": "b1da62d09950031b64011e2b775d9f4ef025f636acc9da1111aa8c60c2d10946"
+  },
+  "dock": [
+    "${DOCK_RUNTIME}/OpenCNC3D.app/"
+  ],
+  "passed": true
+}

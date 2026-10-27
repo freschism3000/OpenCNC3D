@@ -1,0 +1,31 @@
+# G326's script: Enhanced soldiers standing in the shroud's soft edge are as dark as the
+# shroud says (claims in gate_infshroud.py).
+#
+# THE SCENE. SCG01EA, GDI's first mission. A GDI Minigunner from the landing party walks
+# north toward a Nod Minigunner who stands guard in unexplored ground at 57,45. At the
+# last frame the GDI man has uncovered the cells up to the Nod soldier's, so the Nod men
+# up there stand in the feather: drawn, because the bilinear visibility at their feet is
+# above zero, and dark, because it is barely above it. That is the place the report came
+# from: soldiers near the edge read as standing on top of the black.
+#
+# THREE SHOTS OF ONE FRAME, no tick between them: as drawn, the same frame with the
+# shroud lifted (`reveal 1`, presentation only), and that again without the soldiers
+# (`infdraw 0`). The last two differ only in the soldiers' pixels, which is the mask; the
+# first against the second is each soldier's darkening. `infshroud` prints the env term
+# every drawn soldier is given.
+tick 150
+cam 56 52
+lclickobj E1 10
+order 57 47
+cam 57 48
+zoom max
+tick 270
+obj E1 10
+obj E1 9
+infshroud
+shot shots/g326_shroud.png
+reveal 1
+shot shots/g326_lit.png
+infdraw 0
+shot shots/g326_bare.png
+quit

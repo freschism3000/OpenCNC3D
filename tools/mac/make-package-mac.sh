@@ -45,6 +45,8 @@ die() { printf '\nPACKAGING REFUSED: %s\n' "$*" >&2; exit 1; }
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
+OUT=$(cd "$OUT" && pwd -P)
+printf '%s\n' 'OpenCNC3D fresh public package v1' > "$OUT/.opencnc3d-public-stage"
 
 # A required entry is copied with need_*, an optional one with the [ -f ] && cp form.
 # The difference matters: a missing SOUNDS.MIX has to stop the release, while a missing
@@ -89,7 +91,8 @@ need_dir() {
 # same paths: one path per line relative to the package root, a trailing "/" for a folder,
 # '#' for a comment, and the leading "/" optional, read the same way by all four. It is
 # turned here into rsync anchors, each line given its "/" whether it had one or not. The
-# Red Alert module's movies and score are on it too, and are refused at the end like the
+# Red Alert module's movies and score are on it too: tools/ra3d/stage-runtime.py reads the
+# same file and stages the module without them, and they are refused at the end like the
 # rest.
 # The copy below is the same list, used only when that file is absent, so a checkout
 # without it still cannot ship the media.
@@ -126,9 +129,9 @@ need_file opencnc3d
 need_file cnc_eyes
 # RED ALERT is staged only when the build is not told to leave it out: OPENCNC3D_NO_RA=1,
 # which tools/release.sh sets, packages no ra3d/ even when the play folder holds one, and
-# the package is searched for any piece of it at the end. A module that IS staged brings
-# its own movies and score, which may not ship, so such a package is refused by the
-# media check at the end until Red Alert has downloads of its own.
+# the package is searched for any piece of it at the end. A module that IS staged comes
+# without its movies and score, which stage-runtime.py leaves out by the media list, and
+# plays without them as Tiberian Dawn does; the media check at the end still asks.
 if [ "$OPENCNC3D_NO_RA" = "1" ]; then
     echo "   Red Alert: left out (OPENCNC3D_NO_RA=1)"
 elif [ -d "$SRC/ra3d" ]; then
@@ -190,8 +193,16 @@ done
 # ---- the game data ----------------------------------------------------------------
 # The packs are the baked N64 terrain, models, cameos and DOS art; CONQUER.MIX is the
 # 1995 archive the engine's own build/sell state machine reads.
+# Required authored decals come from this source, even if SRC is an older installation.
+python3 "$ROOT/tools/art/remaster/decals/build-runtime.py" --pack "$OUT/decalenh.pack" >/dev/null
+[ -s "$OUT/decalenh.pack" ] || die "the approved Enhanced decal pack is missing or empty."
 _n=0
 for f in "$SRC"/*.pack; do
+    [ "${f##*/}" != decalenh.pack ] || continue
+    if [ "$OPENCNC3D_NO_RA" = "1" ]; then
+        # This one painting is shared by TD's sea despite its historic filename.
+        case "${f##*/}" in waterbase_RA_TEMPERAT.pack) ;; *_RA_*) continue ;; esac
+    fi
     [ -f "$f" ] || continue
     cp "$f" "$OUT/"; _n=$((_n+1))
 done
@@ -246,6 +257,20 @@ if [ -d "$ROOT/game/ebld" ]; then
     done
     [ "$_m" -gt 0 ] || die "game/ebld holds no .ebld files, so the package would draw
        no Enhanced building at all."
+    # Faction livery masks belong to the paired model on both platforms.
+    for f in "$ROOT"/game/ebld/*.ebld.fclv "$ROOT"/game/ebld/*.spec; do
+        [ -f "$f" ] && cp "$f" "$OUT/ebld/"
+    done
+fi
+
+# Final Desert albedo/geometry overrides must precede their paired mineral maps.
+# Select the banks actually shipped after this package's RA surface filtering.
+python3 "$ROOT/tools/art/terrain/stage_desert_details.py" "$OUT"
+if [ "$OPENCNC3D_NO_RA" = "1" ]; then
+    python3 "$ROOT/tools/art/rocks/stage_stone_materials.py" "$OUT" \
+        --banks TEMPERAT DESERT WINTER SNOW SAND
+else
+    python3 "$ROOT/tools/art/rocks/stage_stone_materials.py" "$OUT"
 fi
 
 # THE PLACEMENTS, eplc/<TYPE>.eplc: under Enhanced a remastered structure with one of these
@@ -272,6 +297,8 @@ if [ -d "$ROOT/game/evhc" ]; then
         [ -f "$f" ] || continue
         cp "$f" "$OUT/evhc/"; _m=$((_m+1))
     done
+    # (a type's specular maps, <TYPE>.spec, where its export has them)
+    for f in "$ROOT"/game/evhc/*.spec; do [ -f "$f" ] && cp "$f" "$OUT/evhc/"; done
     [ "$_m" -gt 0 ] || die "game/evhc holds no .evhc files, so the package would draw
        no remastered vehicle at all."
 fi
@@ -289,6 +316,15 @@ if [ -d "$ROOT/game/einf" ]; then
     [ "$_m" -gt 0 ] || die "game/einf holds no .c3m files, so the package would draw
        no remastered soldier at all."
 fi
+
+# THE REMASTERED CURSORS, ecur/ecur.bin: required source data, just as on Windows.
+# The data fingerprint includes this path, so installs from a package that omitted it
+# receive the complete package instead of a binary-only update.
+[ -s "$ROOT/game/ecur/ecur.bin" ] || die "game/ecur/ecur.bin is missing or empty, so the
+       macOS package would draw the cartridge cursors in Enhanced mode."
+mkdir -p "$OUT/ecur"
+cp "$ROOT/game/ecur/ecur.bin" "$OUT/ecur/"
+[ -s "$OUT/ecur/ecur.bin" ] || die "ecur/ecur.bin is missing or empty in the macOS package."
 
 # THE UNITY EXPLOSION, vfx3d/<effect>/, found by path beside the missions exactly as the
 # models are, and missing from a package for the same reason if it is not named here:
@@ -485,16 +521,16 @@ cp "$ROOT/tools/launchers/READ-ME.txt" "$OUT/"
 # carries neither the licence nor the notice of modification is not a compliant
 # distribution. Every release up to and including v0.6.4 shipped without them, which
 # is a defect in the builds already in players' hands and not only in the next one.
-# They are copied from the TRACKED masters at the repo root, never from the play
-# folder, for the same reason READ-ME.txt is: an untracked copy goes stale in silence.
-# NOTICE.md is the file that names all 33 modified engine files and says plainly that
-# the modifications reach the simulation.
-for f in LICENSE NOTICE.md; do
+# The licence is unchanged; the notice describes only the packaged modules while
+# preserving applicable source and art attribution. The full repository notice stays intact.
+for f in LICENSE; do
     [ -f "$ROOT/$f" ] || die "$f is missing from the repo root.
        It is on the package's allow-list because a GPL binary distribution has to carry
        it. Restore it rather than shipping without it."
     cp "$ROOT/$f" "$OUT/"
 done
+python3 "$ROOT/tools/make-package-notice.py" "$OUT/NOTICE.md" \
+    --package-root "$OUT" --no-ra "${OPENCNC3D_NO_RA:-0}"
 
 # ---- what is deliberately NOT above, named so the omission is visible -------------
 #
@@ -538,9 +574,11 @@ done
 #
 #  dosdata/movies/, dosdata/music/, dosdata/SCORES.MIX, dosdata/transit/TRANSIT.MIX,
 #  movies/, and Red Alert's ra3d/movies/ and its SCORES.MIX
-#      The 1995 movies and score, about 566 MB. They come from the disc images on
-#      archive.org at install time, when the player wants them, and are refused just
-#      below if any of them arrives. The list is tools/media/media-paths.txt.
+#      The 1995 movies and score, about 566 MB, and Red Alert's, about 790 MB more. The
+#      Tiberian Dawn ones come from the disc images on archive.org at install time, when
+#      the player wants them; Red Alert's have no download yet, so a package with the
+#      module plays it without them. Any of them is refused just below if it arrives. The
+#      list is tools/media/media-paths.txt.
 
 # NO MOVIE AND NO SCORE CAME WITH ANY OF IT, asked of the whole finished package rather
 # than trusted to the exclude list: every path on the list, matched without regard to case
@@ -562,9 +600,9 @@ _media=$(cd "$OUT" && {
 [ -z "$_media" ] || die "movies or music reached the package, and no package carries them:
 $(echo "$_media" | sed 's/^/           /')
        The Windows installer and the launcher's Setup download them for the player who
-       wants them. The Red Alert module carries its own movies and score, which may not
-       ship either, so a package with the module in it is refused here too until Red
-       Alert has downloads of its own: build it with OPENCNC3D_NO_RA=1."
+       wants them. Red Alert's may not ship either: tools/ra3d/stage-runtime.py stages
+       the module without the paths tools/media/media-paths.txt names under ra3d/, so
+       one found under ra3d/ is either missing from that list or came by another road."
 
 # ---- what the launcher reads about its own install --------------------------------
 # Written here, last, so both files describe the folder exactly as it is about to
@@ -585,11 +623,13 @@ $(echo "$_media" | sed 's/^/           /')
 # in it. Everything Red Alert is under ra3d/ or named for it (RedAlert.dylib, ra3d-fx.cfg),
 # so a package built without it holds no such name anywhere.
 if [ "$OPENCNC3D_NO_RA" = "1" ]; then
-    _ra=$(cd "$OUT" && find . \( -iname 'ra3d*' -o -iname 'redalert*' \) | head -5)
+    _ra=$(cd "$OUT" && find . \( -iname 'ra3d*' -o -iname 'redalert*' -o -name '*_RA_*' \) \
+        ! -name 'waterbase_RA_TEMPERAT.pack' | head -5)
     [ -z "$_ra" ] || die "the package was built with OPENCNC3D_NO_RA=1 and still carries
        Red Alert:
 $(echo "$_ra" | sed 's/^/           /')"
 fi
+python3 "$ROOT/tools/launcher/prepare-public-runtime.py" "$OUT"
 VERNUM=$(tr -d '[:space:]' < "$ROOT/VERSION")
 "$ROOT/tools/launcher/make-changelog-txt.sh" "$OUT/CHANGELOG.txt" >/dev/null
 {

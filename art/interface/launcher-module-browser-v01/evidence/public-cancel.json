@@ -1,0 +1,74 @@
+{
+  "catalog": [
+    "td"
+  ],
+  "choices": {
+    "movies": false,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "keep-download",
+      "kind": "button",
+      "label": "KEEP INSTALLING",
+      "w": 270,
+      "x": 206,
+      "y": 398
+    },
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "discard",
+      "kind": "button",
+      "label": "CANCEL INSTALL",
+      "w": 270,
+      "x": 540,
+      "y": 398
+    }
+  ],
+  "installed": [],
+  "page": "cancel",
+  "progress": 0.42,
+  "scenario": "public",
+  "target": "td",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "CANCEL INSTALLATION?",
+      "width": 236,
+      "x": 390,
+      "y": 190
+    },
+    {
+      "height": 16,
+      "t": "LEAVE YOUR CURRENT MODULES AS THEY ARE.",
+      "width": 438,
+      "x": 289,
+      "y": 272
+    },
+    {
+      "height": 16,
+      "t": "YOU CAN INSTALL DAWN3D FROM THE BROWSER LATER.",
+      "width": 518,
+      "x": 249,
+      "y": 312
+    },
+    {
+      "height": 16,
+      "t": "KEEP INSTALLING",
+      "width": 176,
+      "x": 253,
+      "y": 410
+    },
+    {
+      "height": 16,
+      "t": "CANCEL INSTALL",
+      "width": 164,
+      "x": 593,
+      "y": 410
+    }
+  ]
+}

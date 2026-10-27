@@ -18,6 +18,11 @@
 
 static char g_dsDir[512] = "";
 static char g_dsPath[600];
+static int g_dsGame = DS_GAME_TD;
+
+void ds_set_game(int game) { g_dsGame = (game == DS_GAME_RA) ? DS_GAME_RA : DS_GAME_TD; }
+int ds_get_game(void) { return g_dsGame; }
+int ds_slot_mine(const DS_Slot *s) { return s && s->used && (int)s->game == g_dsGame; }
 
 /* Is this path already absolute? The engine's own test, common/paths_posix.cpp:238-241
  * and paths_win.cpp:140-147: a leading separator on POSIX, a drive letter or a UNC prefix
@@ -164,6 +169,7 @@ static void ds_pack(const DS_Slot *s, unsigned char *r)
     r[100] = s->camp_var;
     r[101] = s->build;
     r[102] = s->cam_mode;
+    r[103] = s->game;
     wr32(r + 104, (unsigned int)s->camx_m);
     wr32(r + 108, (unsigned int)s->camz_m);
     wr32(r + 112, (unsigned int)s->dist_m);
@@ -192,6 +198,12 @@ static int ds_unpack(const unsigned char *r, DS_Slot *s)
     s->camp_var = r[100];
     s->build = r[101];
     s->cam_mode = r[102];
+    s->game = r[103];
+    /* A RECORD FROM BEFORE THE GAME TAG, WRITTEN BY RED ALERT. Both modules shared one
+       folder then, and a Red Alert slot carries its module's pack ("ra3d/..."), which no
+       Tiberian Dawn pack name ever does, so it is told apart by that and never offered to
+       Tiberian Dawn's engine. */
+    if (s->game == DS_GAME_TD && !strncmp(s->pack, "ra3d/", 5)) s->game = DS_GAME_RA;
     s->camx_m = (int)rd32(r + 104);
     s->camz_m = (int)rd32(r + 108);
     s->dist_m = (int)rd32(r + 112);

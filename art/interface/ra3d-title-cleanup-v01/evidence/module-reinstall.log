@@ -1,0 +1,5 @@
+bundle-sdl: copied $HOME/.cnc3d-macsdk/lib/libSDL2-2.0.0.dylib
+bundle-sdl: copied $HOME/.cnc3d-macsdk/lib/libSDL3.0.dylib -> libSDL3.dylib (sdl2-compat dlopens it)
+bundle-sdl: gate -> @executable_path/libSDL2-2.0.0.dylib
+bundle-sdl: $SCRATCH is self-contained (libSDL2-2.0.0.dylib + libSDL3.dylib)
+MODULE-REINSTALL|PASS|installed disabled, removed clickable after restart, controller install, remove/reinstall, cancellation rollback, checksum/ownership refusal, saves/settings/other game preserved

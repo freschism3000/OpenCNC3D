@@ -1,0 +1,224 @@
+#include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+using Uint64 = uint64_t;
+using GLuint = unsigned;
+using GLint = int;
+enum { EBS_INTACT, EBS_CUT, EBS_DESTROYED, EBS_N };
+enum { EB_INTACT, EB_HELD, EB_DAMAGED, EB_WRECKED };
+enum { EBP_SCORCH_TEX = 8, MODE_XLU = 3, GL_TEXTURE_2D, GL_TEXTURE_BINDING_2D };
+struct EbldTri { int tex, texDmg, texGlow, texOver; unsigned mode, kind; };
+struct EbldSet { std::vector<EbldTri> tri; };
+struct EbldTex {
+    int w = 1, h = 1, role = 0, house = 0;
+    long off = 0, csize = 0;
+    bool bled = true, cover = false;
+};
+struct EbldModel {
+    struct Service { std::map<int, std::vector<int> > tex; } service;
+    std::string path, type = "synthetic", tag = "test";
+    long fileSize = 0;
+    int nset = 3, texOwner = -1, tex0 = 0, version = 6;
+    bool attached = true, resident = false, residentAll = false;
+    std::vector<EbldTex> tex;
+    EbldSet set[EBS_N];
+    std::vector<float> param;
+    std::vector<unsigned char> texIntact;
+    uint64_t stageTextures[4] = {};
+};
+static bool g_raModule = false, stageEnabled = true;
+static bool mesh_perf_switch(const char* name)
+{
+    return strcmp(name, "OPENCNC3D_EBLD_STAGE_RESIDENCY") ? true : stageEnabled;
+}
+EXTRACTED_MASKS
+
+struct PackTex {
+    GLuint gl = 0, gl_gdi = 0;
+    bool mips = false;
+    std::vector<unsigned char> gdi, mask;
+};
+struct Pack { std::vector<PackTex> tex; };
+static Pack g_pack;
+static std::vector<EbldModel> g_ebld;
+static long g_ebldResidentBytes = 0;
+static Uint64 g_destructTrace[32] = {};
+struct Metrics { unsigned demandFailures = 0, demandTextures = 0; Uint64 demandTextureUs = 0; };
+static Metrics g_ebldPrepareMetrics;
+static unsigned fileOpens = 0, serviceCalls = 0, liveryCalls = 0;
+static std::vector<unsigned> uploaded;
+static GLuint boundTexture = 817;
+static Uint64 SDL_GetPerformanceCounter() { static Uint64 now = 0; return ++now; }
+static Uint64 SDL_GetPerformanceFrequency() { return 1000000; }
+static bool perf_trace_frame_active() { return false; }
+static void glGetIntegerv(int, GLint* value) { *value = (GLint)boundTexture; }
+static void glBindTexture(int, GLuint texture) { boundTexture = texture; }
+static FILE* test_fopen(const char* path, const char* mode) { fileOpens++; return fopen(path, mode); }
+static bool ebld_inflate_texture(FILE*, const EbldTex&, std::vector<unsigned char>&,
+                                  std::vector<unsigned char>&, std::vector<unsigned char>&) { return false; }
+static void livery_faction_load(PackTex&, const char*, unsigned, const std::vector<unsigned char>&,
+                                const std::vector<unsigned char>&, const std::vector<unsigned char>&) {}
+static void livery_recolour(const unsigned char*, unsigned char, int, unsigned char*) {}
+static void livery_build_range(size_t, size_t) { liveryCalls++; }
+static GLuint upload(const std::vector<unsigned char>& pixels) {
+    uploaded.push_back(pixels[0]); boundTexture = (GLuint)uploaded.size(); return boundTexture;
+}
+static GLuint ebld_upload_cover(const std::vector<unsigned char>& pixels, int, int, bool) { return upload(pixels); }
+static GLuint ebld_upload_mips(const std::vector<unsigned char>& pixels, int, int, bool) { return upload(pixels); }
+static GLuint n64fix_upload(const std::vector<unsigned char>& pixels, int, int, bool = false) { return upload(pixels); }
+EXTRACTED_SERVICE
+static long bservice_upload(EbldModel& model, int texture, const std::vector<unsigned char>& pixels)
+{
+    serviceCalls++;
+    return source_bservice_upload(model, texture, pixels);
+}
+EXTRACTED_RESIDENCY
+EXTRACTED_REFERENCE
+
+static void require(bool condition, const std::string& message)
+{
+    if (!condition) throw std::runtime_error(message);
+}
+template<class Value> static Value read(std::istream& stream)
+{
+    Value value;
+    stream.read(reinterpret_cast<char*>(&value), sizeof value);
+    require((bool)stream, "truncated fixture");
+    return value;
+}
+static void reset(EbldModel& model)
+{
+    g_pack.tex.assign(model.tex.size(), PackTex());
+    for (const auto& source : model.service.tex)
+        for (int slot : source.second)
+            if ((size_t)slot >= g_pack.tex.size()) g_pack.tex.resize((size_t)slot + 1);
+    model.attached = true; model.resident = model.residentAll = false;
+    g_ebldResidentBytes = 0; g_ebldPrepareMetrics = Metrics();
+    uploaded.clear(); fileOpens = serviceCalls = liveryCalls = 0; boundTexture = 817;
+}
+static uint64_t resident_mask()
+{
+    uint64_t mask = 0;
+    for (size_t texture = 0; texture < g_pack.tex.size() && texture < 64; texture++)
+        if (g_pack.tex[texture].gl) mask |= uint64_t(1) << texture;
+    return mask;
+}
+static unsigned check_masks(const char* fixture)
+{
+    std::ifstream stream(fixture, std::ios::binary);
+    unsigned count = read<uint32_t>(stream);
+    for (unsigned index = 0; index < count; index++) {
+        EbldModel model;
+        const unsigned length = read<uint32_t>(stream);
+        model.type.resize(length); stream.read(&model.type[0], length);
+        model.tex.resize(read<uint32_t>(stream)); model.nset = (int)read<uint32_t>(stream);
+        model.param.assign(9, -1.0f); model.param[8] = read<float>(stream);
+        uint64_t expected[4];
+        for (int stage = 0; stage < 4; stage++) expected[stage] = read<uint64_t>(stream);
+        for (int set = 0; set < 3; set++) {
+            const unsigned triangles = read<uint32_t>(stream);
+            for (unsigned triangle = 0; triangle < triangles; triangle++) {
+                EbldTri value;
+                value.tex = read<int32_t>(stream); value.texDmg = read<int32_t>(stream);
+                value.texGlow = read<int32_t>(stream); value.texOver = read<int32_t>(stream);
+                value.mode = read<uint32_t>(stream); value.kind = read<uint32_t>(stream);
+                model.set[set].tri.push_back(value);
+            }
+        }
+        ebld_derive_texture_masks(model);
+        for (int stage = 0; stage < 4; stage++)
+            require(ebld_texture_mask_for_stage(model, stage) == expected[stage], model.type + " stage mask mismatch");
+        for (int fallback = 0; fallback < 3; fallback++) {
+            g_raModule = fallback == 0; model.texOwner = fallback == 1 ? 0 : -1; stageEnabled = fallback != 2;
+            for (int stage = -1; stage < 5; stage++)
+                require(ebld_texture_mask_for_stage(model, stage) == ebld_all_texture_mask(model), "fallback mask mismatch");
+        }
+        g_raModule = false; model.texOwner = -1; stageEnabled = true;
+    }
+    return count;
+}
+static void check_residency(const char* pixels)
+{
+    EbldModel model;
+    model.path = pixels; model.fileSize = 256; model.tex.resize(64);
+    model.texIntact.assign(64, 0); model.texIntact[0] = 1;
+    for (size_t texture = 0; texture < model.tex.size(); texture++) model.tex[texture].off = (long)texture * 4;
+    model.param.assign(9, -1.0f); model.param[8] = 7.0f;
+    model.set[0].tri.push_back({0, -1, -1, -1, 0, 0});
+    model.set[1].tri.push_back({1, 2, 5, 4, 0, 0});
+    model.set[1].tri.push_back({63, -1, -1, 20, MODE_XLU, 0});
+    model.set[1].tri.push_back({-1, -1, -1, 21, 0, 1});
+    model.set[2].tri.push_back({3, -1, 6, -1, 0, 0});
+    ebld_derive_texture_masks(model);
+    require(model.stageTextures[1] == ((uint64_t(1) << 63) | 18), "overlay eligibility or bit63");
+    require(ebld_texture_bit(model, 64) == 0 && ebld_texture_bit(model, -1) == 0, "invalid texture index");
+    reset(model);
+    uint64_t wanted = 0;
+    const int transitions[] = { EB_DAMAGED, EB_HELD, EB_INTACT, EB_DAMAGED, EB_WRECKED };
+    for (int stage : transitions) {
+        wanted |= model.stageTextures[stage];
+        require(ebld_resident_stage(model, stage), "stage demand failed");
+        require(resident_mask() == wanted, "unexpected or missing texture");
+        require(!model.residentAll, "stage incorrectly published all-texture readiness");
+        require(boundTexture == 817, "texture binding not restored");
+        const unsigned opens = fileOpens, uploads = (unsigned)uploaded.size();
+        require(ebld_resident_stage(model, stage), "ready stage failed");
+        require(fileOpens == opens && uploaded.size() == uploads, "ready stage repeated IO or upload");
+    }
+    require(model.resident, "repair did not restore intact readiness");
+    require(serviceCalls == uploaded.size() && liveryCalls == uploaded.size(), "service/livery omissions");
+    reset(model);
+    require(ebld_resident_stage(model, EB_WRECKED), "reload wreck demand failed");
+    require(resident_mask() == model.stageTextures[EB_WRECKED], "reload retained old readiness");
+    reset(model);
+    require(ebld_resident(model, true, 1, 5), "single-texture prepare failed");
+    require(resident_mask() == (uint64_t(1) << 5) && !model.residentAll && !model.resident,
+            "bounded preparation falsely marked readiness");
+    require(ebld_resident_stage(model, EB_DAMAGED), "prepared stage demand failed");
+    require(resident_mask() == model.stageTextures[EB_DAMAGED], "prepared stage loaded extra textures");
+    for (int fallback = 0; fallback < 3; fallback++) {
+        g_raModule = fallback == 0; model.texOwner = fallback == 1 ? 999 : -1; stageEnabled = fallback != 2;
+        reset(model);
+        require(reference_resident(model, true), "reference demand failed");
+        const auto referenceUploads = uploaded;
+        const long referenceBytes = g_ebldResidentBytes;
+        reset(model);
+        require(ebld_resident_stage(model, EB_DAMAGED), "fallback demand failed");
+        require(uploaded == referenceUploads && g_ebldResidentBytes == referenceBytes
+                && model.residentAll && model.resident && resident_mask() == ~uint64_t(0), "fallback deviates from reference");
+    }
+    g_raModule = false; model.texOwner = -1; stageEnabled = true;
+    model.service.tex[2] = {64, 65, 66};
+    for (int reload = 0; reload < 2; reload++) {
+        reset(model);
+        require(ebld_resident_stage(model, EB_DAMAGED), "service damage demand failed");
+        require(uploaded == std::vector<unsigned>({2, 3, 3, 2, 5}), "service variants or source atlas changed");
+        for (int slot : model.service.tex[2]) require(g_pack.tex[slot].gl != 0, "service variant not resident");
+        const size_t uploads = uploaded.size();
+        require(ebld_resident_stage(model, EB_DAMAGED) && uploaded.size() == uploads, "service variants uploaded twice");
+        require(ebld_resident_stage(model, EB_HELD) && ebld_resident_stage(model, EB_INTACT), "service repair transition failed");
+        for (int slot : model.service.tex[2]) require(g_pack.tex[slot].gl != 0, "service repair discarded variant");
+    }
+    reset(model); model.path += ".missing";
+    require(!ebld_resident_stage(model, EB_DAMAGED) && !model.attached, "unreadable file accepted");
+}
+int main(int argc, char** argv)
+{
+    try {
+        require(argc == 3, "expected fixture and raw pixels");
+        unsigned cases = check_masks(argv[1]);
+        check_residency(argv[2]);
+        std::cout << "{\"passed\":true,\"mask_cases\":" << cases
+                  << ",\"stage_masks\":" << cases * 4 << ",\"fallback_masks\":" << cases * 18
+                  << ",\"lifecycle_checks\":true,\"service_variant_checks\":true,\"actual_gl\":false}\n";
+    } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
+}

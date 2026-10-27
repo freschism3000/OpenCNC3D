@@ -1,0 +1,22 @@
+{
+  "reference_asset": "preserved Dock refinery: 440 wreck pieces; differs from full Windows release asset",
+  "comparisons": [
+    {
+      "candidate": "traceoff",
+      "rgba_png_files": 11,
+      "full_float_target_files": 66,
+      "different": [],
+      "decoded_bytes_equal": true
+    },
+    {
+      "candidate": "traceon",
+      "rgba_png_files": 11,
+      "full_float_target_files": 66,
+      "different": [],
+      "decoded_bytes_equal": true
+    }
+  ],
+  "note": "Script-only environment trace leg does not activate normal-loop recorder; active probe is a separate test.",
+  "building_timeline_text_equal": true,
+  "building_raw_hash_controls_equal": true
+}

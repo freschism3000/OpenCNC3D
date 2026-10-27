@@ -1,0 +1,2 @@
+bundle-sdl: gate_enhanced_menu -> @executable_path/libSDL2-2.0.0.dylib
+bundle-sdl: $REPO/art/interface/ra3d-title-cleanup-v01/evidence is self-contained (libSDL2-2.0.0.dylib + libSDL3.dylib)

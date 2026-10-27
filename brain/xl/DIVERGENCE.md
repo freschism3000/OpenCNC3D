@@ -407,3 +407,39 @@ negative entry count, or a table the file is too short to hold), which is where 
 damaged archive faulted once the palette copy no longer did. That file is in
 `common/`, so it is NOT a divergence at all: the fork's copy is the byte-identical
 copy `tools/check-xl-common.sh` demands, and it flowed here by that rule.
+
+
+## Fair per-player skirmish skill
+
+The shared `brain/fair_ai.h` profiles and TD controller now run in both TD
+engines. This is parity, not a new XL rule: all four skill levels use normal
+faction statistics, income, live prerequisites, power penalties and one paid
+production queue per category with the same multiple-factory speed as humans.
+The external controller keeps the legacy HouseClass and object layouts intact.
+An optional versioned, policy-hashed save trailer stores its explicit uint32
+state plus the gameplay and presentation RNG seeds omitted by the legacy TD
+save layout; legacy EOF saves start fresh at Normal, and malformed tagged trailers
+are refused.
+
+AI sight now goes through the ordinary own-unit sight radii and each house's
+explored-cell mask, including the Map::Sight_From and Display::Map_Cell paths
+that previously skipped computer houses. Autonomous targeting, production
+counters and support-power choices share the same knowledge/cloak filter. Live
+enemy navigation, archived and suspended references are cleared on loss of
+observation; friendly docking references and cell memories remain valid. Target
+scores exclude hidden cargo and unobserved kill counts.
+Explored construction origins use normal terrain, bib and adjacency legality;
+requiring a whole refinery bib to be explored was rejected because it is
+stricter than the existing human placement rule and stalls bare-MCV starts.
+The planner varies its economy, scouting, counter composition, army reserves,
+retreat threshold, coordinated objectives, command budget and decision cadence
+by skill, using a separate deterministic random stream. Candidate start
+locations come from the static map; live unseen opponent houses are never used
+to choose scout destinations.
+
+The placement fallback now returns Cell_Coord rather than a raw cell index in
+both engines. No map stride, wide house mask or XL address-space behavior was
+changed by this work. TD headless checks exercise initial-MCV construction,
+paid harvesting/production, level assignment, scouting/attacks, deterministic
+state diagnostics and save/resume; XL additionally requires its normal build
+and parity gates before runtime delivery.

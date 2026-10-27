@@ -61,6 +61,7 @@ read_data_id() {
 MACDATA=""
 WINDATA=""
 TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT HUP INT TERM
 {
     echo "# OpenCNC3D $TAG. Written by tools/launcher/make-manifest.sh and published"
     echo "# as a release asset, which is how the launcher sees it: opencnc3d.com's"
@@ -72,9 +73,24 @@ TMP=$(mktemp)
 for z in "$@"; do
     [ -f "$z" ] || { echo "no such zip: $z" >&2; exit 1; }
     name=$(basename "$z")
+    case "$name" in
+        *-module-*|*-modules.*)
+            echo "module assets belong in the separately verified module catalog: $name" >&2
+            exit 1 ;;
+    esac
     size=$(wc -c < "$z" | tr -d ' ')
     sha=$(sha256_of "$z")
     case "$name" in
+        OpenCNC3DInstaller-macos-*.pkg) key=macos_installer ;;
+        OpenCNC3DComplete-macos-*.pkg) key=macos_td_complete ;;
+        RA3DComplete-macos-*.pkg) key=macos_ra_complete ;;
+        OpenCNC3DInstaller-windows-*.exe) key=windows_installer ;;
+        OpenCNC3DComplete-windows-*.exe) key=windows_td_complete ;;
+        RA3DComplete-windows-*.exe) key=windows_ra_complete ;;
+        RA3DBinaries-macos-*.zip) key=macos_ra_bins ;;
+        RA3DBinaries-windows-*.zip) key=windows_ra_bins ;;
+        OpenCNC3DBinaries-macos-*.zip) key=macos_bins ;;
+        OpenCNC3DBinaries-windows-*.zip) key=windows_bins ;;
         *macos*-bins.zip)   key=macos_bins ;;
         *macos*.zip)        key=macos_full;   MACDATA=$(read_data_id "$z") ;;
         *windows*-bins.zip) key=windows_bins ;;

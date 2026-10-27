@@ -12,8 +12,8 @@ assert sha(ROOT/full['blend'])==full['blend_sha256']==fresh['fresh_blend_sha256'
 approval=read('APPROVAL.json') if (OUT/'APPROVAL.json').exists() else {}
 approved=approval.get('status')=='approved' and approval.get('blend_sha256')==full['blend_sha256']
 stage='approved_finished_asset_material_runtime_pending' if approved else 'pending_finished_asset_material_approval'
-material_gate='Approved; see APPROVAL.json and APPROVAL.md' if approved else 'Pending renewed user approval'
-next_step=('Resume from ../HANDOFF.md when requested: flatten the complete normal stack, prepare runtime delivery and perform separate in-game validation.' if approved else 'Renewed user approval of the actual finished-material version, then runtime delivery preparation and separate in-game validation. Flatten the complete material normal stack before export.')
+material_gate='Approved; see APPROVAL.json and APPROVAL.md' if approved else 'Pending renewed design-review approval'
+next_step=('Resume from ../HANDOFF.md when requested: flatten the complete normal stack, prepare runtime delivery and perform separate in-game validation.' if approved else 'Renewed design-review approval of the actual finished-material version, then runtime delivery preparation and separate in-game validation. Flatten the complete material normal stack before export.')
 channels={name:np.asarray(Image.open(OUT/'material_review'/f'hero_{name}.png').convert('RGB'),dtype=np.float32) for name in ['BaseColor','Roughness','Metallic','PlayerColorMask']}
 comparisons={}
 for a,b in itertools.combinations(channels,2):

@@ -16,8 +16,11 @@
 
 #include "lsetup_cli.h"
 #include "lmedia.h"
+#include "lmodule.h"
+#include "lcfg.h"
 #include "lnet.h"
 #include "lupdate.h"
+#include "lzip.h"
 
 #include <SDL.h>
 
@@ -208,7 +211,7 @@ static void ls_print_record(const char *dir)
  * game package added to the bar before it (0 for --media-install). Returns the exit
  * code. */
 static int ls_run_media(LS_Report *r, LM_State *m, int movies, int music, long long base_done,
-                        long long base_total, long long estimate)
+                        long long base_total, long long estimate, int add_only)
 {
     char item[256], status[600];
     LM_Phase ph;
@@ -222,7 +225,7 @@ static int ls_run_media(LS_Report *r, LM_State *m, int movies, int music, long l
                   "the setup was stopped before the movies and music were downloaded", 1);
         return 2;
     }
-    if (!lm_apply(m, movies, music)) {
+    if (!(add_only ? lm_apply_add_only(m, movies, music) : lm_apply(m, movies, music))) {
         lm_status(m, status, sizeof status);
         ls_report(r, "MEDIA", LS_FAILED, base_done, base_total + estimate, "", status, 1);
         fprintf(stderr, "movies and music: %s\n", status);
@@ -266,7 +269,7 @@ static long long ls_media_estimate(LM_State *m, int movies, int music)
 }
 
 static int ls_media_install(const char *dir, const char *spec, const char *manifest, int stall,
-                            LS_Report *r)
+                            int game, int add_only, LS_Report *r)
 {
     int movies, music, rc;
     LM_State *m;
@@ -278,15 +281,19 @@ static int ls_media_install(const char *dir, const char *spec, const char *manif
                   1);
         return 1;
     }
-    m = lm_create(dir, manifest);
+    if(game>=0 && !(game?lmod_ra_present(dir,NULL,0):lmod_td_present(dir))){
+        ls_report(r,"MEDIA",LS_FAILED,0,0,"","The selected game must be installed before its optional media.",1);return 1;
+    }
+    m = game<0?lm_create(dir,manifest):lm_create_game(dir,manifest,game);
     if (!m) {
         ls_report(r, "MEDIA", LS_FAILED, 0, 0, "", "out of memory", 1);
         return 1;
     }
     lm_set_stall(m, stall);
     printf("MEDIA|start|dir=%s|movies=%d|music=%d\n", dir, movies, music);
-    rc = ls_run_media(r, m, movies, music, 0, 0, ls_media_estimate(m, movies, music));
-    ls_print_record(dir);
+    rc = ls_run_media(r, m, movies, music, 0, 0, ls_media_estimate(m, movies, music), add_only);
+    if(game>=0){int mo,mu;if(lm_wanted(m,&mo,&mu,NULL,NULL))printf("MEDIA|result|game=%s|movies=%s|music=%s\n",game?"ra":"td",mo?"yes":"no",mu?"yes":"no");}
+    else ls_print_record(dir);
     lm_destroy(m);
     return rc;
 }
@@ -436,9 +443,13 @@ static int ls_install_game(const char *dir, const char *spec, const char *manife
     }
 
     /* 3. The movies and music, under the lock the install took, which this process
-     *    still holds, so no other launcher can start on the folder in between. */
+     *    still holds, so no other launcher can start on the folder in between. Their
+     *    size is asked again now the package is in: a package that carries a module
+     *    brings that module's movies and score into the download. The bar does not step
+     *    back for a larger total; it waits for the bytes to catch up. */
     if (want_media) {
-        rc = ls_run_media(r, m, movies, music, game_total, game_total, estimate);
+        estimate = ls_media_estimate(m, movies, music);
+        rc = ls_run_media(r, m, movies, music, game_total, game_total, estimate, 0);
         ls_print_record(dir);
     } else {
         ls_report(r, "GAME", LS_DONE, game_total, game_total, "", "", 1);
@@ -481,19 +492,40 @@ static int ls_fetch_pack(const char *dir, LS_Report *r)
     return unreached ? 3 : 1;
 }
 
+static int ls_module_progress(void *user,int done,int total)
+{
+    LS_Report *r=(LS_Report *)user;
+    if(r->cancel&&ls_exists(r->cancel)){r->cancelled=1;return 0;}
+    ls_report(r,"MODULE",LS_CHECKING,done,total,"Installing verified game files","",0);return 1;
+}
+static int ls_install_module(const char *dir,int target,const char *file,const char *sha,
+                              const char *site,LS_Report *r)
+{
+    char err[512];LMOD_Catalog catalog;int ok;
+    ls_report(r,"MODULE",LS_CHECKING,0,1000,"Checking game package","",0);
+    if(file)ok=lmod_install_file(dir,target,LCFG_BUILD,file,sha,ls_module_progress,r,err,sizeof err);
+    else{
+        ok=site?lmod_catalog_fetch_at(site,LCFG_BUILD,&catalog,err,sizeof err):lmod_catalog_fetch(LCFG_BUILD,&catalog,err,sizeof err);
+        if(ok)ok=lmod_install_remote(dir,target,LCFG_BUILD,&catalog,ls_module_progress,r,err,sizeof err);
+    }
+    ls_report(r,"MODULE",ok?LS_DONE:r->cancelled?LS_CANCELLED:LS_FAILED,ok?1000:0,1000,"",ok?"":err,1);
+    printf("MODULE-INSTALL|%s|%s\n",ok?"PASS":"FAIL",ok?"verified module installed":err);
+    return ok?0:r->cancelled?2:1;
+}
+
 int lsetup_cli_main(int argc, char **argv, int *handled)
 {
     const char *dir = NULL, *media_install = NULL, *media = NULL, *manifest = NULL;
-    const char *build = NULL;
+    const char *build = NULL,*module_file=NULL,*module_sha=NULL,*module_site=NULL;
     LS_Report r;
-    int install_game = 0, fetch_pack = 0, stall = 30, i, rc;
+    int install_game = 0, fetch_pack = 0, stall = 30, i, rc,media_game=-1,module_target=-1,media_add_only=0;
 
     *handled = 0;
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--"))
             break; /* everything after belongs to the game */
         if (!strcmp(argv[i], "--media-install") || !strcmp(argv[i], "--install-game")
-            || !strcmp(argv[i], "--fetch-menu-art"))
+            || !strcmp(argv[i], "--fetch-menu-art") || !strcmp(argv[i],"--install-module"))
             *handled = 1;
     }
     if (!*handled)
@@ -515,7 +547,19 @@ int lsetup_cli_main(int argc, char **argv, int *handled)
         const char *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!strcmp(a, "--"))
             break;
-        if (!strcmp(a, "--install-game")) {
+        if(!strcmp(a,"--install-module")&&v){
+            module_target=!strcmp(v,"td")?0:(!strcmp(v,"ra")||!strcmp(v,"ra3d"))?1:-1;
+            if(module_target<0){fprintf(stderr,"--install-module takes td or ra3d\n");return 1;}i++;
+        }else if(!strcmp(a,"--module-file")&&v){module_file=v;i++;}
+        else if(!strcmp(a,"--module-sha")&&v){module_sha=v;i++;}
+        else if(!strcmp(a,"--module-site")&&v){
+            if(strncmp(v,"http://127.0.0.1:",17)&&strncmp(v,"http://localhost:",17)){fprintf(stderr,"--module-site requires a loopback qualification server\n");return 1;}
+            module_site=v;i++;
+        }else if(!strcmp(a,"--media-add-only")){media_add_only=1;
+        }else if(!strcmp(a,"--media-game")&&v){
+            media_game=!strcmp(v,"td")?0:!strcmp(v,"ra")?1:-1;
+            if(media_game<0){fprintf(stderr,"--media-game takes td or ra\n");return 1;}i++;
+        }else if (!strcmp(a, "--install-game")) {
             install_game = 1;
         } else if (!strcmp(a, "--fetch-menu-art")) {
             fetch_pack = 1;
@@ -555,10 +599,22 @@ int lsetup_cli_main(int argc, char **argv, int *handled)
                   "the setup was not told which folder to use", 1);
         return 1;
     }
-    if ((install_game ? 1 : 0) + (media_install ? 1 : 0) + fetch_pack > 1) {
+    if ((install_game ? 1 : 0) + (media_install ? 1 : 0) + fetch_pack + (module_target>=0?1:0) > 1) {
         fprintf(stderr, "use --install-game with --media, or --media-install or --fetch-menu-art "
                         "on its own\n");
         ls_report(&r, "GAME", LS_FAILED, 0, 0, "", "the setup was asked for two things at once", 1);
+        return 1;
+    }
+    if((module_file&&!module_sha)||(!module_file&&module_sha)){
+        fprintf(stderr,"--module-file and --module-sha must be supplied together\n");return 1;
+    }
+    if(media_add_only&&(!media_install||media_game<0)){
+        fprintf(stderr,"--media-add-only requires --media-install and --media-game td|ra\n");return 1;
+    }
+    /* Refuse before catalog requests, lock/recovery, cache writes or removing a
+     * caller's cancellation file. Media-only jobs remain independent. */
+    if ((install_game || module_target >= 0) && lz_is_private_developer(dir)) {
+        fprintf(stderr, "This private source build is updated from its source checkout, not public game packages.\n");
         return 1;
     }
     if (stall < 1)
@@ -568,12 +624,14 @@ int lsetup_cli_main(int argc, char **argv, int *handled)
     if (r.cancel && ls_exists(r.cancel))
         remove(r.cancel);
 
-    if (fetch_pack)
+    if(module_target>=0)
+        rc=ls_install_module(dir,module_target,module_file,module_sha,module_site,&r);
+    else if (fetch_pack)
         rc = ls_fetch_pack(dir, &r);
     else if (install_game)
         rc = ls_install_game(dir, media, manifest, stall, build, &r);
     else
-        rc = ls_media_install(dir, media_install, manifest, stall, &r);
+        rc = ls_media_install(dir, media_install, manifest, stall, media_game, media_add_only, &r);
     printf("SETUP|exit|%d\n", rc);
     fflush(stdout);
     return rc;

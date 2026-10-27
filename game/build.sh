@@ -2,14 +2,33 @@
 # OpenCNC3D renderer build (macOS). Absolute brain path so the workspace can live anywhere.
 set -e
 cd "$(dirname "$0")"
+python3 ../tools/bakery/materialize-grassmask.py
+python3 ../tools/ra3d/bake-enhanced-hud.py ../game/ra-enhanced-hud.pack --header ../game/ra_hud_layout.h >/dev/null
 
 # Rebuild F5's 256px temperate grass, cliff, and road maps from the committed
 # original high-resolution images before packing them and building the renderer.
+if [ "${OPENCNC3D_CODE_ONLY:-0}" != 1 ]; then
 python3 ../tools/bakery/pack_experimental_terrain.py >/dev/null
 # The Enhanced textures: the remasters at 144 texels a cell and their join strips, two
 # packs per theater, from the finals committed under art/remaster/textures.
 python3 ../tools/bakery/pack_remaster_terrain.py >/dev/null
+python3 ../tools/bakery/pack_desert_ground.py >/dev/null
+python3 ../tools/bakery/pack_snow_ground.py >/dev/null
+python3 ../tools/bakery/terrain_daylight.py >/dev/null
+python3 ../tools/bakery/pack_sand_daylight.py >/dev/null
+python3 ../tools/bakery/pack_coast_masks.py >/dev/null
 python3 bake_dosclassic.py dosclassic.pack >/dev/null
+fi
+python3 ../tools/bakery/materialize-grassmask.py --check
+
+# Bib colour correction requires the calibrated v4 pack; an old v3 silently takes
+# the fallback multiply path and turns dirt roads pink. Refresh it for code-only too.
+python3 ../tools/art/remaster/bib/bake_bibenh.py --pack bibenh.pack >/dev/null
+
+# Required authored decals are refreshed even for a code-only delivery. An absent
+# pack makes Enhanced silently fall back to the cartridge's coarse ground marks.
+python3 ../tools/art/remaster/decals/build-runtime.py --pack decalenh.pack >/dev/null
+[ -s decalenh.pack ] || { echo "Enhanced decal pack is missing or empty" >&2; exit 1; }
 
 # THE OLDEST macOS THIS BINARY RUNS ON. Without it clang stamps LC_BUILD_VERSION minos
 # with whatever SDK it finds (whatever is installed), and dyld refuses a Mach-O whose minos
@@ -29,6 +48,12 @@ if [ -z "$OPENCNC3D_SKIP_VERSION_HEADER" ] || [ ! -f opencnc3d_build.h ]; then
     sh "../tools/version.sh" --header "../game/opencnc3d_build.h"
 fi
 
+# Freeze this build's identity. Another current-main build can regenerate the
+# shared header between translation units or architectures; never mix its stamp.
+BUILD_STAMP=$(mktemp "${TMPDIR:-/tmp}/cnc3d-build-stamp.XXXXXX")
+cp "opencnc3d_build.h" "$BUILD_STAMP"
+trap 'rm -f "$BUILD_STAMP"' 0
+
 # A COOKED BUILD has no F5 panel; see app/build.sh for the whole of it. This binary ships
 # in every package (make-build.sh), so it has to be able to be cooked too.
 #
@@ -37,7 +62,7 @@ fi
 # "|cooked" when the define above reached this compile. The packagers read that string off
 # the binary they ship, which is how a cook that was asked for and not compiled in is
 # caught. Nothing in the renderer reads the header, so this changes no code.
-CDEFS="-include ./opencnc3d_build.h"
+CDEFS="-include $BUILD_STAMP"
 [ -n "$OPENCNC3D_COOKED" ] && CDEFS="$CDEFS -DOPENCNC3D_COOKED=1"
 
 # The old ROOT pointed at a temporary folder that the OS cleans; the checkout now
@@ -59,9 +84,28 @@ cc $OPENCNC3D_ARCH -std=c89 -O2 -g -c dossave.c -o dossave.o
 # no SDL, so the Win98 build takes it unchanged.
 cc $OPENCNC3D_ARCH -std=c89 -O2 -g -c hud640.c -o hud640.o
 
+# Accepted Enhanced menu renderer and its unchanged menu controllers.
+for f in ../menu/dosmenu.c ../menu/dosops.c ../menu/doslobby.c ../menu/dosmp.c ../video/pngwrite.c; do
+    cc $OPENCNC3D_ARCH -std=gnu89 -O2 -g -I. -I../menu -I../video -c "$f" -o "$(basename "$f" .c).o"
+done
+clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g -DGL_SILENCE_DEPRECATION -I. -I../menu -I../video $(sdl2-config --cflags) -c ../menu/enhanced_menu.cpp -o enhanced_menu.o
+
 # The 1995 in-game Options dialog. Same rule as dosbar.c: plain C89, no GL, no SDL,
 # it rasterises into an 8-bit surface and nothing else.
 cc $OPENCNC3D_ARCH -std=c89 -O2 -g -c dosopt.c -o dosopt.o
+# gate_enhanced_menu: the Enhanced menu drawn and pressed against the 1995 controllers it
+# sits on, every screen, in a hidden window (G325). It includes enhanced_menu.cpp itself.
+clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g -DGL_SILENCE_DEPRECATION -I. -I../menu -I../video $(sdl2-config --cflags) \
+   -o gate_enhanced_menu ../menu/gate_enhanced_menu.cpp dosbar.o dossave.o hud640.o dosopt.o \
+   dosmenu.o dosops.o doslobby.o dosmp.o pngwrite.o $(sdl2-config --libs) \
+   -Wl,-headerpad_max_install_names -framework OpenGL
+# ITS SDL IS FIXED THE MOMENT IT IS LINKED, not at the end of this script with cnc_eyes.
+# The linker records @rpath/libSDL2-2.0.0.dylib and the binary carries no LC_RPATH, so
+# until tools/bundle-sdl.sh rewrites it the helper cannot start. Fixed only at the end, a
+# build that stopped in between (a failed cnc_eyes compile), or a play folder staged
+# while this script was still compiling, picked up the unfixed copy, and
+# game/make-build.sh refused the whole folder at its last check.
+sh ../tools/bundle-sdl.sh . gate_enhanced_menu
 
 # THE 3D FACTION LOGOS. app/logo3d.c is compiled into BOTH binaries now: the app draws the
 # spinning emblem on the score screen and the renderer draws it, plus the EVA wordmark, in
@@ -118,7 +162,9 @@ cc $OPENCNC3D_ARCH -std=gnu89 -O2 -g -o gate_roomcode ../net/gate_roomcode.c roo
 # gated elsewhere.
 cc $OPENCNC3D_ARCH -std=gnu99 -O2 -g -o gate_mpbrowse ../menu/gate_mpbrowse.c ../menu/mpbrowse.c \
    ../launcher/lnet.c ../launcher/ljson.c roomcode.o -I../menu -I../launcher \
-   $(sdl2-config --cflags) $(sdl2-config --libs) -lcurl
+   $(sdl2-config --cflags) $(sdl2-config --libs) -lcurl -Wl,-headerpad_max_install_names
+# Same as gate_enhanced_menu above: its SDL path is fixed as soon as it exists.
+sh ../tools/bundle-sdl.sh . gate_mpbrowse
 
 # cnc_twobrain: TWO brain instances in ONE process, compared per tick. It is the gate that
 # one-binary-twice cannot be: it proves two independent copies of the engine AGREE, which is
@@ -154,8 +200,8 @@ AUDOBJ="$AUDOBJ aud_sdl.o"
 # be rewritten after the link without relinking. Same flag and same reason as app/build.sh.
 clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g \
     -fms-extensions -fdeclspec -D__int64="long long" $CDEFS \
-    -o cnc_eyes cnc_eyes.cpp dosbar.o hud640.o dosopt.o dossave.o logo3d.o lockstep.o net_udp.o netmatch.o netbeacon.o roomcode.o $AUDOBJ \
-    -I"$HDR" -I../audio \
+    -o cnc_eyes cnc_eyes.cpp dosbar.o hud640.o dosopt.o dossave.o dosmenu.o dosops.o doslobby.o dosmp.o enhanced_menu.o pngwrite.o logo3d.o lockstep.o net_udp.o netmatch.o netbeacon.o roomcode.o $AUDOBJ \
+    -I"$HDR" -I. -I../audio -I../menu \
     $(sdl2-config --cflags) $(sdl2-config --libs) \
     -Wl,-headerpad_max_install_names \
     -framework OpenGL -lz
@@ -167,7 +213,7 @@ clang++ $OPENCNC3D_ARCH -std=c++14 -O2 -g \
 # why SDL3 has to travel too even though otool -L never mentions it.
 # gate_mpbrowse links SDL too. Left out, it kept the @rpath load command a CMake-built SDL
 # records, which resolves to nothing, and died in dyld before its first check.
-sh ../tools/bundle-sdl.sh . cnc_eyes gate_mpbrowse
+sh ../tools/bundle-sdl.sh . cnc_eyes gate_mpbrowse gate_enhanced_menu
 
 # A CONTENT STAMP OF WHAT WAS JUST COMPILED. playable/Editor.app warns when the binary
 # it is about to run predates the source, and mtime cannot answer that question: an edit
@@ -186,8 +232,8 @@ sh ../tools/bundle-sdl.sh . cnc_eyes gate_mpbrowse
 # own copy of this list -- so the day enhanced_mod.h was added here and not there, the two
 # could never agree again and the launcher warned "rebuild" after every successful build.
 # A warning that is always on is a warning nobody reads. One list, published here.
-BUILD_SOURCES="cnc_eyes.cpp cnc_sidebar.h edit_mod.h edit_tables.h enhanced_mod.h \
-edit_emblem.h codex_mod.h codex_table.h unitcard_mod.h gmwipe_mod.h dosclassic_mod.h bake_dosclassic.py bake_dosclassic_mix.py dosbar.c hud640.c hud640.h hud_enhanced.h hud_enhanced_impl.h hud_enhanced_catalog.h cnc_sidebar_enhanced.h dosopt.c ../app/logo3d.c \
+BUILD_SOURCES="new_sprites_mod.h new_sprites_data.h new_sprites_colour.h td_road_join.h cnc_eyes.cpp clear_blend.h clear_blend_field.h terrain_grass_mask.h diagnostic_session.h diagnostic_renderer.h diagnostic_wininfo.h building_service.h building_service_types.h building_service_bindings.h faction_livery.h n64inf_mod.h dosinf_mod.h dosopt.h dosopt_gl.h fullscreen.h cnc_game.h cursor3d_mod.h ebld_place.h evhc_mod.h n64fix_mod.h n64inf_mod.h dosinf_mod.h n64fix_mod.h evhc_mod.h ebld_place.h cursor3d_mod.h perf_trace.h destruction_trace.h building_physics_capture.h mesh_batch.h gl_state_cache.h ebld_mod.h ebld_prepare.h ../menu/enhanced_menu.cpp ../menu/enhanced_menu.h ../menu/enhanced_menu_font.h cnc_sidebar.h edit_mod.h edit_tables.h enhanced_mod.h \
+edit_emblem.h codex_mod.h codex_table.h unitcard_mod.h gmwipe_mod.h dosclassic_mod.h bake_dosclassic.py bake_dosclassic_mix.py dosbar.c hud640.c hud640.h hud_enhanced.h hud_enhanced_impl.h hud_enhanced_catalog.h sidebar_build_potential.h cnc_sidebar_enhanced.h dosopt.c ../app/logo3d.c \
 ../net/lockstep.c ../net/net_udp.c ../net/lockstep.h ../net/net_udp.h \
 ../net/netmatch.c ../net/netmatch.h ../net/netbeacon.c ../net/netbeacon.h"
 {
@@ -202,6 +248,54 @@ edit_emblem.h codex_mod.h codex_table.h unitcard_mod.h gmwipe_mod.h dosclassic_m
 # be able to disagree, so they no longer can.
 if [ -d ../playable ]; then
     cp cnc_eyes ../playable/cnc_eyes
+    if [ -d sprites ]; then mkdir -p ../playable/sprites; cp sprites/e1-v15.pack sprites/e1-v15-player-mask.png sprites/manifest.json ../playable/sprites/; fi
+    for surface in terrainsurface_*.pack *_SAND.pack; do
+        [ -f "$surface" ] && cp "$surface" ../playable/
+    done
+    # The clear-ground blend is a normal Enhanced asset, including code-only delivery.
+    if [ -f clearblend_TEMPERAT.pack ]; then
+        cp clearblend_TEMPERAT.pack ../playable/.clearblend_TEMPERAT.pack.new
+        mv ../playable/.clearblend_TEMPERAT.pack.new ../playable/clearblend_TEMPERAT.pack
+    fi
+    if [ -f coastmask_DESERT.pack ]; then
+        cp coastmask_DESERT.pack ../playable/.coastmask_DESERT.pack.new
+        mv ../playable/.coastmask_DESERT.pack.new ../playable/coastmask_DESERT.pack
+    fi
+    if [ -f groundmask_DESERT.pack ]; then
+        cp groundmask_DESERT.pack ../playable/.groundmask_DESERT.pack.new
+        mv ../playable/.groundmask_DESERT.pack.new ../playable/groundmask_DESERT.pack
+    fi
+    if [ -f clearblend_DESERT.pack ]; then
+        cp clearblend_DESERT.pack ../playable/.clearblend_DESERT.pack.new
+        mv ../playable/.clearblend_DESERT.pack.new ../playable/clearblend_DESERT.pack
+    fi
+    if [ -f waterbase_RA_TEMPERAT.pack ]; then
+        cp waterbase_RA_TEMPERAT.pack ../playable/.waterbase_RA_TEMPERAT.pack.new
+        mv ../playable/.waterbase_RA_TEMPERAT.pack.new ../playable/waterbase_RA_TEMPERAT.pack
+    fi
+    if [ -f grassmask_TEMPERAT.pack ]; then
+        cp grassmask_TEMPERAT.pack ../playable/.grassmask_TEMPERAT.pack.new
+        mv ../playable/.grassmask_TEMPERAT.pack.new ../playable/grassmask_TEMPERAT.pack
+    fi
+    if [ -f coastmask_TEMPERAT.pack ]; then
+        cp coastmask_TEMPERAT.pack ../playable/.coastmask_TEMPERAT.pack.new
+        mv ../playable/.coastmask_TEMPERAT.pack.new ../playable/coastmask_TEMPERAT.pack
+    fi
+    # Winter's and snow's sea: their coast coverage and their own open-water painting
+    # (tools/bakery/pack_coast_masks.py, above).
+    for sea in coastmask_WINTER coastmask_SNOW waterbase_WINTER waterbase_SNOW; do
+        if [ -f $sea.pack ]; then
+            cp $sea.pack ../playable/.$sea.pack.new
+            mv ../playable/.$sea.pack.new ../playable/$sea.pack
+        fi
+    done
+    cp bibenh.pack ../playable/.bibenh.pack.new
+    mv ../playable/.bibenh.pack.new ../playable/bibenh.pack
+    cp decalenh.pack ../playable/.decalenh.pack.new
+    mv ../playable/.decalenh.pack.new ../playable/decalenh.pack
+    # Runtime-only delivery preserves the installed, approved assets and MIX files.
+    # It compiles the same source with the same flags as a normal build.
+    if [ "${OPENCNC3D_CODE_ONLY:-0}" != 1 ]; then
     cp dosclassic.pack ../playable/dosclassic.pack
     if [ -f ../playable/CONQUER.MIX ]; then
         python3 bake_dosclassic_mix.py ../playable/CONQUER.MIX ../data/dosdata/CONQUER.MIX \
@@ -235,12 +329,13 @@ if [ -d ../playable ]; then
        ../playable/temperate_rivers_height.pack
     cp ../art/generated/temperate_rivers/remastered_style_v1/rivers_normal.pack \
        ../playable/temperate_rivers_normal.pack
+    fi
     # THE NET TEST BINARIES GO WITH IT, because the gate that runs them runs from the
     # PLAY folder and looks for ./gate_lockstep beside itself. Built here and left here,
     # they were invisible to the suite: the gate reported exit 99, "the binary was not
     # built", when all three had been built and were simply somewhere else. Same shape as
     # the engine and the app, so it is staged in the same place rather than in a third.
-    for b in gate_lockstep gate_netloop gate_tunnel gate_beacon gate_lobby gate_roomcode gate_mpbrowse netcheck cnc_twobrain; do
+    for b in gate_lockstep gate_netloop gate_tunnel gate_beacon gate_lobby gate_roomcode gate_mpbrowse gate_enhanced_menu netcheck cnc_twobrain; do
         [ -x "$b" ] && cp "$b" "../playable/$b"
     done
     # THE WORKED EXAMPLE. examples/ is tracked, playable/ is not, so the demo mission has

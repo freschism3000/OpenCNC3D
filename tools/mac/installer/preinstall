@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+SCRIPT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$SCRIPT/install-location.sh"
+resolve_install "$@"
+assert_real_parents
+if [ -d "$install" ]; then
+    for rel in opencnc3d-update.journal opencnc3d-module-removal.txt; do
+        [ ! -e "$install/$rel" ] && [ ! -L "$install/$rel" ] || {
+            echo 'Open the existing launcher once to finish recovery before installing.' >&2; exit 1;
+        }
+    done
+    # Refuse a running launcher/game before native Installer touches its bootstrap.
+    error_file=$(/usr/bin/mktemp -t opencnc3d-installer-lsof)
+    trap 'rm -f "$error_file"' EXIT HUP INT TERM
+    rc=0; refs=$(/usr/sbin/lsof -t +D "$install" 2>"$error_file") || rc=$?
+    [ ! -s "$error_file" ] && [ "$rc" -le 1 ] || {
+        cat "$error_file" >&2; echo 'Cannot check whether this installation is in use.' >&2; exit 1;
+    }
+    rm -f "$error_file"; trap - EXIT HUP INT TERM
+    [ -z "$refs" ] || { echo 'Quit OpenCNC3D before installing this package.' >&2; exit 1; }
+fi
+while IFS= read -r rel; do
+    current=$install; rest=$rel
+    while :; do
+        part=${rest%%/*}; current="$current/$part"
+        [ ! -L "$current" ] || { echo "A package target is linked: $rel" >&2; exit 1; }
+        case "$rest" in
+            */*) [ ! -e "$current" ] || [ -d "$current" ] || exit 1; rest=${rest#*/} ;;
+            *) [ ! -e "$current" ] || [ -f "$current" ] || exit 1; break ;;
+        esac
+    done
+done < "$SCRIPT/payload-files.txt"
+exit 0

@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Adds one read-only inline accessor, OpenCNC3D_Facing, returning the projectile's
+// existing PrimaryFacing so the renderer's object dump can say which way a bullet
+// flies, as the Tiberian Dawn brain's dump does. Nothing is written, and no existing
+// member is changed.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/BULLET.H 2     3/06/97 1:46p Joe_bostic $ */
 /***********************************************************************************************
@@ -92,6 +102,16 @@ public:
     operator BulletType(void) const
     {
         return Class->Type;
+    };
+
+    /*
+    ** OpenCNC3D instrumentation (read-only): the facing the projectile is travelling,
+    ** private above, 0 (north) to 255 clockwise. The object dump reports it. No
+    ** behaviour change.
+    */
+    int OpenCNC3D_Facing(void) const
+    {
+        return (int)(unsigned char)PrimaryFacing.Current();
     };
 
     /*---------------------------------------------------------------------

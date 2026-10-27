@@ -1,0 +1,1756 @@
+{
+ "format": "EBLD version 6; layout in tools/art/remaster/bake_ebld.py",
+ "what": "Red Alert's own versions of OpenCNC3D's trees for Red Alert 3D: the files a version changes, under the names of the type it stands in for; made by tools/art/remaster/ra/bake_versions.py, staged by tools/ra3d/stage-reuse.py once the version's row is approved",
+ "models": {
+  "T11_TEM": {
+   "file": "T11_TEM.ebld",
+   "bytes": 1369844,
+   "sha256": "f500df1c8d471040b77554d7e50bf8b26da2a1cca0a56a1d314e50d4849e206d",
+   "export": "build-native/remaster-ra/foliage-variant/T11RA/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T11_rm_0.png": "99d6da768632dde667c8b9aabd84497673827f91abf3e74e519479d2ddf128b3",
+    "T11_rm_1.png": "b3c2d657fdf97599e9db3ed0799128d32ca42ecd6cce0d43e3e8bc7d74f3e78b",
+    "T11_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T11_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T11_rm_nod_0.png": "99d6da768632dde667c8b9aabd84497673827f91abf3e74e519479d2ddf128b3",
+    "T11_rm_nod_1.png": "b3c2d657fdf97599e9db3ed0799128d32ca42ecd6cce0d43e3e8bc7d74f3e78b",
+    "fx.json": "c0630cd82c69d70a029c3c1000195cbf80e633ac73d745092e15573a58b26b90",
+    "remaster.json": "4b6f0a5aad4211dac27f49bc621852749d8b8242666b863facd14deab4649aad"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 1568
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 2.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T11_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T11_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T11_rm_0.png: its mask T11_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T11_rm_1.png: its mask T11_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the intact model only; 11 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1568 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1568,
+    "max_sway": 255,
+    "fluttering_corners": 3720
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T11_TEM_BURN": {
+   "file": "T11_TEM_BURN.ebld",
+   "bytes": 1956883,
+   "sha256": "6ef1fe7f73f733e3f3e514a83ef7ed01efd66a3651c470d4822c942f96936d11",
+   "export": "build-native/remaster-ra/foliage-variant/T11RA/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T11_burn_rm_0.png": "6fdd56e1f7bceebffd098ae381ff358cc871b1e8c0753697ee759eec1b58cb93",
+    "T11_burn_rm_1.png": "d17419148374c38f1e56a1aa17faf7d79e14e988ada3d33993d54ec708b8f90d",
+    "T11_burn_rm_fire.png": "ac15fd5d653f51ed508860d9f39b57a7c5977243d3d7370b9ec7a0fe57459264",
+    "T11_burn_rm_glow.png": "49f6d9d726d7d869faa660220974830111e68244f09e3437b973e5b7b2d5ad08",
+    "T11_burn_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T11_burn_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T11_burn_rm_nod_0.png": "6fdd56e1f7bceebffd098ae381ff358cc871b1e8c0753697ee759eec1b58cb93",
+    "T11_burn_rm_nod_1.png": "d17419148374c38f1e56a1aa17faf7d79e14e988ada3d33993d54ec708b8f90d",
+    "burning.json": "37cc4750e07bbffb97f463934d52a24643867660167a20c15900a1dddd3e8782",
+    "fx.json": "c0630cd82c69d70a029c3c1000195cbf80e633ac73d745092e15573a58b26b90",
+    "stages.json": "260c155e1a4da17b298c2db14353dbaab3c3fee6eef0cad910e297fd6e0f0d19"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 5,
+     "triangles": 1564
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [
+    {
+     "name": "smoke_plume",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "embers",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "fire_light",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "light"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 6.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T11_burn_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T11_burn_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "T11_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 10
+    },
+    {
+     "index": 3,
+     "name": "T11_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 13
+    },
+    {
+     "index": 4,
+     "name": "T11_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 16
+    },
+    {
+     "index": 5,
+     "name": "T11_burn_rm_glow.png",
+     "role": "anim",
+     "w": 256,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 9
+    },
+    {
+     "index": 6,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T11_burn_rm_0.png: its mask T11_burn_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T11_burn_rm_1.png: its mask T11_burn_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the burning model only; 8 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1564 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1564,
+    "max_sway": 230,
+    "fluttering_corners": 3696
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T14_TEM": {
+   "file": "T14_TEM.ebld",
+   "bytes": 1423288,
+   "sha256": "31519940580eef6fba605848b267706bff4d6fb14220d7de37f99eb83d5fcbda",
+   "export": "build-native/remaster-ra/foliage-variant/T14RA/viewer_ra_colours",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T14RA_rm_0.png": "931176f4e274b5df89dac77b9abbfe2519e88ac36ff5c9854a1b6bc13a7578f6",
+    "T14RA_rm_1.png": "dd20bae8e006fcec35f83438c247fa6f7c2ee93ef691f34dbe009de5536ce49f",
+    "T14RA_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T14RA_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T14RA_rm_nod_0.png": "931176f4e274b5df89dac77b9abbfe2519e88ac36ff5c9854a1b6bc13a7578f6",
+    "T14RA_rm_nod_1.png": "dd20bae8e006fcec35f83438c247fa6f7c2ee93ef691f34dbe009de5536ce49f",
+    "fx.json": "58bd1514109166ef60e51dd4cac0b913deba27705d9275ecdad7f61fcafbd8a9",
+    "remaster.json": "909d3e775b23b4404a593e36f7a77d741bd780967a594739242112f907c6c86a"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 1537
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 2.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T14RA_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T14RA_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T14RA_rm_0.png: its mask T14RA_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T14RA_rm_1.png: its mask T14RA_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the intact model only; 11 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1537 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1537,
+    "max_sway": 255,
+    "fluttering_corners": 3660
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T14_TEM_BURN": {
+   "file": "T14_TEM_BURN.ebld",
+   "bytes": 1907338,
+   "sha256": "6e02656f7348509995c88a49d5978cbcadaface1015f9bbdbd8ff32e53c48581",
+   "export": "build-native/remaster-ra/foliage-variant/T14RA/viewer_ra_colours",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T14RA_burn_rm_0.png": "90d88d872951f5aec9ca92d0339238f05c00728cf449a05dc3f6cc2e51df3d87",
+    "T14RA_burn_rm_1.png": "53b3722e1712b7ff136bf5bd5bd05289e004ccf3cf2beb2ff50ab9c99b1a4e32",
+    "T14RA_burn_rm_fire.png": "ac15fd5d653f51ed508860d9f39b57a7c5977243d3d7370b9ec7a0fe57459264",
+    "T14RA_burn_rm_glow.png": "49f6d9d726d7d869faa660220974830111e68244f09e3437b973e5b7b2d5ad08",
+    "T14RA_burn_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T14RA_burn_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T14RA_burn_rm_nod_0.png": "90d88d872951f5aec9ca92d0339238f05c00728cf449a05dc3f6cc2e51df3d87",
+    "T14RA_burn_rm_nod_1.png": "53b3722e1712b7ff136bf5bd5bd05289e004ccf3cf2beb2ff50ab9c99b1a4e32",
+    "burning.json": "b0d9a631dafbc7674ffd5c7f551e6e21c2f41296e923f94542a7a4c26a4b0f6c",
+    "fx.json": "58bd1514109166ef60e51dd4cac0b913deba27705d9275ecdad7f61fcafbd8a9",
+    "stages.json": "260c155e1a4da17b298c2db14353dbaab3c3fee6eef0cad910e297fd6e0f0d19"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 5,
+     "triangles": 1561
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [
+    {
+     "name": "smoke_plume",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "embers",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "fire_light",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "light"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 6.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T14RA_burn_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T14RA_burn_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "T14RA_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 10
+    },
+    {
+     "index": 3,
+     "name": "T14RA_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 13
+    },
+    {
+     "index": 4,
+     "name": "T14RA_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 16
+    },
+    {
+     "index": 5,
+     "name": "T14RA_burn_rm_glow.png",
+     "role": "anim",
+     "w": 256,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 9
+    },
+    {
+     "index": 6,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T14RA_burn_rm_0.png: its mask T14RA_burn_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T14RA_burn_rm_1.png: its mask T14RA_burn_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the burning model only; 8 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1561 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1561,
+    "max_sway": 230,
+    "fluttering_corners": 3720
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T14_TEM_SNAG": {
+   "file": "T14_TEM_SNAG.ebld",
+   "bytes": 165937,
+   "sha256": "c8c4991ec3d6f832b3b33cdb4076b47989156789bf8f703e76fe1c59e6c9bf20",
+   "export": "build-native/remaster-ra/foliage-variant/T14RA/viewer_ra_colours",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T14RA_snag_rm_1.png": "26a9de629889b602baf842ce37b1967eae6ccda965b63580c713c8a712772d9a",
+    "T14RA_snag_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T14RA_snag_rm_nod_1.png": "26a9de629889b602baf842ce37b1967eae6ccda965b63580c713c8a712772d9a",
+    "fx.json": "58bd1514109166ef60e51dd4cac0b913deba27705d9275ecdad7f61fcafbd8a9",
+    "snag.json": "b789851585d7bd10156d27333825fe848ac91e1a0f8cc5dc9d0542a03338d647",
+    "stages.json": "260c155e1a4da17b298c2db14353dbaab3c3fee6eef0cad910e297fd6e0f0d19"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 244
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [
+    {
+     "name": "snag_smoke_top",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_smoke_stub_0",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_smoke_stub_1",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_smoke_stub_2",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_embers_0",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_embers_1",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_embers_2",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_glow",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until",
+      "light"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T14RA_snag_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T14RA_snag_rm_1.png: its mask T14RA_snag_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the snag model only; 3 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 244 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 244,
+    "max_sway": 64,
+    "fluttering_corners": 0
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T14_WIN": {
+   "file": "T14_WIN.ebld",
+   "bytes": 1282971,
+   "sha256": "d94282d6b56e50c98fa0186c6ab883d35c9ac6464183224b36e1ba5c212cb308",
+   "export": "build-native/remaster-ra/foliage-variant/T14RA_WIN/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T14RA_rm_0.png": "0a556ac32c5147a024b06a220646debebea390b52b9d5914b3a9bd1e6b7f099f",
+    "T14RA_rm_1.png": "aeb5ceedfe0c73cad633cd1ae73df15e94625247ae1a9dec75928c672fb1cfa3",
+    "T14RA_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T14RA_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T14RA_rm_nod_0.png": "0a556ac32c5147a024b06a220646debebea390b52b9d5914b3a9bd1e6b7f099f",
+    "T14RA_rm_nod_1.png": "aeb5ceedfe0c73cad633cd1ae73df15e94625247ae1a9dec75928c672fb1cfa3",
+    "fx.json": "58bd1514109166ef60e51dd4cac0b913deba27705d9275ecdad7f61fcafbd8a9",
+    "remaster.json": "909d3e775b23b4404a593e36f7a77d741bd780967a594739242112f907c6c86a"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 1537
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 2.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T14RA_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T14RA_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T14RA_rm_0.png: its mask T14RA_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T14RA_rm_1.png: its mask T14RA_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the intact model only; 11 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1537 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1537,
+    "max_sway": 255,
+    "fluttering_corners": 3660
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T14_WIN_BURN": {
+   "file": "T14_WIN_BURN.ebld",
+   "bytes": 1446406,
+   "sha256": "301890d2b2431dd1fbca754f0ad7ca071b87de5e40a3ed1e54ff59b6120bc1a4",
+   "export": "build-native/remaster-ra/foliage-variant/T14RA_WIN/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T14RA_burn_rm_0.png": "335dac66ef3e259a11798fe749fb9d5f616264ca9448a63f3f32fb51d61a2703",
+    "T14RA_burn_rm_1.png": "53b3722e1712b7ff136bf5bd5bd05289e004ccf3cf2beb2ff50ab9c99b1a4e32",
+    "T14RA_burn_rm_fire.png": "ac15fd5d653f51ed508860d9f39b57a7c5977243d3d7370b9ec7a0fe57459264",
+    "T14RA_burn_rm_glow.png": "49f6d9d726d7d869faa660220974830111e68244f09e3437b973e5b7b2d5ad08",
+    "T14RA_burn_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T14RA_burn_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T14RA_burn_rm_nod_0.png": "335dac66ef3e259a11798fe749fb9d5f616264ca9448a63f3f32fb51d61a2703",
+    "T14RA_burn_rm_nod_1.png": "53b3722e1712b7ff136bf5bd5bd05289e004ccf3cf2beb2ff50ab9c99b1a4e32",
+    "burning.json": "b0d9a631dafbc7674ffd5c7f551e6e21c2f41296e923f94542a7a4c26a4b0f6c",
+    "fx.json": "58bd1514109166ef60e51dd4cac0b913deba27705d9275ecdad7f61fcafbd8a9",
+    "stages.json": "260c155e1a4da17b298c2db14353dbaab3c3fee6eef0cad910e297fd6e0f0d19"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 5,
+     "triangles": 1561
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [
+    {
+     "name": "smoke_plume",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "embers",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "fire_light",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "light"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 6.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T14RA_burn_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T14RA_burn_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "T14RA_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 10
+    },
+    {
+     "index": 3,
+     "name": "T14RA_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 13
+    },
+    {
+     "index": 4,
+     "name": "T14RA_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 16
+    },
+    {
+     "index": 5,
+     "name": "T14RA_burn_rm_glow.png",
+     "role": "anim",
+     "w": 256,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 9
+    },
+    {
+     "index": 6,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T14RA_burn_rm_0.png: its mask T14RA_burn_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T14RA_burn_rm_1.png: its mask T14RA_burn_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the burning model only; 8 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1561 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1561,
+    "max_sway": 230,
+    "fluttering_corners": 3720
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T14_WIN_SNAG": {
+   "file": "T14_WIN_SNAG.ebld",
+   "bytes": 165937,
+   "sha256": "c8c4991ec3d6f832b3b33cdb4076b47989156789bf8f703e76fe1c59e6c9bf20",
+   "export": "build-native/remaster-ra/foliage-variant/T14RA_WIN/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T14RA_snag_rm_1.png": "26a9de629889b602baf842ce37b1967eae6ccda965b63580c713c8a712772d9a",
+    "T14RA_snag_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T14RA_snag_rm_nod_1.png": "26a9de629889b602baf842ce37b1967eae6ccda965b63580c713c8a712772d9a",
+    "fx.json": "58bd1514109166ef60e51dd4cac0b913deba27705d9275ecdad7f61fcafbd8a9",
+    "snag.json": "b789851585d7bd10156d27333825fe848ac91e1a0f8cc5dc9d0542a03338d647",
+    "stages.json": "260c155e1a4da17b298c2db14353dbaab3c3fee6eef0cad910e297fd6e0f0d19"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 244
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [
+    {
+     "name": "snag_smoke_top",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_smoke_stub_0",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_smoke_stub_1",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_smoke_stub_2",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_embers_0",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_embers_1",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_embers_2",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until"
+     ]
+    },
+    {
+     "name": "snag_glow",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "until",
+      "light"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 1.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T14RA_snag_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T14RA_snag_rm_1.png: its mask T14RA_snag_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the snag model only; 3 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 244 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 244,
+    "max_sway": 64,
+    "fluttering_corners": 0
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T15_TEM": {
+   "file": "T15_TEM.ebld",
+   "bytes": 1438696,
+   "sha256": "c86f97e87180424f611ec53829f75d13b455fcd67251a41e0f6e0d45fed29b6f",
+   "export": "build-native/remaster-ra/foliage-variant/T15RA/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T15_rm_0.png": "88c007c0859ea41e4c9db0c839a39ecef571d2e1df4a10692f46791bfc775d2c",
+    "T15_rm_1.png": "42c342caf4bd150ed674f892ae19ce3e32e4b96d91a341ae7becc9bb5e4677be",
+    "T15_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T15_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T15_rm_nod_0.png": "88c007c0859ea41e4c9db0c839a39ecef571d2e1df4a10692f46791bfc775d2c",
+    "T15_rm_nod_1.png": "42c342caf4bd150ed674f892ae19ce3e32e4b96d91a341ae7becc9bb5e4677be",
+    "fx.json": "de74df651a08e626dc4c1f64d68c28c61b8ddfb0c5251a416bff9249f83705ed",
+    "remaster.json": "bdf6f6e68b1ba774e6c09d5f5da07e31ecf24e5550141ac31bc2609e7ec9adf0"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 1420
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 2.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T15_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T15_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T15_rm_0.png: its mask T15_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T15_rm_1.png: its mask T15_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the intact model only; 11 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1420 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1420,
+    "max_sway": 255,
+    "fluttering_corners": 3312
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T15_TEM_BURN": {
+   "file": "T15_TEM_BURN.ebld",
+   "bytes": 1925412,
+   "sha256": "9dabd48b8319d13a4b5d2083ab280f2ad2dae676c898566853fc35f8f28da3fe",
+   "export": "build-native/remaster-ra/foliage-variant/T15RA/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T15_burn_rm_0.png": "74c5bdca00d15251ee2a37e49ce0a08fcda59aa6f0eb116a5d7db0b6a3983ef0",
+    "T15_burn_rm_1.png": "41b63d7314d266a0ba59d564237bb6842a28a8caccefd6035b2f27ca30d9a2cb",
+    "T15_burn_rm_fire.png": "ac15fd5d653f51ed508860d9f39b57a7c5977243d3d7370b9ec7a0fe57459264",
+    "T15_burn_rm_glow.png": "49f6d9d726d7d869faa660220974830111e68244f09e3437b973e5b7b2d5ad08",
+    "T15_burn_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T15_burn_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T15_burn_rm_nod_0.png": "74c5bdca00d15251ee2a37e49ce0a08fcda59aa6f0eb116a5d7db0b6a3983ef0",
+    "T15_burn_rm_nod_1.png": "41b63d7314d266a0ba59d564237bb6842a28a8caccefd6035b2f27ca30d9a2cb",
+    "burning.json": "67f81fc33a59cf95589b87e8935556dcc754ec5e57b008521ee3e4f19cbdd59a",
+    "fx.json": "de74df651a08e626dc4c1f64d68c28c61b8ddfb0c5251a416bff9249f83705ed",
+    "stages.json": "260c155e1a4da17b298c2db14353dbaab3c3fee6eef0cad910e297fd6e0f0d19"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 5,
+     "triangles": 1444
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [
+    {
+     "name": "smoke_plume",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "embers",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "fire_light",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "light"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 6.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T15_burn_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T15_burn_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "T15_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 10
+    },
+    {
+     "index": 3,
+     "name": "T15_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 13
+    },
+    {
+     "index": 4,
+     "name": "T15_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 16
+    },
+    {
+     "index": 5,
+     "name": "T15_burn_rm_glow.png",
+     "role": "anim",
+     "w": 256,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 9
+    },
+    {
+     "index": 6,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T15_burn_rm_0.png: its mask T15_burn_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T15_burn_rm_1.png: its mask T15_burn_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the burning model only; 8 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 1444 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 1444,
+    "max_sway": 230,
+    "fluttering_corners": 3372
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T17_TEM": {
+   "file": "T17_TEM.ebld",
+   "bytes": 1354852,
+   "sha256": "5c064be2659c2b6537fa36ea110bb43012f8dee4c5120d5590656a1132f33292",
+   "export": "build-native/remaster-ra/foliage-variant/T17RA/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T17_rm_0.png": "03a289647b58869fb6838f869285fc97f53d3aafec5ed92c3eb71124a8ddf128",
+    "T17_rm_1.png": "3697581b7518e0330dea0ffd551141e822d8115a5f124884f91436f608a4da87",
+    "T17_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T17_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T17_rm_nod_0.png": "03a289647b58869fb6838f869285fc97f53d3aafec5ed92c3eb71124a8ddf128",
+    "T17_rm_nod_1.png": "3697581b7518e0330dea0ffd551141e822d8115a5f124884f91436f608a4da87",
+    "fx.json": "1d699e979ab39d5354fa79d3c388fd0c1a73aaf88a6153bd1a41f5c197450ffe",
+    "remaster.json": "0c8fe8378218e6e92e0c7a6e6d10fb7d7294b9f2bb62132365e57809d49e1bec"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 1,
+     "triangles": 879
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 2.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T17_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T17_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T17_rm_0.png: its mask T17_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T17_rm_1.png: its mask T17_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the intact model only; 11 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 879 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 879,
+    "max_sway": 255,
+    "fluttering_corners": 1668
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  },
+  "T17_TEM_BURN": {
+   "file": "T17_TEM_BURN.ebld",
+   "bytes": 1836224,
+   "sha256": "301c10bfcec82616a9623ef1d51791386a267826698cd432ff44bd66804fbd25",
+   "export": "build-native/remaster-ra/foliage-variant/T17RA/viewer",
+   "sources": {
+    "../../../../remaster/NUKE/viewer/fx.json": "387a5dafa44902c8fa7d90d8406e644fe8a42bc6c4fe1e77a669b4d699facf29",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png": "e5da8181f09014b685df1dbfbe09c830984e8273f529cd603c19d875729ecea1",
+    "T17_burn_rm_0.png": "107c8c9c7025a4cd29f10def2e671f22ffb4768400501dcd06b6c17582009dde",
+    "T17_burn_rm_1.png": "ba1157be751ca4b2f2816ed118d54354072c8ef79312e74cb0f3dff8ba69b570",
+    "T17_burn_rm_fire.png": "ac15fd5d653f51ed508860d9f39b57a7c5977243d3d7370b9ec7a0fe57459264",
+    "T17_burn_rm_glow.png": "49f6d9d726d7d869faa660220974830111e68244f09e3437b973e5b7b2d5ad08",
+    "T17_burn_rm_house_0.png": "0f4b1668d119f77ceb6b86645573f088ab2341d7b284314d5df0be7226ea5d91",
+    "T17_burn_rm_house_1.png": "65795a5b91030a2a433dae510d1edf494082a9cfa1153cd94f3797759f68f257",
+    "T17_burn_rm_nod_0.png": "107c8c9c7025a4cd29f10def2e671f22ffb4768400501dcd06b6c17582009dde",
+    "T17_burn_rm_nod_1.png": "ba1157be751ca4b2f2816ed118d54354072c8ef79312e74cb0f3dff8ba69b570",
+    "burning.json": "c1e1bf258fa69207b386acf3bc53c02e110650c6b26cbdd197bbc331e99e4614",
+    "fx.json": "1d699e979ab39d5354fa79d3c388fd0c1a73aaf88a6153bd1a41f5c197450ffe",
+    "stages.json": "260c155e1a4da17b298c2db14353dbaab3c3fee6eef0cad910e297fd6e0f0d19"
+   },
+   "sets": {
+    "INTACT": {
+     "pieces": 5,
+     "triangles": 915
+    }
+   },
+   "chips_per_zone": {},
+   "loose_pieces": [],
+   "emitters": [
+    {
+     "name": "smoke_plume",
+     "state": "intact",
+     "source": "smoke",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "embers",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1
+    },
+    {
+     "name": "fire_light",
+     "state": "intact",
+     "source": "embers",
+     "piece": null,
+     "points": 1,
+     "fields": [
+      "light"
+     ]
+    }
+   ],
+   "emitters_dropped": [],
+   "version": 6,
+   "kind": "intact",
+   "moving": [],
+   "flags": [
+    "scorchcell"
+   ],
+   "liquids": [],
+   "cut_pieces": {},
+   "params": {
+    "water_level": 0.0,
+    "water_drop_to": 0.0,
+    "water_floor": 0.0,
+    "water_seconds": 0.0,
+    "waterfall_speed": 0.0,
+    "scorch_size": 1.5999999999999999,
+    "scorch_seconds": 30.0,
+    "scorch_fade": 4.0,
+    "scorch_tex": 6.0,
+    "sink_after": 3.5,
+    "sink_time": 5.0,
+    "sink_depth": 0.5,
+    "shake_per_cell": 0.028,
+    "chip_step": 0.05,
+    "zone_add": 0.25,
+    "footprint_w": 2.0,
+    "footprint_h": 2.0,
+    "blast_x": 0.0,
+    "blast_z": 0.0
+   },
+   "textures": [
+    {
+     "index": 0,
+     "name": "T17_burn_rm_0.png",
+     "role": "base",
+     "w": 1024,
+     "h": 1024,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 1,
+     "name": "T17_burn_rm_1.png",
+     "role": "base",
+     "w": 512,
+     "h": 512,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    },
+    {
+     "index": 2,
+     "name": "T17_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 10
+    },
+    {
+     "index": 3,
+     "name": "T17_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 13
+    },
+    {
+     "index": 4,
+     "name": "T17_burn_rm_fire.png",
+     "role": "anim",
+     "w": 128,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 16
+    },
+    {
+     "index": 5,
+     "name": "T17_burn_rm_glow.png",
+     "role": "anim",
+     "w": 256,
+     "h": 256,
+     "grid": 4,
+     "frames": 16,
+     "fps": 9
+    },
+    {
+     "index": 6,
+     "name": "../../../../remaster/NUKE/viewer/fx/scorch.png",
+     "role": "scorch",
+     "w": 128,
+     "h": 128,
+     "grid": 1,
+     "frames": 1,
+     "fps": 0
+    }
+   ],
+   "notes": [
+    "T17_burn_rm_0.png: its mask T17_burn_rm_house_0.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "T17_burn_rm_1.png: its mask T17_burn_rm_house_1.png is zero everywhere, so it has no house paint; no Nod decode or mask stored",
+    "stages.json: the burning model only; 8 emitters of the other stages left out",
+    "the scorch mark is NUKE's, fx/scorch.png",
+    "../../../../remaster/NUKE/viewer/fx/scorch.png is 96x96: padded to 128x128, scorch_size 2.4 -> 3.2 cells",
+    "the wind: 915 triangles carry their weights"
+   ],
+   "wind": {
+    "triangles": 915,
+    "max_sway": 230,
+    "fluttering_corners": 1764
+   },
+   "commit": "5a37e64066adff2327549f59e902542abc7bda01",
+   "baker": "tools/art/remaster/bake_ebld.py",
+   "baker_commit": "90d545d8b51a8771d8dd34df66d9e89d084b6410",
+   "baker_modified": false
+  }
+ }
+}

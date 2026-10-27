@@ -1,0 +1,1810 @@
+{
+  "version": "ra3d-enhanced-hud-v02-neutral",
+  "status": "browser review; not a runtime HUD",
+  "sourceRoot": ".",
+  "nativeHeight": 693,
+  "fontAdvances": [
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    5,
+    3,
+    5,
+    7,
+    5,
+    7,
+    7,
+    4,
+    4,
+    4,
+    7,
+    7,
+    4,
+    6,
+    3,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    3,
+    4,
+    5,
+    6,
+    5,
+    6,
+    7,
+    6,
+    6,
+    6,
+    6,
+    5,
+    5,
+    6,
+    6,
+    3,
+    6,
+    6,
+    5,
+    7,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    5,
+    6,
+    7,
+    7,
+    7,
+    7,
+    6,
+    5,
+    7,
+    5,
+    5,
+    7,
+    4,
+    6,
+    6,
+    6,
+    6,
+    5,
+    5,
+    6,
+    6,
+    3,
+    6,
+    6,
+    5,
+    7,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    5,
+    6,
+    7,
+    7,
+    7,
+    7,
+    6,
+    6,
+    3,
+    6,
+    7,
+    7,
+    6,
+    6,
+    5,
+    6,
+    6,
+    6,
+    6,
+    6,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    6,
+    6,
+    5,
+    7,
+    7,
+    6,
+    6,
+    6,
+    6,
+    6,
+    7,
+    6,
+    6,
+    6,
+    7,
+    6,
+    7,
+    6,
+    6,
+    4,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    7,
+    7,
+    7,
+    3,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    6,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7
+  ],
+  "assets": {
+    "minimap": {
+      "file": "minimap.png",
+      "w": 216,
+      "h": 187,
+      "sha256": "a756168dcede4ef67b05247cf0add4f1dc57b910d37d374cfeb6e80f06898a1d"
+    },
+    "production": {
+      "file": "production.png",
+      "w": 216,
+      "h": 488,
+      "sha256": "dcf103d5f8c134a7f550e81ec2e2edd8d191433a79e2c4226c60bca2fafaa04c"
+    },
+    "card": {
+      "file": "card.png",
+      "w": 272,
+      "h": 166,
+      "sha256": "28568edf949b775c29f133eca7215b7099819b594ee6ec987ad787e638a69ba2"
+    },
+    "tools": {
+      "file": "tools.png",
+      "w": 101,
+      "h": 165,
+      "sha256": "1c8c02fd54b0c3a3f7258d29b64a72e1f1ffe26faceb314ac04f6423c924a475"
+    },
+    "tool-normal": {
+      "file": "tool-normal.png",
+      "w": 35,
+      "h": 35,
+      "sha256": "eaa7ae813f81fe8f92260ae05b0c256c6ee4ee2d2002f46dbfeaadfbcdc9e492"
+    },
+    "tool-hover": {
+      "file": "tool-hover.png",
+      "w": 35,
+      "h": 35,
+      "sha256": "b57edb25e7d9c76efefc4b2f81f3379793961ffc352ea8f28f6a471fb470435f"
+    },
+    "tool-pressed": {
+      "file": "tool-pressed.png",
+      "w": 35,
+      "h": 35,
+      "sha256": "4d7150b12cbc3f7a240e4ec05ad63e749f644d41fa95f11432ce682e35c1a4ab"
+    },
+    "tool-active": {
+      "file": "tool-active.png",
+      "w": 35,
+      "h": 35,
+      "sha256": "f708cc28bcdf923c6282c804cd52e6044e62156bef6eacca5c325f45ee75780e"
+    },
+    "tool-disabled": {
+      "file": "tool-disabled.png",
+      "w": 35,
+      "h": 35,
+      "sha256": "6b52dfcc67dbe40ecb28fa4be133089aef49bb0e2d9cb143a605aa9befb05d22"
+    },
+    "tool-activehover": {
+      "file": "tool-activehover.png",
+      "w": 35,
+      "h": 35,
+      "sha256": "fd4161ee78e13bce74c01bb7b0c4d7fbb56f5030aa7eabfcb15fb9ab571ebf52"
+    },
+    "tab-normal": {
+      "file": "tab-normal.png",
+      "w": 28,
+      "h": 30,
+      "sha256": "99fb906a42bc962d2bcbdfe95a696bbcc4bb686eeb0684bfd05ca3939082bd2f"
+    },
+    "tab-hover": {
+      "file": "tab-hover.png",
+      "w": 28,
+      "h": 30,
+      "sha256": "b1073da40e79c51b0280b2329ca2975e929d69fd010a9eeb9839e8a61f12540d"
+    },
+    "tab-pressed": {
+      "file": "tab-pressed.png",
+      "w": 28,
+      "h": 30,
+      "sha256": "966755e5f7aebae4f2c5192126a7ebdf72ec9ec0a9a1d39730f81d0cea28b50b"
+    },
+    "tab-active": {
+      "file": "tab-active.png",
+      "w": 28,
+      "h": 30,
+      "sha256": "0bcd67cff4957de35d3b45c931dd0142d1425bbf66514f5ce10553474deb553c"
+    },
+    "tab-disabled": {
+      "file": "tab-disabled.png",
+      "w": 28,
+      "h": 30,
+      "sha256": "3475566a1cc7d2e36f18eb87ac315161cedd1e1f35ee0969c02fd9ebc5e5fb0e"
+    },
+    "tab-activehover": {
+      "file": "tab-activehover.png",
+      "w": 28,
+      "h": 30,
+      "sha256": "d3df0589c3ba880fb7fa6ccf4de6e8ec32b422027aa357bc1103cb87bb5ff0e9"
+    },
+    "header-normal": {
+      "file": "header-normal.png",
+      "w": 160,
+      "h": 17,
+      "sha256": "f3aead60ca1dc82d449c2e9fff576b1e2e270dd45776fd81c13001f66c2d7f30"
+    },
+    "header-hover": {
+      "file": "header-hover.png",
+      "w": 160,
+      "h": 17,
+      "sha256": "d09df364e04bbd9839b0499a9debe0747a527130bd20e73b610dae6fe572dbd7"
+    },
+    "header-pressed": {
+      "file": "header-pressed.png",
+      "w": 160,
+      "h": 17,
+      "sha256": "66ebda0ff6e8de1e25ad2ac6d1e0412ef053ad5c5ec316f621e36427ef169011"
+    },
+    "header-active": {
+      "file": "header-active.png",
+      "w": 160,
+      "h": 17,
+      "sha256": "1dab50d399dd3be27f2e7a82fb54f01944720d18208f07925eec85d1b3994197"
+    },
+    "header-disabled": {
+      "file": "header-disabled.png",
+      "w": 160,
+      "h": 17,
+      "sha256": "872e2dbd07796ccec19fa48002149c70befd53b1a7740f164c8a41164021afb3"
+    },
+    "header-activehover": {
+      "file": "header-activehover.png",
+      "w": 160,
+      "h": 17,
+      "sha256": "eb603e7f482b60dca1ae7eb251e361cfd404474bf9a58e23527164155f9d611a"
+    },
+    "sidebar-normal": {
+      "file": "sidebar-normal.png",
+      "w": 216,
+      "h": 17,
+      "sha256": "d529095b1e7b54ccb2b5e37353381e2b5f6d036f707c159d2b5ee4d2dd0f142d"
+    },
+    "sidebar-hover": {
+      "file": "sidebar-hover.png",
+      "w": 216,
+      "h": 17,
+      "sha256": "41999c0e8d1f8fe36a7c71e6f80e6bec055ecc21da69b7a84056f592f33ee2e1"
+    },
+    "sidebar-pressed": {
+      "file": "sidebar-pressed.png",
+      "w": 216,
+      "h": 17,
+      "sha256": "e97d2f084b6159976f1f43f3deeafe4d5a2c595b7c31d8b09f79a14784d9541f"
+    },
+    "sidebar-active": {
+      "file": "sidebar-active.png",
+      "w": 216,
+      "h": 17,
+      "sha256": "42d32197ceb5a6976fbe74cf40c7dba2c103a644f13d4f250cc11c1f6312aeaf"
+    },
+    "sidebar-disabled": {
+      "file": "sidebar-disabled.png",
+      "w": 216,
+      "h": 17,
+      "sha256": "b849eb45bf4f1f30774e1c1ac1e2c046ba59fa79b9c78e24e851250f407c28eb"
+    },
+    "sidebar-activehover": {
+      "file": "sidebar-activehover.png",
+      "w": 216,
+      "h": 17,
+      "sha256": "54af7b026faa40ea025a15f09f9b0428031c5c009d8a2acf966ced8a94f20689"
+    },
+    "group-normal": {
+      "file": "group-normal.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "a45bd639966f9492bfc4fb64da0f65a157e29f7e9a49f3ed501edd32bbad8b50"
+    },
+    "group-hover": {
+      "file": "group-hover.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "952814b4d2144746d04a5c412aeffa9246c9c21765f875b8985f707355215e28"
+    },
+    "group-pressed": {
+      "file": "group-pressed.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "677672acd54b4413b6d63d164f4d6984814250e81587d116d05271dcabf7f9cc"
+    },
+    "group-active": {
+      "file": "group-active.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "4d733d6f899b85358120051b607d2d14592570288bee19eafe93207ddc58ed31"
+    },
+    "group-disabled": {
+      "file": "group-disabled.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "15140630cba666d9796ab8bbea5a1c1584b5b9a742054f277362be19357b2d17"
+    },
+    "group-activehover": {
+      "file": "group-activehover.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "2be3b7b01686daffb29b9b1366613571ccf69f3f2d3cf0de70fda998852d8a62"
+    },
+    "font": {
+      "file": "font.png",
+      "w": 1912,
+      "h": 8,
+      "sha256": "f1a65bbd94299e127cbc05434919000e0b4e2315240fb8abe57f6af5bc86137b"
+    },
+    "font-warm": {
+      "file": "font-warm.png",
+      "w": 1912,
+      "h": 8,
+      "sha256": "95b0b06e01d0fbce7372b95bc80d424549fe48726ca53431316c77e3c4fd94f5"
+    },
+    "font-gold": {
+      "file": "font-gold.png",
+      "w": 1912,
+      "h": 8,
+      "sha256": "5dab6d1b8025d19cec429b892204c8e66c06aef8a2277353ca27a18789694221"
+    },
+    "font-muted": {
+      "file": "font-muted.png",
+      "w": 1912,
+      "h": 8,
+      "sha256": "0b36517fcad3d5ae5964ba93ba2a54bfebaf682f9a421640753030db3e0bc2b8"
+    },
+    "icon-repair": {
+      "file": "icon-repair.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "35b891668a65f5c2eca035f82284375a0e1014089560dbf25f4c3ebd6c792e22"
+    },
+    "icon-sell": {
+      "file": "icon-sell.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "46a904b4f61fbb9e474437ee34fcf451b40e880aa4acd920685101b9b1622d28"
+    },
+    "icon-power": {
+      "file": "icon-power.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "e61f8e88c45656d1960ccc9261e3224de1f3c12a9385be34ddbea1fed0c9d598"
+    },
+    "symbol-structures": {
+      "file": "symbol-structures.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "57009d734f6b985145f04791e7c619e3606ffaf67fbf3c1d26a263350bcc59e6"
+    },
+    "symbol-infantry": {
+      "file": "symbol-infantry.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "3ac7cace8946457d249f2d93347446a4d92a3de12d990d0050a184b083df4a43"
+    },
+    "symbol-vehicles": {
+      "file": "symbol-vehicles.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "f21a73a5e15326ad31947211ab217dcc17c121673d48a3741d7e35f6035ea185"
+    },
+    "symbol-aircraft": {
+      "file": "symbol-aircraft.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "894422031bf8b866807dcf83ff30faeb3fb1aa22a3188d30288b438d9b91aa0f"
+    },
+    "symbol-ships": {
+      "file": "symbol-ships.png",
+      "w": 19,
+      "h": 19,
+      "sha256": "4e13c9b8c083e5987d8698d840fc475051f5356c57c09aba10944a0ff302203a"
+    },
+    "cameo-POWR": {
+      "file": "cameo-POWR.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "4d14f3d33e28f8cd30abbe73b354168301714d6f3cfc6d7b158cc0429f2fb3bb"
+    },
+    "cameo-APWR": {
+      "file": "cameo-APWR.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "eb1bc867df29a284e68b89aacd97b2e023f493accebc61bfb6524c928e8457d3"
+    },
+    "cameo-PROC": {
+      "file": "cameo-PROC.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "4c93c131b0cb9b721fc1bcc7e2baf6f980492e5f2b7d1eb4122534487a42108f"
+    },
+    "cameo-SILO": {
+      "file": "cameo-SILO.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "9224eeeff02e15291879fafe5047d6e0c773bc5d1232faf27101ca5294ba46ad"
+    },
+    "cameo-TENT": {
+      "file": "cameo-TENT.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "9f95304abb1dbb8a436e52dc28acccc92d90e5bd0fc4222f89213409bcd28632"
+    },
+    "cameo-BARR": {
+      "file": "cameo-BARR.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "dc08d983c2a5453ed88231ea8ea29758275a7b62fe5a8168d724ba9b6c0e58b7"
+    },
+    "cameo-WEAP": {
+      "file": "cameo-WEAP.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "b125c4eda5791ffbdd32ccb0686f8f4cc18c572a90a961147bcbbb81087a1009"
+    },
+    "cameo-DOME": {
+      "file": "cameo-DOME.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "f8c400d6bb144ad35b47e17fd2ec235a428ab13a6d6ceb9d73d3cbc713ae777e"
+    },
+    "cameo-FIX": {
+      "file": "cameo-FIX.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "d2adcb46b904f3259cafe5c9f24230d3478f982482177c3e968f42e48b76985d"
+    },
+    "cameo-HPAD": {
+      "file": "cameo-HPAD.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "da01ed41c6647e92ad8077f874e51a43f2ead84a28cae04f2440f5243bc7464d"
+    },
+    "cameo-AFLD": {
+      "file": "cameo-AFLD.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "d159ed65b0bab4fca7869ceffe3883c5a15d77764e28ca225ce6593418d5d108"
+    },
+    "cameo-SYRD": {
+      "file": "cameo-SYRD.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "660d1253f09aa83198c48b1dd76806134383962f42e48e71a699fb278f723291"
+    },
+    "cameo-SPEN": {
+      "file": "cameo-SPEN.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "a71dabf48dad34b7fcfca43fddfbb5bfe5dc37a2f7e28595342c120597b343a1"
+    },
+    "cameo-ATEK": {
+      "file": "cameo-ATEK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "3511448d0fc2ca233ad5500a7dbd5782821edc88e762ddb10759913149ab6b8d"
+    },
+    "cameo-STEK": {
+      "file": "cameo-STEK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "1c4ecc8796e8d3021efbaf5051ec47f872333aa53a1c0e7d9a78310cf76160a3"
+    },
+    "cameo-GAP": {
+      "file": "cameo-GAP.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "87d484662ba70cf90606e79929003e76b82e4cd4b2343a6213fd471bb21f1880"
+    },
+    "cameo-PBOX": {
+      "file": "cameo-PBOX.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "a79f54e25c1976d42f2e8c2d9655fec357b2b1bb3826a5c11f7e99690ea435bf"
+    },
+    "cameo-HBOX": {
+      "file": "cameo-HBOX.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "3f4535edce776ee5f44a62c97562a7dfd4960f8d663d4b816bc726e459b29c5f"
+    },
+    "cameo-GUN": {
+      "file": "cameo-GUN.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "40aabf0829d429962794cc69ee527f62d84bbf37e8bf49d69a57986c3bd9ccbd"
+    },
+    "cameo-AGUN": {
+      "file": "cameo-AGUN.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "240cb5c968e228810f6030aad027f5a2d61e357ea81f193581e83fde12af8129"
+    },
+    "cameo-FTUR": {
+      "file": "cameo-FTUR.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "deb63683a9f293cf7f43a5825877cee466829a731f51f9cc56bd25769ad87f04"
+    },
+    "cameo-TSLA": {
+      "file": "cameo-TSLA.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "90a9daf5aba8d414ef4a72e4e7136fc2d1bd81a2a4ca3ee3da7cd9da05fc30b3"
+    },
+    "cameo-SAM": {
+      "file": "cameo-SAM.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "e8c1620cdaf859130ab93927245c97e4c179ac97c3df50330fcccbcb342ac929"
+    },
+    "cameo-IRON": {
+      "file": "cameo-IRON.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "81fe6caa2102600dbdb53fb04f95d9b3a2bd042a2658ec455a2b1aad9b94ba69"
+    },
+    "cameo-PDOX": {
+      "file": "cameo-PDOX.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "f1fed7ac6882a46b2752ed746752f88fc09bb286622b855c244cc3f7e537526c"
+    },
+    "cameo-MSLO": {
+      "file": "cameo-MSLO.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "267e27c3ef5c50af785a46d3b4cdba3f63da4301a891c87fc02dd9b31b396291"
+    },
+    "cameo-SBAG": {
+      "file": "cameo-SBAG.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "235bdb5c05214a959bd0a0ec5bb4c76f94e092b083038b6c4af5b450c40c8191"
+    },
+    "cameo-FENC": {
+      "file": "cameo-FENC.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "def1ea78c8925f9a2367c0f427c6a99821adba1435ff6408bef7e005fa2a42fb"
+    },
+    "cameo-BRIK": {
+      "file": "cameo-BRIK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "05dd4e5becfb16abbcd950990a8ea979a73ccca2379362bf0f6149de241f3b68"
+    },
+    "cameo-E1": {
+      "file": "cameo-E1.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "cb237ad94625af9a8666ce2944e27bf7e4bb7a685705dc24c074aa38d29be1bd"
+    },
+    "cameo-E2": {
+      "file": "cameo-E2.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "55c6357f22e614a7ecff4e51bb2ac6f92466bc54cf91537fb436de2412e30475"
+    },
+    "cameo-E3": {
+      "file": "cameo-E3.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "ae0e341245ac0e0caacfa7fd2abe721e06d338c85059f79d3fcabb375df11699"
+    },
+    "cameo-E4": {
+      "file": "cameo-E4.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "5faa0cf227e827031f73b28497fc0ee04b47b8b4a8c66b6dfc0bc780f7d92762"
+    },
+    "cameo-E6": {
+      "file": "cameo-E6.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "94c2be7926a1eefce011f390e2dbaa570b4c419ea013e7a6e2cd8dd136484d6b"
+    },
+    "cameo-DOG": {
+      "file": "cameo-DOG.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "0bb9827347720445be624003d3b3381028226416347d9266c450bb7373fb8df0"
+    },
+    "cameo-MEDI": {
+      "file": "cameo-MEDI.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "70e0085d3a7e790eef8cdf8f63cdf3ee9d86477cb528fb50fc69fb9e69def52f"
+    },
+    "cameo-SPY": {
+      "file": "cameo-SPY.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "61ce9491bbed09d1136e4c55db916a3b4a53507ad5c5c0ebead79d34a400a7ab"
+    },
+    "cameo-THF": {
+      "file": "cameo-THF.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "b269e92d97b4f8fbbf4cfbf50e1cfb0045cf8b12e52a3b6fa0ea99e139b1f203"
+    },
+    "cameo-E7": {
+      "file": "cameo-E7.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "ad850d841c6dc051749b74c0b59efdfb97389a7731842093a7bc0f3e0e7543ec"
+    },
+    "cameo-JEEP": {
+      "file": "cameo-JEEP.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "587f16abc9353e18667a8d341f903ed4b98dfae6fe2be36d9ee378314ac453ff"
+    },
+    "cameo-1TNK": {
+      "file": "cameo-1TNK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "046c9083b0b173cbc3b35769eeeb87df70862615b077c6330ee69139ead0b093"
+    },
+    "cameo-2TNK": {
+      "file": "cameo-2TNK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "04ddee20041ac1104340325db2454c18a652fe8b9ed4f43eddef35c18116b7af"
+    },
+    "cameo-3TNK": {
+      "file": "cameo-3TNK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "7dc76ee39ff9e59349d37b59f0f17cc0ec8d7ea31c81754abcc71296f9e8b312"
+    },
+    "cameo-4TNK": {
+      "file": "cameo-4TNK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "7073bf98f4217c65ba687599e7ab10185021e226d5a5edc17191e8f48aa9e3d7"
+    },
+    "cameo-V2RL": {
+      "file": "cameo-V2RL.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "484e4d5d3e9748ec3fd4062157d143caac676ab64464b678547e34453f102f30"
+    },
+    "cameo-APC": {
+      "file": "cameo-APC.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "3f7c0a2d1c1a0ef1a58cce778f86c2a243832615d3aee2bf824166e55c67fadf"
+    },
+    "cameo-ARTY": {
+      "file": "cameo-ARTY.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "9427549dd42ee8beafb14bfa0ba1f6cd398f126093e83bfbb7a37ec8e8628cb8"
+    },
+    "cameo-HARV": {
+      "file": "cameo-HARV.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "c95d4b8125077b1ba5f827bf10f569cb481a96a95eb1f0559a02a242bbab3a1d"
+    },
+    "cameo-MCV": {
+      "file": "cameo-MCV.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "bc9ab8010e5cd2c721cf75ee65cc6849785ab15c0af920a208d48577d9cf011b"
+    },
+    "cameo-MNLY": {
+      "file": "cameo-MNLY.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "e32d242592f419201e675204e3e2fa429e1b582f95aed5e6777d1e743ba0351f"
+    },
+    "cameo-MRJ": {
+      "file": "cameo-MRJ.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "0aa106885a153cb9f19e0230977f7173d029997d6e96f1ad5fb13b2de9f7b57a"
+    },
+    "cameo-MGG": {
+      "file": "cameo-MGG.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "0c1b13f06ef7533af2e0a5d56d8ce5e63d6faa3d28e267e5fff3fe850c52a587"
+    },
+    "cameo-HELI": {
+      "file": "cameo-HELI.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "9f48acee1ed4ba645e1a0d0812f59c7402a972367d034f5eae3b59634f591b76"
+    },
+    "cameo-HIND": {
+      "file": "cameo-HIND.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "75db2a224cc73508da00077918e28754ae052811e4fefb0a0800fcc7e298824e"
+    },
+    "cameo-TRAN": {
+      "file": "cameo-TRAN.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "0250f7001718d3b20f99bdf29024d9dc1af7cbb515887c87a291e836fca0d6aa"
+    },
+    "cameo-YAK": {
+      "file": "cameo-YAK.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "4d7a339c95c5f18326b252447f2c831eff9102530290fb29787debd1ddeef141"
+    },
+    "cameo-MIG": {
+      "file": "cameo-MIG.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "0028000e07afa9989a4c56be212d9d8af55b6e8e03442cc520d2186bcd6d4a26"
+    },
+    "cameo-DD": {
+      "file": "cameo-DD.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "992ac8c13efcccf5dc80f71d7ac02d952b6b025743f8a999000a271b0d701d99"
+    },
+    "cameo-CA": {
+      "file": "cameo-CA.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "7156d2f1ff7b73008733c027d17cdd02c78fe2f63ab67aee2cf7f9fa43924697"
+    },
+    "cameo-SS": {
+      "file": "cameo-SS.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "58e00236311ed7b856de4c56e3c555071074947b7176c77db6eb57d998a71720"
+    },
+    "cameo-LST": {
+      "file": "cameo-LST.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "b6a522af066ef391f8dc945ae4c78b11ca682b32102c3b6b0861a722a1beba7f"
+    },
+    "cameo-PT": {
+      "file": "cameo-PT.png",
+      "w": 64,
+      "h": 48,
+      "sha256": "5b373a4201cc52238106a32d1203a1a313d7fa1bd0e1e3286ea671ff93ffe9bf"
+    },
+    "NATORADR": {
+      "file": "NATORADR.png",
+      "w": 160,
+      "h": 141,
+      "sha256": "5b91e1881ab011018d30d1350dad59b226339e05d19627bb4c21e9d7c591d2c8"
+    },
+    "USSRRADR": {
+      "file": "USSRRADR.png",
+      "w": 160,
+      "h": 141,
+      "sha256": "0f2f07830ef67cd2502a6528098cb65384955920d7fa9fde83d7cf9b7ec849da"
+    },
+    "battlefield": {
+      "file": "battlefield.png",
+      "sha256": "979fed4df58d9c85e1c0a559b89952cdc400bdbf8e06ac30953657392565d7b1"
+    }
+  },
+  "sounds": {
+    "hover": {
+      "file": "hud_click.wav",
+      "sha256": "205c61a58c3c41b8bdd3fa46b6fc46a39f4fcc0cea9e4a0527c1cdbb83994d48"
+    },
+    "click": {
+      "file": "hud_mouseover.wav",
+      "sha256": "ed82638105a8efd3de7a78149e6c998a02d67ff6402078d3827ce3db724edf7c"
+    }
+  },
+  "items": [
+    {
+      "id": "POWR",
+      "name": "Power Plant",
+      "category": "structures",
+      "cost": 300,
+      "level": 1,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "FACT"
+      ]
+    },
+    {
+      "id": "APWR",
+      "name": "Advanced Power",
+      "category": "structures",
+      "cost": 500,
+      "level": 8,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "POWR"
+      ]
+    },
+    {
+      "id": "PROC",
+      "name": "Ore Refinery",
+      "category": "structures",
+      "cost": 2000,
+      "level": 1,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "POWR"
+      ]
+    },
+    {
+      "id": "SILO",
+      "name": "Ore Silo",
+      "category": "structures",
+      "cost": 150,
+      "level": 1,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "PROC"
+      ]
+    },
+    {
+      "id": "TENT",
+      "name": "Allied Barracks",
+      "category": "structures",
+      "cost": 300,
+      "level": 1,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "POWR"
+      ]
+    },
+    {
+      "id": "BARR",
+      "name": "Soviet Barracks",
+      "category": "structures",
+      "cost": 300,
+      "level": 1,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "POWR"
+      ]
+    },
+    {
+      "id": "WEAP",
+      "name": "War Factory",
+      "category": "structures",
+      "cost": 2000,
+      "level": 3,
+      "owners": [
+        "soviet",
+        "allies"
+      ],
+      "requires": [
+        "PROC"
+      ]
+    },
+    {
+      "id": "DOME",
+      "name": "Radar Dome",
+      "category": "structures",
+      "cost": 1000,
+      "level": 3,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "PROC"
+      ]
+    },
+    {
+      "id": "FIX",
+      "name": "Service Depot",
+      "category": "structures",
+      "cost": 1200,
+      "level": 3,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "WEAP"
+      ]
+    },
+    {
+      "id": "HPAD",
+      "name": "Helipad",
+      "category": "structures",
+      "cost": 1500,
+      "level": 9,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "DOME"
+      ]
+    },
+    {
+      "id": "AFLD",
+      "name": "Airfield",
+      "category": "structures",
+      "cost": 600,
+      "level": 5,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "DOME"
+      ]
+    },
+    {
+      "id": "SYRD",
+      "name": "Naval Yard",
+      "category": "structures",
+      "cost": 650,
+      "level": 3,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "POWR"
+      ]
+    },
+    {
+      "id": "SPEN",
+      "name": "Sub Pen",
+      "category": "structures",
+      "cost": 650,
+      "level": 3,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "POWR"
+      ]
+    },
+    {
+      "id": "ATEK",
+      "name": "Allied Tech Center",
+      "category": "structures",
+      "cost": 1500,
+      "level": 10,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP",
+        "DOME"
+      ]
+    },
+    {
+      "id": "STEK",
+      "name": "Soviet Tech Center",
+      "category": "structures",
+      "cost": 1500,
+      "level": 6,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "WEAP",
+        "DOME"
+      ]
+    },
+    {
+      "id": "GAP",
+      "name": "Gap Generator",
+      "category": "structures",
+      "cost": 500,
+      "level": 10,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "ATEK"
+      ]
+    },
+    {
+      "id": "PBOX",
+      "name": "Pillbox",
+      "category": "structures",
+      "cost": 400,
+      "level": 2,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "TENT"
+      ]
+    },
+    {
+      "id": "HBOX",
+      "name": "Camo Pillbox",
+      "category": "structures",
+      "cost": 600,
+      "level": 3,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "TENT"
+      ]
+    },
+    {
+      "id": "GUN",
+      "name": "Gun Turret",
+      "category": "structures",
+      "cost": 600,
+      "level": 4,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "TENT"
+      ]
+    },
+    {
+      "id": "AGUN",
+      "name": "AA Gun",
+      "category": "structures",
+      "cost": 600,
+      "level": 5,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "DOME"
+      ]
+    },
+    {
+      "id": "FTUR",
+      "name": "Flame Tower",
+      "category": "structures",
+      "cost": 600,
+      "level": 2,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "BARR"
+      ]
+    },
+    {
+      "id": "TSLA",
+      "name": "Tesla Coil",
+      "category": "structures",
+      "cost": 1500,
+      "level": 7,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "WEAP"
+      ]
+    },
+    {
+      "id": "SAM",
+      "name": "SAM Site",
+      "category": "structures",
+      "cost": 750,
+      "level": 9,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "DOME"
+      ]
+    },
+    {
+      "id": "IRON",
+      "name": "Iron Curtain",
+      "category": "structures",
+      "cost": 2800,
+      "level": 12,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "STEK"
+      ]
+    },
+    {
+      "id": "PDOX",
+      "name": "Chronosphere",
+      "category": "structures",
+      "cost": 2800,
+      "level": 12,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "ATEK"
+      ]
+    },
+    {
+      "id": "MSLO",
+      "name": "Missile Silo",
+      "category": "structures",
+      "cost": 2500,
+      "level": 13,
+      "owners": [
+        "soviet",
+        "allies"
+      ],
+      "requires": [
+        "STEK"
+      ]
+    },
+    {
+      "id": "SBAG",
+      "name": "Sandbags",
+      "category": "structures",
+      "cost": 25,
+      "level": 2,
+      "owners": [
+        "allies"
+      ],
+      "requires": []
+    },
+    {
+      "id": "FENC",
+      "name": "Fence",
+      "category": "structures",
+      "cost": 25,
+      "level": 2,
+      "owners": [
+        "soviet"
+      ],
+      "requires": []
+    },
+    {
+      "id": "BRIK",
+      "name": "Concrete Wall",
+      "category": "structures",
+      "cost": 100,
+      "level": 8,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": []
+    },
+    {
+      "id": "E1",
+      "name": "Rifle Infantry",
+      "category": "infantry",
+      "cost": 100,
+      "level": 1,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": []
+    },
+    {
+      "id": "E2",
+      "name": "Grenadier",
+      "category": "infantry",
+      "cost": 160,
+      "level": 1,
+      "owners": [
+        "soviet"
+      ],
+      "requires": []
+    },
+    {
+      "id": "E3",
+      "name": "Rocket Soldier",
+      "category": "infantry",
+      "cost": 300,
+      "level": 2,
+      "owners": [
+        "allies"
+      ],
+      "requires": []
+    },
+    {
+      "id": "E4",
+      "name": "Flamethrower",
+      "category": "infantry",
+      "cost": 300,
+      "level": 6,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "STEK"
+      ]
+    },
+    {
+      "id": "E6",
+      "name": "Engineer",
+      "category": "infantry",
+      "cost": 500,
+      "level": 5,
+      "owners": [
+        "soviet",
+        "allies"
+      ],
+      "requires": []
+    },
+    {
+      "id": "DOG",
+      "name": "Attack Dog",
+      "category": "infantry",
+      "cost": 200,
+      "level": 3,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "KENN"
+      ]
+    },
+    {
+      "id": "MEDI",
+      "name": "Medic",
+      "category": "infantry",
+      "cost": 800,
+      "level": 2,
+      "owners": [
+        "allies"
+      ],
+      "requires": []
+    },
+    {
+      "id": "SPY",
+      "name": "Spy",
+      "category": "infantry",
+      "cost": 500,
+      "level": 6,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "DOME"
+      ]
+    },
+    {
+      "id": "THF",
+      "name": "Thief",
+      "category": "infantry",
+      "cost": 500,
+      "level": 11,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "ATEK"
+      ]
+    },
+    {
+      "id": "E7",
+      "name": "Tanya",
+      "category": "infantry",
+      "cost": 1200,
+      "level": 11,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "ATEK"
+      ]
+    },
+    {
+      "id": "JEEP",
+      "name": "Ranger",
+      "category": "vehicles",
+      "cost": 600,
+      "level": 3,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP"
+      ]
+    },
+    {
+      "id": "1TNK",
+      "name": "Light Tank",
+      "category": "vehicles",
+      "cost": 700,
+      "level": 4,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP"
+      ]
+    },
+    {
+      "id": "2TNK",
+      "name": "Medium Tank",
+      "category": "vehicles",
+      "cost": 800,
+      "level": 6,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP"
+      ]
+    },
+    {
+      "id": "3TNK",
+      "name": "Heavy Tank",
+      "category": "vehicles",
+      "cost": 950,
+      "level": 4,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "WEAP"
+      ]
+    },
+    {
+      "id": "4TNK",
+      "name": "Mammoth Tank",
+      "category": "vehicles",
+      "cost": 1700,
+      "level": 10,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "WEAP",
+        "STEK"
+      ]
+    },
+    {
+      "id": "V2RL",
+      "name": "V2 Launcher",
+      "category": "vehicles",
+      "cost": 700,
+      "level": 4,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "WEAP",
+        "DOME"
+      ]
+    },
+    {
+      "id": "APC",
+      "name": "APC",
+      "category": "vehicles",
+      "cost": 800,
+      "level": 5,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP",
+        "TENT"
+      ]
+    },
+    {
+      "id": "ARTY",
+      "name": "Artillery",
+      "category": "vehicles",
+      "cost": 600,
+      "level": 8,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP"
+      ]
+    },
+    {
+      "id": "HARV",
+      "name": "Ore Truck",
+      "category": "vehicles",
+      "cost": 1400,
+      "level": 1,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "WEAP",
+        "PROC"
+      ]
+    },
+    {
+      "id": "MCV",
+      "name": "MCV",
+      "category": "vehicles",
+      "cost": 2500,
+      "level": 11,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "WEAP",
+        "FIX"
+      ]
+    },
+    {
+      "id": "MNLY",
+      "name": "Minelayer",
+      "category": "vehicles",
+      "cost": 800,
+      "level": 3,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": [
+        "WEAP",
+        "FIX"
+      ]
+    },
+    {
+      "id": "MRJ",
+      "name": "Radar Jammer",
+      "category": "vehicles",
+      "cost": 600,
+      "level": 12,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP",
+        "DOME"
+      ]
+    },
+    {
+      "id": "MGG",
+      "name": "Mobile Gap",
+      "category": "vehicles",
+      "cost": 600,
+      "level": 11,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "WEAP",
+        "ATEK"
+      ]
+    },
+    {
+      "id": "HELI",
+      "name": "Longbow",
+      "category": "aircraft",
+      "cost": 1200,
+      "level": 9,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "HPAD"
+      ]
+    },
+    {
+      "id": "HIND",
+      "name": "Hind",
+      "category": "aircraft",
+      "cost": 1200,
+      "level": 9,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "HPAD"
+      ]
+    },
+    {
+      "id": "TRAN",
+      "name": "Transport",
+      "category": "aircraft",
+      "cost": 1200,
+      "level": 11,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "HPAD"
+      ]
+    },
+    {
+      "id": "YAK",
+      "name": "Yak",
+      "category": "aircraft",
+      "cost": 800,
+      "level": 5,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "AFLD"
+      ]
+    },
+    {
+      "id": "MIG",
+      "name": "MiG",
+      "category": "aircraft",
+      "cost": 1200,
+      "level": 10,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "AFLD"
+      ]
+    },
+    {
+      "id": "DD",
+      "name": "Destroyer",
+      "category": "ships",
+      "cost": 1000,
+      "level": 7,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "SYRD"
+      ]
+    },
+    {
+      "id": "CA",
+      "name": "Cruiser",
+      "category": "ships",
+      "cost": 2000,
+      "level": 10,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "SYRD",
+        "ATEK"
+      ]
+    },
+    {
+      "id": "SS",
+      "name": "Submarine",
+      "category": "ships",
+      "cost": 950,
+      "level": 5,
+      "owners": [
+        "soviet"
+      ],
+      "requires": [
+        "SPEN"
+      ]
+    },
+    {
+      "id": "LST",
+      "name": "Transport",
+      "category": "ships",
+      "cost": 700,
+      "level": 3,
+      "owners": [
+        "allies",
+        "soviet"
+      ],
+      "requires": []
+    },
+    {
+      "id": "PT",
+      "name": "Gunboat",
+      "category": "ships",
+      "cost": 500,
+      "level": 5,
+      "owners": [
+        "allies"
+      ],
+      "requires": [
+        "SYRD"
+      ]
+    }
+  ],
+  "sources": {
+    "menu/bake_ra_enhanced_menu.py": "cb1daaec8da7f40d2c2491797da7c69d7037041b7eaf01d956eac2baf52cca93",
+    "art/interface/ra-enhanced-menu-v01/README.md": "82f610be36e4b6122b1783672af328d41ac931e85555fc00f90dd3bbb58d0dca",
+    "tools/art/remaster/viewer/cnc-interface/housing/manifest.json": "54737f55b1f2130539b91c153f80f9d3b4720b8c608a41ce781995882a105f6a",
+    "game/hud640_layout.h": "a0f78a369132e6852537e4d30532565d8ad93ade191faf614826a00b3c35a9eb"
+  },
+  "contract": {
+    "radar": [
+      30,
+      34,
+      156,
+      151
+    ],
+    "production": [
+      0,
+      205,
+      216,
+      488
+    ],
+    "tools": [
+      -79,
+      27,
+      101,
+      165
+    ],
+    "toolSeats": [
+      [
+        -42,
+        50,
+        35,
+        35
+      ],
+      [
+        -42,
+        92,
+        35,
+        35
+      ],
+      [
+        -42,
+        134,
+        35,
+        35
+      ]
+    ],
+    "toolInner": [
+      -49,
+      43,
+      49,
+      133
+    ],
+    "underlap": 22,
+    "categories": [
+      "structures",
+      "infantry",
+      "vehicles",
+      "aircraft",
+      "ships"
+    ],
+    "tabWidth": 28,
+    "tabStride": 31,
+    "rows": 8,
+    "cameoSize": [
+      64,
+      48
+    ],
+    "sampleTiming": "Lab fixture; not engine production",
+    "powerAction": "Lab fixture; RA engine capability unverified"
+  }
+}

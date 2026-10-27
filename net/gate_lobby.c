@@ -89,6 +89,7 @@
 #else
   #include <unistd.h>
   #include <sys/time.h>
+  #include <time.h>
   static void gl_nap(int ms) { usleep((useconds_t)ms * 1000); }
 #endif
 
@@ -131,6 +132,7 @@ static void fill_setup(NmSetup *s, const char *scen)
     s->seats = 2;
     for (i = 0; i < NM_MAX_SEATS; i++) {
         s->house[i] = (unsigned char)(i & 1);
+        s->ai_levels[i] = 1;
         s->colour[i] = (unsigned char)i;
         s->team[i] = (unsigned char)i;
         s->start[i] = (unsigned char)i;
@@ -161,9 +163,9 @@ static void fill_setup(NmSetup *s, const char *scen)
 #define GL_SEATPREF 0x54414553u
 #define GL_NEED     0x4445454Eu
 #define GL_LS       0x33434E50u   /* a turn packet, which is what an answer looks like */
-#define GL_VERSION  12   /* NM_VERSION in netmatch.c: the fake peer speaks the host's wire */
+#define GL_VERSION  14   /* NM_VERSION in netmatch.c: the fake peer speaks the host's wire */
 #define GL_REFUSE   0x4D455052u   /* NM_REFUSE: the host saying why not, reason word first */
-#define GL_SETUP_BYTES 192
+#define GL_SETUP_BYTES 200
 #define GL_START_BYTES (16 + GL_SETUP_BYTES)
 #define GL_SETUP_AHEAD 38        /* offsets inside the setup, after the 16 byte header */
 #define GL_SETUP_COLOUR 56
@@ -173,9 +175,17 @@ static unsigned gl_now_ms(void)
 #if defined(_WIN32)
     return (unsigned)GetTickCount();
 #else
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (unsigned)(tv.tv_sec * 1000u + tv.tv_usec / 1000u);
+    /* Match the prober's monotonic schedule. A wall-clock correction must not
+       turn four correctly spaced probes into a failed spacing/deadline assertion. */
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+        return (unsigned)((unsigned long)ts.tv_sec * 1000ul
+                          + (unsigned long)ts.tv_nsec / 1000000ul);
+    {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        return (unsigned)(tv.tv_sec * 1000u + tv.tv_usec / 1000u);
+    }
 #endif
 }
 static void gl_put(unsigned char *p, unsigned v)

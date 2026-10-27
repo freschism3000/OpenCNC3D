@@ -33,6 +33,15 @@ HOW IT WORKS, all by HTTP byte range (nothing reads a whole disc image):
      archives in the game's order, .AUD before .VAR) for every theme in the game's theme
      table, and each track it would open must be the shape the game's music reader takes:
      mono, 22050 Hz, SOS ADPCM (compression 99). That prints themes=N/37.
+  6. RED ALERT, from its two 1996 discs, for the Red Alert module's folder (ra3d/). Its
+     movies and its score are entries of archives inside MAIN.MIX, whose indexes are
+     encrypted; the bodies are not, so each movie is still one byte range of its disc.
+     The score is the exception: the game's audio reader takes plain MIX headers only, so
+     the player's ra3d/audio/SCORES.MIX is the disc's archive with its index rewritten
+     plain (tools/ra3d/stage-audio.py). Its manifest line carries that rewritten header,
+     and the launcher writes it ahead of the disc's data block. Every file is checked
+     against the development copy in data/radata, and the lines are fetched only where
+     the module is installed (the manifest's `module ra3d` line).
 
 It refuses to write anything if a file has no good mirror, unless --allow-gaps.
 """
@@ -49,6 +58,18 @@ import medialib as ml  # noqa: E402
 
 REPO = ml.REPO
 WINDOW = 65536
+
+# Tiberian Dawn's discs, and Red Alert's. The movies and the score of each game come
+# from its own discs only.
+TD_DISCS = ("GDI", "NOD", "COVERT")
+RA_DISCS = ("RA_ALLIED", "RA_SOVIET")
+RA_MODULE = "ra3d"
+# The Red Alert movies' archive on each disc, inside MAIN.MIX.
+RA_MOVIE_ARCHIVES = (("RA_ALLIED", "MOVIES1.MIX"), ("RA_SOVIET", "MOVIES2.MIX"))
+# The Allied ending is the disc's entry C1FB1EE5, which is the MIX ID of ALLYEND.VQA,
+# while the engine asks for ALLIEND.VQA; tools/ra3d/stage-frontend.py stages the same
+# alias in the development folder.
+RA_ALIASES = (("ALLIEND.VQA", 0xC1FB1EE5, "_C1FB1EE5.BIN"),)
 
 # The movie set in data/dosdata/movies was mostly extracted from these very images, so for
 # those files a matching size, head and tail is all the evidence needed. These eight were
@@ -103,8 +124,8 @@ def load_sources(path):
             p = line.split()
             if len(p) != 4 or p[0] != "source" or p[1] not in ml.DISCS or \
                     p[2] not in ("iso", "zip"):
-                raise SystemExit("%s:%d: expected 'source <GDI|NOD|COVERT> iso|zip <url>'"
-                                 % (path, n))
+                raise SystemExit("%s:%d: expected 'source <%s> iso|zip <url>'"
+                                 % (path, n, "|".join(ml.DISCS)))
             out.append(Mirror(p[1], p[2], p[3]))
     return out
 
@@ -157,6 +178,7 @@ class Item:
         self.disc_path = None      # cached whole copy from the reference mirror
         self.differs = False       # the disc's bytes are not the development copy's
         self.head = self.tail = None
+        self.prefix = b""          # bytes the launcher writes ahead of the disc's range
 
     def name(self):
         return self.relpath.rsplit("/", 1)[-1]
@@ -274,6 +296,158 @@ def theme_report(bank, themes, verbose=False):
     return have, bad
 
 
+def ra_theme_names():
+    """The theme names of the game's Red Alert table (audio/ra_theme_table.h)."""
+    src = open(os.path.join(REPO, "audio", "ra_theme_table.h"), encoding="latin-1").read()
+    return re.findall(r'\{\{"([^"]+)",', src)
+
+
+def red_alert(fetch, by_disc, radata, problems, verbose):
+    """Red Alert's movies and score, for the module folder ra3d/. Returns the Items.
+
+    Each disc's MAIN.MIX is an archive of archives with encrypted indexes: MOVIES1.MIX
+    (Allied) or MOVIES2.MIX (Soviet), and SCORES.MIX, are entries of it. Only indexes are
+    encrypted, so an entry of an entry is still one contiguous run of the disc image."""
+    say("\nRED ALERT (the module folder %s/, fetched only where it is installed)" % RA_MODULE)
+    if not all(by_disc.get(d) for d in RA_DISCS):
+        problems.append("Red Alert: a disc has no usable mirror")
+        return []
+    sys.path.insert(0, os.path.join(REPO, "tools", "ra3d"))
+    from importlib import import_module
+    stage_audio = import_module("stage-audio")
+
+    main = {}
+    for d in RA_DISCS:
+        ref = by_disc[d][0]
+        hit = one_file(ref.img, "MAIN.MIX")
+        if not isinstance(hit, tuple):
+            problems.append("Red Alert: %s has %s MAIN.MIX" % (d, "no" if hit is None else
+                                                                 "more than one"))
+            continue
+        path, lba, size = hit
+        idx = ml.RaMixIndex(ref.img, lba * ml.ISO_BLOCK, size, "%s %s" % (d, path))
+        main[d] = idx
+        say("  %-9s %-10s extent %6d, %11s bytes, %2d entries, index %s" % (
+            d, path, lba, fmt(size), idx.count, "encrypted" if idx.encrypted else "plain"))
+    if len(main) != len(RA_DISCS):
+        return []
+
+    def inner(d, name):
+        hit = main[d].find(name)
+        if not hit:
+            return None
+        return ml.RaMixIndex(by_disc[d][0].img, hit[0], hit[1], "%s MAIN.MIX:%s" % (d, name))
+
+    archives = []
+    for d, name in RA_MOVIE_ARCHIVES:
+        idx = inner(d, name)
+        if idx is None:
+            problems.append("Red Alert: %s's MAIN.MIX holds no %s" % (d, name))
+            continue
+        archives.append((d, name, idx))
+        say("  %-9s MAIN.MIX:%-11s %11s bytes, %2d entries" % (d, name, fmt(idx.fsize),
+                                                              idx.count))
+    items = []
+
+    # THE MOVIES: the set tools/ra3d/stage-frontend.py stages, every .VQA the disc
+    # extraction in data/radata/movies named, and the Allied ending under the name the
+    # engine asks for. The Allied disc is searched first.
+    movdir = os.path.join(radata, "movies")
+    want = [(f.upper(), ml.mix_id(f.upper()), f) for f in sorted(os.listdir(movdir))
+            if f.upper().endswith(".VQA")]
+    want += [(n, eid, src) for n, eid, src in RA_ALIASES]
+    on = dict((d, 0) for d in RA_DISCS)
+    for name, eid, src in want:
+        where = [(d, a, idx.find_id(eid)) for d, a, idx in archives if idx.find_id(eid)]
+        if not where:
+            problems.append("Red Alert movie %s is on neither disc" % name)
+            continue
+        d, a, (off, size) = where[0]
+        on[d] += 1
+        it = Item("movies", "%s/movies/%s" % (RA_MODULE, name), d, off, size)
+        it.local = os.path.join(movdir, src)
+        settle(fetch, it, by_disc[d])
+        if it.disc_path or it.differs:
+            problems.append("Red Alert movie %s: the disc's bytes are not data/radata's" % name)
+        items.append(it)
+        if verbose:
+            say("    %-14s %-9s %s %11s bytes at %11s" % (name, d, a, fmt(size), fmt(off)))
+    say("  movies: %d, %d from the Allied disc and %d from the Soviet disc, %s bytes"
+        % (sum(on.values()), on["RA_ALLIED"], on["RA_SOVIET"],
+           fmt(sum(it.size for it in items))))
+
+    # THE SCORE, as the game's audio reads it: the disc's SCORES.MIX with its encrypted
+    # index rewritten plain, then its data block as it is on the disc. The development
+    # copy is made the same way, by stage-audio.py from data/radata/SCORES.MIX, so the
+    # player's file is that file byte for byte or the tool stops.
+    tmp = tempfile.mkdtemp(prefix="opencnc3d-ra-audio-")
+    plain_path = os.path.join(tmp, "SCORES.MIX")
+    stage_audio.stage_one(__import__("pathlib").Path(os.path.join(radata, "SCORES.MIX")),
+                          __import__("pathlib").Path(plain_path))
+    with open(plain_path, "rb") as f:
+        plain = f.read()
+    for d in RA_DISCS:
+        sc = inner(d, "SCORES.MIX")
+        if sc is None:
+            continue
+        prefix = sc.plain_header()
+        body = sc.start + sc.data_start
+        if plain[:len(prefix)] != prefix or len(plain) != len(prefix) + sc.datasize:
+            problems.append("Red Alert's score: the plain header made from %s's index is not "
+                            "stage-audio.py's" % d)
+            break
+        it = Item("music", "%s/audio/SCORES.MIX" % RA_MODULE, d, body, len(plain))
+        it.prefix = prefix
+        it.sha256 = hashlib.sha256(plain).hexdigest()
+        rng = plain[len(prefix):]
+        it.head, it.tail = ml.head_tail(rng, len(rng), WINDOW)
+        for m in by_disc[d]:
+            n = min(WINDOW, len(rng))
+            try:
+                h = fetch.get(m.url, m.base + body, n)
+                t = fetch.get(m.url, m.base + body + len(rng) - n, n)
+            except ml.FetchError as e:
+                drop(m, "could not read Red Alert's score: %s" % e)
+                continue
+            if (h, t) != (it.head, it.tail):
+                drop(m, "its bytes for Red Alert's score are not data/radata's")
+        if not any(m.ok for m in by_disc[d]):
+            problems.append("Red Alert's score has no good mirror")
+            break
+        items.append(it)
+        say("  score: %s MAIN.MIX:SCORES.MIX, %d entries, a %d-byte plain header and %s "
+            "bytes of the disc, sha256 %s" % (d, sc.count, len(prefix), fmt(len(rng)),
+                                               it.sha256))
+        break
+    else:
+        problems.append("Red Alert's score is on neither disc")
+
+    # The themes of the game's Red Alert table, from the player's score or from
+    # RA_LOCAL.MIX, which the package carries (stage-audio.py's LOCAL.MIX). The table also
+    # lists the expansion discs' themes, which neither 1996 disc carries, so the count is
+    # not expected to be whole; what the score must do is add every theme it holds.
+    local_path = os.path.join(tmp, "RA_LOCAL.MIX")
+    stage_audio.stage_one(__import__("pathlib").Path(os.path.join(radata, "LOCAL.MIX")),
+                          __import__("pathlib").Path(local_path))
+    themes = ra_theme_names()
+    score = ml.mixlib.Mix(plain_path)
+    local = ml.mixlib.Mix(local_path)
+    with_music = sum(1 for t in themes if score.has(t + ".AUD") or local.has(t + ".AUD"))
+    without = sum(1 for t in themes if local.has(t + ".AUD"))
+    in_score = sum(1 for t in themes if score.has(t + ".AUD"))
+    say("  Red Alert themes: %d/%d with the music ticked, %d/%d without (RA_LOCAL.MIX's); "
+        "the other %d are the expansion discs'" % (with_music, len(themes), without,
+                                                   len(themes), len(themes) - with_music))
+    say("  the score holds %d entries, %d of them themes of that table" % (score.count,
+                                                                         in_score))
+    if with_music <= without:
+        problems.append("Red Alert's score adds no theme of the game's table")
+    for f in os.listdir(tmp):
+        os.remove(os.path.join(tmp, f))
+    os.rmdir(tmp)
+    return items
+
+
 def c_escape(line):
     s = line.replace("\\", "\\\\").replace('"', '\\"').replace("??", "?\\?")
     return '    "%s\\n"' % s
@@ -290,6 +464,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sources", default=os.path.join(HERE, "media-sources.txt"))
     ap.add_argument("--dosdata", default=os.path.join(REPO, "data", "dosdata"))
+    ap.add_argument("--radata", default=os.path.join(REPO, "data", "radata"))
     ap.add_argument("--cache", default=os.path.join(tempfile.gettempdir(),
                                                     "opencnc3d-media-cache"),
                     help="where ranged reads and whole files are kept between runs")
@@ -311,6 +486,8 @@ def main():
     mirrors = load_sources(args.sources)
     for m in mirrors:
         open_mirror(fetch, m)
+        if m.ok and m.disc in RA_DISCS and m.img.files.get("MAIN.MIX#MULTIEXTENT"):
+            drop(m, "its MAIN.MIX is split over several extents")
         if m.ok:
             say("  open %s\n       %s; volume %s, %s blocks, %d directories, %d files"
                 % (m, m.note, m.img.volume, fmt(m.img.blocks), m.img.dirs,
@@ -330,7 +507,7 @@ def main():
     # ---------------------------------------------------------------- the archives
     say("\nDISC EXTENTS (reference mirror of each disc)")
     mix = {}  # (disc, NAME) -> MixIndex
-    for d in ml.DISCS:
+    for d in TD_DISCS:
         ref = by_disc[d][0]
         for name in ("MOVIES.MIX", "SCORES.MIX", "TRANSIT.MIX"):
             hit = one_file(ref.img, name)
@@ -363,12 +540,12 @@ def main():
         if f != f.upper():
             problems.append("dosdata/movies/%s is not upper case; the game opens "
                             "upper-case names" % f)
-    seen_on = dict((d, 0) for d in ml.DISCS)
+    seen_on = dict((d, 0) for d in TD_DISCS)
     both, missing = [], []
     for f in local_movies:
         name = f.upper()
         where = []
-        for d in ml.DISCS:  # GDI first, then Nod, the Covert Operations disc last
+        for d in TD_DISCS:  # GDI first, then Nod, the Covert Operations disc last
             idx = mix.get((d, "MOVIES.MIX"))
             hit = idx.find(name) if idx else None
             if hit:
@@ -440,7 +617,7 @@ def main():
         % (len(loose), len(loose_only), " ".join(sorted(label(e) for e in loose_only))))
 
     def candidates(archive):
-        return [(d, mix[(d, archive)]) for d in ml.DISCS if (d, archive) in mix]
+        return [(d, mix[(d, archive)]) for d in TD_DISCS if (d, archive) in mix]
 
     def lacks(idx, ids):
         return sorted(label(e) for e in ids if e not in idx.entries)
@@ -451,7 +628,7 @@ def main():
         base_ids = set(local_mix[archive].entries)
         say("  %s: what each disc offers" % rel)
         full, partial = None, None
-        for d in ml.DISCS:
+        for d in TD_DISCS:
             if (d, archive) not in mix:
                 say("    %-6s has no %s" % (d, archive))
                 continue
@@ -588,13 +765,19 @@ def main():
         say("  for comparison, the GDI disc's own SCORES.MIX alone holds %d/%d themes"
             % (n, len(themes)))
 
+    # ---------------------------------------------------------------- 6. Red Alert
+    ra_items = red_alert(fetch, by_disc, args.radata, problems, args.verbose)
+    items += ra_items
+
     # ---------------------------------------------------------------- totals
     say("\nTOTALS")
     totals = {}
     for c in ("movies", "music"):
         sel = [it for it in items if it.component == c]
         totals[c] = (len(sel), sum(it.size for it in sel))
-        say("  %-7s %3d files %14s bytes" % (c, totals[c][0], fmt(totals[c][1])))
+        ra = [it for it in sel if it in ra_items]
+        say("  %-7s %3d files %14s bytes, %d of them %s bytes Red Alert's" % (
+            c, totals[c][0], fmt(totals[c][1]), len(ra), fmt(sum(it.size for it in ra))))
     say("  network: %s bytes in %d requests (the cache answered the rest)"
         % (fmt(fetch.net_bytes), fetch.requests))
 
@@ -615,12 +798,18 @@ def main():
                  totals["movies"][0], fmt(totals["movies"][1]), totals["music"][0],
                  fmt(totals["music"][1])),
              "# A file is the byte range [base+offset, base+offset+size) of any mirror of "
-             "its disc."]
+             "its disc.",
+             "# A file with a head is the head's bytes, then that range for the rest of its "
+             "size.",
+             "# A module's files are fetched only where that module is installed."]
     for m in kept:
         lines.append("mirror %s %s %d" % (m.disc, m.url, m.base))
+    if ra_items:
+        lines.append("module %s" % RA_MODULE)
     for it in sorted(items, key=lambda i: (i.component != "movies", i.relpath)):
-        lines.append("file %s %s %d %s %s %d" % (it.component, it.relpath, it.size,
-                                                  it.sha256, it.disc, it.offset))
+        lines.append("file %s %s %d %s %s %d%s" % (it.component, it.relpath, it.size,
+                                                    it.sha256, it.disc, it.offset,
+                                                    " " + it.prefix.hex() if it.prefix else ""))
     for c, p in sorted(legacy, key=lambda x: (x[0] != "movies", x[1])):
         lines.append("legacy %s %s" % (c, p))
     text = "\n".join(lines) + "\n"

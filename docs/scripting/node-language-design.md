@@ -284,7 +284,7 @@ Flow, using only machinery that already exists and is gated:
 
 Never hash the payload for comparison. Two runs of the identical deterministic sim differ by ~272 bytes because vtable pointers are written raw and move with ASLR. Assert the state, not the file.
 
-### v2: exact trace (needs the project owner's go-ahead, brain change)
+### v2: exact trace (requires design approval and a brain change)
 
 Extend `OpenCNC3D_Dump_Objects` with `TRIG|` and `TEAM|` lines. Triggers are free: every field is public and `Name_From_Event`/`Name_From_Action` already exist, so it is about fifteen lines. Teams need one accessor for `CurrentMission` and the `Member` chain, with `AnimClass::OpenCNC3D_Stage()` as precedent. Cost is a two-platform brain rebuild and a growth of `brain/patches/vanilla-opencnc3d.patch`.
 
@@ -349,7 +349,7 @@ Rules:
 
 ## 9. Where the recon is uncertain or the reports contradict each other
 
-1. **Direct contradiction, resolved.** The waypoints/base report claims `UnitClass::Read_INI`, `InfantryClass::Read_INI`, `BuildingClass::Read_INI` and `AircraftClass::Read_INI` "have no definition anywhere in `tiberiandawn/`" and recommends an entry in `known-gap notes`. The triggers report says they do exist and blames the ISO-8859 encoding for defeating plain `grep`. **The triggers report is correct.** I verified: `unit.cpp` is ISO-8859 text, `grep -a "UnitClass::Read_INI" unit.cpp` returns line 3770, and the INI entry format comment sits at line 3758. Do not file that gap.
+1. **Direct contradiction, resolved.** The waypoints/base report claims `UnitClass::Read_INI`, `InfantryClass::Read_INI`, `BuildingClass::Read_INI` and `AircraftClass::Read_INI` "have no definition anywhere in `tiberiandawn/`" and incorrectly reports it as missing. The triggers report says they do exist and blames the ISO-8859 encoding for defeating plain `grep`. **The triggers report is correct.** I verified: `unit.cpp` is ISO-8859 text, `grep -a "UnitClass::Read_INI" unit.cpp` returns line 3770, and the INI entry format comment sits at line 3758. Do not file that gap.
 
 2. **`Time` units.** The header comment at `trigger.h:264` says minutes; the code says `TICKS_PER_MINUTE / 10`, so 6 seconds. The code wins. Every timer node must display both ("14.0 min / Data=140") because half the community documentation on this is wrong.
 

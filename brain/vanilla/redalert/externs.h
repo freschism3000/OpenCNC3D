@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Declares the project's lockstep switch (OpenCNC3D_Lockstep), the wall line
+// fill reach (OpenCNC3D_WallFill), the short game rule (OpenCNC3D_ShortGame) and
+// the slot count of the order wire fingerprint, all defined in globals.cpp.
+// Declarations only.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /counterstrike/EXTERNS.H 2     3/10/97 6:23p Steve_tall $ */
 /***********************************************************************************************
@@ -355,6 +365,40 @@ extern int NewMaxAheadFrame2;
 
 extern int Seed;
 extern int CustomSeed;
+
+/*
+**	OpenCNC3D_Lockstep -- is this simulation one peer of a deterministic lockstep match?
+**
+**	FALSE unless the host calls OpenCNC3D_Set_Lockstep, so the campaign and the skirmish run
+**	exactly as they did in 1996 and nothing behind this flag can move them. Every peer of a
+**	network match computes the whole world and only the orders cross the wire, so where the
+**	engine would read state that belongs to one machine (the local player, the camera, the
+**	wall clock, libc rand(), the local selection) this flag picks a shared answer instead.
+**	It is not a general "new engine" switch and never gates a balance or content change.
+*/
+extern bool OpenCNC3D_Lockstep;
+/*
+**	OpenCNC3D_WallFill -- how far a newly placed wall reaches to join one of its own kind.
+**
+**	ZERO unless the host calls OpenCNC3D_Set_Wall_Fill, and zero is the 1996 rule: a wall
+**	piece covers the one cell it was placed on. Above zero, a piece a human player places
+**	also fills the straight gap to the nearest wall of the same type owned by the same house
+**	along each cell axis, at most this many cells away, when every cell between would take a
+**	wall. It IS a change to the simulation, so a lockstep match must agree on it.
+*/
+extern int OpenCNC3D_WallFill;
+/*
+**	OpenCNC3D_ShortGame -- the match's SHORT GAME rule: a house is finished when it has no
+**	building left that could rebuild it, so defences and walls do not keep it alive. Read only by
+**	HouseClass::Check_Pertinent_Structures, set from the match options, kept in a save. Off
+**	unless the host ticks it for a match.
+*/
+extern bool OpenCNC3D_ShortGame;
+/*
+**	How many u32 slots OpenCNC3D_Event_ABI reports. Grows at the END only, so a host built
+**	against an older count still reads the slots it knows correctly.
+*/
+#define OPENCNC3D_EVENT_ABI_SLOTS 11
 extern GroundType Ground[LAND_COUNT];
 
 /*

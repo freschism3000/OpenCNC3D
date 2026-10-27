@@ -13,6 +13,10 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Filters hidden enemy navigation and suspended targets and uses public type values for fair skirmish target scoring.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\foot.cpv   2.17   16 Oct 1995 16:51:42   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -74,6 +78,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_td.h"
 #include "common/irandom.h"
 
 /***********************************************************************************************
@@ -1674,6 +1679,10 @@ z * FootClass::Assign_Destination -- Assigns specified destination to NavCom.   
  *=============================================================================================*/
 void FootClass::Assign_Destination(TARGET target)
 {
+    if (GameToPlay != GAME_NORMAL && !House->IsHuman) {
+        TechnoClass* destination=As_Techno(target);
+        if (destination && !House->Is_Ally(destination) && !TD_Fair_AI_Knows(House,destination)) target=TARGET_NONE;
+    }
     NavCom = target;
 }
 

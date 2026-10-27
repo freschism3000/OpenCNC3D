@@ -1,0 +1,608 @@
+{
+  "version": "minigunner-motion-v15",
+  "units": [
+    {
+      "id": "E1",
+      "name": "Minigunner",
+      "directions": [
+        "N",
+        "NW",
+        "W",
+        "SW",
+        "S",
+        "SE",
+        "E",
+        "NE"
+      ],
+      "actions": [
+        {
+          "id": "stand_ready",
+          "name": "Stand Ready",
+          "start": 0,
+          "count": 1,
+          "jump": 1,
+          "fps": 0,
+          "rate_ticks": 0
+        },
+        {
+          "id": "stand_guard",
+          "name": "Stand Guard",
+          "start": 8,
+          "count": 1,
+          "jump": 1,
+          "fps": 0,
+          "rate_ticks": 0
+        },
+        {
+          "id": "prone",
+          "name": "Prone",
+          "start": 192,
+          "count": 1,
+          "jump": 8,
+          "fps": 0,
+          "rate_ticks": 0
+        },
+        {
+          "id": "walk",
+          "name": "Walk",
+          "start": 16,
+          "count": 6,
+          "jump": 6,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "fire_weapon",
+          "name": "Fire Weapon",
+          "start": 64,
+          "count": 8,
+          "jump": 8,
+          "fps": 15.0,
+          "rate_ticks": 1
+        },
+        {
+          "id": "lie_down",
+          "name": "Lie Down",
+          "start": 128,
+          "count": 2,
+          "jump": 2,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "crawl",
+          "name": "Crawl",
+          "start": 144,
+          "count": 4,
+          "jump": 4,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "get_up",
+          "name": "Get Up",
+          "start": 176,
+          "count": 2,
+          "jump": 2,
+          "fps": 5.0,
+          "rate_ticks": 3
+        },
+        {
+          "id": "fire_prone",
+          "name": "Fire Prone",
+          "start": 192,
+          "count": 6,
+          "jump": 8,
+          "fps": 15.0,
+          "rate_ticks": 1
+        },
+        {
+          "id": "idle1",
+          "name": "Idle1",
+          "start": 256,
+          "count": 16,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "idle2",
+          "name": "Idle2",
+          "start": 272,
+          "count": 16,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "on_guard",
+          "name": "On Guard",
+          "start": 288,
+          "count": 13,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "fight_ready",
+          "name": "Fight Ready",
+          "start": 292,
+          "count": 10,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "punch",
+          "name": "Punch",
+          "start": 301,
+          "count": 2,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "kick",
+          "name": "Kick",
+          "start": 303,
+          "count": 6,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "punch_hit1",
+          "name": "Punch Hit1",
+          "start": 309,
+          "count": 2,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "punch_hit2",
+          "name": "Punch Hit2",
+          "start": 311,
+          "count": 4,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "punch_death",
+          "name": "Punch Death",
+          "start": 315,
+          "count": 5,
+          "jump": 0,
+          "fps": 15.0,
+          "rate_ticks": 1,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "kick_hit1",
+          "name": "Kick Hit1",
+          "start": 319,
+          "count": 2,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "kick_hit2",
+          "name": "Kick Hit2",
+          "start": 321,
+          "count": 4,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "kick_death",
+          "name": "Kick Death",
+          "start": 325,
+          "count": 5,
+          "jump": 0,
+          "fps": 15.0,
+          "rate_ticks": 1,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "ready_weapon",
+          "name": "Ready Weapon",
+          "start": 330,
+          "count": 5,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2,
+          "boxing_camera_offset": 47
+        },
+        {
+          "id": "gun_death",
+          "name": "Gun Death",
+          "start": 382,
+          "count": 8,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "explosion_death",
+          "name": "Explosion Death",
+          "start": 398,
+          "count": 8,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "explosion2_death",
+          "name": "Explosion2 Death",
+          "start": 398,
+          "count": 8,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "grenade_death",
+          "name": "Grenade Death",
+          "start": 406,
+          "count": 12,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "fire_death",
+          "name": "Fire Death",
+          "start": 418,
+          "count": 18,
+          "jump": 0,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "gesture1",
+          "name": "Gesture1",
+          "start": 436,
+          "count": 3,
+          "jump": 3,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "salute1",
+          "name": "Salute1",
+          "start": 460,
+          "count": 3,
+          "jump": 3,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "gesture2",
+          "name": "Gesture2",
+          "start": 484,
+          "count": 3,
+          "jump": 3,
+          "fps": 7.5,
+          "rate_ticks": 2
+        },
+        {
+          "id": "salute2",
+          "name": "Salute2",
+          "start": 508,
+          "count": 3,
+          "jump": 3,
+          "fps": 7.5,
+          "rate_ticks": 2
+        }
+      ],
+      "before": {
+        "image": "data/e1-dos.png",
+        "width": 50,
+        "height": 39,
+        "columns": 20,
+        "anchor": [
+          27,
+          20
+        ],
+        "frames": 532
+      },
+      "after": {
+        "image": "data/e1-motion-v15.png",
+        "width": 100,
+        "height": 78,
+        "columns": 20,
+        "anchor": [
+          54,
+          40
+        ],
+        "frames": 532,
+        "actions": {
+          "stand_ready": {
+            "start": 0,
+            "count": 1,
+            "jump": 1,
+            "kind": "semantic native pixel animation",
+            "note": "Preserved v09 standing/firing pixels; body recoil and warm flash lighting."
+          },
+          "stand_guard": {
+            "start": 8,
+            "count": 1,
+            "jump": 1,
+            "kind": "semantic native pixel animation",
+            "note": "Preserved v09 standing/firing pixels; body recoil and warm flash lighting."
+          },
+          "prone": {
+            "start": 192,
+            "count": 1,
+            "jump": 8,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "walk": {
+            "start": 16,
+            "count": 6,
+            "jump": 6,
+            "kind": "semantic native pixel animation",
+            "note": "Approved v14 \u00b7 exact accepted pixels retained."
+          },
+          "fire_weapon": {
+            "start": 64,
+            "count": 8,
+            "jump": 8,
+            "kind": "semantic native pixel animation",
+            "note": "Preserved v09 standing/firing pixels; body recoil and warm flash lighting."
+          },
+          "lie_down": {
+            "start": 128,
+            "count": 2,
+            "jump": 2,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "crawl": {
+            "start": 144,
+            "count": 4,
+            "jump": 4,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "get_up": {
+            "start": 176,
+            "count": 2,
+            "jump": 2,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "fire_prone": {
+            "start": 192,
+            "count": 6,
+            "jump": 8,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "idle1": {
+            "start": 256,
+            "count": 16,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "idle2": {
+            "start": 272,
+            "count": 16,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "on_guard": {
+            "start": 288,
+            "count": 13,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "fight_ready": {
+            "start": 292,
+            "count": 10,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending. Final pose held to avoid the original shared-slot action overlap.",
+            "stage_frames": [
+              292,
+              293,
+              294,
+              295,
+              296,
+              297,
+              298,
+              299,
+              300,
+              300
+            ],
+            "opposite_stage_frames": [
+              339,
+              340,
+              341,
+              342,
+              343,
+              344,
+              345,
+              346,
+              347,
+              347
+            ]
+          },
+          "punch": {
+            "start": 301,
+            "count": 2,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "kick": {
+            "start": 303,
+            "count": 6,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "punch_hit1": {
+            "start": 309,
+            "count": 2,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "punch_hit2": {
+            "start": 311,
+            "count": 4,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "punch_death": {
+            "start": 315,
+            "count": 5,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending. Final pose held to avoid the original shared-slot action overlap.",
+            "stage_frames": [
+              315,
+              316,
+              317,
+              318,
+              318
+            ],
+            "opposite_stage_frames": [
+              362,
+              363,
+              364,
+              365,
+              365
+            ]
+          },
+          "kick_hit1": {
+            "start": 319,
+            "count": 2,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "kick_hit2": {
+            "start": 321,
+            "count": 4,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "kick_death": {
+            "start": 325,
+            "count": 5,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "ready_weapon": {
+            "start": 330,
+            "count": 5,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "gun_death": {
+            "start": 382,
+            "count": 8,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "explosion_death": {
+            "start": 398,
+            "count": 8,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "explosion2_death": {
+            "start": 398,
+            "count": 8,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "grenade_death": {
+            "start": 406,
+            "count": 12,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "fire_death": {
+            "start": 418,
+            "count": 18,
+            "jump": 0,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "gesture1": {
+            "start": 436,
+            "count": 3,
+            "jump": 3,
+            "kind": "semantic native pixel animation",
+            "note": "Approved v14 \u00b7 exact accepted pixels retained."
+          },
+          "salute1": {
+            "start": 460,
+            "count": 3,
+            "jump": 3,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "gesture2": {
+            "start": 484,
+            "count": 3,
+            "jump": 3,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          },
+          "salute2": {
+            "start": 508,
+            "count": 3,
+            "jump": 3,
+            "kind": "semantic native pixel animation",
+            "note": "v15 \u00b7 newly authored action; audited; design-review art review pending."
+          }
+        }
+      }
+    }
+  ],
+  "playback": "Original MasterDoControls rates at a 15 Hz simulation baseline; preview speed multiplier applies equally to both sides. Idle rates can be game-speed normalized in the engine.",
+  "scope": "All 532 Minigunner slots; approved v14 run/Gesture1 preserved; 380 new slots pending design-review art approval.",
+  "hashes": {
+    "e1-dos.png": "5cc543246ef03582025a19088528e4682ef2a8d36b3df7f0aad898fb5119f467",
+    "minigunner-run-48-source.png": "5785fa268db505ec15ff5fb71259608dc550222aae019aa35684fbf8870e3589",
+    "minigunner-design-v01.png": "bba38aa8ad2d3f3644d02e158f718a24b6150d2df428270618db670ca3fd2392",
+    "minigunner-fire-48-source.png": "724126e38e080c0c8063883e66bbedea2533eeb5e57453cbd7034be8a934aa37",
+    "e1-snes.png": "d4eeb393f0da2a60fd9c19d6ac12c1ffcd83ac7c69c6768c872fc271defc4b67",
+    "e1-source-locked-v03.png": "cdd06385cf2e0db55c78400a1a1f299104f44f3899c6fb93e8828c9e22679ec6",
+    "e1-source-locked-v04.png": "1e13477d1de8671713bff7464ce7a86b0bd5b1dee9e823fc8fee1ed8fa6c8454",
+    "e1-source-locked-v05.png": "1b3a26d15e39e58a469d170502535bb1802fce8c06bf6f61cb1f50c76eb355be",
+    "e1-source-locked-v06.png": "fa2f87a1583ba93676db954366bf1a40ae69d89b6ac96a0a9a37453ad46cafc6",
+    "e1-source-locked-v07.png": "ab13e7f0224b52f7fc2186fb49bfa3e0ba8ee240fb7303eff4dd88cac8573740",
+    "e1-source-locked-v08.png": "11ceaff463b039abf76818114264d4af070686fb5021d7c94cf7c4c74c2344ff",
+    "e1-source-locked-v09.png": "7c666bb34242bcbe97b848c296156d8c032145fd49bf681689313ee4d0ef8f4e",
+    "e1-motion-v15.png": "ee850978a8fa4ad181eaa6466f4372ee774fac963b41c01af7d0e47f29b5c3e2"
+  },
+  "review_state": "audited release"
+}

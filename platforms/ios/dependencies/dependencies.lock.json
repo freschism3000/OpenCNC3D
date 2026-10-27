@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "sdl2": {
+    "version": "2.32.10",
+    "git_tag": "release-2.32.10",
+    "git_commit": "5d249570393f7a37e037abf22cd6012a4cc56a71",
+    "url": "https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10.tar.gz",
+    "sha256": "5f5993c530f084535c65a6879e9b26ad441169b3e25d789d83287040a9ca5165",
+    "license": "Zlib",
+    "patches": []
+  },
+  "gl4es": {
+    "version_header": "1.1.7",
+    "git_commit": "a025615bc79ac43ec911dced8fe5b8eb45a0b72d",
+    "url": "https://codeload.github.com/ptitSeb/gl4es/tar.gz/a025615bc79ac43ec911dced8fe5b8eb45a0b72d",
+    "sha256": "b4e68ee01c45c114d89d0df290618ea7aa6f4078db11c276a893af39b9ad9b76",
+    "license": "MIT, plus included third-party notices",
+    "patches": ["patch_gl4es.py"]
+  },
+  "targets": ["arm64-iphoneos", "arm64-iphonesimulator"],
+  "minimum_ios_version": "17.0",
+  "verified_toolchain": {"xcode": "26.2", "xcode_build": "17C52", "sdk": "26.2"}
+}

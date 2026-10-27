@@ -1,0 +1,318 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-20",
+  "passed": true,
+  "conclusion": "All three performance fixes are already integrated and compatible with unified daylight; no additional runtime patch required.",
+  "scope": {
+    "shared_games": [
+      "OpenCNC3D/Tiberian Dawn",
+      "RA3D/Red Alert"
+    ],
+    "runtime_code_changed": false,
+    "new_renderer_build": false,
+    "new_deployment": false,
+    "new_performance_benchmark": false,
+    "current_dirty_source_claimed_built": false,
+    "current_dirty_source_note": "Unrelated infantry sprite and UI work differs from the installed source; this audit does not bind the entire dirty source to the old binary.",
+    "installed_build": "v0.8.7+27f0fc5-dirty",
+    "historical_timing_scope_unchanged": true
+  },
+  "source": {
+    "canonical_head": "bf783633f701e64f57ae3e45fe9b966733320854",
+    "fetched_origin_main": "48404c5eb063e926bc428c9630e1978605328118",
+    "canonical_working_renderer_sha256": "51cc65ef1735f6d28a7818e7c7f3e9144a752a29e2f8fa476a0f16d899f27c79",
+    "source_unchanged_during_native_tests": true,
+    "renderer_sha256_by_source": {
+      "canonical": "51cc65ef1735f6d28a7818e7c7f3e9144a752a29e2f8fa476a0f16d899f27c79",
+      "origin_main": "ca0ad50de5550ef64e34b6de6f0c3a68b3a680d27c54d7d954e1bcaf64824ef8",
+      "v5": "694b4c6313da43fab7134a9380ac67605b015ce62629539a596bdd19c69817e4"
+    },
+    "identical_production_block_sha256": {
+      "wind_reference": "6964410cc6bd4ce3453bd165b7441c8a9dba83156a1748adb6f94d0fe880171d",
+      "wind_unique": "926ef3de01beb3b69a712643ad11c19e8ce3a87a8cb0a6a8a5746bf1f76a5a20",
+      "pick_reference": "bd9f6ddb06470be2178965e62acbfe24775b78d70f9370b08092ea099f4fa3cd",
+      "pick_cache": "c588168c6e5e304749cb9a6791c31c73977fd07a177c63e91d2bdc63d2bef10e",
+      "facing_rot": "1bf66e745a358c4b94c18663ade7b7053e7642693f0eb0d3a10e9acc1c223028",
+      "draw_mesh": "f8a9decc14d8b63709bf332a386d81462aa20bda2a235aeb30b860826a741732"
+    },
+    "production_blocks_identical_canonical_origin_v5": {
+      "wind_reference": true,
+      "wind_unique": true,
+      "pick_reference": true,
+      "pick_cache": true,
+      "facing_rot": true,
+      "draw_mesh": true
+    },
+    "mesh_batch_identical_canonical_origin_v5": true,
+    "mesh_batch_sha256": "74dad108c8d321ee5920962b7a6c9060755c50f50920faf790fe7f82d23a46ea",
+    "comparison_receipt": {
+      "raw_record": "${EVIDENCE_ROOT}/native/source-block-comparison.json",
+      "sha256": "45da401626567b437d7f88ddb956f832afda34b8fed257483b01c70f2f368dab"
+    },
+    "compatibility_contracts": [
+      "The exact picker recomputes terrain_y at the anchor and keys its float bits with geometry identity/revision, position, facing, scale and generation.",
+      "Prepared wind retains immutable source XYZ, sway weights and phase bits; per-draw wind, fill, matrix, facing and placement are recomputed.",
+      "The opaque sun-depth route excludes bake, projected-shadow and normal output; it uses the existing draw/cull state and exact geometry key.",
+      "Cutout baked-light removal retains texture coordinates and its bake-cutout cache discriminator."
+    ],
+    "canonical_lighting_headers_identical_to_v5_sha256": {
+      "game/fx_post.h": "79aa2de5e902535d6bbccd0fdc7b35b533691ccb14269b2aab6da5b9b1c68b23",
+      "game/terrain_surface.h": "bdf7bf63301d4f0469b2caeaaa9eac7d58dfaf7911b51192fc32edfff662afc8",
+      "game/sky3d_mod.h": "be88cd661412f736e178c58e2362643b8c89a68637f4ea7e27c329add4486761",
+      "game/foliage3d_mod.h": "00ddbf174bf0c5015d72e3ba439c1d1b318f4f03846cb409702bb8805abf38e5",
+      "game/model3d_mod.h": "6696deca3b89b013670cc9326224f6de6833d86c1abe536be5c35511a371db21",
+      "game/ebld_mod.h": "06d73f13c79fb39a68ad3bbfee24eeb9dd1672c58c03575f3b6ac185e0a6fde6"
+    },
+    "reviewed_docs": [
+      "the engineering reports",
+      "docs/terrain-lighting-controls.md"
+    ],
+    "remote_update": {
+      "previous_fetched_main": "8d683b20a9f7f5ecaa1114529eb51a2cf00638db",
+      "current_fetched_main": "48404c5eb063e926bc428c9630e1978605328118",
+      "commit_count": 1,
+      "renderer_source_changed": false,
+      "local_remote_divergence_note": "Existing local effects and suspension work is separate from this ore-only remote update; a two-tip diff is not evidence that this update removed it.",
+      "changed_path_count": 6,
+      "runtime_asset_paths": [
+        "data/ra3d_ore/manifest.json",
+        "data/ra3d_ore/ore3d_TEM.pack"
+      ],
+      "other_changes": "Asset authoring tooling and project documentation."
+    }
+  },
+  "native": {
+    "passed": true,
+    "receipt": {
+      "raw_record": "${EVIDENCE_ROOT}/native/verification.json",
+      "sha256": "271bd926d7b69f083fe20b1b1c2d1b870b2f4f2f668d551da64cbbbcb74c39ee"
+    },
+    "scope": "Fresh standalone tests extracted from canonical production source; no full renderer or game build.",
+    "tests": [
+      {
+        "suite": "pick-bounds",
+        "passed": true,
+        "receipt": {
+          "raw_record": "${EVIDENCE_ROOT}/native/pick-bounds/verification.json",
+          "sha256": "c30638d2069bc031d56b48d200a9261003c901dcd00ababf2d8da6295265659b"
+        },
+        "architectures": [
+          {
+            "arch": "arm64",
+            "runs": [
+              {
+                "passed": true,
+                "checks": 32063,
+                "hits": 5420,
+                "misses": 18623,
+                "verify": 0,
+                "verification_checks": 0,
+                "expected_negative_controls": 0
+              },
+              {
+                "passed": true,
+                "checks": 32066,
+                "hits": 5402,
+                "misses": 18643,
+                "verify": 1,
+                "verification_checks": 5402,
+                "expected_negative_controls": 1
+              }
+            ]
+          },
+          {
+            "arch": "x86_64",
+            "runs": [
+              {
+                "passed": true,
+                "checks": 32063,
+                "hits": 5349,
+                "misses": 18694,
+                "verify": 0,
+                "verification_checks": 0,
+                "expected_negative_controls": 0
+              },
+              {
+                "passed": true,
+                "checks": 32066,
+                "hits": 5390,
+                "misses": 18655,
+                "verify": 1,
+                "verification_checks": 5390,
+                "expected_negative_controls": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "suite": "wind-unique-cache",
+        "passed": true,
+        "receipt": {
+          "raw_record": "${EVIDENCE_ROOT}/native/wind-unique-cache/verification.json",
+          "sha256": "52f4cc0ceadf117e711445430bd9ea7131a2a5cc732eb8177c40d128b9b11064"
+        },
+        "architectures": [
+          {
+            "arch": "arm64",
+            "runs": [
+              {
+                "passed": true,
+                "checks": 6054,
+                "verify": 0,
+                "allocation_throws": 5,
+                "mismatches": 0,
+                "expected_negative_controls": 0
+              },
+              {
+                "passed": true,
+                "checks": 5976,
+                "verify": 1,
+                "allocation_throws": 6,
+                "mismatches": 1,
+                "expected_negative_controls": 1
+              }
+            ]
+          },
+          {
+            "arch": "x86_64",
+            "runs": [
+              {
+                "passed": true,
+                "checks": 6050,
+                "verify": 0,
+                "allocation_throws": 5,
+                "mismatches": 0,
+                "expected_negative_controls": 0
+              },
+              {
+                "passed": true,
+                "checks": 5774,
+                "verify": 1,
+                "allocation_throws": 6,
+                "mismatches": 1,
+                "expected_negative_controls": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "negative_controls_note": "Verify-enabled fixtures deliberately corrupt one cached result. Their one expected mismatch proves reference fallback and is not an unexpected failure."
+  },
+  "installed": {
+    "passed": true,
+    "receipt": {
+      "raw_record": "${EVIDENCE_ROOT}/installed/summary.json",
+      "sha256": "9d6d8b8a2a9a0b5516dac1647148893b6dbd3c71fb4443f0cafce45154bbc26c"
+    },
+    "scope": "Existing Dock build with current saved presets; no rebuild or redeployment, no current dirty-source closure claim.",
+    "hidden_processes": 3,
+    "build_provenance_sha256": "138f8a85a5c9ab2e3bc2abe6e8f178676117d99056ff967bab3d08dcb9b87b5a",
+    "smoke_helper_sha256": "8a645cfb8411021935b1f3917b621b6ad337a1912f3fe8ec0db30e93d29e8ae4",
+    "cases": [
+      {
+        "case": "td-standalone",
+        "module": "td",
+        "passed": true,
+        "exit": 0,
+        "binary_sha256": "752652b7a2b20577ea06872c80b473473db8ff957d95e1dad5da7a30b08b897b",
+        "preset_sha256": "aef249179000aa9461841b826eb489b24c5869b46a15c1a1ee6df3435fc3bfb1",
+        "effects_chain_usable": true,
+        "effective_preset_sha256": "a2654f6ebe2a8f088cd3d8a03e785786705cdca58f91ccd3a4b04bb516064f98",
+        "selected_effective_settings": {
+          "unified_lighting": "1",
+          "shadow_on": "1",
+          "shadow_terrain": "1",
+          "terrain_relief": "1"
+        },
+        "wind_depth": {
+          "draws": 288,
+          "fallbacks": 0,
+          "verified": 0,
+          "mismatches": 0
+        },
+        "wind_unique": {
+          "draws": 512,
+          "verified": 512,
+          "mismatches": 0,
+          "fallbacks": 0,
+          "evictions": 0,
+          "cache_bytes": 4616468,
+          "cache_entries": 22
+        },
+        "picker_bounds": {
+          "hits": 222,
+          "misses": 82,
+          "checks": 222,
+          "bad": 0
+        },
+        "fog_changes_pixels": true,
+        "reveal_restored_exact": true
+      },
+      {
+        "case": "td-app",
+        "module": "td",
+        "passed": true,
+        "exit": 0,
+        "binary_sha256": "9077f7b55cf95715ef52b1368714e131a5929758ec7e218f34182ffeb600b13a",
+        "preset_sha256": "aef249179000aa9461841b826eb489b24c5869b46a15c1a1ee6df3435fc3bfb1",
+        "effects_chain_usable": true,
+        "screenshots_checked": 4,
+        "scope": "Native TD harness; explicit frozen fog/wind and optional picking telemetry run in this installation's standalone case. RA app checks the same deployed app binary."
+      },
+      {
+        "case": "ra-app",
+        "module": "ra",
+        "passed": true,
+        "exit": 0,
+        "binary_sha256": "9077f7b55cf95715ef52b1368714e131a5929758ec7e218f34182ffeb600b13a",
+        "preset_sha256": "63f9f054ad32661ec3a945c5bf54cff6ec913b655eb6379f27738a818a5bdf89",
+        "effects_chain_usable": true,
+        "effective_preset_sha256": "04c05d331d80424b16588815b3bad84e3467892d51fc7e7906b55e9eba3c70c2",
+        "selected_effective_settings": {
+          "unified_lighting": "1",
+          "shadow_on": "1",
+          "shadow_terrain": "1",
+          "terrain_relief": "1"
+        },
+        "wind_depth": {
+          "draws": 468,
+          "fallbacks": 0,
+          "verified": 0,
+          "mismatches": 0
+        },
+        "wind_unique": {
+          "draws": 832,
+          "verified": 832,
+          "mismatches": 0,
+          "fallbacks": 0,
+          "evictions": 0,
+          "cache_bytes": 4906772,
+          "cache_entries": 26
+        },
+        "picker_bounds": {
+          "hits": 252,
+          "misses": 84,
+          "checks": 252,
+          "bad": 0
+        },
+        "fog_changes_pixels": true,
+        "reveal_restored_exact": true
+      }
+    ],
+    "dock_unchanged": true,
+    "saved_presets_unchanged": true,
+    "protected_differences": [],
+    "verification_scope": "Prepared-wind arithmetic and picker bounds were checked against their linear reference in TD standalone and RA app. The separate wind-depth full-renderer verifier was not enabled in these checks."
+  },
+  "report": {
+    "original_report": "docs/performance/green-acres-2026-10-19/phase2.md",
+    "original_bytes": 4456,
+    "original_sha256": "0faf6052ed07e49f1e31f3b798df260d24503785b9ea4eff458229bb34ec2403",
+    "original_preserved_as_exact_prefix": true
+  },
+  "raw_record_aliases": {
+    "${EVIDENCE_ROOT}": "Private retained performance-main-compat-2026-10-20 evidence directory; identifiers are not public links."
+  }
+}

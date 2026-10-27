@@ -80,6 +80,11 @@ def pack(theater_dir: Path, out: Path, cell_size: int = 30) -> int:
                 payload += vimg.crop((x0, y0, x0 + cell, y0 + cell)).tobytes()
     out.write_bytes(MAGIC + struct.pack("<3I", VERSION, cell, len(keys))
                     + b"".join(struct.pack("<2H", t, i) for t, i in keys) + payload)
+    if cell == 144:
+        from terrain_daylight import apply
+        apply(out, theater_dir.name, "terrainenh")
+        from terrain_connectors import apply_file
+        apply_file(out)
     return len(keys)
 
 

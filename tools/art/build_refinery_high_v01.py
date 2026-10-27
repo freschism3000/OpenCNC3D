@@ -407,7 +407,7 @@ bm=bmesh.new();bm.from_mesh(left.data);bmesh.ops.remove_doubles(bm,verts=bm.vert
 # Retain approved image within the .blend as an explicit reference datablock.
 im=bpy.data.images.load(str(DESIGN),check_existing=True);im.pack()
 scene['approved_design']='PROC DesignDirection v03';scene['source_first_low_sha256']=hashlib.sha256(SOURCE.read_bytes()).hexdigest();scene['approved_design_sha256']=hashlib.sha256(DESIGN.read_bytes()).hexdigest()
-scene['status']='High v01 actual geometry, pending user approval; provisional ID materials only'
+scene['status']='High v01 actual geometry, pending design-review approval; provisional ID materials only'
 
 # Deterministic studio setup; review colours are untextured IDs.
 scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True

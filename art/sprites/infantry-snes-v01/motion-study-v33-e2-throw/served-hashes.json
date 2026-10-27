@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-21",
+  "url": "http://127.0.0.1:8796/sprites/infantry-designs-v07/study-e2-throw-v33/",
+  "resources": [
+    {
+      "url": "index.html",
+      "sha256": "620afb05a33bb3744b216cf3ddc77e81099492029e9ea854c31f7e423a4faa8b"
+    },
+    {
+      "url": "frames/E-0.png",
+      "sha256": "44e794e179b846698e1fa1e658abda102b6852c59849a2d2a0c18936b8da31b2"
+    },
+    {
+      "url": "frames/E-1.png",
+      "sha256": "74690bbbac6b296f2d7ac7198bba8fa70e0c012055ca7dad61fd013278929167"
+    },
+    {
+      "url": "frames/E-2.png",
+      "sha256": "8c6cfea2779420d93a6ae9abdc7c1699632bb38aaaf3170d481777e6c0bcef74"
+    },
+    {
+      "url": "frames/E-3.png",
+      "sha256": "a594cae8cb9b93eafbf64c1768de48429f43c2616e6f10ba944131a69a9fce23"
+    },
+    {
+      "url": "frames/E-4.png",
+      "sha256": "8c6cfea2779420d93a6ae9abdc7c1699632bb38aaaf3170d481777e6c0bcef74"
+    },
+    {
+      "url": "frames/E-5.png",
+      "sha256": "8d4ab0b68ef8819765e1ca619fe84f2a9b568c4d8d5909e5308411f3de28a7c4"
+    },
+    {
+      "url": "frames/E-6.png",
+      "sha256": "cd7fd972818152a696ee7027d67c48d32f649ec60e90b88d2a78b2d67dadd959"
+    },
+    {
+      "url": "frames/E-7.png",
+      "sha256": "801a665d80011150f9c29b9c1b269b017647cbf6b67eee7685fb338201ccc5c6"
+    },
+    {
+      "url": "frames/E-8.png",
+      "sha256": "7ba6c27a1406de70d42d278d4870d553429aec2f944be4869db8119dd5287cfd"
+    },
+    {
+      "url": "frames/E-9.png",
+      "sha256": "e2bdb93b1002f741743baeafa871c4ba7e9fecbe1bab4bf02118eb57f9b6dfdc"
+    },
+    {
+      "url": "frames/E-10.png",
+      "sha256": "a4911a8599cebcffd919c20331fbda762c36cda1ad1e941b5dafc9fe142809ea"
+    },
+    {
+      "url": "frames/E-11.png",
+      "sha256": "9221c427f0de500e129f055d3089fca563b78ac0ada4b1ccd0e90cbedaf0be1e"
+    },
+    {
+      "url": "frames/E-12.png",
+      "sha256": "adab667e72c9655db617c8b2feba2729db65b1749acc29a5857bec2ccfbb2528"
+    },
+    {
+      "url": "frames/E-13.png",
+      "sha256": "797dc8d4d312761628dc3687d2e8f110ecae8b9bea5be3cbf6948716e50c317e"
+    },
+    {
+      "url": "frames/E-14.png",
+      "sha256": "686a6c8994ef947fcf31087f21a9fc8d586113c60dca16b6c0957ab2a9264a74"
+    },
+    {
+      "url": "frames/E-15.png",
+      "sha256": "00322f4cbcbdf4e46b64cd30fc608e48e8e52ad1781440874a050aa0f703d7b9"
+    },
+    {
+      "url": "frames/E-16.png",
+      "sha256": "344eb1de6301f6e198b2fb964952a8d2105b845b7dc253621432aec060ee6d1f"
+    },
+    {
+      "url": "frames/E-17.png",
+      "sha256": "fcd9c4d170ceea2d0128848230746bd01b4573e903b67c7ae5980e6f144a5d7e"
+    },
+    {
+      "url": "frames/E-18.png",
+      "sha256": "a7e9a93176a19b61c2fa328678be5bfac19f77db31f718665375e9072431ed9d"
+    },
+    {
+      "url": "frames/E-19.png",
+      "sha256": "28b70fe23e4c490beb1d41af4469b27b7c00d6cb15bdaf01cfe3932ca3925d7c"
+    },
+    {
+      "url": "frames/E-ready.png",
+      "sha256": "44e794e179b846698e1fa1e658abda102b6852c59849a2d2a0c18936b8da31b2"
+    }
+  ],
+  "rejected_v31_marked_historical": true
+}

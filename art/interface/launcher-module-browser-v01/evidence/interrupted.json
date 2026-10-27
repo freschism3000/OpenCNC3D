@@ -1,0 +1,77 @@
+{
+  "catalog": [
+    "td",
+    "ra"
+  ],
+  "choices": {
+    "movies": true,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "status-back",
+      "kind": "button",
+      "label": "BACK",
+      "w": 160,
+      "x": 206,
+      "y": 418
+    },
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "status-next",
+      "kind": "button",
+      "label": "RETRY",
+      "w": 190,
+      "x": 620,
+      "y": 418
+    }
+  ],
+  "installed": [
+    "td"
+  ],
+  "page": "failed",
+  "progress": 0.42,
+  "scenario": "td",
+  "target": "ra",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "DOWNLOAD INTERRUPTED",
+      "width": 236,
+      "x": 390,
+      "y": 190
+    },
+    {
+      "height": 16,
+      "t": "YOUR INSTALLED MODULES ARE SAFE.",
+      "width": 362,
+      "x": 392,
+      "y": 256
+    },
+    {
+      "height": 16,
+      "t": "TRY AGAIN TO FINISH INSTALLING.",
+      "width": 350,
+      "x": 392,
+      "y": 296
+    },
+    {
+      "height": 16,
+      "t": "BACK",
+      "width": 48,
+      "x": 262,
+      "y": 430
+    },
+    {
+      "height": 16,
+      "t": "RETRY",
+      "width": 60,
+      "x": 685,
+      "y": 430
+    }
+  ]
+}

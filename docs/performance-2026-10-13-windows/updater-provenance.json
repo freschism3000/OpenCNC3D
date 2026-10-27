@@ -1,0 +1,30 @@
+{
+  "data_file_count": 950,
+  "canonical_from_zip_path_sizes": "c7c6309eec3ffdd7b955990822962c22b3e9ca321eb03e308ea2c24bbf722e42",
+  "package_record_data_id": "c7c6309eec3ffdd7b955990822962c22b3e9ca321eb03e308ea2c24bbf722e42",
+  "manifest_has_matching_windows_data_id": true,
+  "proc": {
+    "size": 38122673,
+    "sha256": "7e3d7675ed41c5d82bd27f946d6482c159210b3b494e7cc8d9020b87b18e9ca0"
+  },
+  "same_other_files_old_proc_size": 36382413,
+  "same_other_files_old_proc_data_id": "84e8b435b8b56cb8da7a9208de432613ac58dc8e92cdfd4e5ef164f9d0f5a815",
+  "counterfactual_note": "Not the actual prior release ID: isolates replacing only PROC size in the v0.8.4 package inventory.",
+  "bins_contains_proc": false,
+  "bins_members": [
+    "enhanced-menu.pack",
+    "TiberianDawn.dll",
+    "CONQUER.MIX",
+    "READ-ME-FIRST.txt",
+    "netcheck.exe",
+    "cnc_eyes.exe",
+    "opencnc3d-game.exe",
+    "OpenCNC3D.exe",
+    "dosmenu.pack",
+    "dosclassic.pack",
+    "BUILD-ID.txt",
+    "SDL2.dll"
+  ],
+  "bins_readme": "Binaries only, build v0.8.4.\n\nCopy these over the folder you already have, keeping the game data where it is:\n\n  OpenCNC3D.exe  opencnc3d-game.exe  cnc_eyes.exe  netcheck.exe  SDL2.dll  TiberianDawn.dll\n  dosclassic.pack  dosmenu.pack  CONQUER.MIX\n\nOpenCNC3D.exe is the launcher and opencnc3d-game.exe is the game. If you have the launcher\nalready you do not need to do any of this by hand: press Update in it.\n\nDelete any PLAY*.bat you still have from an older build. They are gone, and they\npass options the game no longer needs.\n",
+  "public_api_manifest_listed": false
+}

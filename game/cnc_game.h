@@ -45,7 +45,6 @@ typedef struct GameOpts {
     const char* efxEnh;     /* remastered effect art, Enhanced; missing = the cartridge's */
     const char* dostib;     /* real tiberium art pack; missing = crystals  */
     const char* tib3d;      /* solid crystal clumps, Enhanced; missing = flat only */
-    const char* tree3d;     /* leafy trees, Enhanced; missing = the cartridge model */
     const char* models3d;   /* directory of authored vehicle models, Enhanced only  */
     const char* mottle;     /* ground variation patches, Enhanced only; "" is off */
     const char* sky3d;      /* the sky those models are lit by, Enhanced only       */
@@ -152,6 +151,8 @@ typedef struct GameOpts {
        default. Every caller that sets skirmish must therefore set these too;
        game_parse_args does it for the switches and skirmish_apply does it for the
        lobby. */
+    /* The side, or for the Red Alert engine the COUNTRY (its HousesType: 0 Spain,
+       1 Greece, 2 USSR, 3 England, 4 Ukraine, 5 Germany, 6 France, 7 Turkey). */
     int player_house[8];
     int player_team[8];
     int player_colour[8];
@@ -173,6 +174,22 @@ typedef struct GameOpts {
        click do nothing at all. Which counts are safe is a measured property of the engine's
        own scatter, and no value is safe everywhere. Zero is the measured best. */
     int unit_count;
+    /* THE SEED THE MATCH'S SIMULATION STARTS FROM, for the Red Alert engine (zero: the
+       engine's own choice, the clock outside a lockstep match). Red Alert reseeds at
+       every scenario start, so a skirmish repeats exactly only when it is handed the same
+       seed; --seed N. The Tiberian Dawn engine starts every scenario from one stream and
+       has no use for it. */
+    int seed;
+    /* 1 = the shroud grows back over ground nobody is watching: Red Alert's "Shroud
+       Regrows" option (MPlayerShadowRegrow). Ore and Tiberium growth is `tiberium`. */
+    int shroud_regrow;
+    /* 1 = capture the flag, Red Alert's rule: a house is beaten when its flag is taken
+       home. Tiberian Dawn's engine would honour it too; nothing offers it there. */
+    int ctf;
+    /* Fair skirmish skill in both games: 0 unset, 1 Easy, 2 Normal, 3 Hard,
+       4 Expert. CLI default only; per-seat levels below are authoritative. */
+    int ai_difficulty;
+    unsigned char ai_levels[8]; /* roster seats: 0 Easy, 1 Normal, 2 Hard, 3 Expert */
     /* ---- A NETWORK MATCH (Phase 3). 0 is no network, which is every path above. 1 hosts
        on net_port and waits for net_players - 1 joiners; 2 joins net_addr:net_port. Either
        implies skirmish, and the joiner's own skirmish settings lose to what the host sends.
@@ -278,6 +295,13 @@ void game_shutdown(void);
    Before it existed the menu could not be driven headlessly in any way, which is
    precisely why the button stayed broken from 19 to with the suite green. */
 int  game_visuals_open(SDL_Window* win, const char* dospack, const char* shot);
+/* A movie in the chosen language where its pack carries it (game/lang_mod.h): `path` is
+   the English movie's path ("dosdata/movies/GDI1.VQA"); the answer is the pack's copy, or
+   `path` itself. */
+const char* game_lang_movie(const char* path);
+/* Fetch a Tiberian Dawn language pack into the install the process runs in, printing its
+   progress, and return 0 when it is complete (--langget). */
+int game_lang_fetch_cli(const char* code);
 
 /* ---- save and load ------------------------------------------------------------------
    The engine writes the game (CNC_Save_Load -> saveload.cpp); these carry the handful of
@@ -313,14 +337,30 @@ void game_set_movie_player(int (*play)(void* user, const char* name), void* user
  *
  * `preset` is loaded if it exists and ignored in silence if it does not, because a
  * first run has no saved config and that is not an error. */
+int game_enhanced_menu_enabled(void);
 void game_visuals_default_enhanced(const char* preset);
-/* Red Alert's two modes at boot: C&C's dials, Red Alert's last mode and display. See the
+/* Red Alert's two modes at boot: its defaults, C&C's choices, then its own saved file. See the
    definition in cnc_eyes.cpp. */
 void game_visuals_default_ra(const char* preset, const char* tdPreset, int classicOnly);
+/* The Red Alert module's own F5 defaults (fx_red_alert_layer in fx_state.h) in place of
+   Tiberian Dawn's, for the rest of the run. The frontend calls it before game_parse_args
+   when it runs --module ra3d; a renderer run gets the same from --ra3d. */
+void game_use_red_alert_dials(void);
 /* WHAT WINDOW TO MAKE, before there is one: the display mode and size the preset asks
    for (fullscreen.h's FS_MODE_*), or the compiled defaults with no preset. Returns 1
    when a preset file was read. app/opencnc3d.cpp asks this before SDL_CreateWindow. */
 int game_display_wanted(const char* preset, int* mode, int* rw, int* rh);
+/* Synchronize the live display choice after startup without writing a new preset. */
+void game_display_started(int mode, int rw, int rh);
+/* Successful fullscreen keyboard change on a window owned by the game. */
+void game_display_changed(SDL_Window* window, int mode);
+/* No-op in normal frontends; only the dedicated entry starts recording. */
+int game_diagnostics_begin(void);
+void game_diagnostics_end(void);
+void game_diagnostics_graphics(void);
+void game_diagnostics_configuration(void);
+void game_diagnostics_phase(int phase, int code);
+int game_diagnostics_current_phase(void);
 
 /* THE PLAYER'S GAME CONTROLS, REMEMBERED, AND THE SHELL DECIDES THAT TOO.
  *
@@ -339,6 +379,8 @@ int game_display_wanted(const char* preset, int* mode, int* rw, int* rh);
  * Call it AFTER game_set_audio: restoring the volumes pushes them straight at the mixer.
  */
 void game_controls_remember(const char* path);
+/* Restore the same controls without arming implicit writes, even after edits. */
+void game_controls_load_readonly(const char* path);
 /* AND THE SAME FOR THE VISUALS AND INPUT PRESET. An empty path means remember nothing:
    no load, no save, not one fopen. Only the shell's non-automated launch and the explicit
    --visualscfg turn it on, so no automated run can inherit a preset. */
@@ -424,6 +466,9 @@ typedef struct MatchStatRow {
     int defeated;      /* knocked out or resigned                                     */
     int is_local;      /* the player sitting at this machine                           */
     int faction;       /* 0 GDI, 1 Nod: what they PLAYED, not which multi house they got */
+    /* What the seat was given: Tiberian Dawn's side again, or Red Alert's COUNTRY
+       (HousesType 0..7, Spain to Turkey; faction is then 1 for the Soviet side). */
+    int country;
 } MatchStatRow;
 
 typedef struct MatchStats {

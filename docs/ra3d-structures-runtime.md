@@ -13,8 +13,46 @@ An intact model replaces the original building and all its engine subobjects, in
 WEAP2, while alive and outside construction, sale and an open factory door. Health loss
 keeps the approved standing geometry until a separately approved damage model is available.
 Other states retain Red Alert's original sprite presentation. Classic and N64 modes retain
-their original art. Wall connection meshes are pending. The lab's unapproved damage,
-destruction, placement and effects are excluded.
+their original art. Walls and fences draw OpenCNC3D's connection pieces (below). The lab's unapproved damage,
+destruction, placement and effects are excluded. Effects are excluded even where the
+intact model is approved with them: the import carries no emitters, so the Flame Tower
+draws its soot but not the lab's pilot flames. A Red Alert structure below half strength
+takes the cartridge's damage plume from its model's roof instead, and the engine's fire
+anims on it burn on the roof; its death is Enhanced's rebuilt building blast and smoke
+column at the middle of its plot.
+
+Each model stands at its size on the plot (`art/remaster-ra/scale.json`, measured by
+`tools/art/remaster/ra/scale_fit.py`): one uniform factor, never above 1, about the
+footprint's centre on the ground, so a Red Alert building fills its cells as OpenCNC3D's
+remasters fill theirs and a soldier reads the same against it as in Tiberian Dawn (the
+Construction Yard 0.803, 1.25 cells high; the Power Plant 0.886, 1.40; the War Factory
+0.855; the SAM Site 0.593; the Barracks, Tent, Radar Dome, Advanced Power Plant, Forward
+Command Post, Turret and Helipad 1). The bake applies it, so the drawn model, its turret
+pivots, its flag's wave, its pick silhouette, shadows, overlays and the Tesla Coil's bolt
+crown all come from the smaller model; the engine's footprint, bib and apron cells do not
+change. The lab shows it by its As OpenCNC3D size switch.
+
+A model may reach past its plot (`_overhang` in `art/remaster-ra/yaw.json`, of the model at
+its size): the Shipyard 0.221 cells past its plot, the Chronosphere 0.242, the Airfield's
+control tower 0.011 past the plot's north edge (0.111 at its approved size). The model is
+drawn whole and is not shrunk to fit its overhang; the per-building view test allows four
+cells beyond the footprint, so the overhang is never culled on its own.
+
+The art Red Alert shares with OpenCNC3D is drawn from OpenCNC3D's own approved files,
+where the Red Alert lab approved the reuse: `tools/ra3d/stage-reuse.py` (run by
+`stage-structures.py`) copies them from `game/ebld` into `ra3d/ebld` with
+`reuse-manifest.json`. The civilian buildings V01 to V19, BIO, HOSP and MISS keep all
+three stages (worn, broken at half strength, wrecked and sunk over their scorch, the
+engine's death craters held back); the trees T01, T02, T03, T05, T07, T10, T12 and T13
+stand at the engine's trunk point on temperate maps with their burning and snag stages,
+and snow keeps its 1996 trees, since no reused tree has a winter look. The walls and
+fences SBAG, CYCL, BRIK, BARB and WOOD are read from the engine's map (connection nibble
+and damage level from OverlayData) and draw their connection pieces and stages; Red
+Alert's own fence FENC keeps its 1996 picture. The steel crate and the field overlays are
+models, and the craters and scorch marks are OpenCNC3D's remastered decals, with a grey
+burn on snow. Under Enhanced effects Red Alert's 3D pass draws OpenCNC3D's particles
+(`game/ra3d_effects_mod.h`), so the lab's blasts, smoke and flames on these models show,
+and the engine's own explosions and fires on them stand down as in Tiberian Dawn.
 
 Exterior gravel aprons reuse OpenCNC3D's approved softened g3s temperate art in
 `bibenh.pack`, with the same cover/multiply passes and dials. RA supplies every apron
@@ -41,7 +79,8 @@ and output hashes. Each runtime building has fewer than 10,000 triangles.
 Rebuild art with `python3 tools/ra3d/bake-structures.py --export-root build-native/remaster-ra`.
 Run `tools/ra3d/gate-ra-structures.sh playable` for the hidden synthetic instance test.
 `stage-structures.py` refreshes only module building art. `stage-runtime.py` copies a staged
-module's media and the supplied platform binaries into a portable test folder.
+module's data and the supplied platform binaries into a portable folder, leaving out the
+movies and score that `tools/media/media-paths.txt` names under `ra3d/`.
 
 RA reads OpenCNC3D's current `opencnc3d-fx.cfg` for Enhanced presentation and display settings,
 including camera dials, resolution and vsync. RA snow maps also use the shared cool

@@ -1,0 +1,26 @@
+{
+  "checks": [
+    "not-pe: rejected",
+    "win64: rejected",
+    "no-laa: rejected",
+    "no-trace: rejected",
+    "bare-release-number: rejected",
+    "non-commit-diagnostic-label: rejected",
+    "too-short-commit-mark: rejected",
+    "valid PE32 fixture: accepted",
+    "mismatched provided source commit: rejected",
+    "matching commit prefix with dirty suffix: accepted",
+    "six-member ZIP + manifest hashes + no DLL/assets: passed",
+    "mismatched source revision refuses packaging and preserves existing ZIP",
+    "official PowerShell 7.4 parser: zero errors",
+    "tampered binary: refused before copy/picker/launch; original fixture unchanged",
+    "Windows argument quote cases: spaces, drive path, trailing slash, quote and empty passed",
+    "PowerShell snapshot/copy helpers: .enh preserved, newer save protected, legacy index renamed, originals unchanged",
+    "Danish culture: memory CSV retains invariant decimal format",
+    "Asset fingerprints: model/effect selection, relative paths, exact SHA, no assets, no strict rejection passed",
+    "New bundle prose/scripts/manifest: no confidential module disclosure"
+  ],
+  "native_windows_execution": false,
+  "game_runs": 0,
+  "limitations": "Copy/Win32 process/WMI/UI execution still requires native Windows validation; parser runtime is 7.4, intended script uses PowerShell 5.1-compatible features."
+}

@@ -23,6 +23,11 @@
 __pycache__/
 build-native/
 build/
+# The Enhanced menu's baked art: game/make-build.sh runs menu/bake_enhanced_menu.py on
+# the committed art/interface/enhanced-menu-v06 and writes the pack and its .json proof
+# list beside the script.
+menu/enhanced-menu.pack
+menu/enhanced-menu.json
 # Any cmake output directory, whatever it is called. build-native/ and build/ were
 # named individually, so a directory called build-audit/ matched neither and 302
 # files of CMake output -- with absolute paths baked into CMakeCache.txt -- were
@@ -100,6 +105,7 @@ game/gate_roomcode
 # file in exactly the way gate_tunnel did. Found on the first macOS build of it: the
 # binary stood untracked in game/, which is the state release.sh refuses to run in.
 game/gate_mpbrowse
+game/gate_enhanced_menu
 audio/audtest
 audio/banktest
 audio/mixtest
@@ -197,17 +203,6 @@ tools/art/n64fix/viewer/inbox.jsonl
 tools/art/remaster/viewer/inbox.jsonl
 tools/art/remaster/fxviewer/inbox.jsonl
 
-# image-tool logs name this machine's paths; the prompt and the images are the record.
-art/remaster/*/gpt/*/log.txt
-art/remaster/*/gpt/*/log_*.txt
-art/remaster/ra/*/gpt/*/log.txt
-art/remaster-ra/*/gpt/*/log.txt
-art/remaster-ra/*/gpt/*/log_*.txt
-# the texture remasters: image-tool logs, as for the buildings
-art/remaster/textures/*/*/gpt/*/log.txt
-# a painting claimed by a running tex.py gpt (removed when it lands)
-art/remaster/textures/*/*/gpt/*/.claim
-art/remaster/cursors/*/gpt/*/log.txt
 # the Enhanced terrain packs: tools/bakery/pack_remaster_terrain.py rebuilds them
 /art/remaster/textures/**/*.pack
 tools/art/remaster/viewer/inbox-ra.jsonl
@@ -219,3 +214,14 @@ tools/art/remaster/fxviewer/inbox-ra.jsonl
 
 # The menu pack, baked by game/make-build.sh (or python3 menu/bake_dosmenu.py).
 /menu/dosmenu.pack
+
+
+# Written by game/build.sh (tools/ra3d/bake-enhanced-hud.py) beside its pack on every build.
+/game/ra-enhanced-hud.json
+
+# The 92 MiB raw Temperate matte is reproduced from its hash-pinned gzip source.
+# Local raw artist overrides are retained and refused by the materializer.
+/game/grassmask_TEMPERAT.pack
+/game/.grassmask_TEMPERAT.materialized.json
+/game/.grassmask-unpack-*
+/game/.grassmask-record-*

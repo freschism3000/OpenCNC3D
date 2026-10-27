@@ -17,7 +17,7 @@ for name in ['Foundation_SOURCE_CONTOUR_EXACT','Foundation_inset_top_course']:
  for v in o.data.vertices:
   if v.index%6<3:v.co.y-=EXTENSION
 base.name='Foundation_FRONT_APRON_REVISED';base['source_preserved_exactly']=False
-base['footprint_status']='Front extension proposed by current apron revision; needs user acceptance.'
+base['footprint_status']='Front extension proposed by current apron revision; needs acceptance.'
 for i,y in enumerate((-17.55,-15.25,-12.95)):
  o=bpy.data.objects[f'Apron_direction_arrow_ID_{i}'];points=[(-4.7,y-.35,.232),(-3.3,y-.35,.232),(-4,y+.55,.232)]
  for v,p in zip(o.data.vertices,points):v.co=p
@@ -64,7 +64,7 @@ for name,record in source_objects.items():
  o=bpy.data.objects[name]
  assert list(sum((list(row) for row in o.matrix_world),[]))==record['matrix'],name
  assert hashlib.sha256(b''.join(__import__('struct').pack('3f',*v.co) for v in o.data.vertices)).hexdigest()==record['mesh'],name
-manifest={'source_sha256':expected,'approval':'pending; explicit acceptance of front footprint extension required','extension_towards_front':EXTENSION,'old_foundation_vertices':old_vertices,'new_foundation_vertices':new_vertices,'unchanged_above_apron_geometry':True,'arrows':'Three arrows spaced along enlarged concrete approach','xy_original':{'min':[-15.78,-14.64],'max':[11.25,13.76]},'xy_proposed':{'min':[-15.78,-20.04],'max':[11.25,13.76]},'note':'This is a proposed exception to the original full shaped footprint, prompted by the user request for a larger harvester approach. Width, rear edge, building, tanks, pipes, supports and filled hazard field are unchanged.'}
+manifest={'source_sha256':expected,'approval':'pending; explicit acceptance of front footprint extension required','extension_towards_front':EXTENSION,'old_foundation_vertices':old_vertices,'new_foundation_vertices':new_vertices,'unchanged_above_apron_geometry':True,'arrows':'Three arrows spaced along enlarged concrete approach','xy_original':{'min':[-15.78,-14.64],'max':[11.25,13.76]},'xy_proposed':{'min':[-15.78,-20.04],'max':[11.25,13.76]},'note':'This is a proposed exception to the original full shaped footprint, prompted by the design-review request for a larger harvester approach. Width, rear edge, building, tanks, pipes, supports and filled hazard field are unchanged.'}
 (OUT/'REVISION_MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n')
 views=json.loads((OLD/'REVIEW_CAMERAS.json').read_text());views['apron_detail']={'location':[9,-32,29],'target':[-4.5,-13.5,.5],'ortho_scale':23}
 # Wider framing used consistently for before/after views so extension stays uncropped.

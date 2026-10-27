@@ -475,6 +475,7 @@ static void ir_build_caps(int mi)
             r.cap[j][side] = sb;
         }
     }
+    m3_pose_model_changed(m);
     r.capOk = true;
 }
 
@@ -973,10 +974,64 @@ static bool ir_under_hull(const SimObject& o, float x, float z, float keep)
    rolling over a body carries it along and rolls it aside; it wakes a body at rest. */
 static std::map<long long, std::pair<float, float> > g_irPrevPos;
 
+/* Broad phase rebuilt from the immutable object snapshot for this physics step.
+   Cell lists retain object indices. Re-query after a shove so chained contacts
+   still follow the original full-scan order, including a departed overBy hull. */
+static std::map<std::pair<int,int>,std::vector<size_t> > g_irPushGrid;
+static std::map<long long,size_t> g_irPushIds;
+static unsigned long g_irPushCandidates=0;
+static void ir_push_grid() {
+    g_irPushGrid.clear();g_irPushIds.clear();
+    for(size_t i=0;i<g_objects.size();i++) {
+        const SimObject& o=g_objects[i];
+        if(o.limbo||o.dying||(o.kind!=K_UNIT&&o.kind!=K_INFANTRY)) continue;
+        float radius=o.kind==K_UNIT?0.42f:0.10f;
+        if(o.kind==K_UNIT&&ir_crusher(o)&&ir_gibs_on()) {
+            const CrushHull h=crush_hull_for_mesh(mesh_for(o));
+            radius=std::max(radius,0.5f*sqrtf(h.len*h.len+h.beam*h.beam));
+        }
+        radius+=0.002f;
+        const int x0=(int)floorf((o.ex-radius)*0.25f),x1=(int)floorf((o.ex+radius)*0.25f);
+        const int z0=(int)floorf((o.ez-radius)*0.25f),z1=(int)floorf((o.ez+radius)*0.25f);
+        for(int z=z0;z<=z1;z++) for(int x=x0;x<=x1;x++) g_irPushGrid[{x,z}].push_back(i);
+        g_irPushIds[(long long)o.kind*1000000+o.id]=i;
+    }
+}
+static std::vector<size_t> ir_push_candidates(const InfRag& b) {
+    std::vector<size_t> indices;
+    float x0=b.p[0][0],x1=x0,z0=b.p[0][2],z1=z0;
+    for(int j=1;j<IR_N;j++) {
+        x0=std::min(x0,b.p[j][0]);x1=std::max(x1,b.p[j][0]);
+        z0=std::min(z0,b.p[j][2]);z1=std::max(z1,b.p[j][2]);
+    }
+    /* Check diagnostic poses before float-to-int conversion. */
+    if(!std::isfinite(x0+x1+z0+z1)||fabsf(x0)>1e6f||fabsf(x1)>1e6f||fabsf(z0)>1e6f||fabsf(z1)>1e6f) {
+        for(size_t i=0;i<g_objects.size();i++) indices.push_back(i);return indices;
+    }
+    const int ix0=(int)floorf((x0-0.002f)*0.25f),ix1=(int)floorf((x1+0.002f)*0.25f);
+    const int iz0=(int)floorf((z0-0.002f)*0.25f),iz1=(int)floorf((z1+0.002f)*0.25f);
+    if((int64_t)(ix1-ix0+1)*(iz1-iz0+1)>4096) {
+        for(size_t i=0;i<g_objects.size();i++) indices.push_back(i);return indices;
+    }
+    for(int z=iz0;z<=iz1;z++) for(int x=ix0;x<=ix1;x++) {
+        auto f=g_irPushGrid.find({x,z});
+        if(f!=g_irPushGrid.end()) indices.insert(indices.end(),f->second.begin(),f->second.end());
+    }
+    auto old=g_irPushIds.find(b.overBy);
+    if(old!=g_irPushIds.end()) indices.push_back(old->second);
+    std::sort(indices.begin(),indices.end());indices.erase(std::unique(indices.begin(),indices.end()),indices.end());
+    return indices;
+}
 static void ir_push(InfRag& b, const InfRig& r)
 {
     const float hc = r.heightU * b.S;
-    for (size_t i = 0; i < g_objects.size(); i++) {
+    const bool indexed=mesh_perf_switch("OPENCNC3D_CORPSE_GRID");
+    std::vector<size_t> candidates;
+    if(indexed) candidates=ir_push_candidates(b);
+    else for(size_t i=0;i<g_objects.size();i++) candidates.push_back(i);
+    size_t at=0;
+    while(at<candidates.size()) {
+        const size_t i=candidates[at++];g_irPushCandidates++;
         const SimObject& o = g_objects[i];
         if (o.limbo || o.dying) continue;
         float rad;
@@ -990,6 +1045,7 @@ static void ir_push(InfRag& b, const InfRig& r)
         std::map<long long, std::pair<float, float> >::iterator pv = g_irPrevPos.find(k);
         if (pv != g_irPrevPos.end()) { sx = o.ex - pv->second.first; sz = o.ez - pv->second.second; }
         bool hit = false;
+        const unsigned beforeCut=b.cut;
         for (int j = 0; j < IR_N; j++) {
             if (j >= IR_GRIP && !b.freeGun) continue;
             float* p = b.p[j];
@@ -1032,6 +1088,10 @@ static void ir_push(InfRag& b, const InfRig& r)
             } else if (!over && b.overBy == k) {
                 b.overBy = 0;
             }
+        }
+        if(indexed&&(hit||beforeCut!=b.cut)) {
+            candidates=ir_push_candidates(b);
+            at=(size_t)(std::upper_bound(candidates.begin(),candidates.end(),i)-candidates.begin());
         }
     }
 }
@@ -1362,6 +1422,7 @@ static void infdeath_step(void)
     g_irLastFrame = g_engineFrame;
     g_irRagLive = 0;
     ir_detect_crushes();
+    if(mesh_perf_switch("OPENCNC3D_CORPSE_GRID")) ir_push_grid();
     for (size_t i = 0; i < g_m3Corpses.size(); i++) {
         const M3Corpse& c = g_m3Corpses[i];
         InfRag* b = ir_body_for(c);
@@ -1478,6 +1539,11 @@ static bool infdeath_pose(int mi, const SimObject& o, const AnimState& a, float*
     float qp[4] = { q[0], q[1], q[2], q[3] };
     if (r.root >= 0) { q[0] = qp[0]; q[1] = qp[1]; q[2] = qp[2]; q[3] = qp[3]; IR_APPLY(r.root, IR_PELVIS); }
     IR_FRAME(r.chest, IR_CHEST, IR_HEAD, IR_SH_L, IR_SH_R);
+    /* any other bone of the upper body (a collarbone, carrying the arm) turns with the
+       chest; left at its hand-over pose, the skin round a shoulder stayed where the man
+       died while the body fell */
+    for (size_t bi = 0; bi < nb && bi < (size_t)M3_MAX_BONES; bi++)
+        if ((int)bi != r.chest && r.grp[bi] == IG_UPPER) IR_APPLY((int)bi, IR_CHEST);
     IR_FRAME(r.head, IR_NECKX, IR_HEADTIP, IR_HEADSIDE, IR_NECKX);
     float qh[4] = { 0, 0, 0, 1 };
     for (int s = 0; s < 2; s++) {
@@ -1486,6 +1552,10 @@ static bool infdeath_pose(int mi, const SimObject& o, const AnimState& a, float*
         IR_LIMB(r.shin[s], IR_KNEE_L + o4, IR_ANKLE_L + o4);
         IR_LIMB(r.foot[s], IR_ANKLE_L + o4, IR_TOE_L + o4);
         IR_LIMB(r.uarm[s], IR_SHX_L + s, IR_EL_L + o4);
+        /* and any other bone of this arm (a shoulder's half-turn helper) with the upper arm */
+        for (size_t bi = 0; bi < nb && bi < (size_t)M3_MAX_BONES; bi++)
+            if (r.grp[bi] == IG_ARM_L + s && (int)bi != r.uarm[s] && (int)bi != r.farm[s]
+                && (int)bi != r.hand[s]) IR_APPLY((int)bi, IR_SHX_L + s);
         IR_LIMB(r.farm[s], IR_EL_L + o4, IR_WR_L + o4);
         IR_LIMB(r.hand[s], IR_WR_L + o4, IR_FIN_L + o4);
         if (s == 1) { qh[0] = q[0]; qh[1] = q[1]; qh[2] = q[2]; qh[3] = q[3]; }
@@ -1570,58 +1640,90 @@ static void infdeath_torn_begin(int mi, const SimObject& o, const AnimState& a, 
             fold[h][g] = comp[g] == comp[h] || entry[g] < 0 ? -1 : IR_JOINT_P[entry[g] / 2][entry[g] % 2];
     }
     const int gunGrp = b->handGun ? IG_ARM_R : IG_LOWER;
-    /* the bones' matrices, as m3_skin builds them */
-    static float M[M3_MAX_BONES][12];
-    static signed char G[M3_MAX_BONES];
-    for (size_t bi = 0; bi < nb && bi < (size_t)M3_MAX_BONES; bi++) {
-        const float* p = pose + bi * 8;
-        float q[4] = { p[0], p[1], p[2], p[3] };
-        float ql = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
-        ql = ql > 1e-12f ? 1.0f / sqrtf(ql) : 0.0f;
-        for (int k = 0; k < 4; k++) q[k] *= ql;
-        const float sc = p[7];
-        const float x = q[0], y = q[1], z = q[2], w = q[3];
-        const float Hm[12] = {
-            (1 - 2 * (y * y + z * z)) * sc, (2 * (x * y - z * w)) * sc, (2 * (x * z + y * w)) * sc, p[4],
-            (2 * (x * y + z * w)) * sc, (1 - 2 * (x * x + z * z)) * sc, (2 * (y * z - x * w)) * sc, p[5],
-            (2 * (x * z - y * w)) * sc, (2 * (y * z + x * w)) * sc, (1 - 2 * (x * x + y * y)) * sc, p[6] };
-        const float* I = m.bone[bi].ib;
-        float* o2 = M[bi];
-        for (int rr = 0; rr < 3; rr++) {
-            for (int col = 0; col < 3; col++)
-                o2[rr * 4 + col] = Hm[rr * 4] * I[col] + Hm[rr * 4 + 1] * I[4 + col] + Hm[rr * 4 + 2] * I[8 + col];
-            o2[rr * 4 + 3] = Hm[rr * 4] * I[3] + Hm[rr * 4 + 1] * I[7] + Hm[rr * 4 + 2] * I[11] + Hm[rr * 4 + 3];
+    /* THROUGH THE FRAME'S POSE CACHE, like a body in one piece (m3_pose_find): the passes
+       after the first read this skin back instead of making it again at full detail, and
+       draw it from the card (m3_pose_gpu). The key is the skin's whole input: the bone
+       poses, the cut joints' points, which joints are cut and which piece holds the gun.
+       Everything else it reads is fixed with the model. */
+    static float key[M3_MAX_BONES * 8 + IR_N * 3 + 2];
+    float* cached = 0;
+    int got = -1;
+    if (nb <= (size_t)M3_MAX_BONES) {
+        size_t nk = nb * 8;
+        memcpy(key, pose, nk * sizeof(float));
+        for (int i = 0; i < IR_N; i++) {
+            key[nk++] = P[i][0]; key[nk++] = P[i][1]; key[nk++] = P[i][2];
         }
-        G[bi] = r.grp[bi] < 0 ? (signed char)gunGrp : r.grp[bi];
+        const unsigned cut = b->cut;
+        memcpy(&key[nk++], &cut, sizeof cut);
+        key[nk++] = (float)gunGrp;
+        got = m3_pose_find(m, nv, key, nk, &cached);
+    } else {
+        m.drawPosed = 0;
     }
-    const float* src = &m.vert[0];
-    float* dst = &m.posed[0];
-    const unsigned char* sk = &m.skin[0];
-    for (size_t v = 0; v < nv; v++, src += 8, dst += 8, sk += 8) {
-        int h = v < r.vhome.size() ? r.vhome[v] : IG_UPPER;
-        if (h < 0) h = gunGrp;
-        float px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0;
-        for (int k = 0; k < 4; k++) {
-            if (!sk[4 + k]) continue;
-            const float w = (float)sk[4 + k] * (1.0f / 255.0f);
-            const int bi = sk[k];
-            const int f = fold[h][G[bi]];
-            if (f >= 0) {                 /* across a cut: folded to the joint */
-                px += w * P[f][0]; py += w * P[f][1]; pz += w * P[f][2];
-                continue;
+    /* a hit is the skin already made, unless it is to be checked */
+    if (got <= 0 || m3_pose_check()) {
+        /* the bones' matrices, as m3_skin builds them */
+        static float M[M3_MAX_BONES][12];
+        static signed char G[M3_MAX_BONES];
+        for (size_t bi = 0; bi < nb && bi < (size_t)M3_MAX_BONES; bi++) {
+            const float* p = pose + bi * 8;
+            float q[4] = { p[0], p[1], p[2], p[3] };
+            float ql = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
+            ql = ql > 1e-12f ? 1.0f / sqrtf(ql) : 0.0f;
+            for (int k = 0; k < 4; k++) q[k] *= ql;
+            const float sc = p[7];
+            const float x = q[0], y = q[1], z = q[2], w = q[3];
+            const float Hm[12] = {
+                (1 - 2 * (y * y + z * z)) * sc, (2 * (x * y - z * w)) * sc, (2 * (x * z + y * w)) * sc, p[4],
+                (2 * (x * y + z * w)) * sc, (1 - 2 * (x * x + z * z)) * sc, (2 * (y * z - x * w)) * sc, p[5],
+                (2 * (x * z - y * w)) * sc, (2 * (y * z + x * w)) * sc, (1 - 2 * (x * x + y * y)) * sc, p[6] };
+            const float* I = m.bone[bi].ib;
+            float* o2 = M[bi];
+            for (int rr = 0; rr < 3; rr++) {
+                for (int col = 0; col < 3; col++)
+                    o2[rr * 4 + col] = Hm[rr * 4] * I[col] + Hm[rr * 4 + 1] * I[4 + col] + Hm[rr * 4 + 2] * I[8 + col];
+                o2[rr * 4 + 3] = Hm[rr * 4] * I[3] + Hm[rr * 4 + 1] * I[7] + Hm[rr * 4 + 2] * I[11] + Hm[rr * 4 + 3];
             }
-            const float* o2 = M[bi];
-            px += w * (o2[0] * src[0] + o2[1] * src[1] + o2[2] * src[2] + o2[3]);
-            py += w * (o2[4] * src[0] + o2[5] * src[1] + o2[6] * src[2] + o2[7]);
-            pz += w * (o2[8] * src[0] + o2[9] * src[1] + o2[10] * src[2] + o2[11]);
-            nx += w * (o2[0] * src[3] + o2[1] * src[4] + o2[2] * src[5]);
-            ny += w * (o2[4] * src[3] + o2[5] * src[4] + o2[6] * src[5]);
-            nz += w * (o2[8] * src[3] + o2[9] * src[4] + o2[10] * src[5]);
+            G[bi] = r.grp[bi] < 0 ? (signed char)gunGrp : r.grp[bi];
         }
-        float nl = nx * nx + ny * ny + nz * nz;
-        nl = nl > 1e-20f ? 1.0f / sqrtf(nl) : 0.0f;
-        dst[0] = px; dst[1] = py; dst[2] = pz;
-        dst[3] = nx * nl; dst[4] = ny * nl; dst[5] = nz * nl;
+        /* into the cache entry, m.posed when the cache is full, or for a hit being checked
+           (OPENCNC3D_POSECHECK) a scratch array compared with the entry below */
+        static std::vector<float> check;
+        if (got > 0)
+            check.resize(nv * 6);
+        const float* src = &m.vert[0];
+        float* dst = got > 0 ? &check[0] : (cached ? cached : &m.posed[0]);
+        const size_t ds = cached ? 6 : 8;
+        const unsigned char* sk = &m.skin[0];
+        for (size_t v = 0; v < nv; v++, src += 8, dst += ds, sk += 8) {
+            int h = v < r.vhome.size() ? r.vhome[v] : IG_UPPER;
+            if (h < 0) h = gunGrp;
+            float px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0;
+            for (int k = 0; k < 4; k++) {
+                if (!sk[4 + k]) continue;
+                const float w = (float)sk[4 + k] * (1.0f / 255.0f);
+                const int bi = sk[k];
+                const int f = fold[h][G[bi]];
+                if (f >= 0) {                 /* across a cut: folded to the joint */
+                    px += w * P[f][0]; py += w * P[f][1]; pz += w * P[f][2];
+                    continue;
+                }
+                const float* o2 = M[bi];
+                px += w * (o2[0] * src[0] + o2[1] * src[1] + o2[2] * src[2] + o2[3]);
+                py += w * (o2[4] * src[0] + o2[5] * src[1] + o2[6] * src[2] + o2[7]);
+                pz += w * (o2[8] * src[0] + o2[9] * src[1] + o2[10] * src[2] + o2[11]);
+                nx += w * (o2[0] * src[3] + o2[1] * src[4] + o2[2] * src[5]);
+                ny += w * (o2[4] * src[3] + o2[5] * src[4] + o2[6] * src[5]);
+                nz += w * (o2[8] * src[3] + o2[9] * src[4] + o2[10] * src[5]);
+            }
+            float nl = nx * nx + ny * ny + nz * nz;
+            nl = nl > 1e-20f ? 1.0f / sqrtf(nl) : 0.0f;
+            dst[0] = px; dst[1] = py; dst[2] = pz;
+            dst[3] = nx * nl; dst[4] = ny * nl; dst[5] = nz * nl;
+        }
+        if (got > 0 && memcmp(&check[0], cached, nv * 6 * sizeof(float)) != 0)
+            g_m3PoseBad++;
     }
     /* the torn draw list: the model again, side by side, and the cut joints' ends */
     g_irSubSave.swap(m.sub);
@@ -1770,9 +1872,10 @@ static void infdeath_casings_step(void)
    way) came out near black on the dark temperate grass and read as a shadow, not blood.
    The splatter is generated, four variants: a pool of overlapping blots and a spray of
    drops, a little darker and glossier at its heart. It spreads over the first two
-   seconds. */
+   seconds. 128 texels a variant, mipmapped: at 64 the pool's edge and drops were soft
+   blurs at the near camera. */
 static GLuint g_irBloodTex = 0;
-static const int IR_BT = 64;
+static const int IR_BT = 128;
 
 static void ir_build_blood(void)
 {
@@ -1829,11 +1932,13 @@ static void ir_build_blood(void)
     }
     glGenTextures(1, &g_irBloodTex);
     glBindTexture(GL_TEXTURE_2D, g_irBloodTex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, 0x8191 /* GL_GENERATE_MIPMAP */, GL_TRUE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, IR_BT * 4, IR_BT, 0, GL_RGBA, GL_UNSIGNED_BYTE, &px[0]);
+    glTexParameteri(GL_TEXTURE_2D, 0x8191 /* GL_GENERATE_MIPMAP */, GL_FALSE);
 }
 
 static void infdeath_draw_blood(void)
@@ -1860,11 +1965,25 @@ static void infdeath_draw_blood(void)
         const float half = b.bsize * 0.5f * grow;
         const float cr = cosf(b.brot), sr = sinf(b.brot);
         const float u0 = (float)b.bvar * 0.25f;
+        /* Shared grid points keep exactly the original arithmetic, once rather than
+           four times per tile. Its complete posed bounds are valid for this pass. */
+        float points[6][6][3],lo[3]={1e30f,1e30f,1e30f},hi[3]={-1e30f,-1e30f,-1e30f};
+        for(int j=0;j<=N;j++)for(int i=0;i<=N;i++) {
+            const float s=(float)i/N*2.0f-1.0f,t=(float)j/N*2.0f-1.0f;
+            float* p=points[j][i];p[0]=b.bx+(cr*s-sr*t)*half;p[2]=b.bz+(sr*s+cr*t)*half;
+            p[1]=terrain_y(p[0],p[2])+0.002f;
+            for(int q=0;q<3;q++){lo[q]=std::min(lo[q],p[q]);hi[q]=std::max(hi[q],p[q]);}
+        }
+        const bool outside=mesh_perf_switch("OPENCNC3D_EFFECT_CULL")&&mesh_box_outside(lo,hi);
         /* the ground's own light and fog of war on it, as the scorch marks take theirs */
         {
             const float sh = terrain_shade((int)floorf(b.bx + 0.5f), (int)floorf(b.bz + 0.5f))
                            * (g_objShroud ? 1.0f - shroud_env_at(b.bx, b.bz) : 1.0f);
             glColor4f(sh, sh, sh, 1.0f);
+        }
+        if(outside) {
+            const float s=(float)(N-1)/N*2.0f-1.0f;
+            glTexCoord2f(u0+(s*0.5f+0.5f)*0.25f,1.0f);continue;
         }
         glBegin(GL_TRIANGLES);
         for (int j = 0; j < N; j++)
@@ -1873,9 +1992,8 @@ static void infdeath_draw_blood(void)
                 const int ci[4] = { i, i + 1, i + 1, i }, cj[4] = { j, j, j + 1, j + 1 };
                 for (int k = 0; k < 4; k++) {
                     const float s = (float)ci[k] / N * 2.0f - 1.0f, t = (float)cj[k] / N * 2.0f - 1.0f;
-                    X[k] = b.bx + (cr * s - sr * t) * half;
-                    Z[k] = b.bz + (sr * s + cr * t) * half;
-                    Y[k] = terrain_y(X[k], Z[k]) + 0.002f;
+                    const float* p=points[cj[k]][ci[k]];
+                    X[k]=p[0];Y[k]=p[1];Z[k]=p[2];
                     U[k] = u0 + (s * 0.5f + 0.5f) * 0.25f;
                     Vv[k] = t * 0.5f + 0.5f;
                 }
@@ -2100,6 +2218,62 @@ static void ir_draw_objsplats(void)
     GLint vp[4];
     glGetIntegerv(GL_VIEWPORT, vp);
     if (vp[2] <= 0 || vp[3] <= 0) return;
+    struct IrSplatDraw {size_t index;float c[3],d[3],ax[3],ay[3],C[3],V[8][3];};
+    std::vector<IrSplatDraw> prepared;
+    std::map<long long, size_t> at;
+    for (size_t i = 0; i < g_objects.size(); i++)
+        at[(long long)g_objects[i].kind * 1000000 + g_objects[i].id] = i;
+    for (size_t i = 0; i < g_irObjSplats.size(); i++) {
+        const IrObjSplat& sp = g_irObjSplats[i];
+        std::map<long long, size_t>::const_iterator f = at.find((long long)sp.kind * 1000000 + sp.id);
+        if (f == at.end()) continue;
+        const SimObject& o = g_objects[f->second];
+        if (!visible(o)) continue;
+        IrSplatDraw draw;draw.index=i;
+        float* c=draw.c;float* d=draw.d;
+        if (sp.kind == K_UNIT) {
+            float fw[2], rt[2];
+            ir_axes_of(o, fw, rt);
+            const float gy = terrain_y(o.wx, o.wz);
+            c[0] = o.wx + rt[0] * sp.l[0] + fw[0] * sp.l[2];
+            c[2] = o.wz + rt[1] * sp.l[0] + fw[1] * sp.l[2];
+            c[1] = gy + sp.l[1];
+            d[0] = rt[0] * sp.d[0] + fw[0] * sp.d[2];
+            d[2] = rt[1] * sp.d[0] + fw[1] * sp.d[2];
+            d[1] = sp.d[1];
+        } else {
+            memcpy(c, sp.l, 3*sizeof(float)); memcpy(d, sp.d, 3*sizeof(float));
+        }
+        ir_norm3(d);
+        /* the box: across the drop's path the splat's size, along it reaching in */
+        float* ax=draw.ax;float* ay=draw.ay;
+        {
+            const float ref[3] = { fabsf(d[1]) < 0.9f ? 0.0f : 1.0f, fabsf(d[1]) < 0.9f ? 1.0f : 0.0f, 0.0f };
+            ax[0] = d[1] * ref[2] - d[2] * ref[1]; ax[1] = d[2] * ref[0] - d[0] * ref[2]; ax[2] = d[0] * ref[1] - d[1] * ref[0];
+            ir_norm3(ax);
+            const float cr = cosf(sp.rot), sr = sinf(sp.rot);
+            float by[3] = { d[1] * ax[2] - d[2] * ax[1], d[2] * ax[0] - d[0] * ax[2], d[0] * ax[1] - d[1] * ax[0] };
+            for (int k = 0; k < 3; k++) { const float x = ax[k]; ax[k] = cr * x + sr * by[k]; ay[k] = -sr * x + cr * by[k]; }
+        }
+        const float hx = sp.size * 0.5f, hz = 0.16f;
+        float* C=draw.C;
+        for (int k = 0; k < 3; k++) C[k] = c[k] + d[k] * 0.08f;
+        auto& V=draw.V;
+        for (int k = 0; k < 8; k++)
+            for (int q = 0; q < 3; q++)
+                V[k][q] = C[q] + ax[q] * hx * ((k & 1) ? 1 : -1) + ay[q] * hx * ((k & 2) ? 1 : -1)
+                               + d[q] * hz * ((k & 4) ? 1 : -1);
+        float lo[3],hi[3];memcpy(lo,V[0],sizeof lo);memcpy(hi,V[0],sizeof hi);
+        for(int k=1;k<8;k++)for(int q=0;q<3;q++){lo[q]=std::min(lo[q],V[k][q]);hi[q]=std::max(hi[q],V[k][q]);}
+        if(!mesh_perf_switch("OPENCNC3D_EFFECT_CULL")||!mesh_box_outside(lo,hi))prepared.push_back(draw);
+    }
+    if(prepared.empty()) {
+        /* Match the original empty submission's inherited state without copying depth. */
+        glCullFace(GL_BACK);glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);glDisable(GL_BLEND);fx_glUseProgram(0);
+        glActiveTexture(GL_TEXTURE1);glBindTexture(GL_TEXTURE_2D,0);
+        glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,0);return;
+    }
     /* the scene's depth as it stands, copied */
     if (!g_irDepthTex || g_irDepthW != vp[2] || g_irDepthH != vp[3]) {
         if (!g_irDepthTex) glGenTextures(1, &g_irDepthTex);
@@ -2124,9 +2298,6 @@ static void ir_draw_objsplats(void)
             VPm[c * 4 + r] = sum;
         }
     if (!ir_inv4(VPm, inv)) return;
-    std::map<long long, size_t> at;
-    for (size_t i = 0; i < g_objects.size(); i++)
-        at[(long long)g_objects[i].kind * 1000000 + g_objects[i].id] = i;
     ir_build_blood();
     fx_glUseProgram(prog);
     glActiveTexture(GL_TEXTURE1);
@@ -2146,40 +2317,12 @@ static void ir_draw_objsplats(void)
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);                 /* the box's far faces: each pixel once */
-    for (size_t i = 0; i < g_irObjSplats.size(); i++) {
-        const IrObjSplat& sp = g_irObjSplats[i];
-        std::map<long long, size_t>::const_iterator f = at.find((long long)sp.kind * 1000000 + sp.id);
-        if (f == at.end()) continue;
-        const SimObject& o = g_objects[f->second];
-        if (!visible(o)) continue;
-        float c[3], d[3];
-        if (sp.kind == K_UNIT) {
-            float fw[2], rt[2];
-            ir_axes_of(o, fw, rt);
-            const float gy = terrain_y(o.wx, o.wz);
-            c[0] = o.wx + rt[0] * sp.l[0] + fw[0] * sp.l[2];
-            c[2] = o.wz + rt[1] * sp.l[0] + fw[1] * sp.l[2];
-            c[1] = gy + sp.l[1];
-            d[0] = rt[0] * sp.d[0] + fw[0] * sp.d[2];
-            d[2] = rt[1] * sp.d[0] + fw[1] * sp.d[2];
-            d[1] = sp.d[1];
-        } else {
-            memcpy(c, sp.l, sizeof c); memcpy(d, sp.d, sizeof d);
-        }
-        ir_norm3(d);
-        /* the box: across the drop's path the splat's size, along it reaching in */
-        float ax[3], ay[3];
-        {
-            const float ref[3] = { fabsf(d[1]) < 0.9f ? 0.0f : 1.0f, fabsf(d[1]) < 0.9f ? 1.0f : 0.0f, 0.0f };
-            ax[0] = d[1] * ref[2] - d[2] * ref[1]; ax[1] = d[2] * ref[0] - d[0] * ref[2]; ax[2] = d[0] * ref[1] - d[1] * ref[0];
-            ir_norm3(ax);
-            const float cr = cosf(sp.rot), sr = sinf(sp.rot);
-            float by[3] = { d[1] * ax[2] - d[2] * ax[1], d[2] * ax[0] - d[0] * ax[2], d[0] * ax[1] - d[1] * ax[0] };
-            for (int k = 0; k < 3; k++) { const float x = ax[k]; ax[k] = cr * x + sr * by[k]; ay[k] = -sr * x + cr * by[k]; }
-        }
-        const float hx = sp.size * 0.5f, hz = 0.16f;
-        float C[3];
-        for (int k = 0; k < 3; k++) C[k] = c[k] + d[k] * 0.08f;
+    for(const auto& draw:prepared) {
+        const IrObjSplat& sp=g_irObjSplats[draw.index];
+        const float* c=draw.c;const float* d=draw.d;const float* C=draw.C;
+        const float* ax=draw.ax;const float* ay=draw.ay;
+        const float hx=sp.size*0.5f,hz=0.16f;
+        const auto& V=draw.V;
         fx_set3f(prog, "uC", C[0], C[1], C[2]);
         fx_set3f(prog, "uX", ax[0] / hx, ax[1] / hx, ax[2] / hx);
         fx_set3f(prog, "uY", ay[0] / hx, ay[1] / hx, ay[2] / hx);
@@ -2191,11 +2334,6 @@ static void ir_draw_objsplats(void)
         const float sh = terrain_shade((int)floorf(c[0] + 0.5f), (int)floorf(c[2] + 0.5f))
                        * (g_objShroud ? 1.0f - shroud_env_at(c[0], c[2]) : 1.0f);
         fx_set1f(prog, "uShade", sh);
-        float V[8][3];
-        for (int k = 0; k < 8; k++)
-            for (int q = 0; q < 3; q++)
-                V[k][q] = C[q] + ax[q] * hx * ((k & 1) ? 1 : -1) + ay[q] * hx * ((k & 2) ? 1 : -1)
-                               + d[q] * hz * ((k & 4) ? 1 : -1);
         static const int F[6][4] = { {0,2,3,1}, {4,5,7,6}, {0,1,5,4}, {2,6,7,3}, {0,4,6,2}, {1,3,7,5} };
         glBegin(GL_QUADS);
         for (int f2 = 0; f2 < 6; f2++)
@@ -2219,6 +2357,27 @@ static void infdeath_draw_spray(void)
     if (!g_fx.enabled || g_m3Mirrored) return;
     ir_draw_drops();
     ir_draw_objsplats();
+}
+
+/* The engine clock does not restart reliably between missions. Explicit teardown
+   owns heap-id maps and blood/physics queues instead of a backwards-clock guess. */
+static void infdeath_reset(bool closeModels=true)
+{
+    g_irBody.clear(); g_irPrevPos.clear(); g_irSeen.clear(); g_irCrushed.clear();
+    g_irDrops.clear(); g_irSplats.clear(); g_irObjSplats.clear(); g_irCasings.clear();
+    g_irLastStage.clear(); g_irSubSave.clear();
+    /* Rig construction extends model geometry; keep its indices across a save
+       load of the same pack, and retire them only with the models themselves. */
+    if(closeModels)g_irRig.clear();
+    g_irPushGrid.clear();g_irPushIds.clear();
+    g_irLastFrame=-1; g_irDrawnBlood=g_irRagLive=g_irPushes=0;
+    g_irCuts=g_irBlasts=g_irCrushes=g_irRunOver=g_irTornDraws=0;
+    g_irDropsMade=g_irSplatGround=g_irSplatObj=g_irFlashes=g_irCasingsMade=g_irObjDrawn=0;
+    if (g_irBloodTex) glDeleteTextures(1,&g_irBloodTex);
+    if (g_irDepthTex) glDeleteTextures(1,&g_irDepthTex);
+    if (g_irDecalProg && fx_glDeleteProgram) fx_glDeleteProgram(g_irDecalProg);
+    g_irBloodTex=g_irDepthTex=g_irDecalProg=0;
+    g_irDepthW=g_irDepthH=g_irDecalTried=0;
 }
 
 static void infdeath_log(void)

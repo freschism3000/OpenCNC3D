@@ -1,6 +1,6 @@
 """Export an authored Blender vehicle to a .c3m model for the Enhanced art set.
 
-New assets must follow docs/3d-model-recipe.md as the canonical stage and
+New assets must follow the model authoring notes as the canonical stage and
 shared-look entry point. Use its Blender material/chamfer kit, audit the exported
 C3M with tools/art/style_audit.py, and review beside the Mammoth and Construction
 Yard in the fixed USER92 engine view. Export validity alone is not visual approval.

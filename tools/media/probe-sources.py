@@ -21,7 +21,7 @@ Exit status:
 
 A mirror that fails while another serves the file is reported but does not fail the
 run: the launcher falls through to the next mirror by itself. --full fetches every file
-WHOLE from every mirror and checks its SHA-256; that is about 1.3 GB and is for a
+WHOLE from every mirror and checks its SHA-256; that is about 2 GB and is for a
 deliberate audit, not for every release.
 """
 import argparse
@@ -61,17 +61,20 @@ def load_windows(path):
 
 
 def check_one(cache, url, base, f, window, want, full):
+    """A file's range on one mirror. A file with a head (Red Alert's score) serves only the
+    bytes after its head from the disc, and its recorded windows are of that range."""
     fetch = ml.Fetcher(cache, use_cache=bool(cache))
-    n = min(window, f["size"])
+    rng = f["size"] - len(f["head"])
+    n = min(window, rng)
     start = base + f["offset"]
     try:
         if full:
-            h = hashlib.sha256()
-            fetch._read_into(url, start, f["size"], h.update)
+            h = hashlib.sha256(f["head"])
+            fetch._read_into(url, start, rng, h.update)
             ok = h.hexdigest() == f["sha256"]
             return ok, "" if ok else "whole-file SHA-256 differs"
         head = fetch.get(url, start, n)
-        tail = fetch.get(url, start + f["size"] - n, n)
+        tail = fetch.get(url, start + rng - n, n)
     except ml.FetchError as e:
         return None, str(e)
     hs, ts = hashlib.sha256(head).hexdigest(), hashlib.sha256(tail).hexdigest()

@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Rejects navigation destinations that track unobservable enemy objects.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -79,6 +80,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 
 /***********************************************************************************************
  * FootClass::FootClass -- Default constructor for foot class objects.                         *
@@ -1831,6 +1833,10 @@ int FootClass::Mission_Enter(void)
 void FootClass::Assign_Destination(TARGET target)
 {
     assert(IsActive);
+    if (FairAI_RA_Enabled(House)) {
+        TechnoClass* enemy=As_Techno(target);
+        if (enemy && !House->Is_Ally(enemy) && !FairAI_RA_Observed(House,enemy)) target=TARGET_NONE;
+    }
 
     NavCom = target;
 

@@ -91,6 +91,193 @@ def fields(l):
     return dict(kv.split('=', 1) for kv in l.split('|') if '=' in kv)
 
 
+def screen_points(lines):
+    """Each evhcscreen block's points, in order: a list of [(col, row)]."""
+    out, cur = [], None
+    for l in lines:
+        if l.startswith('EVHCSCR|'):
+            if cur is None:
+                cur = []
+                out.append(cur)
+            x, y = map(float, fields(l)['scr'].split(','))
+            cur.append((x, y))
+        else:
+            cur = None
+    return out
+
+
+def changed(a, b):
+    """The pixels of two shots that differ by more than eight levels: (cols, rows), or
+    None when either picture is missing."""
+    try:
+        from PIL import Image
+        import numpy as np
+        A = np.asarray(Image.open(a).convert('RGB')).astype(int)
+        B = np.asarray(Image.open(b).convert('RGB')).astype(int)
+    except (OSError, ImportError):
+        return None
+    if A.shape != B.shape:
+        return None
+    d = abs(A - B).max(-1)
+    rows, cols = (d > 8).nonzero()
+    return cols, rows, A.shape
+
+
+def normals(A, first, bad):
+    """Claim 12, from run a (and n, cl): the smooth normals."""
+    # every one of the 21 files is format 2 and carries the export's smooth normals (the
+    # engine still reads a version 1 file, its corners on their faces' normals, but none
+    # is shipped)
+    v2 = [ty for ty in TYPES if first.get(ty, {}).get('fmt') == '2']
+    v1 = [ty for ty in TYPES if first.get(ty, {}).get('fmt') == '1']
+    fmt = [ty for ty in v2 if int(first.get(ty, {}).get('smooth', '0')) <= 0]
+    if fmt or len(v2) != len(TYPES):
+        bad.append('normals-format(flat %s, %d of format 2, %d of 1)' % (','.join(fmt), len(v2),
+                                                                         len(v1)))
+    nl = [fields(l) for l in A if l.startswith('EVHCNRM|on=')]
+    # the first dump: every vehicle in view drawn there; the second, switched off: none;
+    # the dump after the death: the wreck too
+    objs = int(nl[0]['objects']) if nl else 0
+    off = nl[1] if len(nl) > 1 else {}
+    wrecks = max([int(f['wrecks']) for f in nl[2:]] or [0])
+    if objs < 16 or off.get('on') != '0' or off.get('objects') != '0' or wrecks < 1:
+        bad.append('normals-drawn(objects %d, off %s, wrecks %d)' % (objs, off, wrecks))
+    pts = screen_points(A)
+    c = changed('shots/g296_a_1.png', 'shots/g296_a_1n.png')
+    far = n = 0
+    if c is None or not pts:
+        bad.append('normals-picture(missing)')
+    else:
+        cols, rows, shape = c
+        n = len(cols)
+        P = [(x, y) for x, y in pts[0] if 0 <= x < shape[1] and 0 <= y < shape[0]]
+        for x, y in zip(cols.tolist(), rows.tolist()):
+            if not P or min((x - px) ** 2 + (y - py) ** 2 for px, py in P) > 60 * 60:
+                far += 1
+        if n < 1500 or far:
+            bad.append('normals-picture(%d px changed, %d of them far from a vehicle)' % (n, far))
+    # switched off and in Classic, the switch has nothing to take away
+    for name in ('n', 'cl'):
+        cc = changed('shots/g296_%s_1.png' % name, 'shots/g296_%s_1n.png' % name)
+        if cc is None or len(cc[0]):
+            bad.append('normals-%s(%s)' % (name, 'missing' if cc is None else len(cc[0])))
+        L = log(name)
+        if any(fields(l).get('objects') != '0' for l in L if l.startswith('EVHCNRM|on=')):
+            bad.append('normals-%s-drawn' % name)
+    return ('the smooth normals: all %d files format 2, each with them, %d vehicles and the '
+            'wreck drawn into the light pass\'s normal target, %d pixels change without them, '
+            'all on the vehicles' % (len(v2), objs, n))
+
+
+def ease01(x):
+    x = min(1.0, max(0.0, x))
+    return x * x * (3.0 - 2.0 * x)
+
+
+# THE HARVESTER'S CLAWS, as the approved round 7 declares them: raised 40 degrees over the
+# first 60% of a 0.8 s change, the mouth's lower jaw open 56.7 degrees, shut over the last 60%
+LIFT, JAW, SHARE = 40.0, 56.7, 0.6
+
+
+def claws(C, bad):
+    """13. The Harvester's claws in run c: lowered with the lower jaw open while it
+    harvests, raised with the jaw shut otherwise, caught part way through a change; at
+    every drawn phase the lift and the jaw stand where the schedule puts them; the phase
+    moves only toward what the harvest test says; the rams' rods keep their eyes on the
+    booms' pins; the hub caps roll; docked, the rig draws the claws raised; and the same
+    frame with the claws switched off (harvlift 0) is the model at rest, differing only
+    round the harvesters."""
+    H = [fields(l) for l in C if l.startswith('EVHCHARV|HARV|')]
+    on = [f for f in H if f.get('on') == '1']
+    if not on:
+        bad.append('claws(no EVHCHARV line: the renderer drives no claws)')
+        return None
+    off = False
+    worst, gap, order = 0.0, 0.0, 0
+    lowered = raised = mid = 0
+    rolls = {}
+    last = {}
+    for f in H:
+        c = float(f['drawnclaw'])
+        if f['on'] == '0':
+            off = off or (c < 0 and float(f['drawnlift']) == 0.0 and float(f['drawnjaw']) == 0.0)
+            continue
+        lift, jaw = float(f['drawnlift']), float(f['drawnjaw'])
+        worst = max(worst, abs(lift - LIFT * ease01(c / SHARE)),
+                    abs(jaw - JAW * (1.0 - ease01((c - (1.0 - SHARE)) / SHARE))))
+        gap = max(gap, float(f['ramgap']))
+        if c == 0.0 and lift == 0.0 and jaw == JAW:
+            lowered += 1
+        elif c == 1.0 and lift == LIFT and jaw == 0.0:
+            raised += 1
+        elif 0.0 < c < 1.0:
+            mid += 1
+        rolls.setdefault(f['key'], []).append(float(f['roll']))
+        k, t, hv = f['key'], float(f['claw']), f['harvesting']
+        if k in last and last[k][1] == hv:
+            if (hv == '1' and t > last[k][0] + 1e-6) or (hv == '0' and t < last[k][0] - 1e-6):
+                order += 1
+        last[k] = (t, hv)
+    roll = max((max(v) - min(v) for v in rolls.values()), default=0.0)
+    docked = [fields(l) for l in C if l.startswith('EVHCART|HARV|')
+              and int(fields(l)['rigdrawn']) > 0]
+    rig_ok = bool(docked) and all(float(f['riglift']) == LIFT for f in docked)
+    ab = changed('shots/g296_c_lift.png', 'shots/g296_c_rest.png')
+    npx = len(ab[0]) if ab else 0
+    if not (lowered and raised and mid) or worst > 0.15 or order or gap > 0.5 or roll < 1.0 \
+            or not rig_ok or not off or not 100 <= npx <= 20000:
+        bad.append('claws(lowered %d raised %d mid-change %d, off the schedule by %.2f degrees, '
+                   '%d steps against the harvest test, ram gap %.3f, cap roll %.2f, docked %s, '
+                   'switched off at rest %s, A/B pixels %d)'
+                   % (lowered, raised, mid, worst, order, gap, roll,
+                      [f['riglift'] for f in docked][:3] or 'never', off, npx))
+        return None
+    return ('the Harvester lowers its claws with the lower jaw open to harvest (%d draws) and '
+            'raises them with the jaw shut otherwise (%d), %d draws caught part way, every '
+            'one within %.2f degrees of the schedule and only ever moving toward what the '
+            'harvest test says; the rams\' rods stay on the booms\' pins (%.3f pack units); '
+            'the hub caps roll %.1f radians; docked, the claws are raised; switched off, the '
+            'same frame is the model at rest (%d pixels)'
+            % (lowered, raised, mid, worst, gap, roll, npx))
+
+
+def hoop(C, bad):
+    """14. The Harvester's hoop in run c, when the Harvester file declares one (the hoop
+    swing's hinge): docked, it is drawn over the tank on arrival, swung over the cab with the
+    tank still at its rest, and the tank leaves its rest only with the hoop fully over (never
+    before); undocking, the tank is down before the hoop swings back over it. A file without
+    a hoop is said so, not passed silently; a renderer without the hoop driver prints no
+    hoop field and fails."""
+    D = [fields(l) for l in C if l.startswith('EVHCART|HARV|')]
+    if not D or 'hoop' not in D[0]:
+        bad.append('hoop(no hoop field on EVHCART|HARV: the renderer has no hoop driver)')
+        return None
+    if all(f['hoop'] == '0' for f in D):
+        return ('the Harvester file declares no hoop swing, so the dock plays the cartridge\'s '
+                'rig unchanged (check 14 has nothing to measure until a model with one is '
+                'installed)')
+    docked = [f for f in D if int(f['rigdrawn']) > 0]
+    seq = [(float(f['righoop']), float(f['rigtank'])) for f in docked]
+    nbad = sum(int(f['hoopbad']) for f in docked)
+    nfull = sum(int(f['hoopfull']) for f in docked)
+    arrived = [i for i, (h, t) in enumerate(seq) if h == 0.0 and t == 0.0]
+    waiting = [i for i, (h, t) in enumerate(seq) if h == 1.0 and t == 0.0]
+    tipping = [i for i, (h, t) in enumerate(seq) if t > 0.0]
+    # in order: arrived, swung with the tank waiting, tipping; then down with the hoop still
+    # over, and the hoop back
+    went = bool(arrived and waiting and tipping) and arrived[0] < waiting[0] < tipping[0]
+    back = bool(tipping) and any(i > tipping[-1] for i in waiting) \
+        and any(i > tipping[-1] for i in arrived)
+    if nbad or not nfull or not went or not back:
+        bad.append('hoop(docked draws %d: the tank off its rest before the hoop was over %d times, '
+                   'with it over %d; arrived-swung-tipping in order %s; down then the hoop back %s; '
+                   'the sequence %s)' % (len(docked), nbad, nfull, went, back, seq[:24]))
+        return None
+    return ('the Harvester\'s hoop swings over the cab before the dock rig tips the tank (%d draws '
+            'with the tank off its rest, every one with the hoop fully over) and back over the '
+            'tank once it is down' % nfull)
+
+
 def check():
     bad, say = [], []
     A = log('a')
@@ -254,12 +441,27 @@ def check():
     say.append('with --noevhc and in Classic nothing draws or claims and the old shatter takes '
                'the Mammoth')
     # 11. two runs are one picture
-    for s in ('1', '2', '3'):
+    for s in ('1', '2', '3', '1n', '3n'):
         a, b = 'shots/g296_a_%s.png' % s, 'shots/g296_a2_%s.png' % s
         if not (os.path.exists(a) and os.path.exists(b) and filecmp.cmp(a, b, shallow=False)):
             bad.append('nondeterministic' + s)
+    # 12. the smooth normals: carried by every file, drawn into the normal target by every
+    #     vehicle in view and by the wreck, and only the vehicles' pixels change without them
+    nrm = normals(A, first, bad)
+    if nrm:
+        say.append(nrm)
+    # 13. the Harvester's claws, their rams and its mouth's lower jaw
+    cl = claws(log('c'), bad)
+    if cl:
+        say.append(cl)
+    # 14. the Harvester's hoop in the Refinery's dock
+    ho = hoop(log('c'), bad)
+    if ho:
+        say.append(ho)
     print('\n'.join(say))
-    print(('OK ' + '; '.join(say[:1])) if not bad else 'FAIL ' + ' '.join(bad))
+    # (the suite keeps only the last line: a check that had nothing to measure says so there)
+    idle = '; check 14 measured nothing: ' + ho if ho and 'declares no hoop' in ho else ''
+    print(('OK ' + '; '.join(say[:1]) + idle) if not bad else 'FAIL ' + ' '.join(bad))
 
 
 if __name__ == '__main__':

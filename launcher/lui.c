@@ -4,6 +4,7 @@
  */
 
 #include "lui.h"
+#include "lskin.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +24,19 @@
  * entry 1 AND entries 4..15 with the ink colour. 6POINT's glyphs use nibble class
  * 1, GRAD6FNT's use 4..15, so one palette prints either face correctly and a
  * caller cannot pick the wrong helper for the font it happens to be holding. */
+static int lui_role(unsigned char colour)
+{
+    if (colour == DM_TEXT_BRIGHT || colour == DM_LIGHT_GREEN) return LS_ACCENT;
+    if (colour == DM_TEXT_DISABLED || colour == DM_DIS_HILITE) return LS_DISABLED;
+    if (colour == DB_WHITE) return LS_TEXT;
+    return LS_MUTED;
+}
+
+static int lui_string_width(const DB_Font *f, const char *text)
+{
+    return ls_enabled() ? ls_text_width(text) : db_string_width(f,text,DB_FONT6_XSPACING);
+}
+
 static void lui_pal(unsigned char fp[16], unsigned char colour)
 {
     db_font_palette_grad(fp, colour, LUI_TRANSPARENT);
@@ -34,6 +48,7 @@ void lui_print(DB_Surface *s, const DB_Font *f, const char *text, int x, int y,
     unsigned char fp[16];
     if (!f || !text || !*text)
         return;
+    if (ls_enabled()) { ls_text(text, x, y, lui_role(colour), 0); return; }
     lui_pal(fp, colour);
     db_print(s, f, text, x, y, fp, DB_FONT6_XSPACING);
 }
@@ -43,8 +58,9 @@ void lui_print_centered(DB_Surface *s, const DB_Font *f, const char *text, int c
 {
     if (!f || !text || !*text)
         return;
+    if (ls_enabled()) { ls_text(text, cx, y, lui_role(colour), 1); return; }
     /* dialog.cpp:562 TPF_CENTER: x -= String_Pixel_Width(text) >> 1. */
-    lui_print(s, f, text, cx - (db_string_width(f, text, DB_FONT6_XSPACING) >> 1), y, colour);
+    lui_print(s, f, text, cx - (lui_string_width(f, text) >> 1), y, colour);
 }
 
 void lui_print_right(DB_Surface *s, const DB_Font *f, const char *text, int rx, int y,
@@ -52,8 +68,9 @@ void lui_print_right(DB_Surface *s, const DB_Font *f, const char *text, int rx, 
 {
     if (!f || !text || !*text)
         return;
+    if (ls_enabled()) { ls_text(text, rx, y, lui_role(colour), 2); return; }
     /* dialog.cpp:565 TPF_RIGHT: x is the right edge. */
-    lui_print(s, f, text, rx - db_string_width(f, text, DB_FONT6_XSPACING), y, colour);
+    lui_print(s, f, text, rx - lui_string_width(f, text), y, colour);
 }
 
 void lui_print_shadowed(DB_Surface *s, const DB_Font *f, const char *text, int x, int y,
@@ -63,6 +80,7 @@ void lui_print_shadowed(DB_Surface *s, const DB_Font *f, const char *text, int x
     int i;
     if (!f || !text || !*text)
         return;
+    if (ls_enabled()) { ls_text(text, x, y, lui_role(colour), 0); return; }
     /* menus.cpp:814 TPF_FULLSHADOW, dialog.cpp:536-539: classes 2 and 3 become
      * BLACK so the letters keep an outline wherever the art behind is not black. */
     for (i = 0; i < 16; i++)
@@ -77,6 +95,8 @@ void lui_print_shadowed(DB_Surface *s, const DB_Font *f, const char *text, int x
 
 static int lui_char_w(const DB_Font *f, unsigned char c)
 {
+    char glyph[2];
+    if (ls_enabled()) { glyph[0]=(char)c; glyph[1]='\0'; return ls_text_width(glyph); }
     return (c < f->nchars) ? f->width[c] + DB_FONT6_XSPACING : 0;
 }
 
@@ -86,13 +106,15 @@ int lui_print_wrapped(DB_Surface *s, const DB_Font *f, const char *text, int x, 
                       int w, unsigned char colour, int centered, int max_rows)
 {
     char row[256];
-    int start = 0, n, rows = 0;
+    int start = 0, n, rows = 0, measurew;
 
     if (!f || !text)
         return 0;
     n = (int)strlen(text);
     if (w < 8)
         w = 8;
+    /* The atlas includes a two-texel shadow beyond some advances. */
+    measurew = w * (ls_enabled() ? 3 : 1) - (ls_enabled() ? 4 : 0);
     while (start < n) {
         int take, lastspace = -1, width = 0, i;
         if (max_rows > 0 && rows == max_rows - 1) {
@@ -105,7 +127,7 @@ int lui_print_wrapped(DB_Surface *s, const DB_Font *f, const char *text, int x, 
             memcpy(row, rest, (size_t)take);
             row[take] = '\0';
             if (s) {
-                if (centered && db_string_width(f, row, DB_FONT6_XSPACING) <= w)
+                if (centered && lui_string_width(f, row) <= measurew)
                     lui_print_centered(s, f, row, x + w / 2, y + rows * LUI_LINE_H, colour);
                 else
                     lui_print_fit(s, f, row, x, y + rows * LUI_LINE_H, w, colour);
@@ -114,7 +136,7 @@ int lui_print_wrapped(DB_Surface *s, const DB_Font *f, const char *text, int x, 
         }
         for (i = start; i < n; i++) {
             const int cw = lui_char_w(f, (unsigned char)text[i]);
-            if (text[i] == '\n' || width + cw > w)
+            if (text[i] == '\n' || width + cw > measurew)
                 break;
             width += cw;
             if (text[i] == ' ')
@@ -155,18 +177,19 @@ void lui_print_fit(DB_Surface *s, const DB_Font *f, const char *text, int x, int
 
     if (!f || !text || !*text)
         return;
-    if (db_string_width(f, text, DB_FONT6_XSPACING) <= maxw) {
+    if (ls_enabled()) maxw = maxw * 3 - 4;
+    if (lui_string_width(f, text) <= maxw) {
         lui_print(s, f, text, x, y, colour);
         return;
     }
-    dots = db_string_width(f, "...", DB_FONT6_XSPACING);
+    dots = lui_string_width(f, "...");
     n = (int)strlen(text);
     if (n > (int)sizeof cut - 4)
         n = (int)sizeof cut - 4;
     while (n > 0) {
         memcpy(cut, text, (size_t)n);
         cut[n] = '\0';
-        if (db_string_width(f, cut, DB_FONT6_XSPACING) + dots <= maxw)
+        if (lui_string_width(f, cut) + dots <= maxw)
             break;
         n--;
     }
@@ -188,6 +211,14 @@ void lui_button_draw(DB_Surface *s, const DB_Font *grad, const LUI_Button *b, in
 
     if (b->hidden)
         return;
+
+    if (ls_enabled()) {
+        ls_button(b->x, b->y, b->w, b->h, pressed, hot, b->disabled, 0);
+        if (b->label) ls_text(b->label, b->x + b->w / 2,
+                             b->y + (b->h - 6) / 2,
+                             b->disabled ? LS_DISABLED : (hot || pressed ? LS_ACCENT : LS_TEXT), 1);
+        return;
+    }
 
     /* The disabled arm is the engine's, not a dimmed green: textbtn.cpp:297-305
      * tests IsDisabled first, so a disabled button has no pressed state at all
@@ -236,6 +267,15 @@ void lui_check_draw(DB_Surface *s, const DB_Font *grad, const DB_Font *f6,
     bx = b->x;
     by = b->y + (b->h - LUI_CHECK_BOX) / 2;
 
+    if (ls_enabled()) {
+        ls_check(bx, by, LUI_CHECK_BOX, b->checked, hot || pressed, b->disabled);
+        if (b->label) ls_text(b->label, bx + LUI_CHECK_TEXT, by + 1,
+                             b->disabled ? LS_DISABLED : (hot ? LS_ACCENT : LS_TEXT), 0);
+        if (b->note) ls_text(b->note, b->x + b->w, by + 1,
+                            b->disabled ? LS_DISABLED : LS_MUTED, 2);
+        return;
+    }
+
     /* After dosmp.c's mp_check: the shadow-green well, the black inset along its
      * top and left, the light green square two pixels in. A press shows as the
      * well lifting to the dialog's own green, the nearest thing a box has to the
@@ -280,6 +320,7 @@ void lui_gear_draw(DB_Surface *s, const LUI_Button *b, int pressed, int hot)
 
     if (b->hidden)
         return;
+    if (ls_enabled()) { ls_gear(b->x, b->y, b->w, b->h, pressed, hot, b->disabled); return; }
     dm_green_button(s, b->x, b->y, b->w, b->h, pressed && !b->disabled, b->disabled);
     gx = b->x + (b->w - LUI_GEAR_PX) / 2;
     gy = b->y + (b->h - LUI_GEAR_PX) / 2;
@@ -326,6 +367,7 @@ int lui_button_hit(const LUI_Button *b, int mx, int my)
 
 void lui_panel(DB_Surface *s, int x, int y, int w, int h)
 {
+    if (ls_enabled()) { ls_well(x, y, w, h); return; }
     dm_green_dialog(s, x, y, w, h);
 }
 
@@ -407,6 +449,7 @@ static int lui_wrap(LUI_Text *t, const DB_Font *f, const char *text, unsigned ch
 
     if (avail < 8)
         avail = 8;
+    if (ls_enabled()) avail = avail * 3 - 4;
     if (n == 0)
         return lui_push(t, "", 0, kind, 0);
 
@@ -414,7 +457,7 @@ static int lui_wrap(LUI_Text *t, const DB_Font *f, const char *text, unsigned ch
         int take = 0, lastspace = -1, w = 0, i;
         for (i = start; i < n; i++) {
             unsigned char c = (unsigned char)text[i];
-            int cw = (c < f->nchars) ? f->width[c] + DB_FONT6_XSPACING : 0;
+            int cw = lui_char_w(f,c);
             if (w + cw > avail)
                 break;
             w += cw;
@@ -536,6 +579,7 @@ void lui_text_draw(DB_Surface *s, const DB_Font *f, const LUI_Text *t, int x, in
 
     /* Clip to the panel rather than trusting the wrap: a font swap or a stray
      * long token would otherwise paint over the dialog border. */
+    if (ls_enabled()) ls_clip(x, y, w, h);
     db_clip(s, x, y, x + w - 1, y + h - 1);
 
     for (row = 0; row < t->visible; row++) {
@@ -563,13 +607,15 @@ void lui_text_draw(DB_Surface *s, const DB_Font *f, const LUI_Text *t, int x, in
         if (ln->kind == LUI_LINE_BULLET && !ln->cont) {
             /* A two pixel square rather than a glyph: the DOS fonts have no bullet
              * character, and a hyphen reads as a minus sign in a list of changes. */
-            db_fill_rect(s, x + 1, ly + 3, x + 2, ly + 4, DM_TEXT_MEDIUM);
+            if (ls_enabled()) ls_pixel_rect(28+(x+1)*3, 18+(ly+3)*3, 6, 6, 0xaeb5ac);
+            else db_fill_rect(s, x + 1, ly + 3, x + 2, ly + 4, DM_TEXT_MEDIUM);
         }
 
         lui_print(s, f, ln->text, x + lui_line_indent(ln->kind), ly, colour);
     }
 
     db_clip_reset(s);
+    if (ls_enabled()) ls_clip_reset();
 }
 
 void lui_scrollbar_draw(DB_Surface *s, const LUI_Text *t, int x, int y, int w, int h)
@@ -579,6 +625,16 @@ void lui_scrollbar_draw(DB_Surface *s, const LUI_Text *t, int x, int y, int w, i
 
     if (span <= 0)
         return; /* everything fits: a thumb that cannot move is furniture */
+
+    if (ls_enabled()) {
+        th = (h * t->visible) / t->count;
+        if (th < 6) th = 6;
+        if (th > h) th = h;
+        ty = y + ((h - th) * t->top) / span;
+        ls_well(x,y,w,h);
+        ls_button(x+1,ty,w-2,th,0,0,0,0);
+        return;
+    }
 
     /* The well, then the thumb. Same two greens as the dialog border so the bar
      * belongs to the panel rather than to the button row. */
@@ -602,6 +658,8 @@ void lui_scrollbar_draw(DB_Surface *s, const LUI_Text *t, int x, int y, int w, i
 void lui_gauge_draw(DB_Surface *s, int x, int y, int w, int h, int frac, int phase)
 {
     int inner = w - 2, fill;
+
+    if (ls_enabled()) { ls_gauge(x,y,w,h,frac,phase); return; }
 
     /* gauge.cpp draws the well as a sunken box and the bar inside it. */
     db_fill_rect(s, x, y, x + w - 1, y + h - 1, DB_BLACK);
@@ -666,12 +724,14 @@ void lui_blit_scaled(DB_Surface *s, const DB_Shape *sh, int frame, int sx, int s
 void lui_plus(DB_Surface *s, int cx, int cy, int arm, int thick, unsigned char colour)
 {
     int half = thick / 2;
+    if (ls_enabled()) { ls_plus(cx,cy,arm,thick,lui_role(colour)); return; }
     db_fill_rect(s, cx - arm, cy - half, cx + arm, cy - half + thick - 1, colour);
     db_fill_rect(s, cx - half, cy - arm, cx - half + thick - 1, cy + arm, colour);
 }
 
 void lui_outline(DB_Surface *s, int x, int y, int w, int h, unsigned char colour)
 {
+    if (ls_enabled()) { ls_outline(x,y,w,h,lui_role(colour)); return; }
     db_line_h(s, x, x + w - 1, y, colour);
     db_line_h(s, x, x + w - 1, y + h - 1, colour);
     db_line_v(s, x, y, y + h - 1, colour);

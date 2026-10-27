@@ -12,6 +12,14 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Declares HouseClass::Can_Build_With_Prerequisites, Can_Build's legality test
+// with a caller-supplied prerequisite set, defined in house.cpp.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/HOUSE.H 1     3/03/97 10:24a Joe_bostic $ */
 /***********************************************************************************************
@@ -757,6 +765,9 @@ public:
     void Set_Factory(RTTIType rtti, FactoryClass* factory);
 
     bool Can_Build(ObjectTypeClass const* type, HousesType house) const;
+    /* OpenCNC3D: the same legality rules with a caller-supplied prerequisite set, for a
+       read-only potential build tree. Production still asks Can_Build above. */
+    bool Can_Build_With_Prerequisites(ObjectTypeClass const* type, HousesType house, unsigned int prerequisites) const;
 
     int Get_Quantity(AircraftType aircraft);
     int Get_Quantity(StructType building);

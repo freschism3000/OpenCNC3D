@@ -12,6 +12,16 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Adds one bit to BuildingClass's existing bitfield word, IsPowerOff (a
+// building whose owner has switched its power off), and declares three member
+// functions: Power_Drain, Toggle_Power, OpenCNC3D_Can_Rally (may this
+// building take a rally point); the definitions live in building.cpp.
+// The declarations do not change the game simulation; building.cpp does.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/BUILDING.H 1     3/03/97 10:24a Joe_bostic $ */
 /***********************************************************************************************
@@ -162,6 +172,14 @@ public:
     unsigned HasOpened : 1;
 
     /*
+    **	OpenCNC3D: the owner has switched this building's power off from the sidebar. It
+    **	then produces and drains no power, and its weapons, production, radar and services
+    **	sleep until it is switched back on. Stored in the existing bitfield word, so the
+    **	object keeps its size and the save format its layout.
+    */
+    unsigned IsPowerOff : 1;
+
+    /*
     **	Special countdown to destruction value. If the building is destroyed,
     **	it won't actually be removed from the map until this value reaches
     **	zero. This delay is for cosmetic reasons.
@@ -262,6 +280,8 @@ public:
     virtual InfantryType Crew_Type(void) const;
     virtual int Pip_Count(void) const;
     virtual bool Can_Player_Move(void) const;
+    /* OpenCNC3D, additive: may this building take a rally point? */
+    bool OpenCNC3D_Can_Rally(void) const;
     virtual ActionType What_Action(ObjectClass const* target) const;
     virtual ActionType What_Action(CELL cell) const;
     virtual bool Can_Demolish(void) const;
@@ -275,6 +295,12 @@ public:
     virtual short const* Overlap_List(bool redraw = false) const;
     int Shape_Number(void) const;
     int Power_Output(void) const;
+    /* OpenCNC3D: the drain this building puts on its house, none while switched off. */
+    int Power_Drain(void) const
+    {
+        return IsPowerOff ? 0 : Class->Drain;
+    }
+    bool Toggle_Power(void);
     CELL Check_Point(CheckPointType cp) const;
 
     /*

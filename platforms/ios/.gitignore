@@ -1,0 +1,9 @@
+/build/
+/derived/
+/evidence/
+*.xcuserstate
+xcuserdata/
+
+/__pycache__/
+/testing/device.json
+/testing/latest-report.json

@@ -14,6 +14,12 @@
  * Older packages carried loose themes in dosdata/music; those are legacy names, removed
  * with the music and never fetched.
  *
+ * RED ALERT'S, under the same two boxes, where its module is installed: its movies
+ * (ra3d/movies/<NAME>.VQA) and its score (ra3d/audio/SCORES.MIX) come from the two 1996
+ * Red Alert discs, Allied and Soviet, which EA released as freeware in 2008. The score
+ * is the one file that is not only the disc's bytes: the manifest pins the plain header
+ * the game's audio reader needs, and the disc's data block follows it.
+ *
  * THE GAME NEVER ASKS ANY OF THIS. It plays a movie whose file is there and skips one
  * that is not, and it plays the score when the archives are there and is silent when
  * they are not. File presence is the only switch, so what is on the disk and what the
@@ -24,15 +30,19 @@
  *
  *   OCMEDIA 1
  *   mirror <DISC> <url> <base>
- *   file <component> <relpath> <size> <sha256> <DISC> <offset>
+ *   module <folder>
+ *   file <component> <relpath> <size> <sha256> <DISC> <offset> [<head>]
  *   legacy <component> <relpath>
  *
- * DISC is GDI, NOD or COVERT. A mirror's base is the byte where the disc image starts
- * inside what its URL serves (0 for a raw .ISO, the stored entry's data offset for a
- * zip holding one), and mirrors are tried in the order listed. A file's bytes are
- * [base + offset, base + offset + size) of a mirror of its disc. The component is
- * movies or music. A legacy path belongs to a component and is removed with it, and
- * is never fetched.
+ * DISC is GDI, NOD, COVERT, RA_ALLIED or RA_SOVIET. A mirror's base is the byte where
+ * the disc image starts inside what its URL serves (0 for a raw .ISO, the stored entry's
+ * data offset for a zip holding one), and mirrors are tried in the order listed. A
+ * file's bytes are [base + offset, base + offset + size) of a mirror of its disc; with a
+ * head (hex, at most 2 KB) they are the head and then the first size - head bytes of
+ * that range. The component is movies or music. A module line names a folder whose
+ * files are a module's (lmodule.h knows which modules there are): they count, are
+ * fetched and are summed into the sizes only where that module is installed. A legacy
+ * path belongs to a component and is removed with it, and is never fetched.
  *
  * THE RECORD, opencnc3d-media.txt at the top of the install, says what the player
  * chose and how far the disk has got:
@@ -74,17 +84,27 @@ typedef struct LM_State LM_State;
  * lm_status says what is wrong with it and whose lm_apply refuses. */
 LM_State *lm_create(const char *dir, const char *manifest_override_path);
 
+/* Per-game settings retain separate records and never act on the other game.
+ * ra is 0 for Dawn3D, 1 for RA3D. English is included, never an optional pack.
+ * Language packs use the movies slot internally; apply(pack, wanted, 0).
+ * The optional language catalog override is for local range-server tests. */
+LM_State *lm_create_game(const char *dir, const char *manifest_override_path, int ra);
+int lm_language_pack(int ra, int index, char *code, int code_len, char *name, int name_len);
+LM_State *lm_create_language(const char *dir, int ra, const char *code, const char *catalog_override);
+
 /* Cancels a running job and waits for it. Call it BEFORE lu_destroy when both exist:
  * a job inside a launcher that already holds the install lock runs under that lock. */
 void lm_destroy(LM_State *m);
 
 /* 1 for a component when every one of its files is in the folder with its size, 0
- * otherwise (and for a component the manifest has no files for). A cheap look at the
- * disk: nothing is hashed. */
+ * otherwise (and for a component the manifest has no files for). A module's files are
+ * among them only where the module is installed. A cheap look at the disk: nothing is
+ * hashed. */
 void lm_installed(LM_State *m, int *movies, int *music);
 
-/* 1 for a component when ANY of its names is in the folder: one of its files, one of
- * its legacy files, or a part file a download left on either. This is what an untick
+/* 1 for a component when ANY of its names is in the folder: one of its files, a
+ * module's included whether the module is there or not, one of its legacy files, or a
+ * part file a download left on either. This is what an untick
  * would remove, which is not the same as lm_installed's "all of it": a download that
  * stopped half way, or the shorter score an older package carried, is present and not
  * installed. `movies_bytes` and `music_bytes` (either may be NULL) say how much that is
@@ -99,8 +119,12 @@ void lm_present_any(LM_State *m, int *movies, int *music, long long *movies_byte
  * has no record or it does not say both. */
 int lm_wanted(LM_State *m, int *movies, int *music, int *movies_pending, int *music_pending);
 
-/* What each component weighs, in bytes, from the manifest. */
+/* What each component weighs, in bytes, from the manifest: the game's own files and
+ * those of every module installed in the folder at the moment of asking. */
 void lm_sizes(LM_State *m, long long *movies_bytes, long long *music_bytes);
+/* Preview a physically game-scoped manifest before that game is installed. No
+ * files or records change; applies only to module choice UI. */
+void lm_game_sizes(LM_State *m, long long *movies_bytes, long long *music_bytes);
 
 /* Make the folder match a choice, on a worker thread: fetch every wanted file that is
  * missing or does not match its SHA-256, and remove every file of a component that is
@@ -116,6 +140,9 @@ void lm_sizes(LM_State *m, long long *movies_bytes, long long *music_bytes);
  * "<name>.ocpart", resumes from there, and is renamed onto its name only once its
  * SHA-256 matches. */
 int lm_apply(LM_State *m, int want_movies, int want_music);
+/* Installer/Browser choices only add selected content. Unchecked components,
+ * including their existing preference and completion state, are untouched. */
+int lm_apply_add_only(LM_State *m, int movies, int music);
 
 void lm_cancel(LM_State *m);
 LM_Phase lm_phase(LM_State *m);

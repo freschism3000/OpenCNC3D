@@ -1,0 +1,43 @@
+{
+  "source_sha256": "643bc761fb42b5a7d0b9258b2503230de3900ab37fae693a8b57f9bee3effbcc",
+  "header_sha256": "24766aef1a72135130ffe8edc5308d3cfcd9eaefb1ac93761b34c1faa74c6781",
+  "parts": {
+    "mesh_wind_direct_positions": "6bb2e73ca175243726adaf17f7965fba17008fdea6c6cb64851883c0de7f0f4e",
+    "mesh_wind_direct_verify": "7a840c6dd407b3ad7d284dba71a3e6b1e8005993494e1cede04a2c76e01cd628",
+    "mesh_geometry_upload": "c008afe06a0c5d8e310356707789ecd8f612075372aeb0f9287070aa04e8d17e",
+    "mesh_geometry_gpu": "b72da73306e6568030333ed1a04a20987de7fd5b2f7ad06112532a7fd592f01d",
+    "original_positions": "5301cc689c570149e61210da9602a6413e8f3a089b6db83afdc0465099a730b9",
+    "eligibility": "a3b65f3c58c267e7fa488b35de80b322221574c14209149a10c8d38078ff5ee1",
+    "original_spin": "bc27cb299a6521b1fd5608157b1bde91a970c89737a1c81fb529c2ca829e0f03",
+    "original_normals": "9c69a8e1aecbe3841ff264159a14e1da7928bc522934063bf4f3b1592a883c0e",
+    "MeshBatchVertex": "294a74b80a155606ffc25d5f495266431d4aa9f96dca542277a2f9bb46f3f779",
+    "MeshBatchRun": "a376159299a07242e3b7f88c8d54989cc010b5862def4ac6748605cc20eadf07",
+    "MeshBatchEntry": "cb39d9ff8d9d79887c74b5a410dc394905a8b1b96960a33695785e715d7dec3f",
+    "vertex": "1e38440dd8584e231582e969b72906f4d577ae982c7963485f5b6813119eae4b"
+  },
+  "compiler": [
+    "/usr/bin/clang++",
+    "-std=c++14",
+    "-O2",
+    "-g",
+    "-Wall",
+    "-Wextra",
+    "${EVIDENCE_ROOT}/tests/main-final-native/wind-direct-test.cpp",
+    "-o",
+    "${EVIDENCE_ROOT}/tests/main-final-native/wind-direct-test.exe"
+  ],
+  "passed": true,
+  "result": {
+    "passed": true,
+    "cases": 24000,
+    "vertices": 151032,
+    "fallbacks": 87298,
+    "negative_controls": 61192,
+    "scratch_bytes": 756,
+    "upload_checks": 6,
+    "eligibility_checks": 8,
+    "inert_rotor_cases": 24000,
+    "matrix_cases": 20571,
+    "normal_cases": 96000
+  }
+}

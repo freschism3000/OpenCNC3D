@@ -1,0 +1,622 @@
+{
+  "status": "private direction reconstruction; no visual acceptance",
+  "anchor": [
+    54,
+    40
+  ],
+  "fps": 7.5,
+  "keys": [
+    {
+      "view": "E",
+      "stage": 0,
+      "phase": "A contact / B recovery",
+      "sha256": "db58f02f8dc558c0377902858b5d5b942921038db82bbf904adb333c3af5a904",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            4,
+            16
+          ],
+          "ankle": [
+            3,
+            19
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            3.605551275463989,
+            3.1622776601683795
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            10,
+            18
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.47213595499958,
+            4.47213595499958
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "E",
+      "stage": 1,
+      "phase": "A compression / B passing",
+      "sha256": "61ec1457b952736d8b9c30dcb4b6860c6c0713847476164a4ab1676fa88daa22",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            8,
+            17
+          ],
+          "ankle": [
+            6,
+            19
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            2.23606797749979,
+            2.8284271247461903
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9,
+            18
+          ],
+          "ankle": [
+            9,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            3.1622776601683795,
+            4.0
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "E",
+      "stage": 2,
+      "phase": "A push-off / B forward swing",
+      "sha256": "fcc83125c428420a965eb96e34ea2ee5d424e0b78089415d2ae006108dfa8e85",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            10,
+            16
+          ],
+          "ankle": [
+            11,
+            19
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            3.605551275463989,
+            3.1622776601683795
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            7,
+            18
+          ],
+          "ankle": [
+            5,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            4.123105625617661,
+            4.47213595499958
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "E",
+      "stage": 3,
+      "phase": "B contact / A recovery",
+      "sha256": "5a8badebe0b833baab58f9f6f5c08d2fa025e6c717d2a347eb27accfbd66d8ae",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            9,
+            18
+          ],
+          "ankle": [
+            11,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.47213595499958,
+            4.47213595499958
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            5,
+            16
+          ],
+          "ankle": [
+            4,
+            19
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            3.605551275463989,
+            3.1622776601683795
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "E",
+      "stage": 4,
+      "phase": "B compression / A passing",
+      "sha256": "e528d3b5c3824410f7eb57589ba0dc7df41cca75862dbd01caabdad5531055b0",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            8,
+            18
+          ],
+          "ankle": [
+            8,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            3.1622776601683795,
+            4.0
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9,
+            17
+          ],
+          "ankle": [
+            7,
+            19
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            2.23606797749979,
+            2.8284271247461903
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "E",
+      "stage": 5,
+      "phase": "B push-off / A forward swing",
+      "sha256": "c419726432500739e3c270d7aae0d8791e006b00da656fd1a0e21fa5c2f10d6b",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            7,
+            14
+          ],
+          "knee": [
+            6,
+            18
+          ],
+          "ankle": [
+            4,
+            22
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.123105625617661,
+            4.47213595499958
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            8,
+            14
+          ],
+          "knee": [
+            11,
+            16
+          ],
+          "ankle": [
+            12,
+            19
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            3.605551275463989,
+            3.1622776601683795
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "SE",
+      "stage": 0,
+      "phase": "A contact / B recovery",
+      "sha256": "696793cffb73fb9c74921bbe0f6671803d73629b5d4f82886d1a574ecefb7228",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            6,
+            14
+          ],
+          "knee": [
+            4,
+            16
+          ],
+          "ankle": [
+            3,
+            18
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            2.8284271247461903,
+            2.23606797749979
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            9,
+            15
+          ],
+          "knee": [
+            11,
+            18
+          ],
+          "ankle": [
+            12,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            3.605551275463989,
+            4.123105625617661
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "SE",
+      "stage": 1,
+      "phase": "A compression / B passing",
+      "sha256": "0b2cf9c1ba8c6f73d567a5b3f552981b0ad8a9f79bd289056b1367cc799ab900",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            6,
+            15
+          ],
+          "knee": [
+            7,
+            17
+          ],
+          "ankle": [
+            6,
+            19
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            2.23606797749979,
+            2.23606797749979
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            9,
+            16
+          ],
+          "knee": [
+            10,
+            19
+          ],
+          "ankle": [
+            10,
+            22
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            3.1622776601683795,
+            3.0
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "SE",
+      "stage": 2,
+      "phase": "A push-off / B forward swing",
+      "sha256": "ef0b9ab28f4f8ea8097b522689b0565b03a9a14b395e5a000612d6fd28d75d20",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            6,
+            14
+          ],
+          "knee": [
+            8,
+            16
+          ],
+          "ankle": [
+            9,
+            19
+          ],
+          "support": false,
+          "depth": "far",
+          "projected_segments": [
+            2.8284271247461903,
+            3.1622776601683795
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            9,
+            15
+          ],
+          "knee": [
+            8,
+            18
+          ],
+          "ankle": [
+            6,
+            20
+          ],
+          "support": true,
+          "depth": "near",
+          "projected_segments": [
+            3.1622776601683795,
+            2.8284271247461903
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "SE",
+      "stage": 3,
+      "phase": "B contact / A recovery",
+      "sha256": "f7740ce16d00c8f23b39245e320124336e45b4038dfafabab851ac03b057da8b",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            6,
+            14
+          ],
+          "knee": [
+            7,
+            18
+          ],
+          "ankle": [
+            8,
+            21
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            4.123105625617661,
+            3.1622776601683795
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            9,
+            15
+          ],
+          "knee": [
+            7,
+            17
+          ],
+          "ankle": [
+            7,
+            19
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            2.8284271247461903,
+            2.0
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "SE",
+      "stage": 4,
+      "phase": "B compression / A passing",
+      "sha256": "fdacc4e817e160f3bf270269f18aa74bb589d69e516f01a6c05c6768e04df8ad",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            6,
+            15
+          ],
+          "knee": [
+            6,
+            18
+          ],
+          "ankle": [
+            6,
+            21
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            3.0,
+            3.0
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            9,
+            16
+          ],
+          "knee": [
+            10,
+            18
+          ],
+          "ankle": [
+            10,
+            20
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            2.23606797749979,
+            2.0
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "view": "SE",
+      "stage": 5,
+      "phase": "B push-off / A forward swing",
+      "sha256": "33e09004288aea3bbbe6ba2d0eabbf56b396aaee8c690caf8424973bfd00ab59",
+      "limbs": [
+        {
+          "leg": "B",
+          "hip": [
+            6,
+            14
+          ],
+          "knee": [
+            5,
+            17
+          ],
+          "ankle": [
+            3,
+            20
+          ],
+          "support": true,
+          "depth": "far",
+          "projected_segments": [
+            3.1622776601683795,
+            3.605551275463989
+          ]
+        },
+        {
+          "leg": "A",
+          "hip": [
+            9,
+            15
+          ],
+          "knee": [
+            11,
+            17
+          ],
+          "ankle": [
+            12,
+            20
+          ],
+          "support": false,
+          "depth": "near",
+          "projected_segments": [
+            2.8284271247461903,
+            3.1622776601683795
+          ]
+        }
+      ],
+      "review": "UNREVIEWED"
+    }
+  ]
+}

@@ -99,6 +99,7 @@
 #include <cstring>
 #include <cstdarg>
 #include <cstdint>
+#include <unordered_map>
 #include <cmath>
 #include <dlfcn.h>
 #include <unistd.h>
@@ -120,7 +121,6 @@
    and NOT ONE of them changes a world draw call -- see the header of fx_post.h for
    why that is the whole design. fx_filter.h comes first because every art loader
    below asks it what filter to set. docs/tier1-gap.md carries the Win98 answer. */
-#include "fx_filter.h"
 /* ------------------------------------------------------------------------------------
  *  THE SCREEN'S VIEWPORT, in one place.
  *
@@ -144,7 +144,10 @@ static void cnc_screen_viewport(int w, int h)
     }
 }
 
+#include "gl_state_cache.h"  /* before helpers, so all context mutations are tracked */
 #include "fx_gl.h"
+#include "gpu_profile.h"
+#include "fx_filter.h"
 #include "fx_state.h"
 #include "remaster.h"   /* finding the player's own Remastered Collection */
 #include "remaster_tex.h" /* and reading its terrain art, at runtime, never shipped */
@@ -184,16 +187,16 @@ static void net_hash_world(int frame);     /* defined beside brain_advance */
    g_fxActive, because efx_step runs on the engine tick in refresh_objects, outside the
    frame's draw, where g_fxActive is always 0. Called before efx_step and before efx_draw,
    so the particles born and the art drawn follow the same answer. */
-static void efx_enh_follow(void)
-{
-    g_efxEnhOn = g_fx.enabled && g_fx.efx_enh && g_efxHaveEnh;
-}
+static void efx_enh_follow(void);   /* defined beside g_raModule, which it reads */
+static void ra3d_atom_track(void);  /* ra3d_atom_mod.h: Red Alert's atom bombs, on the tick */
+static void ra3d_efxm_track(void);  /* ra3d_efxm_mod.h: its other effects' forms, on the tick */
 #include "dostib_mod.h"
 #include "tib3d_mod.h"
-#include "tree3d_mod.h"
+#include "foliage_mesh_pack.h"
 #include "doscrate_mod.h"
 #include "smudge_mod.h"
 #include "bibenh_mod.h"
+#include "decalenh_mod.h"
 #include "verdict_mod.h"
 
 /* Sound. The renderer does not own the engine and does not open a device: it is lent
@@ -236,6 +239,7 @@ typedef uint64_t uint64;
 #define __declspec(x)
 #define __cdecl
 #include "dllinterface.h"
+#include "sidebar_build_potential.h"
 
 /* THE LOADED BRAIN'S CELL STRIDE. Read from its own OpenCNC3D_ABI_Facts at dlopen; 128 for
    any brain that does not export that, which is every classic build. Everything that
@@ -293,11 +297,20 @@ typedef bool (*CNC_Start_RA_Mission_t)(int, int, int, int, const char*, const ch
                                        const char*, int, const char*);
 typedef void (*CNC_Add_Mod_Path_t)(const char*);
 static CNC_Start_RA_Mission_t BrainStartRAMission;
+/* Red Alert only: the seed the next scenario start uses (OpenCNC3D_Set_Seed). */
+static void (*BrainSetSeed)(int);
+/* Red Alert only: the computer players' handicap for a network match. */
+static void (*BrainSetComputerDifficulty)(int);
+static void (*BrainSetAIDifficulties)(const unsigned char*, int);
+static unsigned int (*BrainAIPolicy)(void);
+static unsigned int (*BrainAIStateHash)(void);
+static int (*BrainAIDiagnostics)(char*, int);
 static CNC_Add_Mod_Path_t BrainAddModPath;
 typedef void (*OpenCNC3D_SetCampaignDifficulty_t)(int);
 static OpenCNC3D_SetCampaignDifficulty_t BrainSetCampaignDifficulty;
 static CNC_Set_MP_t       BrainSetMP;
 static CNC_Get_State_t    BrainGetState;
+static int (*BrainBuildPotential)(uint64, OpenCNC3D_BuildPotentialEntry*, int);
 static CNC_Advance_t      BrainAdvance;
 static OpenCNC3D_Dump_t       BrainDump;
 /* The lockstep exports, project OpenCNC3D. NULL on a brain without them, and a network match
@@ -435,6 +448,10 @@ static OpenCNC3D_ForceFire_t BrainForceFire;
    Optional. */
 typedef bool (*OpenCNC3D_HurtObject_t)(int, int, int);
 static OpenCNC3D_HurtObject_t BrainHurtObject;
+/* OpenCNC3D_Store_Ore(house, amount): ore into a house's store as a harvest unloads it, or
+   spent from it (negative), Red Alert's brain only. Script: storeore. Optional. */
+typedef int (*OpenCNC3D_StoreOre_t)(const char*, int);
+static OpenCNC3D_StoreOre_t BrainStoreOre;
 typedef bool (*OpenCNC3D_TriggerInfo_t)(const char*, int*, int*, int*, int*);
 static OpenCNC3D_TriggerInfo_t BrainTriggerInfo;
 
@@ -505,6 +522,7 @@ static OpenCNC3D_Probe_t         BrainProbe;
    placement cursor. Self-contained, no SDL, GL 1.x immediate mode only -- see the long
    comment at the top of that file for the decoded GAME_STATE_SIDEBAR / GAME_STATE_
    PLACEMENT semantics it is built on. */
+#include "lang_mod.h"
 #include "cnc_sidebar.h"
 #include "cursors.h"
 /* The cartridge's own soldier shadow texel block, generated and self-asserted by
@@ -542,6 +560,10 @@ static void* g_movieUser = NULL;
    anim-slot mapping; the draw itself is dosinf_draw_sprite below, next to
    draw_sprite so the two share the billboard basis and the walk-phase state. */
 #include "dosinf_mod.h"
+/* The cartridge's own firing, prone and crawling infantry strips (n64infantry.pack),
+   which the scenario pack's stand/run/death strips do not include. Drawn by
+   draw_sprite when the cartridge infantry art is chosen. */
+#include "n64inf_mod.h"
 /* The 1995 MS-DOS construction (buildup) animations: dosmake.pack loader. The draw
    pass itself lives below with the other object passes. */
 #include "dosmake_mod.h"
@@ -570,6 +592,7 @@ static int vsync_from_row(void)
    sites for the account. `--gfx` with no filename does NOT set it, because that means
    "enhanced with the shipped defaults" and has no file to protect. */
 static bool g_fxPresetNamed = false;
+static bool g_fxDisplayPresetLoaded = false;
 
 /* ---------------------------------------------------------------------------------- *
  *  AUDIO, part 1: who owns it.
@@ -588,6 +611,18 @@ static bool g_raAudio = false;
 /* The Red Alert module is running (set at boot from --module ra3d). Classic's Red Alert
    input rules below apply only then; Tiberian Dawn's Classic keeps its own. */
 static bool g_raModule = false;
+/* which game's language packs apply (lang_mod.h): Red Alert's in a Red Alert mission, and
+   at its title, where no mission has set g_raModule yet but its own menu kit is loaded */
+extern "C" int em_red_alert(void);
+static const char* lang_game(void) { return (g_raModule || em_red_alert()) ? "ra" : "td"; }
+
+/* Under Red Alert too, since its 3D view draws OpenCNC3D's effects in place of the 1996
+   anim cards whenever this is on (ra3d_effects_mod.h); never in its Classic, which draws
+   the 1996 anims itself. */
+static void efx_enh_follow(void)
+{
+    g_efxEnhOn = !(g_raModule && g_fx.dos_classic) && g_fx.enabled && g_fx.efx_enh && g_efxHaveEnh;
+}
 
 /* Defined with the rain, far below, and wanted here: this file is one translation unit
    and the shell's hand-back of the mixer happens near the top of it. */
@@ -597,10 +632,29 @@ static void ambience_free(void);
 /* THE SHELL TAKES THE MIXER AWAY BETWEEN MISSIONS, and anything still holding a voice
    has to let go BEFORE it does, while there is still a mixer to tell. The rain's bed is
    the only looping voice here; a looping voice is never retired by the mixer itself. */
+/* The chosen language pack's voices on the sound engine, or English (lang_mod.h). The
+   install's root is taken from the folder the engine reads dosdata from. */
+static void lang_install_hooks(void);   /* the Settings screen's language row, below */
+static void lang_apply_audio(void)
+{
+    if (!g_au) return;
+    lang_set_root(cnc_audio_dosdata(g_au));
+    const char* d = lang_dir();
+    const int n = cnc_audio_set_language(g_au, d);
+    printf("LANG|voices|lang=%s|pack=%s|archives=%d\n", g_langCode, d ? d : "-", n);
+    /* and one name from its table, the Power Plant's, to show the text follows */
+    for (int i = 0; d && !g_raModule && i < DOSNAMES_COUNT; i++)
+        if (!strcmp(DOSNAMES[i].asset, "NUKE"))
+            printf("LANG|names|NUKE=%s|english=%s\n", lang_txt(DOSNAMES[i].txt) ? lang_txt(DOSNAMES[i].txt) : "-",
+                   DOSNAMES[i].title);
+    fflush(stdout);
+}
+
 void game_set_audio(struct CncAudio* au)
 {
     if (au != g_au) { rain_audio_stop(); ambience_free(); }
     g_au = (CncAudio*)au;
+    lang_apply_audio();
 }
 
 /* What the brain asked for while this mission ran. Counted rather than narrated, so a
@@ -830,6 +884,28 @@ static void ev_cb(const EventCallbackStruct& e)
                    !mine ? "not-mine" : (h >= 0 ? "played" : "dropped-duplicate"));
         return;
     }
+    case CALLBACK_EVENT_SPECIAL_WEAPON_TARGETTING: {
+        /* THE ENGINE ASKS FOR THE NEXT CLICK. Red Alert raises this when the Chronosphere
+           has found the unit to move, and when a Chrono Tank jumps: the engine is now in
+           SPC_CHRONO2 and only a second shot at the destination completes the move. The
+           targeting state is the front end's to hold in this DLL, so the sidebar latch is
+           armed with the special the event names; cnc_sidebar.h sb_super_engine_arm has
+           the whole account. Tiberian Dawn's brain never raises it.
+
+           Only this machine's own house: the event is stamped with the firing house's
+           player id, 0 being the local human (the speech case above has the reasoning). */
+        char name[sizeof e.SpecialWeaponTargetting.Name + 1];
+        memcpy(name, e.SpecialWeaponTargetting.Name, sizeof e.SpecialWeaponTargetting.Name);
+        name[sizeof e.SpecialWeaponTargetting.Name] = 0;
+        printf("SUPER|targetting|%s|type=%d|id=%d|player=%llu\n", name,
+               e.SpecialWeaponTargetting.Type, e.SpecialWeaponTargetting.ID,
+               (unsigned long long)e.GlyphXPlayerID);
+        fflush(stdout);
+        if (g_raModule && e.GlyphXPlayerID == 0)
+            sb_super_engine_arm(name, e.SpecialWeaponTargetting.Type,
+                                e.SpecialWeaponTargetting.ID);
+        return;
+    }
     default:
         break;
     }
@@ -895,6 +971,7 @@ static bool          g_meshShadowPass  = false;
    and cleared with it. draw_mesh reads it in two places: it skips a triangle that has no
    texture, and it emits the vertex colour with the texture unbound. */
 static int           g_meshBakePass    = 0;
+static bool g_meshBakeCutout = false;
 /* THE SUN MAP'S OPAQUE HALF WANTS POSITIONS AND NOTHING ELSE. Set by the shadow-caster
    draw around the sun pass's opaque object loop only, and cleared straight after it.
    That loop writes depth into a target with every colour write masked, blending off,
@@ -917,12 +994,17 @@ static int           g_meshSunDepth    = 0;
    mesh is drawn in, so its shadow, its normals and its picture move together; nothing in
    it needs a shader, so the Win98 build could do the same. Below zero: no wind. */
 static float         g_meshSwayT       = -1.0f;
+static float         g_meshTreeGain    = 1.0f;
 static bool          g_meshSwayOn      = true;     /* --notreewind, the A/B */
 /* A UNIFORM ALPHA on the next draw_mesh, caller-set exactly like g_meshShadowPass.
    255 is today's picture to the byte, so every existing caller is untouched. Its one
    user is a settled shatter piece fading out, and it exists so that fade needs no
    second vertex pipeline -- the rule this file lays down for the cursor shadow. */
 static unsigned char g_meshAlphaScale   = 255;
+/* Time-varying colour must not promote many copies of unchanged geometry. */
+static bool g_meshTransientColor = false;
+// Neutral Desert stone joins the terrain BRDF after the colour pass.
+static bool g_meshNeutralStone = false;
 /* A UNIFORM TINT on the next draw_mesh, caller-set exactly like g_meshAlphaScale above and
    for the same reason: it needs no second vertex pipeline. (255,255,255) is today's
    picture to the byte, so every existing caller is untouched.
@@ -1119,8 +1201,9 @@ static const float SPRSHADOW_ALPHA = 80.0f / 255.0f;
    Factory's open bay, the sandbag and concrete wall shadows, and both power plants'
    coolant pools -- which is the "power plant water is the wrong colour" report. */
 enum TriMode { MODE_OPAQUE = 0, MODE_CUTOUT = 1, MODE_SHADOW = 2, MODE_XLU = 3 };
+#include "ra_barrel_visual.h"
 /* Which lean, if any, the cartridge gives a drawn model. See mesh_wobble(). */
-enum { WOBBLE_NONE = 0, WOBBLE_VEHICLE = 1, WOBBLE_SHIP = 2 };
+enum { WOBBLE_NONE = 0, WOBBLE_VEHICLE = 1, WOBBLE_SHIP = 2, WOBBLE_SUSPENDED = 3 };
 
 struct PackVert { float x, y, z, u, v; unsigned char r, g, b, a; };
 struct PackTri  { int tex; unsigned char mode, wrap; PackVert v[3]; };
@@ -1201,17 +1284,27 @@ struct PackMesh { char name[17]; std::vector<PackTri> tris; std::vector<PackPart
                   mutable int gpuHasTread = -1;
                   mutable unsigned gpuSpinRoles = 0;
                   bool gpuDeformed = false;
-                  unsigned gpuPoseRevision = 0; };
+                  unsigned gpuPoseRevision = 0;
+                  /* which triangles the deformation moves, sorted (ebld_wave): a draw
+                     whose range holds none of them is not deformed, whatever the rest
+                     of the mesh does */
+                  std::vector<int> gpuWaveTris; };
 /* gl_gdi is the GDI-house variant of the same texture (PK6): the cartridge keeps two
    resident house TLUTs (GDI sand at ROM 0x98F30, Nod/neutral blue-grey at 0x99130,
    selected per draw by a resident function at RAM 0x80055d08) and the pack bakes CI
    textures through both. 0 = the two tables decode this texture identically. */
+struct LiveryFactionTexel { uint32_t pixel; unsigned char rgba[4], mask; };
 struct PackTex  { int w, h, uw, uh; GLuint gl; GLuint gl_gdi;
-                  /* The six liveries beyond the cartridge's own two, indexed by livery
-                     slot minus 2 (see livery_slot). 0 means not built: a texture the two
+                  /* Additional player liveries, indexed by slot minus 2 (slots
+                     2..7 are the existing colours; slot 8 is multiplayer light blue). 0 means not built: a texture the two
                      house tables decode identically never needs one, and neither does a
                      colour no seat is wearing. */
-                  GLuint gl_extra[6];
+                  GLuint gl_extra[7];
+                  /* Multiplayer faction variants: the existing approved faction art,
+                     paired with its explicit mask; campaign textures remain gl/gl_gdi. */
+                  GLuint gl_faction[8] = {};
+                  std::vector<LiveryFactionTexel> faction;
+                  bool uniformSource = false;
                   /* The two decodes, kept ONLY for a texture that carries a variant, so
                      the extra liveries can be built from their difference once the match
                      has said which colours are in play. 84 of SCB01EA's 329 textures and
@@ -1224,7 +1317,13 @@ struct PackTex  { int w, h, uw, uh; GLuint gl; GLuint gl_gdi;
                   std::vector<unsigned char> mask;
                   /* mipmapped (a remastered building's atlas, ebld_mod.h): its liveries are
                      built with a chain too */
-                  bool mips = false; };
+                  bool mips = false;
+                  /* THE SPECULAR MAP of a remastered vehicle's atlas (evhc_mod.h, the
+                     export's <TYPE>.spec beside its .evhc): red how strongly a texel
+                     reflects the sun, green how tight the highlight is, alpha the atlas's
+                     own. 0 for every texture without one. */
+                  GLuint gl_spec = 0;
+                  GLuint gl_stone = 0; };
 /* mr/mg/mb is the cell's average colour, taken off the tile atlas at load time. The
    minimap paints with it, so the radar shows the theatre's real palette (sand, rock,
    road, tiberium) instead of an invented per-landtype colour table.
@@ -1337,6 +1436,47 @@ struct Pack {
 };
 
 static Pack g_pack;
+static bool fx_desert_terrain(void)
+{ return g_fxActive && !g_fx.dos_classic && !strcmp(g_pack.theater,"DESERT"); }
+static bool fx_snow_terrain(void)
+{ return g_fxActive && !g_fx.dos_classic && (!strcmp(g_pack.theater,"SNOW") || !strcmp(g_pack.theater,"WINTER") || !strcmp(g_pack.theater,"RASNOW")); }
+
+/* The colour sliders describe surface reflectance, before the shared sun/sky. */
+static void fx_terrain_colour_balance(float out[3])
+{
+    float warmth=0,tint=0,r=1,g=1,b=1;
+    if (!strcmp(g_pack.theater,"DESERT")) {
+        warmth=g_fx.desert_terrain_warmth;tint=g_fx.desert_terrain_tint;
+        r=g_fx.desert_terrain_red;g=g_fx.desert_terrain_green;b=g_fx.desert_terrain_blue;
+    }
+    else if (!strcmp(g_pack.theater,"SAND")) {
+        warmth=g_fx.sand_terrain_warmth;tint=g_fx.sand_terrain_tint;
+        r=g_fx.sand_terrain_red;g=g_fx.sand_terrain_green;b=g_fx.sand_terrain_blue;
+    }
+    else if (!strcmp(g_pack.theater,"SNOW") || !strcmp(g_pack.theater,"WINTER") || !strcmp(g_pack.theater,"RASNOW")) {
+        warmth=g_fx.snow_terrain_warmth;tint=g_fx.snow_terrain_tint;
+        r=g_fx.snow_terrain_red;g=g_fx.snow_terrain_green;b=g_fx.snow_terrain_blue;
+    }
+    else if (!strcmp(g_pack.theater,"TEMPERAT") || !strcmp(g_pack.theater,"RATEMP")) {
+        warmth=g_fx.grass_terrain_warmth;tint=g_fx.grass_terrain_tint;
+        r=g_fx.grass_terrain_red;g=g_fx.grass_terrain_green;b=g_fx.grass_terrain_blue;
+    }
+    out[0]=r*(1.0f+0.30f*warmth-0.10f*tint);
+    out[1]=g*(1.0f+0.20f*tint);
+    out[2]=b*(1.0f-0.30f*warmth-0.10f*tint);
+}
+
+static float fx_terrain_shadow_strength(void)
+{
+    /* Captures/settings also query this outside a lit frame. Selection depends
+       on the loaded theater, not on which render pass is currently active. */
+    if (!g_fx.dos_classic) {
+        if (!strcmp(g_pack.theater,"DESERT")) return g_fx.desert_shadow_strength;
+        if (!strcmp(g_pack.theater,"SNOW") || !strcmp(g_pack.theater,"WINTER") || !strcmp(g_pack.theater,"RASNOW")) return g_fx.snow_shadow_strength;
+        if (!strcmp(g_pack.theater,"SAND")) return g_fx.sand_shadow_strength;
+    }
+    return g_fx.terrain_shadow_strength;
+}
 
 /* THE DEBUG PACK: updated meshes, drawn instead of the mission's when the F5 panel's
    DEBUG row is on.
@@ -1464,6 +1604,46 @@ static unsigned g_padEpoch = 1;
    editor draws the ground, because the editor rewrites both in place with no counter of
    its own. A cache of ground geometry keys on this and g_padEpoch together. */
 static unsigned g_groundGen = 1;
+/* WHERE THE GROUND MOVED. g_padEpoch says only that something changed somewhere; a cache
+   that wants to redo just the cells a building touched reads this instead. Once a frame,
+   after the relief surface is current (ground_rev_sync, terrain_surface.h), every cell
+   whose drawn height could have changed is stamped with a new g_groundSeq: the cells
+   around each corner whose padded height moved, and around each relief node whose lift
+   moved, both found by comparing the values themselves. A change that may have moved
+   any cell (a new pack or grid, the editor, a relief lattice of another size) moves
+   g_groundWholeSeq instead. A cache that remembers the g_groundSeq it was last brought
+   up to date at has exactly the cells stamped since then to redo. */
+static unsigned g_groundSeq = 1, g_groundWholeSeq = 1;
+static std::vector<unsigned> g_groundRev;          /* per cell, g_gridW x g_gridH */
+static unsigned g_groundRevPad = 0, g_groundRevGen = 0, g_groundRevSurface = 0;
+static bool g_groundRevLive = false;
+static bool ground_rev_lift_now(unsigned* surface);   /* terrain_surface.h */
+static bool ground_patch_on(void);                     /* OPENCNC3D_GROUND_PATCH, terrain_surface.h */
+static bool ground_patch_verify(void);                 /* OPENCNC3D_GROUND_PATCH_VERIFY */
+static bool ground_read_buffer(GLenum target, GLuint vbo, size_t bytes, void* out);   /* terrain_cache.h */
+/* The stamps describe the ground as it stands now: no pad, pack or relief change has
+   happened since the last sync. A cache that finds this false refreshes the old way. */
+static bool ground_rev_current(void)
+{
+    unsigned surface = 0;
+    const bool live = ground_rev_lift_now(&surface);
+    return g_groundRevPad == g_padEpoch && g_groundRevGen == g_groundGen
+        && g_groundRev.size() == (size_t)g_gridW * g_gridH
+        && live == g_groundRevLive && (!live || surface == g_groundRevSurface);
+}
+/* Has any cell of the box [x0,x1] x [z0,z1] moved since stamp `since`? */
+static bool ground_rev_moved(unsigned since, int x0, int z0, int x1, int z1)
+{
+    if (g_groundWholeSeq > since) return true;
+    if (x0 < 0) x0 = 0;
+    if (z0 < 0) z0 = 0;
+    if (x1 >= g_gridW) x1 = g_gridW - 1;
+    if (z1 >= g_gridH) z1 = g_gridH - 1;
+    for (int z = z0; z <= z1; z++)
+        for (int x = x0; x <= x1; x++)
+            if (g_groundRev[(size_t)z * g_gridW + x] > since) return true;
+    return false;
+}
 static unsigned char g_padFoot[C3D_CORN_MAX * C3D_CORN_MAX];   /* 1: a footprint owns it */
 static bool g_flatPads = true;                  /* --noflatpads turns the pad off */
 
@@ -1484,7 +1664,10 @@ static inline bool ra3d_flat_ground(void)
     return ra3d_own_ground() && !(g_pack.theater[0] == 'R' && g_pack.theater[1] == 'A');
 }
 
-static float terrain_y(float wx, float wz)
+static float water_plane_support_height(float wx,float wz,float fallback);
+static float terrain_surface_height(float wx,float wz);
+static unsigned terrain_surface_generation(void);
+static float terrain_y_base(float wx, float wz)
 {
     if (g_pack.corner.empty() || ra3d_flat_ground())
         return 0.0f;
@@ -1508,6 +1691,9 @@ static float terrain_y(float wx, float wz)
         : h11 + (h01 - h11) * (1.0f - fx) + (h10 - h11) * (1.0f - fz);
     return h * (1.0f / 64.0f) - g_terrainBase;
 }
+
+static float terrain_y(float wx,float wz)
+{ return water_plane_support_height(wx,wz,terrain_y_base(wx,wz)+terrain_surface_height(wx,wz)); }
 
 /* One corner, no interpolation: the terrain quads use the exact corner values so
    neighbouring cells share vertices and the plateau steps come out of the DATA. */
@@ -1779,6 +1965,7 @@ static void terrain_tint_shrouded(int cx, int cz, float vis, unsigned char out[3
    CM block" and "the tint changes a pixel" are different questions. */
 static bool terrain_tint_live(void)
 {
+    if (fx_unified_lighting()) return false;
     if (!g_cmTint || !g_terrainShade || g_pack.cmtint.empty() || g_pack.corner.empty())
         return false;
     if (!g_shadeReady)
@@ -1833,9 +2020,11 @@ static bool pack_short(FILE* f, const char* path)
 }
 
 static void mesh_batch_clear(void);
+static void mesh_wind_unique_clear();
 static bool load_pack(const char* path, Pack& p)
 {
     mesh_batch_clear();
+    mesh_wind_unique_clear();
     g_groundGen++;
     FILE* f = fopen(path, "rb");
     if (!f) {
@@ -1971,7 +2160,7 @@ static bool load_pack(const char* path, Pack& p)
         p.tex[i].uw = (int)uw; p.tex[i].uh = (int)uh;
         p.tex[i].gl = 0;
         p.tex[i].gl_gdi = 0;
-        for (int k = 0; k < 6; k++) p.tex[i].gl_extra[k] = 0;
+        for (int k = 0; k < 7; k++) p.tex[i].gl_extra[k] = 0;
         texdata[i].resize((size_t)w * h * 4);
         if (fread(&texdata[i][0], 1, texdata[i].size(), f) != texdata[i].size()) { return pack_short(f, path); }
         if (pk6) {
@@ -2450,6 +2639,26 @@ static bool load_pack(const char* path, Pack& p)
                      GL_RGBA, GL_UNSIGNED_BYTE, classic.data());
     }
 
+    /* Combat infantry's two authored house rows share the same pixels/grid except
+       their palette band. Preserve those paired decodes while they are already on the
+       CPU; a uniform's livery uses the same exact pair contract as pack meshes, and
+       civilian/doctor rows that share art never become recolourable. */
+    for (const auto& item : p.inf) for (int a = 0; a < SPR_ANIM_COUNT; a++) {
+        const int gr = item.second.strip[SPRH_GDI][a], nr = item.second.strip[SPRH_NOD][a];
+        if (gr < 0 || nr < 0 || gr == nr || gr >= (int)p.sprite.size() || nr >= (int)p.sprite.size()) continue;
+        const PackSprite& g = p.sprite[gr]; const PackSprite& n = p.sprite[nr];
+        if (g.tex < 0 || n.tex < 0 || g.tex >= (int)p.tex.size() || n.tex >= (int)p.tex.size()) continue;
+        const PackTex& gt = p.tex[g.tex]; const PackTex& nt = p.tex[n.tex];
+        if (gt.w != nt.w || gt.h != nt.h || g.frames != n.frames || g.facings != n.facings
+            || g.fw != n.fw || g.fh != n.fh || texdata[g.tex].size() != texdata[n.tex].size()) continue;
+        bool alpha = true;
+        for (size_t q = 3; q < texdata[g.tex].size(); q += 4)
+            if (texdata[g.tex][q] != texdata[n.tex][q]) { alpha = false; break; }
+        if (!alpha || !gdidata[g.tex].empty()) continue;
+        p.tex[g.tex].gdi = texdata[g.tex]; p.tex[g.tex].nod = texdata[n.tex];
+        p.tex[g.tex].uniformSource = true;
+    }
+
     /* upload */
     for (size_t i = 0; i < p.tex.size(); i++) {
         /* THE TWO DECODES, KEPT FOR A TEXTURE THAT HAS BOTH, and kept here rather than
@@ -2582,9 +2791,14 @@ static void pack_free(Pack& p)
             glDeleteTextures(1, &p.tex[i].gl);
         if (p.tex[i].gl_gdi)
             glDeleteTextures(1, &p.tex[i].gl_gdi);
-        for (int k = 0; k < 6; k++)
+        for (int k = 0; k < 7; k++)
             if (p.tex[i].gl_extra[k])
                 glDeleteTextures(1, &p.tex[i].gl_extra[k]);
+        for (int k = 0; k < 8; k++)
+            if (p.tex[i].gl_faction[k]) glDeleteTextures(1, &p.tex[i].gl_faction[k]);
+        if (p.tex[i].gl_spec)
+            glDeleteTextures(1, &p.tex[i].gl_spec);
+        if (p.tex[i].gl_stone) glDeleteTextures(1, &p.tex[i].gl_stone);
     }
     p.tex.clear();
     p.mesh.clear();
@@ -2678,7 +2892,9 @@ static void set_wrap(unsigned char wrap)
    the ground, and every place that treats units as "the mobile things with meshes and a
    facing" wants aircraft too. The ONE thing it does not share is the ground: see
    SimObject::alt. */
-enum ObjKind { K_INFANTRY = 0, K_UNIT, K_BUILDING, K_TERRAIN, K_AIRCRAFT, K_OTHER };
+/* K_VESSEL is Red Alert's navy (the brain's VESSEL heap); Tiberian Dawn exports none. It
+   comes after K_OTHER so every older kind keeps its number in the selection keys. */
+enum ObjKind { K_INFANTRY = 0, K_UNIT, K_BUILDING, K_TERRAIN, K_AIRCRAFT, K_OTHER, K_VESSEL };
 
 struct SimObject {
     ObjKind kind;
@@ -2747,6 +2963,10 @@ struct SimObject {
        its last stage (infantry.cpp Doing_AI). doing/dostage are that Do and its stage;
        dying is the brain's own pre-digested "this Do is a death" flag. */
     int     doing, dostage, dying;
+    /* RED ALERT: a techno's ammunition (TechnoClass::Ammo, -1 for no limit), as its brain
+       exports it: the V2 Rocket's rocket, 1 on the rail and 0 from the launch until it has
+       reloaded. -1 from any other brain. */
+    int     ammo;
     /* RED ALERT: the owner's side colour as a row of its disc's PALETTE.CPS (0 gold,
        1 light blue, 2 red, 3 green, 4 orange, 5 grey, 6 blue, 7 brown), as its brain
        exports it; -1 from any other brain and for anything that is not a techno. */
@@ -2883,7 +3103,6 @@ static int obj_is_gdi(const SimObject& o)
     return obj_side(o) == 0 ? 1 : 0;
 }
 
-
 static std::vector<SimObject> g_objects;
 
 /* Enhanced scripting's per-frame service. Defined after edit_mod.h, because it reads the
@@ -2908,6 +3127,7 @@ static void feed_reset(void);
    the tick edge lives in refresh_objects, and the table it reads lives beside the rest
    of the damage record far below. See DMG_EMIT. */
 static void dmg_emit_step(int frame);
+static void harvestfx_step(int frame);
 
 /* THE TRACE. Which rules fired, and when. Filled by trace_run and kept across the reboot
    that a trace from inside the editor performs, so the editor can annotate its cards
@@ -3004,7 +3224,6 @@ static std::vector<SmudgeCell> g_smudges;
    every wall draws once per dump. */
 struct WallCell { short x, y; unsigned char kind, icon, dmg; char owner[16]; };
 static std::vector<WallCell> g_walls;
-
 
 /* Connectivity -> which of the cartridge's FOUR wall meshes, and how far to turn it.
    The cart authors each wall type as a rotatable four-set (measured off the ROM
@@ -3187,7 +3406,12 @@ static int g_smoothTaps = 5;    /* --movesmooth N; 1 disables the filter, 0 disa
    history is thrown away and the object is drawn at engine truth; see the recorder. */
 static const float SMOOTH_JUMP_CELLS = 1.0f;
 
-struct SmoothPos { float x[SMOOTH_MAX], z[SMOOTH_MAX]; int n; int frame; };
+#include "heading_smooth.h"
+struct SmoothPos {
+    float x[SMOOTH_MAX], z[SMOOTH_MAX]; int n; int frame;
+    int face, prevFace, tface, prevTface;
+    char type[32], house[32];
+};
 static std::map<int, SmoothPos> g_smoothPos;
 
 /* RUNNING TRACK. A vehicle whose model carries track faces scrolls them under itself as
@@ -3280,6 +3504,27 @@ static void smooth_at(const SmoothPos& s, float a, float* ox, float* oz)
 
 /* Heap ids are per-KIND, so a unit and a building can share one. */
 static int smooth_key(const SimObject& o) { return (int)o.kind * 1000000 + o.id; }
+
+/* Render-only headings. Both samples are engine truth; take the shortest arc through
+   north, retaining fractional DirType units all the way to the mesh. No prediction or
+   turn-rate change. The existing Smooth animations switch owns this too. */
+static float smooth_heading_of(const SimObject& o, bool secondary)
+{
+    const int raw = secondary ? o.tface : o.face;
+    if (raw < 0 || !g_smoothMove || g_smoothTaps == 0 || g_legacy || g_fx.dos_classic)
+        return (float)raw;
+    std::map<int, SmoothPos>::const_iterator it = g_smoothPos.find(smooth_key(o));
+    if (it == g_smoothPos.end() || it->second.n < 2
+        || it->second.frame != g_engineFrame
+        || strcmp(it->second.type, o.type) || strcmp(it->second.house, o.house))
+        return (float)raw;
+    const SmoothPos& p = it->second;
+    const int current = secondary ? p.tface : p.face;
+    const int previous = secondary ? p.prevTface : p.prevFace;
+    if (current != raw) return (float)raw;
+    return heading_interpolate(previous, current, g_tickAlpha);
+}
+
 
 /* ---------------------------------------------------------------------------------- *
  *  THE ENGINE'S STAGE COUNTER, SMOOTHED. Reported: "do the same interpolation
@@ -3381,7 +3626,7 @@ static bool smooth_kind(const SimObject& o)
        jump when it finally lands. Feeding a position that does not exist into a
        positional filter is what made a unit stepping off a transport slide in from off
        map over the length of the filter instead of appearing where the engine put it. */
-    return (o.kind == K_UNIT || o.kind == K_INFANTRY || o.kind == K_AIRCRAFT)
+    return (o.kind == K_UNIT || o.kind == K_INFANTRY || o.kind == K_AIRCRAFT || o.kind == K_VESSEL)
            && o.id >= 0 && !o.limbo;
 }
 
@@ -3463,12 +3708,17 @@ struct AnimState {
 static std::map<int, AnimState> g_anim;   /* infantry heap id -> state */
 
 /* How fast a 3D soldier turns and how fast his clips cross-fade, per engine tick at 15
-   ticks a second: 36 degrees a tick is a half turn in a third of a second, and four
-   ticks of fade is a quarter of a second, eased in and out where it is drawn
-   (m3inf_ease): a straight ramp started and stopped every blend on a hard edge. The
-   engine's own facing moves in 45 degree steps and would read as a snap on a model; these are the renderer's, not the engine's, and
-   change nothing a soldier does. */
-static const float M3INF_TURN_PER_TICK = 36.0f;
+   ticks a second. A turn takes M3INF_TURN_SHARE of what is left of it each tick, never
+   less than M3INF_TURN_PER_TICK: a half turn is done in three ticks (a fifth of a
+   second), a big one starts fast and settles, and a small one is done in one. At a
+   fixed 36 degrees a tick a man ordered back the way he came walked a third of a second
+   with his back to where he was going. Four ticks of fade is a quarter of a second,
+   eased in and out where it is drawn (m3inf_ease): a straight ramp started and stopped
+   every blend on a hard edge. The engine's own facing moves in 45 degree steps and would
+   read as a snap on a model; these are the renderer's, not the engine's, and change
+   nothing a soldier does. */
+static const float M3INF_TURN_PER_TICK = 45.0f;
+static const float M3INF_TURN_SHARE    = 0.55f;
 static const float M3INF_BLEND_TICKS   = 4.0f;
 static inline float m3inf_ease(float w)
 {
@@ -3492,6 +3742,16 @@ enum {
    scratch their heads on the same tick. 8 s: often enough to see, rare enough to read
    as a person and not a loop. */
 static const int M3INF_FIDGET_EVERY = 120;
+
+/* THE POSE SHEET (script verb infsheet): every soldier on the field replaced by a grid of
+   one type, a column per compass point and a row per frame of one clip, each posed in
+   that clip alone at that frame and nothing blended. It shows a clip exactly as the
+   renderer skins it, in every direction, on one picture: what a model looks like in the
+   game, not in the tool that made it. Ids below M3INF_SHEET_ID are the sheet's; the
+   engine never hands out a negative one. */
+static const int M3INF_SHEET_ID = -1000;
+static char g_infSheetClip[32] = "";
+static int g_infSheetRows = 0;
 
 /* Defined beside the model code: how many engine ticks clip `slot` (with `variant`)
    lasts on this soldier's model, or 0 when the model has no such clip. */
@@ -3568,9 +3828,32 @@ static const int M3INF_OWN_FIDGETS = 2;
    assigned (doing, defines.h DoType), its own dying flag, whether his leptons moved, and
    whether he has a target. The prone family and death outrank movement, because a
    crawling man moves and must not be drawn running. */
+/* THE CIVILIANS HAVE NO CRAWL. Their 1995 types carry no crawling frames (idata.cpp,
+   both games: C1 to C10, Chan, Delphi, Moebius and Einstein), so the engine's prone family
+   points at the standing frame and DO_CRAWL at the panic run, and a scared civilian who
+   "crawls" is moved at twice his speed (InfantryClass::AI: a fraidycat without crawling
+   frames runs instead). Drawn with the soldiers' crawl clip he slid along on his belly
+   five times faster than the clip was made for. He is drawn as the sprite drew him:
+   standing, and running at the speed he really moves. */
+static bool m3inf_no_crawl(const SimObject& o)
+{
+    if (o.type[0] == 'C' && o.type[1] >= '1' && o.type[1] <= '9'
+        && (o.type[2] == 0 || (o.type[1] == '1' && o.type[2] == '0' && o.type[3] == 0)))
+        return true;
+    return !strcmp(o.type, "CHAN") || !strcmp(o.type, "DELPHI") || !strcmp(o.type, "MOEBIUS")
+        || !strcmp(o.type, "EINSTEIN");
+}
+
 static int m3inf_want_clip(const SimObject& o, const AnimState& a)
 {
     if (o.dying) return M3INF_DIE;
+    if (m3inf_no_crawl(o)) {
+        if (o.doing == 8) return M3INF_SHOOT;   /* DO_FIRE_PRONE: the standing shot */
+        if (o.doing == 2 || o.doing == 5 || o.doing == 6 || o.doing == 7) {
+            if (a.still <= WALK_COAST_TICKS) return M3INF_RUN;
+            return o.tar >= 0 ? M3INF_AIM : M3INF_IDLE;
+        }
+    }
     switch (o.doing) {
     case 5: return M3INF_LIEDOWN;     /* DO_LIE_DOWN   */
     case 2: return M3INF_PRONE;       /* DO_PRONE      */
@@ -3607,14 +3890,19 @@ static int m3inf_death_variant(const SimObject& o, int prevSlot)
 static void m3inf_tick(AnimState& a, const SimObject& o, float dx, float dy, float dist,
                        bool fresh)
 {
-    if (fresh) {
+    if (fresh || (!(dist > 0.0f) && a.still > WALK_COAST_TICKS)) {
+        /* Stopped, his direction of travel is forgotten: the walk he starts next sets it
+           from its own first step, wherever that goes. */
         a.vx = a.vy = 0.0f;
     } else if (dist > 0.0f) {
         /* Each step's unit direction, weighted in at 40 per cent: a corner is mostly
            turned in three steps, and a one-lepton wobble moves the heading by a few
-           degrees rather than by its own ten. */
+           degrees rather than by its own ten. A step that turns him back on himself
+           (more than about a right angle) is taken outright instead: smoothed, the
+           opposite of a direction is that direction shortened, and he kept facing the
+           way he had come while walking away from it. */
         const float ux = dx / dist, uy = dy / dist;
-        if (a.vx == 0.0f && a.vy == 0.0f) { a.vx = ux; a.vy = uy; }
+        if ((a.vx == 0.0f && a.vy == 0.0f) || a.vx * ux + a.vy * uy < -0.2f) { a.vx = ux; a.vy = uy; }
         else { a.vx = a.vx * 0.6f + ux * 0.4f; a.vy = a.vy * 0.6f + uy * 0.4f; }
         const float l = sqrtf(a.vx * a.vx + a.vy * a.vy);
         if (l > 1e-6f) { a.vx /= l; a.vy /= l; }
@@ -3714,8 +4002,9 @@ static void m3inf_tick(AnimState& a, const SimObject& o, float dx, float dy, flo
        the fall or the crawl put it. */
     if (want > -999.0f && a.slot != M3INF_DIE) {
         float d = m3inf_wrap180(want - a.yaw);
-        if (d > M3INF_TURN_PER_TICK) d = M3INF_TURN_PER_TICK;
-        if (d < -M3INF_TURN_PER_TICK) d = -M3INF_TURN_PER_TICK;
+        const float cap = fmaxf(M3INF_TURN_PER_TICK, fabsf(d) * M3INF_TURN_SHARE);
+        if (d > cap) d = cap;
+        if (d < -cap) d = -cap;
         a.yaw = a.yaw + d;
         if (a.yaw >= 360.0f) a.yaw -= 360.0f;
         if (a.yaw < 0.0f) a.yaw += 360.0f;
@@ -3781,6 +4070,7 @@ static ObjKind kind_from(const char* s)
     if (!strcmp(s, "BUILDING")) return K_BUILDING;
     if (!strcmp(s, "TERRAIN"))  return K_TERRAIN;
     if (!strcmp(s, "AIRCRAFT")) return K_AIRCRAFT;
+    if (!strcmp(s, "VESSEL"))   return K_VESSEL;
     return K_OTHER;
 }
 
@@ -3973,7 +4263,9 @@ static FILE* capture_brain_call(int (*fn)(void))
 {
     if (!fn) return NULL;
     fflush(stdout);
-    int saved = dup(STDOUT_FILENO);
+    const int outputDescriptor = fileno(stdout);
+    if (outputDescriptor < 0) return NULL;
+    int saved = dup(outputDescriptor);
     if (saved < 0) return NULL;
     /* THE SCRATCH FILE THE WHOLE WORLD ARRIVES THROUGH.
        Every object in a mission reaches the renderer by being PRINTED by the brain and read
@@ -4023,7 +4315,11 @@ static FILE* capture_brain_call(int (*fn)(void))
     }
     rewind(g_capture);
     if (ftruncate(fileno(g_capture), 0) != 0) { /* non-fatal */ }
-    dup2(fileno(g_capture), STDOUT_FILENO);
+    if (dup2(fileno(g_capture), outputDescriptor) < 0) {
+        close(saved);
+        fprintf(stderr, "FATAL: could not redirect stdout for the world dump.\n");
+        return NULL;
+    }
     /* Give stdout a real buffer for exactly the length of the dump, and take it away
        again straight after.
 
@@ -4055,8 +4351,12 @@ static FILE* capture_brain_call(int (*fn)(void))
     fn();
     fflush(stdout);
     setvbuf(stdout, NULL, _IONBF, 0);
-    dup2(saved, STDOUT_FILENO);
+    const int restored = dup2(saved, outputDescriptor);
     close(saved);
+    if (restored < 0) {
+        fprintf(stderr, "FATAL: could not restore stdout after the world dump.\n");
+        return NULL;
+    }
     rewind(g_capture);
     return g_capture;
 }
@@ -4495,8 +4795,19 @@ static void shatter_step(int frame);
    and the wall pass asks for a remastered wall piece, so those entry points are declared
    up here. */
 static bool ebld_claims_death(const SimObject& o);
+/* (ra3d_sprites_mod.h: Red Alert's wall, crate and field overlays into g_walls, g_crates
+   and g_fields, and its craters and scorch marks with a reused building's death marks held
+   back) */
+static void ra3d_cells_from_map(void);
+static void ra3d_marks_filter_tick(int frame);
+static void ra3d_props_tick(void);   /* (ra3d_props_mod.h) */
+static void ra3d_ore_cast(void);     /* (ra3d_ore_mod.h) */
+static void ra3d_ore_draw_normals(void);
+static bool ra3d_ore_spec_want(void);
+static void ra3d_ore_draw_spec(void);
 static float ebld_death_cells(const SimObject& o, float own);
 static void ebld_step(int frame);
+static void ebld_prepare_ra(void);   /* ebld_prepare.h */
 static void ebld_anims_filter(int frame);
 static void ebld_smudges_filter(int frame);
 static bool ebld_active(const SimObject& o);
@@ -4513,6 +4824,8 @@ static bool eplc_owns(const SimObject& o);
 static bool eplc_owns_jolt(const char* type);
 static void eplc_rumble(float* sx, float* sz);
 static bool eplc_wall_draw(int kind, int icon, float cx, float cz, int pass, float t);
+static void ebld_wall_cull_hold(bool on);
+static void ebld_wall_cull_release(void);
 /* THE REMASTERED VEHICLES AND AIRCRAFT (evhc_mod.h), included right after the remastered
    buildings. A unit's death is observed in the vanish sweep below, their tick runs on the
    same edge as the buildings', and the hovercraft's riders stand on its deck, so those
@@ -4523,12 +4836,18 @@ static bool evhc_take_death(const char* type, int kind, int id, int house, int f
 static void evhc_step(int frame);
 static float evhc_deck_y(const char* type, float cart);
 static bool evhc_claims_type(const char* type);
+/* a Red Alert unit or aircraft drawn by its remastered model (evhc_mod.h): whether it is,
+   and the model's pick volume, facing and lift */
+static bool evhc_ra_ready(const SimObject& o);
+static int  evhc_ra_pick(const SimObject& o, int* face, float* lift);
 static int  mesh_for(const SimObject& o);      /* both defined far below; the death is */
 static int  draw_facing(const SimObject& o);   /* observed here and nowhere else       */
 static float alt_lift(const SimObject& o);     /* an aircraft's height above the ground */
 static void aircraft_stand_resolve(void);      /* and the step it is parked against     */
 enum { CIN_PLACE, CIN_COLLAPSE, CIN_VEHICLE, CIN_DAMAGE, CIN_RUMBLE, CIN_COUNT };
 static void cinematic_audio_note(int kind, float x, float z, float mass);
+static void cinematic_audio_note_as(int kind, float x, float z, float mass, bool splash);
+static bool eplc_splashes(const char* type);
 static void shake_note(float amp);             /* the camera jolt, defined by set_camera */
 
 /* THE GRASS'S PER-TICK OBSERVER, defined in grass_field.h far below. It records what the
@@ -4658,6 +4977,21 @@ static void terrain_pads_rebuild(void)
 {
     if (g_pack.corner.empty())
         return;
+    /* Compare complete inputs, not a lossy hash: unchanged refreshes do no
+       footprint closure or pad painting. Raw corners cover editor writes too. */
+    static std::vector<int> previous, input;
+    static std::vector<unsigned char> corners;
+    input.clear(); input.push_back((int)g_groundGen); input.push_back(g_gridW);
+    input.push_back(g_gridH); input.push_back(g_flatPads?1:0);
+    for (const auto& o : g_objects) if (o.kind==K_BUILDING && !o.limbo) {
+        input.push_back(o.cx); input.push_back(o.cy); input.push_back(o.fw); input.push_back(o.fh);
+    }
+    input.push_back(-2147483647);
+    for (const auto& sc : g_smudges) if (sc.type>=12) {
+        input.push_back((int)sc.x); input.push_back((int)sc.y);
+    }
+    if (input==previous && corners==g_pack.corner) return;
+    previous=input; corners=g_pack.corner;
     static unsigned char prevH[C3D_CORN_MAX * C3D_CORN_MAX], prevOn[C3D_CORN_MAX * C3D_CORN_MAX];
     memcpy(prevH, g_padH, sizeof prevH);
     memcpy(prevOn, g_padOn, sizeof prevOn);
@@ -4794,6 +5128,11 @@ static void terrain_pads_rebuild(void)
    quietly wrong the first time the model or the bake changed; this way a re-baked pack
    simply answers for itself. The area comparison is twice the true triangle area, which
    is all a maximum needs. */
+/* Red Alert's Airfield and Helipad as decks: the remastered model's runway or landing plate
+   under a parked craft (defined after ebld_mod.h, whose models it reads; RED ALERT'S
+   AIRFIELD below). */
+static bool ra_airfield_deck(const SimObject& pad, float x, float z, float* deck);
+
 static float mesh_deck_y(int mi)
 {
     if (mi < 0 || mi >= (int)g_pack.mesh.size())
@@ -4948,6 +5287,96 @@ static void cash_tick(void)
                                           : (h >= 0 ? "played" : "SILENT"));
     }
     g_cashPrev = cur;
+}
+
+/* A SHOT FROM THE AIR, DRAWN FROM THE AIRCRAFT. Both engines draw height the 2D way: an
+   aircraft's Fire_Coord is moved north by its altitude (Red Alert's TechnoClass::Fire_Coord,
+   VerticalOffset + Height; Tiberian Dawn's AircraftClass::Fire_Coord, Altitude pixels), so the
+   projectile starts on the screen where the 2D craft is drawn, and it keeps that offset on
+   its ground track. In 3D the craft stands over its own ground point at alt_lift, so a
+   Longbow's Hellfire started a whole cell north of it and a cell up (Red Alert's High
+   projectiles fly at FLIGHT_LEVEL), and an Orca's rocket on the ground a cell north of the
+   Orca. Each shot fired by an aircraft is drawn from the craft: at launch the north offset
+   is taken off and the projectile stands at the craft's own height, and both are eased out
+   by how far it has come toward where it is going (Red Alert's fuse point, else the cell
+   the craft was aiming at, else over EFX_AIR_EASE ticks), so it arrives where the engine
+   has it, low over the target. Only where it is drawn changes: the engine's point stays in
+   ewx, ewz, and when and where it goes off are the engine's. */
+struct EfxAirShot {
+    int   frame;                 /* the engine tick it was fired on */
+    float shift;                 /* cells the engine moved it north for the craft's height */
+    float fx, fz;                /* the engine's launch point (Fire_Coord) */
+    float lift0, lift1;          /* drawn height at launch (the craft's) and at the target */
+    float tx, tz;                /* where it is going, NAN when nothing says */
+    bool  seen;                  /* the projectile has been in a dump since */
+};
+static std::map<int, EfxAirShot> g_efxAirShots;   /* by projectile id */
+static long g_efxAirShotsMade = 0, g_efxAirDrawn = 0;
+static const int EFX_AIR_EASE = 10;
+static void efx_air_shots(int frameno)
+{
+    for (size_t i = 0; i < g_efxFiresNow.size(); i++) {
+        const EfxFire& f = g_efxFiresNow[i];
+        const SimObject* by = NULL;
+        for (size_t k = 0; k < g_objects.size() && !by; k++)
+            if (g_objects[k].kind == K_AIRCRAFT && g_objects[k].id == f.id
+                && !strcmp(g_objects[k].type, f.type))
+                by = &g_objects[k];
+        if (!by || by->alt <= 0) continue;
+        EfxAirShot a;
+        a.frame = frameno;
+        a.shift = (float)by->alt / 24.0f;
+        a.fx = f.wx; a.fz = f.wz;
+        a.lift0 = alt_lift(*by) - 0.05f;
+        if (a.lift0 < 0.0f) a.lift0 = 0.0f;
+        a.lift1 = 0.12f;
+        a.tx = a.tz = NAN;
+        if (by->tar >= 0) {
+            const int tc = by->tar;
+            a.tx = (float)(tc % g_brainStride) + 0.5f;
+            a.tz = (float)(tc / g_brainStride) + 0.5f;
+            /* a craft in the air over that cell is the target: arrive at its height */
+            for (size_t k = 0; k < g_objects.size(); k++)
+                if (g_objects[k].kind == K_AIRCRAFT && g_objects[k].alt > 0
+                    && g_objects[k].cx + g_objects[k].cy * g_brainStride == tc)
+                    a.lift1 = alt_lift(g_objects[k]);
+        }
+        a.seen = false;
+        g_efxAirShots[f.bullet] = a;
+        g_efxAirShotsMade++;
+    }
+    for (std::map<int, EfxAirShot>::iterator it = g_efxAirShots.begin(); it != g_efxAirShots.end(); ) {
+        EfxBullet* b = NULL;
+        for (size_t k = 0; k < g_efxBullets.size() && !b; k++)
+            if (g_efxBullets[k].id == it->first) b = &g_efxBullets[k];
+        EfxAirShot& a = it->second;
+        if (!b) {
+            /* gone (or not yet in a dump): forgotten once it has flown, or stale */
+            if (a.seen || frameno - a.frame > 4) { g_efxAirShots.erase(it++); continue; }
+            ++it;
+            continue;
+        }
+        a.seen = true;
+        float tx = a.tx, tz = a.tz;
+        if (!std::isnan(b->tx) && !std::isnan(b->tz)) { tx = b->tx; tz = b->tz; }
+        float u;
+        if (!std::isnan(tx)) {
+            const float D = hypotf(tx - a.fx, tz - a.fz);
+            const float d = hypotf(tx - b->ewx, tz - b->ewz);
+            u = D > 0.05f ? 1.0f - d / D : 1.0f;
+        } else {
+            u = (float)(frameno - a.frame) / (float)EFX_AIR_EASE;
+        }
+        u = u < 0.0f ? 0.0f : u > 1.0f ? 1.0f : u;
+        const float w = 1.0f - u;
+        b->wx = b->ewx;
+        b->wz = b->ewz + a.shift * w;
+        const float lift = a.lift0 * w + a.lift1 * u;
+        b->alt = (int)lroundf(lift * 256.0f);
+        if (b->alt < 1) b->alt = 1;
+        g_efxAirDrawn++;
+        ++it;
+    }
 }
 
 static void laser_stamp(int frameno);   /* laser_mod.h: the Obelisk's beams, on the dump's frame */
@@ -5210,6 +5639,11 @@ static void refresh_objects(void)
         /* Default -1, not 0: 0 is a legitimate "empty harvester" and would draw a full
            empty strip on a brain that does not export the pair at all. */
         o.alt     = obj_field(f, nf, "alt", 0);
+        /* RED ALERT COUNTS AN AIRCRAFT'S HEIGHT IN LEPTONS (AircraftClass::Height, its
+           FLIGHT_LEVEL 256), Tiberian Dawn in pixels (Altitude, FLIGHT_LEVEL 24), and every
+           reader here (the lift, the rotors, where a craft shot down explodes) takes
+           Tiberian Dawn's scale: Red Alert's is brought to it once, here */
+        if (g_raModule && o.alt > 0) o.alt = (o.alt * 24 + 128) / 256;
         o.act     = obj_field(f, nf, "act", -1);
         o.pips    = obj_field(f, nf, "pips", -1);
         o.maxpips = obj_field(f, nf, "maxpips", -1);
@@ -5224,6 +5658,7 @@ static void refresh_objects(void)
         o.tar = obj_field(f, nf, "tar", -1);
         o.doing = obj_field(f, nf, "doing", -1);
         o.dostage = obj_field(f, nf, "dostage", -1);
+        o.ammo = obj_field(f, nf, "ammo", -1);
         o.dying = obj_field(f, nf, "dying", 0);
         o.remap = obj_field(f, nf, "remap", -1);
         o.makecnt = obj_field(f, nf, "makecnt", -1);
@@ -5394,7 +5829,8 @@ static void refresh_objects(void)
                 && !eplc_owns_jolt(o.type)) {
                 const int fw = o.fw > 0 ? o.fw : 1, fh = o.fh > 0 ? o.fh : 1;
                 shake_tap(0.009f * (float)(fw > fh ? fw : fh));
-                cinematic_audio_note(CIN_PLACE, o.ex, o.ez, (float)(fw > fh ? fw : fh));
+                cinematic_audio_note_as(CIN_PLACE, o.ex, o.ez, (float)(fw > fh ? fw : fh),
+                                        eplc_splashes(o.type));
             }
             for (int dy = 0; dy < (o.fh > 0 ? o.fh : 1); dy++)
                 for (int dx = 0; dx < (o.fw > 0 ? o.fw : 1); dx++) {
@@ -5414,6 +5850,10 @@ static void refresh_objects(void)
 
     terrain_pads_rebuild();
 
+    /* Red Alert's dump has no CRATE| or FIELD| lines: its engine's map fills the lists */
+    if (g_raModule) ra3d_cells_from_map();
+    if (g_raModule) ra3d_props_tick();   /* (the mines the player cannot see) */
+
     /* THE ENGINE'S OWN DEATH AND DAMAGE ANIMS OF A REMASTERED BUILDING STAND DOWN under
        Enhanced (ebld_mod.h), and the craters its death leaves: taken out of the anim and
        smudge lists here, once the whole dump is read (the deaths were observed above), so
@@ -5421,6 +5861,7 @@ static void refresh_objects(void)
        every parse, to the same answer for a tick re-dumped. */
     ebld_anims_filter(frameno);
     ebld_smudges_filter(frameno);
+    if (g_raModule) ra3d_marks_filter_tick(frameno);
 
     /* ------------------------------------------------------------------------------ *
      *  STAND EVERY PARKED AIRCRAFT ON THE DECK IT IS PARKED ON.
@@ -5470,6 +5911,19 @@ static void refresh_objects(void)
             std::map<int, size_t>::iterator b = bldByKey.find(key);
             if (b == bldByKey.end()) continue;
             const SimObject& pad = g_objects[b->second];
+            /* RED ALERT'S AIRFIELD. Unlike the airstrip above, Red Alert's fixed wing
+               aircraft DO land: Landing_Takeoff_AI brings a MiG or a Yak down to Altitude 0
+               on the Airfield it is docked with, where it parks and rearms, and takes off
+               from it again. The remastered Airfield's runway is a raised slab, so a craft
+               parked on it stands on the slab's top under its own centre. Red Alert's
+               Helipad likewise: its remastered landing plate, not the cartridge's Helipad
+               the block below reads (Red Alert's pack has none). Only while the building is
+               drawn by its model: its 1996 card has no height. */
+            if (g_raModule && (!strcmp(pad.type, "AFLD") || !strcmp(pad.type, "HPAD"))) {
+                float d = 0.0f;
+                if (ra_airfield_deck(pad, o.ex, o.ez, &d)) o.deck = d;
+                continue;
+            }
             if (strcmp(pad.type, "HPAD") != 0 && strcmp(pad.type, "FIX") != 0)
                 continue;
             o.deck = mesh_deck_y(mesh_for(pad));
@@ -5565,6 +6019,7 @@ static void refresh_objects(void)
        time is over leave the list (laser_mod.h). Every dump, not only the first of a tick:
        a second dump of the same tick carries no new beam and ages none. */
     laser_stamp(frameno);
+    efx_air_shots(frameno);
     /* Advance every infantryman's walk cycle by the ground he actually covered.
        Guarded on the engine's own Frame counter: refresh_objects() is called more than
        once for some ticks (the shot path re-dumps, the interactive loop re-dumps on a
@@ -5674,7 +6129,11 @@ static void refresh_objects(void)
                 std::map<int, UnitSnap> unow;
                 for (size_t i = 0; i < g_objects.size(); i++) {
                     const SimObject& o = g_objects[i];
-                    if ((o.kind != K_UNIT && o.kind != K_AIRCRAFT) || o.id < 0)
+                    /* (and Red Alert's vessels: a ship with a remastered model breaks
+                       into its wreck as a vehicle does; one without stays the cards'
+                       business, skip-nomesh below) */
+                    if ((o.kind != K_UNIT && o.kind != K_AIRCRAFT && o.kind != K_VESSEL)
+                        || o.id < 0)
                         continue;
                     UnitSnap u;
                     u.ex = o.ex; u.ez = o.ez;
@@ -5727,7 +6186,10 @@ static void refresh_objects(void)
                     const char* verdict = 0;
                     int witness = -1;
                     if (u.limbo)      verdict = "skip-limbo";           /* clause 3 */
-                    else if (u.mi < 0) verdict = "skip-nomesh";
+                    /* (a Red Alert type with a remastered model has no cartridge mesh: its
+                       death is the remastered wreck's, evhc_take_death below) */
+                    else if (u.mi < 0 && !(g_raModule && evhc_claims_type(u.type)))
+                        verdict = "skip-nomesh";
                     else if (u.kind == K_AIRCRAFT &&                    /* clause 5 */
                              (u.cx < g_mapX || u.cx >= g_mapX + g_mapW ||
                               u.cy < g_mapY || u.cy >= g_mapY + g_mapH))
@@ -5772,7 +6234,7 @@ static void refresh_objects(void)
                     if (evhc_take_death(u.type, (int)u.kind, u.id, (int)u.house, u.face,
                                         u.ex, u.ez, u.vx, u.vz, u.lift, it->first,
                                         g_engineFrame)) {
-                        if (u.kind == K_UNIT) {
+                        if (u.kind == K_UNIT || u.kind == K_VESSEL) {
                             shake_tap(SHAKE_VEHICLE);
                             cinematic_audio_note(CIN_VEHICLE, u.ex, u.ez, 1);
                         }
@@ -5826,7 +6288,9 @@ static void refresh_objects(void)
                 SmoothPos s;
                 std::map<int, SmoothPos>::iterator it = g_smoothPos.find(k);
                 bool carry = (it != g_smoothPos.end()
-                              && it->second.frame == g_engineFrame - 1);
+                              && it->second.frame == g_engineFrame - 1
+                              && !strcmp(it->second.type, o.type)
+                              && !strcmp(it->second.house, o.house));
                 if (carry) {
                     /* THE DISCONTINUITY TEST, and it is OURS: inter-tick interpolation
                        is a modern-tier addition, neither the console nor the 1995 game
@@ -5853,6 +6317,7 @@ static void refresh_objects(void)
                 }
                 if (carry) {
                     s = it->second;                 /* shift the window along by one */
+                    s.prevFace = s.face; s.prevTface = s.tface;
                     for (int q = 0; q < SMOOTH_MAX - 1; q++) {
                         s.x[q] = s.x[q + 1]; s.z[q] = s.z[q + 1];
                     }
@@ -5863,7 +6328,11 @@ static void refresh_objects(void)
                        Start again from truth. */
                     for (int q = 0; q < SMOOTH_MAX; q++) { s.x[q] = o.ex; s.z[q] = o.ez; }
                     s.n = 1;
+                    s.prevFace = o.face; s.prevTface = o.tface;
                 }
+                s.face = o.face; s.tface = o.tface;
+                snprintf(s.type, sizeof s.type, "%s", o.type);
+                snprintf(s.house, sizeof s.house, "%s", o.house);
                 s.x[SMOOTH_MAX - 1] = o.ex; s.z[SMOOTH_MAX - 1] = o.ez;
                 s.frame = g_engineFrame;
                 now[k] = s;
@@ -5877,6 +6346,8 @@ static void refresh_objects(void)
                 stage_record(g_objects[i]);
         efx_enh_follow();
         efx_step(g_engineFrame);
+        ra3d_atom_track();
+        ra3d_efxm_track();
         /* THE REMASTERED BUILDINGS' TICK (ebld_mod.h): hits, stages, their pieces'
            physics and their emitters. After efx_step for the same reason as the
            cartridge's emitters below, and before them, so an emitter riding a falling
@@ -5886,6 +6357,8 @@ static void refresh_objects(void)
            effects, and the placement's dust. */
         eplc_step(g_engineFrame);
         ebld_step(g_engineFrame);
+        /* (Red Alert's structures, read at first sight: their stages prepared once they are) */
+        ebld_prepare_ra();
         /* THE REMASTERED VEHICLES' TICK (evhc_mod.h): each side's travel, the rotors, the
            doors and tilts, the shots read off this tick's newborn muzzle anims, and the
            wrecks' physics. After efx_step, whose newborn test it reads. */
@@ -5898,6 +6371,7 @@ static void refresh_objects(void)
            following pass, so a bubble's first step is the next tick, not this one. */
         dmg_emit_step(g_engineFrame);
         shatter_step(g_engineFrame);
+        harvestfx_step(g_engineFrame);
         /* THE BUILD QUEUE PUMP, and this placement is not optional. It sits inside
            the frameno guard because refresh_objects is called MORE THAN ONCE for
            some ticks -- the shot path re-dumps, and the interactive loop re-dumps on
@@ -6525,10 +6999,15 @@ static float mesh_anim_t(const PackMesh& m)
     return (float)f0 + w;
 }
 
+static bool evhc_suspension_vehicle(const SimObject& o);
 static int wobble_of(const SimObject& o)
 {
     if (o.wobmode >= 0)
         return o.wobmode;
+    if (evhc_suspension_vehicle(o)) return WOBBLE_SUSPENDED;
+    /* (Red Alert's vessels: only its remastered models are meshes, evhc_mod.h) */
+    if (o.kind == K_VESSEL)
+        return WOBBLE_SHIP;
     if (o.kind != K_UNIT)
         return WOBBLE_NONE;
     if (!strcmp(o.type, "BOAT") || !strcmp(o.type, "LST"))
@@ -6589,10 +7068,9 @@ static const unsigned char KEY_BAND[16][3] = {
 
 /* What that ramp becomes under each PlayerColorType: DOS palette entries
    Remap<colour>[176+k] read out of TEMPERAT.PAL with the 6-bit DAC widened by << 2.
-   Rows 0 and 1 are never used to BUILD anything -- colour 0 is gl_gdi and colour 1 is the
-   cartridge's own blue-grey, which is gl -- but they are written out so the table indexes
-   by PlayerColorType with no arithmetic, and so house_colour can read a representative
-   for every colour. */
+   Gold keeps its original texture. Multiplayer light blue is built from this table,
+   independently of the cartridge's campaign Nod decode; house_colour reads the same
+   ramp for flags and swatches. */
 static const unsigned char LIVERY_BAND[LIVERY_COUNT][16][3] = {
     { {244,212,120},{220,188,104},{196,168, 92},{176,148, 80},
       {136,112, 56},{ 96, 76, 36},{ 56, 44, 20},{ 16, 12,  4},
@@ -6633,6 +7111,7 @@ static const unsigned char LIVERY_BAND[LIVERY_COUNT][16][3] = {
    safety of this change: a campaign resolves nothing and every consumer below falls
    through to the side test it has always used. */
 static std::map<std::string, int> g_liveryOf;
+static std::map<std::string, unsigned> g_liveryFactionOf;
 static bool g_teamColours = true;      /* --noteamcolours puts the two-livery look back */
 
 static int livery_of_house(const char* house)
@@ -6655,9 +7134,36 @@ static int livery_slot(int colour)
     return colour;
 }
 
+/* The campaign's two slots keep their old meanings. Light blue is a separate
+   multiplayer sheet because the cartridge's Nod decode is red on buildings and
+   grey on uniforms. Bit 4 carries faction independently of player colour. */
+static int team_livery_slot(int colour)
+{
+    return !g_raModule && colour == 1 ? 8 : livery_slot(colour);
+}
+static int livery_colour_from_slot(int slot)
+{
+    return slot == 1 ? 0 : slot == 8 ? 1 : slot;
+}
+static int dos_livery_index(int colour)
+{
+    return colour == 1 ? 6 : colour >= 2 && colour < LIVERY_COUNT ? colour - 2 : -1;
+}
+/* THE SPECULAR TARGET'S DRAW (evhc_draw_spec, evhc_mod.h), caller-set for one pass: while
+   it is on, every texture bind answers with the texture's specular map instead of its
+   colour (0, which samples as black, for a texture without one). Off by default. */
+static int g_meshSpecPass = 0;
+#include "stone_materials.h"
 static inline GLuint livery_texture(const PackTex& tx, int slot)
 {
-    if (slot >= 2 && slot < LIVERY_COUNT && tx.gl_extra[slot - 2])
+    if (g_meshSpecPass) return tx.gl_spec;
+    if (g_meshNrmOut) stone_mesh_normal_bind(tx.gl_stone);
+    const bool faction = (slot & 16) != 0;
+    slot &= ~16;
+    const int colour = livery_colour_from_slot(slot);
+    if (faction && colour >= 0 && colour < LIVERY_COUNT && tx.gl_faction[colour])
+        return tx.gl_faction[colour];
+    if (slot >= 2 && slot <= 8 && tx.gl_extra[slot - 2])
         return tx.gl_extra[slot - 2];
     return (slot == 1 && tx.gl_gdi) ? tx.gl_gdi : tx.gl;
 }
@@ -6734,10 +7240,14 @@ static unsigned g_surrSeats = 0;
    it is only knowable here, where the roster is built from what the room agreed. The
    debrief needs it for the medallion it turns and the music it plays. */
 static int g_matchFaction[8];
+/* The house each row was GIVEN: Tiberian Dawn's side, Red Alert's country (HousesType 0..7),
+   which the engine's own multiplayer house (Multi1..8) does not say. */
+static int g_matchHouse[8];
 
 static void livery_resolve(int players)
 {
     g_liveryOf.clear();
+    g_liveryFactionOf.clear();
     if (!BrainGetState || !g_teamColours) return;
     if (players < 1) players = 1;
     if (players > 8) players = 8;
@@ -6759,6 +7269,7 @@ static void livery_resolve(int players)
         char name[16];
         snprintf(name, sizeof name, "Multi%d", house + 1);
         g_liveryOf[name] = colour;
+        if (s < g_matchRows) g_liveryFactionOf[name] = g_matchFaction[s] == 1 ? 2u : 1u;
         fprintf(stderr, "TEAMCOLOUR|seat=%d|house=%s|colour=%d|%s\n",
                 s, name, colour, LIVERY_NAME[colour]);
     }
@@ -6953,11 +7464,20 @@ static void livery_recolour(const unsigned char* gdi, int m8, int colour, unsign
     }
 }
 
+#include "faction_livery.h"
+
 /* Whether livery_build has run for the pack now loaded. A remastered building's textures
    are uploaded the first time one is drawn (ebld_mod.h), which can be after the liveries
    were built, so that upload builds its own through livery_build_range when this is set.
    ebld_attach clears it on every pack load, ahead of livery_build. */
 static bool g_liveryLive = false;
+
+static void livery_reset(void)
+{
+    g_liveryOf.clear();
+    g_liveryFactionOf.clear();
+    g_liveryLive = false;
+}
 
 /* The colours the seated houses wear, beyond the pack's own two. */
 static void livery_wanted(bool* want)
@@ -6973,6 +7493,23 @@ static void livery_wanted(bool* want)
     for (std::map<std::string, int>::const_iterator it = g_liveryOf.begin();
          it != g_liveryOf.end(); ++it)
         if (it->second >= 0 && it->second < LIVERY_COUNT) want[it->second] = true;
+}
+
+/* Faction use is resolved once per colour, including every live owner in the engine
+   snapshot, not just the camera. A captured building takes its receiving house's
+   colour and ActLike. A sidecar texture needs only the actually used atlas family. */
+static unsigned livery_colour_factions(int colour)
+{
+    unsigned flags = 0;
+    /* The lobby-to-engine house join persists after the last live unit dies, so a
+       lazily resident wreck keeps its owner's faction too. */
+    for (const auto& seat : g_liveryOf) {
+        const auto faction = g_liveryFactionOf.find(seat.first);
+        if (seat.second == colour && faction != g_liveryFactionOf.end()) flags |= faction->second;
+    }
+    for (const SimObject& o : g_objects)
+        if (livery_of_house(o.house) == colour) flags |= obj_side(o) == 1 ? 2u : 1u;
+    return flags;
 }
 
 /* A MIPMAP CHAIN for the texture bound now, made by the driver as the texture is given
@@ -6993,9 +7530,14 @@ static void gl_upload_mips(const unsigned char* px, int w, int h)
 }
 
 /* One texture's livery in colour c, if it has one to build: 1 built, 0 not. */
-static int livery_build_one(PackTex& tx, int c, std::vector<unsigned char>& out, long* npx)
+static int livery_build_one(PackTex& tx, int c, std::vector<unsigned char>& out, long* npx,
+                            bool faction = false)
 {
-    if (c >= 2 && c < LIVERY_COUNT && tx.gl_extra[livery_slot(c) - 2]) return 0;
+    const int slot = team_livery_slot(c);
+    if (c < 0 || c >= LIVERY_COUNT || (!faction && slot < 2)) return 0;
+    if (faction && tx.gl_faction[c]) return 0;
+    if (!faction && slot >= 2 && slot <= 8 && tx.gl_extra[slot - 2]) return 0;
+    if (faction && tx.faction.empty()) return 0;
     /* a remastered building's masked texture keeps its GDI look and its mask and no Nod
        decode (ebld_mod.h); every other texture needs both decodes */
     const bool masked = !tx.mask.empty() && tx.mask.size() * 4 == tx.gdi.size();
@@ -7005,12 +7547,20 @@ static int livery_build_one(PackTex& tx, int c, std::vector<unsigned char>& out,
        untouched, which is 98.94% of the sheet. Alpha is never written, so a
        cut-out border stays a cut-out border. */
     out = tx.gdi;
+    if (faction)
+        for (const LiveryFactionTexel& q : tx.faction)
+            memcpy(&out[(size_t)q.pixel * 4], q.rgba, 4);
     /* A REMASTERED BUILDING'S TEXTURE carries its own mask and is painted by the
        lab's rule (livery_recolour above); every other texture takes the loop
        below, unchanged. Alpha is never written on either path. */
+    size_t fp = 0;
     for (size_t p = 0, q = 0; masked && p + 3 < out.size(); p += 4, q++) {
-        if (!tx.mask[q]) continue;
-        livery_recolour(&tx.gdi[p], tx.mask[q], c, &out[p]);
+        int m = tx.mask[q];
+        if (faction && fp < tx.faction.size() && tx.faction[fp].pixel == q)
+            m = tx.faction[fp++].mask;
+        if (!m || (faction && c == 0)) continue;  /* the approved Gold atlas is identity */
+        unsigned char paint[4]; memcpy(paint, &out[p], 4);
+        livery_recolour(paint, m, c, &out[p]);
         (*npx)++;
     }
     for (size_t p = 0; !masked && p + 3 < out.size(); p += 4) {
@@ -7045,27 +7595,33 @@ static int livery_build_one(PackTex& tx, int c, std::vector<unsigned char>& out,
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tx.w, tx.h, 0,
                      GL_RGBA, GL_UNSIGNED_BYTE, &out[0]);
     }
-    tx.gl_extra[livery_slot(c) - 2] = id;
+    if (faction) tx.gl_faction[c] = id;
+    else tx.gl_extra[slot - 2] = id;
     return 1;
 }
 
-/* Build the extra liveries the seated houses actually asked for. Only those: a set costs
-   84 textures and 45314 texels on SCB01EA, about 0.18 MB on the card per colour, and the
-   Win98 half has to live inside a Voodoo 2's texture memory. A two-player match on the
-   default colours builds NOTHING, because colours 0 and 1 are the two textures the pack
-   already carries. */
+/* Build only seated player colours. Gold reuses the approved Gold texture; light blue
+   gets its own sheet rather than the faction-dependent campaign Nod decode. Sparse
+   faction overrides are built only where a seated Nod house can use them. */
 static void livery_build(void)
 {
     if (!g_teamColours || (!g_raModule && g_liveryOf.empty())) return;
     bool want[LIVERY_COUNT];
     livery_wanted(want);
     std::vector<unsigned char> out;
-    for (int c = 2; c < LIVERY_COUNT; c++) {
+    for (int c = g_raModule ? 2 : 0; c < LIVERY_COUNT; c++) {
         if (!want[c]) continue;
         int ntex = 0;
         long npx = 0;
-        for (size_t i = 0; i < g_pack.tex.size(); i++)
-            ntex += livery_build_one(g_pack.tex[i], c, out, &npx);
+        const unsigned factions = g_raModule ? 1u : livery_colour_factions(c);
+        const bool factionWanted = (factions & 2u) != 0;
+        const bool genericWanted = (factions & 1u) != 0;
+        for (size_t i = 0; i < g_pack.tex.size(); i++) {
+            if (c != 0 && (g_pack.tex[i].faction.empty() || genericWanted || !factionWanted))
+                ntex += livery_build_one(g_pack.tex[i], c, out, &npx);
+            if (factionWanted)
+                ntex += livery_build_one(g_pack.tex[i], c, out, &npx, true);
+        }
         fprintf(stderr, "TEAMCOLOUR|livery|colour=%d|%s|textures=%d|texels=%ld\n",
                 c, LIVERY_NAME[c], ntex, npx);
     }
@@ -7080,19 +7636,26 @@ static void livery_build_range(size_t a, size_t b)
     bool want[LIVERY_COUNT];
     livery_wanted(want);
     std::vector<unsigned char> out;
-    for (int c = 2; c < LIVERY_COUNT; c++) {
+    for (int c = g_raModule ? 2 : 0; c < LIVERY_COUNT; c++) {
         if (!want[c]) continue;
         int ntex = 0;
         long npx = 0;
-        for (size_t i = a; i < b && i < g_pack.tex.size(); i++)
-            ntex += livery_build_one(g_pack.tex[i], c, out, &npx);
+        const unsigned factions = g_raModule ? 1u : livery_colour_factions(c);
+        const bool factionWanted = (factions & 2u) != 0;
+        const bool genericWanted = (factions & 1u) != 0;
+        for (size_t i = a; i < b && i < g_pack.tex.size(); i++) {
+            if (c != 0 && (g_pack.tex[i].faction.empty() || genericWanted || !factionWanted))
+                ntex += livery_build_one(g_pack.tex[i], c, out, &npx);
+            if (factionWanted)
+                ntex += livery_build_one(g_pack.tex[i], c, out, &npx, true);
+        }
         if (ntex)
             fprintf(stderr, "livery: colour=%d|%s|late textures=%d|texels=%ld\n",
                     c, LIVERY_NAME[c], ntex, npx);
     }
 }
 
-/* THE SAME SIX LIVERIES FOR THE 1995 INFANTRY SHEETS, which livery_build above cannot
+/* THE SAME PLAYER LIVERIES FOR THE 1995 INFANTRY SHEETS, which livery_build above cannot
    reach: a man is a billboard out of dosinfantry.pack and the loop up there walks the
    MISSION pack. That asymmetry is the whole of the symptom this fixes -- two seats on the
    same side fielded pixel-identical riflemen while their tanks and their buildings
@@ -7137,7 +7700,7 @@ static void dosinf_livery_build(void)
     }
     for (std::map<std::string, int>::const_iterator it = g_liveryOf.begin();
          it != g_liveryOf.end(); ++it)
-        if (it->second >= 2 && it->second < LIVERY_COUNT) want[it->second] = true;
+        if (it->second >= 1 && it->second < LIVERY_COUNT) want[it->second] = true;
 
     /* Which strips are a uniform, by the two house rows disagreeing. */
     std::vector<unsigned char> uniform(g_dosStrips.size(), 0);
@@ -7151,8 +7714,9 @@ static void dosinf_livery_build(void)
         }
 
     std::vector<unsigned char> rgba;
-    for (int c = 2; c < LIVERY_COUNT; c++) {
+    for (int c = g_raModule ? 2 : 1; c < LIVERY_COUNT; c++) {
         if (!want[c]) continue;
+        const int ci = dos_livery_index(c);
         int ntex = 0;
         long npx = 0;
         for (size_t i = 0; i < g_dosStrips.size(); i++) {
@@ -7160,9 +7724,9 @@ static void dosinf_livery_build(void)
             DosStrip& s = g_dosStrips[i];
             const std::vector<unsigned char>& idx = g_dosIdx[i];
             if ((size_t)s.texw * (size_t)s.texh != idx.size()) continue;
-            if (s.gl_extra[c - 2]) {
-                glDeleteTextures(1, &s.gl_extra[c - 2]);
-                s.gl_extra[c - 2] = 0;
+            if (s.gl_extra[ci]) {
+                glDeleteTextures(1, &s.gl_extra[ci]);
+                s.gl_extra[ci] = 0;
             }
             rgba.resize(idx.size() * 4);
             for (size_t p = 0; p < idx.size(); p++) {
@@ -7197,13 +7761,44 @@ static void dosinf_livery_build(void)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, s.texw, s.texh, 0,
                          GL_RGBA, GL_UNSIGNED_BYTE, &rgba[0]);
-            s.gl_extra[c - 2] = id;
+            s.gl_extra[ci] = id;
             ntex++;
         }
         fprintf(stderr, "TEAMCOLOUR|dosinf|colour=%d|%s|strips=%d|texels=%ld\n",
                 c, LIVERY_NAME[c], ntex, npx);
     }
     g_dosIdx.clear();       /* the 8-bit source has done its job; 4.7 MB back */
+}
+
+/* Cartridge combat strips use the same paired-decode livery as their standing
+   rows. Build only seated palettes, reuse one sheet per Gold strip and release the
+   temporary source images on every boot, including campaigns. */
+static void n64inf_livery_build(void)
+{
+    if (!g_raModule && g_teamColours && !g_liveryOf.empty()) {
+        bool want[LIVERY_COUNT]; livery_wanted(want);
+        std::vector<unsigned char> out;
+        for (const auto& item : g_n64InfTypes) for (int a = 0; a < N64A_COUNT; a++) {
+            const int gr = item.second.strip[SPRH_GDI][a], nr = item.second.strip[SPRH_NOD][a];
+            if (gr < 0 || nr < 0 || gr == nr || gr >= (int)g_n64Strips.size() || nr >= (int)g_n64Strips.size()) continue;
+            N64InfStrip& g = g_n64Strips[gr]; const N64InfStrip& n = g_n64Strips[nr];
+            if (g.texw != n.texw || g.texh != n.texh || g.frames != n.frames || g.facings != n.facings
+                || g.fw != n.fw || g.fh != n.fh || g.rgba.size() != n.rgba.size() || g.rgba.empty()) continue;
+            bool alpha = true;
+            for (size_t q = 3; q < g.rgba.size(); q += 4)
+                if (g.rgba[q] != n.rgba[q]) { alpha = false; break; }
+            if (!alpha) continue;
+            PackTex tx; tx.w = g.texw; tx.h = g.texh; tx.gdi = g.rgba; tx.nod = n.rgba;
+            memset(tx.gl_extra, 0, sizeof tx.gl_extra);
+            for (int c = 1; c < LIVERY_COUNT; c++) if (want[c]) {
+                const int i = dos_livery_index(c);
+                if (g.gl_livery[i]) continue;
+                long px = 0;
+                if (livery_build_one(tx, c, out, &px)) g.gl_livery[i] = tx.gl_extra[team_livery_slot(c)-2];
+            }
+        }
+    }
+    for (N64InfStrip& s : g_n64Strips) std::vector<unsigned char>().swap(s.rgba);
 }
 
 /* Which livery this object draws through. The two-livery answer -- 1 GDI, 0 everyone else
@@ -7216,7 +7811,7 @@ static int mesh_house(const SimObject& o)
     if (g_raModule && o.remap >= 0 && o.remap < LIVERY_COUNT)
         return livery_slot(o.remap == 5 ? 6 : o.remap == 6 ? 5 : o.remap);
     const int c = livery_of_house(o.house);
-    if (c >= 0) return livery_slot(c);
+    if (c >= 0) return team_livery_slot(c) | ((!g_raModule && obj_side(o) == 1) ? 16 : 0);
     return obj_is_gdi(o);
 }
 
@@ -7262,29 +7857,10 @@ static const float SOLDIER_CLOTH[2][3]  = { { 0.0820f, 0.0820f, 0.0820f },
 static const float SOLDIER_CLOTH_AMT[2] = { 0.0000f, 1.0000f };
 /* END SOLDIER PALETTE */
 
-/* RED ALERT'S SIDE COLOURS for a soldier's uniform: the middle of each PALETTE.CPS ramp
-   (the disc's TEMPERAT.PAL, index 6 of the row), in linear light, so a uniform of average
-   brightness comes out in the colour the 1996 sprite remaps the same cloth to. Rows as the
-   brain's remap= numbers them; France's blue really is that teal. */
-static const float RA_SOLDIER_CLOTH[8][3] = {
-    { 0.2789f, 0.2462f, 0.0723f },   /* gold        (Spain)           sRGB 144,136,76  */
-    { 0.1384f, 0.1746f, 0.3515f },   /* light blue  (Greece, GoodGuy) sRGB 104,116,160 */
-    { 0.4342f, 0.0000f, 0.0000f },   /* red         (USSR, BadGuy)    sRGB 176,0,0     */
-    { 0.1878f, 0.3140f, 0.1274f },   /* green       (England)         sRGB 120,152,100 */
-    { 0.6584f, 0.1878f, 0.0052f },   /* orange      (Ukraine)         sRGB 212,120,16  */
-    { 0.2961f, 0.2016f, 0.1620f },   /* grey        (Germany)         sRGB 148,124,112 */
-    { 0.0513f, 0.2307f, 0.1746f },   /* blue        (France)          sRGB 64,132,116  */
-    { 0.3140f, 0.0723f, 0.0395f } }; /* brown       (Turkey)          sRGB 152,76,56   */
-/* The shader puts the cloth colour on fabric of its reference brightness (M3_CLOTH_REF,
-   0.082, measured on another soldier's colour map); the remastered soldiers' painted
-   uniforms are brighter. Measured: the mean linear luminance under the cloth mask, after
-   the 0.55 albedo, is 0.161 over the Minigunner, Grenadier, Rocket Soldier, Flamethrower,
-   Medic, Thief, General and Tanya (Tanya's top 0.088, the Rocket Soldier's 0.208). Scaled
-   by their ratio, an average uniform comes out in the side's own colour rather than
-   twice as bright (the Allies' light blue read nearly white). */
-static const float RA_SOLDIER_CLOTH_SCALE = 0.082f / 0.161f;
+#include "ra_infantry_colour.h"
+static bool ra_infantry_campaign_palette(void);
 
-static void soldier_colours(const SimObject& o, float* team, float* cloth, float* amt)
+static void soldier_colours(const SimObject& o, float* team, float* cloth, float* amt, bool enhanced)
 {
     house_colour(o, &team[0], &team[1], &team[2]);
     cloth[0] = cloth[1] = cloth[2] = 1.0f;
@@ -7292,12 +7868,8 @@ static void soldier_colours(const SimObject& o, float* team, float* cloth, float
     /* Red Alert: every side's uniform in its own colour, as its sprites remap it; a model
        whose cloth mask is empty (a civilian, the Spy, the Engineer) keeps its paint */
     if (g_raModule) {
-        /* Red Alert's engineer wears no side's colour (his sprite has no remapped band),
-           though the C&C model he shares has a cloth mask */
-        if (o.remap >= 0 && o.remap < 8 && strcmp(o.type, "E6") != 0) {
-            for (int i = 0; i < 3; i++) cloth[i] = RA_SOLDIER_CLOTH[o.remap][i] * RA_SOLDIER_CLOTH_SCALE;
-            *amt = 1.0f;
-        }
+        ra_infantry_colours(o.remap, o.type, enhanced, ra_infantry_campaign_palette(),
+                            team, cloth, amt);
         return;
     }
     const int side = obj_side(o);
@@ -7419,6 +7991,11 @@ static float g_dist = N64_DIST_DEF;    /* leptons */
 
 /* g_camX/g_camZ are defined up by the dump parser (VIEW| sets them once). */
 static float g_zoom = 0.0f;          /* CAM_ORTHO only. 0 = auto-fit the tactical rect */
+/* Capture framing is explicit. Ordinary mission starts reset the live zoom instead of
+   inheriting the previous mission or a save's close camera; --dist/--zoom must still
+   give a diagnostic exactly the framing it asked for on every boot. */
+static bool g_startDistCLI = false, g_startZoomCLI = false;
+static float g_startDist = N64_DIST_DEF, g_startZoom = 0.0f;
 
 /* THE EDITOR'S FREE CAMERA.
  *
@@ -7668,6 +8245,22 @@ static bool g_clamp_camera = true;
    It depends on the pitch, and in CAM_N64 the pitch moves with the zoom, so anything
    that changes the distance or the mode calls this again. */
 static float g_bbRight[3], g_bbUp[3];
+static bool explosion_bloom_want(void)
+{
+    if (!g_efxEnhOn) return false;
+    for (int i=0;i<g_efxNPart;i++)
+        if ((g_efxPart[i].explosionBloom || g_efxPart[i].muzzleFlash) && g_efxPart[i].sys != 6 && g_efxPart[i].hw>0) return true;
+    return false;
+}
+static void explosion_bloom_draw(void)
+{
+    const int drawn=g_efxDrawn;
+    glEnable(GL_BLEND); glDepthMask(GL_FALSE);
+    efx_draw_particles(g_bbRight,g_bbUp,true);
+    glDisable(GL_BLEND); glDepthMask(GL_TRUE);
+    g_efxDrawn=drawn;
+}
+
 static float g_bbBuiltYaw = 0.0f, g_bbBuiltPitch = -1.0f;   /* the pair it was built from */
 
 static void compute_billboard_basis(void)
@@ -8009,6 +8602,53 @@ static void world_to_screen(float wx, float wy, float wz, int fbw, int fbh,
    this function used to say so in a comment. The editor's free camera can look level,
    and then a pixel of sky has no ground behind it. Saying so is the honest answer; the
    old code divided by a near-zero and produced a point thousands of cells away. */
+struct ScreenPlaneRay {
+    double eyeY, vertical, offsetX, offsetZ, directionX, directionZ;
+    float cameraX, cameraZ;
+    bool hit;
+};
+
+static ScreenPlaneRay screen_plane_ray(float col, float row, int fbw, int fbh)
+{
+    const double pitch = n64_pitch();
+    const double sinePitch = sin(pitch), cosinePitch = cos(pitch);
+    const double distance = n64_dist_cells();
+    const double aspect = cam_aspect(fbw, fbh);
+    const double focal = cam_f();
+    const double viewX = (2.0 * col / (double)fbw - 1.0) * aspect / focal;
+    const double viewY = (1.0 - 2.0 * row / (double)fbh) / focal;
+    /* The ray, in the YAW-ROTATED frame -- the same frame n64_eye works in. */
+    const double rotatedX = viewX;
+    const double directionY = viewY * cosinePitch - sinePitch;
+    const double rotatedZ = -viewY * sinePitch - cosinePitch;
+    /* Undo the yaw to get world directions. Inverse of (x cos + z sin, -x sin + z cos). */
+    const double sineYaw = sin((double)g_camYaw), cosineYaw = cos((double)g_camYaw);
+    ScreenPlaneRay ray;
+    ray.directionX = rotatedX * cosineYaw - rotatedZ * sineYaw;
+    ray.directionZ = rotatedX * sineYaw + rotatedZ * cosineYaw;
+    /* The eye, in world. In the rotated frame it sits at (0, Dc*sp, Dc*cp) from the
+       look-at point, so the same un-rotation applies to its offset. */
+    ray.eyeY = cam_at_y() + distance * sinePitch;
+    ray.offsetX = -(distance * cosinePitch) * sineYaw;
+    ray.offsetZ =  (distance * cosinePitch) * cosineYaw;
+    /* A ray that does not descend never reaches the plane. Answered rather than
+       clamped: the point is still filled in (far along the ray) so a careless caller
+       gets a finite number, but the return value is the truth. */
+    ray.hit = (directionY < -1e-6);
+    ray.vertical = ray.hit ? directionY : -1e-6;
+    ray.cameraX = g_camX;
+    ray.cameraZ = g_camZ;
+    return ray;
+}
+
+static bool screen_ray_plane(const ScreenPlaneRay& ray, float height, float* worldX, float* worldZ)
+{
+    const double distance = ((double)height - ray.eyeY) / ray.vertical;
+    *worldX = (float)((double)ray.cameraX + ray.offsetX + distance * ray.directionX);
+    *worldZ = (float)((double)ray.cameraZ + ray.offsetZ + distance * ray.directionZ);
+    return ray.hit;
+}
+
 static bool screen_to_plane(float col, float row, float h, int fbw, int fbh,
                             float* wx, float* wz)
 {
@@ -8022,35 +8662,7 @@ static bool screen_to_plane(float col, float row, float h, int fbw, int fbh,
         *wz = (sum - diff) * 0.5f;
         return true;                 /* orthographic: every pixel meets every plane */
     }
-    const double p  = n64_pitch();
-    const double sp = sin(p), cp = cos(p);
-    const double Dc = n64_dist_cells();
-    const double asp = cam_aspect(fbw, fbh);
-    const double f   = cam_f();
-    const double dvx = (2.0 * col / (double)fbw - 1.0) * asp / f;
-    const double dvy = (1.0 - 2.0 * row / (double)fbh) / f;
-    /* The ray, in the YAW-ROTATED frame -- the same frame n64_eye works in. */
-    const double rdx = dvx;
-    const double diry = dvy * cp - sp;
-    const double rdz = -dvy * sp - cp;
-    /* Undo the yaw to get world directions. Inverse of (x cos + z sin, -x sin + z cos). */
-    const double sy = sin((double)g_camYaw), cy = cos((double)g_camYaw);
-    const double dirx = rdx * cy - rdz * sy;
-    const double dirz = rdx * sy + rdz * cy;
-    /* The eye, in world. In the rotated frame it sits at (0, Dc*sp, Dc*cp) from the
-       look-at point, so the same un-rotation applies to its offset. */
-    const double eyeY = cam_at_y() + Dc * sp;
-    const double offx = -(Dc * cp) * sy;
-    const double offz =  (Dc * cp) * cy;
-    /* A ray that does not descend never reaches the plane. Answered rather than
-       clamped: the point is still filled in (far along the ray) so a careless caller
-       gets a finite number, but the return value is the truth. */
-    const bool hit = (diry < -1e-6);
-    const double dsafe = hit ? diry : -1e-6;
-    const double t    = ((double)h - eyeY) / dsafe;
-    *wx = (float)((double)g_camX + offx + t * dirx);
-    *wz = (float)((double)g_camZ + offz + t * dirz);
-    return hit;
+    return screen_ray_plane(screen_plane_ray(col, row, fbw, fbh), h, wx, wz);
 }
 
 /* Screen pixel -> the point on the TERRAIN that projects there.
@@ -8079,9 +8691,16 @@ static bool screen_to_world(float col, float row, int fbw, int fbh, float* wx, f
     }
     if (g_pack.corner.empty())
         return screen_to_plane(col, row, 0.0f, fbw, fbh, wx, wz);
+    const bool prepared = g_camMode == CAM_N64 && mesh_perf_switch("OPENCNC3D_PREPARED_PICK_RAY");
+    ScreenPlaneRay ray = {};
+    if (prepared) ray = screen_plane_ray(col, row, fbw, fbh);
+    const auto atHeight = [&](float height, float* worldX, float* worldZ) {
+        return prepared ? screen_ray_plane(ray, height, worldX, worldZ)
+                        : screen_to_plane(col, row, height, fbw, fbh, worldX, worldZ);
+    };
     /* Above the horizon there is no ground under this pixel at any height, so the march
        below would test 48 planes and find nothing. Answer once. */
-    if (!screen_to_plane(col, row, g_terrainHBot - 0.01f, fbw, fbh, wx, wz))
+    if (!atHeight(g_terrainHBot - 0.01f, wx, wz))
         return false;
     const int   STEPS = 48, BISECT = 20;
     const float htop = g_terrainHTop + 0.01f, hbot = g_terrainHBot - 0.01f;
@@ -8090,7 +8709,7 @@ static bool screen_to_world(float col, float row, int fbw, int fbh, float* wx, f
     bool found = false;
     for (int i = 1; i <= STEPS; i++) {
         const float h = htop + (hbot - htop) * (float)i / (float)STEPS;
-        screen_to_plane(col, row, h, fbw, fbh, &px, &pz);
+        atHeight(h, &px, &pz);
         if (h <= terrain_y(px, pz)) {          /* first dip under the surface */
             hLo = h;
             hHi = htop + (hbot - htop) * (float)(i - 1) / (float)STEPS;
@@ -8099,15 +8718,15 @@ static bool screen_to_world(float col, float row, int fbw, int fbh, float* wx, f
         }
     }
     if (!found) {                              /* ray never met land: lowest plane */
-        screen_to_plane(col, row, hbot, fbw, fbh, wx, wz);
+        atHeight(hbot, wx, wz);
         return true;
     }
     for (int i = 0; i < BISECT; i++) {
         const float h = 0.5f * (hHi + hLo);
-        screen_to_plane(col, row, h, fbw, fbh, &px, &pz);
+        atHeight(h, &px, &pz);
         if (h <= terrain_y(px, pz)) hLo = h; else hHi = h;
     }
-    screen_to_plane(col, row, 0.5f * (hHi + hLo), fbw, fbh, wx, wz);
+    atHeight(0.5f * (hHi + hLo), wx, wz);
     return true;
 }
 
@@ -8507,6 +9126,27 @@ static void set_dist(float d)
     compute_billboard_basis();
 }
 
+/* A new mission starts at the existing far zoom, in either game. This also runs
+   after a menu's Load Mission has restored its camera, so loading a close save does
+   not undo the start view. Look-at position, visual rig dials and the save itself are
+   untouched. The editor keeps its working camera, and live zoom remains unrestricted. */
+static void camera_startup_zoom(int fbw, int fbh, bool editing)
+{
+    if (!editing) {
+        set_dist(g_startDistCLI ? g_startDist : DIST_MAX_OURS);
+        g_zoom = g_startZoomCLI ? g_startZoom : 0.0f;
+    }
+    if (g_zoom <= 0.0f) {
+        /* Even when N64 boots, C needs an orthographic overview of THIS map rather
+           than the previous mission's zoom. Retain the existing auto-fit arithmetic. */
+        const float span = (float)(g_mapW + g_mapH) * 0.70710678f;
+        const float zx = (float)fbw / (span * 1.06f);
+        const float zy = (float)fbh / (span * 0.4472136f * 1.20f);
+        g_zoom = fminf(zx, zy);
+        fprintf(stderr, "zoom: auto-fit -> %.1f px/cell\n", g_zoom);
+    }
+}
+
 /* ONE place owns the sense of the zoom control, because the two modes disagree about it:
    ours counts pixels per cell (bigger = closer), the console counts distance in leptons
    (bigger = FURTHER). dir > 0 always means "closer", whatever is driving it. */
@@ -8713,19 +9353,10 @@ static int   g_castBoxSunOn = 0, g_castBoxReflOn = 0;
    applies, at the TOP of the variation rather than the mean. */
 static void tree3d_reach(float* outXZ, float* outY)
 {
-    float r = 0.0f, h = 0.0f;
-    for (size_t i = 0; i < g_tree3dModel.size(); i++) {
-        if (g_tree3dModel[i].radius > r) r = g_tree3dModel[i].radius;
-        if (g_tree3dModel[i].height > h) h = g_tree3dModel[i].height;
-    }
-    const float sc = g_fx.tree3d_size * (1.0f + g_fx.tree3d_vary);
-    /* the wind, the resting lean and the leaf flutter all move the crown as fractions
-       of the tree's own height, and they are summed rather than combined because a
-       bound that is too large costs nothing and a bound that is too small pops */
-    const float sway = g_fx.tree3d_wind + g_fx.tree3d_lean
-                     + g_fx.tree3d_flutter * g_fx.tree3d_wind;
-    *outXZ = sc * (r + h * sway) * 1.25f + 0.5f;
-    *outY  = sc * h * (1.0f + sway) * 1.25f + 0.5f;
+    /* Shared foliage has its own fitted tests; keep the broad caster slab conservative.
+       The retired imported tree pack must never supply geometry or bounds. */
+    *outXZ = 6.0f;
+    *outY = 6.0f;
 }
 
 static void tree3d_cull_bounds(int fbw, int fbh)
@@ -9137,6 +9768,7 @@ static void terrain_remaster_ensure(void)
  * under Enhanced (or the first Enhanced frame after a switch). A theater with no pack,
  * or a pack that will not read, is tried once and leaves the DOS art drawing, which
  * terrain_texset_drawn falls back to. See game/remaster_tex.h, rt_build_atlas_enh. */
+static void water_static_atlas_prepare(RtAtlas& a);
 static void terrain_enh_ensure(void)
 {
     RtAtlas a;
@@ -9151,6 +9783,7 @@ static void terrain_enh_ensure(void)
         fprintf(stderr, "enhanced terrain: none for %s; the 1995 art draws\n", g_pack.theater);
         return;
     }
+    water_static_atlas_prepare(a);
     PackTex t;
     memset(&t, 0, sizeof t);
     t.w = a.w; t.h = a.h; t.uw = a.uw; t.uh = a.uh;
@@ -10031,7 +10664,7 @@ static void cliff_relief_draw_pom(GLuint prog, bool normalPass, bool tinted, flo
     GLfloat hadColor[4], hadNormal[3];
     glGetFloatv(GL_CURRENT_COLOR, hadColor);
     glGetFloatv(GL_CURRENT_NORMAL, hadNormal);
-    const bool oneSun = g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals;
+    const bool oneSun = fx_unified_lighting() || (g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals);
     /* only the cells that carry relief, in pack order, already inside the grid */
     for (size_t r = 0; r < cells.size(); r++) {
         const PackCell& c = g_pack.cell[cells[r]];
@@ -10266,7 +10899,7 @@ static void draw_cliff_relief(bool normalPass, bool tinted, float us, float vs)
         CliffReliefLight light = {};
         const int cx[4] = {c.x,c.x+1,c.x,c.x+1};
         const int cz[4] = {c.y,c.y,c.y+1,c.y+1};
-        const bool oneSun = g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals;
+        const bool oneSun = fx_unified_lighting() || (g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals);
         for (int j=0;j<4;j++) {
             float visibility = shroud_corner_vis(cx[j],cz[j]);
             light.shade[j] = (oneSun ? 160.0f/255.0f : terrain_shade(cx[j],cz[j])) * visibility;
@@ -10326,11 +10959,98 @@ static void draw_cliff_relief(bool normalPass, bool tinted, float us, float vs)
 static void terrain_cell_light(const PackCell& c, bool tinted, float s[4], unsigned char t[4][3])
 {
     const int xs[4] = { c.x, c.x + 1, c.x + 1, c.x }, zs[4] = { c.y, c.y, c.y + 1, c.y + 1 };
-    const bool oneSun = g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals;
+    const bool oneSun = fx_unified_lighting() || (g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals);
     for (int k = 0; k < 4; k++) {
         const float vis = shroud_corner_vis(xs[k], zs[k]);
         s[k] = (oneSun ? 160.0f / 255.0f : terrain_shade(xs[k], zs[k])) * vis;
         if (tinted) terrain_tint_shrouded(xs[k], zs[k], vis, t[k]);
+    }
+}
+
+
+static bool terrain_surface_has_cell(int x,int z);
+static bool terrain_surface_bed_bias(void);
+static unsigned desert_detail_state(void);
+static bool desert_detail_replaces(unsigned tid);
+
+#include "clear_blend.h" /* opt-in original-CLEAR1 three-material preview */
+
+static void draw_clear_blend_td(bool tinted)
+{
+    if (!g_fxActive || !g_fx.enabled || g_fx.dos_classic || g_raModule
+        || (strcmp(g_pack.theater, "TEMPERAT") && strcmp(g_pack.theater, "DESERT") && strcmp(g_pack.theater,"SAND"))
+        || terrain_texset_drawn() != FX_TEX_ENH || !clear_blend_requested()) return;
+    static std::vector<unsigned char> eligible;
+    static std::vector<int> grassMasks;
+    static std::vector<unsigned char> contactEdges;
+    static unsigned generation = ~0u;
+    static int width = 0, height = 0, count = 0;
+    static unsigned detailState=~0u;
+    const unsigned details=desert_detail_state();
+    if (detailState!=details || generation != g_groundGen || width != g_gridW || height != g_gridH) {
+        eligible.assign((size_t)g_gridW * g_gridH, 0);
+        grassMasks.assign(eligible.size(),-1);
+        contactEdges.assign(eligible.size(),0);
+        int nslots = 0;
+        const TtSlot* table = tt_table(g_pack.theater, &nslots);
+        std::vector<unsigned short> templates((size_t)nslots, 65535),icons((size_t)nslots,0);
+        for (int i = 0; i < nslots; ++i)
+            if (table[i].slot < nslots) { templates[table[i].slot] = table[i].tmpl;icons[table[i].slot]=table[i].icon; }
+        count = 0;
+        for (size_t i = 0; i < g_pack.cell.size(); ++i) {
+            const PackCell& c = g_pack.cell[i];
+            if (c.x < g_mapX || c.y < g_mapY || c.x >= g_mapX + g_mapW
+                || c.y >= g_mapY + g_mapH || c.x < 0 || c.y < 0
+                || c.x >= g_gridW || c.y >= g_gridH) continue;
+            const int slot = ts_slot_of_cell(c, nslots);
+            if (slot < 0) continue;
+            const int mask=templates[slot]==0?0:terrain_grass_mask_td(templates[slot],icons[slot],enh_cell_variant(c,slot));
+            if(mask>=0) {
+                const size_t ci=(size_t)c.y*g_gridW+c.x;
+                eligible[ci]=1;grassMasks[ci]=mask;++count;
+                const unsigned tid=templates[slot];
+                contactEdges[ci]=g_terrainGrassMasks.softBoundary.count(tid)!=0;
+                // Roads also meet ordinary soil. Their saved foreground matte
+                // must fade to the adjoining ground instead of ending on a cell box.
+                if(tid>=93 && tid<=135)contactEdges[ci]|=2;
+            }
+        }
+        generation = g_groundGen; width = g_gridW; height = g_gridH;detailState=details;
+    }
+    if (!count || !clear_blend_prepare(g_gridW, g_gridH, eligible,
+                                       clear_blend_seed(g_bootScen), !strcmp(g_pack.theater,"DESERT")
+                                           ? g_fx.sand_saturation : !strcmp(g_pack.theater,"SAND") ? 1.0f : g_fx.clear_saturation)) return;
+    static std::vector<ClearBlendCell> visible;
+    visible.clear();
+    for (size_t i = 0; i < g_pack.cell.size(); ++i) {
+        const PackCell& source = g_pack.cell[i];
+        const int x = source.x, z = source.y;
+        if (x < 0 || z < 0 || x >= g_gridW || z >= g_gridH
+            || !eligible[(size_t)z * g_gridW + x]
+            || !cell_shown(x, z) || !cell_in_view(x, z)) continue;
+        ClearBlendCell c;
+        memset(&c, 0, sizeof c);
+        c.x = x; c.z = z;c.grassMask=grassMasks[(size_t)z*g_gridW+x];
+        if (((!strcmp(g_pack.theater,"DESERT") || !strcmp(g_pack.theater,"SAND")) && contactEdges[(size_t)z*g_gridW+x])
+            || (contactEdges[(size_t)z*g_gridW+x]&2)) {
+            const int nx[4]={x-1,x+1,x,x},nz[4]={z,z,z-1,z+1};
+            for(int edge=0;edge<4;edge++)
+                if(nx[edge]>=0 && nz[edge]>=0 && nx[edge]<g_gridW && nz[edge]<g_gridH)
+                    c.groundEdges[edge]=(float)(grassMasks[(size_t)nz[edge]*g_gridW+nx[edge]]+1);
+        }
+        c.height[0] = terrain_corner_y(x, z);
+        c.height[1] = terrain_corner_y(x + 1, z);
+        c.height[2] = terrain_corner_y(x + 1, z + 1);
+        c.height[3] = terrain_corner_y(x, z + 1);
+        terrain_cell_light(source, tinted, c.light, c.tint);
+        visible.push_back(c);
+    }
+    clear_blend_draw(visible, tinted);
+    static unsigned reported = ~0u;
+    if (reported != generation) {
+        fprintf(stderr, "CLEARBLEND|td|scene=%s|original=CLEAR1+outlined-features|eligible=%d|visible=%lu\n",
+                 g_bootScen, count, (unsigned long)visible.size());
+        reported = generation;
     }
 }
 
@@ -10368,8 +11088,9 @@ static void draw_terrain_seams(bool tinted, bool softCoast, GLuint atGL)
         if (!ts_pass(g_seams, pass, &P)) continue;
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, P.tex);
-        glBegin(GL_TRIANGLES);
-        for (size_t i = 0; i < g_pack.cell.size(); i++) {
+        g_tsBatch.clear();
+        const bool cached = tcache_strips_draw(pass, tinted, aus, avs, nslots, tab);
+        for (size_t i = 0; !cached && i < g_pack.cell.size(); i++) {
             const PackCell& a = g_pack.cell[i];
             if (!cell_shown(a.x, a.y) || !cell_in_view(a.x, a.y)) continue;
             const int sa = ts_slot_of_cell(a, nslots);
@@ -10379,7 +11100,10 @@ static void draw_terrain_seams(bool tinted, bool softCoast, GLuint atGL)
             const int bi = g_tsGrid[(size_t)by * g_gridW + bx];
             if (bi < 0 || !cell_shown(bx, by)) continue;
             const int sb = ts_slot_of_cell(g_pack.cell[bi], nslots);
-            if (sb < 0 || g_tsSlotTmpl[sb] <= 0) continue;
+            if (sb < 0 || g_tsSlotTmpl[sb] <= 0 || (desert_detail_replaces(g_tsSlotTmpl[sb]) && !(g_tsSlotTmpl[sb]>=149 && g_tsSlotTmpl[sb]<=160))) continue;
+            // The physical cliff and its explicit ground matte already own this
+            // join. Old colour-only skirts have no matching depth/normal surface.
+            if(fx_unified_lighting() && g_tsSlotTmpl[sb]>=13 && g_tsSlotTmpl[sb]<=50)continue;
             /* the strips of the painting that cell draws (enh_cell_variant) */
             const int sbv = sb * TS_VARS + enh_cell_variant(g_pack.cell[bi], sb);
             if ((*P.idx)[sbv] < 0) continue;
@@ -10389,13 +11113,22 @@ static void draw_terrain_seams(bool tinted, bool softCoast, GLuint atGL)
             ts_strip_emit(g_seams, pass, P, (*P.idx)[sbv], a.x, a.y, a.u0, a.u1, a.v0, a.v1,
                           aus, avs, s, t, tinted);
         }
-        glEnd();
+        if (!cached) imm_draw_triangles(g_tsBatch, true);
     }
     ts_strips_end(tinted, softCoast, atl.gl, atGL);
 }
 
-static void draw_terrain(void)
+static void terrain_surface_prepare_td(void);
+static void terrain_surface_draw(int pass,GLuint atlas);
+static void terrain_surface_prepare_scene(void);
+static GLuint g_terrainSurfaceAtlas=0;
+
+static bool water_fx_wanted(void);
+static void water_opaque_land_draw(void);
+static void draw_td_road_joins(bool tinted);
+static void draw_terrain_layer(bool depthOnly)
 {
+    terrain_surface_prepare_td();
     if (fx_texset_get() == FX_TEX_REMASTER) terrain_remaster_ensure();
     if (fx_texset_get() == FX_TEX_ENH) terrain_enh_ensure();
     if (fx_texset_get() == FX_TEX_REMASTER && g_fx.experimental_textures
@@ -10484,7 +11217,7 @@ static void draw_terrain(void)
         /* ENHANCED: the coast tiles' alpha is a ramp about the cut (water_mod.h) and it
            is BLENDED, so the sand fades into the sea over a few texels instead of
            stopping at a one-texel step. Interior texels are alpha 1, a no-op blend. */
-        glAlphaFunc(GL_GREATER, 0.02f);
+        glAlphaFunc(GL_GREATER, depthOnly ? 0.999f : 0.02f);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     } else
@@ -10502,11 +11235,16 @@ static void draw_terrain(void)
     tt_table(g_pack.theater, &enhSlots);
     const bool enhVar = terrain_atlas_index() == g_pack.terrainTexEnh && g_pack.terrainTexEnh >= 0
                       && !g_pack.enhVar.empty();
-    glBegin(GL_TRIANGLES);
-    for (size_t i = 0; i < g_pack.cell.size(); i++) {
+    /* One array for the whole pass, drawn once (terrain_seam.h, imm_draw_triangles):
+       the same corners in the same order that used to go one call at a time. */
+    static std::vector<ImmVert> cells;
+    cells.clear();
+    /* from the GPU when the cache can hold it (terrain_cache.h); this loop otherwise */
+    const bool cached = tcache_cells_draw(tinted, us, vs, enhVar, enhSlots);
+    for (size_t i = 0; !cached && i < g_pack.cell.size(); i++) {
         const PackCell& c = g_pack.cell[i];
         if (!cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y)) continue;
-        if (cliff_relief_slot(c) >= 0) continue;
+        if (cliff_relief_slot(c) >= 0 || terrain_surface_has_cell(c.x,c.y)) continue;
         const float x = (float)c.x, z = (float)c.y;
         /* Each vertex takes its exact CORNER height (PK9), so neighbouring cells
            share vertices and the stepped plateau edges come straight out of the
@@ -10555,7 +11293,7 @@ static void draw_terrain(void)
            shadow pass runs (fx_sun_dir), so this does not depend on shadow_on: with the
            term tied to the shadow pass, a chain with shadows off lit every field
            against no direction (G36d and G52 caught it on their shadow-off arms). */
-        const bool oneSun = g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals;
+        const bool oneSun = fx_unified_lighting() || (g_fxActive && g_fx.sun_lambert && g_fx.terrain_normals);
         const float flat = 160.0f / 255.0f;
         const float s00 = (oneSun ? flat : terrain_shade(c.x,     c.y))     * k00;
         const float s10 = (oneSun ? flat : terrain_shade(c.x + 1, c.y))     * k10;
@@ -10573,26 +11311,32 @@ static void draw_terrain(void)
             terrain_tint_shrouded(c.x,     c.y + 1, k01, t01);
             const float k = 1.0f / 255.0f;
             /* NW, SW, NE */
-            glColor4f(t00[0]*k, t00[1]*k, t00[2]*k, s00); glTexCoord2f(u0, v0); glVertex3f(x,        y00, z);
-            glColor4f(t01[0]*k, t01[1]*k, t01[2]*k, s01); glTexCoord2f(u0, v1); glVertex3f(x,        y01, z + 1.0f);
-            glColor4f(t10[0]*k, t10[1]*k, t10[2]*k, s10); glTexCoord2f(u1, v0); glVertex3f(x + 1.0f, y10, z);
+            imm_put(cells, x,        y00, z,        u0, v0, t00[0]*k, t00[1]*k, t00[2]*k, s00);
+            imm_put(cells, x,        y01, z + 1.0f, u0, v1, t01[0]*k, t01[1]*k, t01[2]*k, s01);
+            imm_put(cells, x + 1.0f, y10, z,        u1, v0, t10[0]*k, t10[1]*k, t10[2]*k, s10);
             /* NE, SW, SE */
-            glColor4f(t10[0]*k, t10[1]*k, t10[2]*k, s10); glTexCoord2f(u1, v0); glVertex3f(x + 1.0f, y10, z);
-            glColor4f(t01[0]*k, t01[1]*k, t01[2]*k, s01); glTexCoord2f(u0, v1); glVertex3f(x,        y01, z + 1.0f);
-            glColor4f(t11[0]*k, t11[1]*k, t11[2]*k, s11); glTexCoord2f(u1, v1); glVertex3f(x + 1.0f, y11, z + 1.0f);
+            imm_put(cells, x + 1.0f, y10, z,        u1, v0, t10[0]*k, t10[1]*k, t10[2]*k, s10);
+            imm_put(cells, x,        y01, z + 1.0f, u0, v1, t01[0]*k, t01[1]*k, t01[2]*k, s01);
+            imm_put(cells, x + 1.0f, y11, z + 1.0f, u1, v1, t11[0]*k, t11[1]*k, t11[2]*k, s11);
             continue;
         }
-        /* NW, SW, NE */
-        glColor3f(s00, s00, s00); glTexCoord2f(u0, v0); glVertex3f(x,        y00, z);
-        glColor3f(s01, s01, s01); glTexCoord2f(u0, v1); glVertex3f(x,        y01, z + 1.0f);
-        glColor3f(s10, s10, s10); glTexCoord2f(u1, v0); glVertex3f(x + 1.0f, y10, z);
+        /* NW, SW, NE (alpha 1, as glColor3f gave it) */
+        imm_put(cells, x,        y00, z,        u0, v0, s00, s00, s00, 1.0f);
+        imm_put(cells, x,        y01, z + 1.0f, u0, v1, s01, s01, s01, 1.0f);
+        imm_put(cells, x + 1.0f, y10, z,        u1, v0, s10, s10, s10, 1.0f);
         /* NE, SW, SE */
-        glColor3f(s10, s10, s10); glTexCoord2f(u1, v0); glVertex3f(x + 1.0f, y10, z);
-        glColor3f(s01, s01, s01); glTexCoord2f(u0, v1); glVertex3f(x,        y01, z + 1.0f);
-        glColor3f(s11, s11, s11); glTexCoord2f(u1, v1); glVertex3f(x + 1.0f, y11, z + 1.0f);
+        imm_put(cells, x + 1.0f, y10, z,        u1, v0, s10, s10, s10, 1.0f);
+        imm_put(cells, x,        y01, z + 1.0f, u0, v1, s01, s01, s01, 1.0f);
+        imm_put(cells, x + 1.0f, y11, z + 1.0f, u1, v1, s11, s11, s11, 1.0f);
     }
-    glEnd();
-    draw_terrain_seams(tinted, softCoast, atGL);
+    if (!cached) imm_draw_triangles(cells, false);
+    terrain_surface_draw(0,atGL);
+    if(!depthOnly) {
+        draw_clear_blend_td(tinted); /* world and reflection, before feature join strips */
+        draw_terrain_seams(tinted, softCoast, atGL);
+        draw_td_road_joins(tinted);
+        if(softCoast)glDepthMask(GL_FALSE);
+    }
     draw_cliff_relief(false, tinted, us, vs);
     glDisable(GL_ALPHA_TEST);
     if (softCoast) glDisable(GL_BLEND);
@@ -10607,6 +11351,21 @@ static void draw_terrain(void)
         glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     }
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);   /* the shade is per-vertex; leave white behind */
+}
+
+/* Opaque land owns depth. The soft coastal colour fringe is blended only;
+   partial-alpha water paint must not write a raised depth plate over the sea. */
+static void draw_terrain(bool colour = true)
+{
+    if(!water_fx_wanted()) { draw_terrain_layer(false);return; }
+    GLboolean colourMask[4];glGetBooleanv(GL_COLOR_WRITEMASK,colourMask);
+    glPushAttrib(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
+    glDepthFunc(GL_LEQUAL);
+    glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);glDepthMask(GL_TRUE);
+    draw_terrain_layer(true);
+    glColorMask(colourMask[0],colourMask[1],colourMask[2],colourMask[3]);glDepthMask(GL_FALSE);
+    if(colour) draw_terrain_layer(false);
+    glPopAttrib();
 }
 
 /* ---------------------------------------------------------------------------------- *
@@ -10674,8 +11433,11 @@ static void draw_terrain(void)
 static const float WATER_REPEATS_PER_CELL = 1.92f;
 static const float WATER_WARP_REPEATS     = 0.3125f;
 
-/* One water/seabed corner: the TERRAIN's own corner, never a plane. */
-static void water_corner(int cx, int cz, float du, float dv, float phase,
+/* The native seabed retains the terrain; Enhanced clamps it below the shared
+   water-body plane, so autoheight cannot cut a hole through the surface. */
+static float water_plane_floor_y(const PackCell& c,int cx,int cz);
+static bool water_plane_covers(const PackCell& c);
+static void water_corner(const PackCell& c,int cx, int cz, float du, float dv, float phase,
                          bool warp, float uvScale)
 {
     float u = uvScale * (float)cx + du;
@@ -10698,24 +11460,26 @@ static void water_corner(int cx, int cz, float du, float dv, float phase,
        Registered in known-gap notes. */
     const float vis = shroud_corner_vis(cx, cz);
     glColor3f(vis, vis, vis);
-    glVertex3f((float)cx, terrain_corner_y(cx, cz), (float)cz);
+    glVertex3f((float)cx, water_plane_floor_y(c,cx,cz), (float)cz);
 }
 
 /* The two triangles the console draws, shared diagonal SW-NE, exactly draw_terrain's. */
 static void water_cell_tris(const PackCell& c, float du, float dv, float phase,
                             bool warp, float uvScale)
 {
-    water_corner(c.x,     c.y,     du, dv, phase, warp, uvScale);   /* NW */
-    water_corner(c.x,     c.y + 1, du, dv, phase, warp, uvScale);   /* SW */
-    water_corner(c.x + 1, c.y,     du, dv, phase, warp, uvScale);   /* NE */
-    water_corner(c.x + 1, c.y,     du, dv, phase, warp, uvScale);   /* NE */
-    water_corner(c.x,     c.y + 1, du, dv, phase, warp, uvScale);   /* SW */
-    water_corner(c.x + 1, c.y + 1, du, dv, phase, warp, uvScale);   /* SE */
+    water_corner(c,c.x,     c.y,     du, dv, phase, warp, uvScale);   /* NW */
+    water_corner(c,c.x,     c.y + 1, du, dv, phase, warp, uvScale);   /* SW */
+    water_corner(c,c.x + 1, c.y,     du, dv, phase, warp, uvScale);   /* NE */
+    water_corner(c,c.x + 1, c.y,     du, dv, phase, warp, uvScale);   /* NE */
+    water_corner(c,c.x,     c.y + 1, du, dv, phase, warp, uvScale);   /* SW */
+    water_corner(c,c.x + 1, c.y + 1, du, dv, phase, warp, uvScale);   /* SE */
 }
 
 /* The cells the sea lies under: the pack's, or Red Alert's map when its ground is the one
    drawn (water_mod.h, just below). */
 static const std::vector<PackCell>& water_cells(void);
+
+static bool water_cell_wet(const PackCell& c);
 
 static void draw_water_quads(float du, float dv, float phase, bool warp, float uvScale)
 {
@@ -10723,7 +11487,7 @@ static void draw_water_quads(float du, float dv, float phase, bool warp, float u
     glBegin(GL_TRIANGLES);
     for (size_t i = 0; i < cells.size(); i++) {
         const PackCell& c = cells[i];
-        if (!c.holes || !cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y)) continue;
+        if ((!water_cell_wet(c) && !water_plane_covers(c)) || !cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y)) continue;
         water_cell_tris(c, du, dv, phase, warp, uvScale);
     }
     glEnd();
@@ -10747,6 +11511,50 @@ static void draw_water_quads(float du, float dv, float phase, bool warp, float u
    needs a forward declaration. Every one of the three is gated on g_fxActive and draws
    nothing under CLASSIC. */
 #include "grass_bake.h"
+
+/* imm_draw_triangles, declared in terrain_seam.h: v as GL_TRIANGLES from client-side
+   arrays in one call, then the current colour and texture coordinates left as the last
+   corner's, which is what the per-corner calls it replaces left behind for whatever is
+   drawn next. Every array a previous pass may have left enabled is switched off inside
+   the push, because the draw would read it; the pop puts them all back. */
+static void imm_draw_triangles(const std::vector<ImmVert>& v, bool unit1)
+{
+    if (v.empty()) return;
+    static GLint units = 0;
+    if (!units) {
+        glGetIntegerv(GL_MAX_TEXTURE_UNITS, &units);
+        units = units < 2 ? 2 : units > 8 ? 8 : units;
+    }
+    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+    /* With a buffer bound, the pointers below would be read as offsets into it. */
+    if (grass_buf_load() && gls_array_binding() != 0) gr_glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDisableClientState(GL_NORMAL_ARRAY);
+    glDisableClientState(GL_INDEX_ARRAY);
+    glDisableClientState(GL_EDGE_FLAG_ARRAY);
+    for (int u = units - 1; u >= 0; u--) {
+        glClientActiveTexture(GL_TEXTURE0 + u);
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    }
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3, GL_FLOAT, sizeof(ImmVert), v[0].p);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glColorPointer(4, GL_FLOAT, sizeof(ImmVert), v[0].c);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glTexCoordPointer(2, GL_FLOAT, sizeof(ImmVert), v[0].t0);
+    if (unit1) {
+        glClientActiveTexture(GL_TEXTURE1);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+        glTexCoordPointer(2, GL_FLOAT, sizeof(ImmVert), v[0].t1);
+        glClientActiveTexture(GL_TEXTURE0);
+    }
+    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)v.size());
+    glPopClientAttrib();
+    const ImmVert& l = v.back();
+    glColor4f(l.c[0], l.c[1], l.c[2], l.c[3]);
+    glTexCoord2f(l.t0[0], l.t0[1]);
+    if (unit1) glMultiTexCoord2f(GL_TEXTURE1, l.t1[0], l.t1[1]);
+}
+
 #include "grass_field.h"
 #include "grass_draw.h"
 
@@ -10760,15 +11568,24 @@ static void draw_water_quads(float du, float dv, float phase, bool warp, float u
 /* The sea floor. Opaque, depth write ON, exactly one BOTTOM tile per world cell (the
    console's ground ST of 1536 units per cell at tile shift 0 with the shared G_TEXTURE
    scale of 2/3 works out to precisely 1.0 repeat). Seabed pass: ROM 0x19B488..0x19B88C. */
+static bool water_painted_floor(void);
 static void draw_seabed(void)
 {
+    if (water_fx_wanted()) water_field_sync();
+    if (water_bed_draw()) return;
     if (g_pack.seabedTex < 0)
         return;                 /* pre-PKA pack: no floor baked. See known-gap notes. */
+    if (water_painted_floor()) return;   /* winter and snow: their own painted water */
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, g_pack.tex[g_pack.seabedTex].gl);
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     set_wrap(0);                                     /* GL_REPEAT: the tile wraps */
+    // The opaque bed is a background, never a coplanar competitor to the
+    // subdivided physical bank. The native two-triangle ground needs no bias.
+    const bool lowerBed=terrain_surface_bed_bias() && !water_plane_on();
+    if(lowerBed){glPushAttrib(GL_POLYGON_BIT|GL_ENABLE_BIT);glEnable(GL_POLYGON_OFFSET_FILL);glPolygonOffset(1.0f,2.0f);}
     draw_water_quads(0.0f, 0.0f, 0.0f, false, 1.0f);   /* colour is per corner now */
+    if(lowerBed)glPopAttrib();
     glColor3f(1.0f, 1.0f, 1.0f);
     glDisable(GL_TEXTURE_2D);
 }
@@ -11017,7 +11834,6 @@ static void draw_tiberium(void)
     glEnd();
 }
 
-
 /* ---- SOLID TIBERIUM ----------------------------------------------------------------
    Crystal clumps standing on the cells the decal above just painted. Enhanced only,
    and every number in it is ours: the console has no tiberium model, so there is no
@@ -11179,7 +11995,6 @@ static void tib3d_merge(void)
     }
     g_tib3dInst.swap(out);
 }
-
 
 /* ---- THE RINGS RULE: how a cell is filled from a version 3 pack -------------------------
    The remastered Tiberium (art/remaster/resources) draws a field as the 1995 game does,
@@ -11446,7 +12261,6 @@ static float tib3d_pulse(unsigned seed)
     return 1.0f - depth * 0.5f + depth * 0.5f * s;
 }
 
-
 /* The instance list, brought up to date. Both passes need it and either can be the
    first to run in a frame, so neither owns the rebuild. */
 static void tib3d_ensure(void)
@@ -11619,7 +12433,6 @@ static void draw_tiberium_ground(void)
     glDisable(GL_TEXTURE_2D);
 }
 
-
 /* ---- The tree's own GLSL pair, and why the trees needed one -------------------------
  *
  *  Every other Enhanced world surface has per-pixel shading. Water builds its own
@@ -11744,8 +12557,9 @@ static const char* TREE_FS =
     "#version 120\n"
     "uniform sampler2D uAtlas, uAtlasN, uBark, uBarkN;\n"
     "uniform vec3  uSun, uCam, uSunCol, uSkyCol, uGndCol;\n"
+    "uniform int uLightSplit;\n"
     "uniform float uCut, uBurn, uAOAmt, uTrans, uSheen, uAmb, uShroud;\n"
-    "uniform float uWrap, uAoFloor, uAoGamma, uAoDirect, uGain;\n"
+    "uniform float uWrap, uAoFloor, uAoGamma, uAoDirect, uObjectShadowFill, uGain, uStone;\n"
     "varying vec2  vUV;\n"
     "varying vec3  vN, vW;\n"
     "varying float vAO, vTH, vMAT;\n"
@@ -11760,6 +12574,9 @@ static const char* TREE_FS =
     "    vec4 nr = mix(texture2D(uBarkN, vUV), texture2D(uAtlasN, vUV), leaf);\n"
     /* THE CUT RISES AS THE TREE BURNS, which is how the canopy thins. */
     "    if (leaf > 0.5 && c.a < uCut) discard;\n"
+    // Neutral sandstone uses the terrain BRDF once, after the shared biome grade.
+    // Its reference exposure preserves the user's existing rock_gain dial.
+    "    if (uStone > 0.5) { gl_FragColor = uLightSplit == 1 ? vec4(0.0) : vec4(c.rgb*(160.0/255.0)*uShroud*uGain/0.43,1.0); return; }\n"
     "    float rough = clamp(nr.a, 0.06, 1.0);\n"
     /* A TANGENT FRAME WITHOUT A TANGENT ATTRIBUTE: the cotangent construction off the
        screen-space derivatives of the position and the UV. Four derivatives, against
@@ -11792,6 +12609,7 @@ static const char* TREE_FS =
        a canopy interior actually looks like -- dark, and not a hole -- and the gamma
        lifts the bottom of the range where the eye reads the difference. */
     "    float aoS = uAoFloor + (1.0 - uAoFloor) * pow(vAO, uAoGamma);\n"
+    "    aoS = mix(aoS, 1.0, uObjectShadowFill);\n"
     "    aoS = mix(1.0, aoS, uAOAmt);\n"
     /* AND IT LEANS ON THE AMBIENT, NOT ON THE SUN. Ambient occlusion is a statement
        about how much SKY a point can see. Letting it dim the direct sun as hard as it
@@ -11818,6 +12636,10 @@ static const char* TREE_FS =
        in. Correcting that by pulling the ambient back down would have put the holes
        straight back, so the shape of the light and the level of it are separate
        controls. */
+    "    if (uLightSplit == 1) {\n"
+    "        vec3 directC = albedo*uSunCol*direct + trans*albedo + uSunCol*spec*aoS*(1.0-uBurn);\n"
+    "        gl_FragColor = vec4(clamp(directC/max(col,vec3(0.00001)),0.0,1.0),0.375);return;\n"
+    "    }\n"
     "    gl_FragColor = vec4(col * uShroud * uGain, 1.0);\n"
     "}\n";
 
@@ -11829,24 +12651,20 @@ static const char* TREE_FS =
    state rather than the ground one, so the chain takes the normal without also applying
    the ground's own lambert on top of the tree's shader. Same vertex stage as the lit
    pass, so the geometry cannot disagree with itself. */
-static const char* TREE_NRM_FS =
-    "#version 120\n"
-    "uniform sampler2D uAtlas;\n"
-    "uniform float uCut, uNormAlpha;\n"
-    "varying vec2  vUV;\n"
-    "varying vec3  vN, vW;\n"
-    "varying float vAO, vTH, vMAT;\n"
-    "varying float vFade;\n"
-    "uniform vec3  uCam;\n"
-    "void main() {\n"
-    "    if (vFade < 0.999 && fract(sin(dot(floor(vUV * 96.0), vec2(12.9898, 78.233))) * 43758.5453) >= vFade) discard;\n"
-    "    if (vMAT > 0.5 && texture2D(uAtlas, vUV).a < uCut) discard;\n"
-    "    vec3 N = normalize(vN);\n"
-    /* a leaf card's winding is arbitrary and it is lit through both faces, so the normal
-       is turned toward the viewer, exactly as the lit pass does it */
-    "    if (vMAT > 0.5 && dot(N, normalize(uCam - vW)) < 0.0) N = -N;\n"
-    "    gl_FragColor = vec4(N * 0.5 + 0.5, uNormAlpha);\n"
-    "}\n";
+static std::string tree_nrm_fs(void)
+{
+    return std::string("#version 120\n"
+        "uniform sampler2D uAtlas,uAtlasN,uBarkN;uniform float uCut,uNormAlpha,uStone;\n"
+        "varying vec2 vUV;varying vec3 vN,vW;varying float vAO,vTH,vMAT,vFade;uniform vec3 uCam;\n")+STONE_TBN_GLSL+
+        "void main(){\n"
+        "if(vFade<0.999&&fract(sin(dot(floor(vUV*96.0),vec2(12.9898,78.233)))*43758.5453)>=vFade)discard;\n"
+        "if(vMAT>0.5&&texture2D(uAtlas,vUV).a<uCut)discard;\n"
+        "vec3 N=normalize(vN);if(vMAT>0.5&&dot(N,normalize(uCam-vW))<0.0)N=-N;float cls=uNormAlpha;\n"
+        "if(uStone>0.5){vec4 m=vMAT>0.5?texture2D(uAtlasN,vUV):texture2D(uBarkN,vUV);\n"
+        "N=stoneNormal(N,vW,vUV,normalize(m.rgb*2.0-1.0));\n"
+        "if(cls>0.86&&cls<0.89)cls=0.861+0.028*clamp((m.a-0.48)/0.42,0.0,1.0); }\n"
+        "gl_FragColor=vec4(N*0.5+0.5,cls); }\n";
+}
 
 static GLuint g_treeNrmProg = 0;
 static int    g_treeNrmTried = 0;
@@ -11866,7 +12684,7 @@ static int    g_treeProgTried = 0;
     X(uPhase) X(uBone) X(uAnim) X(uRigWind) X(uFol) X(uRock) X(uRot) X(uCrush) \
     X(uCrushSize) X(uAtlas) X(uAtlasN) X(uBark) X(uBarkN) X(uSun) X(uCam) X(uSunCol) \
     X(uSkyCol) X(uGndCol) X(uCut) X(uBurn) X(uAOAmt) X(uTrans) X(uSheen) X(uAmb) \
-    X(uShroud) X(uWrap) X(uAoFloor) X(uAoGamma) X(uAoDirect) X(uGain) X(uNormAlpha)
+    X(uLightSplit) X(uShroud) X(uWrap) X(uAoFloor) X(uAoGamma) X(uAoDirect) X(uObjectShadowFill) X(uGain) X(uNormAlpha) X(uStone)
 enum TfxName {
 #define TFX_ENUM(n) TFX_##n,
     TFX_NAMES(TFX_ENUM)
@@ -11927,7 +12745,7 @@ static GLuint tree3d_nrm_prog(void)
 {
     if (!g_treeNrmProg && !g_treeNrmTried) {
         g_treeNrmTried = 1;
-        g_treeNrmProg = tree3d_link(TREE_NRM_FS, "tree-normals");
+        g_treeNrmProg = tree3d_link(tree_nrm_fs().c_str(), "tree-normals");
         tfx_resolve(g_treeNrmProg, g_treeNrmLoc);
     }
     return g_treeNrmProg;
@@ -11954,137 +12772,17 @@ static inline void tfx_set3f(GLuint p, TfxName n, float a, float b, float c)
 static inline void tfx_set4fv(GLuint p, TfxName n, int count, const float* v)
 { const GLint l = tfx_loc(p, n); if (l >= 0) fx_glUniform4fv(l, count, v); }
 
-static bool tree3d_is_tree(const SimObject& o)
-{
-    /* T01..T18 are the trees. TC01..TC05 are clumps with no model of their own and are
-       left to --clumptrees, and ROCK1..7 and the blossom trees are not trees at all. */
-    return o.kind == K_TERRAIN && o.type[0] == 'T' && o.type[1] >= '0' && o.type[1] <= '9';
-}
-
-/* A TREE WITH AN APPROVED REMASTER (ebld_terr.h): under Enhanced it is drawn whole from
-   its remastered model by the terrain path of ebld_mod.h, and the rebuilt tree stands down
-   for it, in every pass. Defined after the remasters' modules are included. */
+/* Current Enhanced trees are drawn through the remastered terrain models. */
 static bool eterr_tree_claims(const SimObject& o);
 static bool eterr_tree_draw(const SimObject& o, int pass);
-
-static bool tree3d_claims(const SimObject& o)
-{
-    /* AND THE PACK MUST ACTUALLY HAVE A TREE FOR THIS NAME. T04 and T09 are cacti on
-       desert maps and the director kept the cartridge's own model for both, so neither
-       is in the pack's name map. Claiming them anyway suppressed the cactus and drew a
-       hash-picked temperate species in its place: 61 cells across eight campaign
-       scenarios grew a conifer in the sand. An unmapped name now falls through to the
-       cartridge, which is what "not replaced" has to mean. */
-    return g_fxActive && g_fx.tree3d && g_tree3dHave && !g_tree3dModel.empty()
-           && tree3d_is_tree(o) && tree3d_model_for(o.type) >= 0 && !eterr_tree_claims(o);
-}
-
-/* WHERE THIS TREE STANDS AND HOW IT IS MOVING, set on whichever program is about to
-   draw it. Both passes call this, because a normal written from geometry in one place
-   and shaded from geometry in another is a normal that belongs to nothing. */
-static void tree3d_pose(GLuint prog, const Tree3dModel& m, float t, float phase);
-
-/* THE TWO MOVEMENT PARAMETERS NO TREE HAS OF ITS OWN: the flutter's strength is a dial
-   and the clock is the frame's. Set once per pass on whichever program is drawing, before
-   the first tree. The foliage writes both with its own values on the same programs,
-   which is why this is per pass and never per frame. */
-static void tree3d_motion_constants(GLuint prog)
-{
-    tfx_set1f(prog, TFX_uFlutter, g_fx.tree3d_flutter * g_fx.tree3d_wind);
-    tfx_set1f(prog, TFX_uTime, engine_time() * (1.0f / 15.0f));
-}
-
-/* WHETHER THE LIT TREE PROGRAM ALREADY HOLDS THIS PASS'S CONSTANTS: the samplers, the
-   sun, the camera, the three light colours, the shading dials and the two above. They
-   are the same for every tree in a pass, and setting them per tree was most of a tree
-   draw's parameter traffic. tree3d_draw sets them on the first tree it draws and then
-   leaves them. Lazily, and not by the loops up front, because the lit loop also runs in
-   the Classic look, where no tree draws and the program entry points may not exist.
-
-   Anything that may leave different values in the program, or starts a pass whose
-   camera or sun differ, must call tree3d_pass_reset: the lit cutout loop and the shadow
-   casters do so before and after their loops, and foliage3d_draw on every call, because
-   it draws with this same program and writes several of the same parameters. */
+/* A tree clump with a model of its own is drawn whole (ebld_terr.h). */
+static bool eterr_clump_whole(const SimObject& o);
+static int eterr_clump_mesh(const SimObject& o);
+static bool clump_draw_whole(const SimObject& o, int pass);
+static bool g_clumpWholeDrawn = false;   /* the lit pass drew that clump's model */
+/* Shared foliage programs invalidate pass constants between render passes. */
 static bool g_tree3dPassSet = false;
 static void tree3d_pass_reset(void) { g_tree3dPassSet = false; }
-
-static void tree3d_place(GLuint prog, const SimObject& o, const Tree3dModel& m,
-                         int named, unsigned h)
-{
-    const float r1 = (float)((h >> 4) & 1023) / 1023.0f;
-    const float r2 = (float)((h >> 14) & 1023) / 1023.0f;
-    const float r3 = (float)((h >> 24) & 255) / 255.0f;
-    const float vary = (named >= 0) ? g_fx.tree3d_vary * 0.45f : g_fx.tree3d_vary;
-    const float sc  = g_fx.tree3d_size * (1.0f + vary * (r1 * 2.0f - 1.0f));
-    const float yaw = r2 * 6.2831853f;
-    const float t = engine_time() * (1.0f / 15.0f);
-    const float phase = r3 * 6.2831853f;
-    const float amp = g_fx.tree3d_wind
-                      * sinf(6.2831853f * g_fx.tree3d_wind_speed * t + phase);
-    const float wdir = g_fx.tree3d_wind_dir * 0.01745329f;
-    const float lean = g_fx.tree3d_lean * (r1 - 0.5f) * 2.0f;
-    (void)m;
-    tfx_set3f(prog, TFX_uOrigin, o.wx, terrain_y(o.wx, o.wz), o.wz);
-    tfx_set1f(prog, TFX_uScale, sc);
-    tfx_set1f(prog, TFX_uYawC, cosf(yaw));
-    tfx_set1f(prog, TFX_uYawS, sinf(yaw));
-    tfx_set3f(prog, TFX_uWind, cosf(wdir) * amp, 0.0f, sinf(wdir) * amp);
-    tfx_set3f(prog, TFX_uLean, cosf(phase) * lean, 0.0f, sinf(phase) * lean);
-    /* uFlutter and uTime are the same for every tree in a pass, so each pass sets them
-       once (tree3d_motion_constants) rather than this, once per tree. */
-    tfx_set1f(prog, TFX_uPhase, phase);
-    /* A RIGGED TREE KEEPS SOME OF THE GLOBAL SWAY AND NOT ALL OF IT. The authored rig
-       moves branches against one another, which the shear cannot do; the shear moves the
-       whole tree along one bearing, which the rig cannot do, because the rig knows
-       nothing about wind_dir. Both, at less than full weight each, or the crown travels
-       twice as far as the dial says. */
-    const bool rig = (m.nbones > 0 && m.nframes > 0 && g_fx.tree3d_anim > 0.0f);
-    tfx_set1f(prog, TFX_uAnim, rig ? g_fx.tree3d_anim : 0.0f);
-    tfx_set1f(prog, TFX_uRigWind, rig ? g_fx.tree3d_anim_wind : 1.0f);
-    /* BOTH PASSES POSE THE SAME TREE, and that is why the palette is uploaded here
-       rather than at the draw. A crown skinned into one shape for the lit pass and left
-       at bind for the ground-normal pass is a normal that belongs to nothing, which is
-       the mistake this function's own comment was written about. */
-    tree3d_pose(prog, m, t, phase);
-}
-
-/* WHERE THIS TREE IS IN ITS OWN LOOP, as a palette of bone matrices.
-
-   The pack holds twenty frames of a 4.1667 second loop and this lerps between two of
-   them. Twenty is measured, not chosen: reconstructing all hundred authored frames from
-   a decimated set lands within 0.093% of the tree's height on oak_1 and 0.050% on
-   pine_3, which is about a twentieth of a screen pixel at this camera, and sampling
-   finer does not improve it because past twenty the grid stops landing on the artist's
-   own keys.
-
-   THE PHASE IS FOLDED BEFORE IT IS USED, in double, and that is not fussiness. The sway
-   term a few lines up feeds engine_time()/15 straight into sin(6.28 * uTime * 3.1) as a
-   raw float: after two hours of run time that argument is 140,000 radians, where one ulp
-   is 0.0156 and a 60 Hz frame steps twenty ulps, and eventually the wind quantises and
-   then stops. A folded phase cannot do that however long the game runs. */
-static std::vector<float> g_tree3dPalette;
-
-static void tree3d_pose(GLuint prog, const Tree3dModel& m, float t, float phase)
-{
-    if (m.nbones <= 0 || m.nframes <= 0 || g_fx.tree3d_anim <= 0.0f)
-        return;
-    const double loop = (double)TREE3D_LOOP_SECONDS;
-    double u = (double)t * (double)g_fx.tree3d_wind_speed / loop
-             + (double)phase * (1.0 / 6.2831853071795864);
-    u -= floor(u);
-    const double fpos = u * (double)m.nframes;
-    const int a = (int)fpos % m.nframes;
-    const int b = (a + 1) % m.nframes;
-    const float w = (float)(fpos - floor(fpos));
-    const int n = m.nbones * 12;
-    if ((int)g_tree3dPalette.size() < n)
-        g_tree3dPalette.resize((size_t)n);
-    const float* A = &m.frames[(size_t)a * (size_t)n];
-    const float* B = &m.frames[(size_t)b * (size_t)n];
-    for (int i = 0; i < n; i++)
-        g_tree3dPalette[i] = A[i] + (B[i] - A[i]) * w;
-    tfx_set4fv(prog, TFX_uBone, m.nbones * 3, &g_tree3dPalette[0]);
-}
 
 /* The client arrays both passes read, and the teardown that puts them back. */
 /* ---- THE TREES IN GPU MEMORY ---------------------------------------------------------
@@ -12218,187 +12916,6 @@ static SimObject clump_part_n(const SimObject& o, const ClumpDef* cd, int c);
    --noclumptrees is the console's own picture, kept for comparison. Defined here, above
    the tree passes, because the ground-normals pass reads it. */
 static bool g_clumpTrees = true;
-
-static void tree3d_draw_normals(void)
-{
-    if (!g_fx.tree3d || !g_tree3dHave || g_tree3dModel.empty())
-        return;
-    const GLuint prog = tree3d_nrm_prog();
-    if (!prog)
-        return;
-    glEnable(GL_TEXTURE_2D);
-    fx_glUseProgram(prog);
-    tfx_set1i(prog, TFX_uAtlas, 0);
-    tfx_set3f(prog, TFX_uCam, g_fxCamPos[0], g_fxCamPos[1], g_fxCamPos[2]);
-    /* HALF, WHICH IS THE FOLIAGE STATE. One is ground and would earn the ground's own
-       one-sun lambert on top of the tree's shader; zero is nothing drew here. */
-    tfx_set1f(prog, TFX_uNormAlpha, 0.5f);
-    tree3d_motion_constants(prog);
-    /* THE COMPOSED CLUMPS RIDE THIS LIST TOO: each occupied cell of a TC01..TC05 is a
-       single tree here, exactly as the cutout pass draws it, so the ground normals under
-       a wood match the wood. The list is built once per call and is a handful long. */
-    std::vector<SimObject> parts;
-    if (g_clumpTrees)
-        for (size_t i = 0; i < g_objects.size(); i++) {
-            const SimObject& o = g_objects[i];
-            const ClumpDef* cd = (o.kind == K_TERRAIN && !o.limbo) ? clump_def(o.type) : NULL;
-            for (int c = 0; cd && c < clump_def_count(cd); c++)
-                parts.push_back(clump_part_n(o, cd, c));
-        }
-    for (size_t i = 0; i < g_objects.size() + parts.size(); i++) {
-        const SimObject& o = (i < g_objects.size()) ? g_objects[i] : parts[i - g_objects.size()];
-        /* the same two tests the lit pass gets through visible(), which is declared
-           further down this file than this pass has to live */
-        if (!tree3d_claims(o))
-            continue;
-        if (!cell_shown(o.cx, o.cy) || !cell_in_view(o.cx, o.cy)
-            || (i >= g_objects.size() && shroud_cell_hidden(o.cx, o.cy))) {
-            g_nTreeNrmCut++;
-            continue;
-        }
-        g_nTreeNrm++;
-        const unsigned h = tree3d_hash(o.cx, o.cy);
-        const int named = tree3d_model_for(o.type);
-        const size_t pick = (named >= 0 && (size_t)named < g_tree3dModel.size())
-                            ? (size_t)named : (h % g_tree3dModel.size());
-        const Tree3dModel& m = g_tree3dModel[pick];
-        if (m.pos.empty() || m.idx.empty() || m.set < 0 ||
-            (size_t)m.set >= g_tree3dSet.size())
-            continue;
-        float burn = 0.0f;
-        if (o.maxstr > 0 && o.str >= 0 && o.str < o.maxstr)
-            burn = g_fx.tree3d_burn * (1.0f - (float)o.str / (float)o.maxstr);
-        if (burn > 1.0f) burn = 1.0f;
-        tfx_set1f(prog, TFX_uCut, 0.34f + 0.42f * burn);
-        tree3d_place(prog, o, m, named, h);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, g_tree3dSet[m.set].tex[0]);
-        tree3d_arrays_on(m);
-        tree3d_draw_elements(m);
-        tree3d_arrays_off();
-    }
-    fx_glUseProgram(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glDisable(GL_TEXTURE_2D);
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-}
-
-static void tree3d_draw(const SimObject& o, int pass)
-{
-    /* ONE PASS AND ONE ONLY. The first build ignored this argument entirely and drew the
-       whole lit tree again inside the blended cartridge-shadow pass, and twice into the
-       sun map. The tree is alpha-cut and depth-written, so the cutout pass is where it
-       belongs, and both callers reach it there. */
-    if (pass != MODE_CUTOUT || !tree3d_claims(o))
-        return;
-    const GLuint prog = tree3d_prog();
-    if (!prog)
-        return;
-    const unsigned h = tree3d_hash(o.cx, o.cy);
-    /* THE CARTRIDGE'S OWN NAME CHOOSES THE TREE, and the hash only stands in where the
-       pack has nothing to say. Which name gets which species is a decision about the
-       game: T18 is an acacia because every one of its 241 placements is on a desert map,
-       and T05 is a fir because every one of its is temperate. The renderer should not be
-       inventing that, so the pack carries it. */
-    const int named = tree3d_model_for(o.type);
-    /* tree3d_claims has already refused anything the map does not name, so the hash is
-       a guard against a malformed pack rather than a policy. */
-    const size_t pick = (named >= 0 && (size_t)named < g_tree3dModel.size())
-                        ? (size_t)named : (h % g_tree3dModel.size());
-    const Tree3dModel& m = g_tree3dModel[pick];
-    if (m.pos.empty() || m.idx.empty() || m.set < 0 ||
-        (size_t)m.set >= g_tree3dSet.size())
-        return;
-    const Tree3dSet& ts = g_tree3dSet[m.set];
-
-    /* its own settled character, all from the one hash */
-    const float r1 = (float)((h >> 4) & 1023) / 1023.0f;
-    const float r2 = (float)((h >> 14) & 1023) / 1023.0f;
-    const float r3 = (float)((h >> 24) & 255) / 255.0f;
-    /* A NAMED TREE STILL VARIES IN SIZE, but less: the species now carries most of the
-       difference between one tree and the next, so the old spread would read as the same
-       oak drawn at random scales rather than as a wood. */
-    const float vary = (named >= 0) ? g_fx.tree3d_vary * 0.45f : g_fx.tree3d_vary;
-    const float sc  = g_fx.tree3d_size * (1.0f + vary * (r1 * 2.0f - 1.0f));
-    const float yaw = r2 * 6.2831853f;
-
-    const float t = engine_time() * (1.0f / 15.0f);      /* simulated seconds */
-    const float phase = r3 * 6.2831853f;
-    const float amp = g_fx.tree3d_wind
-                      * sinf(6.2831853f * g_fx.tree3d_wind_speed * t + phase);
-    const float wdir = g_fx.tree3d_wind_dir * 0.01745329f;
-    const float lean = g_fx.tree3d_lean * (r1 - 0.5f) * 2.0f;
-
-    float burn = 0.0f;
-    if (o.maxstr > 0 && o.str >= 0 && o.str < o.maxstr)
-        burn = g_fx.tree3d_burn * (1.0f - (float)o.str / (float)o.maxstr);
-    if (burn > 1.0f) burn = 1.0f;
-
-    /* ONE SUN, WHICH IS THE CHAIN'S. The first build multiplied the Tier 2 lambert by
-       terrain_shade, and terrain_shade is the CARTRIDGE's own baked corner shade against
-       a fixed light vector that has nothing to do with sun_az or sun_el. Two suns
-       multiplied together is why a lit crown never got bright. The ground's shade now
-       takes a small ambient share only, which is the same pattern draw_tiberium_solid
-       uses for its own GROUND_MIX. */
-    const float vis = 0.25f * (shroud_corner_vis(o.cx,     o.cy) +
-                               shroud_corner_vis(o.cx + 1, o.cy) +
-                               shroud_corner_vis(o.cx,     o.cy + 1) +
-                               shroud_corner_vis(o.cx + 1, o.cy + 1));
-    const float gshade = 0.70f + 0.30f * terrain_shade(o.cx, o.cy);
-
-    fx_glUseProgram(prog);
-    /* THE PASS'S CONSTANTS, on the first tree of the pass only (g_tree3dPassSet). */
-    if (!g_tree3dPassSet) {
-        fx_sun_dir();
-        tfx_set1i(prog, TFX_uAtlas, 0);  tfx_set1i(prog, TFX_uAtlasN, 1);
-        tfx_set1i(prog, TFX_uBark,  2);  tfx_set1i(prog, TFX_uBarkN,  3);
-        tfx_set3f(prog, TFX_uSun, -g_fxSunDir[0], -g_fxSunDir[1], -g_fxSunDir[2]);
-        tfx_set3f(prog, TFX_uCam, g_fxCamPos[0], g_fxCamPos[1], g_fxCamPos[2]);
-        tfx_set3f(prog, TFX_uSunCol, 1.00f, 0.97f, 0.90f);
-        tfx_set3f(prog, TFX_uSkyCol, 0.52f, 0.62f, 0.78f);
-        tfx_set3f(prog, TFX_uGndCol, 0.30f, 0.31f, 0.22f);
-        tfx_set1f(prog, TFX_uAOAmt, g_fx.tree3d_ao);
-        tfx_set1f(prog, TFX_uWrap, g_fx.tree3d_wrap);
-        tfx_set1f(prog, TFX_uAoFloor, g_fx.tree3d_ao_floor);
-        tfx_set1f(prog, TFX_uAoGamma, g_fx.tree3d_ao_gamma);
-        tfx_set1f(prog, TFX_uAoDirect, g_fx.tree3d_ao_direct);
-        tfx_set1f(prog, TFX_uTrans, g_fx.tree3d_trans);
-        tfx_set1f(prog, TFX_uSheen, g_fx.tree3d_sheen);
-        tree3d_motion_constants(prog);
-        g_tree3dPassSet = true;
-    }
-    tree3d_place(prog, o, m, named, h);
-    /* AND THE TREE'S OWN. uGain is the same for every tree, but the foliage sets its own
-       exposure on this program per batch, so it stays with the tree rather than trusting
-       the pass. */
-    tfx_set1f(prog, TFX_uCut, 0.34f + 0.42f * burn);
-    tfx_set1f(prog, TFX_uBurn, burn);
-    tfx_set1f(prog, TFX_uGain, g_fx.tree3d_gain);
-    tfx_set1f(prog, TFX_uAmb, g_fx.tree3d_ambient * gshade);
-    tfx_set1f(prog, TFX_uShroud, vis);
-
-    for (int u = 3; u >= 0; u--) {
-        glActiveTexture(GL_TEXTURE0 + u);
-        glBindTexture(GL_TEXTURE_2D, ts.tex[u]);
-    }
-
-    /* THE STATE THIS PASS WAS GIVEN IS THE STATE IT GETS BACK. The cutout loop enables
-       the alpha test ONCE before it runs and every draw inside inherits it; the first
-       build disabled it on the way out, which silently turned the cutout off for every
-       object drawn after the first tree. The shader discards on its own and writes alpha
-       1, so the inherited test passes and nothing here needs to touch it. */
-    tree3d_arrays_on(m);
-    tree3d_draw_elements(m);
-    tree3d_arrays_off();
-
-    fx_glUseProgram(0);
-    for (int u = 3; u >= 1; u--) {
-        glActiveTexture(GL_TEXTURE0 + u);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-    glActiveTexture(GL_TEXTURE0);
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-}
 
 static void fprof_mark(const char* name);   /* the frame profiler, with draw_frame */
 
@@ -12554,6 +13071,7 @@ static void tib3d_flow_end(void)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 }
 
+static void (*g_tibGpuReset)(void)=NULL;
 static void draw_tiberium_solid(void)
 {
     if (!g_fx.enabled || !g_fx.tib3d)        /* Enhanced only, and off is the console */
@@ -12679,6 +13197,18 @@ static void draw_tiberium_solid(void)
     s_dirty.clear();
     /* a different clump table (a new pack) invalidates every slot */
     static size_t s_clumpTypes = 0;
+    g_tibGpuReset=+[]() {
+        GLuint names[]={s_vbo,s_glow,s_ibo,s_iboC,s_iboM,s_gndBuf};
+        if (gr_glDeleteBuffers) for (GLuint name:names) if(name) gr_glDeleteBuffers(1,&name);
+        s_vbo=s_glow=s_ibo=s_iboC=s_iboM=s_gndBuf=0; s_nidx=0;
+        decltype(s_instFirst)().swap(s_instFirst);decltype(s_instCount)().swap(s_instCount);decltype(s_instIdx)().swap(s_instIdx);decltype(s_instSlot)().swap(s_instSlot);decltype(s_glowBytes)().swap(s_glowBytes);
+        decltype(s_slot)().swap(s_slot);s_slotOf.clear();for(auto& f:s_free) std::vector<int>().swap(f); decltype(s_V)().swap(s_V);decltype(s_I)().swap(s_I);
+        decltype(s_Icrys)().swap(s_Icrys);decltype(s_Imound)().swap(s_Imound);decltype(s_gndBytes)().swap(s_gndBytes);decltype(s_haveGrow)().swap(s_haveGrow);decltype(s_haveLit)().swap(s_haveLit);
+        decltype(s_haveShow)().swap(s_haveShow);decltype(s_haveGeo)().swap(s_haveGeo);decltype(s_dirty)().swap(s_dirty);decltype(s_haveGlow)().swap(s_haveGlow);decltype(s_ranges)().swap(s_ranges);
+        s_haveIC=s_capIC=s_haveIM=s_capIM=s_capV=s_capI=s_haveI=0;
+        s_glowWhole=true; s_haveSun[0]=s_haveSun[1]=s_haveSun[2]=0; s_haveSun[3]=-1;
+        s_stamp=0;s_clumpTypes=0;
+    };
     if (s_clumpTypes != g_tib3dClump.size()) {
         s_clumpTypes = g_tib3dClump.size();
         s_slot.clear(); s_slotOf.clear(); s_V.clear(); s_I.clear(); s_Icrys.clear();
@@ -13093,7 +13623,6 @@ static void draw_tiberium_solid(void)
     }
 }
 
-
 /* THE REMASTERED BUILDING APRONS, Enhanced only (bibenh_mod.h): every apron cell on the
    same four terrain corners and the same SW-NE split draw_smudges uses, with the same
    polygon offset in place of a lift, three times over. First the COVER pass: the painted
@@ -13208,7 +13737,9 @@ static void draw_bibenh(const BibEnhTheater* be, const std::vector<SmudgeCell>& 
                         bool painted = false)
 {
     if (g_fx.bib_enh_strength <= 0.0f) return;
-    /* Snow needs painted gravel, without the red gain that turns green grass brown. */
+    /* Temperate aprons retain the substrate and honour the saved cover dial,
+       as the accepted RA grass reference does. Only explicitly painted looks
+       (RA snow) bypass the calibrated ground-preserving shader. */
     bibenh_build(g_fx.bib_enh_strength, painted ? 1.0f : g_fx.bib_enh_cover);
 
     GLint vp[4];
@@ -13325,6 +13856,141 @@ static void draw_bibenh(const BibEnhTheater* be, const std::vector<SmudgeCell>& 
     glDisable(GL_TEXTURE_2D);
 }
 
+/* The console's priority for a crater or scorch (ROM 0x35E5C): an overlay on the same cell,
+   tiberium or a wall, beats it, and it is not drawn. */
+static bool smudge_cell_covered(const SmudgeCell& sc)
+{
+    static std::vector<unsigned char> covered;
+    static unsigned serial=~0u, gen=~0u;
+    const size_t n=(size_t)g_gridW*(size_t)g_gridH;
+    if (serial!=g_drawFrameSerial || gen!=g_groundGen || covered.size()!=n) {
+        covered.assign(n,0); serial=g_drawFrameSerial; gen=g_groundGen;
+        for (const auto& t:g_tib)
+            if ((int)t.x>=0 && (int)t.y>=0 && (int)t.x<g_gridW && (int)t.y<g_gridH)
+                covered[(size_t)t.y*g_gridW+t.x]=1;
+        for (const auto& w:g_walls)
+            if ((int)w.x>=0 && (int)w.y>=0 && (int)w.x<g_gridW && (int)w.y<g_gridH)
+                covered[(size_t)w.y*g_gridW+w.x]=1;
+    }
+    if ((int)sc.x>=0 && (int)sc.y>=0 && (int)sc.x<g_gridW && (int)sc.y<g_gridH)
+        return covered[(size_t)sc.y*g_gridW+sc.x]!=0;
+    /* Preserve out-of-grid answers for malformed/debug cells. */
+    for (const auto& t:g_tib) if (t.x==sc.x && t.y==sc.y) return true;
+    for (const auto& w:g_walls) if (w.x==sc.x && w.y==sc.y) return true;
+    return false;
+}
+
+/* One cell of the ground, on its own four corners and the ground's SW-NE split, carrying
+   the texture rectangle u0..u1 x v0..v1 and one grey per corner. */
+static void decalenh_cell(int cx, int cy, float u0, float v0, float u1, float v1,
+                          float s00, float s10, float s11, float s01)
+{
+    const float x = (float)cx, z = (float)cy;
+    const float y00 = terrain_corner_y(cx,     cy);
+    const float y10 = terrain_corner_y(cx + 1, cy);
+    const float y11 = terrain_corner_y(cx + 1, cy + 1);
+    const float y01 = terrain_corner_y(cx,     cy + 1);
+    /* NW, SW, NE then NE, SW, SE, as draw_smudges explains */
+    glColor4f(s00, s00, s00, 1.0f); glTexCoord2f(u0, v0); glVertex3f(x,        y00, z);
+    glColor4f(s01, s01, s01, 1.0f); glTexCoord2f(u0, v1); glVertex3f(x,        y01, z + 1.0f);
+    glColor4f(s10, s10, s10, 1.0f); glTexCoord2f(u1, v0); glVertex3f(x + 1.0f, y10, z);
+    glColor4f(s10, s10, s10, 1.0f); glTexCoord2f(u1, v0); glVertex3f(x + 1.0f, y10, z);
+    glColor4f(s01, s01, s01, 1.0f); glTexCoord2f(u0, v1); glVertex3f(x,        y01, z + 1.0f);
+    glColor4f(s11, s11, s11, 1.0f); glTexCoord2f(u1, v1); glVertex3f(x + 1.0f, y11, z + 1.0f);
+}
+
+/* THE REMASTERED CRATERS AND SCORCH MARKS (decalenh_mod.h), in its two layers: the cells
+   draw_smudges handed over, on the same corners, split and polygon offset as its own pass.
+   Red Alert in 3D hands over its own cells (ra3d_sprites_mod.h), read from the engine's map
+   rather than from g_smudges, and on its snow asks for the burn on snow (snow, the grey
+   char decalenh_snow_soot makes from the temperate set).
+
+   THE SOOT FIRST, a doubled multiply: the ground already in the frame times twice the burn's
+   texel, over the 3 x 3 cells round the decal's cell, each on its own corners so the burn
+   follows the hills and spreads past its cell with nothing cut off at a cell's edge.
+   Mid-grey leaves the ground as it is, so no light term goes in: the ground under it already
+   carries its shade and its shroud, and the multiply keeps them. Two burns that overlap
+   darken each other, as burns do.
+
+   THEN THE BODY, a crater's soil, over that on its own cell: lit by the ground's own corner
+   shade times the shroud like the cartridge's decal, and blended through its faded edge from
+   a premultiplied, mipmapped texture. */
+static void draw_decalenh(const DecalEnhTheater* de, const std::vector<SmudgeCell>& cells = g_smudges,
+                          bool snow = false, bool cover = true)
+{
+    /* (cover: the console's priority, a wall or tiberium on the cell beats the mark,
+       smudge_cell_covered. Red Alert draws its smudge under the overlay on the same cell,
+       cell.cpp, so its cells come without it.) */
+    const int slot = g_deCell + 2 * g_deGutter;
+    const int sslot = g_deSootCell * g_deSootSpan + 2 * g_deSootGutter;
+    const int half = g_deSootSpan / 2;
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-1.0f, -1.0f);
+    glDepthMask(GL_FALSE);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glEnable(GL_BLEND);
+
+    glBindTexture(GL_TEXTURE_2D, (snow && de->sootSnow) ? de->sootSnow : de->soot);
+    glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR);
+    glBegin(GL_TRIANGLES);
+    for (size_t i = 0; i < cells.size(); i++) {
+        const SmudgeCell& sc = cells[i];
+        if (!decalenh_has(de, sc.type, sc.data) || !(de->layers[sc.type] & DECALENH_SOOT)
+            || !cell_shown(sc.x, sc.y) || (cover && smudge_cell_covered(sc)))
+            continue;
+        g_deStat.cells++;
+        const float sx = (float)(sc.data * sslot + g_deSootGutter);
+        const float sy = (float)(sc.type * sslot + g_deSootGutter);
+        for (int dy = -half; dy <= half; dy++)
+            for (int dx = -half; dx <= half; dx++) {
+                if (!cell_shown(sc.x + dx, sc.y + dy))
+                    continue;
+                const float u0 = (sx + (dx + half) * g_deSootCell) / (float)de->sootw;
+                const float v0 = (sy + (dy + half) * g_deSootCell) / (float)de->sooth;
+                const float u1 = u0 + (float)g_deSootCell / (float)de->sootw;
+                const float v1 = v0 + (float)g_deSootCell / (float)de->sooth;
+                decalenh_cell(sc.x + dx, sc.y + dy, u0, v0, u1, v1, 1.0f, 1.0f, 1.0f, 1.0f);
+            }
+    }
+    glEnd();
+
+    glBindTexture(GL_TEXTURE_2D, de->tex);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_ALPHA_TEST);
+    glAlphaFunc(GL_GREATER, 0.004f);
+    glBegin(GL_TRIANGLES);
+    for (size_t i = 0; i < cells.size(); i++) {
+        const SmudgeCell& sc = cells[i];
+        if (!decalenh_has(de, sc.type, sc.data) || !(de->layers[sc.type] & DECALENH_BODY)
+            || !cell_shown(sc.x, sc.y) || (cover && smudge_cell_covered(sc)))
+            continue;
+        if (!(de->layers[sc.type] & DECALENH_SOOT))
+            g_deStat.cells++;
+        /* The frame's 144-texel cell inside its slot; the gutter round it stays unread. */
+        const float u0 = (float)(sc.data * slot + g_deGutter) / (float)de->texw;
+        const float u1 = (float)(sc.data * slot + g_deGutter + g_deCell) / (float)de->texw;
+        const float v0 = (float)(sc.type * slot + g_deGutter) / (float)de->texh;
+        const float v1 = (float)(sc.type * slot + g_deGutter + g_deCell) / (float)de->texh;
+        decalenh_cell(sc.x, sc.y, u0, v0, u1, v1,
+                      terrain_shade(sc.x,     sc.y)     * shroud_corner_vis(sc.x,     sc.y),
+                      terrain_shade(sc.x + 1, sc.y)     * shroud_corner_vis(sc.x + 1, sc.y),
+                      terrain_shade(sc.x + 1, sc.y + 1) * shroud_corner_vis(sc.x + 1, sc.y + 1),
+                      terrain_shade(sc.x,     sc.y + 1) * shroud_corner_vis(sc.x,     sc.y + 1));
+    }
+    glEnd();
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glDepthMask(GL_TRUE);
+    glPolygonOffset(0.0f, 0.0f);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glDisable(GL_ALPHA_TEST);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_BLEND);
+    glDisable(GL_TEXTURE_2D);
+    if (g_deStat.cells)
+        g_deStat.path = 1;
+}
+
 /* The cartridge's scorch marks, craters and building aprons: one textured quad per
    SMUDGE| cell, on that cell's OWN four terrain corners so it follows the hills
    exactly. Everything here is read out of the ROM rather than chosen; see the header
@@ -13345,6 +14011,8 @@ static void draw_smudges(void)
 {
     g_beStat.path = 0;        /* `bibdump` reports this frame's aprons, or none */
     g_beStat.cells = 0;
+    g_deStat.path = 0;        /* `decaldump` likewise for the craters and scorch marks */
+    g_deStat.cells = 0;
     if (!g_smOn || !g_smHave || g_smudges.empty())
         return;
     const SmudgeSet* set = smudge_set_for(g_theater);
@@ -13364,6 +14032,10 @@ static void draw_smudges(void)
        by draw_bibenh after it. */
     const BibEnhTheater* be = (g_beOn && g_beHave && g_fx.enabled && g_fx.bib_enh)
                         ? bibenh_set_for(g_theater) : NULL;
+    /* THE REMASTERED CRATERS AND SCORCH MARKS (decalenh_mod.h), likewise: under Enhanced,
+       with the dial on, every one the pack has art for leaves this pass for draw_decalenh. */
+    const DecalEnhTheater* de = (g_deOn && g_deHave && g_fx.enabled && g_fx.decal_enh)
+                          ? decalenh_set_for(g_theater) : NULL;
 
     /* THE SOFT EDGE, if asked for. See smudge_feather: the alpha is blurred per FRAME at
        load and re-uploaded when the dial moves, so this is a state change and nothing
@@ -13417,17 +14089,10 @@ static void draw_smudges(void)
         const bool isBib = (sc.type >= 12);
         if (isBib && be)
             continue;   /* drawn by draw_bibenh below, in the remastered art */
-        if (!isBib) {
-            bool covered = false;
-            for (size_t k = 0; k < g_tib.size() && !covered; k++)
-                if (g_tib[k].x == sc.x && g_tib[k].y == sc.y)
-                    covered = true;
-            for (size_t k = 0; k < g_walls.size() && !covered; k++)
-                if (g_walls[k].x == sc.x && g_walls[k].y == sc.y)
-                    covered = true;
-            if (covered)
-                continue;
-        }
+        if (!isBib && decalenh_has(de, sc.type, sc.data))
+            continue;   /* drawn by draw_decalenh below, in the remastered art */
+        if (!isBib && smudge_cell_covered(sc))
+            continue;
 
         /* The engine enumerates CRATER1..6, SCORCH1..6, BIB1..3; the cartridge's
            terrain loader reads the bibs into slots 1..3 first. */
@@ -13511,6 +14176,8 @@ static void draw_smudges(void)
     glDisable(GL_ALPHA_TEST);
     glDisable(GL_BLEND);
     glDisable(GL_TEXTURE_2D);
+    if (de)
+        draw_decalenh(de);
     if (be)
         draw_bibenh(be);
 }
@@ -13524,7 +14191,7 @@ static void draw_smudges(void)
    NOTE: the authored-forward correction is NOT in here any more. draw_facing() folds the
    per-type model_face_bias() into the facing it hands out, so every caller (draw, boxes,
    centroid, picking) sees one consistent number. */
-static void facing_rot(int face, float* s, float* c)
+static void facing_rot(float face, float* s, float* c)
 {
     if (face < 0) { *s = 0.0f; *c = 1.0f; return; }
     const float a = -((float)face) * (2.0f * (float)M_PI / 256.0f);
@@ -13602,9 +14269,11 @@ static inline bool packed_normal_colour(unsigned char r, unsigned char g, unsign
 static void mesh_wobble(int mode, float cx, float cz, float* ax, float* az)
 {
     *ax = *az = 0.0f;
-    if (mode == WOBBLE_VEHICLE) {
-        *ax = 0.1f * sinf(6.0f * cz);
-        *az = 0.1f * sinf(6.0f * cx);
+    if (mode == WOBBLE_VEHICLE || mode == WOBBLE_SUSPENDED) {
+        if (mode == WOBBLE_VEHICLE) {
+            *ax = 0.1f * sinf(6.0f * cz);
+            *az = 0.1f * sinf(6.0f * cx);
+        }
         /* AND THE GROUND ITSELF. Everything above is the console's washboard, a fixed
            field of two sines standing in the world that reads no terrain at all, so a
            tank on a hill stood upright and cut into the slope. The slope term is summed
@@ -13693,6 +14362,12 @@ static float g_meshAnchorX = 0.0f, g_meshAnchorZ = 0.0f, g_meshAnchorY = 0.0f;
    anchor is. */
 static int   g_meshFace  = -1;
 static float g_meshYawS  = 0.0f, g_meshYawC = 1.0f;
+/* THE LEAN WITNESS, for the same reason again: the two lean angles (radians, about world X
+   and world Z) mesh_wobble gave the last draw that reached the lean, so a gate can read
+   whether a ship's roll changes as it sails out of the draw rather than out of a copy of
+   the formula. Written after the empty-pass return below, so only a draw that emitted
+   triangles leaves it. Nothing in play reads it. */
+static float g_meshWobX  = 0.0f, g_meshWobZ = 0.0f;
 
 /* THE CONSTRUCTION YARD'S COOLING FANS. the project owner sent console capture on 18 Aug showing the
    two vent grilles spinning; an earlier RE pass had concluded they do not move and called
@@ -13816,14 +14491,557 @@ static bool mesh_shroud_clear(const PackMesh& m, float cx, float cz)
     return true;
 }
 
+/* THE SHROUD UNDER A MESH, AS A PART OF ITS BATCH KEY. A mesh the shroud touches is darkened
+   vertex by vertex, and that darkening reads only the corners mesh_shroud_clear scans (the
+   square its reach covers). It used to make the mesh uncacheable outright, so every piece of
+   a building standing near unexplored ground (early in a mission, every building), or near
+   the always-shrouded rim, was walked triangle by triangle in every pass of every frame: the
+   sun's depth, the reflection, the normal target and the picture. Instead the corner values
+   in that square are hashed into the key: the finished vertices are kept until the shroud
+   under the mesh changes, and they are the same vertices, because the darkening reads
+   nothing else. False when the square is too wide to sample this way, which is the old
+   answer for such a mesh. The answer for a square is kept for the frame: every piece of a
+   building asks about the same one in every pass. */
+static bool mesh_shroud_sig(const PackMesh& m, float cx, float cz, uint64_t* sig)
+{
+    *sig = 0;
+    if (g_shroudEditorOff)
+        return true;
+    if (!g_shroudRimOn && (!g_shroudOn || !g_shroudValid || g_shroudRevealed))
+        return true;
+    const float r = mesh_xz_reach(m) * fabsf(MODEL_SCALE) + 0.01f;
+    const float x0f = cx - r, x1f = cx + r, z0f = cz - r, z1f = cz + r;
+    if (!(x0f > -4096.0f && x1f < 4096.0f && z0f > -4096.0f && z1f < 4096.0f))
+        return false;
+    int x0 = (int)floorf(x0f), x1 = (int)floorf(x1f) + 1;
+    int z0 = (int)floorf(z0f), z1 = (int)floorf(z1f) + 1;
+    const int cw = g_shroudCornW - 1, ch = g_shroudCornH - 1;
+    if (x0 < 0) x0 = 0; else if (x0 > cw) x0 = cw;
+    if (x1 < 0) x1 = 0; else if (x1 > cw) x1 = cw;
+    if (z0 < 0) z0 = 0; else if (z0 > ch) z0 = ch;
+    if (z1 < 0) z1 = 0; else if (z1 > ch) z1 = ch;
+    if ((x1 - x0 + 1) * (z1 - z0 + 1) > 256)
+        return false;
+    static std::unordered_map<uint64_t, uint64_t> s_memo;
+    static unsigned s_memoFrame = ~0u;
+    if (s_memoFrame != g_drawFrameSerial) { s_memo.clear(); s_memoFrame = g_drawFrameSerial; }
+    const uint64_t square = ((uint64_t)(unsigned)x0 << 48) ^ ((uint64_t)(unsigned)z0 << 32)
+                          ^ ((uint64_t)(unsigned)x1 << 16) ^ (uint64_t)(unsigned)z1;
+    const auto known = s_memo.find(square);
+    if (known != s_memo.end()) { *sig = known->second; return true; }
+    shroud_corners_sync();
+    uint64_t h = 1469598103934665603ull ^ square;         /* FNV-1a over the corners */
+    for (int z = z0; z <= z1; z++)
+        for (int x = x0; x <= x1; x++) {
+            const float a = shroud_corner_a(x, z);
+            uint32_t bits; memcpy(&bits, &a, 4);
+            for (int b = 0; b < 4; b++) { h ^= (bits >> (8 * b)) & 0xffu; h *= 1099511628211ull; }
+        }
+    s_memo[square] = h;
+    *sig = h;
+    return true;
+}
+
+static bool perf_trace_enabled();  /* optional telemetry, defined after world types */
+static bool perf_trace_frame_active();
 #include "mesh_batch.h"
 
-static void draw_mesh(int mi, float cx, float cz, int face, int pass,
-                      int turyaw = 0, float rotor = 0.0f, int house = 0,
+static bool mesh_wind_direct_positions(const PackMesh& mesh,size_t first,size_t last,int pass,
+        size_t count,float cx,float cz,float rc,float rs,float ground,float ylift,
+        float swayLean,float swayA1,float swayB1,float swayA2,float swayB2,
+        const float* extraMat,float* low,float* high)
+{
+    const size_t cap=16u*1024u*1024u/(3*sizeof(float));
+    if(!count || count>cap || !mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT_ALLOC_OK"))return false;
+    try {
+        if(g_meshGeometryUpload.capacity()<count*3)std::vector<float>(count*3).swap(g_meshGeometryUpload);
+        else g_meshGeometryUpload.resize(count*3);
+    } catch(const std::bad_alloc&) {return false;}
+    /* These frame settings stay fixed during a draw. Snapshot their exact original
+       expressions once: writing position/bounds floats otherwise stops the compiler
+       from proving that the global settings cannot alias the per-vertex outputs. */
+    const float windX=1024.0f*sinf((114.086f+g_fx.tree3d_wind_dir-183.21429f)*0.0174532925f);
+    const float windZ=-1024.0f*cosf((114.086f+g_fx.tree3d_wind_dir-183.21429f)*0.0174532925f);
+    const float flutterScale=0.007f*g_fx.tree3d_flutter/0.07143f;
+    float* const positions=g_meshGeometryUpload.data();
+    const float fillY=g_meshFillY;
+    float lowX=0,lowY=0,lowZ=0,highX=0,highY=0,highZ=0;
+    size_t emitted=0;
+    const auto publishBounds=[&]() {
+        if(emitted) {
+            low[0]=lowX;low[1]=lowY;low[2]=lowZ;
+            high[0]=highX;high[1]=highY;high[2]=highZ;
+        }
+    };
+    for(size_t triangle=first;triangle<last;triangle++) {
+        const PackTri& tri=mesh.tris[triangle];
+        if((int)tri.mode!=pass)continue;
+        const float ybias=0.0f,snx=0.0f,snz=0.0f;
+        for(size_t corner=0;corner<3;corner++) {
+            if(emitted==count){publishBounds();return false;}
+            const PackVert& vertex=tri.v[corner];
+            float vx=vertex.x,vy=vertex.y,vz=vertex.z;
+            if(swayLean>-1.0e30f && triangle*6<mesh.sway.size()) {
+                const unsigned char* weights=&mesh.sway[triangle*6+corner*2];
+                const float amount=swayLean*(float)weights[0]*(1.0f/255.0f);
+                float up=-0.6f*amount*amount;
+                if(weights[1] && mesh.swayPh.size()==mesh.sway.size()*2) {
+                    const float* phase=&mesh.swayPh[triangle*12+corner*4];
+                    up+=flutterScale*(float)weights[1]*(1.0f/255.0f)
+                        *(swayA1*phase[1]+swayB1*phase[0]
+                          +0.55f*(swayA2*phase[3]+swayB2*phase[2]));
+                }
+                vx+=windX*amount;
+                vy+=1024.0f*up;
+                vz+=windZ*amount;
+            }
+            if(vy>fillY)vy=fillY;
+            /* The tree's fitted size/lean is the same immutable 3x4 transform the
+               full path applies AFTER wind and fill, before model facing. Keep its
+               exact expression order; every matrix float already belongs to both
+               the attribute key and the geometric-pose key. */
+            if (extraMat) {
+                const float bx = extraMat[0] * vx + extraMat[1] * vy + extraMat[2]  * vz + extraMat[3];
+                const float by = extraMat[4] * vx + extraMat[5] * vy + extraMat[6]  * vz + extraMat[7];
+                const float bz = extraMat[8] * vx + extraMat[9] * vy + extraMat[10] * vz + extraMat[11];
+                vx = bx; vy = by; vz = bz;
+            }
+            const float mx=vx*rc+vz*rs;
+            const float mz=-vx*rs+vz*rc;
+            const float wx=cx+mx*MODEL_SCALE+snx;
+            const float wz=cz+mz*MODEL_SCALE+snz;
+            float* position=&positions[emitted*3];
+            position[0]=wx;position[1]=vy*MODEL_SCALE+ybias+ylift+ground;position[2]=wz;
+            if(!emitted) {
+                lowX=highX=position[0];lowY=highY=position[1];lowZ=highZ=position[2];
+            } else {
+                lowX=std::min(lowX,position[0]);highX=std::max(highX,position[0]);
+                lowY=std::min(lowY,position[1]);highY=std::max(highY,position[1]);
+                lowZ=std::min(lowZ,position[2]);highZ=std::max(highZ,position[2]);
+            }
+            emitted++;
+        }
+    }
+    publishBounds();
+    return emitted==count;
+}
+
+/* Exact immutable wind-input preparation. */
+struct MeshWindUniqueInput {
+    float position[3], phase[4];
+    unsigned char weights[2], weighted, phased;
+};
+static_assert(sizeof(MeshWindUniqueInput)==32,"wind input key must have no padding");
+struct MeshWindUniquePrepared {
+    std::vector<MeshWindUniqueInput> unique;
+    std::vector<uint32_t> corners;
+};
+static std::vector<float> g_meshWindUniqueUpload;
+
+static size_t mesh_wind_unique_hash(const MeshWindUniqueInput& input)
+{
+    uint32_t bits[8];memcpy(bits,&input,sizeof bits);
+    uint64_t hash=1469598103934665603ull;
+    for(uint32_t word:bits)hash=(hash^word)*1099511628211ull;
+    hash^=hash>>33;hash*=0xff51afd7ed558ccdull;
+    hash^=hash>>33;hash*=0xc4ceb9fe1a85ec53ull;
+    hash^=hash>>33;
+    return (size_t)hash;
+}
+
+static bool mesh_wind_unique_prepare(const PackMesh& mesh,size_t first,size_t last,int pass,
+                                     size_t count,MeshWindUniquePrepared& output)
+{
+    /* At most 8 MiB retained capacity plus a <=2 MiB transient index table.
+       36 bytes/corner reserves both worst-case unique input and output index.
+       Every count multiplication below is therefore bounded on 32-bit hosts. */
+    const size_t cap=8u*1024u*1024u;
+    if(!mesh_perf_switch("OPENCNC3D_MESH_WIND_UNIQUE_ALLOC_OK") || !count || count>cap/36u
+        || first>last || last>mesh.tris.size() || mesh.sway.size()%6u)return false;
+    size_t actual=0;
+    for(size_t triangle=first;triangle<last;triangle++)
+        if((int)mesh.tris[triangle].mode==pass)actual+=3;
+    if(actual!=count)return false;
+    try {
+        MeshWindUniquePrepared prepared;
+        prepared.unique.reserve(count);prepared.corners.reserve(count);
+        size_t slots=1;while(slots<count*2u)slots*=2u;
+        std::vector<uint32_t> table(slots,UINT32_MAX);
+        for(size_t triangle=first;triangle<last;triangle++) {
+            const PackTri& tri=mesh.tris[triangle];
+            if((int)tri.mode!=pass)continue;
+            for(size_t corner=0;corner<3;corner++) {
+                MeshWindUniqueInput input={};
+                const PackVert& vertex=tri.v[corner];
+                input.position[0]=vertex.x;input.position[1]=vertex.y;input.position[2]=vertex.z;
+                if(triangle*6<mesh.sway.size()) {
+                    input.weighted=1;
+                    const unsigned char* weights=&mesh.sway[triangle*6+corner*2];
+                    input.weights[0]=weights[0];input.weights[1]=weights[1];
+                    if(mesh.swayPh.size()==mesh.sway.size()*2) {
+                        input.phased=1;
+                        memcpy(input.phase,&mesh.swayPh[triangle*12+corner*4],sizeof input.phase);
+                    }
+                }
+                size_t slot=mesh_wind_unique_hash(input)&(slots-1);
+                while(table[slot]!=UINT32_MAX
+                      && memcmp(&prepared.unique[table[slot]],&input,sizeof input))
+                    slot=(slot+1)&(slots-1);
+                if(table[slot]==UINT32_MAX) {
+                    table[slot]=(uint32_t)prepared.unique.size();
+                    prepared.unique.push_back(input);
+                }
+                prepared.corners.push_back(table[slot]);
+            }
+        }
+        output.unique.swap(prepared.unique);output.corners.swap(prepared.corners);
+        return true;
+    } catch(const std::bad_alloc&) {return false;}
+}
+
+static bool mesh_wind_unique_positions(const MeshWindUniquePrepared& prepared,size_t count,
+        float cx,float cz,float rc,float rs,float ground,float ylift,
+        float swayLean,float swayA1,float swayB1,float swayA2,float swayB2,
+        const float* extraMat,float* low,float* high)
+{
+    const size_t cap=16u*1024u*1024u/(3*sizeof(float));
+    if(!count || count>cap || prepared.corners.size()!=count || prepared.unique.empty()
+       || prepared.unique.size()>count
+       || !mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT_ALLOC_OK"))return false;
+    try {
+        if(g_meshGeometryUpload.capacity()<count*3)std::vector<float>(count*3).swap(g_meshGeometryUpload);
+        else g_meshGeometryUpload.resize(count*3);
+        const size_t uniqueFloats=prepared.unique.size()*3;
+        if(g_meshWindUniqueUpload.capacity()<uniqueFloats)
+            std::vector<float>(uniqueFloats).swap(g_meshWindUniqueUpload);
+        else g_meshWindUniqueUpload.resize(uniqueFloats);
+    } catch(const std::bad_alloc&) {return false;}
+    const float windX=1024.0f*sinf((114.086f+g_fx.tree3d_wind_dir-183.21429f)*0.0174532925f);
+    const float windZ=-1024.0f*cosf((114.086f+g_fx.tree3d_wind_dir-183.21429f)*0.0174532925f);
+    const float flutterScale=0.007f*g_fx.tree3d_flutter/0.07143f;
+    const float fillY=g_meshFillY;
+    float* const uniquePositions=g_meshWindUniqueUpload.data();
+    for(size_t i=0;i<prepared.unique.size();i++) {
+        const MeshWindUniqueInput& input=prepared.unique[i];
+        const float ybias=0.0f,snx=0.0f,snz=0.0f;
+        float vx=input.position[0],vy=input.position[1],vz=input.position[2];
+        if(swayLean>-1.0e30f && input.weighted) {
+            const unsigned char* weights=input.weights;
+            const float amount=swayLean*(float)weights[0]*(1.0f/255.0f);
+            float up=-0.6f*amount*amount;
+            if(weights[1] && input.phased) {
+                const float* phase=input.phase;
+                up+=flutterScale*(float)weights[1]*(1.0f/255.0f)
+                    *(swayA1*phase[1]+swayB1*phase[0]
+                      +0.55f*(swayA2*phase[3]+swayB2*phase[2]));
+            }
+            vx+=windX*amount;
+            vy+=1024.0f*up;
+            vz+=windZ*amount;
+        }
+        if(vy>fillY)vy=fillY;
+        if(extraMat) {
+            const float bx = extraMat[0] * vx + extraMat[1] * vy + extraMat[2]  * vz + extraMat[3];
+            const float by = extraMat[4] * vx + extraMat[5] * vy + extraMat[6]  * vz + extraMat[7];
+            const float bz = extraMat[8] * vx + extraMat[9] * vy + extraMat[10] * vz + extraMat[11];
+            vx = bx; vy = by; vz = bz;
+        }
+        const float mx=vx*rc+vz*rs;
+        const float mz=-vx*rs+vz*rc;
+        const float wx=cx+mx*MODEL_SCALE+snx;
+        const float wz=cz+mz*MODEL_SCALE+snz;
+        float* position=&uniquePositions[i*3];
+        position[0]=wx;position[1]=vy*MODEL_SCALE+ybias+ylift+ground;position[2]=wz;
+    }
+    float* const positions=g_meshGeometryUpload.data();
+    float lowX=0,lowY=0,lowZ=0,highX=0,highY=0,highZ=0;
+    /* THE BOX FROM THE UNIQUE CORNERS, THE SAME BITS. The unique inputs are kept in the
+       order the corner walk first meets them, and a corner's position is a function of
+       its input alone, so every corner repeats a value already met at its input's first
+       occurrence. A running std::min/std::max keeps the earliest of equal values (+0 and
+       -0 included) and never lets a later NaN in; the earliest corner holding the
+       extreme is therefore a first occurrence, and the walk over the unique positions
+       in that order ends on exactly the box the walk over every corner ends on. The
+       copy out to the corners is then a plain gather, about two and a half corners for
+       every unique one on the remastered trees. OPENCNC3D_MESH_WIND_UNIQUE_BOUNDS=0
+       measures the box over every corner again. */
+    if(mesh_perf_switch("OPENCNC3D_MESH_WIND_UNIQUE_BOUNDS")) {
+        const size_t unique=prepared.unique.size();
+        for(size_t i=0;i<unique;i++) {
+            const float* position=&uniquePositions[i*3];
+            if(!i) {
+                lowX=highX=position[0];lowY=highY=position[1];lowZ=highZ=position[2];
+            } else {
+                lowX=std::min(lowX,position[0]);highX=std::max(highX,position[0]);
+                lowY=std::min(lowY,position[1]);highY=std::max(highY,position[1]);
+                lowZ=std::min(lowZ,position[2]);highZ=std::max(highZ,position[2]);
+            }
+        }
+        const uint32_t* const corner=prepared.corners.data();
+        for(size_t emitted=0;emitted<count;emitted++)
+            memcpy(&positions[emitted*3],&uniquePositions[(size_t)corner[emitted]*3],3*sizeof(float));
+    } else
+    for(size_t emitted=0;emitted<count;emitted++) {
+        float* position=&positions[emitted*3];
+        const float* source=&uniquePositions[(size_t)prepared.corners[emitted]*3];
+        memcpy(position,source,3*sizeof(float));
+        if(!emitted) {
+            lowX=highX=position[0];lowY=highY=position[1];lowZ=highZ=position[2];
+        } else {
+            lowX=std::min(lowX,position[0]);highX=std::max(highX,position[0]);
+            lowY=std::min(lowY,position[1]);highY=std::max(highY,position[1]);
+            lowZ=std::min(lowZ,position[2]);highZ=std::max(highZ,position[2]);
+        }
+    }
+    low[0]=lowX;low[1]=lowY;low[2]=lowZ;
+    high[0]=highX;high[1]=highY;high[2]=highZ;
+    return true;
+}
+
+/* Source preparation is shared across instances; transformed positions remain
+   draw-local. Four-way sets bound lookup work and the fixed table allocates no
+   map nodes. Retained capacity is capped globally, not just per source. */
+struct MeshWindUniqueKey { uint64_t value[14]; };
+struct MeshWindUniqueEntry {
+    MeshWindUniqueKey key={};
+    MeshWindUniquePrepared prepared;
+    size_t bytes=0;
+    uint64_t used=0;
+    bool valid=false;
+};
+static MeshWindUniqueEntry g_meshWindUniqueCache[128];
+static size_t g_meshWindUniqueBytes=0,g_meshWindUniqueEntries=0;
+static unsigned g_meshWindUniqueGeneration=0;
+static uint64_t g_meshWindUniqueClock=0;
+static int g_meshWindUniqueActive=-1;
+static unsigned long long g_meshWindUniqueCalls=0,g_meshWindUniqueOff=0,
+    g_meshWindUniqueLinearCalls=0,g_meshWindUniqueFastCalls=0,
+    g_meshWindUniqueDraws=0,g_meshWindUniqueCorners=0,g_meshWindUniqueInputs=0,
+    g_meshWindUniqueHits=0,g_meshWindUniqueMisses=0,g_meshWindUniqueBuilds=0,g_meshWindUniqueFallbacks=0,
+    g_meshWindUniqueVerified=0,g_meshWindUniqueMismatches=0,g_meshWindUniqueEvictions=0,
+    g_meshWindUniqueClears=0;
+
+static bool mesh_wind_unique_enabled()
+{
+    if(g_meshWindUniqueActive<0)
+        g_meshWindUniqueActive=mesh_perf_switch("OPENCNC3D_MESH_WIND_UNIQUE")?1:0;
+    return g_meshWindUniqueActive!=0;
+}
+
+static bool mesh_wind_unique_verify_enabled()
+{
+    static const bool enabled=[]() {
+        const char* value=getenv("OPENCNC3D_MESH_WIND_UNIQUE_VERIFY");
+        return value&&!strcmp(value,"1");
+    }();
+    return enabled;
+}
+
+static void mesh_wind_unique_clear()
+{
+    if(g_meshWindUniqueEntries || g_meshWindUniqueUpload.capacity())++g_meshWindUniqueClears;
+    for(auto& entry:g_meshWindUniqueCache)entry=MeshWindUniqueEntry();
+    std::vector<float>().swap(g_meshWindUniqueUpload);
+    g_meshWindUniqueBytes=0;g_meshWindUniqueEntries=0;g_meshWindUniqueClock=0;
+    g_meshWindUniqueGeneration=g_groundGen;
+}
+
+static void mesh_wind_unique_evict(MeshWindUniqueEntry& entry)
+{
+    if(!entry.valid)return;
+    g_meshWindUniqueBytes-=entry.bytes;--g_meshWindUniqueEntries;
+    entry=MeshWindUniqueEntry();++g_meshWindUniqueEvictions;
+}
+
+static const MeshWindUniquePrepared* mesh_wind_unique_source(const PackMesh& mesh,
+        size_t first,size_t last,int pass,size_t count)
+{
+    const size_t entryCap=8u*1024u*1024u,cacheCap=16u*1024u*1024u;
+    const size_t tableBytes=sizeof g_meshWindUniqueCache;
+    if(!count || count>entryCap/36u || first>last || last>mesh.tris.size())return NULL;
+    if(g_meshWindUniqueGeneration!=g_groundGen)mesh_wind_unique_clear();
+    const MeshWindUniqueKey key={{
+        (uint64_t)(uintptr_t)&mesh,(uint64_t)(uintptr_t)mesh.tris.data(),mesh.tris.size(),
+        (uint64_t)(uintptr_t)mesh.sway.data(),mesh.sway.size(),
+        (uint64_t)(uintptr_t)mesh.swayPh.data(),mesh.swayPh.size(),
+        first,last,(uint64_t)(unsigned)pass,count,mesh.gpuPoseRevision,g_groundGen,0}};
+    uint64_t hash=1469598103934665603ull;
+    for(uint64_t value:key.value)hash=(hash^value)*1099511628211ull;
+    hash^=hash>>33;hash*=0xff51afd7ed558ccdull;
+    hash^=hash>>33;hash*=0xc4ceb9fe1a85ec53ull;hash^=hash>>33;
+    const size_t firstSlot=(size_t)(hash&31u)*4u;
+    MeshWindUniqueEntry* target=&g_meshWindUniqueCache[firstSlot];
+    for(size_t i=firstSlot;i<firstSlot+4;i++) {
+        MeshWindUniqueEntry& entry=g_meshWindUniqueCache[i];
+        if(entry.valid && !memcmp(&entry.key,&key,sizeof key)) {
+            entry.used=++g_meshWindUniqueClock;++g_meshWindUniqueHits;
+            return &entry.prepared;
+        }
+        if(!entry.valid || (target->valid && entry.used<target->used))target=&entry;
+    }
+    ++g_meshWindUniqueMisses;
+    if(!mesh_perf_switch("OPENCNC3D_MESH_WIND_UNIQUE_ALLOC_OK"))return NULL;
+    /* Reserve the worst retained capacity before allocating the new preparation.
+       The transient hash is additionally bounded to 2 MiB, and draw scratch to
+       12*(8 MiB/36) bytes. The existing shared output has its own 16 MiB cap. */
+    const size_t wanted=count*36u;
+    mesh_wind_unique_evict(*target);
+    while(g_meshWindUniqueBytes+tableBytes+wanted>cacheCap) {
+        MeshWindUniqueEntry* oldest=NULL;
+        for(auto& entry:g_meshWindUniqueCache)
+            if(entry.valid && (!oldest || entry.used<oldest->used))oldest=&entry;
+        if(!oldest)return NULL;
+        mesh_wind_unique_evict(*oldest);
+    }
+    MeshWindUniquePrepared prepared;
+    if(!mesh_wind_unique_prepare(mesh,first,last,pass,count,prepared))return NULL;
+    const size_t bytes=prepared.unique.capacity()*sizeof(MeshWindUniqueInput)
+                      +prepared.corners.capacity()*sizeof(uint32_t);
+    if(bytes>entryCap || g_meshWindUniqueBytes+tableBytes+bytes>cacheCap)return NULL;
+    target->prepared.unique.swap(prepared.unique);target->prepared.corners.swap(prepared.corners);
+    target->key=key;target->bytes=bytes;target->used=++g_meshWindUniqueClock;target->valid=true;
+    g_meshWindUniqueBytes+=bytes;++g_meshWindUniqueEntries;++g_meshWindUniqueBuilds;
+    return &target->prepared;
+}
+
+static bool mesh_wind_positions_prepared(const PackMesh& mesh,size_t first,size_t last,int pass,
+        size_t count,float cx,float cz,float rc,float rs,float ground,float ylift,
+        float swayLean,float swayA1,float swayB1,float swayA2,float swayB2,
+        const float* extraMat,float* low,float* high)
+{
+    ++g_meshWindUniqueCalls;
+    const auto linear=[&]() {
+        ++g_meshWindUniqueLinearCalls;
+        return mesh_wind_direct_positions(mesh,first,last,pass,count,cx,cz,rc,rs,ground,ylift,
+            swayLean,swayA1,swayB1,swayA2,swayB2,extraMat,low,high);
+    };
+    if(!mesh_wind_unique_enabled()) {++g_meshWindUniqueOff;return linear();}
+    /* Preserve the old allocation-refusal and partial-count behavior through its
+       original helper. Optional preparation cannot make a rejected draw vanish. */
+    if(!mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT_ALLOC_OK")) {
+        ++g_meshWindUniqueFallbacks;return linear();
+    }
+    const MeshWindUniquePrepared* prepared=mesh_wind_unique_source(mesh,first,last,pass,count);
+    if(!prepared || !mesh_perf_switch("OPENCNC3D_MESH_WIND_UNIQUE_SCRATCH_OK")
+       || !mesh_wind_unique_positions(*prepared,count,cx,cz,rc,rs,ground,ylift,
+            swayLean,swayA1,swayB1,swayA2,swayB2,extraMat,low,high)) {
+        ++g_meshWindUniqueFallbacks;return linear();
+    }
+    ++g_meshWindUniqueFastCalls;
+    if(mesh_wind_unique_verify_enabled()) {
+        try {
+            const std::vector<float> expected=g_meshGeometryUpload;
+            float expectedLow[3],expectedHigh[3];
+            memcpy(expectedLow,low,sizeof expectedLow);memcpy(expectedHigh,high,sizeof expectedHigh);
+            const bool accepted=linear();
+            ++g_meshWindUniqueVerified;
+            if(!accepted || expected.size()!=g_meshGeometryUpload.size()
+                || memcmp(expected.data(),g_meshGeometryUpload.data(),expected.size()*sizeof(float))
+                || memcmp(expectedLow,low,sizeof expectedLow)||memcmp(expectedHigh,high,sizeof expectedHigh)) {
+                ++g_meshWindUniqueMismatches;
+                fprintf(stderr,"MESHWINDUNIQUE|mismatch|pass=%d|count=%zu\n",pass,count);
+                return accepted; /* The authoritative linear result is already installed. */
+            }
+        } catch(const std::bad_alloc&) {++g_meshWindUniqueFallbacks;return linear();}
+    }
+    ++g_meshWindUniqueDraws;g_meshWindUniqueCorners+=(unsigned long long)count;
+    g_meshWindUniqueInputs+=(unsigned long long)prepared->unique.size();
+    return true;
+}
+
+static void mesh_wind_unique_dump()
+{
+    printf("MESHWINDUNIQUE|enabled=%d|calls=%llu|off=%llu|calls_linear=%llu|calls_unique=%llu"
+           "|draws=%llu|corners=%llu|unique_inputs=%llu"
+           "|hits=%llu|misses=%llu|builds=%llu|fallbacks=%llu|verified=%llu|mismatches=%llu|evictions=%llu"
+           "|cache_bytes=%zu|cache_entries=%zu|scratch_bytes=%zu|clears=%llu\n",
+           mesh_wind_unique_enabled()?1:0,g_meshWindUniqueCalls,g_meshWindUniqueOff,
+           g_meshWindUniqueLinearCalls,g_meshWindUniqueFastCalls,
+           g_meshWindUniqueDraws,g_meshWindUniqueCorners,g_meshWindUniqueInputs,g_meshWindUniqueHits,
+           g_meshWindUniqueMisses,g_meshWindUniqueBuilds,g_meshWindUniqueFallbacks,g_meshWindUniqueVerified,g_meshWindUniqueMismatches,
+           g_meshWindUniqueEvictions,g_meshWindUniqueBytes+sizeof g_meshWindUniqueCache,g_meshWindUniqueEntries,
+           g_meshWindUniqueUpload.capacity()*sizeof(float),g_meshWindUniqueClears);
+    fflush(stdout);
+}
+
+
+static bool mesh_wind_direct_verify(const MeshBatch& output,const MeshBatchEntry& attributes,
+                                    const float* low,const float* high)
+{
+    if(output.vertices.size()*3!=g_meshGeometryUpload.size()
+        || output.entry.uv!=attributes.uv || output.entry.runs.size()!=attributes.runs.size()
+        || memcmp(output.entry.lo,low,sizeof output.entry.lo)
+        || memcmp(output.entry.hi,high,sizeof output.entry.hi))return false;
+    for(size_t vertex=0;vertex<output.vertices.size();vertex++)
+        if(memcmp(output.vertices[vertex].p,&g_meshGeometryUpload[vertex*3],3*sizeof(float)))return false;
+    if(memcmp(output.current.uv,attributes.last.uv,sizeof output.current.uv)
+        || memcmp(output.current.n,attributes.last.n,sizeof output.current.n)
+        || memcmp(output.current.c,attributes.last.c,sizeof output.current.c))return false;
+    for(size_t run=0;run<output.entry.runs.size();run++) {
+        const MeshBatchRun& actual=output.entry.runs[run];
+        const MeshBatchRun& cached=attributes.runs[run];
+        if(actual.tex!=cached.tex || actual.wrap!=cached.wrap || actual.x2!=cached.x2
+            || actual.first!=cached.first || actual.count!=cached.count)return false;
+    }
+    return true;
+}
+
+/* The bake drawn over the frame's shared pose: compare the full loop's own output with
+   the positions the card holds for the pose and the colour/UV the kept store holds,
+   byte for byte, together with the runs, the bounds and the last corner's attributes
+   (which the draw leaves current). */
+static bool mesh_bake_share_verify(const MeshBatch& output,const MeshBatchEntry& attributes,
+                                   const MeshGeometryPose& geometry)
+{
+    const size_t count=output.vertices.size();
+    if(count!=geometry.gpuCount || count!=attributes.bytes/sizeof(MeshBatchAttributes)
+        || output.entry.uv!=attributes.uv || output.entry.runs.size()!=attributes.runs.size()
+        || !geometry.boundsValid
+        || memcmp(output.entry.lo,geometry.lo,sizeof output.entry.lo)
+        || memcmp(output.entry.hi,geometry.hi,sizeof output.entry.hi))return false;
+    if(memcmp(output.current.uv,attributes.last.uv,sizeof output.current.uv)
+        || memcmp(output.current.n,attributes.last.n,sizeof output.current.n)
+        || memcmp(output.current.c,attributes.last.c,sizeof output.current.c))return false;
+    for(size_t run=0;run<output.entry.runs.size();run++) {
+        const MeshBatchRun& actual=output.entry.runs[run];
+        const MeshBatchRun& cached=attributes.runs[run];
+        if(actual.tex!=cached.tex || actual.wrap!=cached.wrap || actual.x2!=cached.x2
+            || actual.first!=cached.first || actual.count!=cached.count)return false;
+    }
+    std::vector<float> positions(count*3);
+    std::vector<MeshBatchAttributes> stored(count);
+    if(!mesh_buffer_read(geometry.gpu,positions.size()*sizeof(float),positions.data())
+        || !mesh_buffer_read(attributes.vbo,stored.size()*sizeof(MeshBatchAttributes),stored.data()))return false;
+    for(size_t vertex=0;vertex<count;vertex++) {
+        const MeshBatchVertex& v=output.vertices[vertex];
+        if(memcmp(v.p,&positions[vertex*3],sizeof v.p) || memcmp(v.uv,stored[vertex].uv,sizeof v.uv)
+            || memcmp(v.n,stored[vertex].n,sizeof v.n) || memcmp(v.c,stored[vertex].c,sizeof v.c))return false;
+    }
+    return true;
+}
+
+/* The opaque sun path emits exactly one untextured depth run. This verifier
+   compares the direct positions to the original full loop before it uploads. */
+static bool mesh_wind_depth_verify(const MeshBatch& output,const float* low,const float* high)
+{
+    if(output.vertices.size()*3!=g_meshGeometryUpload.size() || output.entry.uv
+        || output.entry.runs.size()!=1
+        || memcmp(output.entry.lo,low,sizeof output.entry.lo)
+        || memcmp(output.entry.hi,high,sizeof output.entry.hi))return false;
+    const MeshBatchRun& run=output.entry.runs[0];
+    if(run.tex!=-2 || run.wrap!=-1 || run.x2 || run.first!=0
+        || run.count!=output.vertices.size())return false;
+    for(size_t vertex=0;vertex<output.vertices.size();vertex++)
+        if(memcmp(output.vertices[vertex].p,&g_meshGeometryUpload[vertex*3],3*sizeof(float)))return false;
+    return true;
+}
+
+static void draw_mesh(int mi, float cx, float cz, float face, int pass,
+                      float turyaw = 0.0f, float rotor = 0.0f, int house = 0,
                       float build_frac = 1.0f, float ylift = 0.0f,
                       bool whiten_packed = false, int wobble = WOBBLE_NONE,
                       float animT = -1.0f, const float* extraMat = NULL,
-                      size_t triFirst = 0, size_t triLast = 0)
+                      size_t triFirst = 0, size_t triLast = 0, bool propScaleApplied = false)
 {
     if (mi < 0 || mi >= (int)g_pack.mesh.size())
         return;
@@ -13857,17 +15075,6 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
     g_meshYawS = rs;
     g_meshYawC = rc;
     const PackMesh& mesh = src->mesh[mi];
-    /* the wind's lean for this draw (g_meshSwayT), the same for every corner */
-    float swayLean = -1.0e31f, swayA1 = 0.0f, swayB1 = 1.0f, swayA2 = 0.0f, swayB2 = 1.0f;
-    if (g_meshSwayT >= 0.0f && g_meshSwayOn && !mesh.sway.empty()
-        && mesh.sway.size() <= mesh.tris.size() * 6) {
-        const float t = g_meshSwayT, T = 6.2831853f;
-        swayLean = 0.012f + 0.040f * (0.55f * sinf(T * 0.16f * t)
-                                      + 0.30f * sinf(T * 0.27f * t + 1.3f)
-                                      + 0.15f * sinf(T * 0.53f * t + 2.1f));
-        swayA1 = sinf(T * 1.6f * t); swayB1 = cosf(T * 1.6f * t);
-        swayA2 = sinf(T * 2.9f * t); swayB2 = cosf(T * 2.9f * t);
-    }
     /* A PASS THIS MESH HAS NO TRIANGLE OF DRAWS NOTHING, and every GL call below sits
        behind the per-triangle mode test, so returning here emits exactly the nothing the
        loop would have. Most meshes have no cutout or translucent triangle and every object
@@ -13876,10 +15083,36 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
        feeds nothing but the vertices. */
     if (pass >= 0 && pass < 32 && !(mesh.modeMask & (1u << pass)))
         return;
+    /* One transform reaches the same barrel surfaces in colour, normals, sun depth,
+       reflection, damage and debris. Unrelated meshes retain their original pointer
+       and arithmetic. Recursive range draws reuse this composed transform once. */
+    float barrelMatrix[12];
+    if (ra_barrel_visual_matrix(g_raModule,g_fx.enabled!=0,g_fx.dos_classic!=0,
+            mesh.name,pass==MODE_SHADOW,propScaleApplied,extraMat,barrelMatrix))
+        extraMat=barrelMatrix;
+    /* the wind's lean for this draw (g_meshSwayT), the same for every corner */
+    float swayLean = -1.0e31f, swayA1 = 0.0f, swayB1 = 1.0f, swayA2 = 0.0f, swayB2 = 1.0f;
+    float swayWindX = 0.0f, swayWindZ = 0.0f, swayFlutterScale = 0.0f;
+    if (g_meshSwayT >= 0.0f && g_meshSwayOn && !mesh.sway.empty()
+        && mesh.sway.size() <= mesh.tris.size() * 6) {
+        const float t = g_meshSwayT * (g_fx.tree3d_wind_speed / 0.12902f), T = 6.2831853f;
+        swayLean = (g_fx.tree3d_wind / 0.04107f) * (0.012f + 0.040f * (0.55f * sinf(T * 0.16f * t)
+                                      + 0.30f * sinf(T * 0.27f * t + 1.3f)
+                                      + 0.15f * sinf(T * 0.53f * t + 2.1f)));
+        swayA1 = sinf(T * 1.6f * t); swayB1 = cosf(T * 1.6f * t);
+        swayA2 = sinf(T * 2.9f * t); swayB2 = cosf(T * 2.9f * t);
+        /* Fixed for this draw, including its depth-only shadow pass. Preserve the
+           per-vertex expressions and multiplication order while evaluating once. */
+        swayWindX = 1024.0f * sinf((114.086f+g_fx.tree3d_wind_dir-183.21429f)*0.0174532925f);
+        swayWindZ = -1024.0f * cosf((114.086f+g_fx.tree3d_wind_dir-183.21429f)*0.0174532925f);
+        swayFlutterScale = 0.007f*g_fx.tree3d_flutter/0.07143f;
+    }
     /* The cartridge's washboard lean; see mesh_wobble above. Identity when wobble is
        WOBBLE_NONE, which is every building, tree, wall, cursor and bullet. */
     float wax, waz;
     mesh_wobble(wobble, cx, cz, &wax, &waz);
+    g_meshWobX = wax;
+    g_meshWobZ = waz;
     const float wsx = sinf(wax), wcx = cosf(wax);
     const float wsz = sinf(waz), wcz = cosf(waz);
     const bool  wob = (wobble != WOBBLE_NONE);
@@ -13937,8 +15170,8 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
        fold light, ebld_mod.h) stores half its colour and is drawn with the texture
        environment's colour scale at 2. Only a mesh that carries such a flag takes the
        branch; the environment is handed back at the end. */
-    const bool hasX2 = mesh.tfl.size() == tris.size() && !g_meshBakePass && !nrmOut
-                     && !g_meshShadowPass;
+    const bool treeBoost=g_meshTreeGain>1.0f&&!g_meshBakePass&&!nrmOut&&!g_meshShadowPass;
+    const bool hasX2 = (mesh.tfl.size()==tris.size()||treeBoost) && !g_meshBakePass && !nrmOut && !g_meshShadowPass;
     bool curX2 = false;
     GLint envWas = GL_MODULATE;
 
@@ -13958,24 +15191,109 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
         && mesh.nrm.size() == tris.size() * 9) {
         g_meshClassSkipped++; return;
     }
-    const bool batch = g_fx.enabled && !g_meshBatchEditor
-        && !strncmp(mesh.name, "ebld:", 5)
+    /* EVERY MODEL, NOT ONLY THE REMASTERED BUILDINGS. The batch began with the buildings
+       and stayed there, so the walls, the vehicles, the cartridge's own models and the rest
+       were still sent a vertex at a time (glVertex, glColor, glTexCoord for each one) in
+       every pass: about 43,000 vertices a frame on a base with sandbag walls, some 170,000
+       GL calls. Apple's driver takes those almost for free; a Windows driver pays for every
+       one. The vertices are the ones the immediate path computes, sent as arrays instead,
+       cached where they do not change. OPENCNC3D_MESH_ALL=0 puts the buildings-only rule
+       back. */
+    const bool isEbld = !strncmp(mesh.name, "ebld:", 5);
+    if (g_efxMeshGrade) efx_grade_scale(1.0f);
+    /* Rare graded effect meshes use the immediate path so each textured/untextured
+       run can select its source correctly; neutral effects retain normal batching. */
+    const bool batch = g_fx.enabled && !g_meshBatchEditor && !g_efxMeshGrade
+        && (isEbld || mesh_perf_switch("OPENCNC3D_MESH_ALL"))
         && mesh_perf_switch("OPENCNC3D_MESH_GPU") && grass_buf_load();
+    /* A diagnostic/debug path can decline array collection. Drain its ordered
+       prefix and materialize logical polygon state before any immediate draw. */
+    if(!batch&&g_meshFragmentCollect)mesh_fragment_polygon_drain();
     MeshBatch output;
-    std::string batchKey;
+    MeshKey batchKey;
+    /* The key below runs to a few hundred bytes in about fifty appends; one allocation up
+       front instead of a doubling chain of them, on every model drawn. */
+    if (batch) batchKey.reserve(512);
     if (batch && mesh.gpuHasTread < 0) {
         mesh.gpuHasTread=0;
         for(const auto& part : mesh.parts)
             mesh.gpuSpinRoles |= (part.role==ROLE_ROTOR ? 1u : part.role==ROLE_TURRET ? 2u : 0u);
         for (const auto& t : tris) if (t.wrap >> 4) { mesh.gpuHasTread=1; break; }
     }
-    const bool stable = batch && !g_meshFragmentCollect && !mesh.gpuDeformed && (!extraMat || g_meshBatchRestPose)
+    /* DEFORMED IS A PROPERTY OF TRIANGLES, NOT OF THE MESH. A remastered building with a
+       waving flag or awning has those triangles moved in place every frame (ebld_wave), and
+       the flag used to make the whole building count as deformed: every one of its pieces,
+       walls and roof included, was walked triangle by triangle in every pass of every
+       frame. Only a draw whose range holds a waved triangle is deformed now; the rest of
+       the building is the same vertices as before and caches like any still piece. */
+    bool deformed = mesh.gpuDeformed;
+    if (deformed && !mesh.gpuWaveTris.empty()) {
+        deformed = false;
+        for (auto w = std::lower_bound(mesh.gpuWaveTris.begin(), mesh.gpuWaveTris.end(), (int)triFirst);
+             w != mesh.gpuWaveTris.end() && *w < (int)tri_limit; ++w)
+            if ((int)tris[(size_t)*w].mode == pass) { deformed = true; break; }
+        /* Preserve triangle order while giving still spans their own cache entry.
+           The recursive calls have no interior boundary and take the normal path.
+           Fragment collection already owns its range/ordering and is left intact. */
+        if (batch && deformed && !g_meshFragmentCollect
+            && mesh_perf_switch("OPENCNC3D_MESH_CLOTH_SPLIT")) {
+            std::vector<std::pair<size_t, size_t> > bands;
+            for (auto w = std::lower_bound(mesh.gpuWaveTris.begin(), mesh.gpuWaveTris.end(), (int)triFirst);
+                 w != mesh.gpuWaveTris.end() && *w < (int)tri_limit; ++w) {
+                const size_t j = (size_t)*w;
+                if ((int)tris[j].mode != pass) continue;
+                if (!bands.empty() && bands.back().second == j) bands.back().second++;
+                else bands.push_back({j, j + 1});
+            }
+            if (bands.size() != 1 || bands[0].first != triFirst || bands[0].second != tri_limit) {
+                size_t start = triFirst;
+                for (const auto& band : bands) {
+                    if (start < band.first)
+                        draw_mesh(mi, cx, cz, face, pass, turyaw, rotor, house, build_frac, ylift,
+                                  whiten_packed, wobble, animT, extraMat, start, band.first, true);
+                    draw_mesh(mi, cx, cz, face, pass, turyaw, rotor, house, build_frac, ylift,
+                              whiten_packed, wobble, animT, extraMat, band.first, band.second, true);
+                    start = band.second;
+                }
+                if (start < tri_limit)
+                    draw_mesh(mi, cx, cz, face, pass, turyaw, rotor, house, build_frac, ylift,
+                              whiten_packed, wobble, animT, extraMat, start, tri_limit, true);
+                return;
+            }
+        }
+    }
+    uint64_t shroudSig = 0;
+    const bool shroudKeyed = batch && (!g_objShroud || g_meshNoShroud || mesh_shroud_sig(mesh, cx, cz, &shroudSig));
+    const bool stable = batch && isEbld && !g_meshFragmentCollect && !g_meshTransientColor && !deformed && (!extraMat || g_meshBatchRestPose)
         && !mesh.gpuHasTread && !anim && !wob
         && (!(mesh.gpuSpinRoles & 1) || rotor == 0)
         && swayLean <= -1.0e30f && g_fanTex < 0
-        && (!g_objShroud || g_meshNoShroud || mesh_shroud_clear(mesh,cx,cz));
+        && shroudKeyed;
+    /* A PLACED PART STANDING STILL. Everything that makes a draw stable except that it
+       carries its own matrix (a remastered building's pieces all do). Such a part used to
+       be treated as moving and rebuilt on the CPU every frame, about 900 a frame on a big
+       base; most never move. Its matrix is in the key, so when the whole key comes back
+       the next frame the part did not move and its finished vertices go into the
+       persistent cache; a part that really moves has a new key every frame and keeps the
+       per-frame path (mesh_batch_placed_seen).
+       EVERY OTHER MODEL IS KEPT THE SAME WAY, matrix or not. A remastered building's
+       still parts are known to stay still; a projectile, the turning repair wrench or a
+       vehicle on the move is not, and has a new key every frame, so kept at once each
+       of those would fill the cache with entries never asked for again. Their tracks'
+       phase and their washboard tilt (mesh_wobble) go into the key below, so a vehicle
+       parked with its tracks part way through a cycle, leaning with the ground under
+       it, is kept too. */
+    const bool placedStill = batch && !stable && !g_meshFragmentCollect && !g_meshTransientColor && !deformed
+        && ((extraMat && !g_meshBatchRestPose) || !isEbld)
+        && (!mesh.gpuHasTread || !isEbld) && !anim && (!wob || !isEbld)
+        && (!(mesh.gpuSpinRoles & 1) || rotor == 0)
+        && swayLean <= -1.0e30f && g_fanTex < 0
+        && shroudKeyed
+        && mesh_perf_switch("OPENCNC3D_MESH_PLACED");
     const bool frameCache = batch && !g_meshFragmentCollect && !stable && mesh_perf_switch("OPENCNC3D_MESH_POSE");
-    if (stable || frameCache) {
+    const bool fragmentCache=batch && g_meshFragmentCollect && g_meshFragmentStore && shroudKeyed;
+    bool promote = false;
+    if (stable || frameCache || fragmentCache) {
         const PackTri* geometry = tris.data();
         mesh_batch_key(batchKey, geometry); mesh_batch_key(batchKey, tris.size());
         mesh_batch_key(batchKey, mi); mesh_batch_key(batchKey, cx); mesh_batch_key(batchKey, cz);
@@ -13983,29 +15301,92 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
         mesh_batch_key(batchKey, face); mesh_batch_key(batchKey, ground); mesh_batch_key(batchKey, pass);
         mesh_batch_key(batchKey, triFirst); mesh_batch_key(batchKey, tri_limit); mesh_batch_key(batchKey, ylift);
         mesh_batch_key(batchKey, whiten_packed); mesh_batch_key(batchKey, nrmOut); mesh_batch_key(batchKey, depthOnly);
-        mesh_batch_key(batchKey, g_meshBakePass); mesh_batch_key(batchKey, g_meshShadowPass);
+        mesh_batch_key(batchKey, g_meshBakePass); mesh_batch_key(batchKey, g_meshShadowPass); mesh_batch_key(batchKey,g_meshBakeCutout);
         mesh_batch_key(batchKey, g_meshShadowAlpha); mesh_batch_key(batchKey, g_meshFlash);
+        mesh_batch_key(batchKey,g_meshTreeGain);
+        mesh_batch_key(batchKey,g_meshNeutralStone);
+        if(g_meshNeutralStone)mesh_batch_key(batchKey,g_fx.rock_gain);
         mesh_batch_key(batchKey, g_meshAlphaScale); mesh_batch_key(batchKey, g_meshTintR);
         mesh_batch_key(batchKey, g_meshTintG); mesh_batch_key(batchKey, g_meshTintB);
         mesh_batch_key(batchKey, g_meshFillY); mesh_batch_key(batchKey, g_meshGroundPerVertex);
         mesh_batch_key(batchKey, g_meshUVScaleU); mesh_batch_key(batchKey, g_meshUVScaleV);
         mesh_batch_key(batchKey, g_meshUVOffU); mesh_batch_key(batchKey, g_meshUVOffV);
         mesh_batch_key(batchKey, MODEL_SCALE);
-        mesh_batch_key(batchKey, g_groundGen); mesh_batch_key(batchKey, g_padEpoch);
+        mesh_batch_key(batchKey, g_groundGen);
+        /* Anchor-only geometry already keys its exact resolved ground height.
+           Conforming meshes still depend on the complete pad field. */
+        if (g_meshGroundPerVertex || !mesh_perf_switch("OPENCNC3D_MESH_LOCAL_PADS"))
+            mesh_batch_key(batchKey, g_padEpoch);
         mesh_batch_key(batchKey, g_terrainBase); mesh_batch_key(batchKey, g_terrainMargin);
         mesh_batch_key(batchKey, g_clip_to_map);
+        /* the shroud under the mesh (mesh_shroud_sig) and whether it is applied at all */
+        mesh_batch_key(batchKey, shroudSig);
+        mesh_batch_key(batchKey, g_objShroud); mesh_batch_key(batchKey, g_meshNoShroud);
         const float sx=shadow_nudge_x(), sz=shadow_nudge_z();
         if (pass == MODE_SHADOW) { mesh_batch_key(batchKey,sx); mesh_batch_key(batchKey,sz); }
         const bool extra=extraMat!=NULL; mesh_batch_key(batchKey,extra);
         if(extra) batchKey.append((const char*)extraMat,12*sizeof(float));
-        if (frameCache) {
+        /* Wind moves positions, while these trees' UV/colour/normal bytes keep
+           their exact existing values. The fitted tree matrix also transforms the
+           normals, but is already in this key: changing size/lean creates another
+           exact attribute store. OPENCNC3D_MESH_WIND_MATRIX=0 restores the original
+           matrix exclusion for a paired control.
+           The lighting bake keys its own store the same way (the key above already
+           holds the bake and cutout flags, so it can never meet a lit store): its
+           colour is the unswayed vertex's shade and its UV the rest pose's, so the
+           wind changes none of those bytes either, provided the shroud the colour was
+           made under is in the key, so the bake shares only shroud-keyed draws.
+           OPENCNC3D_BAKE_SHARED_POSE=0 sends every bake draw back through the full
+           per-corner loop. */
+        if(frameCache && !deformed && !anim && !wob
+            && (!extraMat || mesh_perf_switch("OPENCNC3D_MESH_WIND_MATRIX")) && !depthOnly
+            && !mesh.sway.empty() && swayLean>-1.0e30f && !mesh.gpuHasTread
+            && !mesh.gpuSpinRoles && g_fanTex<0 && !g_meshTransientColor
+            && (!g_meshBakePass || (shroudKeyed && mesh_perf_switch("OPENCNC3D_BAKE_SHARED_POSE")))
+            && mesh_perf_switch("OPENCNC3D_MESH_WIND_ATTRIBUTES")) {
+            output.attributesKey=batchKey;const uint64_t schema=0x57494e4441545452ull;
+            mesh_batch_key(output.attributesKey,schema);
+        }
+        if(fragmentCache) {
+            /* Every resolved varying input; latest-slot replacement bounds time/alpha. */
+            mesh_batch_key(batchKey,src);mesh_batch_key(batchKey,house);
+            if(deformed)mesh_batch_key(batchKey,mesh.gpuPoseRevision);
+            mesh_batch_key(batchKey,hasX2);
+            mesh_batch_key(batchKey,anim);mesh_batch_key(batchKey,af0);mesh_batch_key(batchKey,af1);
+            mesh_batch_key(batchKey,afMix);mesh_batch_key(batchKey,rotor);mesh_batch_key(batchKey,wobble);
+            mesh_batch_key(batchKey,wax);mesh_batch_key(batchKey,waz);
+            mesh_batch_key(batchKey,g_fx.tree3d_wind_dir);mesh_batch_key(batchKey,g_fx.tree3d_flutter);mesh_batch_key(batchKey,swayLean);mesh_batch_key(batchKey,swayA1);mesh_batch_key(batchKey,swayB1);
+            mesh_batch_key(batchKey,swayA2);mesh_batch_key(batchKey,swayB2);
+            if(mesh.gpuHasTread)mesh_batch_key(batchKey,g_treadNow);
+            mesh_batch_key(batchKey,g_fanTex);if(g_fanTex>=0)mesh_batch_key(batchKey,g_fanAngle);
+            mesh_batch_key(batchKey,g_shroudEditorOff);mesh_batch_key(batchKey,g_shroudRimOn);
+            mesh_batch_key(batchKey,g_shroudOn);mesh_batch_key(batchKey,g_shroudValid);
+            mesh_batch_key(batchKey,g_shroudRevealed);
+            if(mesh_fragment_input_reuse(batchKey,*src,house,pass,depthOnly,nrmOut))return;
+        }
+        if (placedStill) {
+            if (deformed) mesh_batch_key(batchKey, mesh.gpuPoseRevision);
+            if (!isEbld) {
+                if (mesh.gpuHasTread) mesh_batch_key(batchKey, g_treadNow);
+                mesh_batch_key(batchKey, wax); mesh_batch_key(batchKey, waz);
+            }
+            const MeshBatchEntry* kept = mesh_batch_kept_find(batchKey);
+            if (kept) {
+                mesh_batch_draw(*kept,*src,house,pass,depthOnly,nrmOut); return;
+            }
+            promote = mesh_batch_placed_seen(batchKey);
+            if (!promote) {
+                const MeshBatchEntry* found = mesh_batch_frame_find(batchKey);
+                if (found) { g_meshFrameHits++; mesh_batch_draw(*found,*src,house,pass,depthOnly,nrmOut); return; }
+            }
+        } else if (frameCache) {
             /* All changing pose/attribute inputs, scoped to this draw_frame. */
-            mesh_batch_key(batchKey,mesh.gpuPoseRevision);
+            if (deformed) mesh_batch_key(batchKey,mesh.gpuPoseRevision);
             mesh_batch_key(batchKey,anim); mesh_batch_key(batchKey,af0);
             mesh_batch_key(batchKey,af1); mesh_batch_key(batchKey,afMix);
             mesh_batch_key(batchKey,rotor); mesh_batch_key(batchKey,wobble);
             mesh_batch_key(batchKey,wax); mesh_batch_key(batchKey,waz);
-            mesh_batch_key(batchKey,swayLean); mesh_batch_key(batchKey,swayA1);
+            mesh_batch_key(batchKey,g_fx.tree3d_wind_dir);mesh_batch_key(batchKey,g_fx.tree3d_flutter);mesh_batch_key(batchKey,swayLean); mesh_batch_key(batchKey,swayA1);
             mesh_batch_key(batchKey,swayB1); mesh_batch_key(batchKey,swayA2);
             mesh_batch_key(batchKey,swayB2); mesh_batch_key(batchKey,g_treadNow);
             mesh_batch_key(batchKey,g_fanTex); mesh_batch_key(batchKey,g_fanAngle);
@@ -14013,12 +15394,147 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
             const MeshBatchEntry* found=mesh_batch_frame_find(batchKey);
             if(found) { g_meshFrameHits++; mesh_batch_draw(*found,*src,house,pass,depthOnly,nrmOut); return; }
         }
-        auto found=g_meshBatchCache.find(batchKey);
-        if(found!=g_meshBatchCache.end()) {
-            found->second.used=g_drawFrameSerial; g_meshBatchHits++;
-            mesh_batch_draw(found->second,*src,house,pass,depthOnly,nrmOut); return;
+        const MeshBatchEntry* found=fragmentCache ? NULL : mesh_batch_kept_find(batchKey);
+        if(found) {
+            mesh_batch_draw(*found,*src,house,pass,depthOnly,nrmOut); return;
         }
     }
+    const MeshBatchEntry* windVerifyAttributes=NULL;
+    const MeshBatchEntry* bakeVerifyAttributes=NULL;
+    bool windVerifyDepth=false;
+    float windLow[3],windHigh[3];
+    MeshGeometryPose* geometry = NULL;
+    if (batch && !stable && !promote && mesh_perf_switch("OPENCNC3D_MESH_GEOMETRY")) {
+        MeshKey key;
+        const PackTri* source = tris.data();
+        mesh_batch_key(key, source); mesh_batch_key(key, tris.size());
+        mesh_batch_key(key, triFirst); mesh_batch_key(key, tri_limit); mesh_batch_key(key, pass);
+        mesh_batch_key(key, cx); mesh_batch_key(key, cz); mesh_batch_key(key, ground);
+        mesh_batch_key(key, face); mesh_batch_key(key, turyaw); mesh_batch_key(key, rotor);
+        mesh_batch_key(key, MODEL_SCALE); mesh_batch_key(key, ylift); mesh_batch_key(key, g_meshFillY);
+        mesh_batch_key(key, g_meshGroundPerVertex); mesh_batch_key(key, g_groundGen);
+        mesh_batch_key(key, g_terrainBase); mesh_batch_key(key, g_terrainMargin);
+        mesh_batch_key(key, g_clip_to_map);
+        if (g_meshGroundPerVertex) mesh_batch_key(key, g_padEpoch);
+        mesh_batch_key(key, anim); mesh_batch_key(key, af0); mesh_batch_key(key, af1); mesh_batch_key(key, afMix);
+        mesh_batch_key(key, wax); mesh_batch_key(key, waz); mesh_batch_key(key, wobble);
+        mesh_batch_key(key,g_fx.tree3d_wind_dir);mesh_batch_key(key,g_fx.tree3d_flutter);mesh_batch_key(key, swayLean); mesh_batch_key(key, swayA1); mesh_batch_key(key, swayB1);
+        mesh_batch_key(key, swayA2); mesh_batch_key(key, swayB2);
+        const bool extra = extraMat != NULL; mesh_batch_key(key, extra);
+        if (extra) key.append((const char*)extraMat, 12*sizeof(float));
+        if (deformed) mesh_batch_key(key, mesh.gpuPoseRevision);
+        if (pass == MODE_SHADOW) {
+            const float nx=shadow_nudge_x(), nz=shadow_nudge_z();
+            mesh_batch_key(key,nx); mesh_batch_key(key,nz);
+        }
+        geometry=g_meshBatchRestPose && mesh_perf_switch("OPENCNC3D_MESH_SETTLED")
+            ? mesh_geometry_settled(key,(tri_limit-triFirst)*3)
+            : mesh_geometry_find(key,(tri_limit-triFirst)*3);
+        output.geometry=geometry;
+        /* Wind-driven opaque sun casters need positions only. Keep their exact
+           full-loop vertex order, shared pose buffer and normal mesh draw state. */
+        if(geometry && frameCache && depthOnly && !geometry->gpu && shroudKeyed
+            && !deformed && !anim && !wob && !mesh.sway.empty() && swayLean>-1.0e30f
+            && (!extraMat || mesh_perf_switch("OPENCNC3D_MESH_WIND_MATRIX"))
+            && !mesh.gpuSpinRoles && turyaw==0 && !mesh.gpuHasTread && g_fanTex<0
+            && !g_meshTransientColor && !g_meshBakePass && !g_meshShadowPass && !nrmOut
+            && !g_meshFragmentCollect && !g_meshGroundPerVertex && pass==MODE_OPAQUE
+            && mesh_perf_switch("OPENCNC3D_MESH_SHARED_POSITIONS")
+            && mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT")
+            && mesh_perf_switch("OPENCNC3D_MESH_WIND_DEPTH")) {
+            size_t count=0;
+            for(size_t triangle=triFirst;triangle<tri_limit;triangle++)
+                if((int)tris[triangle].mode==MODE_OPAQUE)count+=3;
+            if(count && mesh_wind_positions_prepared(mesh,triFirst,tri_limit,pass,count,cx,cz,rc,rs,ground,ylift,
+                    swayLean,swayA1,swayB1,swayA2,swayB2,extraMat,windLow,windHigh)) {
+                if(mesh_wind_direct_verify_enabled())windVerifyDepth=true;
+                else if(mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT_UPLOAD_OK")) {
+                    MeshBatchEntry draw;
+                    bool ready=false;
+                    try {draw.runs.push_back({-2,-1,false,0,count});ready=true;}
+                    catch(const std::bad_alloc&) {}
+                    if(ready) {
+                        draw.positionVbo=mesh_geometry_upload(*geometry,g_meshGeometryUpload.data(),count);
+                        if(draw.positionVbo) {
+                            draw.vbo=draw.positionVbo;draw.bytes=count*3*sizeof(float);
+                            draw.last={};
+                            memcpy(draw.last.p,&g_meshGeometryUpload[(count-1)*3],sizeof draw.last.p);
+                            memcpy(geometry->lo,windLow,sizeof geometry->lo);
+                            memcpy(geometry->hi,windHigh,sizeof geometry->hi);geometry->boundsValid=true;
+                            memcpy(draw.lo,windLow,sizeof draw.lo);memcpy(draw.hi,windHigh,sizeof draw.hi);
+                            g_meshWindDepthDraws++;g_meshWindDepthVertices+=count;
+                            mesh_batch_draw(draw,*src,house,pass,true,false);
+                            mesh_batch_frame_keep(batchKey,draw);return;
+                        }
+                    }
+                }
+            }
+            if(count && !windVerifyDepth)g_meshWindDepthFallbacks++;
+        }
+        if(geometry && !output.attributesKey.empty()
+            && (geometry->gpu || mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT"))) {
+            const MeshBatchEntry* attributes=mesh_batch_kept_find(output.attributesKey);
+            if(attributes && attributes->compact
+                && geometry->gpu && geometry->gpuCount==attributes->bytes/sizeof(MeshBatchAttributes)) {
+                /* The bake under the verifier walks the full loop instead and compares
+                   what it made with the shared pose and the kept store (below). */
+                if(g_meshBakePass && mesh_wind_direct_verify_enabled())bakeVerifyAttributes=attributes;
+                else {
+                    MeshBatchEntry draw=*attributes;draw.positionVbo=geometry->gpu;
+                    memcpy(draw.lo,geometry->lo,sizeof draw.lo);memcpy(draw.hi,geometry->hi,sizeof draw.hi);
+                    if(g_meshBakePass){g_meshBakeShareDraws++;g_meshBakeShareVertices+=geometry->gpuCount;}
+                    mesh_batch_draw(draw,*src,house,pass,depthOnly,nrmOut);return;
+                }
+            }
+            if(attributes && attributes->compact && !geometry->gpu && shroudKeyed
+                && !deformed && !anim && !wob
+                && (!extraMat || mesh_perf_switch("OPENCNC3D_MESH_WIND_MATRIX")) && !mesh.gpuSpinRoles
+                && turyaw==0 && !mesh.gpuHasTread && g_fanTex<0
+                && !g_meshTransientColor && !g_meshBakePass && !depthOnly && !g_meshFragmentCollect
+                && !g_meshGroundPerVertex && (pass==MODE_OPAQUE || pass==MODE_CUTOUT)
+                && mesh_perf_switch("OPENCNC3D_MESH_SHARED_POSITIONS")
+                && mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT")) {
+                const size_t count=attributes->bytes/sizeof(MeshBatchAttributes);
+                if(mesh_wind_positions_prepared(mesh,triFirst,tri_limit,pass,count,cx,cz,rc,rs,ground,ylift,
+                                              swayLean,swayA1,swayB1,swayA2,swayB2,extraMat,windLow,windHigh)) {
+                    if(mesh_wind_direct_verify_enabled())windVerifyAttributes=attributes;
+                    else if(mesh_perf_switch("OPENCNC3D_MESH_WIND_DIRECT_UPLOAD_OK")) {
+                        MeshBatchEntry draw;
+                        bool copied=false;
+                        try {
+                            draw=*attributes;copied=true;
+                        } catch(const std::bad_alloc&) {}
+                        if(copied) {
+                            draw.positionVbo=mesh_geometry_upload(*geometry,g_meshGeometryUpload.data(),count);
+                            if(draw.positionVbo) {
+                                memcpy(geometry->lo,windLow,sizeof geometry->lo);
+                                memcpy(geometry->hi,windHigh,sizeof geometry->hi);geometry->boundsValid=true;
+                                memcpy(draw.lo,windLow,sizeof draw.lo);memcpy(draw.hi,windHigh,sizeof draw.hi);
+                                g_meshWindDirectDraws++;g_meshWindDirectVertices+=count;
+                                mesh_batch_draw(draw,*src,house,pass,depthOnly,nrmOut);return;
+                            }
+                        }
+                    }
+                }
+                if(!windVerifyAttributes)g_meshWindDirectFallbacks++;
+            }
+        }
+    }
+    /* Active fragments reuse exact resolved positions and immutable source
+       preparation across passes. Every excluded varying effect keeps this loop. */
+    if(geometry && !g_meshNeutralStone && g_meshFragmentCollect && isEbld
+        && mesh_perf_switch("OPENCNC3D_MESH_FRAGMENT_PREPARE")
+        && !deformed && !anim && !wob && !mesh.gpuHasTread && !mesh.gpuSpinRoles
+        && swayLean<=-1.0e30f && g_fanTex<0 && !uvHook && !whiten_packed
+        && g_meshFillY>=1.0e38f && !g_meshGroundPerVertex
+        && g_meshTreeGain==1.0f && g_meshTintR==255 && g_meshTintG==255 && g_meshTintB==255
+        && (!g_objShroud || g_meshNoShroud || mesh_shroud_clear(mesh,cx,cz))
+        && mesh_prepare_fragment(output,*src,mesh,*geometry,triFirst,tri_limit,pass,
+                                 depthOnly,nrmOut,hasX2,extraMat,rc,rs,house)) {
+        if(!output.fragmentQueued)output.finish(batchKey,*src,house,pass,depthOnly,nrmOut,frameCache&&!promote);
+        return;
+    }
+    if (batch) output.prepare((tri_limit-triFirst)*3);
     int shroudPerVertex = -1;
     /* The node's animation delta, lerped once per PART rather than once per triangle:
        every triangle of a part reads the same two baked frames with the same mix. */
@@ -14091,11 +15607,12 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
            one; dividing it out would leave white. Not writing them leaves them exactly
            as they are, lit by the console as before. 1,282 triangles in a mission pack
            are of this kind. */
-        if (g_meshBakePass) {
+        if (g_meshBakePass && t.tex < 0) continue;
+        if (g_meshBakePass && !g_meshBakeCutout) {
             if (t.tex < 0)
                 continue;
             if (curtex != -3) { if (began) { if (batch) output.end(); else glEnd(); began = false; }
-                                if (!g_meshFragmentCollect) glDisable(GL_TEXTURE_2D);
+                                if (!batch) glDisable(GL_TEXTURE_2D);
                                 curtex = -3; }
         } else if (!depthOnly
                    && (t.tex != curtex || (t.tex >= 0 && (int)t.wrap != curwrap))) {
@@ -14113,7 +15630,7 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                                                && t.mode != MODE_XLU;
             if (curtex >= 0 && !flashThis) {
                 /* Collected runs apply this state during their single replay. */
-                if (!g_meshFragmentCollect) {
+                if (!batch) {
                     const PackTex& tx = src->tex[curtex];
                     glEnable(GL_TEXTURE_2D);
                     glBindTexture(GL_TEXTURE_2D, livery_texture(tx, house));
@@ -14121,15 +15638,16 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                 }
                 curwrap = (int)t.wrap;
             } else {
-                if (!g_meshFragmentCollect) glDisable(GL_TEXTURE_2D);
+                if (!batch) glDisable(GL_TEXTURE_2D);
                 curwrap = -1;
             }
+            if (g_efxMeshGrade) efx_grade_textured(curtex>=0 && !flashThis);
         }
         if (hasX2) {
-            const bool x2 = curtex >= 0 && (mesh.tfl[i] & 2) != 0;
+            const bool x2=curtex>=0 && (treeBoost || (i<mesh.tfl.size() && (mesh.tfl[i]&2)!=0));
             if (x2 != curX2) {
                 if (began) { if (batch) output.end(); else glEnd(); began = false; }
-                if (!g_meshFragmentCollect) {
+                if (!batch) {
                 if (x2) {
                     glGetTexEnviv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, &envWas);
                     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
@@ -14149,6 +15667,7 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, envWas);
                 }
                 }
+                if (g_efxMeshGrade) efx_grade_scale(x2 ? 2.0f : 1.0f);
                 curX2 = x2;
             }
         }
@@ -14201,6 +15720,15 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                 } else {
                     cr = v.r; cg = v.g; cb = v.b;
                 }
+                if(g_meshNeutralStone && !g_meshNrmOut && !g_meshBakePass && !g_meshShadowPass) {
+                    const float reference=160.0f*g_fx.rock_gain*1.70f/.43f;
+                    cr=cg=cb=(unsigned char)std::min(255.0f,reference/(curX2?2.0f:1.0f)+.5f);
+                }
+                if(g_meshTreeGain!=1.0f&&!g_meshNrmOut&&!g_meshBakePass&&!g_meshShadowPass) {
+                    cr=(unsigned char)std::min(255.0f,cr*g_meshTreeGain*(treeBoost && !(i<mesh.tfl.size()&&(mesh.tfl[i]&2))?0.5f:1.0f));
+                    cg=(unsigned char)std::min(255.0f,cg*g_meshTreeGain*(treeBoost && !(i<mesh.tfl.size()&&(mesh.tfl[i]&2))?0.5f:1.0f));
+                    cb=(unsigned char)std::min(255.0f,cb*g_meshTreeGain*(treeBoost && !(i<mesh.tfl.size()&&(mesh.tfl[i]&2))?0.5f:1.0f));
+                }
                 if (g_objShroud && !g_meshNoShroud) {   /* the cursor opts out; see the flag */
                     if (shroudPerVertex < 0)
                         shroudPerVertex = mesh_shroud_clear(mesh, cx, cz) ? 0 : 1;
@@ -14236,8 +15764,13 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                 }
                 if (nrmOut) {
                     /* the corner's normal, turned as the corner is below (the extra
-                       matrix's rotation, the part's spin, the facing), and the self-lit
-                       flag */
+                       matrix's rotation, the part's spin, the facing, the lean), and the
+                       self-lit flag */
+                    const size_t vi=(i-triFirst)*3+(size_t)k;
+                    if (geometry && (geometry->valid[vi]&2)) {
+                        const float* n=geometry->corners[vi].n;
+                        output.normal(n[0],n[1],n[2]);
+                    } else {
                     const float* nn = &mesh.nrm[i * 9 + (size_t)k * 3];
                     float nx = nn[0], ny = nn[1], nz = nn[2];
                     if (extraMat) {
@@ -14251,8 +15784,23 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                         nx = dx * pcs + dz * psn;
                         nz = -dx * psn + dz * pcs;
                     }
-                    if (batch) output.normal(nx * rc + nz * rs, ny, -nx * rs + nz * rc);
-                else glNormal3f(nx * rc + nz * rs, ny, -nx * rs + nz * rc);
+                    float normal[3] = {nx * rc + nz * rs, ny, -nx * rs + nz * rc};
+                    if (wob) {
+                        /* the lean turns the normal as it turns the corner below: about
+                           world X, then world Z */
+                        const float y1 = normal[1] * wcx - normal[2] * wsx;
+                        const float z1 = normal[1] * wsx + normal[2] * wcx;
+                        const float x2 = normal[0] * wcz - y1 * wsz;
+                        const float y2 = normal[0] * wsz + y1 * wcz;
+                        normal[0] = x2; normal[1] = y2; normal[2] = z1;
+                    }
+                    if (geometry) {
+                        memcpy(geometry->corners[vi].n,normal,sizeof normal);
+                        geometry->valid[vi] |= 2;
+                    }
+                    if (batch) output.normal(normal[0],normal[1],normal[2]);
+                    else glNormal3f(normal[0],normal[1],normal[2]);
+                    }
                     if (batch) output.color(255, 255, 255,
                                (i < mesh.tfl.size() && (mesh.tfl[i] & 1)) ? 255 : 0);
                 else glColor4ub(255, 255, 255,
@@ -14273,6 +15821,11 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                     else glColor4ub(cr, cg, cb, alpha);
                 }
             }
+            const size_t vi=(i-triFirst)*3+(size_t)k;
+            if (geometry && (geometry->valid[vi]&1)) {
+                const float* p=geometry->corners[vi].p;
+                output.vertex(p[0],p[1],p[2]);
+            } else {
             float vx = v.x, vy = v.y, vz = v.z;
             /* (the weights cover the model's own triangles; the borrowed shadow plate
                after them stays put) */
@@ -14284,13 +15837,13 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                 if (w[1] && mesh.swayPh.size() == mesh.sway.size() * 2) {
                     /* sin(a + ph) and sin(b + 1.7 ph), from the phases kept per corner */
                     const float* q = &mesh.swayPh[i * 12 + (size_t)k * 4];
-                    up += 0.007f * (float)w[1] * (1.0f / 255.0f)
+                    up += swayFlutterScale * (float)w[1] * (1.0f / 255.0f)
                         * (swayA1 * q[1] + swayB1 * q[0]
                            + 0.55f * (swayA2 * q[3] + swayB2 * q[2]));
                 }
-                vx += 1024.0f * 0.9129234f * m;
+                vx += swayWindX * m;
                 vy += 1024.0f * up;
-                vz += 1024.0f * -0.4081304f * m;
+                vz += swayWindZ * m;
             }
             if (vy > g_meshFillY) vy = g_meshFillY;
             if (extraMat) {
@@ -14334,7 +15887,7 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                 const float x2 = lx * wcz - y1 * wsz;      /* then about world Z    */
                 const float y2 = lx * wsz + y1 * wcz;
                 if (batch) output.vertex(cx + x2 + snx, y2 + ground, cz + z1 + snz);
-                else glVertex3f(cx + x2 + snx, y2 + ground, cz + z1 + snz);
+                else { glVertex3f(cx + x2 + snx, y2 + ground, cz + z1 + snz); g_meshImmVerts++; }
             } else {
                 const float wx = cx + mx * MODEL_SCALE + snx;
                 const float wz = cz + mz * MODEL_SCALE + snz;
@@ -14342,17 +15895,39 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
                    g_meshGroundPerVertex. */
                 const float g = g_meshGroundPerVertex ? terrain_y(wx, wz) : ground;
                 if (batch) output.vertex(wx, vy * MODEL_SCALE + ybias + ylift + g, wz);
-                else glVertex3f(wx, vy * MODEL_SCALE + ybias + ylift + g, wz);
+                else { glVertex3f(wx, vy * MODEL_SCALE + ybias + ylift + g, wz); g_meshImmVerts++; }
+            }
+                if (geometry) {
+                    memcpy(geometry->corners[vi].p,output.current.p,3*sizeof(float));
+                    geometry->valid[vi] |= 1; g_meshGeometryBuilds++;
+                }
             }
 
         }
     }
     if (began) { if (batch) output.end(); else glEnd(); }
-    if (curX2 && !g_meshFragmentCollect) {
+    if (g_efxMeshGrade) { efx_grade_textured(false); efx_grade_scale(1.0f); }
+    if (curX2 && !batch) {
         glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, 1.0f);
         glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, envWas);
     }
-    if (batch) output.finish(batchKey,*src,house,pass,depthOnly,nrmOut,frameCache);
+    if(windVerifyDepth) {
+        g_meshWindDepthVerified++;
+        if(!mesh_wind_depth_verify(output,windLow,windHigh))g_meshWindDepthMismatches++;
+    }
+    if(windVerifyAttributes) {
+        g_meshWindDirectVerified++;
+        if(!mesh_wind_direct_verify(output,*windVerifyAttributes,windLow,windHigh))g_meshWindDirectMismatches++;
+    }
+    if(bakeVerifyAttributes) {
+        g_meshBakeShareVerified++;
+        if(!mesh_bake_share_verify(output,*bakeVerifyAttributes,*geometry)) {
+            if(g_meshBakeShareMismatches<8)
+                fprintf(stderr,"MESHBAKESHARE|mismatch|mesh=%s|pass=%d|count=%zu\n",mesh.name,pass,output.vertices.size());
+            g_meshBakeShareMismatches++;
+        }
+    }
+    if (batch) output.finish(batchKey,*src,house,pass,depthOnly,nrmOut,frameCache && !promote);
 }
 
 /* The shatter pool draws PIECES of a mesh through draw_mesh above, so it lands here,
@@ -14377,6 +15952,11 @@ static void draw_mesh(int mi, float cx, float cz, int face, int pass,
 #include "model3d_mod.h"
 /* The Unity explosion, replayed. Experimental art only; see its header. */
 #include "unityvfx_mod.h"
+/* Shared world-detail placement asks RA's native map, defined after its terrain loader. */
+static int ra3d_detail_cell(int x,int y,int* slot);
+static float ra3d_detail_texels(void);
+static bool ra3d_detail_plants(void);
+static const char* ra3d_detail_rock_theater(void);
 #include "mottle_mod.h"
 #include "foliage3d_mod.h"
 
@@ -14496,12 +16076,79 @@ static bool g_wallsDraw = true;
    draw the way the mesh hooks are: set for one cell, then back to 0. */
 static float g_wallLiftNow = 0.0f;
 
+/* OFF THIS PASS'S VIEW, IN A PASS THAT IS NOT THE COLOUR PICTURE: the sun's map, the
+   sea's reflection, the normal target and the relight's bake. Each walks every wall,
+   soldier and vehicle the shroud shows, the whole map once it is explored, and every piece
+   is dropped only at the draw, by its own box against the pass's clip, after its pose and
+   its key were built. A box round the whole object (r cells either way across the ground,
+   from under the lowest ground to `up` above the highest) tested against the same clip
+   first: outside it, every piece would have been dropped. The colour picture keeps its
+   path, because drawing there also counts and marks what the player sees.
+   OPENCNC3D_OBJ_CULL=0 turns it off for an A/B. */
+static bool aux_object_outside(float x, float z, float r, float up)
+{
+    if (!(g_spriteShadowPass || g_m3NormalPass || g_m3Mirrored || g_m3CasterDepth || g_meshBakePass))
+        return false;
+    const float lo[3] = { x - r, g_terrainHBot - 2.0f, z - r };
+    const float hi[3] = { x + r, g_terrainHTop + up, z + r };
+    if (mesh_perf_switch("OPENCNC3D_OBJ_CULL") && mesh_box_outside(lo, hi)) return true;
+    /* and, in the sun's two passes, outside every texel the light pass reads
+       (fx_post.h, the receiver window): the same box, the same answer */
+    return fx_recv_object_outside(lo, hi);
+}
+
+/* ONE CLIENT-ARRAY SCOPE AND ONE CULL BRACKET FOR THE WHOLE WALK. Each wall cell is its
+   own small draw, and each used to save and restore the client arrays around itself and
+   toggle the one-sided cull state in and out (ebld_wall_cull_begin). The walk holds only
+   model draws, each of which sets every array it reads, so one scope round the walk leaves
+   every draw the same arrays; the cull state is entered once and left before any draw that
+   does not want it (ebld_wall_cull_hold). OPENCNC3D_WALL_WALK_SCOPE=0 brackets every cell
+   on its own again. */
+struct WallWalkScope {
+    bool on;
+    WallWalkScope() : on(mesh_perf_switch("OPENCNC3D_WALL_WALK_SCOPE")) { if (on) ebld_wall_cull_hold(true); }
+    ~WallWalkScope() { if (on) ebld_wall_cull_hold(false); }
+    void release() { if (on) ebld_wall_cull_release(); }
+};
 static void draw_walls(int wallpass)
 {
     if (!g_wallsDraw)
         return;
     if (g_walls.empty())
         return;
+    const bool walkScope = mesh_perf_switch("OPENCNC3D_WALL_WALK_SCOPE");
+    /* RED ALERT'S WALLS (ra3d_cells_from_map fills g_walls from its engine's map): the five
+       both games share, each drawn as its remastered piece where one is in force, in every
+       pass that asks (the colour picture, the sun's casters, the normal target), rising and
+       wearing down as Tiberian Dawn's do. A scene of Red Alert's has no cartridge wall to
+       fall back on: a cell with no remastered piece (its own fence FENC where no approved
+       model is staged, or the remasters switched off) is the sprite pass's 1996 picture
+       (ra3d_draw_sprites); its fence, where staged, is kind 5 here. There is no
+       separate shadow set, the sun shadow being the models' own. */
+    if (g_raModule) {
+        if (wallpass == WALLPASS_SHADOW) return;
+        const int mode = wallpass == WALLPASS_OPAQUE ? MODE_OPAQUE : MODE_CUTOUT;
+        g_meshGroundPerVertex = true;
+        MeshArrayScope arrays(walkScope);
+        WallWalkScope cull;
+        for (size_t i = 0; i < g_walls.size(); i++) {
+            const WallCell& w = g_walls[i];
+            if (w.kind > 5 || !cell_shown(w.x, w.y) || shroud_cell_hidden(w.x, w.y))
+                continue;
+            const float cx = (float)w.x + 0.5f, cz = (float)w.y + 0.5f;
+            float rise = 0.0f;
+            if (!wall_rise_lift(w.x, w.y, &rise) || aux_object_outside(cx, cz, 3.0f, 6.0f))
+                continue;
+            const float rt = wall_rise_secs(w.x, w.y);
+            if (rt >= 0.0f && eplc_wall_draw(w.kind, w.icon, cx, cz, mode, rt))
+                continue;
+            g_wallLiftNow = rise;
+            ebld_wall_draw(w.kind, w.icon, cx, cz, mode);
+            g_wallLiftNow = 0.0f;
+        }
+        g_meshGroundPerVertex = false;
+        return;
+    }
     if (!g_wallArtReady)
         wall_art_init();
     if (!g_wallArtUsable)
@@ -14510,6 +16157,8 @@ static void draw_walls(int wallpass)
     /* Every wall piece overhangs its cell, so every one of them wants the per-vertex
        ground. See g_meshGroundPerVertex. */
     g_meshGroundPerVertex = true;
+    MeshArrayScope arrays(walkScope);
+    WallWalkScope cull;
     for (size_t i = 0; i < g_walls.size(); i++) {
         const WallCell& w = g_walls[i];
         if (w.kind > 4)
@@ -14536,8 +16185,11 @@ static void draw_walls(int wallpass)
         float rise = 0.0f;
         if (!wall_rise_lift(w.x, w.y, &rise))
             continue;
+        if (aux_object_outside(cx, cz, 3.0f, 6.0f))
+            continue;
 
         if (wallpass == WALLPASS_SHADOW) {
+            cull.release();                 /* (the shadow sets are drawn unbracketed) */
             const int m4 = a.sha4[v.variant];
             if (m4 >= 0) {
                 /* SBAG 157-160 and BRIK 180/183 are flat untextured quads modelled at
@@ -14595,6 +16247,7 @@ static void draw_walls(int wallpass)
                                                             : a.body[v.variant];
         if (m < 0)
             continue;
+        cull.release();                     /* (the cartridge's wall is drawn unbracketed) */
         draw_mesh(m, cx, cz, wall_face(v.face),
                   wallpass == WALLPASS_OPAQUE ? MODE_OPAQUE : MODE_CUTOUT,
                   0, 0.0f, 0, 1.0f, rise);
@@ -14871,7 +16524,10 @@ static void draw_fields(int mode)
            anchor; the overlay V12 takes V13's model as it takes V13's mesh */
         const int er = eterr_cell_draw(ETERR_FIELD, FIELD_MESH_KEY[fc.kind], fc.x, fc.y,
                                        mode);
-        if (er == ETERR_OFF || (er == ETERR_NONE && mi < 0))
+        /* (Red Alert's fields come from its engine's map, ra3d_cells_from_map, and a
+           scene of Red Alert's has no cartridge field to fall back on: a field with no
+           reused model keeps its 1996 picture) */
+        if (er == ETERR_OFF || (er == ETERR_NONE && (mi < 0 || g_raModule)))
             continue;
         if (er == ETERR_NONE)
             draw_mesh(mi, (float)fc.x + 0.5f, (float)fc.y + 0.5f, -1, mode);
@@ -15236,7 +16892,6 @@ static bool efx_nuke_draw_model(int mi, float wx, float wz, float frame)
     return true;
 }
 
-
 /* ---- THE ION CANNON ------------------------------------------------------------------
    Ten snapshot meshes ION0..ION9, one per 160-tick clip slot, each already carrying the
    motion AND the texture for that instant; see bake_ion_effect in bake5.py for why the
@@ -15300,7 +16955,6 @@ static void efx_ion_draw_model(int mi, float wx, float wz)
        modulated by one stale texel of the ion ring. Every sibling helper restores it. */
     glDisable(GL_TEXTURE_2D);
 }
-
 
 /* WHERE A GUN ACTUALLY POINTS, measured off the shipped mesh rather than tabulated.
    
@@ -15497,29 +17151,16 @@ static int sprite_house(const SimObject& o)
     return obj_side(o) == 1 ? SPRH_NOD : SPRH_GDI;
 }
 
-/* WHICH UNIFORM A MAN WEARS ONCE THE SEATS HAVE COLOURS. Answers the house row through
-   *row, and returns the extra sheet's colour, or -1 for "one of the pack's own two".
-
-   Colours 0 and 1 need no new art: they ARE the pack's gold and Nod rows, so a Nod seat
-   that drew the gold square in the lobby wears gold, which is exactly what mesh_house
-   already does for that seat's tanks. Everything else keeps the side row, so a strip that
-   was never recoloured still falls back to the right one of the two.
-
-   THESE ROWS ARE NOT THE MESH PACK'S LIVERY SLOTS AND livery_slot MUST NOT BE USED ON
-   THEM. A mesh's slot 0 is the base decode and slot 1 the GDI variant; a sprite's row 0
-   is gold and row 1 is Nod. Same two colours, opposite order, and swapping them swaps
-   every soldier's side.
-
-   Outside a skirmish, and for any house with no seat colour (Neutral, and the campaign's
-   GoodGuy and BadGuy), the lookup misses and the answer is the side test it has always
-   been, so a campaign frame is unchanged. */
+/* Multiplayer uniforms use the player's palette. Gold reuses its existing row;
+   light blue, like the other colours, is built from the original 176..191 indices.
+   Campaigns and unseated civilian houses retain their existing faction row. */
 static int sprite_livery(const SimObject& o, int* row)
 {
     *row = sprite_house(o);
     const int c = livery_of_house(o.house);
     if (c < 0 || c >= LIVERY_COUNT) return -1;
     if (c == 0) { *row = SPRH_GDI; return -1; }
-    if (c == 1) { *row = SPRH_NOD; return -1; }
+    if (c == 1) { *row = g_raModule ? SPRH_NOD : SPRH_GDI; return g_raModule ? -1 : c; }
     return c;
 }
 
@@ -15531,6 +17172,8 @@ static bool inf_use_sprites(void)
 {
     return g_dosinfOn && fx_infset_get() != FX_INF_N64;
 }
+
+#include "new_sprites_mod.h"
 
 /* ---- REMASTERED INFANTRY -------------------------------------------------------------
  *
@@ -15862,7 +17505,13 @@ static bool dosinf_draw_sprite(const SimObject& o)
        here is not an error, it is the DOS sprite -- which is also what a machine with no
        install draws, and what a type the Remaster does not carry draws. */
     int si = t.strip[hs][anim];
-    if (fx_infset_get() == FX_INF_REMASTER) {
+    int nativeAction=-1,nativeStrip=-1;
+    if (new_sprite_active(o)) {
+        nativeAction=o.doing>=0&&o.doing<31?o.doing:(walking?3:0);
+        nativeStrip=new_sprite_strip(nativeAction,liv<0?hs:liv);
+    }
+    if (nativeStrip>=0) si=nativeStrip;
+    else if (fx_infset_get() == FX_INF_REMASTER) {
         const int lv = (liv < 0) ? hs : liv;
         const int rs = rm_inf_strip(o.type, anim, lv, t);
         if (rs >= 0) si = rs;
@@ -15873,10 +17522,16 @@ static bool dosinf_draw_sprite(const SimObject& o)
        screen-yaw bias is absorbed the same way the N64 path absorbs it. */
     int facenum = 0;
     if (sp.facings > 1 && o.face >= 0)
-        facenum = dosinf_facenum(o.face + sprite_facing_bias());
+        facenum = nativeStrip>=0 && sp.facings==2
+            ? (((o.face+sprite_facing_bias())&255)<128?1:0)
+            : dosinf_facenum(o.face + sprite_facing_bias());
 
     int stage = 0;
-    if (anim == DA_WALK && sp.stages > 1) {
+    if (nativeStrip>=0) {
+        stage=o.dostage>=0?o.dostage:(nativeAction==3?(int)floorf(phase):0);
+        if(stage<0)stage=0;
+        stage=o.dying?std::min(stage,sp.stages-1):stage%sp.stages;
+    } else if (anim == DA_WALK && sp.stages > 1) {
         stage = (int)floorf(phase) % sp.stages;
         if (stage < 0) stage += sp.stages;
     } else if (anim == live && sp.stages > 0) {
@@ -15895,6 +17550,10 @@ static bool dosinf_draw_sprite(const SimObject& o)
     if (frame < 0) frame = 0;
     if (frame >= sp.frames) frame = sp.frames - 1;
 
+    if (nativeStrip>=0 && g_dumpanim && !g_spriteShadowPass) {
+        printf("NEWSPRITES|pick|id=%d|action=%d|facing=%d|stage=%d|source=%d\n",o.id,nativeAction,facenum,stage,
+               ns_frame(g_nsPack.actions[nativeAction],facenum,stage,o.dying));
+    }
     if (g_dumpanim && !g_spriteShadowPass) {
         AnimPick ap;
         ap.id = o.id; ap.set = sp.name; ap.anim = anim; ap.oct = facenum;
@@ -16009,14 +17668,15 @@ static bool dosinf_draw_sprite(const SimObject& o)
        the sheet was assembled -- so the extra-sheet lookup is skipped rather than left to
        find a zero, which would also have worked but only by accident. tpu is the tell:
        only a strip built at another resolution carries one. */
-    if (liv >= 2 && sp.tpu <= 0.0f) {
+    if (liv >= 1 && sp.tpu <= 0.0f) {
+        const int li = dos_livery_index(liv);
         const int gi = t.strip[SPRH_GDI][anim];
         if (gi >= 0 && gi < (int)g_dosStrips.size()) {
             const DosStrip& gs = g_dosStrips[gi];
-            if (gs.gl_extra[liv - 2] && gs.texw == sp.texw && gs.texh == sp.texh
+            if (gs.gl_extra[li] && gs.texw == sp.texw && gs.texh == sp.texh
                 && gs.cols == sp.cols && gs.fw == sp.fw && gs.fh == sp.fh
                 && gs.frames == sp.frames)
-                tex = gs.gl_extra[liv - 2];
+                tex = gs.gl_extra[li];
         }
     }
 
@@ -16891,6 +18551,7 @@ static std::vector<M3Corpse> g_m3Corpses;
 /* what a 3-D soldier leaves and throws: ragdolls, kept and darkened bodies under a cap,
    blood, muzzle flashes and casings (Enhanced only) */
 #include "infdeath_mod.h"
+#include "render_capture.h"
 
 /* WHICH LEVEL OF DETAIL, by Unreal's own ScreenSize measure so Tempest Rising's
    thresholds mean here what they meant there: the bind pose's bounding sphere, its
@@ -16955,7 +18616,7 @@ static void m3inf_draw_pieces(int mi, const M3Draw& d, const SimObject& o, const
    for a body the engine has already let go of. */
 static bool m3inf_draw_as(const SimObject& o, const AnimState* a, bool corpse)
 {
-    if (o.kind != K_INFANTRY)
+    if (o.kind != K_INFANTRY || new_sprite_active(o))
         return false;
     const int mi = m3inf_find(m3inf_model_type(o));
     if (mi < 0)
@@ -16984,6 +18645,9 @@ static bool m3inf_draw_as(const SimObject& o, const AnimState* a, bool corpse)
         m.drawLod = -1;
         return true;
     }
+    /* claimed, as a soldier drawn whole would be, so no sprite card stands in for him */
+    if (aux_object_outside(o.wx, o.wz, 3.0f, 8.0f))
+        return true;
 
     float ground = 0.0f;
     /* THE BODY'S HEADING AND CLIP WEIGHTS come from his own state (m3inf_tick), between
@@ -17069,6 +18733,22 @@ static bool m3inf_draw_as(const SimObject& o, const AnimState* a, bool corpse)
     if (wIdle > 1e-4f) {
         lc[nl] = cIdle; lf[nl] = tsec * m.clip[cIdle].fps; lw[nl] = wIdle; nl++;
     }
+    /* A pose-sheet soldier: his row's frame of the sheet's clip, alone. A loop's rows
+       share its whole cycle; a once-clip's run from its first frame to its last. */
+    if (o.id <= M3INF_SHEET_ID && g_infSheetClip[0]) {
+        const int ci = m3_clip(m, g_infSheetClip);
+        if (ci >= 0) {
+            const M3Clip& c = m.clip[ci];
+            const int row = (M3INF_SHEET_ID - o.id) / 8;
+            const bool loop = (c.flags & 1u) != 0;
+            const int span = loop ? g_infSheetRows : g_infSheetRows - 1;
+            const float u = span > 0 ? (float)row / (float)span : 0.0f;
+            nl = 1;
+            lc[0] = ci;
+            lf[0] = u * (float)(loop ? c.nframe : c.nframe - 1);
+            lw[0] = 1.0f;
+        }
+    }
     /* EASED: each fading weight through a smoothstep (the blend renormalises), so a
        change of state starts and settles softly instead of on a straight ramp's corners */
     for (int l = 0; l < nl; l++) lw[l] = m3inf_ease(lw[l]);
@@ -17119,10 +18799,14 @@ static bool m3inf_draw_as(const SimObject& o, const AnimState* a, bool corpse)
        nose-south vehicle mesh needs one) and no sprite screen-yaw correction (a sprite is
        a picture taken from one fixed direction; a model is not). */
     d.yaw = -yawDeg;
-    d.shroud = g_objShroud ? shroud_env_at(o.ex, o.ez) : 0.0f;
+    /* Sampled where he is DRAWN (d.cx, d.cz), as draw_object_model3d samples a vehicle:
+       with movement smoothing on, the engine's ex/ez runs ahead of the mesh, and a man
+       walking out of the shroud was lit for the cell he had not reached yet. */
+    d.shroud = g_objShroud ? shroud_env_at(o.wx, o.wz) : 0.0f;
     {
         float team[3], cloth[3];
-        soldier_colours(o, team, cloth, &d.camt);
+        soldier_colours(o, team, cloth, &d.camt, m.enh);
+        d.normalizeCloth = g_raModule && ra_infantry_source_cloth(o.remap, o.type, m.enh, ra_infantry_campaign_palette());
         d.pr = team[0]; d.pg = team[1]; d.pb = team[2];
         d.cr = cloth[0]; d.cg = cloth[1]; d.cb = cloth[2];
         d.side = (obj_side(o) == 1) ? 1.0f : 0.0f;   /* Nod's emblem, else the eagle */
@@ -17222,6 +18906,20 @@ static void m3inf_corpse_expire(void)
     }
 }
 
+/* HOW MANY FRAMES THE ENGINE'S CURRENT DO RUNS FOR: the 1995 DoControls Count, which
+   this renderer holds as the DOS pack's src_stages (m3inf_engine_phase reads it the same
+   way). 0 when that pack is not loaded or does not know the type. */
+static int inf_engine_count(const SimObject& o)
+{
+    const int da = dosinf_live_slot(o.doing);
+    std::map<std::string, DosInfType>::iterator ti = g_dosInfTypes.find(o.type);
+    if (da < 0 || ti == g_dosInfTypes.end()) return 0;
+    const int si = ti->second.strip[SPRH_GDI][da];
+    if (si < 0 || si >= (int)g_dosStrips.size()) return 0;
+    const DosStrip& sp = g_dosStrips[si];
+    return sp.src_stages > 0 ? sp.src_stages : sp.stages;
+}
+
 static void draw_sprite(const SimObject& o, size_t idx)
 {
     (void)idx;
@@ -17233,7 +18931,7 @@ static void draw_sprite(const SimObject& o, size_t idx)
 
     /* The DOS art wins whenever it is loaded and knows the type; anything it does
        not know falls through to the N64 path (and its loud miss counter). */
-    if (inf_use_sprites() && dosinf_draw_sprite(o))
+    if ((new_sprite_active(o) || inf_use_sprites()) && dosinf_draw_sprite(o))
         return;
 
     /* Which sprite set this INI type wears. Resolved in bake.py from idata.cpp's
@@ -17257,7 +18955,9 @@ static void draw_sprite(const SimObject& o, size_t idx)
         walking = ai->second.still <= WALK_COAST_TICKS;
     }
 
-    const int hs = sprite_house(o);
+    int hs = sprite_house(o);
+    const int liv = sprite_livery(o, &hs);
+    if (liv >= 1) hs = SPRH_GDI;  /* extra palettes are built from the Gold row */
     int anim = walking ? SPR_RUN : SPR_STAND;
     /* A dying man plays the ROM's DETH strip, stepped by the ENGINE's own death-Do
        stage (OBJ dostage), not a renderer clock: the engine deletes him the tick after
@@ -17270,10 +18970,28 @@ static void draw_sprite(const SimObject& o, size_t idx)
     const PackSprite* sp = &g_pack.sprite[pi.strip[hs][anim]];
     const PackTex& tx = g_pack.tex[sp->tex];
 
+    /* FIRING, PRONE OR CRAWLING: the cartridge's own strip for the engine's Do
+       (n64inf_mod.h), which the scenario pack does not carry. Without it a man in a
+       firefight stood in his standing frame, and since the rifle's flash is painted into
+       the firing frames there was no muzzle flash either. NULL keeps the pick above. */
+    int lift = 0;
+    const N64InfStrip* act = o.dying ? NULL : n64inf_strip(o.type, hs, o.doing, &lift);
+    const char* sname = act ? act->name : sp->name;
+    const int sframes = act ? act->frames : sp->frames;
+    const int sfw = act ? act->fw : sp->fw, sfh = act ? act->fh : sp->fh;
+    const int stw = act ? act->texw : tx.w, sth = act ? act->texh : tx.h;
+    GLuint sgl = act ? act->gl : tx.gl;
+    if (liv >= 1) {
+        const int i = dos_livery_index(liv);
+        if (act && act->gl_livery[i]) sgl = act->gl_livery[i];
+        else if (!act) sgl = livery_texture(tx, team_livery_slot(liv));
+    }
+
     /* Facing -> strip row. 8 compass octants collapse onto the 5 the ROM stores; the
        stored half is the WESTERN one (rows are N, NW, W, SW, S: see sprite_pick_facing),
        so it is the eastern octants that draw mirrored. */
-    const int nfac = sp->facings > 0 ? sp->facings : 1;
+    const int nfac = act ? (act->facings > 0 ? act->facings : 1)
+                         : (sp->facings > 0 ? sp->facings : 1);
     int oct = 0, facingRow = 0;
     bool mirror = false;
     sprite_pick_facing(nfac, o.face, &oct, &facingRow, &mirror);
@@ -17281,9 +18999,18 @@ static void draw_sprite(const SimObject& o, size_t idx)
     /* Stage within the cycle. STAND has one stage per facing, RUN has six. DETH is
        non-directional (facings=1) and follows the engine's stage; if the engine Do has
        more stages than the strip has frames (fire death), hold the last frame. */
-    const int stages = sp->frames / nfac;
+    const int stages = sframes / nfac;
     int stage = 0;
-    if (anim == SPR_DETH) {
+    if (act && stages > 0) {
+        /* The cartridge's own stage rule, read off its sprite accessor (RAM 0x801FB600):
+           the engine's stage modulo the Do's frame count, scaled onto the strip,
+           (stage % count) * stages / count. It is the 1995 pack's src_stages rule too,
+           and that is where the count comes from; with no count the stage wraps on
+           the strip's own length. */
+        const int c = inf_engine_count(o);
+        const int s = o.dostage > 0 ? o.dostage : 0;
+        stage = c > 0 ? (s % c) * stages / c : s % stages;
+    } else if (anim == SPR_DETH) {
         stage = o.dostage > 0 ? o.dostage : 0;
         if (stage >= stages) stage = stages - 1;
     } else if (anim == SPR_RUN && stages > 1) {
@@ -17292,24 +19019,24 @@ static void draw_sprite(const SimObject& o, size_t idx)
     }
     int frame = facingRow * stages + stage;
     if (frame < 0) frame = 0;
-    if (frame >= sp->frames) frame = sp->frames - 1;
+    if (frame >= sframes) frame = sframes - 1;
 
     if (g_dumpanim) {
         AnimPick ap;
-        ap.id = o.id; ap.set = sp->name; ap.anim = anim; ap.oct = oct;
+        ap.id = o.id; ap.set = sname; ap.anim = anim; ap.oct = oct;
         ap.stage = stage; ap.frame = frame; ap.phase = phase;
         g_animPicks.push_back(ap);
     }
 
-    const float fu = (float)sp->fw / (float)tx.w;
-    const float v0 = (float)(frame * sp->fh) / (float)tx.h;
-    const float v1 = (float)((frame + 1) * sp->fh) / (float)tx.h;
+    const float fu = (float)sfw / (float)stw;
+    const float v0 = (float)(frame * sfh) / (float)sth;
+    const float v1 = (float)((frame + 1) * sfh) / (float)sth;
     float ua = 0.0f, ub = fu;
     if (mirror) { ua = fu; ub = 0.0f; }
 
     const float tpu = inf_card_tpu(sprite_texels_per_unit());
-    const float hgt = (float)sp->fh / tpu;
-    const float wid = (float)sp->fw / tpu;
+    const float hgt = (float)sfh / tpu;
+    const float wid = (float)sfw / tpu;
 
     /* wx/wz is the engine's own lepton position, so a walking man slides between cells
        instead of snapping. */
@@ -17317,7 +19044,19 @@ static void draw_sprite(const SimObject& o, size_t idx)
        every object that came out of g_objects. The lift has to enter here rather
        than through a matrix push because the Glide port has no matrix stack, so
        every billboard is emitted with explicit vertices. */
-    const float bx = o.wx, bz = o.wz, by = terrain_y(o.wx, o.wz) + o.ylift;
+    float bx = o.wx, bz = o.wz, by = terrain_y(o.wx, o.wz) + o.ylift;
+    if (act) {
+        /* AND STOOD WHERE THE CARTRIDGE STANDS IT: lowered by half its anchor byte and
+           brought the whole byte nearer the camera, 256 to the cell (n64inf_mod.h). A
+           prone frame carries five to nine empty rows under the body; stood on the plain
+           ground point, a man firing prone would rise off the ground with every shot.
+           "Nearer the camera" is the horizontal at right angles to the camera's right,
+           which is world south under the unturned camera the cartridge has. */
+        const float k = (float)lift / 256.0f;
+        by -= (float)(lift >> 1) / 256.0f;
+        bx -= g_bbRight[2] * k;
+        bz += g_bbRight[0] * k;
+    }
 
     const float rx = g_bbRight[0] * wid * 0.5f;
     const float ry = g_bbRight[1] * wid * 0.5f;
@@ -17325,12 +19064,12 @@ static void draw_sprite(const SimObject& o, size_t idx)
     const float ux = g_bbUp[0] * hgt, uy = g_bbUp[1] * hgt, uz = g_bbUp[2] * hgt;
 
     if (g_spriteShadowPass) {
-        fx_emit_sprite_shadow(o, tx.gl, ua, ub, v0, v1, wid, hgt, bx, by, bz);
+        fx_emit_sprite_shadow(o, sgl, ua, ub, v0, v1, wid, hgt, bx, by, bz);
         return;
     }
 
     glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, tx.gl);
+    glBindTexture(GL_TEXTURE_2D, sgl);
     /* The palette carries the colour, so white is the neutral modulate -- except that
        the shroud darkens whatever stands in it. A sprite is one quad, so it takes the
        console's per-node sample at the object's own position rather than the per-vertex
@@ -17372,7 +19111,9 @@ static void draw_sprite(const SimObject& o, size_t idx)
 
    --clumptrees is the OPT-IN presentation alternative: a COMPOSITION (not console
    behavior, and labelled so in the log) that plants one single-tree mesh per occupied
-   cell of the clump's own footprint. The footprints below are the engine's occupy
+   cell of the clump's own footprint. Under Enhanced a clump with a remaster of its own
+   (game/ebld/TC0N_TEM.ebld: the approved trees composed as the 1995 art pastes them) is
+   drawn whole from it instead, at its centre coordinate (ebld_terr.h, clump_draw_whole). The footprints below are the engine's occupy
    lists (tdata.cpp _List000110 etc.), byte-identical in the ROM at 0x801C7988+. */
 
 struct ClumpCell { signed char dx, dy; };
@@ -17384,8 +19125,9 @@ static const ClumpDef CLUMPS[5] = {
     {"TC04", 4, {{0,1},{1,1},{2,1},{0,2}}},
     {"TC05", 6, {{2,0},{0,1},{1,1},{2,1},{1,2},{2,2}}},
 };
-/* g_clumpTrees, the composition switch, is defined above tree3d_draw_normals. */
+/* g_clumpTrees is defined with the shared foliage renderer. */
 static int  g_nInvisible = 0, g_nComposed = 0;
+static int  g_nClumpModel = 0;   /* clumps drawn whole from a model of their own */
 static int  g_nNoCartType = 0;
 static int  g_nVShadow = 0;      /* vehicle/aircraft ground shadows actually drawn */
 
@@ -17581,6 +19323,22 @@ static SimObject clump_part(const SimObject& o, int cellx, int celly)
     t.lx = cellx * 256 + 128; t.ly = celly * 256 + 128;
     t.str = t.maxstr;
     return t;
+}
+
+/* ONE LINE PER CLUMP DRAWN WHOLE, the first time the lit pass draws it: its cell, the
+   engine's centre coordinate and the anchor draw_mesh last stood the model on, read back
+   out of draw_mesh (g_meshAnchorX, Z), never recomputed beside it, so a gate can hold the
+   model to the clump's own point. */
+static std::set<std::string> g_clumpWholeSeen;
+static void clump_whole_log(const SimObject& o)
+{
+    char key[64];
+    snprintf(key, sizeof(key), "%s@%d,%d", o.type, o.cx, o.cy);
+    if (g_clumpWholeSeen.count(key))
+        return;
+    g_clumpWholeSeen.insert(key);
+    fprintf(stderr, "CLUMP|%s|cell=%d,%d|centre=%.3f,%.3f|anchor=%.3f,%.3f|drawn=whole\n",
+            o.type, o.cx, o.cy, o.ex, o.ez, g_meshAnchorX, g_meshAnchorZ);
 }
 
 /* One report line per missing-model terrain instance, first time it is drawn. The
@@ -17845,6 +19603,7 @@ static bool visible(const SimObject& o)
     switch (o.kind) {
         case K_BUILDING: if (!g_vShowBuildings)  return false; break;
         case K_UNIT:
+        case K_VESSEL:
         case K_AIRCRAFT: if (!g_vShowUnits)      return false; break;
         case K_INFANTRY: if (!g_vShowInfantry)   return false; break;
         case K_TERRAIN:  if (!g_vShowTerrainObj) return false; break;
@@ -18005,7 +19764,7 @@ static float overlay_zoff(const SimObject& o)
     return cart_zoff_for_mesh(mi);
 }
 
-static WorldBox mesh_world_box(int mi, float cx, float cz, int face)
+static WorldBox mesh_world_box_uncached(int mi, float cx, float cz, int face)
 {
     WorldBox b;
     b.ok = false;
@@ -18035,6 +19794,120 @@ static WorldBox mesh_world_box(int mi, float cx, float cz, int face)
         }
     }
     return b;
+}
+
+/* Cache the complete result of the original vertex walk. Local-space extrema
+   followed by translation can round differently, so neither that arithmetic nor
+   the original comparison order is replaced. World position, terrain height,
+   scale and facing all belong to the key. Geometry replacement changes its data
+   identity/count; wave/growth writers advance gpuPoseRevision. g_groundGen changes
+   on pack load/free and editor changes, including reuse of old mesh indices. */
+struct MeshPickBoundsKey { uint64_t value[10]; };
+struct MeshPickBoundsEntry {
+    MeshPickBoundsKey key = {};
+    WorldBox bounds = {};
+    bool valid = false;
+};
+static MeshPickBoundsEntry g_meshPickBoundsCache[4096];
+static int g_meshPickBoundsActive = -1;
+static unsigned g_meshPickBoundsGeneration = 0;
+static unsigned long long g_meshPickBoundsHits = 0, g_meshPickBoundsMisses = 0,
+                          g_meshPickBoundsOff = 0, g_meshPickBoundsChecks = 0,
+                          g_meshPickBoundsBad = 0;
+
+static bool mesh_pick_bounds_enabled()
+{
+    if (g_meshPickBoundsActive < 0) {
+        const char* value = getenv("OPENCNC3D_MESH_PICK_BOUNDS");
+        g_meshPickBoundsActive = !value || strcmp(value,"0") ? 1 : 0;
+    }
+    return g_meshPickBoundsActive != 0;
+}
+
+static bool mesh_pick_bounds_verify_enabled()
+{
+    static const bool enabled = []() {
+        const char* value = getenv("OPENCNC3D_MESH_PICK_BOUNDS_VERIFY");
+        return value && !strcmp(value,"1");
+    }();
+    return enabled;
+}
+
+static uint64_t mesh_pick_bounds_float(float value)
+{
+    uint32_t bits;
+    memcpy(&bits,&value,sizeof bits);
+    return bits;
+}
+
+static size_t mesh_pick_bounds_slot(const MeshPickBoundsKey& key)
+{
+    uint64_t hash = 1469598103934665603ull;
+    for (uint64_t value : key.value) hash = (hash ^ value) * 1099511628211ull;
+    /* Mix upper float/pointer bits before selecting a power-of-two table slot. */
+    hash ^= hash >> 33; hash *= 0xff51afd7ed558ccdull;
+    hash ^= hash >> 33; hash *= 0xc4ceb9fe1a85ec53ull;
+    hash ^= hash >> 33;
+    return (size_t)(hash & 4095u);
+}
+
+static bool mesh_pick_bounds_equal(const WorldBox& a, const WorldBox& b)
+{
+    return a.ok == b.ok
+        && mesh_pick_bounds_float(a.x0) == mesh_pick_bounds_float(b.x0)
+        && mesh_pick_bounds_float(a.x1) == mesh_pick_bounds_float(b.x1)
+        && mesh_pick_bounds_float(a.z0) == mesh_pick_bounds_float(b.z0)
+        && mesh_pick_bounds_float(a.z1) == mesh_pick_bounds_float(b.z1)
+        && mesh_pick_bounds_float(a.y0) == mesh_pick_bounds_float(b.y0)
+        && mesh_pick_bounds_float(a.y1) == mesh_pick_bounds_float(b.y1);
+}
+
+static WorldBox mesh_world_box(int mi, float cx, float cz, int face)
+{
+    if (!mesh_pick_bounds_enabled() || mi < 0 || mi >= (int)g_pack.mesh.size()) {
+        ++g_meshPickBoundsOff;
+        return mesh_world_box_uncached(mi,cx,cz,face);
+    }
+    if (g_meshPickBoundsGeneration != g_groundGen) {
+        for (auto& entry : g_meshPickBoundsCache) entry.valid = false;
+        g_meshPickBoundsGeneration = g_groundGen;
+    }
+    const PackMesh& mesh = g_pack.mesh[(size_t)mi];
+    const float ground = terrain_y(cx,cz);
+    const MeshPickBoundsKey key = {{(uint64_t)(unsigned)mi,(uint64_t)(unsigned)face,
+        (uint64_t)(uintptr_t)mesh.tris.data(),(uint64_t)mesh.tris.size(),mesh.gpuPoseRevision,
+        mesh_pick_bounds_float(cx),mesh_pick_bounds_float(cz),mesh_pick_bounds_float(ground),
+        mesh_pick_bounds_float(MODEL_SCALE),g_groundGen}};
+    MeshPickBoundsEntry& entry = g_meshPickBoundsCache[mesh_pick_bounds_slot(key)];
+    if (entry.valid && !memcmp(&entry.key,&key,sizeof key)) {
+        ++g_meshPickBoundsHits;
+        if (mesh_pick_bounds_verify_enabled()) {
+            ++g_meshPickBoundsChecks;
+            const WorldBox reference = mesh_world_box_uncached(mi,cx,cz,face);
+            if (!mesh_pick_bounds_equal(entry.bounds,reference)) {
+                ++g_meshPickBoundsBad;
+                fprintf(stderr,"MESHPICKBOUNDS|mismatch|mesh=%d|face=%d|revision=%u\n",
+                        mi,face,mesh.gpuPoseRevision);
+                entry.bounds = reference;
+            }
+        }
+        return entry.bounds;
+    }
+    ++g_meshPickBoundsMisses;
+    entry.bounds = mesh_world_box_uncached(mi,cx,cz,face);
+    entry.key = key;
+    entry.valid = true;
+    return entry.bounds;
+}
+
+static void mesh_pick_bounds_dump()
+{
+    printf("MESHPICKBOUNDS|active=%d|verify=%d|hits=%llu|misses=%llu|off=%llu"
+           "|checks=%llu|bad=%llu|slots=4096\n",mesh_pick_bounds_enabled() ? 1 : 0,
+           mesh_pick_bounds_verify_enabled() ? 1 : 0,
+           g_meshPickBoundsHits,g_meshPickBoundsMisses,g_meshPickBoundsOff,
+           g_meshPickBoundsChecks,g_meshPickBoundsBad);
+    fflush(stdout);
 }
 
 /* The mesh's area-weighted centroid, projected to the ground, in world cells. Fairer than
@@ -18207,6 +20080,27 @@ static int turret_delta(const SimObject& o)
     return 0;
 }
 
+/* Separate from draw_facing/turret_delta: diagnostics, picks, death records and
+   simulation observations continue to read the engine's whole-tick orientation. */
+static float draw_heading(const SimObject& o)
+{
+    const int face = draw_facing(o);
+    if (face < 0) return (float)face;
+    const bool secondary = (o.kind == K_AIRCRAFT && o.tface >= 0)
+        || launcher_follows_turret(o);
+    const int raw = secondary ? o.tface : o.face;
+    return heading_wrap((float)face + smooth_heading_of(o, secondary) - (float)raw);
+}
+
+static float draw_turret_heading(const SimObject& o)
+{
+    const int mi = mesh_for(o);
+    if (o.kind != K_UNIT || o.face < 0 || o.tface < 0 || g_legacy
+        || mi < 0 || !mesh_has_role(mi, ROLE_TURRET))
+        return (float)turret_delta(o);
+    return heading_wrap(smooth_heading_of(o, true) - smooth_heading_of(o, false));
+}
+
 /* WHERE AN INFANTRYMAN'S WEAPON IS, in the sprite's own texels above the ground line.
 
    Infantry are BILLBOARDS, so there is no turret part to measure and muzzle_geom has
@@ -18235,6 +20129,16 @@ static const float INF_MUZZLE_TEXELS = 8.9f;
    did before the kind was available. */
 static ObjKind efx_att_objkind(int attkind)
 {
+    /* (Red Alert's brain numbers its RTTI its own way: redalert/defines.h) */
+    if (g_raModule)
+        switch (attkind) {
+        case 13: return K_INFANTRY;
+        case 28: return K_UNIT;
+        case 1:  return K_AIRCRAFT;
+        case 5:  return K_BUILDING;
+        case 30: return K_VESSEL;
+        default: return K_OTHER;
+        }
     switch (attkind) {
     case 1:  return K_INFANTRY;      /* RTTI_INFANTRY */
     case 3:  return K_UNIT;          /* RTTI_UNIT */
@@ -18739,14 +20643,15 @@ static ScreenPoly screen_poly_of_world_box(const WorldBox& b, int fbw, int fbh)
    triangles are excluded, for the same reason mesh_world_box excludes them: the blob on
    the ground is not the object. */
 static ScreenPoly screen_poly_of_mesh(int mi, float cx, float cz, int face,
-                                      int fbw, int fbh)
+                                      int fbw, int fbh, float lift = 0.0f)
 {
     ScreenPoly s;
     dop_reset(&s);
     if (mi < 0 || mi >= (int)g_pack.mesh.size()) return s;
     float rs, rc;
     facing_rot(face, &rs, &rc);
-    const float ground = terrain_y(cx, cz);   /* the drawn mesh lifts; so must the poly */
+    float ground = terrain_y(cx, cz);         /* the drawn mesh lifts; so must the poly */
+    if (lift != 0.0f) ground += lift;         /* (and an aircraft drawn in the air) */
     const std::vector<PackTri>& tris = g_pack.mesh[mi].tris;
     for (size_t i = 0; i < tris.size(); i++) {
         if (tris[i].mode == MODE_SHADOW) continue;
@@ -18791,6 +20696,10 @@ static ScreenPoly screen_poly_of_billboard(float bx, float bz, float wid, float 
 /* The infantry billboard's size, resolved exactly as draw_sprite resolves it. */
 static bool infantry_quad_size(const SimObject& o, float* wid, float* hgt)
 {
+    if(new_sprite_active(o)) {
+        const NsAction& a=g_nsPack.actions[0];const float tpu=inf_card_tpu(48);
+        *wid=(a.x1-a.x0)/tpu;*hgt=(40-a.y0)/tpu;return true;
+    }
     /* Picking and health bars must measure the quad that is actually DRAWN, so this
        follows the same choice the draw does: on the cartridge setting the sprite strips
        are loaded but not drawn, and measuring them would put the hit box on art nobody
@@ -18837,12 +20746,20 @@ static int ebld_ra_pick_mesh(const SimObject& o);
    silhouette would select by one truth and order by another, and the disagreement would
    be at its worst exactly when it is least forgivable: on a fast unit under fire.
    o.ex/o.ez is the engine's own footprint centre and is never smoothed. */
+/* Enhanced vehicles are picked at their rendered pose, including the current
+   interpolated position, slope lean, turret and moving parts. Engine identity and
+   target cells still come from the selected SimObject. A cartridge proxy or the
+   last integral engine position is not the silhouette the player is aiming at. */
+static bool evhc_screen_poly(const SimObject& o, int fbw, int fbh, bool coarse,
+                              ScreenPoly* out);
+
 static ScreenPoly object_screen_poly(const SimObject& o, int fbw, int fbh, bool coarse)
 {
     if (g_fx.dos_classic && g_raModule)
         return dos2d_object_screen_poly(o, fbw, fbh);
     ScreenPoly s;
     dop_reset(&s);
+    if(!g_fx.dos_classic && evhc_screen_poly(o,fbw,fbh,coarse,&s))return s;
     if (o.kind == K_INFANTRY) {
         float wid = 0.7f, hgt = 1.0f;
         infantry_quad_size(o, &wid, &hgt);
@@ -18855,6 +20772,22 @@ static ScreenPoly object_screen_poly(const SimObject& o, int fbw, int fbh, bool 
         return screen_poly_of_billboard(o.ex, o.ez, wid, hgt, fbw, fbh);
     }
     const int raMesh = g_raModule ? ebld_ra_pick_mesh(o) : -1;
+    /* A RED ALERT UNIT OR AIRCRAFT DRAWN BY ITS REMASTERED MODEL is picked by that model,
+       at the facing and the height it is drawn at (evhc_mod.h) */
+    int raFace = 0;
+    float raLift = 0.0f;
+    const int raVehicle = (g_raModule && raMesh < 0) ? evhc_ra_pick(o, &raFace, &raLift) : -1;
+    if (raVehicle >= 0) {
+        if (!coarse)
+            return screen_poly_of_mesh(raVehicle, o.ex, o.ez, raFace, fbw, fbh, raLift);
+        WorldBox b = mesh_world_box(raVehicle, o.ex, o.ez, raFace);
+        if (b.ok) {
+            b.y0 += raLift; b.y1 += raLift;
+            if (b.y0 > 0.0f) b.y0 = 0.0f;       /* always include the ground contact */
+            return screen_poly_of_world_box(b, fbw, fbh);
+        }
+        return s;
+    }
     const int mi = raMesh >= 0 ? raMesh : mesh_for(o);
     if (mi >= 0) {
         if (!coarse)
@@ -18869,7 +20802,15 @@ static ScreenPoly object_screen_poly(const SimObject& o, int fbw, int fbh, bool 
     if (o.kind == K_TERRAIN) {
         /* No model (TC01..TC05). The hit test mirrors what is DRAWN: nothing by
            default (an invisible clump must not swallow clicks aimed at the grass),
-           or the union box of the composed trees under --clumptrees. */
+           the box of the clump's own model where it is drawn whole, or the union box of
+           the composed trees under --clumptrees. */
+        const int whole = g_clumpTrees ? eterr_clump_mesh(o) : -1;
+        if (whole >= 0) {
+            WorldBox b = mesh_world_box(whole, o.ex, o.ez, -1);
+            if (!b.ok) return s;
+            if (b.y0 > 0.0f) b.y0 = 0.0f;
+            return screen_poly_of_world_box(b, fbw, fbh);
+        }
         const ClumpDef* cd = g_clumpTrees ? clump_def(o.type) : NULL;
         if (!cd)
             return s;                      /* degenerate: poly_contains says no */
@@ -18940,7 +20881,8 @@ static int pick_class(const SimObject& o)
        1995 already prefers the mobile object standing on a structure. Aircraft are also
        drawn above everything they overlap, so the thing under the pointer IS the
        aircraft. */
-    if (o.kind == K_INFANTRY || o.kind == K_UNIT || o.kind == K_AIRCRAFT) return 0;
+    if (o.kind == K_INFANTRY || o.kind == K_UNIT || o.kind == K_AIRCRAFT
+        || o.kind == K_VESSEL)                                           return 0;
     if (o.kind == K_BUILDING)                                            return 1;
     return 2;                                     /* terrain: last resort */
 }
@@ -19231,6 +21173,9 @@ static int dll_type_of(ObjKind k)
     case K_UNIT:     return UNIT;
     case K_AIRCRAFT: return AIRCRAFT;
     case K_BUILDING: return BUILDING;
+    /* a ship: until the kind existed every Red Alert vessel came through as K_OTHER and
+       answered UNKNOWN here, so no click in the 3D modes could select one */
+    case K_VESSEL:   return VESSEL;
     default:         return UNKNOWN;
     }
 }
@@ -20361,6 +22306,25 @@ static void ui_order_at(float col, float row, int fbw, int fbh, bool ctrl, bool 
            ctrl ? "|ctrl" : "", alt ? "|alt" : "");
 }
 
+/* THE CHRONOSPHERE'S DESTINATION, AS THE ENGINE JUDGES IT. While the engine waits for it
+   (SPC_CHRONO2), OpenCNC3D_Probe_Object_At with nothing selected answers the 1996 cursor
+   rule: ACTION_NOMOVE over unmapped ground and wherever the chosen unit could not be
+   teleported (an infantryman anywhere, water for a tank), ACTION_CHRONO2 elsewhere. The
+   placement does not check any of it, so a refused cell must not be clicked through.
+   Asked once per cell and engine frame, since the probe prints a line per call; a brain
+   without that answer reads as "allowed". */
+static bool ra_chrono_dest_ok(int cx, int cy)
+{
+    static int lastX = -1, lastY = -1, lastFrame = -1;
+    static bool lastOk = true;
+    if (cx == lastX && cy == lastY && lastFrame == g_engineFrame) return lastOk;
+    int px, py;
+    lastOk = !(BrainProbe && engine_pixels_for_cell(cx, cy, &px, &py)
+               && BrainProbe(px, py) == CUR_ACTION_NOMOVE);
+    lastX = cx; lastY = cy; lastFrame = g_engineFrame;
+    return lastOk;
+}
+
 /* THE SUPERWEAPON SHOT. Armed by clicking a ready special on the sidebar; this is the
    map click that launches it. The pixel conversion is the renderer's because it owns the
    camera, and it is the SAME engine_pixels_for_cell the order path uses, so a special
@@ -20373,6 +22337,11 @@ static bool ui_super_fire(float col, float row, int fbw, int fbh)
     int px, py;
     if (!engine_pixels_for_cell(p.cellX, p.cellY, &px, &py)) {
         printf("SUPER|fire|cell=%d,%d|REJECTED by the engine view\n", p.cellX, p.cellY);
+        return true;
+    }
+    if (g_raModule && sb_super_id() == 8 && !ra_chrono_dest_ok(p.cellX, p.cellY)) {
+        /* the no-move cursor's click: nothing is sent and the destination is still wanted */
+        printf("SUPER|target|cell=%d,%d|REFUSED by the engine\n", p.cellX, p.cellY);
         return true;
     }
     printf("SUPER|target|cell=%d,%d\n", p.cellX, p.cellY);
@@ -21020,9 +22989,6 @@ static float cursor_match_scale(int fbw, int fbh, float plateScale = 0.0f)
     return g_cursorScale;                        /* latched at the pick, see above */
 }
 
-
-
-
 /* The one cursor blit. draw_frame calls it as its last step in normal play;
    with the pause dialog open the live loop calls it after opt_draw instead,
    so the pointer is over the dialog, never under it and never doubled. */
@@ -21044,6 +23010,13 @@ static void draw_cursor_top(int fbw, int fbh, bool dialogOpen = false,
        rather than no pointer at all. */
     if (g_cursorOnMap && !dialogOpen && c3d_have() && !dosClassic) return;
     sb_layout(fbw, fbh);                    /* keeps sb_scale() fresh */
+    /* Red Alert's radar cursor under Enhanced: its remastered frame in place of the 1996
+       sprite, at the sprite's size (24 sprite pixels a cell) on the same hot spot. */
+    if (g_raModule && !dialogOpen && !dosClassic && cur_type() == MOUSE_RADAR_CURSOR
+        && ecur_on()
+        && c3d_ra_overlay(C3D_RA_RADAR, g_mouseScrC, g_mouseScrR,
+                          24.0f * cursor_match_scale(fbw, fbh, plateScale), fbw, fbh))
+        return;
     begin_overlay(fbw, fbh);
     /* The cursor's own animation clock is the ENGINE frame, not the wall clock:
        MouseClass::AI steps Frame every FrameRate 60ths of a second, and our engine
@@ -21084,7 +23057,16 @@ static void update_cursor(int fbw, int fbh)
         || uc_over(col, row, fbw, fbh)
         || edit_over_chrome(col, row, fbw, fbh)) {
         g_cursorOnMap = false;
-        cur_set(MOUSE_NORMAL);
+        /* RED ALERT'S RADAR CURSOR over its radar map, with nothing selected
+           (radar.cpp:1806, the arm where no selection's action applies). With a selection
+           the 1996 radar previews that selection's order; this host gives the radar its
+           orders (minimap_order) but previews none there, so the plain arrow stays. */
+        float rwx, rwz;
+        if (g_raModule && g_selCount == 0 && !sb_placing() && !sb_super_armed()
+            && minimap_hit(col, row, fbw, fbh, &rwx, &rwz))
+            cur_set(MOUSE_RADAR_CURSOR);
+        else
+            cur_set(MOUSE_NORMAL);
         return;
     }
 
@@ -21156,6 +23138,12 @@ static void update_cursor(int fbw, int fbh)
        can never be in while targeting, and never appeared in the state the engine is
        always in. Placement still wins over targeting: the sb_placing() guard at the top
        of this function is our PendingObject override. */
+    if (sb_super_armed() && g_raModule) {
+        /* (the Chronosphere's destination takes the engine's verdict: ra_chrono_dest_ok) */
+        if (sb_super_id() == 8 && !ra_chrono_dest_ok(p.cellX, p.cellY)) cur_set(MOUSE_NO_MOVE);
+        else cur_set(cur_mouse_for_special_ra(sb_super_id()));
+        return;
+    }
     if (sb_super_armed()) {
         switch (sb_super_id()) {
         case 1:  cur_set(MOUSE_ION_CANNON);   break;
@@ -21333,7 +23321,8 @@ static void update_cursor(int fbw, int fbh)
     if (ctrl && alt)    mt = MOUSE_AREA_GUARD;   /* the engine reads ctrl+alt as guard */
     else if (ctrl)      mt = MOUSE_CAN_ATTACK;   /* force fire, ui_order_at's rule */
     else if (probe < 0) mt = hostile ? MOUSE_CAN_ATTACK : MOUSE_CAN_MOVE;
-    else                mt = cur_mouse_for_action(probe);
+    else                mt = g_raModule ? cur_mouse_for_action_ra(probe)
+                                        : cur_mouse_for_action(probe);
     cur_set(mt);
 }
 
@@ -21520,6 +23509,22 @@ static int   g_mmX = 0, g_mmY = 0, g_mmW = 0, g_mmH = 0;  /* the same rect, SCRE
 static float g_mmScale = 1.0f;                            /* screen pixels per cell       */
 static int   g_fbW = 1280, g_fbH = 720;   /* last framebuffer, for the radar view cursor */
 
+/* cursor3d_mod.h's question for Red Alert's NO_SCROLL: can the view go any further toward
+   (dx, dz)? The camera's own clamp answers it: the target is moved half a cell that way,
+   clamped as every frame clamps it, and put back. Blocked when it could not move along
+   any axis the direction has. Nothing else the clamp touches is changed, because the frame
+   being drawn was already clamped before the cursor is. */
+static bool c3d_cam_blocked(float dx, float dz)
+{
+    const float x0 = g_camX, z0 = g_camZ;
+    g_camX = x0 + dx * 0.5f;
+    g_camZ = z0 + dz * 0.5f;
+    clamp_camera(g_fbW, g_fbH);
+    const float mx = (g_camX - x0) * dx, mz = (g_camZ - z0) * dz;
+    g_camX = x0; g_camZ = z0;
+    return mx < 0.01f && mz < 0.01f;
+}
+
 /* Nearest palette index for an RGB triple, memoised over a 5:5:5 cube. The radar has to
    speak the sidebar's 8-bit palette, so every colour this renderer knows in RGB has to
    be quantised exactly once. 32768 entries, built once, then a shift and a lookup. */
@@ -21593,14 +23598,14 @@ static void minimap_layout(int fbw, int fbh)
        from DOS geometry under the new HUD put click-to-jump in the wrong place and at
        the wrong size, which is a quieter fault than the missing map and would have
        outlived it. */
-    if (g_hudNew && g_h6Pack) {
-        const int rw=eh_enabled()?160:H6_RADAR_W,rh=eh_enabled()?144:H6_RADAR_H;
+    if (sb_hud_active()) {
+        const int rw=rah_enabled()?156:eh_enabled()?160:H6_RADAR_W,rh=rah_enabled()?151:eh_enabled()?144:H6_RADAR_H;
         const float z=fminf((float)rw/g_mapW,(float)rh/g_mapH);
         const int ox = (rw - (int)((float)g_mapW * z)) / 2;
         const int oy = (rh - (int)((float)g_mapH * z)) / 2;
         const float sc = g_h6Scale;
-        g_mmX = (int)(g_dbX0 + ((float)(eh_enabled()?-1:H6_RADAR_X) + (ox > 0 ? ox : 0)) * sc);
-        g_mmY = (int)(g_dbY0 + ((float)H6_RADAR_Y + (oy > 0 ? oy : 0)) * sc);
+        g_mmX = (int)(g_dbX0 + ((float)(rah_enabled()?30:eh_enabled()?-1:H6_RADAR_X) + (ox > 0 ? ox : 0)) * sc);
+        g_mmY = (int)(g_dbY0 + ((float)(rah_enabled()?34:H6_RADAR_Y) + (oy > 0 ? oy : 0)) * sc);
         g_mmScale = z * sc;
         int wc = (int)((float)g_mapW * z), hc = (int)((float)g_mapH * z);
         if (wc > rw) wc = rw;
@@ -21818,6 +23823,14 @@ static void radar_plot_into(const RadarTarget* t, float z, int ox, int oy)
         /* By SIDE, not by owner name: in a skirmish every house is Multi1..Multi6, and
            keying the blip colour on the name turned the whole radar light blue. */
         else if (!strcmp(o.house, "Neutral"))   col = DB_LTGREY;
+        /* RED ALERT'S BLIPS ARE EACH HOUSE'S OWN COLOUR, as its radar plots them: the "Bar"
+           colour of the owner's remap, which Red Alert takes from column 6 of its row of the
+           disc's PALETTE.CPS (init.cpp, ColorRemaps[].Bar). The brain exports that row as
+           remap=, so a country, a capture and a multiplayer seat's chosen colour all come
+           out right. Without it every Red Alert house fell to the side colours below, which
+           are C&C's GDI yellow and Nod red. */
+        else if (g_raModule && o.remap >= 0 && o.remap < 8)
+            col = pal_index(RA_RADAR_BAR[o.remap][0], RA_RADAR_BAR[o.remap][1], RA_RADAR_BAR[o.remap][2]);
         /* THE PLAYER'S OWN COLOUR IN A SKIRMISH, quantised through the same pal_index the
            terrain goes through so the 8-bit bar and the 640x480 HUD stay one picture. A
            campaign house is not in the table and falls through to the side below, so GDI
@@ -21926,7 +23939,7 @@ static void dos_radar_plot(DB_Surface* s, const DB_Pack* p, int active)
 static void h6_radar_plot(unsigned char* rgba, int w, int h, const DB_Pack* p, int active)
 {
     if (!rgba || !p || !active) return;
-    if(w<=0||h<=0||w>160||h>144)return;   /* the buffer is that size or nothing */
+    if(w<=0||h<=0||w>160||h>160)return;   /* the buffer is that size or nothing */
     memset(rgba, 0, (size_t)w*h * 4);
     if (g_mapW <= 0 || g_mapH <= 0) return;
     build_pal_lut(p->pal8);
@@ -22024,7 +24037,6 @@ static void eh_draw_power_feedback(int fbw,int fbh){
     glDisable(GL_TEXTURE_2D);glColor4f(1,1,1,1);end_overlay();
 }
 
-
 /* THE MAP EDITOR. Included here and not at the top with cnc_sidebar.h because it calls
    this file's own camera and overlay helpers, and every one of them is declared above
    this line. */
@@ -22033,6 +24045,19 @@ static void eh_draw_power_feedback(int fbw,int fbh){
 #include "edit_font.h"
 #include "enhanced_mod.h"
 #include "edit_mod.h"
+#include "terrain_cache.h"  /* the ground kept on the GPU, for draw_terrain and its seams (after the editor, whose switch it reads) */
+#include "terrain_surface.h"
+#include "td_road_join.h"
+
+/* Geometry caches declared before terrain_surface.h use the effective surface
+   generation without depending on its later-defined state type. Mirror the
+   height sampler's availability checks so disabled/stale relief maps to zero. */
+static unsigned terrain_surface_generation(void)
+{
+    const TerrainSurfaceState& surface = g_terrainSurface;
+    return terrain_surface_on() && surface.ready && surface.gen == g_groundGen
+        && surface.fw >= 2 && surface.fh >= 2 ? surface.epoch : 0;
+}
 
 /* FREE CAM (the F5 header toggle; g_freeCam in fx_panel.h). The editor's Unreal fly
    camera, lent to the game, so it is the same camera with the same hand-written inverse
@@ -22178,7 +24203,6 @@ static void enh_service(int frame)
     w.spring    = enh_w_spring;
     enh_tick(w);
 }
-
 
 /* ---------------------------------------------------------------------------------- *
  *  THE CM COMBINER SELF-TEST.
@@ -22359,8 +24383,11 @@ static bool g_optSeeded = false;
 
 /* Engine ticks a second at each game speed setting; the curve is described where the
    main loop paces its ticks by it. */
+/* THE TOP END IS FAST ENOUGH TO SEE. It used to stop at 27 ticks a second, half again the
+   Normal 18, and turning the slider up from Normal read as doing nothing: Fast is now one and
+   a half times Normal and Fastest twice it. Below Normal the curve is unchanged. */
 static const double SPEED_HZ_TABLE[DOPT_MAX_SPEED] = {
-    7.5, 10.0, 12.5, 15.0, 18.0, 22.0, 27.0
+    7.5, 10.0, 12.5, 15.0, 18.0, 27.0, 36.0
 };
 static int game_speed_setting(void);
 /* the rate the world runs at now, for anything drawn by real speed (the soldiers' gait) */
@@ -22387,7 +24414,6 @@ static int game_speed_setting(void)
     if (sp >= DOPT_MAX_SPEED) sp = DOPT_MAX_SPEED - 1;
     return sp;
 }
-
 
 /* ---------------------------------------------------------------------------------- *
  *  THE PAUSE DIALOG.
@@ -22447,9 +24473,11 @@ static void opt_apply_settings(void* user, const DOPT_Settings* set)
  *
  *  IT IS THE SHELL THAT DECIDES, for the same reason game_visuals_default_enhanced is a
  *  call the shell makes rather than a value in a defaults function. The path below starts
- *  EMPTY, and empty means remember nothing: no load, no save, not one fopen. Only
- *  game_controls_remember turns it on, and the shell makes that call on a player's launch
- *  and NOT on an automated one.
+ *  EMPTY, and empty means no implicit saves. Only game_controls_remember arms a
+ *  save path, and the shell makes that call on a player's launch and NOT on an
+ *  automated one. game_controls_load_readonly restores the same values for a bare
+ *  background player probe while leaving the save path empty. Explicit remembering
+ *  callers retain their write opt-in even under a background or automated run.
  *
  *  THAT IS THE WHOLE GATE-SAFETY ARGUMENT, and it has to be one, because a remembered
  *  SPEED is not cosmetic: game_speed_setting feeds SPEED_HZ and therefore the engine tick
@@ -22494,6 +24522,8 @@ static int opt_controls_save(const char* path)
     fprintf(f, "sound   %d\n", g_optState.set.sound);
     fprintf(f, "speech  %d\n", g_optState.set.speech);
     fprintf(f, "ambience %d\n", g_optState.set.ambience);
+    /* the language Settings chose (lang_mod.h): en, or a pack's code */
+    fprintf(f, "language %s\n", g_langCode);
     fclose(f);
     return 1;
 }
@@ -22511,6 +24541,11 @@ static int opt_controls_load(const char* path, DOPT_Settings* s)
     while (fgets(line, sizeof line, f)) {
         char* h = strchr(line, '#'); if (h) *h = 0;
         char key[64]; int val = 0;
+        char word[16];
+        if (sscanf(line, "%63s %15s", key, word) == 2 && !strcmp(key, "language")) {
+            snprintf(g_langCode, sizeof g_langCode, "%s", word);
+            continue;
+        }
         if (sscanf(line, "%63s %d", key, &val) != 2) continue;
         if      (!strcmp(key, "speed"))  s->speed      = opt_clampi(val, 0, DOPT_MAX_SPEED - 1);
         else if (!strcmp(key, "scroll")) s->scrollrate = opt_clampi(val, 0, DOPT_MAX_SCROLL - 1);
@@ -22536,21 +24571,32 @@ static void opt_controls_baseline(void)
     g_optHaveBaseline = true;
 }
 
-void game_controls_remember(const char* path)
+static void opt_controls_restore(const char* path, bool remember)
 {
     if (!path || !*path) { g_optCfgPath[0] = 0; return; }
-    snprintf(g_optCfgPath, sizeof g_optCfgPath, "%s", path);
+    /* A bare background launch still reads the player's controls. Keep its load
+       path separate from write permission: the empty save path makes every later
+       pause-dialog sync read-only, including when no file existed on this launch. */
+    char loadPath[sizeof g_optCfgPath];
+    snprintf(loadPath, sizeof loadPath, "%s", path);
+    const bool readOnly = !remember;
+    if (readOnly) g_optCfgPath[0] = 0;
+    else snprintf(g_optCfgPath, sizeof g_optCfgPath, "%s", loadPath);
 
     DOPT_Settings s;
     dopt_settings_init(&s);
-    if (!opt_controls_load(g_optCfgPath, &s)) {
+    if (!opt_controls_load(loadPath, &s)) {
         /* NOTHING IS SEEDED HERE ON A FIRST RUN, deliberately. Pushing the compiled
            defaults in now would set g_optSeeded, which stands opt_show's own seeding
            down, and that seeding is what makes --musicvol and --soundvol mean anything
            on the sliders. So the block is left exactly as it was and the baseline is
            taken later, when the dialog has shown the player what it has. */
-        fprintf(stderr, "controls: no %s yet; the shipped defaults, and the first change "
-                        "the player makes will write one\n", g_optCfgPath);
+        if (readOnly)
+            fprintf(stderr, "controls: no %s yet; the shipped defaults; this read-only "
+                            "background run will not create one\n", loadPath);
+        else
+            fprintf(stderr, "controls: no %s yet; the shipped defaults, and the first change "
+                            "the player makes will write one\n", loadPath);
         return;
     }
     g_optState.set = s;
@@ -22568,8 +24614,20 @@ void game_controls_remember(const char* path)
        fires the same call again on open, harmlessly, with the same values. */
     opt_apply_settings(NULL, &g_optState.set);
     fprintf(stderr, "controls: restored from %s (speed %d, scroll %d, music %d, sound %d,"
-                    " speech %d)\n", g_optCfgPath, s.speed, s.scrollrate, s.music,
+                    " speech %d)\n", loadPath, s.speed, s.scrollrate, s.music,
             s.sound, s.speech);
+}
+
+/* Explicit remembering remains an opt-in even for automated/background callers.
+   The shell's automatic background restore uses the separate read-only entry. */
+void game_controls_remember(const char* path)
+{
+    opt_controls_restore(path, true);
+}
+
+void game_controls_load_readonly(const char* path)
+{
+    opt_controls_restore(path, false);
 }
 
 /* THE WRITE, and it happens on the way OUT of the dialog rather than on every slider
@@ -22591,7 +24649,6 @@ static void opt_controls_sync(void)
        rest of the run, burying everything else in the log. */
     g_optOnDisk = g_optState.set;
 }
-
 
 /* THE DATABASE TAB. Included HERE and not up beside dosopt_gl.h, because its music
    duck needs BOTH g_optState.set.music (the Sound Controls slider) and g_optSeeded
@@ -22694,7 +24751,6 @@ static void opt_push_abort_click(float mscaleX, float mscaleY, int item, const c
     SDL_Event e;
     int x, y, w, h, fx, fy;
 
-
     if (!dopt_item_rect(&g_optState, item, &x, &y, &w, &h))
         return;
     fx = g_optX0 + (x + w / 2) * g_optScale;
@@ -22734,7 +24790,6 @@ static void opt_push_abort_click(float mscaleX, float mscaleY, int item, const c
  *  come back when they switch it on, so the last non-1.0 value is remembered here rather
  *  than reset to a default that would silently overwrite what they tuned in the F5
  *  panel or loaded from their own preset. */
-static float g_visSSRemembered = 2.0f;
 
 /* THE RESOLUTION LIST'S SOURCE. What the display said the last time the list was built,
    kept so the apply can resolve the Desktop entry and the readout can say what the list
@@ -22779,6 +24834,7 @@ static void vis_seed_res(DOPT_Visuals* v)
     }
     res_desktop(&dw, &dh, &uw, &uh);
     v->residx = 0;
+    v->resolution_changed = 0;
     if ((fw == 0 && fh == 0) || (fw == dw && fh == dh) || (fw == uw && fh == uh))
         return;
     for (k = 1; k < v->nres; k++)
@@ -22797,7 +24853,7 @@ static const struct { int elem; int fxr; } VIS_FXR[] = {
     { DOPT_VE_BLOOM,     FXR_BLOOM },    { DOPT_VE_GRADE,     FXR_GRADE },
     { DOPT_VE_CRT,       FXR_CRT },      { DOPT_VE_NEWAUDIO,  FXR_NEWAUDIO },
     { DOPT_VE_GRASS,     FXR_GRASS },    { DOPT_VE_FOLIAGE,   FXR_FOLIAGE },
-    { DOPT_VE_ROCKS,     FXR_ROCKS },    { DOPT_VE_SOLDIERS,  FXR_SOLDIERS },
+    { DOPT_VE_ROCKS,     FXR_ROCKS },    { DOPT_VE_SOLDIERS,  FXR_EINF },
     { DOPT_VE_MODELS,    FXR_MODELS },   { DOPT_VE_UVFX,      FXR_UVFX },
     { DOPT_VE_PATCHES,   FXR_PATCHES },  { DOPT_VE_RELIEF,    FXR_RELIEF },
     { DOPT_VE_POINTER,   FXR_POINTER },
@@ -22821,26 +24877,25 @@ static void prof_from_rows(DOPT_Profile* p, const float* rows, int mode)
     memset(p, 0, sizeof *p);
     for (k = 0; k < sizeof VIS_FXR / sizeof VIS_FXR[0]; k++)
         p->elem[VIS_FXR[k].elem] = r[VIS_FXR[k].fxr] >= 0.5f ? 1 : 0;
-    p->elem[DOPT_VE_SUPERSAMPLE] = (r[FXR_SS] > 1.001f) ? 1 : 0;
+    p->elem[DOPT_VE_SUPERSAMPLE] = 0; /* retired UI slot; keep enum/save compatibility */
     p->texset      = vis_clampi(r[FXR_TEXSET], 0, DOPT_TEX_COUNT - 1);
-    p->infset      = vis_clampi(r[FXR_INFSET], 0, DOPT_INF_COUNT - 1);
+    p->infset      = vis_clampi(r[FXR_INFSET], FX_INF_N64, FX_INF_DOS);
+    p->model_soldiers = r[FXR_SOLDIERS] >= 0.5f ? 1 : 0;
     p->uiscale     = vis_clampi(r[FXR_UISCALE], 0, DOPT_UI_COUNT - 1);
     p->perspective = vis_clampi(r[FXR_PERSP], 0, DOPT_PERSP_COUNT - 1);
 }
 
-/* And back. `ss_was` is the scale this mode last had: a ticked supersampling box keeps a
-   scale it already had above 1, and otherwise takes the one remembered for the box (or the
-   shipped 2x), so ticking it on another mode's tab does not reset a tuned scale. */
+/* Back to native-resolution profiles. The retired enum remains ABI compatible. */
 static void rows_from_prof(float* r, const DOPT_Profile* p, float ss_was)
 {
     size_t k;
     for (k = 0; k < sizeof VIS_FXR / sizeof VIS_FXR[0]; k++)
         r[VIS_FXR[k].fxr] = p->elem[VIS_FXR[k].elem] ? 1.0f : 0.0f;
-    if (!p->elem[DOPT_VE_SUPERSAMPLE])     r[FXR_SS] = 1.0f;
-    else if (ss_was > 1.001f)              r[FXR_SS] = ss_was;
-    else r[FXR_SS] = g_visSSRemembered > 1.001f ? g_visSSRemembered : 2.0f;
+    (void)ss_was;
+    r[FXR_SS] = 1.0f; /* Visuals always uses native resolution. */
     r[FXR_TEXSET]  = (float)p->texset;
     r[FXR_INFSET]  = (float)p->infset;
+    r[FXR_SOLDIERS] = p->model_soldiers ? 1.0f : 0.0f;
     r[FXR_UISCALE] = (float)p->uiscale;
     r[FXR_PERSP]   = (float)p->perspective;
 }
@@ -22885,8 +24940,6 @@ static void vis_from_fx(DOPT_Visuals* v)
     vis_seed_res(v);
     v->vsync = vis_clampi(g_fx.vsync, 0, 2);
     v->fps   = g_fx.show_stats ? 1 : 0;
-    if (g_fx.ss_scale > 1.001f)
-        g_visSSRemembered = g_fx.ss_scale;
 }
 
 /* THE GAMEPLAY PAGE'S OWN SEED AND ITS OWN APPLY, a pair of their own rather than two more
@@ -22920,6 +24973,9 @@ static bool opt_run_is_automated(void);
 static void opt_apply_display(const DOPT_Visuals* v)
 {
     const int mode = v->dispmode;
+    /* An unlisted custom window size displays as Desktop in the selector. A feature
+       checkbox must not commit that fallback. Only a display-mode/size choice can. */
+    if (mode == (int)(g_fx.display_mode + 0.5f) && !v->resolution_changed) return;
     /* ENTRY 0 IS THE DESKTOP'S OWN. Under borderless and true fullscreen it is written as
        0 x 0, the dial's word for "the desktop's". Under WINDOWED it has to be a real
        window, so it resolves to the desktop's usable room here, and the birth of the
@@ -22944,14 +25000,57 @@ static void opt_apply_display(const DOPT_Visuals* v)
         oldh = uh;
     }
     changed = ((int)(g_fx.display_mode + 0.5f) != mode) || (oldw != rw) || (oldh != rh);
-    g_fx.display_mode = (float)mode;
-    g_fx.res_w = (float)rw;
-    g_fx.res_h = (float)rh;
     /* NOT IN AN AUTOMATED RUN: a hidden window is never given the display's size and a
        fullscreen one would measure the wrong thing (the note on the window flags). The
        dial is still written, which is what a gate reads. */
-    if (changed && !opt_run_is_automated() && !fs_background_only()) fs_apply_mode(SDL_GL_GetCurrentWindow(), mode, rw, rh);
-    else if (changed) { printf("DISPLAY|deferred|mode=%d|automated run\n", mode); fflush(stdout); }
+    if (changed && !opt_run_is_automated() && !fs_background_only()) {
+        SDL_Window* win = SDL_GL_GetCurrentWindow();
+        if (!fs_apply_mode(win, mode, rw, rh)) {
+            /* Rollback can fail too. Record the mode the driver actually left us in,
+               rather than showing or later saving a fullscreen mode we no longer have. */
+            game_display_changed(win, fs_window_mode(win));
+            return;
+        }
+    } else if (changed) { printf("DISPLAY|deferred|mode=%d|automated run\n", mode); fflush(stdout); }
+    g_fx.display_mode = (float)mode;
+    g_fx.res_w = (float)rw;
+    g_fx.res_h = (float)rh;
+}
+
+void game_display_started(int mode, int rw, int rh)
+{
+    g_fx.display_mode = (float)mode;
+    g_fx.res_w = (float)rw;
+    g_fx.res_h = (float)rh;
+    game_diagnostics_configuration();
+}
+
+/* Keyboard switches are shared by menu, mission, movie and campaign event loops.
+   Remember the successful SDL change too, so a restart returns to the same mode. */
+void game_display_changed(SDL_Window* win, int mode)
+{
+    if (!win || opt_run_is_automated() || fs_background_only()
+        || (SDL_GetWindowFlags(win) & SDL_WINDOW_HIDDEN)) return;
+    int rw = (int)g_fx.res_w, rh = (int)g_fx.res_h;
+    if (mode == FS_MODE_WINDOWED) SDL_GetWindowSize(win, &rw, &rh);
+    else if (mode == FS_MODE_FULLSCREEN) {
+        SDL_DisplayMode actual;
+        if (SDL_GetWindowDisplayMode(win, &actual) == 0) { rw = actual.w; rh = actual.h; }
+    }
+    game_display_started(mode, rw, rh);
+    if (g_optOpen) {
+        g_optState.vis.dispmode = mode;
+        g_optState.vis.residx = 0;
+        for (int k = 0; k < g_optState.vis.nres; k++)
+            if (g_optState.vis.res_w[k] == rw && g_optState.vis.res_h[k] == rh)
+                g_optState.vis.residx = k;
+    }
+    /* An open dialog/panel owns its pending choices and its normal save on close.
+       A menu hotkey has no mission loop to perform opt_visuals_sync later. */
+    if (g_visCfgPath[0] && !g_optOpen && !fxp_is_open()) {
+        if (fx_save(&g_fx, g_visCfgPath)) opt_visuals_adopt();
+        else fprintf(stderr, "visuals: cannot remember the keyboard display change\n");
+    }
 }
 
 /* THE MODE IN USE, PUT ON SCREEN from the live fields that hold its rows: the art, the
@@ -22960,6 +25059,8 @@ static void opt_apply_display(const DOPT_Visuals* v)
 static void vis_push_mode(void)
 {
     const int mode = fx_mode_of(&g_fx);
+    g_fx.ecur_on = 1;
+    g_fx.efx_enh = 1;
     fx_texset_set((int)g_fx.texset);
     fx_grass_follow_texset();   /* the grass is tuned against the 1995 bank */
     fx_infset_set((int)g_fx.infset);
@@ -23022,14 +25123,12 @@ static void opt_apply_visuals(void* user, const DOPT_Visuals* v)
         for (r = 0; r < FXR_COUNT; r++)
             fx_mode_set_live(&g_fx, r, row[r]);
     }
-    /* SUPERSAMPLING IS A FLOAT WEARING A CHECKBOX, and the scale a player switches off
-       has to come back when they switch it on. */
-    if (g_fx.ss_scale > 1.001f) g_visSSRemembered = g_fx.ss_scale;
 
     g_fx.vsync      = (float)v->vsync;
     g_fx.show_stats = v->fps ? 1 : 0;
     vis_push_mode();
     opt_apply_display(v);
+    game_diagnostics_configuration();
 }
 
 /* RESET TO DEFAULTS, the Advanced page's button, for ONE graphics mode: the one its tabs
@@ -23095,14 +25194,8 @@ static void opt_reset_visuals(void* user, DOPT_Visuals* v, int mode)
        ground was switched to the cartridge bank, and gives it back when the 1995 bank
        returns. Without forgetting it, a tick the reset had just cleared could be handed
        straight back over the top of the reset.
-
-       THE SUPERSAMPLE SCALE. The tick box remembers the scale it switched off so that
-       switching it on again returns to what was tuned rather than to a default. After a
-       reset there is nothing to return to, so the next tick of that box must give the
-       shipped scale. 2.0 is that scale, the same value this static holds on a boot nobody
-       has touched and the same fallback the box uses when it has nothing remembered. */
+ */
     fx_grass_forget_cart();
-    g_visSSRemembered = 2.0f;
     cam_apply_option();
     vis_from_fx(v);
     fprintf(stderr, "FX|advanced reset to defaults|%s, the mode in use\n", FX_MODE_NAME[mode]);
@@ -23561,7 +25654,15 @@ static void net_hash_world(int frame)
             p = e;
         }
     }
-    if (seen_end) nm_note_hash((unsigned)frame, h);
+    if (seen_end) {
+        if (BrainAIStateHash) {
+            const unsigned a = BrainAIStateHash();
+            const unsigned char bytes[4] = {(unsigned char)a, (unsigned char)(a >> 8),
+                (unsigned char)(a >> 16), (unsigned char)(a >> 24)};
+            h = net_fnv(h, (const char*)bytes, sizeof bytes);
+        }
+        nm_note_hash((unsigned)frame, h);
+    }
 }
 
 /* THE SCENARIO'S OWN BYTES, hashed, and it is a different question from every other check
@@ -23583,6 +25684,20 @@ static void net_hash_world(int frame)
    RETURNS 0 to mean "could not compute one", which nm_host and nm_join read as "skip the
    check" rather than "disagree": a joiner started with no --scen at all has no scenario to
    hash yet, and refusing it here would be refusing a fact not in evidence. */
+static int ra_country_soviet(int country);   /* defined beside arm_skirmish */
+
+/* A MATCH SEED FOR A HOST TO OFFER: never zero (zero is "none agreed") and kept to the
+   positive range of the engine's int. From the clock and the process, which is all a seed
+   that only has to differ between two matches needs. */
+static unsigned net_draw_seed(void)
+{
+    const Uint64 pc = SDL_GetPerformanceCounter();
+    unsigned v = (unsigned)SDL_GetTicks() * 2654435761u ^ (unsigned)pc ^ (unsigned)(pc >> 32)
+               ^ (unsigned)(uintptr_t)&pc;
+    v &= 0x7FFFFFFFu;
+    return v ? v : 1u;
+}
+
 static unsigned net_scen_hash(const GameOpts* o)
 {
     static const char* const EXT[2] = {".INI", ".BIN"};
@@ -23666,6 +25781,12 @@ static int g_netChatTaken = 0;
    options dialog and the end-of-match table all reach it long before the boot code that
    writes it. */
 static bool g_skirmishRunning;
+/* This is the running scenario's mode, reset on every mission boot and retained by
+   campaign save loads. Never infer a campaign from the last menu/lobby selection. */
+static bool ra_infantry_campaign_palette(void)
+{
+    return !g_skirmishRunning && !nm_active();
+}
 
 enum { VERDICT_REVEAL_MS = 4000 };
 static double g_verdictRevealMs = -1.0;
@@ -23738,6 +25859,7 @@ static void match_stats_capture(void)
             r->defeated = pi.IsDefeated ? 1 : 0;
             r->is_local = (pid == 0) ? 1 : 0;
             r->faction = (i < 8) ? g_matchFaction[i] : 0;
+            r->country = (i < 8) ? g_matchHouse[i] : 0;
             if (r->is_local) g_matchStats.side = r->faction;
         }
         memset(sbuf, 0, sizeof(CNCSidebarStruct));
@@ -23768,16 +25890,18 @@ static void match_stats_capture(void)
     for (i = 0; i < g_matchStats.nrows; i++) {
         const MatchStatRow* r = &g_matchStats.row[i];
         printf("MATCHSTATS|%d|name=%s|colour=%d|house=%d|killed=%d|razed=%d|lost=%d|"
-               "harvested=%d|score=%d|defeated=%d|me=%d\n",
+               "harvested=%d|score=%d|defeated=%d|me=%d",
                i, r->name, r->colour, r->house, r->killed, r->razed, r->lost,
                r->harvested, r->score, r->defeated, r->is_local);
+        /* Red Alert's rows also say which country they played. */
+        if (g_raModule) printf("|country=%d", r->country);
+        printf("\n");
     }
     fflush(stdout);
 }
 
 const MatchStats* game_match_stats(void) { return &g_matchStats; }
 const char* game_net_fail(void) { return g_netFailWhy; }
-
 
 static void verdict_begin_reveal(void)
 {
@@ -23874,7 +25998,7 @@ static bool net_arm_from_lobby(const GameOpts* o)
     unsigned slots[32];
     memset(slots, 0, sizeof slots);
     const int n = BrainEventABI(slots, 32);
-    const unsigned abi = (n > 10) ? slots[10] : 0u;
+    const unsigned abi = (n > 10 && BrainAIPolicy) ? (slots[10] ^ BrainAIPolicy()) * 16777619u : 0u;
     const int evsize = (n > 1) ? (int)slots[1] : 22;
     const NmSetup* ls = nm_lobby_setup();
     net_adopt_agreed(ls);
@@ -23893,7 +26017,7 @@ static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
     unsigned slots[32];
     memset(slots, 0, sizeof slots);
     const int n = BrainEventABI(slots, 32);
-    const unsigned abi = (n > 10) ? slots[10] : 0u;
+    const unsigned abi = (n > 10 && BrainAIPolicy) ? (slots[10] ^ BrainAIPolicy()) * 16777619u : 0u;
     const unsigned scen = net_scen_hash(o);
     const int evsize = (n > 1) ? (int)slots[1] : 22;
     NmSetup s;
@@ -23911,6 +26035,21 @@ static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
         s.superweapons = o->superweapons;
         s.bases = o->bases;
         s.unit_count = o->unit_count;
+        s.ai_difficulty = o->ai_difficulty > 0 ? o->ai_difficulty - 1 : 1;
+        for (int i = 0; i < 8; ++i) s.ai_levels[i] = o->ai_levels[i] < 4 ? o->ai_levels[i] : 1;
+        /* A RED ALERT ROOM says so, and carries what only that engine reads: its rules,
+           its tech level and the seed every peer starts from. The host's own --seed when it
+           gave one, otherwise one drawn here, so two matches are not the same match. A
+           Tiberian Dawn room leaves all of it zero, as it always sent. */
+        if (o->ra3d) {
+            s.game = 1;
+            s.shroud = o->shroud_regrow;
+            s.ctf = o->ctf;
+            s.ai_difficulty = o->ai_difficulty > 0 ? o->ai_difficulty - 1 : 1;
+            s.build = o->build;
+            s.seed = o->seed ? (unsigned)o->seed : net_draw_seed();
+            eff->seed = (int)s.seed;   /* and the host plays the seed it offers */
+        }
         /* THE COMMAND LINE HAS NO LOBBY TO CHOOSE A SPEED ON, so the host offers its own
            Game Controls setting and the joiners adopt it, which is the same rule the
            screen follows: one peer decides and the number travels. Untouched, that is
@@ -23934,7 +26073,8 @@ static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
         s.humans = humans;
         s.seats = humans + ai;
         for (int i = 0; i < s.seats; i++) {
-            s.house[i] = o->player_house[i] ? 1 : 0;
+            /* Tiberian Dawn's side, 0 or 1; for the Red Alert engine the seat's country. */
+            s.house[i] = (unsigned char)(o->ra3d ? o->player_house[i] : (o->player_house[i] ? 1 : 0));
             s.colour[i] = (unsigned char)((o->player_colour[i] < 0 || o->player_colour[i] > 7) ? (i & 7) : o->player_colour[i]);
             s.team[i] = (unsigned char)o->player_team[i];
             s.start[i] = (unsigned char)((o->start_wp[i] >= 0) ? o->start_wp[i] : OPENCNC3D_START_RANDOM);
@@ -23963,14 +26103,25 @@ static bool net_match_prepare(const GameOpts* o, GameOpts* eff)
         eff->superweapons = s.superweapons;
         eff->bases = s.bases;
         eff->unit_count = s.unit_count;
+        /* A Red Alert room's own rules, tech level and seed, as the host gave them. */
+        if (s.game) {
+            eff->shroud_regrow = s.shroud;
+            eff->ctf = s.ctf;
+            eff->ai_difficulty = (int)s.ai_difficulty + 1;
+            if (s.build > 0) eff->build = s.build;
+            eff->seed = (int)s.seed;
+        }
         for (int i = 0; i < NM_MAX_SEATS; i++) {
             eff->player_house[i] = s.house[i];
             eff->player_colour[i] = s.colour[i];
             eff->player_team[i] = s.team[i];
             eff->start_wp[i] = (s.start[i] == OPENCNC3D_START_RANDOM) ? -1 : s.start[i];
+            eff->ai_levels[i] = s.ai_levels[i];
         }
-        /* THIS MACHINE'S OWN SEAT, which is no longer always 1. */
+        /* THIS MACHINE'S OWN SEAT, which is no longer always 1. A Red Alert seat holds a
+           country, and the side follows from it. */
         eff->side = s.house[nm_seat() < 0 ? 1 : nm_seat()];
+        if (o->ra3d) eff->side = ra_country_soviet(eff->side);
     }
     net_adopt_agreed(&s);
     /* THE SEAT MODES TRAVEL INTO THE OPTIONS, host and joiner alike, so arm_skirmish
@@ -24343,7 +26494,7 @@ static void cheat_show(const char* scenario)
        network match count, because both are games with other commanders in them. */
     dopt_set_match(&g_optState, g_skirmishRunning ? 1 : 0, g_surrendered);
     dopt_bind_cheats(&g_optState, cheat_apply);
-    g_optOpen = true;
+    g_optOnTitle = false; g_optEnhanced = game_enhanced_menu_enabled() != 0; em_reset(); g_optOpen = true;
     SDL_ShowCursor(SDL_DISABLE);
     cur_lock(MOUSE_NORMAL);
 }
@@ -24428,6 +26579,7 @@ static void opt_show(const char* scenario)
        with other commanders in them. */
     dopt_set_match(&g_optState, g_skirmishRunning ? 1 : 0, g_surrendered);
     dopt_bind(&g_optState, NULL, opt_apply_settings);
+    lang_install_hooks();
     /* Seed the checkboxes from what the chain is ACTUALLY set to before binding, or the
        bind's immediate apply would push a zeroed struct into it and switch the picture
        off the first time anybody opened the pause menu. */
@@ -24454,7 +26606,7 @@ static void opt_show(const char* scenario)
     dopt_set_tracks(&g_optState, g_jbTracks.empty() ? NULL : &g_jbTracks[0],
                     (int)g_jbTracks.size(), jb_playing_row());
     dopt_bind_jukebox(&g_optState, opt_jukebox);
-    g_optOpen = true;
+    g_optOnTitle = false; g_optEnhanced = game_enhanced_menu_enabled() != 0; em_reset(); g_optOpen = true;
     SDL_ShowCursor(SDL_DISABLE);
     /* 1995 shows the plain arrow over a modal dialog, and LATCHES it there:
        conquer.cpp:216-220 is Override_Mouse_Shape(MOUSE_NORMAL, false) / Options.Process()
@@ -24924,7 +27076,6 @@ static int shroud_shown_ring_cb(int x, int y)
         || cell_shown(x, y - 1) || cell_shown(x, y + 1);
 }
 
-
 /* Frame-time evidence for the blended pass: when g_shroudPerfOn, the dispatch below
    brackets the shroud draw in glFinish() pairs so the GPU cost lands inside the
    measured window instead of hiding in the swap. Off by default because the extra
@@ -25035,7 +27186,11 @@ static std::vector<HBar> collect_health_bars(int fbw, int fbh)
            this arm in v0.6.0, when they first reached the renderer at all; the comment
            had named them since the health bar was written. */
         int dimw = o.dimw;
-        if (o.kind == K_UNIT || o.kind == K_AIRCRAFT) {
+        /* (and Red Alert's ships, the one brain that exports a vessel: its dimw is the
+           1996 sprite's width, which stood a selected Destroyer's bar two cells tall, so
+           a ship takes the vehicles' rule and, with no cartridge model, has no bar, as a
+           Red Alert vehicle has none) */
+        if (o.kind == K_UNIT || o.kind == K_AIRCRAFT || o.kind == K_VESSEL) {
             const int mi = mesh_for(o);
             if (mi < 0)
                 continue;                 /* no model, no bar; do not guess a length */
@@ -25208,7 +27363,8 @@ static std::vector<PipRow> collect_pip_rows(void)
         if (!hb_should_show(o.str, o.maxstr, is_selected(o) ? 1 : 0)) continue;
         if (o.dimw <= 0) continue;
         int dimw = o.dimw;
-        if (o.kind == K_UNIT || o.kind == K_AIRCRAFT) {
+        /* (a Red Alert ship by the health bar's rule, so the two strips stay together) */
+        if (o.kind == K_UNIT || o.kind == K_AIRCRAFT || o.kind == K_VESSEL) {
             const int mi = mesh_for(o);
             if (mi < 0) continue;
             dimw = cart_dimw_for_mesh(mi);
@@ -26172,7 +28328,6 @@ static bool texbook_overdraws(int baseMesh, int varMesh)
     return true;
 }
 
-
 /* ---- THE CARTRIDGE'S DAMAGE ART ----------------------------------------------------
    Every structure the console has a model for also has DAMAGE ART, and the rule that
    picks it is byte for byte the 1995 rule. BuildingClass::Draw3D calls Health_Ratio()
@@ -26543,6 +28698,7 @@ static void dmg_emit_fire(const SimObject& o, const DmgEmitter& s,
    draw because that is where its frame counter and its position are, but a renderer that
    draws one tick more than once -- the shot path, a pause -- would spawn the same bubble
    twice. Self-deduplicating on the frame for the same belt-and-braces reason efx_step is. */
+static void ra3d_damage_smoke(int frame);   /* ra3d_effects_mod.h, far below */
 static void dmg_emit_step(int frame)
 {
     if (frame < g_dmgEmitFrame)              /* the clock went back: a new mission */
@@ -26554,6 +28710,14 @@ static void dmg_emit_step(int frame)
        the legacy one-billboard-per-anim path that knows nothing about them. */
     if (!g_dmgEmit || !g_efxPoolLive)
         return;
+    /* RED ALERT'S STRUCTURES ARE NOT THESE. The rows are keyed by Tiberian Dawn's idents
+       and placed for its models, and the names Red Alert shares (FACT, WEAP, PROC, SILO,
+       SAM...) are other buildings there: a damaged one takes the cartridge's plume from
+       its own model's roof instead (ra3d_effects_mod.h). */
+    if (g_raModule) {
+        ra3d_damage_smoke(frame);
+        return;
+    }
     for (size_t i = 0; i < g_objects.size(); i++) {
         const SimObject& o = g_objects[i];
         if (o.kind != K_BUILDING || o.limbo)
@@ -26598,6 +28762,137 @@ static void dmg_emit_step(int frame)
 /* The remastered vehicles and aircraft, Enhanced only, beside the buildings: they keep
    their models in the buildings' struct and share its residency, liveries and solver. */
 #include "evhc_mod.h"
+
+/* Requires the Enhanced vehicle/building types above; the picking path uses
+   the forward declaration near object_screen_poly. */
+static bool evhc_screen_poly(const SimObject& o, int fbw, int fbh, bool coarse,
+                              ScreenPoly* out)
+{
+    const int model=evhc_for(o);
+    if(model<0 || !evhc_resident(g_evhc[model],false))return false;
+    const EvhcModel& V=g_evhc[model];
+    const EbldModel& M=V.m;
+    const int mi=M.mesh[EBM_INTACT];
+    if(mi<0 || mi>=(int)g_pack.mesh.size())return false;
+    const PackMesh& mesh=g_pack.mesh[mi];
+    const EbldSet& S=M.set[EBS_INTACT];
+    const std::vector<int>& ranges=M.rng[EBM_INTACT];
+    struct Bounds {
+        unsigned gen=~0u;
+        const PackTri* data=NULL;
+        std::vector<WorldBox> piece;
+    };
+    static std::map<int,Bounds> saved;
+    Bounds& B=saved[model];
+    const PackTri* data=mesh.tris.empty()?NULL:&mesh.tris[0];
+    if(B.gen!=g_groundGen || B.data!=data || B.piece.size()!=S.piece.size()) {
+        B.gen=g_groundGen;B.data=data;B.piece.resize(S.piece.size());
+        for(size_t k=0;k<S.piece.size();++k) {
+            WorldBox& b=B.piece[k];b.ok=false;
+            b.x0=b.y0=b.z0=1e9f;b.x1=b.y1=b.z1=-1e9f;
+            for(int t=ranges[k*EBR+EBR_A];t<ranges[k*EBR+EBR_B];++t) {
+                if(mesh.tris[t].mode==MODE_SHADOW)continue;
+                for(int j=0;j<3;++j) {
+                    const PackVert& v=mesh.tris[t].v[j];
+                    b.x0=std::min(b.x0,v.x);b.x1=std::max(b.x1,v.x);
+                    b.y0=std::min(b.y0,v.y);b.y1=std::max(b.y1,v.y);
+                    b.z0=std::min(b.z0,v.z);b.z1=std::max(b.z1,v.z);b.ok=true;
+                }
+            }
+        }
+    }
+    std::map<int,EvhcUnit>::const_iterator it=g_evhcUnit.find(smooth_key(o));
+    const EvhcUnit* U=it!=g_evhcUnit.end() && it->second.model==model ? &it->second : NULL;
+    if(o.ylift>0.0f)U=NULL;
+    EvhcPose P;evhc_pose_of(V,o,U,P);
+    std::vector<float> mats;evhc_pose_all(V,P,U,mats);
+    SimObject posed=o;posed.ylift-=evhc_dive(V,o);
+    dop_reset(out);
+    for(size_t k=0;k<S.piece.size();++k) {
+        const int part=V.partOf[k];
+        if(!B.piece[k].ok || !evhc_piece_shows(V,part,P))continue;
+        const float* local=part>=0 ? &mats[part*12] : NULL;
+        /* Four calls to the renderer's existing point transform give an affine
+           frame. Reuse it for all vertices rather than recomputing trigonometry. */
+        float world[12],origin[3];
+        const float zero[3]={0,0,0};evhc_lamp_world(posed,local,zero,true,origin);
+        for(int axis=0;axis<3;++axis) {
+            float basis[3]={0,0,0},p[3];basis[axis]=1024.0f;
+            evhc_lamp_world(posed,local,basis,true,p);
+            for(int row=0;row<3;++row)world[row*4+axis]=(p[row]-origin[row])/1024.0f;
+        }
+        for(int row=0;row<3;++row)world[row*4+3]=origin[row];
+        const auto point=[&](float x,float y,float z) {
+            const float wx=world[0]*x+world[1]*y+world[2]*z+world[3];
+            const float wy=world[4]*x+world[5]*y+world[6]*z+world[7];
+            const float wz=world[8]*x+world[9]*y+world[10]*z+world[11];
+            dop_add_world(out,wx,wy,wz,fbw,fbh);
+        };
+        if(coarse) {
+            const WorldBox& b=B.piece[k];
+            for(int j=0;j<8;++j)point(j&1?b.x1:b.x0,j&2?b.y1:b.y0,j&4?b.z1:b.z0);
+        } else {
+            for(int t=ranges[k*EBR+EBR_A];t<ranges[k*EBR+EBR_B];++t) {
+                if(mesh.tris[t].mode==MODE_SHADOW)continue;
+                for(int j=0;j<3;++j) {
+                    const PackVert& v=mesh.tris[t].v[j];point(v.x,v.y,v.z);
+                }
+            }
+        }
+    }
+    dop_finish(out);return true;
+}
+
+/* RED ALERT'S AIRFIELD (and Helipad): the height of the remastered building's runway or
+   landing plate under the point (x, z), cells, over the ground the building stands on. The
+   highest upward facing triangle of its standing model over that point, below
+   RA_AFLD_DECK_MAX (the control tower's roof and the wind sock are not where a craft parks),
+   turned with the building exactly as draw_mesh turns it. False when the building is not
+   drawn by its model (no Enhanced, no file, going up or in pieces), and the craft keeps the
+   ground. */
+static const float RA_AFLD_DECK_MAX = 0.5f;   /* cells */
+static bool ra_airfield_deck(const SimObject& pad, float x, float z, float* deck)
+{
+    if (!ebld_rule_now() || pad.str <= 0 || construction_frac(pad) < 1.0f) return false;
+    const int m = ebld_model_of(pad.type);
+    if (m < 0 || m >= (int)g_ebld.size()) return false;
+    const EbldBld* E = ebld_find(pad);
+    if (E && E->stage == EB_WRECKED) return false;
+    const EbldSet& S = g_ebld[m].set[EBS_INTACT];
+    /* the point in the model's own frame: draw_mesh's yaw undone */
+    float rs, rc;
+    facing_rot(draw_facing(pad), &rs, &rc);
+    const float dx = (x - pad.wx) / MODEL_SCALE, dz = (z - pad.wz) / MODEL_SCALE;
+    const float lx = dx * rc - dz * rs, lz = dx * rs + dz * rc;
+    const float cap = RA_AFLD_DECK_MAX / MODEL_SCALE;
+    bool hit = false;
+    float best = 0.0f;
+    for (size_t t = 0; t < S.tri.size(); t++) {
+        const EbldTri& T = S.tri[t];
+        if (T.mode == MODE_SHADOW || T.mode == MODE_XLU) continue;
+        const float e1[3] = { T.v[1].x - T.v[0].x, T.v[1].y - T.v[0].y, T.v[1].z - T.v[0].z };
+        const float e2[3] = { T.v[2].x - T.v[0].x, T.v[2].y - T.v[0].y, T.v[2].z - T.v[0].z };
+        const float n[3] = { e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2],
+                             e1[0] * e2[1] - e1[1] * e2[0] };
+        const float L = sqrtf(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        if (L < 1e-6f || fabsf(n[1]) < 0.9f * L) continue;      /* not a level face */
+        float sg[3];
+        for (int q = 0; q < 3; q++) {
+            const int r = (q + 1) % 3;
+            sg[q] = (T.v[r].x - T.v[q].x) * (lz - T.v[q].z) - (T.v[r].z - T.v[q].z) * (lx - T.v[q].x);
+        }
+        const bool in = (sg[0] >= 0 && sg[1] >= 0 && sg[2] >= 0) || (sg[0] <= 0 && sg[1] <= 0 && sg[2] <= 0);
+        if (!in) continue;
+        const float y = T.v[0].y - (n[0] * (lx - T.v[0].x) + n[2] * (lz - T.v[0].z)) / n[1];
+        if (y > cap || (hit && y <= best)) continue;
+        best = y;
+        hit = true;
+    }
+    if (!hit || best <= 0.0f) return false;
+    *deck = best * MODEL_SCALE;
+    return true;
+}
+
 /* The placement of the remastered structures, Enhanced only, after the buildings and the
    vehicles whose models it moves (the Construction Yard deploys out of the remastered MCV). */
 #include "ebld_place.h"
@@ -26605,10 +28900,47 @@ static void dmg_emit_step(int frame)
 /* The remastered terrain's cell decorations, Enhanced only, after the buildings whose
    models and residency they use: the crates, the field overlays and the P04 wreck. */
 #include "ebld_terr.h"
+#include "building_physics_capture.h"
 /* The Obelisk of Light's beam, in all three modes: after the remastered buildings, whose
    standing model it starts from under Enhanced, and before the Classic scene, which draws
    the 1995 lines out of the same list. */
 #include "laser_mod.h"
+
+/* Database previews resolve actual installed Enhanced assets, never cartridge proxies.
+   Residency uses the battlefield importers; walls use a single isolated cell. */
+static int codex_enhanced_mesh(const char* code){
+    if(!g_fx.enabled)return -1;
+    int wk=ebld_wall_kind(code),b=-1;
+    if(wk>=0){ebld_ensure(code);ebld_wall_models();int owner=g_ebldWallModel[wk];
+        if(owner>=0)b=g_ebld[owner].wallStaged?g_ebld[owner].wallSub[0]:owner;
+    }else b=ebld_model_of(code);
+    if(b>=0&&ebld_resident(g_ebld[b],false))return g_ebld[b].mesh[EBM_INTACT];
+    int v=evhc_model_of(code);
+    if(v>=0&&evhc_resident(g_evhc[v],false))return g_evhc[v].m.mesh[EBM_INTACT];
+    return -1;
+}
+static int codex_enhanced_m3(const char* code){
+    if(!g_fx.enabled)return -1;
+    /* Infantry always use the Enhanced set, independent of the sprite-size/experimental
+       switches. A rigid authored override is allowed only when it is the live art set. */
+    for(size_t i=0;i<g_m3.size();i++)if(g_m3[i].type==code&&g_m3[i].enh)return int(i);
+    return m3_find(code);
+}
+static void codex_enhanced_draw_m3(int mi,float x,float y,float z,int house){
+    M3Model &m=g_m3[mi];M3Draw d={};d.cx=x;d.cz=z;d.ground=y;
+    d.tintR=d.tintG=d.tintB=d.alpha=1;d.side=house==0?1:0;
+    SimObject o={};snprintf(o.type,sizeof o.type,"%s",m.type.c_str());
+    snprintf(o.house,sizeof o.house,"%s",house==0?"BadGuy":"GoodGuy");
+    o.kind=m.bone.empty()?K_UNIT:K_INFANTRY;
+    o.remap=g_raModule?(house==0?2:1):-1;
+    if(!m.bone.empty()){
+        int clip=m3_clip(m,"idle");if(clip>=0)m3_pose(m,clip,float(SDL_GetTicks())*.001f*m.clip[clip].fps);
+        float team[3],cloth[3];soldier_colours(o,team,cloth,&d.camt,m.enh);
+        d.normalizeCloth=g_raModule&&ra_infantry_source_cloth(o.remap,o.type,m.enh,ra_infantry_campaign_palette());
+        d.pr=team[0];d.pg=team[1];d.pb=team[2];d.cr=cloth[0];d.cg=cloth[1];d.cb=cloth[2];d.soldier=1;
+    }else house_colour(o,&d.pr,&d.pg,&d.pb);
+    m.drawLod=-1;m3_draw(mi,d);
+}
 
 /* ---- the authored art set ----------------------------------------------------------
    Everything an authored model is drawn with comes from the SAME functions the pack
@@ -26635,11 +28967,12 @@ static void draw_object_model3d(int m3, const SimObject& o)
     d.cz = o.wz;
     d.ground = terrain_y(o.wx, o.wz);
     d.ylift  = alt_lift(o);
+    d.vehicle = o.kind == K_UNIT || o.kind == K_AIRCRAFT || o.kind == K_VESSEL;
     float rs, rc;
-    facing_rot(draw_facing(o), &rs, &rc);
+    facing_rot(draw_heading(o), &rs, &rc);
     d.yaw = atan2f(rs, rc) * 180.0f / (float)M_PI;
     mesh_wobble(wobble_of(o), o.wx, o.wz, &d.wobX, &d.wobZ);
-    d.turyaw = turret_delta(o);
+    d.turyaw = draw_turret_heading(o);
     d.treadV = tread_phase_of(o.id);
     /* ONE SHROUD SAMPLE FOR THE WHOLE HULL, at its anchor, where the pack path takes
        one per vertex. The per-vertex reading exists so a TREE whose canopy straddles
@@ -26750,8 +29083,8 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
        of the cartridge mesh, whose clips the fixed one carries unchanged. */
     const int baseMi = n64fix_mesh_for(mi, o);
     g_n64fixLast = (baseMi != mi);
-    draw_mesh(baseMi, o.wx, o.wz, draw_facing(o), pass,
-              turret_delta(o), rotor_spin(o), mesh_house(o),
+    draw_mesh(baseMi, o.wx, o.wz, draw_heading(o), pass,
+              draw_turret_heading(o), rotor_spin(o), mesh_house(o),
               construction_frac(o), lift, false, wobble_of(o),
               object_anim_t(mi, o));
     g_fanTex = -1;
@@ -26781,7 +29114,7 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
                 bookRotor = rotor_spin(o);
             }
             if (over) { glEnable(GL_POLYGON_OFFSET_FILL); glPolygonOffset(-1.0f, -1.0f); }
-            draw_mesh(tb, o.wx, o.wz, draw_facing(o), pass,
+            draw_mesh(tb, o.wx, o.wz, draw_heading(o), pass,
                       bookTurret, bookRotor, mesh_house(o), 1.0f, 0.0f, false,
                       wobble_of(o), bookT);
             if (over) glDisable(GL_POLYGON_OFFSET_FILL);
@@ -26811,7 +29144,7 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
     {
         const int door = transport_door_for(o);
         if (door >= 0 && g_doorsDraw)
-            draw_mesh(door, o.wx, o.wz, draw_facing(o), pass,
+            draw_mesh(door, o.wx, o.wz, draw_heading(o), pass,
                       0, 0.0f, mesh_house(o), 1.0f, lift, false, wobble_of(o));
     }
     /* The refinery's second command rides here rather than at the three call sites, for
@@ -26824,7 +29157,7 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
         float rigT = -1.0f;
         const int rig = procrig_for(o, &rigT);
         if (rig >= 0 && !evhcDocked)
-            draw_mesh(rig, o.wx, o.wz, draw_facing(o), pass,
+            draw_mesh(rig, o.wx, o.wz, draw_heading(o), pass,
                       0, 0.0f, mesh_house(o), 1.0f, 0.0f, false, WOBBLE_NONE, rigT);
     }
     /* THE DAMAGE OVERLAY, and it is ADDITIVE rather than a replacement: the cartridge
@@ -26848,7 +29181,7 @@ static void draw_object_mesh(int mi, const SimObject& o, int pass)
            this distinction on its own. */
         const int dmi = dmg_mesh_for(o);
         if (dmi >= 0)
-            draw_mesh(dmi, o.wx, o.wz, draw_facing(o), pass,
+            draw_mesh(dmi, o.wx, o.wz, draw_heading(o), pass,
                       0, 0.0f, mesh_house(o), 1.0f, 0.0f, false, WOBBLE_NONE);
     }
     /* The other end of the bracket. Every command this object emits -- base mesh, texture
@@ -26875,21 +29208,20 @@ static void draw_object_rig(int rig, const SimObject& o, int pass, float rigT)
             const bool mcv = (p >= 1 && p <= 5);
             if (!mcv) continue;
             if ((size_t)pp.tri0 > run0)
-                draw_mesh(rig, o.wx, o.wz, draw_facing(o), pass, 0, 0.0f, mesh_house(o), 1.0f,
+                draw_mesh(rig, o.wx, o.wz, draw_heading(o), pass, 0, 0.0f, mesh_house(o), 1.0f,
                           0.0f, false, WOBBLE_NONE, rigT, NULL, run0, (size_t)pp.tri0);
             run0 = (size_t)(pp.tri0 + pp.ntris);
         }
         if (run0 < rm.tris.size())
-            draw_mesh(rig, o.wx, o.wz, draw_facing(o), pass, 0, 0.0f, mesh_house(o), 1.0f,
+            draw_mesh(rig, o.wx, o.wz, draw_heading(o), pass, 0, 0.0f, mesh_house(o), 1.0f,
                       0.0f, false, WOBBLE_NONE, rigT, NULL, run0, rm.tris.size());
         g_meshFlash = false;
         return;
     }
-    draw_mesh(rig, o.wx, o.wz, draw_facing(o), pass,
+    draw_mesh(rig, o.wx, o.wz, draw_heading(o), pass,
               0, 0.0f, mesh_house(o), 1.0f, 0.0f, false, WOBBLE_NONE, rigT);
     g_meshFlash = false;
 }
-
 
 /* ====================================================================================
  *  TIER 2 PRESENTATION: the two things the post chain needs FROM the renderer.
@@ -26925,11 +29257,12 @@ static void draw_object_rig(int rig, const SimObject& o, int pass, float rigT)
    vehicle and every wall. Drawn with the geometry already on the card and the same
    normal map the lit pass samples, so the occlusion and the wet-surface response see
    the panel gaps and the weld seams rather than a smooth slab. */
-static void m3_draw_object_normals(void)
+static void m3_draw_object_normals(bool lightSplit=false)
 {
     if (!m3_available() && !m3inf_available())
         return;
     g_m3NormalPass = 1;
+    g_m3LightSplit = lightSplit?1:0;
     for (size_t i = 0; i < g_objects.size(); i++) {
         const SimObject& o = g_objects[i];
         if (!visible(o))
@@ -26947,9 +29280,13 @@ static void m3_draw_object_normals(void)
     }
     m3inf_draw_corpses();
     g_m3NormalPass = 0;
+    g_m3LightSplit = 0;
 }
 
-/* THE CARTRIDGE'S BUILDINGS AND WALLS, MARKED IN THE NORMAL TARGET, for the STRUCTURES
+/* CLASSIFY BUILDINGS, WALLS AND VEHICLES for their independent F5 groups.
+   Vehicle fallback is 0.09, below every real-normal band. Like structures, it is
+   written only while that group is active and preserves existing ground normals.
+   THE CARTRIDGE'S BUILDINGS AND WALLS, MARKED IN THE NORMAL TARGET, for the STRUCTURES
    group of the F5 panel (fx_state.h, 12p). The light pass knows a remastered structure by
    the class its own normals carry (ebld_mod.h), but a building or wall drawn from the
    cartridge's model writes nothing there, and in that target it is indistinguishable from
@@ -26960,13 +29297,14 @@ static void m3_draw_object_normals(void)
    exactly as before it was marked. It needs glBlendEquation (GL 1.4, the grass's own
    loader); a driver without it leaves the cartridge's structures unmarked and says so
    once (grass_crush_gl_load).
-   DRAWN ONLY WHILE ONE OF THE GROUP'S DIALS IS OFF NEUTRAL (fx_struct_active), so at the
-   neutral settings the target holds what it always held.
+   DRAWN ONLY WHILE A STRUCTURE DIAL OR OBJECT SHADOW FILL NEEDS ITS CLASS (fx_struct_active),
+   so at neutral settings the target holds what it always held.
    WHAT IT DOES NOT MARK: a cartridge building's pieces once the old shatter owns it as it
    dies (shatter_mod.h draws those), and the translucent faces, which write no depth and
    no normal anywhere. A harvester docked in a refinery is drawn as part of the refinery
    and is marked with it. */
 #define STR_CART_CLASS 0.05f
+#define VH_CART_CLASS  0.09f
 static const char* STR_CLASS_VS =
     "#version 120\n"
     "varying vec2 vUV;\n"
@@ -26988,6 +29326,7 @@ static GLuint g_strClassProg = 0;
 static bool   g_strClassTried = false;
 /* Buildings drawn into the target in the last frame, for the dump (stdump). */
 static long   g_strClassDraws = 0, g_strClassSkips = 0;
+static long   g_vhClassDraws = 0;
 static GLuint str_class_prog(void)
 {
     if (g_strClassProg || g_strClassTried) return g_strClassProg;
@@ -27016,7 +29355,10 @@ static GLuint str_class_prog(void)
 static void str_draw_class(void)
 {
     g_strClassDraws = g_strClassSkips = 0;
-    if (!fx_struct_active(&g_fx)) return;
+    g_vhClassDraws = 0;
+    const bool structures = fx_struct_active(&g_fx) != 0;
+    const bool vehicles = fx_vehicle_active(&g_fx) != 0;
+    if (!structures && !vehicles) return;
     const GLuint prog = str_class_prog();
     if (!prog || !grass_crush_gl_load()) return;
     GLint was = 0, bsrc = GL_ONE, bdst = GL_ZERO, beq = GL_FUNC_ADD;
@@ -27046,28 +29388,46 @@ static void str_draw_class(void)
     glBlendFunc(GL_ONE, GL_ONE);
     grass_glBlendEquation(GL_MAX);
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+    /* The two per-object uniforms' locations, looked up once for the walk rather than by
+       name for every object (OPENCNC3D_PROGRAM_SHADOW=0 looks them up by name again). */
+    const bool knownLocations = gls_program_shadow();
+    const GLint locCut = knownLocations ? fx_glGetUniformLocation(prog, "uCut") : -1;
+    const GLint locClass = knownLocations ? fx_glGetUniformLocation(prog, "uClass") : -1;
     for (int pi = 0; pi < 2; pi++) {
         const int pass = pi ? MODE_CUTOUT : MODE_OPAQUE;
         for (size_t i = 0; i < g_objects.size(); i++) {
             const SimObject& o = g_objects[i];
-            if (o.kind != K_BUILDING || !visible(o)) continue;
+            const bool building = o.kind == K_BUILDING;
+            const bool vehicle = o.kind == K_UNIT || o.kind == K_AIRCRAFT || o.kind == K_VESSEL;
+            if (!visible(o) || !(building ? structures : (vehicle && vehicles))) continue;
             const int mi = mesh_for(o);
             if (mi < 0) continue;
             /* bound again for every building: a draw it reaches may bind a program of
-               its own and leave another one bound */
+               its own and leave another one bound (the state cache skips the bind when
+               nothing did) */
             fx_glUseProgram(prog);
-            fx_set1i(prog, "uCut", pi);
+            if (knownLocations) {
+                if (locCut >= 0) fx_glUniform1i(locCut, pi);
+                if (locClass >= 0) fx_glUniform1f(locClass, building ? STR_CART_CLASS : VH_CART_CLASS);
+            } else {
+                fx_set1i(prog, "uCut", pi);
+                fx_set1f(prog, "uClass", building ? STR_CART_CLASS : VH_CART_CLASS);
+            }
             const unsigned long skipped = g_meshClassSkipped;
             draw_object_mesh(mi, o, pass);
             if (!pi) {
-                if (skipped == g_meshClassSkipped) g_strClassDraws++;
+                if (vehicle) g_vhClassDraws++;
+                else if (skipped == g_meshClassSkipped) g_strClassDraws++;
                 else g_strClassSkips++;
             }
         }
         fx_glUseProgram(prog);
         fx_set1i(prog, "uCut", pi);
-        ebld_draw(pass, false);              /* a remaster's pieces, which outlive it */
-        draw_walls(pi ? WALLPASS_CUTOUT : WALLPASS_OPAQUE);
+        if (structures) {
+            fx_set1f(prog, "uClass", STR_CART_CLASS);
+            ebld_draw(pass, false);          /* pieces which outlive the building */
+            draw_walls(pi ? WALLPASS_CUTOUT : WALLPASS_OPAQUE);
+        }
     }
     g_meshClassSkip = false;
     g_m3NormalPass = was3;
@@ -27090,36 +29450,40 @@ static void str_draw_class(void)
    surface to light; not the water, which has a shader of its own. Each of those leaves
    the target's alpha at zero and is passed through untouched, and that is the whole
    safety property of this arrangement rather than an omission. */
+/* Cutout foliage needs the same baked-light removal as opaque models, while
+   preserving the actual texture silhouette. RGB is vertex shade; alpha is a class,
+   never a filtered leaf coverage value or a different material's direct fraction. */
+static GLuint g_lightBakeProgram=0;
+static GLuint light_bake_program(void)
+{
+    if(g_lightBakeProgram)return g_lightBakeProgram;
+    const char* vs="#version 120\n varying vec4 shade;varying vec2 uv;void main(){shade=gl_Color;uv=gl_MultiTexCoord0.xy;gl_ClipVertex=gl_ModelViewMatrix*gl_Vertex;gl_Position=ftransform();}";
+    const char* fs="#version 120\n uniform sampler2D uTex;uniform int uCut;varying vec4 shade;varying vec2 uv;void main(){if(uCut==1&&texture2D(uTex,uv).a<=0.5)discard;gl_FragColor=vec4(shade.rgb,1.0);}";
+    const GLuint v=fx_compile(GL_VERTEX_SHADER,vs,"lighting-bake-vs"),f=fx_compile(GL_FRAGMENT_SHADER,fs,"lighting-bake-fs");if(!v||!f)return 0;
+    const GLuint p=fx_glCreateProgram();fx_glAttachShader(p,v);fx_glAttachShader(p,f);fx_glLinkProgram(p);GLint ok=0;fx_glGetProgramiv(p,GL_LINK_STATUS,&ok);fx_glDeleteShader(v);fx_glDeleteShader(f);if(!ok){fx_glDeleteProgram(p);return 0;}g_lightBakeProgram=p;return p;
+}
 static void fx_draw_mesh_bake(void)
 {
     g_meshBakePass = 1;
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_BLEND);
-    glDisable(GL_ALPHA_TEST);
-    glDisable(GL_CULL_FACE);
-    for (size_t i = 0; i < g_objects.size(); i++) {
-        const SimObject& o = g_objects[i];
-        if (!visible(o))
-            continue;
-        /* An object the authored art set answers is lit by its own shader and must not
-           be relit a second time here. */
-        if (object_model3d(o) >= 0)
-            continue;
-        if (dosmake_strip_for(o) >= 0)
-            continue;
-        if (tree3d_claims(o))
-            continue;
-        const int mi = mesh_for(o);
-        if (mi >= 0)
-            draw_object_mesh(mi, o, MODE_OPAQUE);
+    glDisable(GL_TEXTURE_2D);glDisable(GL_BLEND);glDisable(GL_ALPHA_TEST);glDisable(GL_CULL_FACE);
+    const bool unified=fx_unified_lighting();const GLuint program=unified?light_bake_program():0;
+    for(int pi=0;pi<(program?2:1);pi++) {
+        const int pass=pi?MODE_CUTOUT:MODE_OPAQUE;g_meshBakeCutout=pi!=0;
+        if(program){fx_glUseProgram(program);fx_set1i(program,"uTex",0);fx_set1i(program,"uCut",pi);}
+        for (size_t i=0;i<g_objects.size();i++) {
+            const SimObject& o=g_objects[i];if(!visible(o)||object_model3d(o)>=0||dosmake_strip_for(o)>=0)continue;
+            const int mi=mesh_for(o);if(mi>=0)draw_object_mesh(mi,o,pass);
+            else if(g_clumpTrees&&o.kind==K_TERRAIN) {
+                if(clump_draw_whole(o,pass))continue;
+                const ClumpDef* cd=clump_def(o.type);
+                for(int k=0;cd&&k<clump_def_count(cd);k++){const SimObject part=clump_part_n(o,cd,k);if(clump_cell_drawn(part.cx,part.cy))eterr_tree_draw(part,pass);}
+            }
+        }
+        ebld_draw(pass,false);evhc_draw_wrecks(pass,false);draw_walls(pi?WALLPASS_CUTOUT:WALLPASS_OPAQUE);
+        if(!pi){draw_fields(MODE_OPAQUE);eterr_draw_aux(MODE_OPAQUE,1);}
     }
-    /* the remastered buildings' pieces, which outlive the objects above (ebld_mod.h) */
-    ebld_draw(MODE_OPAQUE, false);
-    evhc_draw_wrecks(MODE_OPAQUE, false);
-    draw_walls(WALLPASS_OPAQUE);
-    draw_fields(MODE_OPAQUE);
-    eterr_draw_aux(MODE_OPAQUE, 1);   /* the remastered crates and wreck (ebld_terr.h) */
-    g_meshBakePass = 0;
+    g_meshBakeCutout=false;g_meshBakePass=0;fx_glUseProgram(0);
+    if(unified){m3_draw_object_normals(true);foliage3d_draw(FOL_LIGHT_SPLIT,0,0,0,0,0);}
 }
 
 /* ---- THE GROUND IN GRAPHICS MEMORY, for the two passes that carry no per-frame term ----
@@ -27135,7 +29499,7 @@ static void fx_draw_mesh_bake(void)
    own, so while it is open both passes keep their per-frame path and g_groundGen moves
    every frame. Buffer names are the mission's: game_shutdown hands them back. */
 struct GroundKey {
-    unsigned gen, pad, shade, cells;
+    unsigned gen, pad, shade, cells, surface;
     int gridW, gridH, mapX, mapY, mapW, mapH, margin, clip, relief;
     float base, us, vs;
 };
@@ -27144,6 +29508,7 @@ static void ground_key_now(GroundKey* k, unsigned shade, int relief, float us, f
 {
     memset(k, 0, sizeof *k);          /* padding included, so the whole key compares */
     k->gen = g_groundGen; k->pad = g_padEpoch; k->shade = shade;
+    k->surface = terrain_surface_on() && g_terrainSurface.ready ? g_terrainSurface.epoch : 0;
     k->cells = (unsigned)g_pack.cell.size();
     k->gridW = g_gridW; k->gridH = g_gridH;
     k->mapX = g_mapX; k->mapY = g_mapY; k->mapW = g_mapW; k->mapH = g_mapH;
@@ -27156,6 +29521,10 @@ struct GroundVbo {
     int       state;    /* 0 nothing built; 1 the buffer holds `key`; 2 the driver refused `key` */
     GroundKey key;
     GLsizei   verts;
+    /* What the store holds, byte for byte, and where its second block starts, for the
+       in-place update below (OPENCNC3D_GROUND_VBO_DIFF). */
+    std::vector<unsigned char> held;
+    size_t    split;
 };
 static GroundVbo g_groundDepthVbo, g_groundNrmVbo;
 
@@ -27172,9 +29541,48 @@ static void ground_vbo_upload(GroundVbo& b, const GroundKey& k, GLsizei verts,
                               const void* a, size_t aBytes, const void* c, size_t cBytes)
 {
     const size_t want = aBytes + cBytes;
+    /* A BUILDING CHANGES A FEW CELLS OF THESE ARRAYS, and every pad change used to hand
+       the driver a new store for all of them, about 2 MB on Red Alert's maps, which it
+       could have to wait for while the old one was still being read. When the layout is
+       the one the store already holds, only the span of bytes that differs is sent over
+       it, so the store ends up holding exactly what a new one would. */
+    static const bool diffOn = mesh_perf_switch("OPENCNC3D_GROUND_VBO_DIFF");
+    if (diffOn && b.state == 1 && b.vbo && want && b.held.size() == want && b.split == aBytes) {
+        const unsigned char* parts[2] = { (const unsigned char*)a, (const unsigned char*)c };
+        const size_t bytes[2] = { aBytes, cBytes }, at[2] = { 0, aBytes };
+        size_t lo = want, hi = 0;
+        for (int p = 0; p < 2; p++) {
+            if (!bytes[p]) continue;
+            const unsigned char* was = &b.held[at[p]];
+            size_t i = 0;
+            while (i < bytes[p] && was[i] == parts[p][i]) i++;
+            if (i == bytes[p]) continue;
+            size_t j = bytes[p];
+            while (j > i && was[j - 1] == parts[p][j - 1]) j--;
+            memcpy(&b.held[at[p] + i], parts[p] + i, j - i);
+            if (at[p] + i < lo) lo = at[p] + i;
+            if (at[p] + j > hi) hi = at[p] + j;
+        }
+        if (lo < hi) {
+            gr_glBindBuffer(GL_ARRAY_BUFFER, b.vbo);
+            gr_glBufferSubData(GL_ARRAY_BUFFER, (FxGLsizeiptr)lo, (FxGLsizeiptr)(hi - lo), &b.held[lo]);
+            gr_glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+        b.key = k;
+        b.verts = verts;
+        if (ground_patch_verify()) {
+            std::vector<unsigned char> gpu(want);
+            const bool read = ground_read_buffer(GL_ARRAY_BUFFER, b.vbo, want, gpu.data());
+            fprintf(stderr, "GROUNDPATCH|verify|ground store|%s|sent=%zu of %zu\n",
+                    !read ? "unread" : gpu == b.held ? "ok" : "MISMATCH", hi > lo ? hi - lo : 0, want);
+        }
+        return;
+    }
     b.key = k;
     b.verts = verts;
     b.state = 1;
+    b.held.clear();
+    b.split = 0;
     if (want == 0) return;
     if (!b.vbo) gr_glGenBuffers(1, &b.vbo);
     gr_glBindBuffer(GL_ARRAY_BUFFER, b.vbo);
@@ -27189,6 +29597,11 @@ static void ground_vbo_upload(GroundVbo& b, const GroundKey& k, GLsizei verts,
         fprintf(stderr, "GROUND|refused|the driver made %ld B of a %lu B ground store; "
                         "that pass draws from client memory until the ground changes\n",
                 (long)got, (unsigned long)want);
+    } else if (diffOn) {
+        b.held.resize(want);
+        if (aBytes) memcpy(&b.held[0], a, aBytes);
+        if (cBytes) memcpy(&b.held[aBytes], c, cBytes);
+        b.split = aBytes;
     }
 }
 
@@ -27224,7 +29637,7 @@ static void ground_normals_arrays(int cw, int relief, std::vector<GroundNrmVert>
     for (size_t i = 0; i < g_pack.cell.size(); i++) {
         const PackCell& c = g_pack.cell[i];
         if (!cell_shown(c.x, c.y)) continue;
-        if (relief && cliff_relief_slot_for(c) >= 0) continue;
+        if ((relief && cliff_relief_slot_for(c) >= 0) || terrain_surface_has_cell(c.x,c.y)) continue;
         const float x = (float)c.x, z = (float)c.y;
         const float y00 = terrain_corner_y(c.x,     c.y);
         const float y10 = terrain_corner_y(c.x + 1, c.y);
@@ -27301,15 +29714,19 @@ static void ra3d_reflect_ground(void);   /* ra3d_terrain.h */
 
 static void fx_draw_terrain_normals(void)
 {
+    // Closed cliff sides above the water need their own physical normals too.
+    water_bed_draw(true);
     /* RED ALERT: its own flat ground's normal (ra3d_terrain.h) and then what stands on it,
        as below; nothing of the placeholder pack's ground */
     if (g_raModule) {
         ra3d_ground_normals();
-        tree3d_draw_normals();
+        water_plane_draw_normals();
         m3_draw_object_normals();
         str_draw_class();
         ebld_draw_normals();
+        evhc_draw_normals();           /* its units and aircraft drawn by their models */
         eterr_draw_normals();
+        ra3d_ore_draw_normals();       /* its ore's and gems' pieces (ra3d_ore_mod.h) */
         return;
     }
     const PackTex& atlas = g_pack.tex[terrain_atlas_index()];
@@ -27320,6 +29737,7 @@ static void fx_draw_terrain_normals(void)
         m3_draw_object_normals();
         str_draw_class();              /* every structure's class, for the STRUCTURES group */
         ebld_draw_normals();           /* the remastered buildings' own (ebld_mod.h) */
+        evhc_draw_normals();           /* the remastered vehicles' and wrecks' (evhc_mod.h) */
         eterr_draw_normals();          /* and the remastered cell decorations' */
         return;
     }
@@ -27335,7 +29753,7 @@ static void fx_draw_terrain_normals(void)
         for (size_t i = 0; i < g_pack.cell.size(); i++) {
             const PackCell& c = g_pack.cell[i];
             if (!cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y)) continue;
-            if (cliff_relief_slot(c) >= 0) continue;
+            if (cliff_relief_slot(c) >= 0 || terrain_surface_has_cell(c.x,c.y)) continue;
             const float x = (float)c.x, z = (float)c.y;
             const float y00 = terrain_corner_y(c.x,     c.y);
             const float y10 = terrain_corner_y(c.x + 1, c.y);
@@ -27356,9 +29774,10 @@ static void fx_draw_terrain_normals(void)
         glEnd();
     }
     draw_cliff_relief(true, false, 1, 1);
+    terrain_surface_draw(1,0);
+    water_plane_draw_normals();
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
     /* AND THE TREES, into the same buffer with the foliage state in their alpha. */
-    tree3d_draw_normals();
     /* AND THE SCATTERED BUSHES AND CLUMPS, the same way (foliage3d_mod.h). */
     foliage3d_draw(FOL_NRM, 0, 0.0f, 0.0f, 0.0f, 0.0f);
     /* AND THE AUTHORED HULLS, with theirs. */
@@ -27370,6 +29789,9 @@ static void fx_draw_terrain_normals(void)
     /* AND THE REMASTERED BUILDINGS AND WALLS, with theirs and a class of their own
        (ebld_mod.h), self-lit surfaces marked */
     ebld_draw_normals();
+    /* AND THE REMASTERED VEHICLES, AIRCRAFT AND THEIR WRECKS, with theirs and an authored
+       hull's class (evhc_mod.h) */
+    evhc_draw_normals();
     /* AND THE REMASTERED CRATES, FIELD OVERLAYS AND WRECK (ebld_terr.h) */
     eterr_draw_normals();
     /* AND THE OBELISK'S BEAM, last: the self-lit class over whatever its core crosses
@@ -27431,7 +29853,7 @@ static void terrain_depth_arrays(float us, float vs, std::vector<float>& pos, st
     pos.clear(); uv.clear();
     for (size_t i = 0; i < g_pack.cell.size(); i++) {
         const PackCell& c = g_pack.cell[i];
-        if (!cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y)) continue;
+        if (!cell_shown(c.x, c.y) || !cell_in_view(c.x, c.y) || terrain_surface_has_cell(c.x,c.y)) continue;
         const float x = (float)c.x, z = (float)c.y;
         const float y00 = terrain_corner_y(c.x,     c.y);
         const float y10 = terrain_corner_y(c.x + 1, c.y);
@@ -27447,7 +29869,7 @@ static void terrain_depth_arrays(float us, float vs, std::vector<float>& pos, st
     }
 }
 
-static void draw_terrain_depth(void)
+static void draw_terrain_depth(bool submit=true)
 {
     if (fx_texset_get() == FX_TEX_REMASTER) terrain_remaster_ensure();
     const PackTex& at = g_pack.tex[terrain_atlas_index()];
@@ -27495,7 +29917,7 @@ static void draw_terrain_depth(void)
         glVertexPointer(3, GL_FLOAT, 0, &pos[0]);
         glTexCoordPointer(2, GL_FLOAT, 0, &uv[0]);
     }
-    glDrawArrays(GL_TRIANGLES, 0, nv);
+    if(submit) glDrawArrays(GL_TRIANGLES, 0, nv);
     if (gpu) gr_glBindBuffer(GL_ARRAY_BUFFER, 0);
     if (!hadTexArr) glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     if (!hadVertexArr) glDisableClientState(GL_VERTEX_ARRAY);
@@ -27621,10 +30043,73 @@ static inline bool tree3d_cell_casts(int x, int y)
     return cell_in_box(x, y, g_treeCullPad, g_castX0, g_castX1, g_castZ0, g_castZ1);
 }
 
+/* The existing separate terrain-depth target can survive a frame when its full
+   projection and source inputs match. No depth merge, new PCF, or changed bias.
+   Other shadow modes keep the original path. */
+static unsigned long g_terrainShadowHits=0,g_terrainShadowMisses=0;
+static std::string g_terrainShadowKey;
+static bool terrain_shadow_cached() {
+    GroundKey ground;ground_key_now(&ground,0,0,0,0);
+    const PackTex& at=g_pack.tex[terrain_atlas_index()];
+    const GLuint texture=water_terrain_gl(at.gl);
+    std::string key((const char*)&ground,sizeof ground);
+    key.append((const char*)g_fxSunVP,sizeof g_fxSunVP);
+    key.append((const char*)&g_fx,sizeof g_fx);
+    key.append((const char*)&g_fxTerrainShadow.depth,sizeof g_fxTerrainShadow.depth);
+    key.append((const char*)&texture,sizeof texture);
+    /* hardened when Red Alert's ground became cacheable at every rise setting: the
+       relief surface's own atlas, and the target's allocation, so a made-again target
+       never passes as drawn */
+    if(mesh_perf_switch("OPENCNC3D_RA_TERRAIN_SHADOW_CACHE")) {
+        key.append((const char*)&g_terrainSurfaceAtlas,sizeof g_terrainSurfaceAtlas);
+        key.append((const char*)&g_fxTerrainShadowSerial,sizeof g_fxTerrainShadowSerial);
+    }
+    const int dimensions[]={at.w,at.h,at.uw,at.uh};key.append((const char*)dimensions,sizeof dimensions);
+    const bool hit=key==g_terrainShadowKey;g_terrainShadowKey=std::move(key);
+    if(hit)g_terrainShadowHits++;else g_terrainShadowMisses++;return hit;
+}
+/* THE RECEIVER FLOOR (fx_post.h, the receiver window): no pixel the light pass lights
+   can stand lower than the lowest ground drawn with depth, so the frustum the window is
+   built from is clipped there. Taken from the data that ground is drawn from: the
+   heightmap's lowest corner (which Red Alert's own ground shares), the relief surface's
+   deepest dip below it, and the water's bed. Then a whole cell lower, which is room for
+   what stands in the ground rather than on it (a crater's bowl, a hull at its waterline)
+   and costs a sliver of window. The verify mode (OPENCNC3D_SUN_RECV_VERIFY) checks every
+   lit pixel of a frame against it. The editor reshapes the ground under the camera, so
+   there it is not vouched for and the window stays open. */
+static void sun_recv_floor(void)
+{
+    g_fxRecvFloorOk = 0;
+    if (g_editOn || !fx_recv_on()) return;
+    float lo = g_terrainHBot;
+    /* the relief's lift is added to the heightmap's own height, and its array is large,
+       so its lowest value is kept until the surface is rebuilt */
+    static const float* liftData = 0;
+    static size_t liftSize = 0;
+    static unsigned liftEpoch = 0, liftGen = 0;
+    static float liftMin = 0.0f;
+    const TerrainSurfaceState& S = g_terrainSurface;
+    if (S.ready && !S.lift.empty()) {
+        if (S.lift.data() != liftData || S.lift.size() != liftSize || S.epoch != liftEpoch
+            || S.gen != liftGen) {
+            liftData = S.lift.data(); liftSize = S.lift.size(); liftEpoch = S.epoch; liftGen = S.gen;
+            liftMin = 0.0f;
+            for (size_t i = 0; i < S.lift.size(); i++) if (S.lift[i] < liftMin) liftMin = S.lift[i];
+        }
+        lo += liftMin;
+    }
+    for (size_t i = 0; i < g_waterPlane.floor.size(); i++)
+        if (g_waterPlane.floor[i] < lo) lo = g_waterPlane.floor[i];
+    if (!std::isfinite(lo)) return;
+    g_fxRecvFloor = lo - 1.0f;
+    g_fxRecvFloorOk = 1;
+}
+
 static void fx_draw_shadow_casters(void)
 {
     /* First, because the object loop below asks it once per tree. */
     caster_cull_bounds();
+    g_fxRecvArmed = 0;
     /* THE AUTHORED MODELS DRAW DEPTH ONLY INTO THE SUN'S BOX. The reflection pass is
        the other caller and it IS looking at colour, so the flag is the pass and not
        the function. Cleared at the end, never left on for the frame's own draw. */
@@ -27639,23 +30124,33 @@ static void fx_draw_shadow_casters(void)
     /* The ground casting into itself is a switch because it is the one caster that can
        fight its own depth: a hillside lit at a grazing angle is exactly the geometry
        shadow acne comes from, and turning it off costs only hill-on-hill shadow. */
-    if (g_fx.shadow_terrain && (g_fxCasterPass != FXCAST_SUN || g_fx.terrain_shadow_strength > 0.0f)) {
+    if (g_fx.shadow_terrain && (g_fxCasterPass != FXCAST_SUN || fx_terrain_shadow_strength() > 0.0f)) {
         const bool separateTerrain = g_fxCasterPass == FXCAST_SUN && g_fxTerrainShadowLive;
+        /* Red Alert never draws the rise path (below), so its ground is the cacheable
+           one whatever the rise dial says */
+        const bool cacheEligible=separateTerrain && !g_editOn
+            && (g_fx.shadow_terrain_rise<=0.0f
+                || (g_raModule && mesh_perf_switch("OPENCNC3D_RA_TERRAIN_SHADOW_CACHE")))
+            && (!cliff_relief_on()||(int)(g_fx.experimental_relief_mode+0.5f)==0)
+            && mesh_perf_switch("OPENCNC3D_TERRAIN_SHADOW_CACHE");
+        if(!cacheEligible && separateTerrain)g_terrainShadowKey.clear();
+        const bool cachedTerrain=cacheEligible && terrain_shadow_cached();
         if (separateTerrain) {
             fx_rt_bind(&g_fxTerrainShadow);
-            glClear(GL_DEPTH_BUFFER_BIT);
+            if(!cachedTerrain)glClear(GL_DEPTH_BUFFER_BIT);
         }
         /* The SUN'S view, not the player's: a plateau outside the player's cull box
            still casts into it, so the per-frame view cull stands down for this pass. */
         g_cullOn = false;
-        if (g_fx.shadow_terrain_rise > 0.0f && !g_raModule) draw_terrain_casters(g_fx.shadow_terrain_rise);
+        if (g_fx.shadow_terrain_rise > 0.0f && !g_raModule) { draw_terrain_casters(g_fx.shadow_terrain_rise); terrain_surface_draw(2,g_terrainSurfaceAtlas); }
         else if (g_fxCasterPass == FXCAST_SUN) {
             /* The lattice relief (experimental_relief_mode 1) is real displaced geometry
                and casts its own shape, which the depth-only ground does not draw; that
                mode keeps the whole draw_terrain here. The parallax relief, the default,
                writes only its flat triangles' depth, which draw_terrain_depth matches. */
             if (cliff_relief_on() && (int)(g_fx.experimental_relief_mode + 0.5f) != 0) draw_terrain();
-            else draw_terrain_depth();
+            else draw_terrain_depth(!cachedTerrain);
+            if(!cachedTerrain)terrain_surface_draw(2,g_terrainSurfaceAtlas);
         }
         else {
             /* THE REFLECTION'S GROUND, IN THE REFLECTION'S OWN BOX. This pass is looking
@@ -27678,6 +30173,10 @@ static void fx_draw_shadow_casters(void)
         if (separateTerrain) fx_rt_bind(&g_fxShadow);
     }
 
+    /* THE RECEIVER WINDOW (fx_post.h), armed from here to the end of the sun's pass:
+       after the ground, which is never windowed, and never for the reflection. */
+    g_fxRecvArmed = (g_fxCasterPass == FXCAST_SUN && g_fxRecvSun.on) ? &g_fxRecvSun : 0;
+
     /* the sun map and the reflection are a pass each, so the first tree drawn in either
        sets the tree program's constants afresh (tree3d_pass_reset) */
     tree3d_pass_reset();
@@ -27694,46 +30193,30 @@ static void fx_draw_shadow_casters(void)
             const SimObject& o = g_objects[i];
             if (!visible(o))
                 continue;
-            if (g_raModule) { ebld_draw_object(-1, o, mode); continue; }
+            /* (Red Alert: its reused buildings and trees, and its units and aircraft drawn
+               by their remastered models, which cast and reflect as Tiberian Dawn's do) */
+            if (g_raModule) {
+                if (!evhc_draw_object(o, mode)) ebld_draw_object(-1, o, mode);
+                continue;
+            }
             if (dosmake_strip_for(o) >= 0)
                 continue;
             float rigT = -1.0f;
             const int rig = mcvrig_for(o, &rigT);
             if (rig >= 0) { draw_object_rig(rig, o, mode, rigT); continue; }
-            /* the rebuilt tree casts its own shadow, from the same geometry and
-               the same alpha test, so the silhouette on the ground is the one
-               the player can see in the canopy -- but only if it is inside the box
-               this pass is drawing into. visible() carries no frustum term, so
-               without the test the whole map's trees are submitted twice more. */
-            if (tree3d_claims(o)) {
-                const bool casts = tree3d_cell_casts(o.cx, o.cy);
-                if (mode == MODE_CUTOUT) {
-                    /* counted per PASS, because the two boxes are different sizes for
-                       different reasons and one aggregate cannot tell a wide sun box
-                       from a reflection cull that is not working */
-                    if (g_fxCasterPass == FXCAST_REFLECT) {
-                        if (casts) g_nTreeRefl++; else g_nTreeReflCut++;
-                    } else {
-                        if (casts) g_nTreeSun++;  else g_nTreeSunCut++;
-                    }
-                }
-                if (casts) tree3d_draw(o, mode);
-                continue;
-            }
+
             const int mi = mesh_for(o);
             if (mi >= 0) {
                 draw_object_mesh(mi, o, mode);
             } else if (g_clumpTrees && o.kind == K_TERRAIN) {
+                if (clump_draw_whole(o, mode)) continue;   /* its own model, whole */
                 const ClumpDef* cd = clump_def(o.type);
                 for (int c = 0; cd && c < cd->n; c++) {
                     const int px = o.cx + cd->at[c].dx, py = o.cy + cd->at[c].dy;
                     if (!clump_cell_drawn(px, py)) continue;
                     const SimObject part = clump_part(o, px, py);
                     if (eterr_tree_draw(part, mode)) continue;   /* a remastered tree */
-                    if (tree3d_claims(part)) {
-                        if (tree3d_cell_casts(px, py)) tree3d_draw(part, mode);
-                        continue;
-                    }
+
                     const int tm = clump_tree_mesh(px, py);
                     if (tm >= 0)
                         draw_mesh(tm, (float)px + 0.5f, (float)py + 0.5f, -1, mode);
@@ -27746,7 +30229,7 @@ static void fx_draw_shadow_casters(void)
             if (evhc_draw_object(r, mode)) continue;   /* a remastered rider */
             const int rmi = mesh_for(r);
             if (rmi >= 0)
-                draw_mesh(rmi, r.wx, r.wz, draw_facing(r), mode,
+                draw_mesh(rmi, r.wx, r.wz, draw_heading(r), mode,
                           turret_delta(r), rotor_spin(r), mesh_house(r), 1.0f, r.ylift);
         }
         /* THE REMASTERED BUILDINGS' PIECES cast and reflect too (ebld_mod.h): the old
@@ -27757,6 +30240,8 @@ static void fx_draw_shadow_casters(void)
         if (!pass) {
             draw_fields(MODE_OPAQUE);   /* no cutout faces in any field mesh */
             eterr_draw_aux(MODE_OPAQUE, 0);   /* the remastered crates and wreck */
+            /* (Red Alert's gold nuggets and gem stones, into the sun's map: ra3d_ore_mod.h) */
+            if (g_raModule && g_fxCasterPass == FXCAST_SUN) ra3d_ore_cast();
         }
         /* THE SCATTERED BUSHES AND CLUMPS cast like the trees, alpha-cut, and only
            within the box this pass draws into (foliage3d_mod.h). */
@@ -27792,6 +30277,7 @@ static void fx_draw_shadow_casters(void)
     glDisable(GL_ALPHA_TEST);
     g_m3CasterDepth = 0;
     g_m3Mirrored    = 0;
+    g_fxRecvArmed = 0;
 }
 
 /* THE 3D SOLDIERS' OWN SUN MAP (fx_post.h, fx_render_inf_shadow_map): the posed
@@ -27804,6 +30290,8 @@ static void fx_draw_inf_casters(void)
     g_m3CasterDepth = 1;
     g_m3InfOwnPass  = 1;
     g_spriteShadowPass = g_spriteShadowOn;
+    /* the soldiers' own window, against their own map (fx_post.h) */
+    g_fxRecvArmed = g_fxRecvInf.on ? &g_fxRecvInf : 0;
     glDisable(GL_ALPHA_TEST);
     glDisable(GL_BLEND);
     for (size_t i = 0; g_infantryDraw && g_spriteShadowPass && i < g_objects.size(); i++) {
@@ -27820,6 +30308,7 @@ static void fx_draw_inf_casters(void)
     g_spriteShadowPass = false;
     g_m3InfOwnPass  = 0;
     g_m3CasterDepth = 0;
+    g_fxRecvArmed = 0;
 }
 
 /* ---- Light sources ----------------------------------------------------------------
@@ -27899,10 +30388,12 @@ static int fx_light_class(const char* n)
    the choice is the same on every run. */
 struct FxLightTrack {
     int   cls, lastSeen;
+    bool muzzleFlash;
     float x, z, y, radius, power;
 };
 static std::map<int, FxLightTrack> g_fxLightTrack;
 
+static bool ra3d_anim_companion(const EfxAnim& a);   /* ra3d_effects_mod.h, below */
 static void fx_gather_lights(void)
 {
     g_fxNLight = 0;
@@ -27923,6 +30414,20 @@ static void fx_gather_lights(void)
         const EfxAnim& a = g_efxAnims[i];
         const int cls = fx_light_class(a.name);
         if (cls == FXLC_NONE) continue;
+        /* (a Red Alert remaster companion is invisible in the 1996 game and draws nothing
+           here either: every fire lit the ground twice, once for itself and once for it) */
+        if (g_raModule && ra3d_anim_companion(a)) continue;
+        /* (and a Red Alert building's death lights the ground once, from the fireball its
+           one blast went off at, as its one blast is drawn: a fireball on every cell of the
+           plot lit it four to nine times over and burned the picture out) */
+        if (g_raModule && a.type == 0) {
+            const std::map<int, std::pair<int, int> >::const_iterator fp =
+                g_efxFbPlot.find((a.type << 16) | (a.id & 0xFFFF));
+            const int k = fp == g_efxFbPlot.end() ? -1 : fp->second.first;
+            const std::map<int, std::pair<int, int> >::const_iterator fb = g_efxFootBlast.find(k);
+            if (k >= 0 && fb != g_efxFootBlast.end()
+                && fb->second.first != ((a.type << 16) | (a.id & 0xFFFF))) continue;
+        }
         if (cls == FXLC_BLAST  && !g_fx.light_explosions) continue;
         if (cls == FXLC_MUZZLE && !g_fx.light_muzzle)     continue;
         if (cls == FXLC_FIRE   && !g_fx.light_fire)       continue;
@@ -27941,7 +30446,7 @@ static void fx_gather_lights(void)
         if (fade <= 0.01f) continue;
 
         FxLightTrack& T = g_fxLightTrack[a.id];
-        T.cls = cls;
+        T.cls = cls; T.muzzleFlash = efx_is_muzzle_flash(a.name);
         T.x = a.wx; T.z = a.wz;
         T.y = terrain_y(a.wx, a.wz) + 0.25f;
         T.radius = rad;
@@ -27958,7 +30463,7 @@ static void fx_gather_lights(void)
         FxLightTrack& T = it->second;
         const int age = g_engineFrame - T.lastSeen;
         const int ff = (T.cls == FXLC_MUZZLE) ? fadeFramesMuz : fadeFrames;
-        float p = T.power;
+        float p = T.power * (T.muzzleFlash ? g_fx.muzzle_light_gain : 1.0f);
         if (age > 0) {
             if (ff <= 0 || age >= ff) {
                 std::map<int, FxLightTrack>::iterator dead = it++;
@@ -28118,8 +30623,106 @@ static void terrain_range_refresh(void)
 }
 
 #include "dosclassic_mod.h"
+#include "ra3d_props_mod.h"     /* Red Alert's own props as their remastered models, under Enhanced */
 #include "ra3d_sprites_mod.h"   /* Red Alert in the 3D modes: its own sprites on the 3D ground */
+#include "ra3d_ore_mod.h"       /* and its ore, gems and ore mine as their models, under Enhanced */
+#include "ra3d_effects_mod.h"   /* and OpenCNC3D's effects in place of its anim cards, under Enhanced */
+#include "ra3d_efxm_mod.h"      /* and its own effects, particles and 3D forms, under Enhanced */
+#include "ra3d_atom_mod.h"      /* and its atom bomb's own blast in 3D, under Enhanced */
 #include "ra3d_terrain.h"   /* Red Alert's ground in the 3D view, under Enhanced */
+
+/* The water normal pass needs the opaque land that actually painted over water,
+   at the terrain's projected height. Reuse the production prepass, with borrowed
+   scene depth kept read-only; colour-only seams and clear mattes stay excluded. */
+static void water_opaque_land_draw(void)
+{
+    const bool buffers = grass_buf_load();
+    GLint arrayBuffer = 0, elementBuffer = 0;
+    if (buffers) {
+        glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
+        glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementBuffer);
+    }
+    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+    if (ra3d_own_ground()) ra3d_draw_ground(true, true, true, false);
+    else draw_terrain_layer(true);
+    glPopClientAttrib();
+    if (buffers) {
+        gr_glBindBuffer(GL_ARRAY_BUFFER, (GLuint)arrayBuffer);
+        gr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (GLuint)elementBuffer);
+    }
+}
+
+static float ra3d_detail_texels(void)
+{
+    return g_ra3d.ok && g_ra3d.set==FX_TEX_ENH && g_ra3d.theater!='I' ? (float)g_ra3d.ts : 0.0f;
+}
+static bool ra3d_detail_plants(void) { return ra3d_detail_texels()>0 && g_ra3d.theater=='T'; }
+static const char* ra3d_detail_rock_theater(void) { return ra2d_theater_letter()=='S'?"WINTER":"TEMPERAT"; }
+static int ra3d_detail_cell(int x,int y,int* slot)
+{
+    *slot=-1;
+    const int W=g_raStaticMap.MapCellWidth,H=g_raStaticMap.MapCellHeight;
+    const int cx=x-g_raStaticMap.MapCellX,cy=y-g_raStaticMap.MapCellY;
+    if(!g_ra3d.ok || cx<0 || cy<0 || cx>=W || cy>=H)return 0;
+    const int i=cy*W+cx;
+    if(i>=(int)g_ra3d.cellBase.size())return 0;
+    const int s=ra3d_cell_slot(i,x,y);if(s<0 || s>=(int)g_ra3d.slot.size())return 0;
+    *slot=s;const char* name=g_ra3d.names[g_ra3d.slot[s].name].c_str();
+    const bool face=(name[0]=='S' && name[1]>='0' && name[1]<='9') ||
+                    (name[0]=='B' && name[1]>='0' && name[1]<='9') || !strncmp(name,"WC",2) || !strncmp(name,"RC",2);
+    const bool wet=g_ra3d.wet[s] || !strncmp(name,"SH",2);
+    return (!strcmp(name,"CLEAR1") && !wet ? 1:0) | (face?2:0) | (wet?4:0);
+}
+
+static void terrain_surface_prepare_scene(void)
+{
+    if(!terrain_surface_on())return;
+    if(!g_raModule) {
+        terrain_surface_prepare_td();
+        const PackTex& a=g_pack.tex[terrain_atlas_index()];g_terrainSurfaceAtlas=water_terrain_gl(a.gl);return;
+    }
+    if(!ra3d_ground_ensure() || !terrain_surface_load() || g_ra3d.set!=FX_TEX_ENH)return;
+    g_terrainSurfaceAtlas=g_ra3d.tex;const std::string key=terrain_surface_key(g_ra3d.tex,g_ra3dSheetGen);
+    if(g_terrainSurface.ready && g_terrainSurface.key==key)return;
+    const int W=g_raStaticMap.MapCellWidth,H=g_raStaticMap.MapCellHeight;
+    std::vector<TerrainSurfaceCell> cells;
+    /* The template lookup is a string-keyed find for each of the map's cells, redone on
+       every pad change. Its answer depends only on the template name and the slot's icon
+       and variant, so it is asked once per slot and name pair (OPENCNC3D_SURFACE_CELLS=0
+       asks every cell, as before). */
+    static const bool memoOn=mesh_perf_switch("OPENCNC3D_SURFACE_CELLS");
+    struct TileMemo { char name[17]; int tile; bool known; };
+    static std::vector<TileMemo> memo;memo.assign(memoOn?g_ra3d.slot.size():0,TileMemo());
+    for(int i=0;i<W*H;i++) {
+        TerrainSurfaceCell c;c.x=g_raStaticMap.MapCellX+i%W;c.z=g_raStaticMap.MapCellY+i/W;
+        const int slot=ra3d_cell_slot(i,c.x,c.z);if(slot<0)continue;
+        char name[17];ra3d_template_name(g_raStaticMap.StaticCells[i].TemplateTypeName,name);
+        const Ra3dSlot& m=g_ra3d.slot[slot];
+        TileMemo* t=memoOn && (size_t)slot<memo.size()?&memo[slot]:NULL;
+        if(t && t->known && !strcmp(t->name,name))c.tile=t->tile;
+        else {
+            c.tile=terrain_surface_ra_tile(name,m.icon,m.var);
+            if(t && !t->known){memcpy(t->name,name,sizeof name);t->tile=c.tile;t->known=true;}
+        }
+        ra3d_slot_uv(slot,&c.uv[0],&c.uv[1],&c.uv[2],&c.uv[3]);cells.push_back(c);
+    }
+    terrain_surface_build(cells,key);
+}
+
+
+#include "perf_trace.h"
+#include "startup_trace.h"
+#include "diagnostic_renderer.h"
+static bool perf_trace_brain_advance() {
+    if(!perf_trace_enabled())return brain_advance(0);
+    const Uint64 t=perf_trace_now();const bool result=brain_advance(0);perf_trace_add_sim(t);return result;
+}
+static void perf_trace_refresh_objects() {
+    if(!perf_trace_enabled()){refresh_objects();return;}
+    const Uint64 t=perf_trace_now();refresh_objects();perf_trace_add_refresh(t);
+}
+
+#include "destruction_trace.h"
 
 /* PER-PASS FRAME PROFILE, opt in (OPENCNC3D_FRAMEPROF=1). A mark closes the section that
    ran since the previous mark; a frame is everything from one fprof_end to the next, so
@@ -28134,14 +30737,30 @@ struct FpSec { const char* name; double ms, sum; };
 static FpSec  g_fpSec[40];
 static int    g_fpN = 0, g_fpFrames = 0;
 static double g_fpWinSum = 0.0, g_fpWinWorst = 0.0;
+/* A script that reports its own windows (fprofreport) owns them: the five-second report
+   stands down from its first call, so a window of scripted frames longer than five
+   seconds is not cut in two. */
+static bool   g_fpManual = false;
 static double fprof_now_ms(Uint64 a, Uint64 b)
 {
     return (double)(b - a) * 1000.0 / (double)SDL_GetPerformanceFrequency();
 }
 static void fprof_mark(const char* name)
 {
+    perf_trace_section(name);
+    gpu_prof_mark(name);
     if (g_fpOn < 0) g_fpOn = getenv("OPENCNC3D_FRAMEPROF") ? 1 : 0;
     if (!g_fpOn) return;
+    /* Diagnostic only: attribute GPU completion to each pass when timestamp
+       queries are unavailable. This serializes the pipeline and must never be
+       interpreted as ordinary frame timing. Default profiling remains nonblocking. */
+    static const bool synchronize=[](){
+        const char* value=getenv("OPENCNC3D_FRAMEPROF_SYNC");
+        const bool enabled=value && strcmp(value,"0");
+        if(enabled)printf("FRAMEPROFMODE|cpu+gpu-serialized|not-live-frame-time\n");
+        return enabled;
+    }();
+    if(synchronize)glFinish();
     const Uint64 t = SDL_GetPerformanceCounter();
     if (!g_fpLast) { g_fpLast = g_fpFrame0 = g_fpWin0 = t; return; }
     int k = 0;
@@ -28153,8 +30772,26 @@ static void fprof_mark(const char* name)
     g_fpSec[k].ms += fprof_now_ms(g_fpLast, t);
     g_fpLast = t;
 }
+static void fprof_report(Uint64 t)
+{
+    const double mean = g_fpWinSum / (double)g_fpFrames;
+    printf("FRAMEPROF|frames=%d|mean=%.2f|worst=%.1f", g_fpFrames, mean, g_fpWinWorst);
+    for (int k = 0; k < g_fpN; k++)
+        printf("|%s=%.2f", g_fpSec[k].name, g_fpSec[k].sum / (double)g_fpFrames);
+    printf("\n");
+    fflush(stdout);
+    if(getenv("OPENCNC3D_PERFDETAIL")) {
+        mesh_batch_dump();
+        printf("TERRAINSUNCACHE|hits=%lu|misses=%lu\n",g_terrainShadowHits,g_terrainShadowMisses);
+        printf("CORPSEGRID|tested=%lu|objects=%zu|bodies=%zu\n",g_irPushCandidates,g_objects.size(),g_irBody.size());
+    }
+    for (int k = 0; k < g_fpN; k++) g_fpSec[k].sum = 0.0;
+    g_fpFrames = 0; g_fpWinSum = 0.0; g_fpWinWorst = 0.0; g_fpWin0 = t;
+}
+
 static void fprof_end(void)
 {
+    gpu_prof_end();
     if (g_fpOn <= 0 || !g_fpLast) return;
     const Uint64 t = SDL_GetPerformanceCounter();
     const double total = fprof_now_ms(g_fpFrame0, t);
@@ -28169,16 +30806,18 @@ static void fprof_end(void)
     }
     if (total > g_fpWinWorst) g_fpWinWorst = total;
     for (int k = 0; k < g_fpN; k++) { g_fpSec[k].sum += g_fpSec[k].ms; g_fpSec[k].ms = 0.0; }
-    if (fprof_now_ms(g_fpWin0, t) >= 5000.0) {
-        printf("FRAMEPROF|frames=%d|mean=%.2f|worst=%.1f", g_fpFrames, mean, g_fpWinWorst);
-        for (int k = 0; k < g_fpN; k++)
-            printf("|%s=%.2f", g_fpSec[k].name, g_fpSec[k].sum / (double)g_fpFrames);
-        printf("\n");
-        fflush(stdout);
-        for (int k = 0; k < g_fpN; k++) g_fpSec[k].sum = 0.0;
-        g_fpFrames = 0; g_fpWinSum = 0.0; g_fpWinWorst = 0.0; g_fpWin0 = t;
-    }
+    if (!g_fpManual && fprof_now_ms(g_fpWin0, t) >= 5000.0) fprof_report(t);
     g_fpFrame0 = g_fpLast = t;
+}
+
+/* The window so far, printed now. A scripted benchmark (framebench) closes every frame
+   with fprof_end itself, and on a fast machine it is over long before five seconds of
+   frames have passed. */
+static void fprof_flush(void)
+{
+    gpu_prof_collect(true);
+    if (g_fpOn <= 0 || !g_fpFrames) return;
+    fprof_report(SDL_GetPerformanceCounter());
 }
 
 /* THE PLACEMENT GHOST: the pending building itself, see-through, standing where it would
@@ -28314,8 +30953,11 @@ static void draw_place_ghost(void)
     g_placeGhostPass = false;
 }
 
+#include "harvester_fx_mod.h"
+
 static void draw_frame(int fbw, int fbh)
 {
+    gls_frame_begin();      /* nothing cached about GL state survives into a new frame */
     ra3d_enforce_scene();   /* a Red Alert mission with no 3D scene stays in Classic */
     g_drawFrameSerial++;
     g_meshBatchEditor = g_editOn;
@@ -28351,6 +30993,8 @@ static void draw_frame(int fbw, int fbh)
     g_fxInfCasters = fx_draw_inf_casters;
     g_fxGroundNormals = fx_draw_terrain_normals;
     g_fxMeshBake = fx_draw_mesh_bake;
+    g_fxSpecDraw = evhc_draw_spec;
+    g_fxSpecWant = evhc_spec_want;
     int rw = fbw, rh = fbh;
     fx_world_begin(fbw, fbh, &rw, &rh);
 
@@ -28444,21 +31088,25 @@ static void draw_frame(int fbw, int fbh)
        clock here would break G4 and G36c; a rendered-frame count would leave those
        green and make the weather race the frame rate, which is the harder one to see. */
     g_fxTime = engine_time() * (1.0f / 15.0f);
+    terrain_surface_prepare_scene();
+    ground_rev_sync();    /* which cells that moved (terrain_surface.h), for the caches that redo only those */
+    fprof_mark("relief surface");
     fx_gather_lights();
+    evhc_gather_lamps();  /* the remastered vehicles' lamps, in slots of their own (evhc_mod.h) */
     tibglow_frame();      /* the crystals' colour and the field's light, before any draw */
     /* Asked here and not beside the caster hookup above: the GL entry points the soldier
        art needs are resolved inside fx_world_begin, so on the first frame drawn the
        answer before it is no. */
     g_fxInfSoldiers = m3inf_available() ? 1 : 0;
     g_fxInfWant = (g_fxInfSoldiers && g_fx.m3inf_shadow) ? 1 : 0;
+    sun_recv_floor();
     fx_shadow_stage();
     fprof_mark("sun shadow map");
 
-    /* 1-3: the ground, in the cartridge's own order. The seabed is opaque and writes
-       depth; the water is a 170/255 wash over it with depth writes OFF; the terrain
-       goes LAST, opaque and alpha-cut, so the shoreline's shape comes from the terrain
-       art at texel resolution and the rocks standing in the sea keep their own colour
-       instead of being washed blue. */
+    /* The native passes retain their cartridge order. Enhanced captures the bed,
+       writes opaque terrain depth, resolves live water, then composites the native
+       dry-bank colour feather once. The projected opaque mask protects dry land;
+       resolving after the feather would erase it into a hard alpha-core cut. */
     /* RED ALERT draws its own mission's ground here instead (ra3d_terrain.h): the sea,
        the terrain and the coast below all belong to the placeholder pack the module loads,
        and none of them may show. Everything after this stands on Red Alert's ground. */
@@ -28470,8 +31118,17 @@ static void draw_frame(int fbw, int fbh)
     fprof_mark("seabed");
     draw_water();
     fprof_mark("water");
-    draw_terrain();
-    fprof_mark("terrain");
+    const bool coastColourDeferred = g_waterSurfaceDeferred;
+    draw_terrain(!coastColourDeferred);
+    fprof_mark("terrain depth");
+    water_fx_draw_after_terrain();
+    if(coastColourDeferred) {
+        glPushAttrib(GL_DEPTH_BUFFER_BIT);
+        glDepthFunc(GL_LEQUAL);glDepthMask(GL_FALSE);
+        draw_terrain_layer(false);
+        glPopAttrib();
+    }
+    fprof_mark("terrain colour");
     /* ENHANCED (water_mod.h): after the terrain, the wash laps a little way up the
        sand and the foam rolls over the opaque edge that used to be the coast. */
     water_shore_draw();
@@ -28502,7 +31159,7 @@ static void draw_frame(int fbw, int fbh)
        tiberium that has grown on it, because a vehicle drives over both; UNDER the
        scorch marks below, because a crater is a hole in the ground and the tracks that
        were there before it are not in it any more. Classic returns immediately. */
-    if (!g_ra3dSprites) treadmark_draw();
+    treadmark_draw();   /* Red Alert's vehicles too: a track is ground, whatever drew the hull */
     fprof_mark("tread marks");
     /* The smudges go with it, and AFTER it: a crater under a tiberium field is
        suppressed by the console's own priority rather than by draw order, but the
@@ -28510,12 +31167,17 @@ static void draw_frame(int fbw, int fbh)
     if (!g_ra3dSprites) draw_smudges();
     fprof_mark("smudges");
     /* the blood under the bodies, a decal like the tracks, after the scorches */
-    if (!g_ra3dSprites) infdeath_draw_blood();
+    infdeath_draw_blood();   /* Red Alert's modelled soldiers bleed like C&C's */
     /* AND AFTER BOTH DECALS: the crystals are solid and write depth, so drawn earlier
        they would take the depth test away from the scorch under them and the apron
        beside them. Enhanced only; Classic returns from this immediately. */
     if (!g_ra3dSprites) draw_tiberium_solid();
     fprof_mark("tiberium crystals");
+    /* Red Alert's ore and gems in the same slot, under Enhanced (ra3d_ore_mod.h) */
+    if (g_ra3dSprites) {
+        ra3d_ore_draw();
+        fprof_mark("ore field");
+    }
 
     if (g_grid) {
         glDisable(GL_TEXTURE_2D);
@@ -28530,6 +31192,7 @@ static void draw_frame(int fbw, int fbh)
 
     g_nFallback = g_nMesh = g_nSprite = 0;
     g_nInvisible = g_nComposed = g_nNoCartType = g_nVShadow = 0;
+    g_nClumpModel = 0;
     g_fallbackTypes.clear();
 
     /* Painter order for the meshes themselves: back-to-front by screen depth keeps the
@@ -28537,7 +31200,7 @@ static void draw_frame(int fbw, int fbh)
     std::vector<size_t> order;
     for (size_t i = 0; i < g_objects.size(); i++)
         if (visible(g_objects[i]) && g_objects[i].kind != K_INFANTRY
-            && (!g_ra3dSprites || ebld_ra_ready(g_objects[i])))
+            && (!g_ra3dSprites || ebld_ra_ready(g_objects[i]) || evhc_ra_ready(g_objects[i])))
             order.push_back(i);
     struct Cmp {
         static bool less(size_t a, size_t b) {
@@ -28549,7 +31212,13 @@ static void draw_frame(int fbw, int fbh)
     /* 3: opaque geometry */
     for (size_t k = 0; k < order.size(); k++) {
         const SimObject& o = g_objects[order[k]];
-        if (g_ra3dSprites) { ebld_draw_object(-1, o, MODE_OPAQUE); continue; }
+        /* (Red Alert: its reused buildings and trees, and its units and aircraft drawn by
+           their remastered models, evhc_mod.h) */
+        if (g_ra3dSprites) {
+            if (evhc_draw_object(o, MODE_OPAQUE)) g_nMesh++;
+            else ebld_draw_object(-1, o, MODE_OPAQUE);
+            continue;
+        }
         if (dosmake_strip_for(o) >= 0)
             continue;             /* --dosmake: the 1995 scaffold card draws instead */
         /* A Construction Yard in BSTATE_CONSTRUCTION draws the cartridge's own deploy
@@ -28563,15 +31232,7 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
-        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's
-           own tree model, in this pass and every other, so the two can never both
-           draw. It is alpha tested and depth written, so it belongs in the cutout
-           pass and in the shadow caster and nowhere else. */
-        if (tree3d_claims(o)) {
-            if (MODE_OPAQUE == MODE_CUTOUT || MODE_OPAQUE == MODE_SHADOW)
-                tree3d_draw(o, MODE_OPAQUE);
-            continue;
-        }
+
         if (mi >= 0) {
             draw_object_mesh(mi, o, MODE_OPAQUE);
             g_nMesh++;
@@ -28583,16 +31244,17 @@ static void draw_frame(int fbw, int fbh)
                the leafy cutout parts in pass 5. Either way this is NOT a fallback box:
                the counters and the log tell the truth about which it was. */
             const ClumpDef* cd = g_clumpTrees ? clump_def(o.type) : NULL;
-            if (cd) {
+            if (cd && clump_draw_whole(o, MODE_OPAQUE)) {
+                g_nClumpModel++;
+                if (g_clumpWholeDrawn) clump_whole_log(o);
+            } else if (cd) {
                 for (int c = 0; c < cd->n; c++) {
                     const int px = o.cx + cd->at[c].dx, py = o.cy + cd->at[c].dy;
                     if (!clump_cell_drawn(px, py)) continue;
                     /* a remastered tree draws whole from its model (ebld_terr.h) */
                     if (eterr_tree_draw(clump_part(o, px, py), MODE_OPAQUE))
                         continue;
-                    /* a rebuilt tree draws in the cutout pass only; see the tree3d note */
-                    if (tree3d_claims(clump_part(o, px, py)))
-                        continue;
+
                     const int tm = clump_tree_mesh(px, py);
                     if (tm >= 0)
                         draw_mesh(tm, (float)px + 0.5f, (float)py + 0.5f, -1, MODE_OPAQUE);
@@ -28632,8 +31294,8 @@ static void draw_frame(int fbw, int fbh)
     /* And the remastered buildings' pieces (ebld_mod.h), here for the same reason: a
        building worn down, broken or wrecked is drawn from its pieces, and they outlive
        the object. */
-    if (!g_ra3dSprites) ebld_draw(MODE_OPAQUE, false);
-    if (!g_ra3dSprites) evhc_draw_wrecks(MODE_OPAQUE, false);
+    ebld_draw(MODE_OPAQUE, false);   /* (Red Alert: its reused civilian buildings and trees) */
+    evhc_draw_wrecks(MODE_OPAQUE, false);
     /* Deck riders, after the transport so they composite on top of it -- the same order
        UnitClass::Draw_It uses (the hovercraft's own shape, then the piggyback units).
        ylift puts them on the deck plate rather than in the water. Riders are not in
@@ -28644,7 +31306,7 @@ static void draw_frame(int fbw, int fbh)
         if (evhc_draw_object(r, MODE_OPAQUE)) { g_nMesh++; continue; }   /* remastered */
         const int rmi = mesh_for(r);
         if (rmi >= 0) {
-            draw_mesh(rmi, r.wx, r.wz, draw_facing(r), MODE_OPAQUE,
+            draw_mesh(rmi, r.wx, r.wz, draw_heading(r), MODE_OPAQUE,
                       turret_delta(r), rotor_spin(r), mesh_house(r), 1.0f, r.ylift,
                       false, wobble_of(r));
             g_nMesh++;
@@ -28653,7 +31315,7 @@ static void draw_frame(int fbw, int fbh)
 
     /* Sandbag and brick walls are opaque geometry (their display lists carry real
        vertex colours and an authored texture), so their bodies belong here. */
-    if (!g_ra3dSprites) draw_walls(WALLPASS_OPAQUE);
+    draw_walls(WALLPASS_OPAQUE);   /* (Red Alert: its reused walls and fences) */
     /* And the terrain's own wreck, which is opaque cell geometry of exactly the same
        kind: authored texture, real vertex colours, anchored on a cell centre. */
     eterr_frame_begin();   /* the remastered cell decorations' witness (ebld_terr.h) */
@@ -28664,6 +31326,7 @@ static void draw_frame(int fbw, int fbh)
        so this is its only pass. The sprite fallback inside draw_crates sets and restores
        its own state, so it is safe in this slot too. */
     if (!g_ra3dSprites) draw_crates();
+    else ra3d_draw_cells(MODE_OPAQUE);   /* Red Alert's reused crate and fields */
     /* The field overlays, the third thing that cell-decoration path draws. Their body
        faces are all opaque; the shadow faces go in pass 4 below. This is the pass whose
        anchors fielddump reports. */
@@ -28685,7 +31348,10 @@ static void draw_frame(int fbw, int fbh)
     glDepthMask(GL_FALSE);
     for (size_t k = 0; cartShadows && k < order.size(); k++) {
         const SimObject& o = g_objects[order[k]];
-        if (g_ra3dSprites) { ebld_draw_object(-1, o, MODE_SHADOW); continue; }
+        if (g_ra3dSprites) {
+            if (!evhc_draw_object(o, MODE_SHADOW)) ebld_draw_object(-1, o, MODE_SHADOW);
+            continue;
+        }
         if (dosmake_strip_for(o) >= 0)
             continue;             /* --dosmake: the 1995 scaffold card draws instead */
         float rigT = -1.0f;
@@ -28695,25 +31361,18 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
-        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's own
-           tree model in EVERY pass, so the two can never both draw. It is alpha tested
-           and depth written, so it draws in the cutout pass and in the shadow caster,
-           and is simply skipped in the others. */
-        if (tree3d_claims(o)) {
-            tree3d_draw(o, MODE_SHADOW);
-            continue;
-        }
+
         if (mi >= 0)
             draw_object_mesh(mi, o, MODE_SHADOW);
         else if (g_clumpTrees && o.kind == K_TERRAIN) {
+            if (clump_draw_whole(o, MODE_SHADOW)) continue;   /* its own model, whole */
             const ClumpDef* cd = clump_def(o.type);
             for (int c = 0; cd && c < cd->n; c++) {
                 const int px = o.cx + cd->at[c].dx, py = o.cy + cd->at[c].dy;
                 if (!clump_cell_drawn(px, py)) continue;
                 if (eterr_tree_draw(clump_part(o, px, py), MODE_SHADOW))
                     continue;                 /* a remastered tree (ebld_terr.h) */
-                if (tree3d_claims(clump_part(o, px, py)))
-                    continue;                 /* tree3d_draw refuses every pass but cutout */
+
                 const int tm = clump_tree_mesh(px, py);
                 if (tm >= 0)
                     draw_mesh(tm, (float)px + 0.5f, (float)py + 0.5f, -1, MODE_SHADOW);
@@ -28726,7 +31385,7 @@ static void draw_frame(int fbw, int fbh)
         if (evhc_draw_object(r, MODE_SHADOW)) continue;   /* remastered */
         const int rmi = mesh_for(r);
         if (rmi >= 0)
-            draw_mesh(rmi, r.wx, r.wz, draw_facing(r), MODE_SHADOW,
+            draw_mesh(rmi, r.wx, r.wz, draw_heading(r), MODE_SHADOW,
                       turret_delta(r), rotor_spin(r), mesh_house(r), 1.0f, r.ylift);
     }
     /* Wall shadows ride this pass because it already holds exactly the state they need
@@ -28747,7 +31406,10 @@ static void draw_frame(int fbw, int fbh)
     tree3d_pass_reset();          /* the first tree below sets the pass's constants */
     for (size_t k = 0; k < order.size(); k++) {
         const SimObject& o = g_objects[order[k]];
-        if (g_ra3dSprites) { ebld_draw_object(-1, o, MODE_CUTOUT); continue; }
+        if (g_ra3dSprites) {
+            if (!evhc_draw_object(o, MODE_CUTOUT)) ebld_draw_object(-1, o, MODE_CUTOUT);
+            continue;
+        }
         if (dosmake_strip_for(o) >= 0)
             continue;             /* --dosmake: the 1995 scaffold card draws instead */
         float rigT = -1.0f;
@@ -28757,32 +31419,18 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
-        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's own
-           tree model in EVERY pass, so the two can never both draw. It is alpha tested
-           and depth written, so it draws in the cutout pass and in the shadow caster,
-           and is simply skipped in the others.
-           AND IT IS TESTED AGAINST THE FRAME. order is built from visible(), which has
-           no frustum term at all, so without this line every tree in the map is submitted
-           in full whatever the camera is looking at. */
-        if (tree3d_claims(o)) {
-            if (tree3d_cell_in_view(o.cx, o.cy)) { g_nTreeLit++; tree3d_draw(o, MODE_CUTOUT); }
-            else                                   g_nTreeLitCut++;
-            continue;
-        }
+
         if (mi >= 0)
             draw_object_mesh(mi, o, MODE_CUTOUT);
         else if (g_clumpTrees && o.kind == K_TERRAIN) {
+            if (clump_draw_whole(o, MODE_CUTOUT)) continue;   /* its own model, whole */
             const ClumpDef* cd = clump_def(o.type);
             for (int c = 0; cd && c < cd->n; c++) {
                 const int px = o.cx + cd->at[c].dx, py = o.cy + cd->at[c].dy;
                 if (!clump_cell_drawn(px, py)) continue;
                 const SimObject part = clump_part(o, px, py);
                 if (eterr_tree_draw(part, MODE_CUTOUT)) continue;   /* a remastered tree */
-                if (tree3d_claims(part)) {
-                    if (tree3d_cell_in_view(px, py)) { g_nTreeLit++; tree3d_draw(part, MODE_CUTOUT); }
-                    else                               g_nTreeLitCut++;
-                    continue;
-                }
+
                 const int tm = clump_tree_mesh(px, py);
                 if (tm >= 0)
                     draw_mesh(tm, (float)px + 0.5f, (float)py + 0.5f, -1, MODE_CUTOUT);
@@ -28797,8 +31445,8 @@ static void draw_frame(int fbw, int fbh)
     if (!g_ra3dSprites) shatter_draw(MODE_CUTOUT, false);
     /* the remastered buildings' pieces, and the damage creeping into a worn one's
        struck sides, which is an alpha-tested redraw and so belongs in this pass */
-    if (!g_ra3dSprites) ebld_draw(MODE_CUTOUT, false);
-    if (!g_ra3dSprites) evhc_draw_wrecks(MODE_CUTOUT, false);
+    ebld_draw(MODE_CUTOUT, false);
+    evhc_draw_wrecks(MODE_CUTOUT, false);
     /* Deck riders, after the transport so they composite on top of it -- the same order
        UnitClass::Draw_It uses (the hovercraft's own shape, then the piggyback units).
        ylift puts them on the deck plate rather than in the water. Riders are not in
@@ -28809,7 +31457,7 @@ static void draw_frame(int fbw, int fbh)
         if (evhc_draw_object(r, MODE_CUTOUT)) continue;   /* remastered */
         const int rmi = mesh_for(r);
         if (rmi >= 0)
-            draw_mesh(rmi, r.wx, r.wz, draw_facing(r), MODE_CUTOUT,
+            draw_mesh(rmi, r.wx, r.wz, draw_heading(r), MODE_CUTOUT,
                       turret_delta(r), rotor_spin(r), mesh_house(r), 1.0f, r.ylift);
     }
 
@@ -28817,7 +31465,9 @@ static void draw_frame(int fbw, int fbh)
        behind this pass's GL_GREATER 0.5 test. SBAG and BRIK still contribute nothing
        here, but the reason changed on 19 Aug: their shadow quads are MODE_XLU now, not
        mode 0, and they are drawn by the wall SHADOW pass above. */
-    if (!g_ra3dSprites) draw_walls(WALLPASS_CUTOUT);
+    draw_walls(WALLPASS_CUTOUT);
+    /* (Red Alert's own cell decorations' cut-out triangles: ra3d_props_mod.h) */
+    if (g_ra3dSprites) ra3d_props_draw_cells(MODE_CUTOUT);
 
     /* 5b: TRANSLUCENT geometry -- blended, depth tested, no depth write, no alpha test.
        That state is the cartridge's G_RM_AA_ZB_XLU_SURF read back term by term:
@@ -28845,7 +31495,10 @@ static void draw_frame(int fbw, int fbh)
     glDepthMask(GL_FALSE);
     for (size_t k = 0; k < order.size(); k++) {
         const SimObject& o = g_objects[order[k]];
-        if (g_ra3dSprites) { ebld_draw_object(-1, o, MODE_XLU); continue; }
+        if (g_ra3dSprites) {
+            if (!evhc_draw_object(o, MODE_XLU)) ebld_draw_object(-1, o, MODE_XLU);
+            continue;
+        }
         if (dosmake_strip_for(o) >= 0)
             continue;
         float rigT = -1.0f;
@@ -28855,24 +31508,18 @@ static void draw_frame(int fbw, int fbh)
             continue;
         }
         int mi = mesh_for(o);
-        /* ENHANCED (tree3d_mod.h): the rebuilt tree stands in for the cartridge's own
-           tree model in EVERY pass, so the two can never both draw. It is alpha tested
-           and depth written, so it draws in the cutout pass and in the shadow caster,
-           and is simply skipped in the others. */
-        if (tree3d_claims(o)) {
-            continue;
-        }
+
         if (mi >= 0)
             draw_object_mesh(mi, o, MODE_XLU);
         else if (g_clumpTrees && o.kind == K_TERRAIN) {
+            if (clump_draw_whole(o, MODE_XLU)) continue;   /* its own model, whole */
             const ClumpDef* cd = clump_def(o.type);
             for (int c = 0; cd && c < cd->n; c++) {
                 const int px = o.cx + cd->at[c].dx, py = o.cy + cd->at[c].dy;
                 if (!clump_cell_drawn(px, py)) continue;
                 if (eterr_tree_draw(clump_part(o, px, py), MODE_XLU))
                     continue;                 /* a remastered tree (ebld_terr.h) */
-                if (tree3d_claims(clump_part(o, px, py)))
-                    continue;                 /* cutout pass only, as above */
+
                 const int tm = clump_tree_mesh(px, py);
                 if (tm >= 0)
                     draw_mesh(tm, (float)px + 0.5f, (float)py + 0.5f, -1, MODE_XLU);
@@ -28881,10 +31528,12 @@ static void draw_frame(int fbw, int fbh)
     }
     if (!g_ra3dSprites) shatter_draw(MODE_XLU, false);
     /* the remastered buildings' water, and a wreck's scorch on the ground */
-    if (!g_ra3dSprites) ebld_draw(MODE_XLU, false);
+    ebld_draw(MODE_XLU, false);
+    /* (Red Alert's water crate's ripple rings, over the sea: ra3d_props_mod.h) */
+    if (g_ra3dSprites) ra3d_props_draw_cells(MODE_XLU);
     /* the ring of broken earth round a structure put down (ebld_place.h) */
     if (!g_ra3dSprites) eplc_draw_rings();
-    if (!g_ra3dSprites) evhc_draw_wrecks(MODE_XLU, false);
+    evhc_draw_wrecks(MODE_XLU, false);
     /* THE FADING MICRO-PASS. A settled piece past its linger fades on alpha, which needs
        blended state; this sits where GL_BLEND is already on, depth test on, depth write
        off. A piece at alpha 255 never reaches here, so a scene with nothing fading is
@@ -28893,17 +31542,20 @@ static void draw_frame(int fbw, int fbh)
     if (!g_ra3dSprites) shatter_draw(MODE_CUTOUT, true);
     if (!g_ra3dSprites) shatter_draw(MODE_XLU,    true);
     /* the same for a sinking remastered wreck and a draining pool */
-    if (!g_ra3dSprites) ebld_draw(MODE_OPAQUE, true);
-    if (!g_ra3dSprites) evhc_draw_wrecks(MODE_OPAQUE, true);
-    if (!g_ra3dSprites) ebld_draw(MODE_CUTOUT, true);
-    if (!g_ra3dSprites) evhc_draw_wrecks(MODE_CUTOUT, true);
-    if (!g_ra3dSprites) ebld_draw(MODE_XLU,    true);
-    if (!g_ra3dSprites) evhc_draw_wrecks(MODE_XLU, true);
+    ebld_draw(MODE_OPAQUE, true);
+    evhc_draw_wrecks(MODE_OPAQUE, true);
+    ebld_draw(MODE_CUTOUT, true);
+    evhc_draw_wrecks(MODE_CUTOUT, true);
+    ebld_draw(MODE_XLU,    true);
+    evhc_draw_wrecks(MODE_XLU, true);
+    /* the player's own submarines fully under, faint through the sea (evhc_mod.h) */
+    evhc_draw_dived_ghosts();
     /* AND THEIR EMBER GLOW, additive, after everything translucent and still inside the
        scene target so the bloom picks it up. It sets and restores its own blend and
        depth state, and hands this pass's blend function back. */
-    if (!g_ra3dSprites) ebld_draw_glow();
-    if (!g_ra3dSprites) evhc_draw_glow();       /* and the remastered vehicles' wrecks' (evhc_mod.h) */
+    ebld_draw_glow();
+    evhc_draw_glow();       /* and the remastered vehicles' wrecks' (evhc_mod.h) */
+    evhc_draw_lamp_glows(); /* and the lenses of their lamps */
     fprof_mark("cutout + translucent");
     for (size_t k = 0; g_ridersDraw && !g_ra3dSprites && k < g_riders.size(); k++) {
         const SimObject& r = g_riders[k];
@@ -28911,7 +31563,7 @@ static void draw_frame(int fbw, int fbh)
         if (evhc_draw_object(r, MODE_XLU)) continue;   /* remastered */
         const int rmi = mesh_for(r);
         if (rmi >= 0)
-            draw_mesh(rmi, r.wx, r.wz, draw_facing(r), MODE_XLU,
+            draw_mesh(rmi, r.wx, r.wz, draw_heading(r), MODE_XLU,
                       turret_delta(r), rotor_spin(r), mesh_house(r), 1.0f, r.ylift);
     }
     glDepthMask(GL_TRUE);
@@ -29175,12 +31827,14 @@ static void draw_frame(int fbw, int fbh)
         g_nSprite++;
     }
     if (g_infantryDraw) m3inf_draw_corpses();
+    g_fxVehicleCards = NULL;           /* no stale RA card mask after a mode/module change */
     if (g_ra3dSprites) ra3d_draw_sprites();   /* every Red Alert object, overlay and animation */
     fprof_mark("infantry");
     glDisable(GL_ALPHA_TEST);
     glDisable(GL_TEXTURE_2D);
-    if (g_infantryDraw && !g_ra3dSprites) infdeath_draw_casings();
-    if (g_infantryDraw && !g_ra3dSprites) infdeath_draw_spray();
+    /* the brass and the spray of the modelled soldiers, Red Alert's among them */
+    if (g_infantryDraw) infdeath_draw_casings();
+    if (g_infantryDraw) infdeath_draw_spray();
 
     /* 6a2: THE GRASS, AFTER EVERY SPRITE AND EVERY MESH.
        It began one pass after the cutout walls, which put it under the infantry: a blade
@@ -29217,10 +31871,9 @@ static void draw_frame(int fbw, int fbh)
        IF grass_crush_sim RETURNS 0 THE GRASS MUST NOT DRAW, because with no cover channel
        there is nothing keeping blades out from under a hull. grass_draw asks
        grass_crush_ready() on its own account and declines, so this is belt and braces. */
-    /* AND THE GRASS IS PART OF THE SAME LOOK, for the reason m3_available gives: the
-       blades are tuned against the ground they stand on, so they follow the ground the
-       experiment puts down rather than standing on whatever was there before. */
-    if (g_fxActive && g_fx.experimental_textures && g_fx.grass) {
+    /* The F5 grass switch belongs to standard Enhanced too. Its colour follows the
+       active ground; Experimental Art is a separate optional asset set. */
+    if (g_fxActive && fx_mode_of(&g_fx) == FX_MODE_ENHANCED && g_fx.grass) {
         /* WHERE THE POINTER IS, handed in rather than reached for: the cursor's world
            position is declared far below the point these three headers are included, so
            the grass cannot read it and the host tells it instead. Zero strength whenever
@@ -29248,8 +31901,12 @@ static void draw_frame(int fbw, int fbh)
        predates the shroud pass) so nothing flashes above the black. */
     /* the world camera as the effects see it, for the Unity explosion's own pass */
     uvfx_capture_camera();
-    if (!g_ra3dSprites) efx_enh_follow();
-    if (!g_ra3dSprites) efx_draw(g_bbRight, g_bbUp);
+    efx_enh_follow();
+    /* (Red Alert's 3D view: OpenCNC3D's effects under Enhanced, in place of the anim cards
+       its sprite pass has stood down, ra3d_effects_mod.h) */
+    if (!g_ra3dSprites || g_efxEnhOn) efx_draw(g_bbRight, g_bbUp);
+    harvestfx_draw(g_bbRight, g_bbUp);
+    ra3d_bolt_glow();
     /* and the Obelisk's beam (laser_mod.h): the cartridge's under N64, the bright one that
        feeds the bloom under Enhanced. Classic draws the 1995 lines in its own scene. */
     if (!g_ra3dSprites) laser_draw_3d();
@@ -29366,6 +32023,12 @@ static void draw_frame(int fbw, int fbh)
     fx_world_end();
     fprof_mark("post chain");
 
+    /* 8f: RED ALERT'S ATOM BOMB'S FLASH (ra3d_atom_mod.h), white over the battlefield, below
+       the seam so the grade and the bloom do not take it, and under the sidebar, the
+       captions and the cursor, which keep reading through it. Nothing outside a Red Alert blast's first
+       eight ticks. */
+    ra3d_atom_flash_draw(fbw, fbh);
+
     /* 8d: the primary factory's name for itself. BELOW the seam, unlike the three
        per-object overlays above it, because it is text: fx_world_end's chain would bloom
        and grade it, and it needs no depth buffer to test against since it only ever names
@@ -29479,6 +32142,7 @@ static void draw_frame(int fbw, int fbh)
     fxp_draw_stats(fbw, fbh);
     fxp_draw(fbw, fbh);
     fprof_mark("panels");
+    destruction_trace_gather();
     if (pointerNow && pointerLate)
         draw_cursor_top(fbw, fbh);
 }
@@ -29594,16 +32258,46 @@ static const char* find_brain(const char* explicitPath)
  *  human any other id and every single state fetch returns false: no map, no sidebar, no
  *  shroud, a blank screen with no error.
  * ==================================================================================== */
+/* RED ALERT'S COUNTRIES, as its engine numbers them (HousesType, redalert/defines.h). A Red
+   Alert match seats a country rather than a side: it decides the build list (an Allied
+   country builds the Allied tree, the USSR and Ukraine the Soviet one) and the default
+   colour, and the side follows from it. */
+enum {
+    RA_HOUSE_SPAIN = 0, RA_HOUSE_GREECE, RA_HOUSE_USSR, RA_HOUSE_ENGLAND,
+    RA_HOUSE_UKRAINE, RA_HOUSE_GERMANY, RA_HOUSE_FRANCE, RA_HOUSE_TURKEY, RA_HOUSE_COUNTRIES
+};
+static const char* const RA_COUNTRY_NAME[RA_HOUSE_COUNTRIES] = {
+    "Spain", "Greece", "USSR", "England", "Ukraine", "Germany", "France", "Turkey" };
+
+/* 1 when the country plays the Soviet side. */
+static int ra_country_soviet(int country)
+{
+    return country == RA_HOUSE_USSR || country == RA_HOUSE_UKRAINE;
+}
+
+/* A country from a name (any case, "ussr", "greece" ...) or from its number; -1 if neither. */
+static int ra_country_from_name(const char* name)
+{
+    if (!name || !*name) return -1;
+    if (name[0] >= '0' && name[0] <= '9') {
+        const int n = atoi(name);
+        return (n >= 0 && n < RA_HOUSE_COUNTRIES) ? n : -1;
+    }
+    for (int c = 0; c < RA_HOUSE_COUNTRIES; c++)
+        if (!strcasecmp(name, RA_COUNTRY_NAME[c])) return c;
+    return -1;
+}
+
 static bool arm_skirmish(const GameOpts* o)
 {
-    if (!BrainSetMP) {
-        fprintf(stderr, "skirmish: this brain does not export CNC_Set_Multiplayer_Data, "
-                        "so a skirmish cannot be started against it.\n");
+    if (!BrainSetMP || !BrainSetAIDifficulties || !BrainAIPolicy || !BrainAIStateHash) {
+        fprintf(stderr, "skirmish: this brain lacks multiplayer or fair AI policy exports; "
+                        "update both game libraries before starting Skirmish.\n");
         return false;
     }
 
     /* WHICH SEATS PLAY. A match from the lobby says so seat by seat (GameOpts::seat_mode):
-       a BLOCKed seat is not handed to the engine at all, a BOT seat is a computer wherever
+       an Empty or Blocked seat is not handed to the engine, a BOT seat is a computer wherever
        it sits, and everything else is a person. rows[] maps the engine's roster row back
        to the WIRE seat, because the lockstep names seats and the engine names rows, and
        the two stop agreeing the moment a seat is skipped. With no modes said -- a
@@ -29623,7 +32317,7 @@ static bool arm_skirmish(const GameOpts* o)
            skirmish walks all eight, and the app writes BLOCK past the roster. */
         const int seats = net ? (nm_seats() > 8 ? 8 : nm_seats()) : 8;
         for (int i = 0; i < seats; i++) {
-            if (o->seat_mode[i] == NM_SEAT_BLOCK) continue;
+            if (o->seat_mode[i] == NM_SEAT_BLOCK || o->seat_mode[i] == NM_SEAT_OPEN) continue;
             rows[players++] = i;
             if (o->seat_mode[i] != NM_SEAT_BOT) humans++;
         }
@@ -29652,6 +32346,10 @@ static bool arm_skirmish(const GameOpts* o)
     opts.MPlayerUnitCount = o->unit_count;
     opts.EnableSuperweapons = o->superweapons ? true : false;
     opts.ModernBalance = false;
+    /* Red Alert's "Shroud Regrows": ground nobody is watching goes back under the shroud. */
+    opts.MPlayerShadowRegrow = o->shroud_regrow ? true : false;
+    /* Red Alert's capture the flag. Nothing turns it on for Tiberian Dawn. */
+    opts.CaptureTheFlag = o->ctf ? true : false;
     /* The early win rule ends a match when a house has no building and no MCV left.
        It is only safe with bases ON: with bases off nobody ever has either, so every
        house is declared dead about a second into the match. */
@@ -29674,7 +32372,11 @@ static bool arm_skirmish(const GameOpts* o)
         const int i = rows[k];                       /* the WIRE seat this row plays */
         CNCPlayerInfoStruct& p = list[k];
         const bool human = modes ? (o->seat_mode[i] != NM_SEAT_BOT) : (i < humans);
-        const int house = o->player_house[i] ? 1 : 0;
+        /* Tiberian Dawn's side is 0 or 1; Red Alert's engine takes the seat's country. */
+        const int house = o->ra3d
+            ? ((o->player_house[i] >= 0 && o->player_house[i] < RA_HOUSE_COUNTRIES)
+                   ? o->player_house[i] : RA_HOUSE_GREECE)
+            : (o->player_house[i] ? 1 : 0);
         const int team  = o->player_team[i];
         /* THE NAME THE PLAYER TYPED: the engine copies it into MPlayerNames[] and onto
            the house, which is what the MAP button's player list reads, and what the
@@ -29729,7 +32431,9 @@ static bool arm_skirmish(const GameOpts* o)
         if (net) p.GlyphxPlayerID = (i == nm_seat()) ? 0ULL : (unsigned long long)(i + 1);
         /* AND THE SAME PAIR, KEPT, so every later reader asks by the id this row was
            given rather than by its position. See g_matchId. */
-        if (k < 8) { g_matchId[k] = p.GlyphxPlayerID; g_matchFaction[k] = house; }
+        if (k < 8) { g_matchId[k] = p.GlyphxPlayerID;
+                     g_matchFaction[k] = o->ra3d ? ra_country_soviet(house) : house;
+                     g_matchHouse[k] = house; }
         /* AND THE SAME PAIR AGAIN, for the seat and the person: see g_matchSeat. */
         if (k < 8) { g_matchSeat[k] = i; g_matchHuman[k] = human ? 1 : 0; }
         /* THE TEAM IS THE FIELD THAT DOES THE WORK. CNC_Set_Multiplayer_Data copies it to
@@ -29761,10 +32465,24 @@ static bool arm_skirmish(const GameOpts* o)
         p.AllyFlags = allies;
     }
 
+    unsigned char levels[8];
+    for (int i = 0; i < 8; ++i) levels[i] = 1;
+    for (int k = 0; k < players && k < 8; ++k) {
+        const int seat = rows[k];
+        levels[k] = o->ai_levels[seat] < 4 ? o->ai_levels[seat] : 1;
+    }
+    BrainSetAIDifficulties(levels, players);
     if (!BrainSetMP(1, opts, players, list, 8)) {
         fprintf(stderr, "skirmish: CNC_Set_Multiplayer_Data refused %d player(s)\n", players);
         return false;
     }
+    if (o->ra3d)
+        fprintf(stderr, "skirmish: %d player(s), Red Alert, human plays %s, %d credits, "
+                        "bases %s, ore grows %s, shroud regrows %s, tech level %d, seed %d\n",
+                players, o->side ? "the Soviets" : "the Allies", o->credits,
+                o->bases ? "on" : "off", o->tiberium ? "on" : "off",
+                o->shroud_regrow ? "on" : "off", o->build, o->seed);
+    else
     fprintf(stderr, "skirmish: %d player(s), human plays %s, %d credits, bases %s, "
                     "tiberium %s\n",
             players, o->side ? "Nod" : "GDI", o->credits,
@@ -29775,10 +32493,14 @@ static bool arm_skirmish(const GameOpts* o)
        the lobby's own numbering: with seat 4 BLOCKed the lines read 0,1,2,3,5. */
     for (int i = 0; i < players; i++)
         fprintf(stderr, "skirmish: seat=%d|name=%s|house=%s|team=%d|colour=%d|ai=%d|"
-                        "start=%d|allies=0x%02X\n",
-                rows[i], list[i].Name, list[i].House ? "Nod" : "GDI", list[i].Team + 1,
+                        "start=%d|allies=0x%02X|difficulty=%s\n",
+                rows[i], list[i].Name,
+                o->ra3d ? (list[i].House < RA_HOUSE_COUNTRIES ? RA_COUNTRY_NAME[list[i].House] : "?")
+                        : (list[i].House ? "Nod" : "GDI"),
+                list[i].Team + 1,
                 (int)list[i].ColorIndex, list[i].IsAI ? 1 : 0,
-                list[i].StartLocationIndex, (unsigned)list[i].AllyFlags);
+                list[i].StartLocationIndex, (unsigned)list[i].AllyFlags,
+                list[i].IsAI ? (levels[i] == 0 ? "Easy" : levels[i] == 2 ? "Hard" : levels[i] == 3 ? "Expert" : "Normal") : "Human");
     /* AND THE COLOURS AS A SET, because "every seat got the colour the screen showed" and
        "no two seats got the same colour" are two different assertions and only the second
        one can be made from the whole list at once. The engine cannot make it for us:
@@ -29829,6 +32551,10 @@ static void skirmish_report_teams(const GameOpts* o)
     }
     const CNCPlayerInfoStruct& info = *(const CNCPlayerInfoStruct*)buf;
     unsigned int f = info.AllyFlags;
+    /* Red Alert's multiplayer houses are also allied with its civilians (HOUSE_NEUTRAL),
+       which no seat chose, so only its eight multiplayer houses (HOUSE_MULTI1, 12, and
+       up) are counted. Tiberian Dawn's mask is read whole, as it always was. */
+    if (o->ra3d) f &= ~((1u << 12) - 1u);
     int bits = 0;
     for (int b = 0; b < 32; b++)
         if (f & (1u << b))
@@ -29843,7 +32569,8 @@ static void skirmish_report_teams(const GameOpts* o)
     if (modes) {
         /* Seat by seat, skipping a BLOCKed one: the roster is not a prefix any more. */
         for (int j = 0; j < 8; j++)
-            if (o->seat_mode[j] != NM_SEAT_BLOCK && o->player_team[j] == o->player_team[0])
+            if (o->seat_mode[j] != NM_SEAT_BLOCK && o->seat_mode[j] != NM_SEAT_OPEN
+                && o->player_team[j] == o->player_team[0])
                 asked++;
     } else {
         for (int j = 0; j < players; j++)
@@ -29888,6 +32615,19 @@ static bool g_brainLoaded = false;
 /* Whether the RUNNING match is a skirmish. Not the same question as the option, because
    the option is re-read on every mission start and the campaign runs in the same process. */
 
+/* THE COMPUTER PLAYERS' DIFFICULTY in a Red Alert match, set just before the scenario is
+   read. A skirmish takes Red Alert's own skirmish slider rule (the person's handicap moves
+   opposite to the computers'); a network match moves only the computers', and sets it on
+   every peer even when nothing was chosen, so a peer that played something else before in
+   the same process starts the same match as the others. */
+static void ra_match_difficulty(const GameOpts* o, bool skirmish)
+{
+    if (!o || !o->ra3d || !skirmish) return;
+    /* Skills never select a combat/economy handicap. Campaign selection is separate. */
+    if (BrainSetCampaignDifficulty) BrainSetCampaignDifficulty(1);
+    if (BrainSetComputerDifficulty) BrainSetComputerDifficulty(1);
+}
+
 static bool boot_brain(const char* dylib, const char* content, const char* dir,
                        const char* scen, int build, const GameOpts* o)
 {
@@ -29929,6 +32669,8 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
             static GameOpts netopts;
             if (!net_match_prepare(o, &netopts)) return false;
             o = &netopts;
+            /* A Red Alert joiner plays the host's tech level. */
+            if (o->ra3d && o->build > 0) build = o->build;
         } else if (o && o->net_mode && nm_active()) {
             /* THE LOBBY'S MATCH. The handshake is done; the switch still has to be
                thrown, and it was not. */
@@ -29938,7 +32680,12 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
             return false;
         char ra_mission[32];
         snprintf(ra_mission, sizeof ra_mission, "%s.INI", scen ? scen : "");
-        const bool started = o && o->ra3d
+        ra_match_difficulty(o, skirmish);
+        if (o && o->ra3d && BrainSetSeed) BrainSetSeed(o->seed);
+        /* A Red Alert campaign mission starts through the campaign entry; a Red Alert
+           skirmish is a multiplayer map started as one, the same call Tiberian Dawn's
+           skirmish makes, with the match already armed above. */
+        const bool started = o && o->ra3d && !skirmish
             ? (BrainStartRAMission && BrainStartRAMission(1, 0, 0, build,
                   scen && scen[2] == 'U' ? "USSR" : "GREECE", "GAME_NORMAL",
                   content, 0, ra_mission))
@@ -29972,7 +32719,7 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
                 scen, g_theater, g_mapX, g_mapY, g_mapW, g_mapH);
         shroud_init(g_mapX, g_mapY, g_mapW, g_mapH);
         g_efxCellHidden = shroud_cell_hidden;
-        g_efxDeadFootprint = dead_footprint_at;
+        g_efxDeadFootprint = g_raModule ? ra3d_dead_footprint : dead_footprint_at;
         g_efxDeadHouse = dead_house_at;
         g_efxGroundY = terrain_y;  /* effects stand on the PK9 heightfield */
         g_efxMuzzleAt = efx_muzzle_at;   /* and a cannon flash stands at the gun */
@@ -30003,6 +32750,12 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
     BrainConfig   = (CNC_Config_t)dlsym(hnd, "CNC_Config");
     BrainStart    = (CNC_Start_Custom_t)dlsym(hnd, "CNC_Start_Custom_Instance");
     BrainStartRAMission = (CNC_Start_RA_Mission_t)dlsym(hnd, "CNC_Start_Instance_Variation");
+    BrainSetSeed = (void (*)(int))dlsym(hnd, "OpenCNC3D_Set_Seed");
+    BrainSetComputerDifficulty = (void (*)(int))dlsym(hnd, "OpenCNC3D_Set_Computer_Difficulty");
+    BrainSetAIDifficulties = (void (*)(const unsigned char*, int))dlsym(hnd, "OpenCNC3D_Set_AI_Difficulties");
+    BrainAIPolicy = (unsigned int (*)(void))dlsym(hnd, "OpenCNC3D_AI_Policy");
+    BrainAIStateHash = (unsigned int (*)(void))dlsym(hnd, "OpenCNC3D_AI_State_Hash");
+    BrainAIDiagnostics = (int (*)(char*, int))dlsym(hnd, "OpenCNC3D_AI_Diagnostics");
     BrainAddModPath = (CNC_Add_Mod_Path_t)dlsym(hnd, "CNC_Add_Mod_Path");
     BrainSetCampaignDifficulty = (OpenCNC3D_SetCampaignDifficulty_t)
         dlsym(hnd, "OpenCNC3D_Set_Campaign_Difficulty");
@@ -30010,6 +32763,8 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
        can live without: a brain without it simply cannot play a skirmish. */
     BrainSetMP    = (CNC_Set_MP_t)dlsym(hnd, "CNC_Set_Multiplayer_Data");
     BrainGetState = (CNC_Get_State_t)dlsym(hnd, "CNC_Get_Game_State");
+    BrainBuildPotential = (int (*)(uint64, OpenCNC3D_BuildPotentialEntry*, int))
+        dlsym(hnd, "OpenCNC3D_Get_Build_Potential");
     BrainAdvance  = (CNC_Advance_t)dlsym(hnd, "CNC_Advance_Instance");
     BrainDump     = (OpenCNC3D_Dump_t)dlsym(hnd, "OpenCNC3D_Dump_Objects");
     BrainSidebar  = (CNC_Sidebar_t)dlsym(hnd, "CNC_Handle_Sidebar_Request");
@@ -30039,6 +32794,7 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
     BrainSpawnAnim = (OpenCNC3D_SpawnAnim_t)dlsym(hnd, "OpenCNC3D_Spawn_Anim");
     BrainForceFire = (OpenCNC3D_ForceFire_t)dlsym(hnd, "OpenCNC3D_Force_Fire");
     BrainHurtObject = (OpenCNC3D_HurtObject_t)dlsym(hnd, "OpenCNC3D_Hurt_Object");
+    BrainStoreOre = (OpenCNC3D_StoreOre_t)dlsym(hnd, "OpenCNC3D_Store_Ore");
     BrainTriggerInfo   = (OpenCNC3D_TriggerInfo_t)dlsym(hnd, "OpenCNC3D_Trigger_Info");
     if (!BrainSpringTrigger)
         fprintf(stderr, "WARNING: OpenCNC3D_Spring_Trigger is not exported by this brain; "
@@ -30238,6 +32994,8 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
         static GameOpts netopts;
         if (!net_match_prepare(o, &netopts)) return false;
         o = &netopts;
+        /* A Red Alert joiner plays the host's tech level. */
+        if (o->ra3d && o->build > 0) build = o->build;
     } else if (o && o->net_mode && nm_active()) {
         /* THE LOBBY'S MATCH: see the sibling site above. */
         if (!net_arm_from_lobby(o)) return false;
@@ -30246,7 +33004,10 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
         return false;
     char ra_mission[32];
     snprintf(ra_mission, sizeof ra_mission, "%s.INI", scen ? scen : "");
-    const bool started = o && o->ra3d
+    ra_match_difficulty(o, skirmish);
+    if (o && o->ra3d && BrainSetSeed) BrainSetSeed(o->seed);
+    /* See the restart path above: a Red Alert skirmish is a multiplayer map. */
+    const bool started = o && o->ra3d && !skirmish
         ? (BrainStartRAMission && BrainStartRAMission(1, 0, 0, build,
               scen && scen[2] == 'U' ? "USSR" : "GREECE", "GAME_NORMAL",
               content, 0, ra_mission))
@@ -30283,7 +33044,7 @@ static bool boot_brain(const char* dylib, const char* content, const char* dir,
     /* Effects predate the shroud pass: hand them the same cull the objects use so
        an explosion in unexplored land cannot flash above the black. */
     g_efxCellHidden = shroud_cell_hidden;
-    g_efxDeadFootprint = dead_footprint_at;
+    g_efxDeadFootprint = g_raModule ? ra3d_dead_footprint : dead_footprint_at;
     g_efxDeadHouse = dead_house_at;
     g_efxGroundY = terrain_y;      /* effects stand on the PK9 heightfield */
     g_efxMuzzleAt = efx_muzzle_at;     /* and a cannon flash stands at the gun */
@@ -30305,6 +33066,8 @@ static void report_coverage(void)
                     "%d absent-from-cartridge, %d vehicle shadows\n",
             g_nMesh, g_nSprite, g_nFallback, g_nInvisible, g_nComposed,
             g_nNoCartType, g_nVShadow);
+    if (g_nClumpModel > 0)
+        fprintf(stderr, "clumps: %d drawn whole from their own models\n", g_nClumpModel);
     if (g_nTreeLit + g_nTreeLitCut + g_nTreeNrm + g_nTreeNrmCut
         + g_nTreeSun + g_nTreeSunCut + g_nTreeRefl + g_nTreeReflCut > 0)
         fprintf(stderr, "trees: last frame submitted %d of %d lit, %d of %d into the "
@@ -30601,7 +33364,6 @@ static void ui_rbtn_up(int fbw, int fbh, bool* lpress, bool* band)
     printf("RBTN|up|click|at=%.0f,%.0f\n", g_rbDownC, g_rbDownR);
     ui_right_press(g_rbDownC, g_rbDownR, fbw, fbh, lpress, band);
 }
-
 
 /* mx/my are window pixels; outside the window means no scroll, matching what SDL
    reports when the pointer leaves.
@@ -31466,7 +34228,23 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
 
     /* Some scripts are pinned to one window size, because they click raw pixels. Say so
        in the script rather than finding out from a silent miss. */
-    if (!strcmp(cmd, "expectres")) {
+    if (!strcmp(cmd, "harvestfx")) {
+        if (!strncmp(arg,"drawmask ",9)) {
+            unsigned mask=0;char trailing=0;
+            if(sscanf(arg+9,"%u %c",&mask,&trailing)==1 && mask<(1u<<HFX_KINDS))g_hfxDrawMask=mask;
+            else { printf("SCRIPT|harvestfx drawmask wants 0..31\n");g_scriptFails++; }
+        } else if (!strcmp(arg,"reset")) {
+            g_hfxParticles.clear(); g_hfxEmitters=0;
+            for(int i=0;i<HFX_KINDS;i++)g_hfxBirths[i]=0;
+        } else if (!strcmp(arg,"0") || !strcmp(arg,"1")) {
+            g_hfxOn=atoi(arg)!=0;
+            if(!g_hfxOn)g_hfxParticles.clear();
+        } else if (strcmp(arg,"dump")) {
+            printf("SCRIPT|harvestfx wants 0|1|reset|dump|drawmask N\n");g_scriptFails++;
+        }
+        harvestfx_dump();
+        return true;
+    } else if (!strcmp(cmd, "expectres")) {
         int w = 0, h = 0;
         const bool ok = (sscanf(arg, "%d %d", &w, &h) == 2 && w == fbw && h == fbh);
         printf("EXPECTRES|want=%dx%d|have=%dx%d|%s\n", w, h, fbw, fbh, ok ? "PASS" : "FAIL");
@@ -31511,6 +34289,20 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             printf("CODEX|hit|at=%.0f,%.0f|chrome=%s|avail=%d\n", hx, hy, nm,
                    codex_available() ? 1 : 0);
         }
+        else if (!strcmp(a1,"point")) {
+            float x=0,y=0;sscanf(arg,"%*s %f %f",&x,&y);codex_click(x,y,fbw,fbh);
+        }
+        else if (!strcmp(a1,"models")) {
+            int found=0;
+            for(int i=0;i<CODEX_N;i++){
+                int mesh=codex_mesh_for(CODEX[i].code),m3=codex_enhanced_m3(CODEX[i].code);
+                if(mesh>=0||m3>=0)found++;
+                printf("CODEXMODEL|%s|source=%s|mesh=%d|m3=%d|triangles=%zu\n",CODEX[i].code,
+                    m3>=0?"enhanced-c3m":mesh>=0?"enhanced-pack":"unavailable",mesh,m3,
+                    m3>=0?g_m3[m3].idx.size()/3:mesh>=0?g_pack.mesh[mesh].tris.size():0);
+            }
+            printf("CODEXMODELS|available=%d|total=%d|cartridge=0\n",found,CODEX_N);
+        }
         else if (!strcmp(a1, "settle")) {
             /* THE DRAWER'S END STATE, for a script that has no frame clock. The slide is
                16 drawn frames (H6_SLIDE_STEP) and a script's `shot` draws once, so a
@@ -31532,7 +34324,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             const int ci = codex_current();
             printf("CODEX|state|open=%d|avail=%d|house=%s|cat=%s|row=%d|of=%d|code=%s"
                    "|name=%s|hp=%d|dmg=%d|spd=%d|rof=%d|duck=%.2f|ceil=%d|seeded=%d"
-                   "|scale=%d|strip=%d|boxtop=%d|duckto=%.2f\n",
+                   "|scale=%d|strip=%d|boxtop=%d|duckto=%.2f|detail=%d\n",
                    g_cxOpen ? 1 : 0, codex_available() ? 1 : 0,
                    g_cxHouse == CODEX_HOUSE_NOD ? "NOD" : "GDI",
                    CODEX_CAT_NAME[g_cxCat], g_cxSel[g_cxCat], codex_count(g_cxCat),
@@ -31541,7 +34333,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    ci >= 0 ? CODEX[ci].speed : -1, ci >= 0 ? CODEX[ci].rof : -1,
                    g_cxDuck, codex_music_ceiling(), g_optSeeded ? 1 : 0,
                    g_cxL.scale, g_cxL.stripFb, g_cxL.boxY * g_cxL.scale,
-                   (double)CODEX_DUCK_TO);
+                   (double)CODEX_DUCK_TO,g_cxDetail);
         }
     } else if (!strcmp(cmd, "height")) {
         /* height X Y -- the terrain height the renderer would put a mesh anchored at that
@@ -32483,6 +35275,13 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    mesh_for(o), visible(o) ? 1 : 0, o.pips, o.maxpips, o.dimw,
                    o.face, o.tface, draw_facing(o), rd);
         }
+    } else if (!strcmp(cmd,"rahcat")) {
+        int cat=atoi(arg);if(!rah_enabled()||cat<0||cat>4){g_scriptFails++;printf("RAHUD|category|unavailable\n");}
+        else{sb_layout(fbw,fbh);sb_click(g_dbX0+(46+31*cat)*g_h6Scale,244*g_h6Scale,fbw,fbh,false);sb_pointer_up();}
+    } else if (!strcmp(cmd,"rahdump")) {
+        sb_layout(fbw,fbh);eh_refresh();
+        printf("RAHUD|state|enabled=%d|pack=%d|category=%d|items=%d|top=%d|rows=%d|scale=%.0f|x=%.0f|y=%.0f|power=%d/%d|credits=%d|repair=%d|sell=%d|powerMode=%d\n",rah_enabled()?1:0,g_raHudPack?1:0,g_ehCategory,(int)g_ehItems.size(),g_ehTop[g_ehCategory],g_h6Rows,g_h6Scale,g_dbX0,g_dbY0,g_sbState.powerProduced,g_sbState.powerDrained,g_sbState.creditsCounter,g_sbRepairOn?1:0,g_sbSellOn?1:0,g_sbPowerOn?1:0);
+        for(size_t k=0;k<g_ehItems.size();k++)printf("RAHUD|item|%s|live=%d\n",g_ehItems[k].name,g_ehItems[k].engine>=0?1:0);
     } else if (!strcmp(cmd, "powerdump")) {
         /* Both halves of the gauge, watts AND bar pixels, plus the colour each rule
            would choose. Printed together because the whole v0.5.9 defect was that the
@@ -32557,6 +35356,67 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
            because the sidebar's left edge moves with the UI scale and a reader that
            assumes one counts ground as chrome. */
         treadmark_dump(fbw, fbh);
+    } else if (!strcmp(cmd, "infsheet")) {
+        /* infsheet TYPE CLIP [ROWS] [SPACING] [X Z] [REMAP]: the pose sheet (M3INF_SHEET_ID).
+           Every object on the field is replaced by ROWS (default 6) rows of eight TYPE
+           soldiers SPACING cells apart (default 0.9), the columns facing N, NE, E, SE, S,
+           SW, W and NW, the rows stepping through CLIP from the top, laid out from cell
+           X,Z (default about the camera). A `tick` brings the engine's own objects back.
+           For looking at clips, not for play. */
+        char type[16] = {0}, clip[32] = {0};
+        int rows = 6, remap = g_raModule ? 1 : -1;
+        float sp = 0.9f, x0 = -1.0f, z0 = -1.0f;
+        const int got = sscanf(arg, "%15s %31s %d %f %f %f %d", type, clip, &rows, &sp, &x0, &z0, &remap);
+        if (got < 2 || rows < 1 || rows > 16 || !(sp > 0.1f)) {
+            printf("SCRIPT|infsheet wants TYPE CLIP [ROWS 1..16] [SPACING] [X Z]\n"); g_scriptFails++;
+        } else {
+            if (got < 6) { x0 = g_camX - 3.5f * sp; z0 = g_camZ - 0.5f * (float)(rows - 1) * sp; }
+            snprintf(g_infSheetClip, sizeof g_infSheetClip, "%s", clip);
+            g_infSheetRows = rows;
+            g_objects.clear();
+            g_riders.clear();
+            g_cargoLinks.clear();
+            for (int r = 0; r < rows; r++)
+                for (int k = 0; k < 8; k++) {
+                    SimObject so;
+                    memset(&so, 0, sizeof(so));
+                    so.kind = K_INFANTRY;
+                    so.remap = remap;
+                    snprintf(so.type, sizeof(so.type), "%s", type);
+                    snprintf(so.house, sizeof(so.house), "%s", "GoodGuy");
+                    so.id = M3INF_SHEET_ID - (r * 8 + k);
+                    so.wx = so.ex = x0 + sp * (float)k;
+                    so.wz = so.ez = z0 + sp * (float)r;
+                    so.cx = (int)so.wx;
+                    so.cy = (int)so.wz;
+                    so.lx = (int)(so.wx * 256.0f);
+                    so.ly = (int)(so.wz * 256.0f);
+                    so.fw = so.fh = 1;
+                    so.face = k * 32;
+                    so.tface = -1;
+                    so.tar = -1;
+                    so.str = so.maxstr = 100;
+                    g_objects.push_back(so);
+                }
+            /* each soldier's feet and a point a man's height above them, on the glass, so
+               a reader can cut the sheet into one picture per pose */
+            for (size_t i = 0; i < g_objects.size(); i++) {
+                const SimObject& so = g_objects[i];
+                const float gy = terrain_y(so.wx, so.wz);
+                float c0, r0, c1, r1;
+                world_to_screen(so.wx, gy, so.wz, fbw, fbh, &c0, &r0);
+                world_to_screen(so.wx, gy + 0.45f, so.wz, fbw, fbh, &c1, &r1);
+                printf("INFSHEETPOS|%d|%d|feet=%.1f,%.1f|head=%.1f,%.1f|fb=%dx%d\n",
+                       (M3INF_SHEET_ID - so.id) / 8, (M3INF_SHEET_ID - so.id) % 8,
+                       c0, r0, c1, r1, fbw, fbh);
+            }
+            const int mi = m3inf_find(type);
+            const int ci = mi >= 0 ? m3_clip(g_m3[mi], clip) : -1;
+            printf("INFSHEET|%s|%s|rows=%d|at=%.2f,%.2f|model=%s|frames=%d|loop=%d\n", type, clip, rows,
+                   x0, z0, mi >= 0 ? "yes" : "no", ci >= 0 ? g_m3[mi].clip[ci].nframe : 0,
+                   ci >= 0 ? (int)(g_m3[mi].clip[ci].flags & 1u) : -1);
+            if (ci < 0) g_scriptFails++;
+        }
     } else if (!strcmp(cmd, "m3lod")) {
         /* Pin every 3D soldier to one level of detail: "auto", "full", or 1.. (the
            coarser levels). For comparing levels on one frame; a live game is always auto. */
@@ -32653,6 +35513,30 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
            reads it, how many are live, how many (explosion, system) pairs drew on the
            last frame, and how many were ever spawned. */
         uvfx_dump();
+    } else if (!strcmp(cmd, "infpalette")) {
+        /* Read only: the actual owner remains rawremap. uniformremap says which source
+           ramp the soldier draw uses, separately from the engine's country/player data. */
+        const bool campaign=ra_infantry_campaign_palette();
+        for (size_t i=0;i<g_objects.size();++i) {
+            const SimObject& o=g_objects[i];
+            if (o.kind!=K_INFANTRY) continue;
+            const int mi=m3inf_model_any(o);
+            const bool enhanced=mi>=0 && g_m3[mi].enh;
+            const int uniform=g_raModule?ra_infantry_uniform_remap(o.remap,campaign):o.remap;
+            const bool source=g_raModule&&ra_infantry_source_cloth(o.remap,o.type,enhanced,campaign);
+            const bool valid=g_raModule&&uniform>=0&&uniform<8;
+            printf("INFPALETTE|id=%d|type=%s|house=%s|rawremap=%d|uniformremap=%d"
+                   "|campaign=%d|enhanced=%d|normalize=%d|targetrgb=%d,%d,%d\n",
+                   o.id,o.type,o.house,o.remap,uniform,campaign?1:0,enhanced?1:0,source?1:0,
+                   valid?RA_RADAR_BAR[uniform][0]:-1,valid?RA_RADAR_BAR[uniform][1]:-1,
+                   valid?RA_RADAR_BAR[uniform][2]:-1);
+        }
+    } else if (!strcmp(cmd, "m3modeldump")) {
+        for(size_t i=0;i<g_m3.size();i++) {
+            const auto& m=g_m3[i];
+            printf("M3MODEL|index=%zu|verts=%zu|indices=%zu|skin=%zu|bones=%zu|materials=%zu|textures=%zu\n",
+                i,m.vert.size(),m.idx.size(),m.skin.size(),m.bone.size(),m.mat.size(),m.tex.size());
+        }
     } else if (!strcmp(cmd, "m3dump")) {
         infdeath_log();          /* the bodies, ragdolls, blood, flashes and casings */
         /* What the authored art set did on the last frame. It reports SUBMITTED
@@ -32670,9 +35554,13 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                g_m3InfLod[0], g_m3InfLod[1], g_m3InfLod[2], g_m3InfLod[3]);
         /* THE FRAME'S POSE CACHE: skins written, draws served from it, skins that found
            it full, and, under OPENCNC3D_POSECHECK, hits whose re-skin came out different
-           (which must be 0). One skin per soldier drawn, whatever the pass count. */
-        printf("M3POSE|skins=%d|hits=%d|full=%d|check=%d|bad=%d\n", g_m3PoseSkins,
-               g_m3PoseHits, g_m3PoseFull, m3_pose_check(), g_m3PoseBad);
+           (which must be 0). One skin per soldier drawn, whatever the pass count. Then
+           the GPU copies (m3_pose_gpu): poses sent to the card, and draws that read one
+           from there; at most one upload per skin, however many passes draw it. */
+        printf("M3POSE|skins=%d|hits=%d|full=%d|check=%d|bad=%d|uploads=%d|gpudraws=%d\n",
+               g_m3PoseSkins, g_m3PoseHits, g_m3PoseFull, m3_pose_check(), g_m3PoseBad,
+               g_m3PoseUploads, g_m3PoseGpuDraws);
+        m3_rest_dump();
         /* THE SOLDIERS' LIGHT AND SHADOW as the renderer read them: their shares of the
            model light, whether their own sun map was drawn, and one texel of it and of
            the shared map in cells, which is the number that decides whether a shadow
@@ -32707,6 +35595,11 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             printf("M3INF2|id=%d|type=%s|state=%s|since=%d|variant=%d|clip=%s|w=%.2f|doing=%d\n",
                    o.id, m3inf_model_type(o), SN[a.slot], a.since, a.variant,
                    ci >= 0 ? g_m3[mi].clip[ci].name.c_str() : "-", a.w[a.slot], o.doing);
+            /* Where he is, in leptons, beside the heading he is drawn at: two of these a
+               tick apart give the way he actually went, so a script can ask whether he
+               faces where he walks (a man drawn walking backwards is the failure). */
+            printf("M3INFMOVE|id=%d|lx=%d|ly=%d|yaw=%.1f|still=%d\n",
+                   o.id, o.lx, o.ly, a.yaw, a.still);
             /* The gait blend while he moves: his speed in cells a second, the two clips
                mixed and their shares, and the stride phase they share. */
             if (mi >= 0 && a.w[M3INF_RUN] > 1e-4f) {
@@ -32730,6 +35623,8 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    cart_is_damaged(o) ? 1 : 0, terrain_y(o.wx, o.wz));
         }
         fflush(stdout);
+    } else if (!strcmp(cmd, "bservicedump")) {
+        bservice_dump();
     } else if (!strcmp(cmd, "silodump")) {
         /* Which image of the silo's fill book each SILO is showing, and why. `state` is
            the cartridge's own arm; -1 there means the renderer fell back to the clock,
@@ -33282,6 +36177,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 g_simTicks++;
             }
             refresh_objects();
+            startup_trace_prepare_loading(true);
             printf("REMISSION|booted|%s|pack=%s|warmup=%d\n",
                    next.scen ? next.scen : "", next.pack ? next.pack : "", next.ticks);
         }
@@ -33335,6 +36231,21 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         g_c3dForceState = atoi(arg);
         if (g_c3dForceState < -1 || g_c3dForceState > 19) g_c3dForceState = -1;
         c3d_dump(cur_type());
+    } else if (!strcmp(cmd, "cursor3dmouse")) {
+        /* cursor3dmouse NAME|-1 -- Red Alert: draw the world cursor for this mouse state
+           (cursors.h's names: heal, damage, grepair, chrono-dest...), -1 to follow the
+           engine again. The Red Alert counterpart of cursor3dstate: the state rows are its
+           own (c3d_ra_row), and several need situations no mission reaches on demand.
+           Changes nothing but which row the world cursor is drawn from. */
+        int want = -1;
+        for (int t = 0; t < MOUSE_TYPE_COUNT; t++)
+            if (!strcmp(arg, cur_name(t))) want = t;
+        if (want < 0 && strcmp(arg, "-1")) {
+            printf("SCRIPT|cursor3dmouse: no mouse state %s\n", arg);
+            g_scriptFails++;
+        }
+        g_c3dForceMouse = want;
+        c3d_dump(cur_type());
     } else if (!strcmp(cmd, "cursor3danim")) {
         /* cursor3danim 0|1 -- run the cursor animation clock or freeze every state at
            its rest pose. The animation's own negative control. */
@@ -33375,6 +36286,23 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
            g_wallsDraw); it changes nothing the brain reports. */
         g_wallsDraw = (atoi(arg) != 0);
         printf("WALLS|draw=%d\n", g_wallsDraw ? 1 : 0);
+    } else if (!strcmp(cmd, "ebld")) {
+        /* ebld 0|1 -- the remastered buildings, walls, props and trees (ebld_mod.h) in force
+           or not, --noebld inside one run: a gate's frame with them and the same frame
+           without, the world unchanged between the two. Takes hold at once for the draw;
+           the stages' entries follow on the next tick. */
+        g_ebldOn = (arg && *arg) ? (atoi(arg) != 0) : true;
+        printf("EBLDSWITCH|%d\n", g_ebldOn ? 1 : 0);
+    } else if (!strcmp(cmd, "vhshow")) {
+        g_vShowUnits = atoi(arg) != 0;
+        printf("VHSHOW|draw=%d\n", g_vShowUnits ? 1 : 0);
+    } else if (!strcmp(cmd, "evhc")) {
+        /* evhc 0|1 -- the remastered vehicles and aircraft (evhc_mod.h) in force or not,
+           --noevhc inside one run: under Red Alert the same frame with the models and with
+           the 1996 cards, the world unchanged between the two. Takes hold at once for the
+           draw; the motion state follows on the next tick. */
+        g_evhcOn = (arg && *arg) ? (atoi(arg) != 0) : true;
+        printf("EVHCSWITCH|%d\n", g_evhcOn ? 1 : 0);
     } else if (!strcmp(cmd, "bldshow")) {
         /* bldshow 0|1 -- draw the buildings or not, the editor's BUILDINGS view switch.
            A gate's control leg (G305: which pixels of a frame are a structure's at all,
@@ -33496,6 +36424,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         int drawn = 0;
         for (size_t i = 0; i < g_walls.size(); i++) {
             const WallCell& w = g_walls[i];
+            if (w.kind > 4) continue;     /* (Red Alert's fence, kind 5: no cartridge wall) */
             const WallVariant& v = WALL_VARIANT[w.icon];
             const WallArt& a = g_wallArt[w.kind];
             const int m = (w.dmg > 0 && a.dmgd[v.variant] >= 0) ? a.dmgd[v.variant]
@@ -33509,6 +36438,34 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             drawn += vis;
         }
         printf("WALLDUMP-END|cells=%d|drawn=%d\n", (int)g_walls.size(), drawn);
+    } else if (!strcmp(cmd, "raprops")) {
+        /* raprops [0|1] -- Red Alert's props (ra3d_props_mod.h): with no argument a line per
+           prop and whether its model draws it; 0 draws their 1996 pictures again, 1 the
+           models (set before the mission's first tick, for an A/B) */
+        int on = -1;
+        if (sscanf(arg, "%d", &on) == 1) {
+            g_ra3dPropsOn = on != 0;
+            printf("RA3DPROP|switch|%d\n", g_ra3dPropsOn ? 1 : 0);
+            fflush(stdout);
+        } else {
+            ra3d_props_dump();
+        }
+    } else if (!strcmp(cmd, "raore")) {
+        /* raore [0|1] -- Red Alert's ore, gems and ore mine (ra3d_ore_mod.h): with no argument
+           a line per cell and mine and the totals of the last frame; 0 draws the 1996 decals
+           and the mine's card again, 1 the models */
+        int on = -1;
+        if (sscanf(arg, "%d", &on) == 1) {
+            g_ra3dOreOn = on != 0;
+            printf("RA3DORE|switch|%d\n", g_ra3dOreOn ? 1 : 0);
+            fflush(stdout);
+        } else {
+            ra3d_ore_dump();
+        }
+    } else if (!strcmp(cmd, "atomdump")) {
+        ra3d_atom_dump();
+    } else if (!strcmp(cmd, "efxmdump")) {
+        ra3d_efxm_dump();
     } else if (!strcmp(cmd, "efxdump")) {
         efx_dump();
         /* WHERE EACH BULLET MESH'S CENTRE LANDS ON THE GLASS, one line per drawn bullet,
@@ -33539,6 +36496,13 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
     } else if (!strcmp(cmd, "eterrstain")) {
         /* eterrstain FILE -- the blossom trees' ground stain tile as drawn, for the lab */
         eterr_stain_png(arg && *arg ? arg : "eterrstain.png");
+    } else if (!strcmp(cmd, "resourceprepare")) {
+        const int beforeEngine = g_engineFrame, beforeTicks = g_simTicks;
+        startup_trace_prepare_required(fbw, fbh);
+        printf("RESOURCEPREPARE|engine_before=%d|engine_after=%d|ticks_before=%d|ticks_after=%d\n",
+               beforeEngine, g_engineFrame, beforeTicks, g_simTicks);
+    } else if (!strcmp(cmd, "resourceprepdump")) {
+        ebld_prepare_dump();
     } else if (!strcmp(cmd, "ebldump")) {
         /* THE REMASTERED BUILDINGS (ebld_mod.h): EBLD is the set and the switches,
            EBLDMESH each model as attached to this pack, EBLDOBJ every building the
@@ -33584,6 +36548,33 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             printf("EVHCSCR|%s|id=%d|kind=%d|house=%s|scr=%.0f,%.0f|alt=%d\n", o.type, o.id,
                    (int)o.kind, o.house, c, r, o.alt);
         }
+    } else if (!strcmp(cmd, "evhclamps")) {
+        /* evhclamps 0|1 -- the remastered vehicles' lamps out and back on
+           (--novehiclelights at run time), for a same-run A/B; evhclampdump lists them */
+        g_evhcLampsOn = (arg && *arg) ? (atoi(arg) != 0) : true;
+        printf("EVHCLAMP|switch|on=%d\n", g_evhcLampsOn ? 1 : 0);
+    } else if (!strcmp(cmd, "harvsusp")) {
+        g_evhcHarvSuspOn = (arg && *arg) ? (atoi(arg) != 0) : true;
+        printf("EVHCSUSP|switch|on=%d\n", g_evhcHarvSuspOn ? 1 : 0);
+    } else if (!strcmp(cmd, "harvlift")) {
+        /* harvlift 0|1 -- the Harvester's claws, their rams and its mouth's lower jaw held
+           at the model's rest and back to following the harvest (--noharvlift at run time),
+           for a same-run A/B; evhcdump's EVHCHARV lines say where they stand */
+        g_evhcHarvLiftOn = (arg && *arg) ? (atoi(arg) != 0) : true;
+        printf("EVHCHARV|switch|on=%d\n", g_evhcHarvLiftOn ? 1 : 0);
+    } else if (!strcmp(cmd, "evhclampdump")) {
+        evhc_lamp_dump();
+    } else if (!strcmp(cmd, "evhcnormals")) {
+        /* evhcnormals 0|1 -- the remastered vehicles' normals out of the light pass's
+           normal target and back (--noevhcnormals at run time): a same-run A/B for the
+           picture and the frame time */
+        g_evhcNrmOn = (arg && *arg) ? (atoi(arg) != 0) : true;
+        printf("EVHCNRM|switch|on=%d\n", g_evhcNrmOn ? 1 : 0);
+    } else if (!strcmp(cmd, "evhcspec")) {
+        /* evhcspec 0|1 -- the remastered vehicles' specular maps off and back
+           (--noevhcspec at run time): a same-run A/B for the picture */
+        g_evhcSpecOn = (arg && *arg) ? (atoi(arg) != 0) : true;
+        printf("EVHCSPEC|switch|on=%d\n", g_evhcSpecOn ? 1 : 0);
     } else if (!strcmp(cmd, "evhcdump")) {
         /* THE REMASTERED VEHICLES (evhc_mod.h): EVHC is the set and the switches, EVHCART
            each model against the cartridge model it stands in for, EVHCOBJ every unit the
@@ -33879,6 +36870,24 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         } else { printf("SCRIPT|facewatch wants TYPE NTH TICKS\n"); g_scriptFails++; }
     } else if (!strcmp(cmd, "facedump")) {
         report_facing();
+    } else if (!strcmp(cmd, "drawheading")) {
+        char type[32] = {0}; int nth = 0;
+        if (sscanf(arg, "%31s %d", type, &nth) >= 1) {
+            const int oi = find_object(type, nth);
+            if (oi < 0) { printf("DRAWHEADING|MISSING|%s\n", type); g_scriptFails++; }
+            else {
+                const SimObject& o = g_objects[oi];
+                const int mi = evhc_for(o);
+                const float hull = mi >= 0 ? evhc_draw_face(o) : draw_heading(o);
+                const float turret = mi >= 0 ? evhc_draw_turret_delta(g_evhc[mi], o)
+                                               : draw_turret_heading(o);
+                printf("DRAWHEADING|%s|frame=%d|alpha=%.3f|smooth=%d|face=%d|tface=%d"
+                       "|primary=%.6f|secondary=%.6f|hull=%.6f|turret=%.6f\n",
+                       objlab(type,nth), g_engineFrame, g_tickAlpha, g_smoothMove,
+                       o.face, o.tface, smooth_heading_of(o,false), smooth_heading_of(o,true),
+                       hull, turret);
+            }
+        } else { printf("SCRIPT|drawheading wants TYPE [N]\n"); g_scriptFails++; }
     } else if (!strcmp(cmd, "aimwatch")) {
         /* Diagnostic instrumentation: aimwatch TYPE NTH TICKS [SHOTEVERY PREFIX] --
            every tick, moving or not, print the engine facing, the turret facing, the
@@ -34192,6 +37201,44 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             printf("HURTCELL|%d,%d|frame=%d\n", hx, hy, g_engineFrame);
         }
         fflush(stdout);
+    } else if (!strcmp(cmd, "spawnobj")) {
+        /* spawnobj TYPE X Y [enemy] -- the engine's own debug spawn (DEBUG_REQUEST_SPAWN_OBJECT,
+           Debug_Spawn_Unit) of a TYPE for the player, or for the strongest other house, on
+           cell X,Y or the nearest free one. GATE ONLY, a desync in a match for hurtobj's
+           reason. It exists to stage a fight the mission does not: a flamethrower beside a
+           tree, a launcher in range of a building. */
+        char type[32] = {0}, who[16] = {0};
+        int sx = -1, sy = -1, px = 0, py = 0;
+        if (sscanf(arg, "%31s %d %d %15s", type, &sx, &sy, who) < 3) {
+            printf("SCRIPT|spawnobj wants TYPE X Y [enemy]\n"); g_scriptFails++;
+        } else if (!BrainDebug) {
+            printf("SPAWNOBJ|%s|NO DEBUG EXPORT\n", type); g_scriptFails++;
+        } else if (!engine_pixels_for_cell(sx, sy, &px, &py)) {
+            printf("SPAWNOBJ|%s|%d,%d|REJECTED by the engine view\n", type, sx, sy); g_scriptFails++;
+        } else {
+            BrainDebug(DEBUG_REQUEST_SPAWN_OBJECT, 0, type, px, py, false, !strcmp(who, "enemy"));
+            printf("SPAWNOBJ|%s|%d,%d|%s|frame=%d\n", type, sx, sy,
+                   !strcmp(who, "enemy") ? "enemy" : "player", g_engineFrame);
+        }
+        fflush(stdout);
+    } else if (!strcmp(cmd, "storeore")) {
+        /* storeore HOUSE AMOUNT -- AMOUNT credits of ore into HOUSE's store as a harvest
+           unloads it (up to its capacity), or spent from it when negative, through the brain's
+           OpenCNC3D_Store_Ore. GATE ONLY, a desync in a match for hurtobj's reason. It exists
+           for the Ore Silo, whose fill is the house's stored ore against its capacity: no
+           mission fills a store on cue. */
+        char house[32] = {0};
+        int amount = 0;
+        if (!arg || sscanf(arg, "%31s %d", house, &amount) != 2) {
+            printf("SCRIPT|storeore wants HOUSE AMOUNT\n"); g_scriptFails++;
+        } else if (!BrainStoreOre) {
+            printf("STOREORE|%s|NO BRAIN EXPORT\n", house); g_scriptFails++;
+        } else {
+            const int now = BrainStoreOre(house, amount);
+            printf("STOREORE|%s|amount=%d|stored=%d\n", house, amount, now);
+            if (now < 0) g_scriptFails++;
+        }
+        fflush(stdout);
     } else if (!strcmp(cmd, "hurtunit")) {
         /* hurtunit TYPE[:HOUSE] [N] [DAMAGE] -- DAMAGE (default 1000) points of HE to the
            unit, aircraft or infantry itself, through the brain's OpenCNC3D_Hurt_Object. GATE ONLY, and a
@@ -34214,7 +37261,8 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    values, so the test hook must send the active brain's. */
                 const int rtti = (o.kind == K_AIRCRAFT) ? (g_dos2dRa ? 1 : 5)
                                : (o.kind == K_UNIT) ? (g_dos2dRa ? 28 : 3)
-                               : (o.kind == K_INFANTRY && g_dos2dRa) ? 13 : -1;
+                               : (o.kind == K_INFANTRY && g_dos2dRa) ? 13
+                               : (o.kind == K_VESSEL && g_dos2dRa) ? 30 : -1;
                 const bool ok = rtti >= 0 && BrainHurtObject(rtti, o.id, dmg);
                 printf("HURTUNIT|%s|id=%d|kind=%d|alt=%d|str-before=%d/%d|%s\n",
                        objlab(type, nth), o.id, (int)o.kind, o.alt, o.str, o.maxstr,
@@ -34918,8 +37966,50 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         int k = arg && arg[0] ? atoi(arg) : 1;
         int dw = fbw, dh = fbh;
         SDL_GL_GetDrawableSize(win, &dw, &dh);
-        for (int i = 0; i < k; i++) draw_frame(dw, dh);
+        for (int i = 0; i < k; i++) {
+            draw_frame(dw, dh);
+            /* With OPENCNC3D_FRAMEPROF set, each frame is closed as the live loop closes
+               its own, so a run of scripted frames at chosen moments of an animation can
+               be profiled and printed with fprofreport. Finished on the card by default,
+               the wait as a section of its own (framebench's method): every frame then
+               starts with the card idle, which is the clean cost of the frame's own work.
+               OPENCNC3D_FRAMEPROF_END=swap presents the frame instead, as the live loop
+               does, and =flush only flushes it: both let the frames run ahead of the card
+               as play does, so a stall on a buffer the card is still reading shows where
+               it is paid. */
+            if (g_fpOn > 0) {
+                static const int endMode = [](){
+                    const char* e = getenv("OPENCNC3D_FRAMEPROF_END");
+                    return (e && !strcmp(e, "swap")) ? 1 : (e && !strcmp(e, "flush")) ? 2 : 0;
+                }();
+                if (endMode == 1) {
+                    static bool swapSet = false;
+                    if (!swapSet) { SDL_GL_SetSwapInterval(0); swapSet = true; }
+                    SDL_GL_SwapWindow(win);
+                    fprof_mark("swap");
+                } else if (endMode == 2) {
+                    glFlush();
+                    fprof_mark("flush");
+                } else {
+                    glFinish();
+                    fprof_mark("gpu finish");
+                }
+                fprof_end();
+            }
+        }
         printf("FRAMES|%d\n", k);
+    } else if (!strcmp(cmd, "fprofreport")) {
+        /* fprofreport -- print the frame profiler's window so far (the frames closed
+           since the last report, in a scripted run the frames of `frames` and
+           `framebench`) and start a new window; FRAMEPROF|off without the profiler. */
+        g_fpManual = true;
+        if (g_fpOn > 0 && g_fpFrames) fprof_flush();
+        else printf("FRAMEPROF|off\n");
+        fflush(stdout);
+    } else if (!strcmp(cmd, "label")) {
+        /* label TEXT -- print LABEL|TEXT, so a script can mark a stretch of its log. */
+        printf("LABEL|%s\n", arg ? arg : "");
+        fflush(stdout);
     } else if (!strcmp(cmd, "tick")) {
         int k = atoi(arg);
         if (k <= 0) k = 1;
@@ -34995,6 +38085,9 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
     } else if (!strcmp(cmd, "gfx")) {
         char key[64], val[64];
         if (sscanf(arg, "%63s %63s", key, val) == 2) {
+            if (fx_retired_water_key(key)) {
+                printf("GFX|retired|%s ignored (water reflections removed)\n", key);
+            } else {
             const FxParam* hit = NULL;
             for (const FxParam* q = FX_PARAMS; q->kind != FXP_END; q++)
                 if (q->kind != FXP_GROUP && !strcmp(q->key, key)) { hit = q; break; }
@@ -35004,6 +38097,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 else *fx_fptr(&g_fx, hit) = fx_quant(hit, (float)atof(val));
                 fxp_after_change(hit);
                 printf("GFX|%s=%s\n", key, val);
+            }
             }
         } else { printf("SCRIPT|gfx wants KEY VALUE\n"); g_scriptFails++; }
     } else if (!strcmp(cmd, "dumpobj")) {
@@ -35217,6 +38311,111 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             }
             if (!found) { printf("DRAWPOS|MISSING|%s#%d\n", want, nth); g_scriptFails++; }
         } else { printf("SCRIPT|drawpos wants TYPE N\n"); g_scriptFails++; }
+    } else if (!strcmp(cmd, "footdump")) {
+        /* EVERY BUILDING'S CELLS ON THE SCREEN, beside what is drawn over them: the
+           footprint rectangle the engine gives it (top-left cell, Width x Height) projected
+           at the ground's height, the model's world box when a model draws it, its pick
+           silhouette, and under Red Alert's 3D modes the card a 1996 sprite stands on.
+           `footdump grid X0 Y0 X1 Y1` prints the cell corners of that rectangle instead,
+           so a picture can carry the grid. Read-only; it projects the last frame's camera. */
+        int gx0, gy0, gx1, gy1;
+        if (sscanf(arg, "grid %d %d %d %d", &gx0, &gy0, &gx1, &gy1) == 4) {
+            for (int y = gy0; y <= gy1; y++)
+                for (int x = gx0; x <= gx1; x++) {
+                    float c, r;
+                    const bool front = project_point((float)x, terrain_corner_y(x, y), (float)y,
+                                                     fbw, fbh, &c, &r);
+                    printf("FOOTGRID|%d,%d|%.1f,%.1f|%d\n", x, y, c, r, front ? 1 : 0);
+                }
+        } else {
+            printf("FOOTCAM|x=%.3f|z=%.3f|dist=%.1f|pitch=%.3f|mode=%s|classic=%d|enhanced=%d|fb=%dx%d\n",
+                   g_camX, g_camZ, g_dist,
+                   g_camMode == CAM_N64 ? n64_pitch() * 180.0 / M_PI : (double)PITCH_DEG,
+                   cam_mode_name(), g_fx.dos_classic ? 1 : 0, g_fx.enabled ? 1 : 0, fbw, fbh);
+            for (size_t i = 0; i < g_objects.size(); i++) {
+                const SimObject& o = g_objects[i];
+                if (o.kind != K_BUILDING || o.limbo) continue;
+                const float fx[4] = { (float)o.cx, (float)(o.cx + o.fw), (float)(o.cx + o.fw), (float)o.cx };
+                const float fz[4] = { (float)o.cy, (float)o.cy, (float)(o.cy + o.fh), (float)(o.cy + o.fh) };
+                printf("FOOT|%s|%d|cell=%d,%d|size=%d,%d|centre=%.3f,%.3f|scr=", o.type, o.id,
+                       o.cx, o.cy, o.fw, o.fh, o.ex, o.ez);
+                for (int k = 0; k < 4; k++) {
+                    float c, r;
+                    project_point(fx[k], terrain_y(fx[k], fz[k]), fz[k], fbw, fbh, &c, &r);
+                    printf("%s%.1f,%.1f", k ? ";" : "", c, r);
+                }
+                const ScreenPoly s = object_screen_poly(o, fbw, fbh, false);
+                printf("|sil=%.1f,%.1f,%.1f,%.1f|silok=%d\n", s.c0, s.r0, s.c1, s.r1, s.ok ? 1 : 0);
+                int mi = g_fx.dos_classic ? -1 : (g_raModule ? ebld_ra_pick_mesh(o) : mesh_for(o));
+                /* Tiberian Dawn's Enhanced draws the remastered model where it has one */
+                if (!g_raModule && !g_fx.dos_classic && ebld_rule_now()) {
+                    const int em = ebld_model_of(o.type);
+                    if (em >= 0 && g_ebld[em].mesh[EBM_INTACT] >= 0) mi = g_ebld[em].mesh[EBM_INTACT];
+                }
+                if (mi >= 0) {
+                    const WorldBox w = mesh_world_box(mi, o.ex, o.ez, draw_facing(o));
+                    if (w.ok) {
+                        const float bx[4] = { w.x0, w.x1, w.x1, w.x0 }, bz[4] = { w.z0, w.z0, w.z1, w.z1 };
+                        printf("FOOTMODEL|%s|%d|mesh=%d|box=%.3f,%.3f,%.3f,%.3f|top=%.3f|wide=%.3f|deep=%.3f|scr=",
+                               o.type, o.id, mi, w.x0, w.x1, w.z0, w.z1, w.y1 - terrain_y(o.ex, o.ez),
+                               w.x1 - w.x0, w.z1 - w.z0);
+                        for (int k = 0; k < 4; k++) {
+                            float c, r;
+                            project_point(bx[k], terrain_y(bx[k], bz[k]), bz[k], fbw, fbh, &c, &r);
+                            printf("%s%.1f,%.1f", k ? ";" : "", c, r);
+                        }
+                        printf("\n");
+                    }
+                }
+            }
+            for (size_t i = 0; i < g_ra3dCardRecs.size(); i++) {
+                const Ra3dCardRec& r = g_ra3dCardRecs[i];
+                printf("FOOTCARD|%d|%s|scr=", r.id, r.art);
+                for (int k = 0; k < 4; k++) {
+                    float c, rr;
+                    project_point(r.v[k][0], r.v[k][1], r.v[k][2], fbw, fbh, &c, &rr);
+                    printf("%s%.1f,%.1f", k ? ";" : "", c, rr);
+                }
+                printf("|world=%.3f,%.3f,%.3f;%.3f,%.3f,%.3f", r.v[0][0], r.v[0][1], r.v[0][2],
+                       r.v[2][0], r.v[2][1], r.v[2][2]);
+                /* the foot row on the drawn card, and where the 2D game lays that row: the
+                   ground under the sprite's centre column, (foot + 1) rows below its top */
+                if (r.h > 0) {
+                    const float t = (r.foot + 1.0f) / (float)r.h;
+                    float f[3];
+                    for (int k = 0; k < 3; k++) {
+                        const float top = 0.5f * (r.v[0][k] + r.v[1][k]);
+                        const float bot = 0.5f * (r.v[2][k] + r.v[3][k]);
+                        f[k] = top + (bot - top) * t;
+                    }
+                    const float zf = r.cz - r.h / 48.0f + (r.foot + 1.0f) / 24.0f;
+                    float c0, r0, c1, r1;
+                    project_point(f[0], f[1], f[2], fbw, fbh, &c0, &r0);
+                    project_point(r.cx, terrain_y(r.cx, zf), zf, fbw, fbh, &c1, &r1);
+                    printf("|foot=%d/%d|footscr=%.1f,%.1f|ground2d=%.1f,%.1f", r.foot, r.h, c0, r0, c1, r1);
+                }
+                printf("\n");
+            }
+        }
+    } else if (!strcmp(cmd, "infshroud")) {
+        /* EVERY SOLDIER THE FRAME DRAWS, WITH THE SHROUD HE IS DRAWN UNDER: the env term
+           m3inf_draw_as hands the soldier shader (sampled at his drawn position) and the
+           centre of his screen silhouette, so a gate can hold his pixels to that number.
+           Read-only. */
+        int n = 0;
+        apply_move_smoothing();
+        for (size_t i = 0; i < g_objects.size(); i++) {
+            const SimObject& o = g_objects[i];
+            if (o.kind != K_INFANTRY || !visible(o)) continue;
+            const ScreenPoly s = object_screen_poly(o, fbw, fbh, false);
+            float c, r;
+            poly_centre(s, &c, &r);
+            printf("INFSHROUD|%s|%d|wx=%.4f|wz=%.4f|vis=%.4f|env=%.4f|screen=%.1f,%.1f\n",
+                   o.type, o.id, o.wx, o.wz, shroud_vis_at(o.wx, o.wz),
+                   g_objShroud ? shroud_env_at(o.wx, o.wz) : 0.0f, c, r);
+            n++;
+        }
+        printf("INFSHROUD|count=%d\n", n);
     } else if (!strcmp(cmd, "decalsoft")) {
         /* GATES ONLY, like tickalpha and smoothmove beside it. The dial reaches the
            renderer through the Enhanced path and the Visuals dialog, neither of which a
@@ -35275,6 +38474,17 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             } else if (g_beStat.armed)
                 printf("BIBENH|probe|pending: no apron was drawn on screen since `bibdump arm`\n");
         }
+    } else if (!strcmp(cmd, "decalenh")) {
+        /* decalenh 0|1 -- the remastered craters and scorch marks (the decal_enh dial),
+           for the A/B inside one run. */
+        g_fx.decal_enh = (arg && *arg) ? (atoi(arg) != 0) : 1;
+        printf("DECALENH|dial=%d\n", g_fx.decal_enh);
+    } else if (!strcmp(cmd, "decaldump")) {
+        /* decaldump -- what the last decal pass did with the remastered craters and scorch
+           marks: drawn from the pack (path=enh) or not, and on how many cells. */
+        printf("DECALENH|path=%s|have=%d|on=%d|dial=%d|enhanced=%d|theater=%d|cells=%d|cell=%d\n",
+               g_deStat.path ? "enh" : "none", g_deHave ? 1 : 0, g_deOn ? 1 : 0,
+               g_fx.decal_enh, g_fx.enabled ? 1 : 0, g_theater, g_deStat.cells, g_deCell);
     } else if (!strcmp(cmd, "mottledump")) {
         printf("MOTTLE|theater=%s|bank=%s|materials=%d|available=%d|drawn=%d|density=%.5f|strength=%.5f\n",
                g_pack.theater, g_mottlePath.c_str(), (int)g_mottle.size(),
@@ -35290,8 +38500,40 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
     /* THE F5 PANEL'S STRUCTURES GROUP, as the last frame drew it: whether the light pass
        took its path (a dial off neutral and a normal target to read), how many buildings
        were drawn into that target with the cartridge structures' class, and the dials. */
+    } else if (!strcmp(cmd, "livebench")) {
+        /* Gate-only entry into the real tick/present loop from a prepared base. */
+        const double seconds=arg?atof(arg):0.0;
+        if(!g_scriptOpts||seconds<=0.0||seconds>1800.0)g_scriptFails++;
+        else {
+            const double old=g_run_seconds;g_run_seconds=seconds;
+            const Uint64 start=SDL_GetPerformanceCounter();
+            const int before=g_engineFrame,rc=game_loop(win,g_scriptOpts);
+            printf("LIVEBENCH|requested=%.1f|elapsed=%.3f|ticks=%d|result=%d\n",seconds,
+                fprof_now_ms(start,SDL_GetPerformanceCounter())*0.001,g_engineFrame-before,rc);
+            if(rc==GAME_EXIT_ERROR)g_scriptFails++;
+            g_run_seconds=old;fprof_flush();
+        }
+    } else if (!strcmp(cmd, "meshcaptest")) {
+        if(!mesh_batch_selftest())g_scriptFails++;
+    } else if (!strcmp(cmd, "physicsdump")) {
+        physics_capture();
+        building_physics_capture();
+    } else if (!strcmp(cmd, "renderdump")) {
+        if(!arg||!*arg||!render_capture(arg))g_scriptFails++;
     } else if (!strcmp(cmd, "meshperfdump")) {
         mesh_batch_dump();
+        printf("RESOLVE|ebld_model_of|hits=%lu|scans=%lu\n",g_ebldResolveHits,g_ebldResolveScans);
+        printf("EBLDNOOP|early_outs=%lu\n",g_ebldPassEarlyOuts);
+        printf("WALLSCOPE|cells=%lu|entered=%lu\n",g_ebldWallCullCells,g_ebldWallCullEntered);
+        mesh_wind_unique_dump();
+        mesh_pick_bounds_dump();
+        printf("TERRAINSUNCACHE|hits=%lu|misses=%lu\n",g_terrainShadowHits,g_terrainShadowMisses);
+    } else if (!strcmp(cmd, "vhdump")) {
+        printf("VEHICLE|on=%d|active=%d|enhanced=%d|cartdraws=%ld|gamma=%.3f|bright=%.3f"
+               "|contrast=%.3f|sat=%.3f|shade=%.3f|sun=%.3f|glow=%.3f|ao=%.3f\n",
+               g_fxVehicleOn, fx_vehicle_active(&g_fx), g_fx.enabled ? 1 : 0, g_vhClassDraws,
+               g_fx.vh_gamma, g_fx.vh_bright, g_fx.vh_contrast, g_fx.vh_sat, g_fx.vh_shade,
+               g_fx.vh_sun, g_fx.vh_glow, g_fx.vh_ao);
     } else if (!strcmp(cmd, "stdump")) {
         printf("STRUCT|on=%d|active=%d|enhanced=%d|cartdraws=%ld|cartskips=%ld|gamma=%.3f|bright=%.3f"
                "|contrast=%.3f|sat=%.3f|shade=%.3f|sun=%.3f|glow=%.3f|ao=%.3f\n",
@@ -35336,6 +38578,19 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
        the panel and so invisible)? The panel swallowing motion is what broke this, and
        it is a fault no screenshot of a static frame can see, because the script `cursor`
        verb sets the position directly and bypasses the very step that failed. G39. */
+    } else if (!strcmp(cmd, "panelclick")) {
+        /* Same SDL button path as a real F5 click, available to hidden gates. */
+        int x=0,y=0;
+        if(sscanf(arg,"%d %d",&x,&y)!=2)g_scriptFails++;
+        else {
+            SDL_Event event;memset(&event,0,sizeof event);
+            event.type=SDL_MOUSEBUTTONDOWN;event.button.button=SDL_BUTTON_LEFT;
+            event.button.x=x;event.button.y=y;
+            const int eaten=fxp_event(&event,fbw,fbh,1,1);
+            event.type=SDL_MOUSEBUTTONUP;fxp_event(&event,fbw,fbh,1,1);
+            printf("PANELCLICK|%d,%d|eaten=%d|tab=%d|new_sprites=%d\n",x,y,eaten,g_fxpTab,g_fx.new_sprites);
+            if(!eaten)g_scriptFails++;
+        }
     } else if (!strcmp(cmd, "panelprobe")) {
         float c, r;
         if (sscanf(arg, "%f %f", &c, &r) == 2) {
@@ -35367,9 +38622,9 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             for (int r = 0; r <= rows; r++) {
                 for (int c = 0; c < H6_COLUMNS; c++) {
                     if (r == rows && c > 0) break;
-                    const float cx = g_dbX0 + ((float)H6_COL_X[c] + H6_CELL_W * 0.5f) * g_h6Scale;
-                    const float cy = g_dbY0 + ((float)(hud640_row_y(r) + EH_GRID_SHIFT)
-                                               + H6_CELL_H * 0.5f) * g_h6Scale;
+                    const float cx = g_dbX0 + ((float)(rah_enabled()?RAH_GRID_X+c*RAH_DX:H6_COL_X[c]) + (rah_enabled()?RAH_CW:H6_CELL_W) * 0.5f) * g_h6Scale;
+                    const float cy = g_dbY0 + ((float)(rah_enabled()?RAH_GRID_Y+r*RAH_DY:hud640_row_y(r) + EH_GRID_SHIFT)
+                                               + (rah_enabled()?RAH_CH:H6_CELL_H) * 0.5f) * g_h6Scale;
                     const EH_Display* d = (r < rows) ? eh_display(c, r) : NULL;
                     const SbHit want = d ? (d->engine < 0 ? SBH_LOCKED : SBH_ITEM) : SBH_NONE;
                     int hc = -1, hs = -1;
@@ -35385,7 +38640,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                                r, c, cx, cy, (int)h, hc, hs, (int)want);
                 }
             }
-        } else if (g_hudNew && g_h6Pack) {
+        } else if (sb_hud_active()) {
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < H6_COLUMNS; c++) {
                     const float cx = g_dbX0 + ((float)H6_COL_X[c] + H6_CELL_W * 0.5f) * g_h6Scale;
@@ -35416,6 +38671,19 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                rows, eh_enabled() ? hud_enhanced_height(rows) : hud640_bar_h(rows),
                g_h6Scale, cells, ok);
         if (cells != ok) g_scriptFails++;
+    } else if (!strcmp(cmd, "newspritepose")) {
+        /* Presentation-only fixture: change draw records, never the engine or saves.
+           A subsequent simulation tick replaces these records normally. */
+        int doing=-1,stage=-1,face=-1,count=0;
+        if(sscanf(arg,"%d %d %d",&doing,&stage,&face)!=3||doing<0||doing>=31||stage<0||face<0||face>255)g_scriptFails++;
+        else for(size_t k=0;k<g_objects.size();k++) {
+            SimObject& actor=g_objects[k];
+            if(actor.kind!=K_INFANTRY||strcmp(actor.type,"E1"))continue;
+            actor.doing=doing;actor.dostage=stage;actor.face=face;
+            actor.dying=doing==17||doing==20||(doing>=22&&doing<=26);count++;
+        }
+        printf("NEWSPRITES|fixture|action=%d|stage=%d|face=%d|actors=%d\n",doing,stage,face,count);
+        if(!count)g_scriptFails++;
     } else if (!strcmp(cmd, "gfxpanel")) {
         /* THE HARNESS'S DOOR, and deliberately not cooked out: see fxp_toggle.
               gfxpanel 1            open it at wherever it was left
@@ -35505,6 +38773,32 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             printf("CURSORCELL|cell=%d,%d|at=%.1f,%.1f|shape=%s\n",
                    cx, cy, c, r, cur_name(cur_type()));
         } else { printf("SCRIPT|cursorcell wants CX CY\n"); g_scriptFails++; }
+    } else if (!strcmp(cmd, "cursorat")) {
+        /* cursorat WX WZ -- the pointer on a world point given in cells, not a cell's
+           centre: the map-edge scroll arrow answers only within 16 leptons of the map's
+           bounds, which no cell centre is. */
+        float wx, wz;
+        if (sscanf(arg, "%f %f", &wx, &wz) == 2) {
+            float c, r;
+            world_to_screen(wx, terrain_y(wx, wz), wz, fbw, fbh, &c, &r);
+            g_mouseScrC = c; g_mouseScrR = r;
+            update_cursor(fbw, fbh);
+            printf("CURSORAT|world=%.3f,%.3f|at=%.1f,%.1f|picked=%.3f,%.3f|shape=%s\n",
+                   wx, wz, c, r, g_cursorWX, g_cursorWZ, cur_name(cur_type()));
+        } else { printf("SCRIPT|cursorat wants WX WZ\n"); g_scriptFails++; }
+    } else if (!strcmp(cmd, "cursorradar")) {
+        /* cursorradar CX CY -- the pointer over that cell of the radar map, pressing
+           nothing, addressed by cell as mmclick is so a script needs neither HUD's
+           rectangle. */
+        int cx, cy;
+        if (sscanf(arg, "%d %d", &cx, &cy) == 2) {
+            minimap_layout(fbw, fbh);
+            g_mouseScrC = (float)g_mmX + ((float)cx + 0.5f - g_mapX) * g_mmScale;
+            g_mouseScrR = (float)g_mmY + ((float)cy + 0.5f - g_mapY) * g_mmScale;
+            update_cursor(fbw, fbh);
+            printf("CURSORRADAR|cell=%d,%d|at=%.1f,%.1f|onmap=%d|shape=%s\n", cx, cy,
+                   g_mouseScrC, g_mouseScrR, g_cursorOnMap ? 1 : 0, cur_name(cur_type()));
+        } else { printf("SCRIPT|cursorradar wants CX CY\n"); g_scriptFails++; }
     } else if (!strcmp(cmd, "cursorobj")) {
         char type[32] = {0};
         int nth = 0;
@@ -35628,9 +38922,14 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             const Uint64 t0 = SDL_GetPerformanceCounter();
             draw_frame(dw, dh);
             glFinish();
+            /* With OPENCNC3D_FRAMEPROF set, each pass's CPU time as the live loop reports
+               it, the wait for the GPU being this mark's own section. */
+            fprof_mark("gpu finish");
+            fprof_end();
             ms.push_back((double)(SDL_GetPerformanceCounter() - t0) * 1000.0
                          / (double)SDL_GetPerformanceFrequency());
         }
+        fprof_flush();
         std::sort(ms.begin(), ms.end());
         printf("FRAMEBENCH|n=%d|median=%.2f|p90=%.2f\n", n, ms[ms.size() / 2],
                ms[(ms.size() * 9) / 10]);
@@ -35810,10 +39109,10 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         printf("DOSDRAW|fog|hidden=%d|partial=%d\n",fogHidden,fogPartial);
         for (size_t ai=0;ai<g_efxAnims.size();ai++) {
             const EfxAnim& a=g_efxAnims[ai];
-            if (a.type>=0 && a.type<80 && a.stages>0 && a.stage>=0
+            if (a.etype>=0 && a.etype<80 && a.stages>0 && a.stage>=0
                 && a.stage<a.stages)
                 printf("DOSDRAW|anim|%s|frame=%d|stage=%d|type=%d\n",
-                       a.name,a.start+a.stage,a.stage,a.type);
+                       a.name,a.start+a.stage,a.stage,a.etype);
         }
         printf("DOSDRAW|tibcells=%zu", g_tib.size());
         for (size_t i = 0; i < g_tib.size() && i < 8; i++)
@@ -35859,12 +39158,158 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                    r.name, r.frame, r.ghost, r.trans, r.x0, r.y0, r.x1, r.y1);
         }
         fflush(stdout);
+    } else if (!strcmp(cmd, "ra3dprobe")) {
+        /* What the last Red Alert 3D frame's sprite pass drew (ra3d_sprites_mod.h): its
+           cards, the Tesla bolt's pieces among them, and the building parts an imported
+           model stood in for. Run it after a `shot`. */
+        printf("RA3DPROBE|frame|engineframe=%d|cards=%d|zap=%d|zapoff=%d|modelroots=%d"
+               "|modelsubs=%d|fallbackbuildings=%d|treemodels=%d|marks=%d"
+               "|vehiclemodels=%d|vehicleparts=%d\n",
+               g_engineFrame, g_ra3dCards, g_ra3dZapCards, g_ra3dZapOff ? 1 : 0,
+               g_ra3dModelRoots, g_ra3dModelSubs, g_ra3dFallbackBuildings,
+               g_ra3dTreeModels, g_ra3dMarks, g_ra3dVehicleModels, g_ra3dVehicleCards);
+        /* the structures going up by their placement (ebld_place.h) against their 1996 cards */
+        printf("RA3DPROBE|place|models=%d|cards=%d\n", g_ra3dPlacedModels, g_ra3dPlacedCards);
+        /* and OpenCNC3D's effects in place of the anim cards (ra3d_effects_mod.h) */
+        ra3d_efx_probe();
+        /* each unit and aircraft: whether its remastered model draws it (evhc_mod.h) or its
+           1996 card, its point, the engine's facing and turret facing, its height (Tiberian
+           Dawn's scale) and the lift it is drawn at, its strength, and with a model the
+           model's box on the ground there at the facing it is drawn with (cells; height
+           over the anchor's ground, the lift included) */
+        for (size_t i = 0; i < g_objects.size(); i++) {
+            const SimObject& o = g_objects[i];
+            if ((o.kind != K_UNIT && o.kind != K_AIRCRAFT && o.kind != K_VESSEL) || o.id < 0)
+                continue;
+            int face = 0;
+            float lift = 0.0f;
+            const int mi = evhc_ra_pick(o, &face, &lift);
+            WorldBox b; b.ok = false; b.x0 = b.x1 = b.z0 = b.z1 = b.y0 = b.y1 = 0.0f;
+            if (mi >= 0) b = mesh_world_box(mi, o.wx, o.wz, face);
+            printf("RA3DPROBE|vehicle|%s|id=%d|kind=%s|house=%s|remap=%d|model=%d|at=%.3f,%.3f"
+                   "|face=%d|tface=%d|alt=%d|lift=%.3f|str=%d/%d|limbo=%d|visible=%d"
+                   "|box=%.3f,%.3f,%.3f,%.3f|height=%.3f\n",
+                   o.type, o.id,
+                   o.kind == K_UNIT ? "unit" : o.kind == K_VESSEL ? "vessel" : "aircraft",
+                   o.house, o.remap,
+                   mi >= 0 ? 1 : 0, o.wx, o.wz, o.face, o.tface, o.alt, alt_lift(o), o.str,
+                   o.maxstr, o.limbo ? 1 : 0, visible(o) ? 1 : 0, b.x0, b.x1, b.z0, b.z1,
+                   b.ok ? b.y1 + lift - terrain_y(o.wx, o.wz) : -1.0f);
+        }
+        /* each bolt a model's coil fired: its source on the 2D game's ground, the
+           nearest and furthest piece from it (the walk starts one 8-pixel step out), the
+           target and the model's crown it was laid from */
+        for (size_t i = 0; i < g_ra3dBolts.size(); i++) {
+            const Ra3dBolt& b = g_ra3dBolts[i];
+            printf("RA3DPROBE|bolt|source=%.2f,%.2f|near=%.2f|far=%.2f|target=%.2f,%.2f"
+                   "|crown=%.2f,%.2f,%.2f\n", b.sx, b.sz, sqrtf(b.near2), sqrtf(b.far2),
+                   b.tx, b.tz, b.cx, b.cy, b.cz);
+        }
+        /* each tree and ore mine: its engine cell, draw flags, sprite size, whether it
+           hung from its top left, and the card's centre in cells; a tree drawn as its
+           reused model, the point the model stands on */
+        for (size_t i = 0; i < g_ra3dTerrainRecs.size(); i++) {
+            const Ra3dTerrainRec& r = g_ra3dTerrainRecs[i];
+            printf("RA3DPROBE|terrain|%s|cell=%d,%d|flags=%d|size=%dx%d|topleft=%d|centre=%.3f,%.3f"
+                   "|model=%d|at=%.3f,%.3f\n",
+                   r.type, r.cellX, r.cellY, r.flags, r.w, r.h, r.topLeft ? 1 : 0, r.cx, r.cz,
+                   r.model ? 1 : 0, r.mx, r.mz);
+        }
+        /* each civilian building and tree drawn as a model reused from OpenCNC3D's art: the
+           engine's cell and footprint, the point the model stands on and the model's box
+           on the ground there (cells; y1 its height over the anchor's ground), and its
+           stage (0 whole, 1 worn, 2 broken, 3 wrecked) */
+        for (size_t i = 0; i < g_objects.size(); i++) {
+            const SimObject& o = g_objects[i];
+            if (!ebld_ra_ready(o) || (o.kind == K_BUILDING && !ebld_ra_civil(o.type))) continue;
+            const int m = ebld_model_of(o.type);
+            if (m < 0) continue;
+            const WorldBox b = mesh_world_box(g_ebld[m].mesh[EBM_INTACT], o.wx, o.wz, draw_facing(o));
+            const EbldBld* E = ebld_find(o);
+            printf("RA3DPROBE|model|%s|%s|cell=%d,%d|foot=%dx%d|at=%.3f,%.3f|box=%.3f,%.3f,%.3f,%.3f"
+                   "|height=%.3f|str=%d/%d|stage=%d\n",
+                   o.kind == K_TERRAIN ? "tree" : "civil", o.type, o.cx, o.cy, o.fw, o.fh,
+                   o.wx, o.wz, b.x0, b.x1, b.z0, b.z1,
+                   b.ok ? b.y1 - terrain_y(o.wx, o.wz) : -1.0f, o.str, o.maxstr,
+                   E ? E->stage : 0);
+        }
+        /* and every wall cell a reused piece stands on, by kind, and the cells in pieces */
+        {
+            int byKind[6] = { 0, 0, 0, 0, 0, 0 }, cells = 0;
+            for (size_t i = 0; i < g_walls.size(); i++)
+                if (g_walls[i].kind < 6) { byKind[g_walls[i].kind]++; cells++; }
+            int broken = 0;
+            for (std::map<long long, EbldBld>::const_iterator it = g_ebldBld.begin();
+                 it != g_ebldBld.end(); ++it)
+                if (it->first >= EBLD_WALL_KEY0 && it->second.stage != EB_INTACT) broken++;
+            ebld_wall_models();
+            printf("RA3DPROBE|walls|cells=%d|SBAG=%d|CYCL=%d|BRIK=%d|BARB=%d|WOOD=%d|FENC=%d"
+                   "|models=%d,%d,%d,%d,%d|broken=%d|crates=%d|fields=%d\n",
+                   cells, byKind[0], byKind[1], byKind[2], byKind[3], byKind[4], byKind[5],
+                   g_ebldWallModel[0] >= 0, g_ebldWallModel[1] >= 0, g_ebldWallModel[2] >= 0,
+                   g_ebldWallModel[3] >= 0, g_ebldWallModel[4] >= 0, broken,
+                   g_ra3dCellsCrates, g_ra3dCellsFields);
+        }
+        /* the share of each body card and wall on screen, from the frame `ra3dcardvis`
+           armed (type: the brain's object type, -1 a wall or a fence) */
+        for (size_t i = 0; i < g_ra3dVis.size(); i++) {
+            const Ra3dCardVis& v = g_ra3dVis[i];
+            printf("RA3DPROBE|vis|%s|type=%d|full=%u|seen=%u|share=%.3f\n", v.art, v.type,
+                   v.full, v.seen, v.full ? (double)v.seen / (double)v.full : 0.0);
+        }
+        fflush(stdout);
+    } else if (!strcmp(cmd, "ra3danchor")) {
+        /* ra3danchor 0|1 -- 0 centres every Red Alert sprite card on its draw point again,
+           trees included, the drawing before the anchors were read */
+        g_ra3dCentreAll = (arg && *arg) ? !atoi(arg) : false;
+        printf("RA3DANCHOR|%d\n", g_ra3dCentreAll ? 0 : 1);
+    } else if (!strcmp(cmd, "ra3dstand")) {
+        /* ra3dstand 0|1 -- 0 puts the Red Alert sprite cards back where they stood before
+           they stood on their own feet (ra3d_stand): centred on their draw point, a
+           building lifted to its foot at its centre, so a gate can compare the two. */
+        g_ra3dStandOff = (arg && *arg) ? !atoi(arg) : false;
+        printf("RA3DSTAND|%d\n", g_ra3dStandOff ? 0 : 1);
+    } else if (!strcmp(cmd, "ra3dcardvis")) {
+        /* the next Red Alert 3D frame measures how much of each card is on screen
+           (ra3d_sprites_mod.h); take a `shot`, then ra3dprobe prints it */
+        g_ra3dVisArm = true;
+        printf("RA3DCARDVIS|armed\n");
+    } else if (!strcmp(cmd, "ra3dzap")) {
+        /* ra3dzap 0|1 -- 0 leaves the Tesla bolt out when an imported model draws its
+           coil, the drawing before the bolt was exempted, so a gate can find its pixels
+           by difference within one frame. */
+        g_ra3dZapOff = (arg && *arg) ? !atoi(arg) : false;
+        printf("RA3DZAP|%d\n", g_ra3dZapOff ? 0 : 1);
     } else if (!strcmp(cmd, "dosshadows")) {
         /* dosshadows 0|1 -- leave out of Classic's frame every aircraft layer the
            engine draws with SHAPE_FADING | SHAPE_PREDATOR (shadows, flying rotors), so a
            gate can find their pixels by difference whatever the renderer made of them. */
         g_dos2dShadowsOff = (arg && *arg) ? !atoi(arg) : 0;
         printf("DOSSHADOWS|%d\n", !g_dos2dShadowsOff);
+    } else if (!strcmp(cmd, "doscloakprobe")) {
+        /* What the last Classic frame met for every vehicle and vessel in the view, one
+           line per layer: the engine's cloak state and stage, the 1995 visual character
+           worked out from them, the engine's draw flags, what was drawn for it (sprite,
+           darken, shimmer, or hidden / invisible / omitted for nothing at all), and the
+           SHP's rectangle in framebuffer pixels from the top left. */
+        printf("DOSCLOAK|frame|records=%zu|engineframe=%d|player=%s|omit=%s\n",
+               g_dos2dCloakRecs.size(), g_engineFrame, g_playerHouse,
+               g_dos2dOmit[0] ? g_dos2dOmit : "-");
+        for (size_t i = 0; i < g_dos2dCloakRecs.size(); i++) {
+            const Dos2DCloakRec& r = g_dos2dCloakRecs[i];
+            printf("DOSCLOAK|%s|id=%d|sub=%d|owner=%d|ours=%d|cloak=%d|cstage=%d|visual=%s"
+                   "|flags=%d|as=%s|rect=%.0f,%.0f,%.0f,%.0f\n",
+                   r.type, r.id, r.sub, r.owner, r.ours, r.cloak, r.cstage,
+                   D2V_NAME[r.visual], r.flags, r.as, r.x0, r.y0, r.x1, r.y1);
+        }
+        fflush(stdout);
+    } else if (!strcmp(cmd, "dosomit")) {
+        /* dosomit TYPE | dosomit - -- leave every layer of every object of that type out
+           of Classic's frame, whatever this renderer would have made of it: a gate's
+           control leg, so what was drawn for the type is the difference of two frames. */
+        snprintf(g_dos2dOmit, sizeof g_dos2dOmit, "%s",
+                 (arg && *arg && strcmp(arg, "-")) ? arg : "");
+        printf("DOSOMIT|%s\n", g_dos2dOmit[0] ? g_dos2dOmit : "-");
     } else if (!strcmp(cmd, "gfxprebuild")) {
         /* Let this automated run build the legacy experimental ground in the background, as a
            player's run does, so the path can be measured. */
@@ -35872,8 +39317,9 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         printf("GFXWIPE|prebuild allowed\n");
         fflush(stdout);
     } else if (!strcmp(cmd, "gfxwhoosh")) {
-        /* gfxwhoosh PATH: the whoosh alone, through the mixer, panned as in play, to WAV. */
-        if (!arg || !*arg || !gmw_whoosh_wav(arg)) {
+        /* gfxwhoosh PATH: the mode switch's rumble alone, through the mixer, panned as in
+           play, to WAV. The verb's name predates the rumble; gates use it. */
+        if (!arg || !*arg || !gmw_rumble_wav(arg)) {
             printf("SCRIPT|gfxwhoosh wants a writable PATH\n");
             g_scriptFails++;
         }
@@ -36109,7 +39555,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
            the swapped-buttons gate counts ADVRECT lines and a second source of them would
            silently change what that count means. */
         const int delta = (arg && *arg) ? atoi(arg) : 1;
-        dopt_scroll(&g_optState, delta);
+        opt_scroll(delta);
         printf("OPTIONS|script|scroll|delta=%d|page=%d|advtop=%d\n", delta,
                g_optState.page, g_optState.advTop);
         if (g_optState.page == DOPT_PAGE_ADVANCED) {
@@ -36163,9 +39609,9 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                        "scrolled out of the well)\n", n);
                 g_scriptFails++;
             } else if (!strcmp(what, "hover")) {
-                dopt_motion(&g_optState, x + w / 2, y + h / 2);
+                em_opt_motion(&g_optState, x + w / 2, y + h / 2);
             } else {
-                dopt_press(&g_optState, x + w / 2, y + h / 2);
+                em_opt_press(&g_optState, x + w / 2, y + h / 2);
             }
         } else if (nargs >= 1) {
             printf("SCRIPT|opttex wants open|close|hover N|pick N\n");
@@ -36287,7 +39733,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 printf("SCRIPT|optres scroll|the list is not open\n");
                 g_scriptFails++;
             } else {
-                dopt_scroll(&g_optState, n);
+                opt_scroll(n);
             }
         }
         else if (nargs >= 1 && !strcmp(what, "bar")) {
@@ -36298,9 +39744,9 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 printf("SCRIPT|optres bar|no slider well (list shut, or it holds no more than it shows)\n");
                 g_scriptFails++;
             } else if (!strcmp(half, "upper")) {
-                dopt_press(&g_optState, bx + bw / 2, by);
+                em_opt_press(&g_optState, bx + bw / 2, by);
             } else if (!strcmp(half, "lower")) {
-                dopt_press(&g_optState, bx + bw / 2, by + bh - 1);
+                em_opt_press(&g_optState, bx + bw / 2, by + bh - 1);
             } else {
                 printf("SCRIPT|optres bar wants upper|lower\n");
                 g_scriptFails++;
@@ -36318,7 +39764,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 if (n < top) top = n;
                 if (n >= top + shown) top = n - shown + 1;
                 if (top != g_optState.restop) {
-                    dopt_scroll(&g_optState, top - g_optState.restop);
+                    opt_scroll(top - g_optState.restop);
                     printf("OPTIONS|script|scrolled|restop=%d|for=optres pick %d\n",
                            g_optState.restop, n);
                 }
@@ -36328,9 +39774,9 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                        "out of the well, or entry outside the list's window)\n", n);
                 g_scriptFails++;
             } else if (!strcmp(what, "hover")) {
-                dopt_motion(&g_optState, x + w / 2, y + h / 2);
+                em_opt_motion(&g_optState, x + w / 2, y + h / 2);
             } else {
-                dopt_press(&g_optState, x + w / 2, y + h / 2);
+                em_opt_press(&g_optState, x + w / 2, y + h / 2);
             }
         } else if (nargs >= 1) {
             printf("SCRIPT|optres wants open|close|hover N|pick N|scroll D|bar upper|lower|inject ...\n");
@@ -36395,7 +39841,7 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             dopt_text(&g_optState, arg);
         } else {
             int n = (int)strlen(dopt_slot_descr(&g_optState));
-            while (n-- > 0) dopt_key(&g_optState, DOPT_KEY_BACKSPACE);
+            while (n-- > 0) em_opt_key(&g_optState, DOPT_KEY_BACKSPACE);
         }
         printf("OPTIONS|script|type|descr=%s|ok-disabled=%d\n", dopt_slot_descr(&g_optState),
                g_optState.page == DOPT_PAGE_SLOTS
@@ -36410,13 +39856,40 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
             && r >= g_optState.sl.top && r < g_optState.sl.nrows
             && (r - g_optState.sl.top) * DOPT_SL_ROW_H < h) {
             const int ry = y + 1 + (r - g_optState.sl.top) * DOPT_SL_ROW_H + DOPT_SL_ROW_H / 2;
-            dopt_press(&g_optState, x + w / 2, ry);
-            dopt_release(&g_optState, x + w / 2, ry);
+            em_opt_press(&g_optState, x + w / 2, ry);
+            em_opt_release(&g_optState, x + w / 2, ry);
             printf("OPTIONS|script|row|%d|sel=%d|descr=%s\n", r, g_optState.sl.sel,
                    dopt_slot_descr(&g_optState));
         } else {
             printf("SCRIPT|optrow|no such visible row '%s'\n", arg ? arg : "");
             g_scriptFails++;
+        }
+    } else if (!strcmp(cmd, "emclick")) {
+        /* emclick LABEL: press and release the Enhanced dialog's seat with that label the
+           way the pointer does (em_to_legacy, the seat's own action), where optclick aims at
+           the 1995 rectangle underneath. */
+        int dw = fbw, dh = fbh, fx, fy, dx, dy, act;
+        SDL_GL_GetDrawableSize(win, &dw, &dh);
+        if (!g_optOpen || !g_optEnhanced) {
+            printf("SCRIPT|emclick|no Enhanced dialog is open\n");
+            g_scriptFails++;
+        } else {
+            em_title_mode(g_optOnTitle ? 1 : 0);
+            em_options(&g_optState); em_viewport(dw, dh);
+            if (!em_seat_point(arg, &fx, &fy)) {
+                printf("SCRIPT|emclick|no live seat named '%s' on page %d\n", arg, g_optState.page);
+                g_scriptFails++;
+            } else {
+                em_to_legacy(fx, fy, &dx, &dy); em_opt_press(&g_optState, dx, dy);
+                em_options(&g_optState); em_viewport(dw, dh);
+                em_to_legacy(fx, fy, &dx, &dy); act = em_opt_release(&g_optState, dx, dy);
+                printf("OPTIONS|script|emclick|%s|act=%d|page=%d|caption=%s\n", arg, act, g_optState.page,
+                       g_optState.page == DOPT_PAGE_NOTICE ? g_optState.ncaption : "");
+                if (act == DOPT_ACT_RESUME) { g_optOpen = false; cur_unlock(); }
+                else if (act == DOPT_ACT_SAVE) { if (opt_do_save()) { g_optOpen = false; cur_unlock(); } }
+                else if (act == DOPT_ACT_LOAD) { if (opt_do_load()) { g_optOpen = false; cur_unlock(); } }
+                else if (act == DOPT_ACT_DELETE) { opt_do_delete(); }
+            }
         }
     } else if (!strcmp(cmd, "optclick")) {
         /* optclick NAME: press and release on an item, by its DOS label. */
@@ -36444,8 +39917,8 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 g_scriptFails++;
                 goto optclick_done;
             }
-            dopt_press(&g_optState, x + w / 2, y + h / 2);
-            act = dopt_release(&g_optState, x + w / 2, y + h / 2);
+            em_opt_press(&g_optState, x + w / 2, y + h / 2);
+            act = em_opt_release(&g_optState, x + w / 2, y + h / 2);
             printf("OPTIONS|script|click|%s|at=%d,%d|act=%d|page=%d\n", arg,
                    x + w / 2, y + h / 2, act, g_optState.page);
             /* Every door out of the dialog reverts the pointer override (cur_lock in
@@ -36588,9 +40061,9 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
                 g_scriptFails++;
             } else {
                 px = x + 1 + (int)((w - 2) * frac);
-                dopt_press(&g_optState, x + 1, y + h / 2);
-                dopt_motion(&g_optState, px, y + h / 2);
-                dopt_release(&g_optState, px, y + h / 2);
+                em_opt_press(&g_optState, x + 1, y + h / 2);
+                em_opt_motion(&g_optState, px, y + h / 2);
+                em_opt_release(&g_optState, px, y + h / 2);
                 printf("OPTIONS|script|slider|%s|frac=%.2f|speed=%d|scroll=%d|"
                        "music=%d|sound=%d|speech=%d|audio_music=%d|audio_sound=%d|ambience=%d|audio_ambience=%d\n",
                        nm, frac, g_optState.set.speed, g_optState.set.scrollrate,
@@ -36659,13 +40132,27 @@ static int s_netPort = NM_PORT_DEFAULT;
 static int s_netPlayers = 2;   /* --players N: humans in the match. The host decides. */
 static int s_camHudOn = 0;     /* --camhud: the camera readout, off unless asked for  */
 
+static int ai_level_from_name(const char* value)
+{
+    if (!value) return -1;
+    if (!strcasecmp(value, "easy") || !strcmp(value, "0")) return 0;
+    if (!strcasecmp(value, "normal") || !strcmp(value, "1")) return 1;
+    if (!strcasecmp(value, "hard") || !strcmp(value, "2")) return 2;
+    if (!strcasecmp(value, "expert") || !strcmp(value, "3")) return 3;
+    return -1;
+}
+
 int game_parse_args(int argc, char** argv, GameOpts* out)
 {
     /* TIER 2. The dials get their shipped values BEFORE argv is read, so --gfx
        overrides a default instead of a default overriding --gfx. Note the master
        switch in fx_defaults is OFF: nothing on the gate path passes --gfx and nothing
        on the gate path presses F5, so every existing gate keeps drawing the picture
-       it has always drawn. */
+       it has always drawn.
+       Red Alert's Enhanced HUD/tree/grass feature defaults when --ra3d is present; the
+       shared visual values still come from fx_defaults. */
+    for (int i = 1; i < argc; i++)
+        if (!strcmp(argv[i], "--ra3d")) fx_red_alert_dials(1);
     fx_defaults(&g_fx);
 
     /* THE SHIPPED LAYOUT FIRST, THE DEV TREE SECOND, and this is what lets the game be
@@ -36702,7 +40189,6 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     const char* verdictpack = "verdict.pack";
     const char* dostib  = "dostib.pack";  /* the cartridge's real tiberium art */
     const char* tib3d   = "tib3d.pack";   /* solid crystals, Enhanced only     */
-    const char* tree3d  = "tree3d.pack";  /* leafy trees, Enhanced only        */
     /* The authored vehicle art set. A DIRECTORY rather than a file: a model is
        installed by dropping models3d/<TYPE>.c3m into it, and nothing has to be
        registered anywhere for the renderer to find it. */
@@ -36749,6 +40235,11 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     int mp_units = 0;
     int edit = 0;
     int ra3d = 0;
+    int seed = 0, shroud_regrow = 0, ctf = 0, ai_difficulty = 0;
+    int ai_levels[8];
+    for (int w = 0; w < 8; ++w) ai_levels[w] = -1;
+    int countries[8], colours[8];
+    for (int w = 0; w < 8; w++) countries[w] = colours[w] = -1;
     int start_wp[8];
     /* SEAT ORDER BY DEFAULT: seat w starts on start w unless --start says otherwise. This
        is the command line's rule and it is what every skirmish gate's world is built on;
@@ -36817,7 +40308,69 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         }
         else if (!strcmp(argv[i], "--side") && i + 1 < argc) {
             const char* v = argv[++i];
-            side = (*v == 'n' || *v == 'N' || *v == '1') ? 1 : 0;
+            /* gdi / nod, and for Red Alert allies / soviet: no Tiberian Dawn side starts
+               with an s */
+            side = (*v == 'n' || *v == 'N' || *v == '1' || *v == 's' || *v == 'S') ? 1 : 0;
+        }
+        /* RED ALERT'S SKIRMISH SEATS from the command line, seat order, human first:
+           --countries greece,ussr,england (a name or Red Alert's HousesType number) and
+           --colours 1,2,3 (Red Alert's PlayerColorType, 0..7). The lobby fills both
+           itself; these exist so a script can set up any match a menu could. */
+        else if (!strcmp(argv[i], "--countries") && i + 1 < argc) {
+            const char* v = argv[++i];
+            int w = 0;
+            while (*v && w < 8) {
+                char tok[16];
+                int n = 0;
+                while (*v && *v != ',' && n < 15) tok[n++] = *v++;
+                tok[n] = 0;
+                while (*v && *v != ',') v++;
+                if (*v == ',') v++;
+                countries[w++] = ra_country_from_name(tok);
+            }
+        }
+        else if (!strcmp(argv[i], "--colours") && i + 1 < argc) {
+            const char* v = argv[++i];
+            int w = 0;
+            while (*v && w < 8) {
+                colours[w++] = atoi(v);
+                while (*v && *v != ',') v++;
+                if (*v == ',') v++;
+            }
+        }
+        else if (!strcmp(argv[i], "--seed") && i + 1 < argc)    seed = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--shroudregrow"))            shroud_regrow = 1;
+        else if (!strcmp(argv[i], "--ctf"))                     ctf = 1;
+        /* Both games use fair skill profiles, separately selectable per roster seat. */
+        else if (!strcmp(argv[i], "--difficulty") && i + 1 < argc) {
+            const char* v = argv[++i];
+            const int level = ai_level_from_name(v);
+            if (level < 0) {
+                fprintf(stderr, "--difficulty requires easy, normal, hard or expert\n");
+                return 2;
+            }
+            ai_difficulty = level + 1;
+        }
+        else if (!strcmp(argv[i], "--ai-levels") && i + 1 < argc) {
+            const char* v = argv[++i];
+            int seat = 0;
+            while (*v && seat < 8) {
+                char token[16];
+                int length = 0;
+                while (*v && *v != ',') {
+                    if (length >= 15) { fprintf(stderr, "invalid --ai-levels value\n"); return 2; }
+                    token[length++] = *v++;
+                }
+                token[length] = 0;
+                const int level = ai_level_from_name(token);
+                if (level < 0) { fprintf(stderr, "invalid --ai-levels value '%s'\n", token); return 2; }
+                ai_levels[seat++] = level;
+                if (*v == ',') {
+                    ++v;
+                    if (!*v) { fprintf(stderr, "--ai-levels has an empty seat\n"); return 2; }
+                }
+            }
+            if (*v || !seat) { fprintf(stderr, "--ai-levels accepts one to eight roster levels\n"); return 2; }
         }
         else if (!strcmp(argv[i], "--ai") && i + 1 < argc)      ai_count = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--credits") && i + 1 < argc) credits = atoi(argv[++i]);
@@ -36921,8 +40474,6 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
            set that function does. Opt-in, so no gate reaches it. */
         else if (!strcmp(argv[i], "--enhanced")) { enhanced_player = 1; g_fx.enabled = 1; }
         else if (!strcmp(argv[i], "--notib3d"))                 tib3d = NULL;
-        else if (!strcmp(argv[i], "--tree3d") && i + 1 < argc)  tree3d = argv[++i];
-        else if (!strcmp(argv[i], "--notree3d"))                tree3d = NULL;
         else if (!strcmp(argv[i], "--efxenh") && i + 1 < argc)  efxenhpack = argv[++i];
         else if (!strcmp(argv[i], "--noefxenh"))                efxenhpack = NULL;
         else if (!strcmp(argv[i], "--models3d") && i + 1 < argc) models3d = argv[++i];
@@ -36933,6 +40484,7 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--smudge") && i + 1 < argc)  smudge = argv[++i];
         else if (!strcmp(argv[i], "--nosmudge"))                g_smOn = false;
         else if (!strcmp(argv[i], "--nobibenh"))                g_beOn = false;
+        else if (!strcmp(argv[i], "--nodecalenh"))              g_deOn = false;
         /* the remastered aprons by their three passes alone, without reading the ground */
         else if (!strcmp(argv[i], "--nobibhue"))                g_beHue = false;
         /* THE GROUND TRACKS OFF, for the A/B, and for the same reason --noshade,
@@ -36951,6 +40503,7 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         /* The remastered buildings off, for the A/B: Enhanced then draws, damages and
            shatters those types the way it did before they existed. */
         else if (!strcmp(argv[i], "--noebld"))                  g_ebldOn = false;
+        else if (!strcmp(argv[i], "--noebldshare"))             g_ebldShareOn = false;
         else if (!strcmp(argv[i], "--eboomlab"))                g_ebldBoomLab = true;
         /* the remastered crates, field overlays and P04 wreck off (ebld_terr.h), for the
            A/B: Enhanced then draws the cartridge's meshes of them */
@@ -36964,6 +40517,10 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--noebldnormals"))           g_ebldNrmOn = false;
         else if (!strcmp(argv[i], "--noeplc"))                  g_eplcOn = false;
         else if (!strcmp(argv[i], "--noevhc"))                  g_evhcOn = false;
+        else if (!strcmp(argv[i], "--noevhcnormals"))           g_evhcNrmOn = false;
+        else if (!strcmp(argv[i], "--noevhcspec"))              g_evhcSpecOn = false;
+        else if (!strcmp(argv[i], "--novehiclelights"))         g_evhcLampsOn = false;
+        else if (!strcmp(argv[i], "--noharvlift"))              g_evhcHarvLiftOn = false;
         else if (!strcmp(argv[i], "--nouvfx"))                  { g_fx.uvfx_on = 0; }
         else if (!strcmp(argv[i], "--nohdr"))                   g_fx.hdr_on = 0;
         else if (!strcmp(argv[i], "--nosky"))                   g_fx.m3_env = 0;
@@ -36972,6 +40529,10 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         else if (!strcmp(argv[i], "--norelight"))               g_fx.relight_on = 0;
         else if (!strcmp(argv[i], "--sky") && i + 1 < argc)      sky3d = argv[++i];
         else if (!strcmp(argv[i], "--dosdata") && i + 1 < argc) dosdata = argv[++i];
+        /* --lang CODE: the language pack to speak and write in (lang_mod.h), as Settings
+           would choose it; used only if the pack is complete on the disk */
+        else if (!strcmp(argv[i], "--lang") && i + 1 < argc)
+            snprintf(g_langCode, sizeof g_langCode, "%s", argv[++i]);
         else if (!strcmp(argv[i], "--audiowav") && i + 1 < argc) audiowav = argv[++i];
         else if (!strcmp(argv[i], "--nosound"))                 nosound = 1;
         else if (!strcmp(argv[i], "--audiodevicetest"))         g_audioDeviceTest = 1;
@@ -36988,12 +40549,25 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         }
         else if (!strcmp(argv[i], "--w") && i + 1 < argc)       { fbw = atoi(argv[++i]); sizeGiven = 1; }
         else if (!strcmp(argv[i], "--h") && i + 1 < argc)       { fbh = atoi(argv[++i]); sizeGiven = 1; }
-        else if (!strcmp(argv[i], "--zoom") && i + 1 < argc)    g_zoom = (float)atof(argv[++i]);
+        else if (!strcmp(argv[i], "--zoom") && i + 1 < argc) {
+            g_startZoomCLI = true;
+            g_zoom = g_startZoom = (float)atof(argv[++i]);
+        }
         else if (!strcmp(argv[i], "--oldcam"))                  g_camMode = CAM_ORTHO;
         else if (!strcmp(argv[i], "--n64cam"))                  g_camMode = CAM_N64;
-        else if (!strcmp(argv[i], "--dist") && i + 1 < argc)     g_dist = (float)atof(argv[++i]);
+        else if (!strcmp(argv[i], "--dist") && i + 1 < argc) {
+            g_startDistCLI = true;
+            g_dist = g_startDist = (float)atof(argv[++i]);
+        }
         else if (!strcmp(argv[i], "--cam") && i + 1 < argc)     { camarg = argv[++i]; }
         else if (!strcmp(argv[i], "--run") && i + 1 < argc)     g_run_seconds = atof(argv[++i]);
+        /* --speed N: the Game Controls speed (0 slowest .. 6 fastest, 4 Normal), as if the
+           slider had been set, for measuring the tick rate a setting gives */
+        else if (!strcmp(argv[i], "--speed") && i + 1 < argc) {
+            dopt_settings_init(&g_optState.set);
+            g_optState.set.speed = atoi(argv[++i]);
+            g_optSeeded = true;
+        }
         else if (!strcmp(argv[i], "--playticks") && i + 1 < argc) g_playTicks = atoi(argv[++i]);
         /* --nodeathshed turns off the SHATTER TOO, and that is a clean refusal rather
            than a half-state: the shatter launches each piece at the tick the shed would
@@ -37060,7 +40634,8 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                    the shipped defaults" and is silent, as does the menu path in
                    game_visuals_default_enhanced(), where no saved preset yet is the
                    normal first run rather than a mistake. */
-                if (!fx_load(&g_fx, preset))
+                g_fxDisplayPresetLoaded = fx_load(&g_fx, preset) != 0;
+                if (!g_fxDisplayPresetLoaded)
                     fprintf(stderr, "FX|preset|MISSING %s: cannot open it, so this run "
                                     "uses the shipped defaults and NOT the preset it was "
                                     "given\n", preset);
@@ -37116,7 +40691,8 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                and never read back is not persistence. */
             const char* vp = argv[++i];
             FILE* vf = fopen(vp, "r");
-            if (vf) { fclose(vf); fx_load(&g_fx, vp); }
+            g_fxDisplayPresetLoaded = false;
+            if (vf) { fclose(vf); g_fxDisplayPresetLoaded = fx_load(&g_fx, vp) != 0; }
             game_visuals_remember(vp);
         }
         else if (!strcmp(argv[i], "--novshadow"))               g_vehShadow = false;
@@ -37196,7 +40772,8 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                 "                perspective, 50 deg vertical FOV, yaw 0, pitch coupled to\n"
                 "                distance over 2400..3800 leptons\n"
                 "  --oldcam      start on the renderer's old orthographic 45/26.565 guess\n"
-                "  --dist N      N64 camera distance in leptons (2400..3800, default 3000)\n"
+                "  --dist N      N64 camera distance in leptons (2400..4200, start 4200;\n"
+                "                Enhanced also allows 1920..2400)\n"
                 "  --camflip N   press C for you every N seconds, hands-free A/B\n"
                 "  --nominimap   suppress the radar overlay (for pixel diagnostics)\n"
                 "  --nosidebar   suppress the build sidebar\n"
@@ -37247,7 +40824,9 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
                 "                cancelbuild NAME | ready NAME [MAXTICKS] | startplace NAME |\n"
                 "                place X Y | place auto | cancelplace | hover X Y |\n"
                 "                sbitem NAME | sbclick C R | sbrclick C R | placemap |\n"
-                "                objdump\n"
+                "                objdump | aidump\n"
+                "  --difficulty easy|normal|hard|expert  default computer skill, both games\n"
+                "  --ai-levels normal,easy,hard,expert  skill per roster seat (humans ignored)\n"
                 "  play script verbs (the same calls the mouse makes):\n"
                 "                lclick C R | lshiftclick C R | lclickobj TYPE [N] |\n"
                 "                band C0 R0 C1 R1 | shiftband ... | bandoff |\n"
@@ -37308,7 +40887,6 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
     out->verdict = verdictpack;
     out->dostib = dostib;
     out->tib3d = tib3d;
-    out->tree3d = tree3d;
     out->models3d = models3d;
     out->mottle = mottle;
     out->sky3d = sky3d;
@@ -37395,10 +40973,34 @@ int game_parse_args(int argc, char** argv, GameOpts* out)
         out->player_team[w] = w;
         out->player_colour[w] = w;
     }
+    /* RED ALERT'S SEATS ARE COUNTRIES. The human takes Greece for the Allies or the USSR
+       for the Soviets, and the computers take the other side's countries in turn, each in
+       its own colour; --countries and --colours override any seat. */
+    if (ra3d) {
+        static const int allies[6] = { RA_HOUSE_GREECE, RA_HOUSE_ENGLAND, RA_HOUSE_GERMANY,
+                                       RA_HOUSE_FRANCE, RA_HOUSE_TURKEY, RA_HOUSE_SPAIN };
+        static const int soviets[2] = { RA_HOUSE_USSR, RA_HOUSE_UKRAINE };
+        for (int w = 0; w < 8; w++) {
+            if (w == 0)
+                out->player_house[w] = side ? RA_HOUSE_USSR : RA_HOUSE_GREECE;
+            else
+                out->player_house[w] = side ? allies[(w - 1) % 6] : soviets[(w - 1) % 2];
+            if (countries[w] >= 0) out->player_house[w] = countries[w];
+            if (colours[w] >= 0 && colours[w] <= 7) out->player_colour[w] = colours[w];
+        }
+    }
+    /* The side of the human seat follows its country in a Red Alert match. */
+    if (ra3d && out->player_house[0] >= 0) out->side = ra_country_soviet(out->player_house[0]);
+    out->seed = seed;
+    out->shroud_regrow = shroud_regrow;
+    out->ctf = ctf;
+    out->ai_difficulty = ai_difficulty;
+    for (int w = 0; w < 8; ++w)
+        out->ai_levels[w] = (unsigned char)(ai_levels[w] >= 0 ? ai_levels[w] : ai_difficulty > 0 ? ai_difficulty - 1 : 1);
     /* A skirmish has no campaign behind it, so the tech level has to be opened here or
        the build list stops at whatever the map's own BuildLevel says, which on the retail
        skirmish maps is 1. */
-    if (skirmish && build <= 1) out->build = 7;
+    if (skirmish && build <= 1) out->build = ra3d ? 10 : 7;
     return 0;
 }
 
@@ -37565,6 +41167,17 @@ int game_save_slot(int slot, const char* descr)
         fflush(stdout);
         return 0;
     }
+    /* NEVER OVER THE OTHER GAME'S SAVE. Each module saves in a folder of its own, so this
+       only bites when one folder is shared on purpose (a --savedir handed to both); the
+       slot dialog lists this game's slots only, and its empty row could then name a
+       number the other game is using. */
+    ds_read_index(tab);
+    if (tab[slot].used && !ds_slot_mine(&tab[slot])) {
+        printf("SAVE|slot=%d|REFUSED it holds a %s save\n", slot,
+               tab[slot].game == DS_GAME_RA ? "Red Alert" : "Tiberian Dawn");
+        fflush(stdout);
+        return 0;
+    }
     if (!BrainSaveLoad(true, ds_payload_path(slot), NULL)) {
         printf("SAVE|slot=%d|REFUSED the engine declined\n", slot);
         fflush(stdout);
@@ -37590,6 +41203,7 @@ int game_save_slot(int slot, const char* descr)
     r.zoom_m = (int)(g_zoom * 1000.0f);
     r.music = g_au ? cnc_music_index(g_au) : -1;
     r.frame = g_engineFrame;
+    r.game = (unsigned char)ds_get_game();
     r.bytes = 0;
     f = fopen(ds_payload_path(slot), "rb");
     if (f) {
@@ -37633,6 +41247,14 @@ int game_load_slot(int slot)
         fflush(stdout);
         return 0;
     }
+    /* THE GAME HAS TO MATCH, before the mission does: both games have an SCG01EA, and one
+       game's payload in the other's engine is the wrong world entirely. */
+    if (!ds_slot_mine(&tab[slot])) {
+        printf("LOAD|slot=%d|REFUSED saved by %s\n", slot,
+               tab[slot].game == DS_GAME_RA ? "Red Alert" : "Tiberian Dawn");
+        fflush(stdout);
+        return 0;
+    }
     /* THE MISSION HAS TO MATCH. The engine's payload restores the world, but the terrain
        heightfield, the models and the tiberium art come from the .pack this process booted
        with -- so loading a slot saved in a different mission would put the right objects on
@@ -37673,6 +41295,10 @@ int game_load_slot(int slot)
     shroud_init(g_mapX, g_mapY, g_mapW, g_mapH);
     g_shroudFetchedFrame = -2;     /* the cached snapshot belongs to the old timeline */
 
+    g_m3Corpses.clear();infdeath_reset(false);g_orderQ.clear();
+    g_sbQueue.clear();g_sbQueueOpen.clear();g_wallPrevCells.clear();g_wallPrevValid=false;
+    mesh_batch_clear();g_terrainShadowKey.clear();
+    if(g_tibGpuReset)g_tibGpuReset();
     efx_pool_clear();              /* particles in flight belong to the abandoned one too */
 
     /* The vanished-unit tracker diffs consecutive dumps to find deaths. Leaving it armed
@@ -37769,10 +41395,11 @@ static void opt_sync_textinput(void)
     else if (!want && g_optTextInput) { SDL_StopTextInput(); g_optTextInput = false; }
 }
 
-/* The rows the slot dialog lists: every occupied slot, newest first (loaddlg.cpp:690
-   sorts on the file's date, which is what ds_read_index reads back), each as
-   "(GDI) description". The house is the scenario's side: a mission is played as the
-   house its code names, and no skirmish is ever saved (game_save_slot refuses). */
+/* The rows the slot dialog lists: every occupied slot of the running game, newest first
+   (loaddlg.cpp:690 sorts on the file's date, which is what ds_read_index reads back),
+   each as "(GDI) description". The house is the scenario's side: a mission is played as
+   the house its code names, and no skirmish is ever saved (game_save_slot refuses). Red
+   Alert's sides are the Allies and the Soviets, its SCU missions the Soviet ones. */
 static int opt_slot_rows(void* user, DOPT_SlotRow* out, int max)
 {
     DS_Slot tab[DS_SLOTS];
@@ -37781,7 +41408,7 @@ static int opt_slot_rows(void* user, DOPT_SlotRow* out, int max)
     (void)user;
     ds_read_index(tab);
     for (i = 0; i < DS_SLOTS; i++)
-        if (tab[i].used) order[n++] = i;
+        if (ds_slot_mine(&tab[i])) order[n++] = i;
     /* newest first; equal times fall back to the engine frame, then the number */
     for (i = 1; i < n; i++) {
         const int k = order[i];
@@ -37803,7 +41430,9 @@ static int opt_slot_rows(void* user, DOPT_SlotRow* out, int max)
         const DS_Slot* r = &tab[order[i]];
         out[i].slot = r->slot;
         snprintf(out[i].text, sizeof out[i].text, "(%s) %s",
-                 (r->scen[2] == 'B') ? "NOD" : "GDI", r->descr);
+                 r->game == DS_GAME_RA ? ((r->scen[2] == 'U') ? "Soviet" : "Allies")
+                                       : ((r->scen[2] == 'B') ? "NOD" : "GDI"),
+                 r->descr);
     }
     return n;
 }
@@ -37828,6 +41457,8 @@ static bool opt_do_load(void)
         fflush(stdout);
         return false;
     }
+    if (!ds_slot_mine(&tab[sl]))
+        return game_load_slot(sl) != 0;   /* refuses it, and says which game saved it */
     if (!g_bootScen[0] || !strcmp(tab[sl].scen, g_bootScen))
         return game_load_slot(sl) != 0;
     /* Another mission's slot: the shell boots that mission and loads it there. */
@@ -37861,7 +41492,7 @@ int game_slot_list(DS_Slot* out, int max)
     int i, n = 0;
     ds_read_index(tab);
     for (i = 0; i < DS_SLOTS && n < max; i++)
-        if (tab[i].used) out[n++] = tab[i];
+        if (ds_slot_mine(&tab[i])) out[n++] = tab[i];
     return n;
 }
 
@@ -37887,7 +41518,6 @@ int game_slot_list(DS_Slot* out, int max)
  * The handler does the minimum that is safe from a signal context: writes a fixed string and
  * a number, flushes, restores the default disposition and re-raises, so the process still
  * dies exactly as it would have and any system crash reporting still sees it. */
-
 
 static void crash_stage_handler(int sig)
 {
@@ -38044,13 +41674,26 @@ static int trace_run(const GameOpts* o, int ticks)
 
 int game_boot(SDL_Window* win, const GameOpts* o)
 {
+    StartupBootScope startupBoot(o ? o->scen : NULL);
     crash_stage_install();
     g_bootStage = "game_boot entry";
+    livery_reset();  /* no previous match's Multi colours in a new campaign/editor */
     g_bootRefusal[0] = 0;   /* this start's reason, not the last one's */
     g_dos2dRa = o && o->ra3d;
     g_raAudio = g_dos2dRa;
     g_raModule = g_dos2dRa;
-    cnc_music_set_red_alert(g_au, g_raAudio && o && o->scen && o->scen[2] == 'U' ? 2 :
+    /* (the sound engine took its language before the game was known: Red Alert's pack now) */
+    lang_apply_audio();
+    /* Red Alert's Enhanced dialogs come from its own kit in a renderer started on its own
+       too; under the frontend, which chose the kit at the title, this changes nothing. */
+    if (g_raModule && !em_red_alert()) em_set_red_alert("OpenCNC3D", "");
+    /* Red Alert's mission names say the side: SCG.. Allied, SCU.. Soviet */
+    if (g_raModule) em_set_mission_side(o && o->scen && (o->scen[2] == 'U' || o->scen[2] == 'u'));
+    /* The saves this mission lists, writes and loads are its own game's (dossave.h). */
+    ds_set_game(g_raModule ? DS_GAME_RA : DS_GAME_TD);
+    /* The Soviet score for a Soviet mission, or in a skirmish for a Soviet country. */
+    cnc_music_set_red_alert(g_au, g_raAudio && o && (o->skirmish ? o->side != 0
+                                                     : (o->scen && o->scen[2] == 'U')) ? 2 :
                                   g_raAudio ? 1 : 0);
     if (o) {
         snprintf(g_bootScen, sizeof g_bootScen, "%s", o->scen ? o->scen : "");
@@ -38238,6 +41881,7 @@ int game_boot(SDL_Window* win, const GameOpts* o)
     ebld_load(o->models3d);
     /* the remastered cursors: read once, attached to each pack by c3d_init */
     ecur_load(o->models3d);
+    ecur_ra_load(o->models3d);
     ebld_attach();
     /* AND THE REMASTERED VEHICLES AND AIRCRAFT (evhc_mod.h), after the buildings, whose
        attach begins the pack's liveries afresh. */
@@ -38247,6 +41891,13 @@ int game_boot(SDL_Window* win, const GameOpts* o)
        pack meshes the two above just made, and the Construction Yard its MCV's. */
     eplc_load(o->models3d);
     eplc_attach();
+    /* AND RED ALERT'S ATOM BOMB (ra3d_atom_mod.h): its blast's parts and textures, read
+       once, appended to every pack like the models above. */
+    ra3d_atom_load(o->models3d);
+    ra3d_atom_attach();
+    /* and its other effects with forms of their own (ra3d_efxm_mod.h) */
+    ra3d_efxm_load(o->models3d);
+    ra3d_efxm_attach_all();
     /* The Database tab caches a model's bounds by MESH INDEX, and the index of an
        appended fixed model depends on how many meshes this pack carries, so a cache
        kept from the last mission could frame one model by another's box. */
@@ -38301,6 +41952,20 @@ int game_boot(SDL_Window* win, const GameOpts* o)
         if (wantLivery)
             dosinf_livery_build();
     }
+    /* The cartridge infantry's firing, prone and crawling strips. Same GL-context rule,
+       and loaded whichever art is chosen, since the art can be switched mid-mission. It
+       sits beside the mission's packs; a missing one is a line on stderr and soldiers
+       drawn in the cartridge art stand while they fight. */
+    n64inf_load("n64infantry.pack");
+    n64inf_livery_build();
+    /* Uniform source pairs are needed only during the boot's livery build.
+       An editor can introduce a new house later; ordinary missions cannot.
+       Clear only newly retained sprite pairs, preserving existing mesh pairs. */
+    if (!o->edit) for (PackTex& tx : g_pack.tex) if (tx.uniformSource) {
+        std::vector<unsigned char>().swap(tx.gdi);
+        std::vector<unsigned char>().swap(tx.nod);
+        tx.uniformSource = false;
+    }
 
     /* The 1995 construction animations. Same GL-context rule; a missing pack
        degrades loudly to buildings popping in finished, exactly as before. */
@@ -38314,6 +41979,10 @@ int game_boot(SDL_Window* win, const GameOpts* o)
        mid-game, and it only draws while it is (g_efxEnhOn). */
     if (o->efxEnh)
         efx_load_pack_enh(o->efxEnh);
+    /* and, in a Red Alert mission, the sheets painted for its own effects beside it
+       (ra3d_efxm_mod.h) */
+    ra3d_efxm_sheets(o->models3d);
+    ra3d_ore_dir(o->models3d);   /* (Red Alert's ore packs, read at their first frame) */
 
     /* A BORROWED PACK gets re-skinned here -- AFTER load_pack, which is the only point
        at which there is anything to repaint. The first version of this sat up in the
@@ -38358,7 +42027,6 @@ int game_boot(SDL_Window* win, const GameOpts* o)
         fprintf(stderr, "tiberium: rings rule colour, hue %.2f saturation %.2f while the dials are shipped\n",
                 TIB3D_RINGS_HUE, TIB3D_RINGS_SAT);
     }
-    if (o->tree3d) tree3d_load(o->tree3d);
     /* Same footing as the two above and for the same reason: Enhanced only when it
        draws, loaded unconditionally because the panel can turn the chain on mid-game
        and an upload needs a live GL context. */
@@ -38371,6 +42039,13 @@ int game_boot(SDL_Window* win, const GameOpts* o)
        runs after its resolve */
     uvfx_load(o->models3d);
     g_efxClaim = uvfx_claim;
+    /* Red Alert's anims in Tiberian Dawn's numbers, where its effects start, one blast a
+       dead building, and its projectiles left to its sprite pass (ra3d_effects_mod.h) */
+    ra3d_efx_install();
+    /* and its atom bomb's own blast (ra3d_atom_mod.h) */
+    ra3d_atom_install();
+    /* and its other effects of its own, which also reach the atom bomb's (ra3d_efxm_mod.h) */
+    ra3d_efxm_install();
     /* a remastered building's death explosion, the lab's, emitted on the particle tick */
     g_efxBeforeIntegrate = ebld_boom_step;
     g_efxOnFire = uvfx_on_fire;
@@ -38379,6 +42054,8 @@ int game_boot(SDL_Window* win, const GameOpts* o)
     g_efxBulletOffset = uvfx_launch_offset;
     g_efxIsClaimed = uvfx_is_claimed;
     g_fxAfterResolve = uvfx_after_resolve;
+    g_fxExplosionWant = explosion_bloom_want;
+    g_fxExplosionDraw = explosion_bloom_draw;
     /* Loaded whether or not the switch that draws it is on, for the reason the packs
        above are: the panel has to be able to turn it on mid-run without a reload, and a
        missing pack has to be reported once at start rather than at the moment somebody
@@ -38396,7 +42073,11 @@ int game_boot(SDL_Window* win, const GameOpts* o)
        like the trees; a folder without the pack draws none and says nothing. */
     if (g_folPath && *g_folPath) {
         FILE* ff = fopen(g_folPath, "rb");
-        if (ff) { fclose(ff); foliage3d_load(g_folPath); }
+        if (ff) { fclose(ff);
+            const bool desert=!strcmp(g_pack.theater,"DESERT") || !strcmp(g_pack.theater,"SAND");
+            FILE* df=desert?fopen("foliage3d_DESERT.pack","rb"):NULL;
+            if(df){fclose(df);foliage3d_load("foliage3d_DESERT.pack");}else foliage3d_load(g_folPath);
+        }
     }
     /* The rocks after the foliage: their pack is appended to the foliage's models. */
     if (g_rockPath && *g_rockPath) {
@@ -38404,6 +42085,7 @@ int game_boot(SDL_Window* win, const GameOpts* o)
         FILE* rf = fopen(rp, "rb");
         if (rf) { fclose(rf); rock3d_load(rp); }
     }
+    desert_details_load();
     /* --texset, applied here because g_pack is loaded by now and the answer depends on
        it. AND IT SAYS SO WHEN IT CANNOT BE HONOURED, which is the whole reason this
        block is more than one line: a pack older than CNC3DPKG carries no DOS terrain
@@ -38458,6 +42140,9 @@ int game_boot(SDL_Window* win, const GameOpts* o)
         const size_t sl = bp.find_last_of("/\\");
         bp = (sl == std::string::npos ? std::string() : bp.substr(0, sl + 1)) + "bibenh.pack";
         bibenh_load(bp.c_str());
+        /* and the remastered craters and scorch marks, as decalenh.pack */
+        std::string dp = bp.substr(0, bp.size() - strlen("bibenh.pack")) + "decalenh.pack";
+        decalenh_load(dp.c_str(), g_raModule);   /* (Red Alert's snow burns grey) */
     }
 
     /* THE LAST OF THE MISSION'S SET-UP, and load_pack has to stop taking the blame for
@@ -38505,6 +42190,7 @@ int game_boot(SDL_Window* win, const GameOpts* o)
         hk.Roster = o->skirmish ? sb_roster_fetch : 0;
         hk.StructureReq = BrainStructureReq;
         hk.EffectTime=eh_effect_time;hk.OwnedBuilding=eh_owned_building;
+        hk.BuildPotential=BrainBuildPotential;
         hk.Unselect = ui_unselect_for_targeting;
         hk.Speak = ui_speak_vox;
         /* radar.cpp:348 picks the bezel by house; the scenario letter is the house. */
@@ -38553,28 +42239,6 @@ int game_boot(SDL_Window* win, const GameOpts* o)
             fprintf(stderr, "WARNING: %s; falling back to the OS cursor\n", cerr);
         }
     }
-    if (g_zoom <= 0.0f) {
-        /* CAM_ORTHO's start-up overview. Computed even when the N64 camera is the one
-           booting, so that pressing C lands on a sane orthographic view rather than on a
-           zoom of zero. Under the fixed 45/26.565 camera a WxH cell rectangle projects to
-           (W+H)*cos45 wide and (W+H)*cos45*sin(pitch) tall. */
-        const float span = (float)(g_mapW + g_mapH) * 0.70710678f;
-        const float zx = (float)fbw / (span * 1.06f);
-        const float zy = (float)fbh / (span * 0.4472136f * 1.20f);
-        g_zoom = fminf(zx, zy);
-        fprintf(stderr, "zoom: auto-fit -> %.1f px/cell\n", g_zoom);
-    }
-    fprintf(stderr, "zoom: OLD camera range %.1f .. %.1f px/cell (start %.1f)\n",
-            ZOOM_MIN, ZOOM_MAX, g_zoom);
-    fprintf(stderr, "zoom: N64 camera range %.0f .. %.0f leptons -- the cartridge's own "
-                    "far limit is %.0f and the last %.0f are OURS, a registered "
-                    "deviation; under Enhanced the near limit is %.0f, also OURS (start %.0f, "
-                    "%.1f px/cell horizontally at %d wide)\n",
-            N64_DIST_MIN, DIST_MAX_OURS, N64_DIST_MAX, DIST_MAX_EXTRA, DIST_MIN_ENH, g_dist,
-            (float)fbw * 256.0f / (2.0f * g_dist * tanf(cam_fovy_deg() * 0.5f * (float)M_PI / 180.0f)
-                                   * cam_aspect(fbw, fbh)),
-            fbw);
-    fprintf(stderr, "camera: %s (press C in the live window to switch)\n", cam_mode_name());
     if (o->cam) {
         float cx = g_camX, cz = g_camZ;
         if (sscanf(o->cam, "%f,%f", &cx, &cz) == 2) {
@@ -38700,9 +42364,43 @@ int game_boot(SDL_Window* win, const GameOpts* o)
             return 0;
         }
     }
+    camera_startup_zoom(fbw, fbh, g_editOn);
+    fprintf(stderr, "zoom: OLD camera range %.1f .. %.1f px/cell (start %.1f)\n",
+            ZOOM_MIN, ZOOM_MAX, g_zoom);
+    fprintf(stderr, "zoom: N64 camera range %.0f .. %.0f leptons -- the cartridge's own "
+                    "far limit is %.0f and the last %.0f are OURS, a registered "
+                    "deviation; under Enhanced the near limit is %.0f, also OURS (start %.0f, "
+                    "%.1f px/cell horizontally at %d wide)\n",
+            N64_DIST_MIN, DIST_MAX_OURS, N64_DIST_MAX, DIST_MAX_EXTRA, DIST_MIN_ENH, g_dist,
+            (float)fbw * 256.0f / (2.0f * g_dist * tanf(cam_fovy_deg() * 0.5f * (float)M_PI / 180.0f)
+                                   * cam_aspect(fbw, fbh)),
+            fbw);
+    fprintf(stderr, "camera: %s (press C in the live window to switch)\n", cam_mode_name());
+    /* Predictable shader compilation belongs to loading, before the first tactical
+       frame. No simulation, animation sampling or draw is performed here. */
+    /* Red Alert compiles what its 3D scene uses: its trees are 1996 sprites and its ground
+       is drawn without the cliff relief, so those two programs would be work for nothing.
+       The water program is the variant for whichever sea this mission has. */
+    if(g_fx.enabled && (!g_raModule || !g_fx.dos_classic) && mesh_perf_switch("OPENCNC3D_PREWARM")) {
+        const Uint64 start=SDL_GetPerformanceCounter();
+        glPushAttrib(GL_TEXTURE_BIT|GL_ENABLE_BIT|GL_VIEWPORT_BIT);
+        const bool ready=fx_boot();
+        if(ready) {
+            if(g_fx.tree3d && !g_raModule){tree3d_prog();tree3d_nrm_prog();}
+            if(cliff_relief_on() && !g_raModule)cliff_pom_prog();
+            if(g_fx.water_fx)water_prog_get();
+            if(!g_m3.empty()){m3_prog();m3_nrm_prog();}
+            if(g_fx.einf_blood)ir_decal_prog();
+            str_class_prog();
+        }
+        glPopAttrib();
+        printf("PERFWARM|shaders_ms=%.2f|draws=0\n",fprof_now_ms(start,SDL_GetPerformanceCounter()));
+        if(ready)water_textures_prepare();
+    }
     /* The mission is up. Anything that dies from here on is not a mission-start fault, and
        the stage must stop claiming that it is. */
     g_bootStage = "mission running";
+    startupBoot.complete();
     return 1;
 }
 
@@ -38719,6 +42417,7 @@ int game_run_script(SDL_Window* win, const GameOpts* o)
 {
     g_scriptOpts = o;            /* the `remission` verb boots the next mission with these */
     refresh_objects();
+    startup_trace_prepare_loading(true);
     for (int i = 0; i < o->ticks; i++) {
         cheat_tick();
         if (edit_sim_frozen()) { /* the editor's world does not move */ } else
@@ -38775,6 +42474,7 @@ int game_run_shot(SDL_Window* win, const GameOpts* o)
                 refresh_objects();
             }
         }
+        startup_trace_prepare_loading();
         fprintf(stderr, "shot: %d ticks, %zu objects\n", shot_ticks, g_objects.size());
         if (dumpobj)
             for (size_t i = 0; i < g_objects.size(); i++)
@@ -38872,6 +42572,39 @@ int game_run_shot(SDL_Window* win, const GameOpts* o)
  *
  *  It loads dossidebar.pack itself if no mission has been booted yet, which at the main
  *  menu is the normal case. */
+/* OPENCNC3D_MENU_1995=1 keeps the 1995 menus under Enhanced too, the screens Classic and
+   N64 draw. It exists for scripted runs that click those screens by their own rectangles;
+   the Enhanced menu lays the same controllers out differently, and a click aimed at a 1995
+   rectangle lands on nothing there. */
+/* EACH GAME DRAWS ITS OWN ENHANCED KIT. Red Alert is known two ways: g_optRedAlert from the
+   frontend at the title, before any mission (game_set_n64_unavailable), and g_raModule from
+   game_boot once one has started. Either way it gets the Enhanced screens only from Red
+   Alert's own kit (em_set_red_alert), never Tiberian Dawn's; Tiberian Dawn never draws Red
+   Alert's. */
+extern "C" int game_enhanced_menu_enabled(void)
+{
+    static int menu1995 = -1;
+    if (menu1995 < 0) { const char *e = SDL_getenv("OPENCNC3D_MENU_1995"); menu1995 = e && e[0] == '1'; }
+    const bool redAlert = g_raModule || g_optRedAlert;
+    return g_fx.enabled && redAlert == (em_red_alert() != 0) && !menu1995;
+}
+
+/* The menu uses the HUD's existing clips, gain, FX bus and bounded voices. */
+extern "C" void game_enhanced_menu_sound(int click)
+{
+    if (!game_enhanced_menu_enabled()) return;
+    unsigned before = g_ambHudPlays[click ? 1 : 0];
+    ambience_hud_sound(click != 0);
+    if (SDL_getenv("OPENCNC3D_BACKGROUND") && g_ambHudPlays[click ? 1 : 0] != before)
+        fprintf(stderr, "MENU_AUDIO|%s|clip=%s\n", click ? "click" : "hover", g_ambNames[g_ambHudLastClip]);
+}
+
+
+void game_use_red_alert_dials(void)
+{
+    fx_red_alert_dials(1);
+}
+
 void game_visuals_default_enhanced(const char* preset)
 {
     /* A PRESET NAMED ON THE COMMAND LINE WINS. --gfx FILE is an explicit instruction and
@@ -38916,12 +42649,20 @@ void game_visuals_default_enhanced(const char* preset)
 
 /* RED ALERT'S VISUALS AT BOOT. Two modes, Classic and Enhanced, and nothing of N64.
 
-   THE DIALS ARE C&C'S. Every F5 value under Enhanced is the one OpenCNC3D uses: the shipped
-   defaults, then C&C's own saved file (tdPreset) where one sits in the game folder, so the
-   two modules cannot drift apart. From Red Alert's own file (preset) only what is Red
-   Alert's is kept: which of its two modes the player last chose. Display mode,
-   resolution and vsync also use C&C's settings. A file that held N64 starts in Classic, and with no file at all Red
-   Alert starts in Classic, the original 1996 picture.
+   THE DIALS COME IN THREE LAYERS, each over the one before:
+   1. The shared Enhanced visual defaults, plus Red Alert's own HUD/tree/grass feature
+      defaults, already in g_fx.
+   2. C&C's saved file (tdPreset), where one sits in the game folder: every dial its player
+      moved off the shared default can carry to Red Alert, unless Red Alert's own saved
+      file overrides it. A dial C&C's file holds at the shared default is not
+      a choice and is not carried.
+   3. Red Alert's own saved file (preset): everything it holds, as C&C's own file is for
+      C&C, so whatever was saved from the F5 panel in Red Alert comes back on the next
+      start; the layers below only fill what it does not name. The one exception is the
+      window: display mode, resolution and vsync follow C&C's file where there is one, so
+      the two modules open the same window.
+   A file that held N64 starts in Classic. With no saved file, an interactive Red Alert
+   launch starts Enhanced with the shared compiled defaults, like Tiberian Dawn.
 
    Classic keeps Red Alert's own rows whatever C&C's file says: the 1996 art, the original
    sidebar, no filter. Saves go to Red Alert's file, never to C&C's.
@@ -38945,17 +42686,54 @@ void game_visuals_default_ra(const char* preset, const char* tdPreset, int class
     FILE* t = (tdPreset && *tdPreset) ? fopen(tdPreset, "r") : NULL;
     if (t) {
         fclose(t);
-        fx_load(&g_fx, tdPreset);
-        if (fx_mode_rows_loaded == 0) fx_mode_migrate(&g_fx);
+        /* C&C's file read the way C&C reads it, over C&C's defaults, then only what it
+           moved off them is carried, the dials and each mode's own rows, and only where
+           Red Alert's default is C&C's. */
+        FxState td, tdDefault, raDefault;
+        const int ra = g_fxRedAlert;
+        fx_defaults(&raDefault);
+        fx_red_alert_dials(0);
+        fx_defaults(&tdDefault);
+        td = tdDefault;
+        fx_load(&td, tdPreset);
+        if (fx_mode_rows_loaded == 0) fx_mode_migrate(&td);
+        fx_red_alert_dials(ra);
+        int carried = 0;
+        for (const FxParam* p = FX_PARAMS; p->kind != FXP_END; p++) {
+            if (p->kind == FXP_GROUP) continue;
+            if (p->kind == FXP_BOOL) {
+                if (*fx_iptr(&td, p) != *fx_iptr(&tdDefault, p) &&
+                    *fx_iptr(&raDefault, p) == *fx_iptr(&tdDefault, p)) {
+                    *fx_iptr(&g_fx, p) = *fx_iptr(&td, p); carried++;
+                }
+            } else if (*fx_fptr(&td, p) != *fx_fptr(&tdDefault, p) &&
+                       *fx_fptr(&raDefault, p) == *fx_fptr(&tdDefault, p)) {
+                *fx_fptr(&g_fx, p) = *fx_fptr(&td, p); carried++;
+            }
+        }
+        for (int m = 0; m < FX_MODE_COUNT; m++)
+            for (int r = 0; r < FXR_COUNT; r++)
+                if (td.mode_row[m][r] != tdDefault.mode_row[m][r] &&
+                    raDefault.mode_row[m][r] == tdDefault.mode_row[m][r]) {
+                    g_fx.mode_row[m][r] = td.mode_row[m][r]; carried++;
+                }
+        fprintf(stderr, "RA3D|visuals|%d of %s's values moved off C&C's defaults carried\n",
+                carried, tdPreset);
     }
-    if (haveRa && !t) {
-        g_fx.display_mode = ra.display_mode;
-        g_fx.res_w = ra.res_w;
-        g_fx.res_h = ra.res_h;
-        g_fx.vsync = ra.vsync;
+    if (haveRa) {
+        const FxState window = g_fx;
+        fx_load(&g_fx, preset);
+        if (fx_mode_rows_loaded == 0) fx_mode_migrate(&g_fx);
+        if (t) {
+            g_fx.display_mode = window.display_mode;
+            g_fx.res_w = window.res_w;
+            g_fx.res_h = window.res_h;
+            g_fx.vsync = window.vsync;
+        }
     }
     fxp_set_save_path(preset);
-    int mode = haveRa && !classicOnly ? fx_mode_of(&ra) : FX_MODE_CLASSIC;
+    int mode = classicOnly ? FX_MODE_CLASSIC
+             : haveRa ? fx_mode_of(&ra) : FX_MODE_ENHANCED;
     if (mode == FX_MODE_N64) mode = FX_MODE_CLASSIC;
     g_fx.mode_row[FX_MODE_CLASSIC][FXR_TEXSET]   = (float)FX_TEX_DOS;
     g_fx.mode_row[FX_MODE_CLASSIC][FXR_NEWHUD]   = 0.0f;
@@ -38964,8 +42742,8 @@ void game_visuals_default_ra(const char* preset, const char* tdPreset, int class
     g_fx.dos_classic = mode == FX_MODE_CLASSIC ? 1 : 0;
     g_fx.enabled = mode == FX_MODE_ENHANCED ? 1 : 0;
     vis_push_mode();
-    fprintf(stderr, "RA3D|visuals|%s|dials from %s\n", FX_MODE_NAME[mode],
-            t ? tdPreset : "the shipped defaults");
+    fprintf(stderr, "RA3D|visuals|%s|dials from Red Alert's defaults%s%s\n", FX_MODE_NAME[mode],
+            t ? ", C&C's moved values" : "", haveRa ? ", Red Alert's saved file" : "");
 }
 
 int game_display_wanted(const char* preset, int* mode, int* rw, int* rh)
@@ -38973,7 +42751,11 @@ int game_display_wanted(const char* preset, int* mode, int* rw, int* rh)
     FxState t;
     int found = 0;
     fx_defaults(&t);
-    if (preset && *preset) {
+    /* Explicit --gfx / --visualscfg settings were already loaded by the arg pass. */
+    if (g_fxPresetNamed || g_visCfgPath[0]) {
+        t = g_fx;
+        found = g_fxDisplayPresetLoaded ? 1 : 0;
+    } else if (preset && *preset) {
         FILE* f = fopen(preset, "r");
         if (f) {
             fclose(f);
@@ -38989,12 +42771,144 @@ int game_display_wanted(const char* preset, int* mode, int* rw, int* rh)
     return found;
 }
 
+/* THE POINTER OVER A SCREEN OPENED FROM THE TITLE (Settings, Load, a notice): the 1995
+   arrow from the dialog's sidebar pack, the plain arrow locked, the system's hidden.
+   RED ALERT'S POINTER IS IN ITS OWN PACK (ra3d/cursor-*.pack), not in the sidebar pack these
+   screens open with, so from Red Alert's title that load found no MOUSE shape and, the menu
+   having hidden the system's arrow to draw its own, the screen had no pointer at all. The
+   snow set's arrow is Red Alert's arrow. With no art anywhere the system's arrow is shown.
+   True when the 1995 arrow is drawn. */
+static bool cur_dialog_pointer(const char* who)
+{
+    bool ok = g_curShape != NULL;
+    char cerr[256] = "";
+    if (!ok) ok = cur_init(g_dbPack, cerr, sizeof cerr);
+    if (!ok) {
+        FILE* rp = fopen("ra3d/cursor-snow.pack", "rb");
+        if (rp) { fclose(rp); ok = cur_init(NULL, cerr, sizeof cerr, 1); }
+    }
+    if (ok) {
+        SDL_ShowCursor(SDL_DISABLE);
+        cur_lock(MOUSE_NORMAL);   /* 1995 shows the plain arrow over a modal dialog */
+    } else {
+        fprintf(stderr, "%s: %s; falling back to the OS cursor\n", who, cerr);
+        SDL_ShowCursor(SDL_ENABLE);
+    }
+    return ok;
+}
+
+/* ---- THE LANGUAGE ROW (Settings, Gameplay tab) and the movies in a language ----------
+   The menu asks through EM_LangHooks (menu/enhanced_menu.h); language 0 is English, and
+   the rest are this game's packs in the manifest's order (game/lang_mod.h). Choosing one
+   puts its voices on the sound engine at once, its names and briefings from the next
+   screen that reads them, and remembers it in the controls file. */
+static const LangPack* lang_pack_at(int i)
+{
+    lang_parse();
+    for (size_t k = 0; k < g_langPacks.size(); k++)
+        if (g_langPacks[k].game == lang_game() && --i == 0) return &g_langPacks[k];
+    return NULL;
+}
+static int lang_hook_count(void)
+{
+    int n = 1;
+    while (lang_pack_at(n)) n++;
+    return n;
+}
+static const char* lang_hook_name(int i)
+{
+    const LangPack* p = i > 0 ? lang_pack_at(i) : NULL;
+    return p ? p->name.c_str() : "English";
+}
+static int lang_hook_current(void)
+{
+    for (int i = 1; lang_pack_at(i); i++)
+        if (lang_pack_at(i)->code == g_langCode) return i;
+    return 0;
+}
+static int lang_hook_installed(int i)
+{
+    const LangPack* p = i > 0 ? lang_pack_at(i) : NULL;
+    return i == 0 || (p && lang_installed(p->code.c_str(), p->game.c_str()));
+}
+static long long lang_hook_missing(int i)
+{
+    const LangPack* p = i > 0 ? lang_pack_at(i) : NULL;
+    return p ? lang_pack_missing(p->code, p->game) : 0;
+}
+static int lang_hook_choose(int i)
+{
+    const LangPack* p = i > 0 ? lang_pack_at(i) : NULL;
+    if (i > 0 && (!p || !lang_installed(p->code.c_str(), p->game.c_str()))) return 0;
+    snprintf(g_langCode, sizeof g_langCode, "%s", p ? p->code.c_str() : "en");
+    g_langTxtFor.clear();
+    lang_apply_audio();
+    if (g_optCfgPath[0] && !opt_controls_save(g_optCfgPath))
+        fprintf(stderr, "language: cannot write %s; the choice lasts this session only\n", g_optCfgPath);
+    return 1;
+}
+static int lang_hook_download(int i)
+{
+    const LangPack* p = i > 0 ? lang_pack_at(i) : NULL;
+    return p && lang_download(p->code.c_str());
+}
+static int lang_hook_progress(long long* done, long long* total, char* msg, int msglen)
+{
+    return lang_progress(done, total, msg, msglen);
+}
+static void lang_hook_cancel(void) { g_langCancel = 1; }
+static const EM_LangHooks g_langHooks = {
+    lang_hook_count, lang_hook_name, lang_hook_current, lang_hook_installed, lang_hook_missing,
+    lang_hook_choose, lang_hook_download, lang_hook_progress, lang_hook_cancel
+};
+static void lang_install_hooks(void) { em_set_language_hooks(&g_langHooks); }
+
+int game_lang_fetch_cli(const char* spec)
+{
+    /* CODE for Tiberian Dawn's pack, CODE:ra for Red Alert's */
+    char code[8];
+    snprintf(code, sizeof code, "%s", spec);
+    char* colon = strchr(code, ':');
+    if (colon) { *colon = 0; g_raModule = !strcmp(colon + 1, "ra"); }
+    lang_set_root(g_raModule ? "ra3d/audio" : "dosdata");
+    if (!lang_download(code)) {
+        char m[256]; lang_progress(NULL, NULL, m, sizeof m);
+        printf("LANG|fetch|%s|FAILED|%s\n", code, m);
+        return 1;
+    }
+    long long last = -1;
+    for (;;) {
+        long long done = 0, total = 0;
+        char m[256];
+        const int st = lang_progress(&done, &total, m, sizeof m);
+        if (done / 20000000 != last) { last = done / 20000000; printf("LANG|fetch|%s|%lld/%lld\n", code, done, total); }
+        if (st != LANG_RUNNING) {
+            printf("LANG|fetch|%s|%s|%s|installed=%d\n", code, st == LANG_DONE ? "DONE" : "STOPPED", m,
+                   lang_installed(code, lang_game()) ? 1 : 0);
+            return st == LANG_DONE ? 0 : 1;
+        }
+        SDL_Delay(200);
+    }
+}
+
+const char* game_lang_movie(const char* path)
+{
+    static char buf[700];
+    const char* slash = path ? strrchr(path, '/') : NULL;
+    if (!slash || (strncmp(path, "dosdata/movies/", 15) && strncmp(path, "ra3d/movies/", 12))) return path;
+    char name[96];
+    snprintf(name, sizeof name, "movies/%s", slash + 1);
+    return lang_path(name, buf, sizeof buf) ? buf : path;
+}
+
 int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
 {
     if (!win) return 0;
     /* What the dials were on the way in, so the write on the way out can tell an actual
        tuning session from a player who opened the screen and looked at it. */
     const FxState fxOnOpen = g_fx;
+    bool feedback_queued = false;
+    const unsigned hover_before = g_ambHudPlays[0], click_before = g_ambHudPlays[1];
     if (!g_dbPack) {
         char err[256];
         g_dbPack = db_pack_load(dospack && *dospack ? dospack : "dossidebar.pack",
@@ -39028,6 +42942,24 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
         dopt_set_gameplay(&g_optState, &g);
     }
     dopt_bind_gameplay(&g_optState, opt_apply_gameplay);
+    /* AND THE GAME AND SOUND SETTINGS, for the screen's Gameplay and Audio tabs: the block
+       the pause menu's Game Controls carries. Seeded as the pause menu seeds it when no
+       controls file has filled it yet (the defaults, the mixer's own music and sound, the
+       voices at the sound's level), so binding it, which applies it at once, changes
+       nothing the player hears; and its baseline is taken, so the write on the way out
+       happens only if a slider moved. */
+    if (!g_optSeeded) {
+        dopt_settings_init(&g_optState.set);
+        if (g_au) {
+            g_optState.set.music = codex_music_ceiling() * DOPT_VOL_TOP / 255;
+            g_optState.set.sound = cnc_audio_get_sound_volume(g_au) * DOPT_VOL_TOP / 255;
+            g_optState.set.speech = g_optState.set.sound;
+        }
+        g_optSeeded = true;
+    }
+    if (!g_optHaveBaseline) { g_optOnDisk = g_optState.set; g_optHaveBaseline = true; }
+    dopt_bind(&g_optState, NULL, opt_apply_settings);
+    lang_install_hooks();
 
     /* THE LINE THAT MADE THIS BUTTON DEAD FROM THE DAY IT WAS ADDED (cd0240b, 19 Aug
        2026). opt_draw's very first statement is `if (!g_optOpen || !g_dbPack) return;`
@@ -39037,7 +42969,7 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
        ESC closed it, and from the outside the button looked like it did nothing.
        Nothing detected it either -- G42 drives the PAUSE route and asserts only the
        OPTVIS| state, so it cannot fail on this. */
-    g_optOpen = true;
+    g_optOnTitle = true; g_optEnhanced = game_enhanced_menu_enabled() != 0; em_reset(); g_optOpen = true;
 
     /* AND THE POINTER, which is the other half of why it read as dead. cur_init is
        called in exactly one place, game_boot, so on the menu path it has never run: the
@@ -39062,17 +42994,7 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
        reload cannot leak, and the one cur_init per boot / one cur_free per shutdown
        pairing is untouched. */
     {
-        int visCurOk = (g_curShape != NULL);
-        if (!visCurOk) {
-            char cerr[256];
-            visCurOk = cur_init(g_dbPack, cerr, sizeof cerr) ? 1 : 0;
-            if (!visCurOk)
-                fprintf(stderr, "visuals: %s; falling back to the OS cursor\n", cerr);
-        }
-        if (visCurOk) {
-            SDL_ShowCursor(SDL_DISABLE);
-            cur_lock(MOUSE_NORMAL);   /* 1995 shows the plain arrow over a modal dialog */
-        }
+        cur_dialog_pointer("visuals");
     }
     for (;;) {
         int dw = 0, dh = 0, winw = 0, winh = 0;
@@ -39093,6 +43015,7 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
         while (SDL_PollEvent(&e)) {
             int dx, dy, act = DOPT_ACT_NONE;
             if (fs_handle_event(&e)) continue;
+            if (g_optEnhanced) em_sound_event(&e, win);
             /* Both early exits clear the flag. Leaving it true would put the mission's
                own draw path into its dialog-open branch on the next boot. */
             if (e.type == SDL_QUIT) { g_optOpen = false; cur_unlock(); return 1; }
@@ -39109,16 +43032,16 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
                 case SDLK_KP_ENTER: k = DOPT_KEY_ENTER; break;
                 default: break;
                 }
-                if (k) act = dopt_key(&g_optState, k);
+                if (k) act = em_opt_key(&g_optState, k);
             } else if (e.type == SDL_MOUSEMOTION) {
-                opt_to_dos(mx, my, &dx, &dy);
-                dopt_motion(&g_optState, dx, dy);
+                opt_to_dos(e.motion.x*dw/(winw?winw:1), e.motion.y*dh/(winh?winh:1), &dx, &dy);
+                em_opt_motion(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-                opt_to_dos(mx, my, &dx, &dy);
-                act = dopt_press(&g_optState, dx, dy);
+                opt_to_dos(e.button.x*dw/(winw?winw:1), e.button.y*dh/(winh?winh:1), &dx, &dy);
+                act = em_opt_press(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
-                opt_to_dos(mx, my, &dx, &dy);
-                act = dopt_release(&g_optState, dx, dy);
+                opt_to_dos(e.button.x*dw/(winw?winw:1), e.button.y*dh/(winh?winh:1), &dx, &dy);
+                act = em_opt_release(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEWHEEL) {
                 /* THE WHEEL OVER A DIALOG LIST, and it is new here in the sense that it
                    has never worked at all: dopt_scroll shipped with the jukebox and no
@@ -39126,7 +43049,7 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
                    track list either. Positive delta scrolls DOWN, so the natural
                    direction is the negated wheel, which is the same expression the menu
                    shell's two lists use. */
-                dopt_scroll(&g_optState, -e.wheel.y);
+                opt_scroll(-e.wheel.y);
             }
             /* OK on the Visuals page reports RESUME, which here means "close me". */
             if (act == DOPT_ACT_RESUME) done = 1;
@@ -39149,6 +43072,24 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
            the ordinary close path below, so the no-write-unless-moved rule is exercised
            rather than bypassed. */
         if (shot) {
+            /* Hidden regression: actual Settings event loop, an inert Display tab.
+               Repeated motion and release must not duplicate feedback or write CFG. */
+            if (g_optEnhanced && fs_background_only() && SDL_getenv("OPENCNC3D_MENU_FEEDBACK_GATE")) {
+                if (!feedback_queued) {
+                    int x,y,w,h; if (!em_item_rect(-1,&x,&y,&w,&h)) return 1;
+                    SDL_Event probe = {}; probe.type = SDL_MOUSEMOTION;
+                    probe.motion.x = (x+w/2)*winw/dw; probe.motion.y = (y+h/2)*winh/dh;
+                    SDL_PushEvent(&probe); SDL_PushEvent(&probe);
+                    probe.type = SDL_MOUSEBUTTONDOWN; probe.button.button = SDL_BUTTON_LEFT;
+                    SDL_PushEvent(&probe); probe.type = SDL_MOUSEBUTTONUP; SDL_PushEvent(&probe);
+                    feedback_queued = true; continue;
+                }
+                if (g_ambHudPlays[0] != hover_before+1 || g_ambHudPlays[1] != click_before+1 ||
+                    memcmp(&fxOnOpen,&g_fx,sizeof g_fx) != 0) {
+                    fprintf(stderr,"ENMENU|settings-feedback|FAIL\n"); return 1;
+                }
+                fprintf(stderr,"ENMENU|settings-feedback|hover=1|click=1|release/duplicate-motion=0|CFG=unchanged\n");
+            }
             if (*shot) game_grab_png(shot, dw, dh);
             break;                       /* "" means one frame and no file: see cnc_game.h */
         }
@@ -39166,6 +43107,8 @@ int game_visuals_open(SDL_Window* win, const char* dospack, const char* shot)
        overwritten by their own accidental snapshot. the project owner had one, which is why the
        tuned picture could not have reached him through a new default either.
        FxState is int and float throughout with no padding, so memcmp is exact. */
+    /* the game and sound settings, remembered the way the pause menu's are */
+    opt_controls_sync();
     if (memcmp(&fxOnOpen, &g_fx, sizeof g_fx) != 0)
         fx_save(&g_fx, g_fxpSavePath);
         /* AND THE PER-FRAME SYNC IS TOLD. Without this its baseline is still the state
@@ -39200,20 +43143,10 @@ int game_load_menu_open(SDL_Window* win, const char* dospack, const char* shot)
     g_optState.version = "OpenCNC3D";
     printf("LOADMENU|open|rows=%d\n", g_optState.sl.nrows);
     fflush(stdout);
-    g_optOpen = true;
+    g_optOnTitle = true; g_optEnhanced = game_enhanced_menu_enabled() != 0; em_reset(); g_optOpen = true;
     {
         /* Same pointer arrangement as the Visuals screen, same reasons. */
-        int curOk = (g_curShape != NULL);
-        if (!curOk) {
-            char cerr[256];
-            curOk = cur_init(g_dbPack, cerr, sizeof cerr) ? 1 : 0;
-            if (!curOk)
-                fprintf(stderr, "load: %s; falling back to the OS cursor\n", cerr);
-        }
-        if (curOk) {
-            SDL_ShowCursor(SDL_DISABLE);
-            cur_lock(MOUSE_NORMAL);
-        }
+        cur_dialog_pointer("load");
     }
     for (;;) {
         int dw = 0, dh = 0, winw = 0, winh = 0;
@@ -39232,6 +43165,7 @@ int game_load_menu_open(SDL_Window* win, const char* dospack, const char* shot)
         while (SDL_PollEvent(&e)) {
             int dx, dy, act = DOPT_ACT_NONE;
             if (fs_handle_event(&e)) continue;
+            if (g_optEnhanced) em_sound_event(&e, win);
             if (e.type == SDL_QUIT) { g_optOpen = false; cur_unlock(); return -2; }
             opt_layout(dw, dh);
             if (e.type == SDL_KEYDOWN) {
@@ -39246,18 +43180,18 @@ int game_load_menu_open(SDL_Window* win, const char* dospack, const char* shot)
                 case SDLK_KP_ENTER: k = DOPT_KEY_ENTER; break;
                 default: break;
                 }
-                if (k) act = dopt_key(&g_optState, k);
+                if (k) act = em_opt_key(&g_optState, k);
             } else if (e.type == SDL_MOUSEMOTION) {
-                opt_to_dos(mx, my, &dx, &dy);
-                dopt_motion(&g_optState, dx, dy);
+                opt_to_dos(e.motion.x*dw/(winw?winw:1), e.motion.y*dh/(winh?winh:1), &dx, &dy);
+                em_opt_motion(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-                opt_to_dos(mx, my, &dx, &dy);
-                act = dopt_press(&g_optState, dx, dy);
+                opt_to_dos(e.button.x*dw/(winw?winw:1), e.button.y*dh/(winh?winh:1), &dx, &dy);
+                act = em_opt_press(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
-                opt_to_dos(mx, my, &dx, &dy);
-                act = dopt_release(&g_optState, dx, dy);
+                opt_to_dos(e.button.x*dw/(winw?winw:1), e.button.y*dh/(winh?winh:1), &dx, &dy);
+                act = em_opt_release(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEWHEEL) {
-                dopt_scroll(&g_optState, -e.wheel.y);
+                opt_scroll(-e.wheel.y);
             }
             if (act == DOPT_ACT_RESUME) { result = -1; done = 1; }   /* Cancel: close me */
             if (act == DOPT_ACT_LOAD)   { result = dopt_slot_pick(&g_optState); done = 1; }
@@ -39325,19 +43259,9 @@ int game_notice_open(SDL_Window* win, const char* dospack, const char* caption,
                text ? text : "");
         fflush(stdout);
     }
-    g_optOpen = true;
+    g_optOnTitle = true; g_optEnhanced = game_enhanced_menu_enabled() != 0; em_reset(); g_optOpen = true;
     {
-        int curOk = (g_curShape != NULL);
-        if (!curOk) {
-            char cerr[256];
-            curOk = cur_init(g_dbPack, cerr, sizeof cerr) ? 1 : 0;
-            if (!curOk)
-                fprintf(stderr, "notice: %s; falling back to the OS cursor\n", cerr);
-        }
-        if (curOk) {
-            SDL_ShowCursor(SDL_DISABLE);
-            cur_lock(MOUSE_NORMAL);
-        }
+        cur_dialog_pointer("notice");
     }
     for (;;) {
         int dw = 0, dh = 0, winw = 0, winh = 0;
@@ -39356,6 +43280,7 @@ int game_notice_open(SDL_Window* win, const char* dospack, const char* caption,
         while (SDL_PollEvent(&e)) {
             int dx, dy, act = DOPT_ACT_NONE;
             if (fs_handle_event(&e)) continue;
+            if (g_optEnhanced) em_sound_event(&e, win);
             if (e.type == SDL_QUIT) { g_optOpen = false; cur_unlock(); return -2; }
             opt_layout(dw, dh);
             if (e.type == SDL_KEYDOWN) {
@@ -39366,16 +43291,16 @@ int game_notice_open(SDL_Window* win, const char* dospack, const char* caption,
                 case SDLK_KP_ENTER: k = DOPT_KEY_ENTER; break;
                 default: break;
                 }
-                if (k) act = dopt_key(&g_optState, k);
+                if (k) act = em_opt_key(&g_optState, k);
             } else if (e.type == SDL_MOUSEMOTION) {
-                opt_to_dos(mx, my, &dx, &dy);
-                dopt_motion(&g_optState, dx, dy);
+                opt_to_dos(e.motion.x*dw/(winw?winw:1), e.motion.y*dh/(winh?winh:1), &dx, &dy);
+                em_opt_motion(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-                opt_to_dos(mx, my, &dx, &dy);
-                act = dopt_press(&g_optState, dx, dy);
+                opt_to_dos(e.button.x*dw/(winw?winw:1), e.button.y*dh/(winh?winh:1), &dx, &dy);
+                act = em_opt_press(&g_optState, dx, dy);
             } else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
-                opt_to_dos(mx, my, &dx, &dy);
-                act = dopt_release(&g_optState, dx, dy);
+                opt_to_dos(e.button.x*dw/(winw?winw:1), e.button.y*dh/(winh?winh:1), &dx, &dy);
+                act = em_opt_release(&g_optState, dx, dy);
             }
             if (act == DOPT_ACT_RESUME) { result = 0; done = 1; }
             if (act == DOPT_ACT_EXIT)   { g_optOpen = false; cur_unlock(); return -2; }
@@ -39610,24 +43535,19 @@ int game_loop(SDL_Window* win, const GameOpts* o)
     /* CLEARED PER MISSION, so a debrief can never print the previous match's reason. */
     g_netFailWhy[0] = '\0';
 
-    /* Kept at 1. --vsync exists because a swap interval that is silently not honoured
-       cost a long investigation once, and GL_SWAP makes it visible.
-
-       THE MEASUREMENT BEHIND IT, carried over from the windows-vsync branch when the two
-       accounts of this code were merged: on the project owner's Windows box, 20 Aug 2026, an RTX 3080
-       on a 4K 60 Hz panel, a swap interval of 1 gives 29 to 44 fps with huge run-to-run
-       variance, and that variance IS the judder. At 0 the same build runs at 632 fps, so
-       the renderer needs about 1.6 ms a frame and the GPU is idle: the cost is entirely
-       in the present, not in the drawing, and neither the resolution nor disabling any
-       draw pass moves it. The default stays 1, so nothing about the Mac build or the
-       Win98 target changes; -1 asks for adaptive and falls back to 1 if the driver
-       refuses. Root cause still open, see known-gap notes. */
+    /* Apply the selected interval, retaining the user's policy. The August Windows
+       slowdown once attributed to presentation was resolved by buffered brain dumps
+       (capture_brain_call); it is not evidence that v0.8.4 is present-bound. The actual
+       row default is off, with on/adaptive available. Trace requested/returned values
+       and CPU/GPU/driver/present intervals before attributing new reports. */
     {
         /* the F5 row (vsync: 0 off, 1 on, 2 adaptive) unless --vsync named one */
         int want = g_vsyncCLI ? g_vsyncMode : vsync_from_row();
         if (SDL_GL_SetSwapInterval(want) != 0 && want == -1) SDL_GL_SetSwapInterval(1);
         g_vsyncApplied = want;
-        fprintf(stderr, "GL_SWAP     = requested %d, got %d\n", want, SDL_GL_GetSwapInterval());
+        const int got=SDL_GL_GetSwapInterval();
+        perf_trace_swap_state(want,got);
+        fprintf(stderr, "GL_SWAP     = requested %d, got %d\n", want, got);
     }
     /* THE GAME SPEED SLIDER, which until v0.6.0 moved and did nothing. It is
        OptionsClass::GameSpeed, 0..6, and the engine's own clock is the only thing it can
@@ -39652,6 +43572,12 @@ int game_loop(SDL_Window* win, const GameOpts* o)
     const double TICK_HZ = 15.0;                 /* the anchor; see SPEED_HZ above */
     const double TICK_MS = 1000.0 / TICK_HZ;
     (void)TICK_MS;
+    perf_trace_refresh_objects();
+    int prepareWidth = fbw0, prepareHeight = fbh0;
+    SDL_GL_GetDrawableSize(win, &prepareWidth, &prepareHeight);
+    startup_trace_prepare_required(prepareWidth, prepareHeight);
+    startup_trace_prepare_loading();
+    perf_trace_begin_session(win);
     double start_ms = (double)SDL_GetTicks();
     double next_tick = start_ms;
     /* The editor boots into a stopped world on purpose: the mission is loaded and the
@@ -39686,8 +43612,6 @@ int game_loop(SDL_Window* win, const GameOpts* o)
     float ap_destC = 0.0f, ap_destR = 0.0f;
     float ap_b0C = 0.0f, ap_b0R = 0.0f, ap_b1C = 0.0f, ap_b1R = 0.0f;
     int   ap_unitId = -1, ap_destX = -1, ap_destY = -1;
-
-    refresh_objects();
 
     /* The window is the SDL surface; the drawable can be twice that on a Retina display,
        and every screen coordinate in the camera and picking code is in DRAWABLE pixels.
@@ -39724,7 +43648,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
     {
         int winw0 = fbw0, winh0 = fbh0;
         SDL_GetWindowSize(win, &winw0, &winh0);
-        SDL_WarpMouseInWindow(win, winw0 / 2, winh0 / 2);
+        if (!fs_background_only()) SDL_WarpMouseInWindow(win, winw0 / 2, winh0 / 2);
         warpPending = true;
         mouseC = fbw0 / 2;
         mouseR = fbh0 / 2;
@@ -39733,6 +43657,9 @@ int game_loop(SDL_Window* win, const GameOpts* o)
     }
 
     while (running) {
+        startup_trace_frame_begin();
+        perf_trace_begin_frame(tick_count);
+        destruction_trace_frame_begin();
         int dw = fbw0, dh = fbh0;
         SDL_GL_GetDrawableSize(win, &dw, &dh);
         int winw = fbw0, winh = fbh0;
@@ -40136,9 +44063,16 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                and its release were pushed into the queue as one burst, and an assertion
                made between two of them read state from before the burst. Frames are the
                only clock that cannot do that. AP_EVERY frames is about 0.2s at 60 fps,
-               which also gives the 15 Hz sim a tick or two between an act and its check. */
+               which also gives the 15 Hz sim a tick or two between an act and its check.
+               AND TWO ENGINE TICKS SINCE THE LAST STEP, because "12 frames is 0.2s" holds
+               only at 60 fps. With vertical sync off a hidden window runs hundreds of
+               frames a second, 12 of them pass inside one engine tick, and a check made
+               that soon reads the selection from before the engine took the order: the
+               move went out and the NavCom check still failed. Still one step per frame. */
             const int AP_EVERY = 12;
-            if (frame_count >= 24 && (frame_count % AP_EVERY) == 0) {
+            static int ap_lastTick = -1000;
+            if (frame_count >= 24 && (frame_count % AP_EVERY) == 0 && g_simTicks - ap_lastTick >= 2) {
+                ap_lastTick = g_simTicks;
                 const int s = autoplay_step++;
                 /* The pixels are computed ONCE, at the first step, and cached. Recomputing
                    them per step looks tidier and is wrong: the synthetic pointer parks at
@@ -40533,6 +44467,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                so the left button goes through sb_click first and the page takes what is
                left. See the left-button branch below. */
             if (g_cxOpen) {
+                if (game_enhanced_menu_enabled()) em_sound_event(&e, win);
                 /* NO !e.key.repeat HERE. codex_key answers true for every key, which is
                    the whole point of a modal page; letting auto-repeat through means a
                    HELD hotkey still reaches the game's own handlers while the page is
@@ -40668,6 +44603,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                and it is also what stops a click meant for a slider from ordering an
                attack on whatever is underneath it. */
             else if (g_optOpen) {
+                if (g_optEnhanced) em_sound_event(&e, win);
                 int act = DOPT_ACT_NONE, dx, dy;
                 if (e.type == SDL_KEYDOWN) {
                     int k = 0;
@@ -40682,7 +44618,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     case SDLK_BACKSPACE: k = DOPT_KEY_BACKSPACE; break;
                     default: break;
                     }
-                    if (k) act = dopt_key(&g_optState, k);
+                    if (k) act = em_opt_key(&g_optState, k);
                 } else if (e.type == SDL_TEXTINPUT) {
                     /* The save dialog's description field. Every other page ignores
                        typing, and dopt_text knows which page it is on. */
@@ -40696,23 +44632,23 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                        IS the game cursor now, drawn from g_mouseScrC/R */
                     g_mouseScrC = (float)mouseC;
                     g_mouseScrR = (float)mouseR;
-                    act = dopt_motion(&g_optState, dx, dy);
+                    act = em_opt_motion(&g_optState, dx, dy);
                 } else if (e.type == SDL_MOUSEBUTTONDOWN &&
                            e.button.button == SDL_BUTTON_LEFT) {
                     opt_to_dos((int)(e.button.x * mscaleX), (int)(e.button.y * mscaleY),
                                &dx, &dy);
-                    act = dopt_press(&g_optState, dx, dy);
+                    act = em_opt_press(&g_optState, dx, dy);
                 } else if (e.type == SDL_MOUSEBUTTONUP &&
                            e.button.button == SDL_BUTTON_LEFT) {
                     opt_to_dos((int)(e.button.x * mscaleX), (int)(e.button.y * mscaleY),
                                &dx, &dy);
-                    act = dopt_release(&g_optState, dx, dy);
+                    act = em_opt_release(&g_optState, dx, dy);
                 } else if (e.type == SDL_MOUSEWHEEL) {
                     /* The wheel over the Advanced column or the jukebox list. It needs no
                        pointer position: dopt_scroll moves whichever page is showing, and
                        while this dialog is up it owns every event anyway, so there is
                        nothing else on screen the wheel could have been meant for. */
-                    dopt_scroll(&g_optState, -e.wheel.y);
+                    opt_scroll(-e.wheel.y);
                 }
 
                 /* The pointer override goes down with the dialog, on every door out of
@@ -41182,8 +45118,8 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     if (!sim_over) {
                         cheat_tick();
                         if (edit_sim_frozen()) { /* the editor's world does not move */ } else
-                        if (brain_advance(0)) {
-                            g_simTicks++; tick_count++; refresh_objects();
+                        if (perf_trace_brain_advance()) {
+                            g_simTicks++; tick_count++; perf_trace_refresh_objects();
                         }
                     }
                     break;
@@ -42486,6 +46422,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
             }
         }
 
+        perf_trace_events_end();
         double now = (double)SDL_GetTicks();
         float dt = (float)(now - last_ms) / 1000.0f;
         last_ms = now;
@@ -42648,6 +46585,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                at mission start exists to prevent. The next move INSIDE the viewport arms
                it again, and that is where the hand has to go anyway. */
             edgeArmed = false;
+            perf_trace_cancel_frame();
             continue;
         }
 
@@ -42665,6 +46603,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
            a match runs while you think about it. The campaign is untouched, so the pause
            gate's whole question -- did the world advance while the dialog was up -- is
            still asked and still answered the same way there. */
+        perf_trace_tick_begin();
         const bool holds_world = !nm_active()
                               && (paused || g_optOpen || codex_holds_the_world());
         if (!holds_world && !sim_over) {
@@ -42781,7 +46720,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                    to be kept in step. */
                 cheat_tick();
                 if (edit_sim_frozen()) { /* the editor's world does not move */ } else
-                if (!brain_advance(0)) {
+                if (!perf_trace_brain_advance()) {
                     /* CNC_Advance_Instance returns false for TWO completely different
                        reasons and the difference is the whole mission-end feature.
                        After a real verdict it fires On_Game_Over and then returns
@@ -42863,7 +46802,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                         next_tick = now;
                         gameover_ms = (double)SDL_GetTicks();
                         gameover_frame = frame_count;
-                        refresh_objects();
+                        perf_trace_refresh_objects();
                         break;
                     }
                 }
@@ -42874,13 +46813,13 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                                     "mission\n", tick_count);
                     running = false;
                     exit_reason = GAME_EXIT_MENU;
-                    refresh_objects();
+                    perf_trace_refresh_objects();
                     break;
                 }
                 /* Once per tick, not once per catch-up burst: the walk cycle steps per
                    engine tick, so a burst of 5 ticks with one dump would show one stage
                    of animation for five ticks of travel. */
-                refresh_objects();
+                perf_trace_refresh_objects();
             }
             /* The selection is the engine's, not ours: re-read it after time has passed
                so a unit that died, or that the engine dropped, loses its bracket. */
@@ -42889,6 +46828,8 @@ int game_loop(SDL_Window* win, const GameOpts* o)
         } else {
             next_tick = now;
         }
+
+        perf_trace_tick_end();
 
         /* Once per frame, not per motion event: the probe cache inside makes the
            common case (same cell, same selection, same tick) free, and a world that
@@ -42922,8 +46863,12 @@ int game_loop(SDL_Window* win, const GameOpts* o)
             g_smoothMove = 0;    /* a paused world holds still at the engine's own truth */
         }
 
+        ebld_prepare_idle(paused);
         fprof_mark("events + tick + refresh");
+        startup_trace_draw_begin();
+        perf_trace_draw_begin();
         draw_frame(dw, dh);
+        perf_trace_draw_end();
         /* The editor's overlays go over the world and under the dialog, which is where
            the sidebar's own placement cursor sits too. */
         if (g_editOn) {
@@ -42958,12 +46903,20 @@ int game_loop(SDL_Window* win, const GameOpts* o)
             const int want = vsync_from_row();
             if (SDL_GL_SetSwapInterval(want) != 0 && want == -1) SDL_GL_SetSwapInterval(1);
             g_vsyncApplied = want;
-            fprintf(stderr, "GL_SWAP     = requested %d, got %d (F5)\n", want, SDL_GL_GetSwapInterval());
+            const int got=SDL_GL_GetSwapInterval();
+            perf_trace_swap_state(want,got);
+            fprintf(stderr, "GL_SWAP     = requested %d, got %d (F5)\n", want, got);
         }
         fprof_mark("editor + options");
+        startup_trace_swap_begin();
+        perf_trace_swap_begin();
         SDL_GL_SwapWindow(win);
+        startup_trace_swap_end();
+        perf_trace_swap_end();
         fprof_mark("swap");
         fprof_end();
+        perf_trace_end_frame(win,dw,dh,tick_count,paused,g_optOpen,holds_world,g_objects.size());
+        startup_trace_frame_completed(win, g_objects.size(), g_engineFrame, g_simTicks, dw, dh);
         frame_count++;
 
         /* --run is a harness bound, not a player. It must not be able to cut the
@@ -43002,6 +46955,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
 
     /* An autoplay failure has to reach the shell, or the run is just a story. */
     if (g_autoplayFails || g_edgePlayFails) exit_reason = GAME_EXIT_ERROR;
+    perf_trace_end_session();
     return exit_reason;
 }
 
@@ -43020,6 +46974,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
  * ---------------------------------------------------------------------------------- */
 void game_shutdown(void)
 {
+    startup_trace_shutdown();
     /* THE TABLE THE MATCH ENDS ON, taken FIRST, before anything below is pulled down.
        The screen that draws it runs in the shell after this function returns, by which
        time the engine is gone; this is the last moment those numbers exist. Here rather
@@ -43045,6 +47000,7 @@ void game_shutdown(void)
        had already finished. The report this mechanism exists for covers mission two
        onward as well, and there the old answer was simply wrong. */
     g_bootStage = "game_shutdown (tearing the mission down)";
+    livery_reset();
 
     /* TIER 2. The chain's own framebuffers, textures and programs go back with
        everything else a mission allocated. It is legal to call this with the chain
@@ -43052,7 +47008,8 @@ void game_shutdown(void)
        because boot -> loop -> shutdown repeats on one window and a tuning session
        that lost its values every time the player returned to the menu would be
        useless. */
-    mesh_batch_clear();
+    mesh_batch_clear();g_terrainShadowKey.clear();
+    mesh_wind_unique_clear();
     fx_shutdown();
 
     /* Hand the score back. The mission owned the playlist; the menu owns MAP1 and
@@ -43084,7 +47041,10 @@ void game_shutdown(void)
     sb_free();
     dos2d_free();
     ra3d_free();          /* Red Alert's 3D ground and its strips (ra3d_terrain.h) */
+    rm_inf_close();
+    new_sprites_close();
     dosinf_free();
+    n64inf_free();
     dosmake_free();
     g_makeLastFrame.clear();
     /* A light must not survive the mission that lit it: g_engineFrame restarts, so a
@@ -43098,6 +47058,7 @@ void game_shutdown(void)
     doscrate_free();
     smudge_free();
     bibenh_free();
+    decalenh_free();
     /* THE GRASS BELONGS TO THE MISSION. g_grassTile holds byte offsets into a buffer name
        the next mission will reuse, and the ground colour texture was read back off THIS
        pack's atlas. Freed before pack_free for the same reason the shatter cache is: the
@@ -43106,7 +47067,10 @@ void game_shutdown(void)
     grass_crush_free();
     /* The ground's static buffers: their key would rebuild them on the next map anyway,
        but the names belong to this mission's context like every other buffer here. */
+    terrain_surface_free();
     ground_static_free();
+    tcache_free();
+    clear_blend_free();
     /* The ground tracks hold no pack index, but they do hold a texture, and a texture
        name outliving the context that made it is how a later mission draws somebody
        else's art. */
@@ -43117,15 +47081,20 @@ void game_shutdown(void)
        it the patches. tree3d_free had existed all along with no caller. The authored models and
        the Unity explosion are NOT here on purpose: their loaders run once per process and
        keep their textures for every later mission. */
-    tree3d_gpu_release(g_tree3dModel);
-    tree3d_free();
     foliage3d_free();
     sky3d_free();
     mottle_free();
-    foliage3d_free();
     shroud_free();
     pack_free(g_pack);
 
+    gpu_prof_reset();
+    /* Authored models and their appended torn-cap geometry live for the process.
+       Preserve the matching rig indices while retiring mission physics. */
+    g_m3Corpses.clear(); infdeath_reset(false);
+    if(g_tibGpuReset) g_tibGpuReset();
+    g_wallPrevCells.clear();g_wallPrevValid=false;
+    g_orderQ.clear();
+    g_muzzleGeom.clear(); g_cartDimw.clear(); g_cartZoff.clear();
     g_objects.clear();
     g_riders.clear();
     g_cargoLinks.clear();
@@ -43151,6 +47120,7 @@ void game_shutdown(void)
        new processes and the host had not. Only the editor and a slot load cleared these. */
     feed_reset();
 
+    harvestfx_reset();
     g_engineFrame = -1;
     g_tickAlpha = 0.0f;
     g_smoothMove = 0;
@@ -43208,6 +47178,7 @@ void game_shutdown(void)
     g_viewValid = false;
     g_mouseScrC = g_mouseScrR = -1.0f;
     g_nFallback = g_nMesh = g_nSprite = g_nInvisible = g_nComposed = 0;
+    g_nClumpModel = 0;
     g_nNoCartType = g_nVShadow = 0;
     g_autoplayFails = 0;
     g_scriptFails = 0;
@@ -43233,6 +47204,8 @@ int main(int argc, char** argv)
     memset(&o, 0, sizeof(o));
     const int prc = game_parse_args(argc, argv, &o);
     if (prc) return prc;
+    if (getenv("OPENCNC3D_PREPARED_PICK_RAY"))
+        printf("SCREENRAY|prepared=%d\n", mesh_perf_switch("OPENCNC3D_PREPARED_PICK_RAY") ? 1 : 0);
 
     /* --audiodevicetest ASKS FOR A REAL DEVICE on a run nobody is listening to, so it will
        not do so without being told which driver to ask. The test it exists for names a
@@ -43550,6 +47523,7 @@ int main(int argc, char** argv)
     SDL_Window* win = SDL_CreateWindow("OpenCNC3D eyes", SDL_WINDOWPOS_CENTERED,
                                        SDL_WINDOWPOS_CENTERED, o.w, o.h, flags);
     if (!win) { fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError()); return 1; }
+    fs_set_change_handler(win, game_display_changed);
     SDL_GLContext ctx = SDL_GL_CreateContext(win);
     if (!ctx) { fprintf(stderr, "SDL_GL_CreateContext: %s\n", SDL_GetError()); return 1; }
     SDL_GL_MakeCurrent(win, ctx);

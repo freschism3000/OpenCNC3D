@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Restricts AI targeting/navigation to observed enemies and gives normal sale refunds and public target scores.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -12,6 +13,15 @@
 // distributed with this program. You should have received a copy of the
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
+//
+// MODIFIED for OpenCNC3D in October 2026. This is not EA's original file.
+// Fire_At hands a copy of each shot (firer, weapon, barrel, projectile) to
+// OpenCNC3D_Note_Fire for the renderer, as the Tiberian Dawn brain's Fire_At does.
+// That copy is read by nothing in the game.
+// It does not change the game simulation.
+// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
+// and NOTICE.md lists every modified file.
+//
 
 /* $Header: /CounterStrike/TECHNO.CPP 5     3/17/97 1:28a Steve_tall $ */
 /***********************************************************************************************
@@ -131,7 +141,11 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 #include "utracker.h"
+
+/* OpenCNC3D: the renderer's shot record, kept by the object dump (dllinterface.cpp). */
+void OpenCNC3D_Note_Fire(TechnoClass* firer, int which, BulletClass* bullet, int second, COORDINATE fire);
 
 /***************************************************************************
 **	Cloaking control values.
@@ -766,7 +780,7 @@ bool TechnoClass::Revealed(HouseClass* house)
         return false;
     }
 
-    if (house->IsHuman == false) {
+    if (house->IsHuman == false && !FairAI_RA_Enabled(house)) {
         if (IsDiscoveredByComputer) {
             return false;
         }
@@ -827,7 +841,7 @@ bool TechnoClass::Revealed(HouseClass* house)
 
         } else {
 
-            if (house->IsHuman) {
+            if (house->IsHuman || FairAI_RA_Enabled(house)) {
                 Set_Discovered_By_Player(house);
             }
 
@@ -1563,6 +1577,11 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
 
     BStart(BENCH_EVAL_OBJECT);
 
+    if (FairAI_RA_Enabled(House) && !House->Is_Ally(object) && !FairAI_RA_Observed(House, object)) {
+        BEnd(BENCH_EVAL_OBJECT);
+        return false;
+    }
+
     /*
     **	An object in limbo can never be a valid target.
     */
@@ -1765,8 +1784,8 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
         **	target value then record this target for possible return as the
         **	best.
         */
-        int rawval = object->Value();
-        value = rawval + object->Crew.Kills;
+        int rawval = FairAI_RA_Enabled(House) ? object->Risk() + tclass->Reward : object->Value();
+        value = rawval + (FairAI_RA_Enabled(House) ? 0 : object->Crew.Kills);
 
         /*
         **	If the candidate object is owned by the designated enemy of this house, then
@@ -1782,7 +1801,7 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
         **	If the object is outside of the protective umbrella of the enemy base, then give it
         **	a target boost value.
         */
-        if (object->House->Which_Zone(object) == ZONE_NONE) {
+        if (!FairAI_RA_Enabled(House) && object->House->Which_Zone(object) == ZONE_NONE) {
             value *= 2;
         }
 
@@ -1996,6 +2015,10 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
     int TechnoClass::Evaluate_Just_Cell(CELL cell) const
     {
         BStart(BENCH_EVAL_WALL);
+        if (FairAI_RA_Enabled(House) && !Map[cell].Is_Mapped(House)) {
+            BEnd(BENCH_EVAL_WALL);
+            return 0;
+        }
 
         /*
         **	Ships don't scan for walls.
@@ -2491,6 +2514,20 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
     void TechnoClass::AI(void)
     {
         assert(IsActive);
+        if (FairAI_RA_Enabled(House)) {
+            TechnoClass* enemy=As_Techno(TarCom);
+            if (enemy && !House->Is_Ally(enemy) && !FairAI_RA_Observed(House,enemy)) Assign_Target(TARGET_NONE);
+            enemy=As_Techno(SuspendedTarCom);
+            if (enemy && !House->Is_Ally(enemy) && !FairAI_RA_Observed(House,enemy)) SuspendedTarCom=TARGET_NONE;
+            if (Is_Foot()) {
+                FootClass* foot=(FootClass*)this;
+                TARGET* refs[]={&foot->NavCom,&foot->SuspendedNavCom,&foot->ArchiveTarget};
+                for (unsigned i=0;i<sizeof(refs)/sizeof(refs[0]);++i) {
+                    enemy=As_Techno(*refs[i]);
+                    if (enemy && !House->Is_Ally(enemy) && !FairAI_RA_Observed(House,enemy)) *refs[i]=TARGET_NONE;
+                }
+            }
+        }
 
         /*
         **	Handle recoil recovery here.
@@ -2542,6 +2579,10 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
         **	If for some strange reason, the computer is firing upon itself, then
         **	tell it not to.
         */
+        if (FairAI_RA_Enabled(House) && As_Techno(TarCom) && !FairAI_RA_Observed(House, As_Techno(TarCom))) {
+            Assign_Target(TARGET_NONE);
+        }
+
         if (!House->IsHuman && As_Techno(TarCom) && As_Techno(TarCom)->House->Is_Ally(this) && Combat_Damage() >= 0) {
             //#ifdef FIXIT_CSII	//	checked - ajw 9/28/98 (commented out)
             // if(What_Am_I() == RTTI_INFANTRY && *(InfantryClass *)this==INFANTRY_GENERAL && Session.Type==GAME_NORMAL
@@ -2864,6 +2905,8 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
         }
 
         ObjectClass* object = As_Object(target);
+        if (FairAI_RA_Enabled(House) && object && object->Is_Techno() && !House->Is_Ally(object)
+            && !FairAI_RA_Observed(House,(TechnoClass*)object)) return FIRE_CANT;
 
         /*
         **	If an enemy object is completely cloaked, then you can't fire on it.
@@ -3003,6 +3046,10 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
     void TechnoClass::Assign_Target(TARGET target)
     {
         assert(IsActive);
+        if (FairAI_RA_Enabled(House)) {
+            TechnoClass* enemy=As_Techno(target);
+            if (enemy && !House->Is_Ally(enemy) && !FairAI_RA_Observed(House,enemy)) target=TARGET_NONE;
+        }
 
         if (target == TarCom)
             return;
@@ -3325,6 +3372,12 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
             }
 
             if (bullet->Unlimbo(fire_coord, dir)) {
+                /*
+                **	OpenCNC3D: the renderer's shot record (muzzle flash, projectile in
+                **	flight). A copy, read by nothing in the game; IsSecondShot is the value
+                **	BEFORE it flips below, so it names the barrel this shot left.
+                */
+                OpenCNC3D_Note_Fire(this, which, bullet, IsSecondShot ? 1 : 0, fire_coord);
             } else {
                 delete bullet;
             }
@@ -3446,7 +3499,7 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
             HousesType tgt_owner = obj->Owner();
 
             HouseClass* player = HouseClass::As_Pointer(tgt_owner);
-            if ((player != NULL) && player->IsHuman) {
+            if ((player != NULL) && (player->IsHuman || FairAI_RA_Enabled(player))) {
                 if ((!Is_Owned_By_Player(player) && !Is_Discovered_By_Player(player))
                     || (!Map[Coord_Cell(Center_Coord())].Is_Mapped(House)
                         && (What_Am_I() != RTTI_AIRCRAFT || !Is_Owned_By_Player(player)))) {
@@ -5292,7 +5345,8 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
         /*
         ** Humans have to deal with their own base is attacked problems.
         */
-        if (enemy == NULL || House->Is_Ally(enemy) || House->IsHuman) {
+        if (enemy == NULL || House->Is_Ally(enemy) || House->IsHuman
+            || (FairAI_RA_Enabled(House) && !FairAI_RA_Observed(House, enemy))) {
             return;
         }
 
@@ -5574,6 +5628,7 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
         */
         if (source == NULL)
             return (false);
+        if (FairAI_RA_Enabled(House) && !FairAI_RA_Observed(House, source)) return false;
 
         /*
         **	If the mission precludes retaliation, then don't retaliate.
@@ -6428,7 +6483,7 @@ bool TechnoClass::Evaluate_Object(ThreatType method,
 //	cost += Fixed_To_Cardinal(UnitTypeClass::FULL_LOAD_CREDITS, Tiberium_Load())/2;
 #endif
 
-        if (House->IsHuman) {
+        if (House->IsHuman || FairAI_RA_Enabled(House)) {
             cost = cost * Rule.RefundPercent;
             //		cost /= 2;
         }

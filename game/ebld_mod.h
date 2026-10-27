@@ -102,8 +102,8 @@
  * THE DRAW is fixed function throughout: every piece is a draw_mesh call with a 3x4
  * extra matrix and a triangle range, exactly the way the old shatter draws its pieces
  * (two ranges in fact, its surfaces and then its broken faces, see EbldGL), and the
- * damage overlay is the same triangles again under a per-zone alpha test. The glow is an
- * additive redraw. Nothing here needs more than GL 1.1.
+ * damage overlay is the same triangles again, blended in by zone (ebld_overlay_begin).
+ * The glow is an additive redraw. Nothing here needs more than GL 1.3.
  *
  * TIER 1. Enhanced does not exist on the Win98 build, so neither does this; see
  * docs/tier1-gap.md. The Classic path, including the old shatter, is what that build
@@ -125,7 +125,12 @@ enum { EBP_WATER_LEVEL = 0, EBP_WATER_DROP, EBP_WATER_FLOOR, EBP_WATER_SECONDS,
           blast and its scorch, pack units from the footprint centre. A civilian building
           stands on only some of its footprint's cells (bdata.cpp's occupy lists), and its
           death is centred on those. */
-       EBP_BLAST_X = EBP_N, EBP_BLAST_Z, EBP_N6 };
+       EBP_BLAST_X = EBP_N, EBP_BLAST_Z, EBP_N6,
+       /* THE SEA, a tail a building standing in the water carries (bake_ebld.py's format):
+          the surface, how a piece moves in the water, and three splash bursts of
+          EBP_SEA_BN values each where a piece goes in */
+       EBP_SEA_Z = EBP_N6, EBP_SEA_DRAG, EBP_SEA_SPIN, EBP_SEA_SINK, EBP_SEA_DEPTH,
+       EBP_SEA_BURST, EBP_SEA_BN = 18, EBP_SEA_N = EBP_SEA_BURST + 3 * EBP_SEA_BN };
 /* The pack meshes one model becomes on every pack load. */
 enum { EBM_INTACT = 0, EBM_CUT, EBM_CUTDMG, EBM_GLOWC, EBM_OVER0,
        EBM_WRECK = EBM_OVER0 + 8, EBM_GLOWX, EBM_SCORCH, EBM_N };
@@ -287,7 +292,25 @@ struct EbldWave { float a[33]; std::vector<float> mode; };
    which face of the cloth it is (+1, -1, or 0 for a lip joining the two). */
 struct EbldWaveV { float p[3], n[3], s, z; unsigned char c[3]; signed char side; };
 struct EbldWaveT { int w; EbldWaveV v[3]; };
+struct EbldWavePose {
+    float time = 0.0f;
+    float position[9], normal[9], light[3];
+    bool valid = false;
+};
+struct EbldWaveCache {
+    EbldWavePose pose[2];
+    unsigned next = 0;
+};
+#include "building_service_types.h"
+/* One texture's specular map in a .spec file: its own pixels at `off` (a zlib stream of red
+   and green, `csize` bytes), or another texture's (`from`) taken at `scale` / 255 of its
+   strength (the damaged stage's atlas takes the standing one's, dulled). */
+/* (sheen: an own map's upright sheen, 0..255 from the record's flags bits 8..15, carried to
+   the light pass in the map's blue: a broad, stronger sun highlight for a model whose shine
+   is on upright round sides, which the tight lobe never reaches at the game camera) */
+struct EbldSpecRec { int from = -1; int scale = 255; long off = 0; long csize = 0; int sheen = 0; };
 struct EbldModel {
+    BService service;
     std::string type;
     /* The prefix of this model's log lines: "ebld", or "evhc" for a remastered vehicle
        (evhc_mod.h keeps its models in this struct, to share the records it reads). */
@@ -334,6 +357,7 @@ struct EbldModel {
        are waved, (mesh triangle, record), with the time they were last posed at. */
     std::vector<int> waveOf[2];
     std::vector<struct EbldWaveT> waveT[2];
+    std::vector<EbldWaveCache> waveCache[2];
     std::vector<std::pair<int, int> > waveMesh[EBM_N];
     std::vector<int> waveMeshSet;             /* per mesh slot: 0 INTACT, 1 CUT, -1 none */
     float wavePosed[EBM_N];
@@ -360,6 +384,14 @@ struct EbldModel {
     std::vector<EbldClip> clip;
     std::vector<int> clipPart, clipIPart;
     int clipIntact = -1, clipCut = -1;        /* the clips' indices, -1 none */
+    /* RED ALERT'S DRIVEN CLIP (ebld_ra_drive_*): the row of RA_DRIVE whose engine state
+       plays the intact clip, -1 none; and where its motion lies in the clip: the last rest
+       frame before it moves, the first frame fully out, the last frame fully out, and the
+       first frame back at rest (-1: a one-way clip, closed by playing the opening back) */
+    int raDrive = -1;
+    bool sea = false;                         /* its PARAM table has THE SEA (EBP_SEA_N) */
+    int drvSeg[4] = { 0, 0, 0, -1 };
+    bool drvSprite = false;                   /* its clip is the 1996 pictures, frame for frame */
     /* A THEATER'S OWN LOOK (version 6, <TYPE>_<TH>.ebld): 0 temperate, 1 desert, 2 winter;
        -1 for a file that serves every theater */
     int theater = -1;
@@ -383,12 +415,27 @@ struct EbldModel {
     bool resident;                            /* its whole model's textures are on the card */
     bool residentAll;                         /* and the rest of them (ebld_resident) */
     bool cutBuilt;                            /* its cut's meshes exist (ebld_build_cut) */
+    int cutNext = 0;                           /* prepared original mesh kinds, 0..13 */
+    double cutPrepareMs = 0.0;
+    std::vector<float> cutAngles;              /* only while an incremental cut is building */
+    PackMesh cutTemp;
+    int cutBlock = 0;
+    size_t cutPiece = 0;
     std::vector<unsigned char> texIntact;     /* per texture: the whole model draws with it */
+    uint64_t stageTextures[4] = {};
     /* THE OBSERVER: whole-model draws in the colour picture since the last ebldump, counted
        where they are submitted (ebld_draw_object, ebld_wall_draw), so what a gate asserts
        is what was drawn and not a decision recomputed beside it. */
     long drawn;
+    /* THE SPECULAR MAPS beside the file (<file stem>.spec, ebld_spec_read): per texture,
+       where its map lies in that file, or none. Only the index is kept; the pixels are read
+       when the texture goes to the card (ebld_spec_pixels). */
+    std::string specPath;
+    std::vector<EbldSpecRec> spec;
+    bool hasSpec = false;
 };
+#include "ebld_texture_mask.h"
+
 enum { EBR_A = 0, EBR_B, EBR_TEX, EBR_RA, EBR_RB, EBR_FA, EBR };
 
 static std::vector<EbldModel> g_ebld;
@@ -402,9 +449,22 @@ static bool g_ebldNrmOn = true;
    kind (-1 none), for which attach (ebld_attach bumps the serial). */
 /* Bytes of texture uploaded for the pack now loaded (ebld_resident). */
 static long g_ebldResidentBytes = 0;
-static int g_ebldWallModel[5] = { -1, -1, -1, -1, -1 };
+static void ebld_share_reset(void);   /* the textures trees share on the card, per pack */
+static int g_ebldWallModel[6] = { -1, -1, -1, -1, -1, -1 };
 static int g_ebldWallPack = -1;
 static int g_ebldPackSerial = 0;
+/* Bumped wherever a model is attached or detached outside a pack-wide attach, which
+   bumps g_ebldPackSerial instead; ebld_model_of's memo is keyed on both. */
+static unsigned g_ebldResolveGen = 0;
+/* Object draws answered before their walk because the pass has no triangle of the model. */
+static unsigned long g_ebldPassEarlyOuts = 0;
+static unsigned g_ebldPrepareGeneration = 0;
+struct EbldPrepareMetrics {
+    uint64_t demandCutUs = 0, demandTextureUs = 0;
+    unsigned demandCuts = 0, demandTextures = 0, demandFailures = 0;
+};
+static EbldPrepareMetrics g_ebldPrepareMetrics;
+
 /* THE POSES DRAWN, the moving parts' observer: per building and moving piece, the angle
    (degrees) or fill level the colour picture last submitted it at. Written by the draw,
    printed and cleared by ebldump. */
@@ -426,6 +486,9 @@ struct EbldBody {
                                                  DESTROYED set dies */
     int   tore;                               /* the tick it came off (a flag on it keeps
                                                  the pose the wave had then) */
+    int   wet;                                /* THE SEA: 0 dry, else the tick it went into
+                                                 the water + 1; it then only drifts and sinks */
+    bool  sunk;                               /* gone under: no longer drawn */
 };
 /* A looping motion's place in its tries, so the next frame need not count them again. */
 struct EbldLoopCache { int k; double t; };
@@ -452,6 +515,8 @@ struct EbldBld {
     int   stageTick, drainTick, damagedTick, blastTick;
     int   heldTick;                           /* when it was first hit (a held loop's clock) */
     int   face;                               /* the building's facing, for a turret piece */
+    int serviceDoing=BS_IDLE, serviceStage=0;
+    bool servicePowerOff=false;
     float fillF;                              /* the owner's store, 0..1, or -1 unknown */
     float fillH0;                             /* the fill's level when it broke, pack y */
     float fillWreck;                          /* and when it died, pack y */
@@ -468,6 +533,12 @@ struct EbldBld {
        door stage (weap_door_frame), and that stage; -1 for every other model */
     float doorF;
     int   doorStage;
+    /* RED ALERT'S DRIVEN CLIP (ebld_ra_drive_step): how far out its motion is, 0 at rest to
+       1 fully out, this tick and the last; whether it is on its way back; and a looping
+       clip's frame this tick and the last */
+    float drvCur, drvPrev;
+    bool  drvClosing;
+    float cycCur, cycPrev;
     /* A REMASTERED TREE'S STAGE (etree_*): 0 standing, 1 burning, 2 the charred snag; the
        tick it began; and whether the engine has deleted the tree, so that the entry, under
        a key of its own, is all that is left of it while the snag smokes out */
@@ -509,6 +580,17 @@ struct EbldIn {
     size_t o;
     char why[200];
     bool bad;
+    bool bounded = false;
+    bool available(size_t count, size_t width)
+    {
+        if (!bounded) return true;
+        if (bad) return false;
+        if (o > b->size() || (width && count > (b->size() - o) / width)) {
+            fail("bounded preparation count exceeds remaining source bytes");
+            return false;
+        }
+        return true;
+    }
     bool take(void* dst, size_t n)
     {
         if (bad) return false;
@@ -662,11 +744,15 @@ static bool ebld_support_at(const EbldSupport& G, float x, float z, float yMax, 
 
 /* THE TEXTURES AND THE SETS, the part of the file the remastered vehicles' file
    (evhc_mod.h) shares byte for byte. `setOf` maps the file's set order onto EBS_* (NULL:
-   the file's own order); `maxRole` is the highest texture role the caller's format knows. */
+   the file's own order); `maxRole` is the highest texture role the caller's format knows.
+   `recVer` is the version of the piece and triangle records when it is not `ver` (0: the
+   same): the vehicles' version 2 keeps version 3's textures and takes version 5's pieces
+   and triangles, the smooth normals with them. */
 static void ebld_read_body(EbldIn& in, const std::vector<unsigned char>& b, EbldModel& m,
                            uint32_t ver, uint32_t ntex, uint32_t nset, int maxRole,
-                           const int* setOf)
+                           const int* setOf, uint32_t recVer = 0)
 {
+    const uint32_t rv = recVer ? recVer : ver;
     char msg[200];
     m.tex.resize(in.bad ? 0 : ntex);
     for (uint32_t t = 0; t < ntex && !in.bad; t++) {
@@ -759,12 +845,13 @@ static void ebld_read_body(EbldIn& in, const std::vector<unsigned char>& b, Ebld
             in.fail(msg);
             break;
         }
+        if (!in.available(np, ver >= 5 ? 76 : 60)) break;
         S.piece.resize(np);
         uint32_t run = 0;
         for (uint32_t k = 0; k < np && !in.bad; k++) {
             EbldPiece& P = S.piece[k];
             memset(P.name, 0, sizeof P.name);
-            in.take(P.name, ver >= 5 ? 32 : 16);
+            in.take(P.name, rv >= 5 ? 32 : 16);
             P.parent = in.i16();
             P.zone = in.u8();
             P.flags = in.u8();
@@ -811,22 +898,23 @@ static void ebld_read_body(EbldIn& in, const std::vector<unsigned char>& b, Ebld
             in.fail(msg);
             break;
         }
+        if (!in.available(nt, ver >= 5 ? 144 : 108)) break;
         S.tri.resize(nt);
         for (uint32_t t = 0; t < nt && !in.bad; t++) {
             EbldTri& T = S.tri[t];
             T.tex = in.i16(); T.texDmg = in.i16(); T.texGlow = in.i16(); T.texOver = in.i16();
             T.mode = in.u8(); T.kind = in.u8(); T.wrap = in.u8();
             T.tflags = in.u8();
-            if (ver < 4) T.tflags = 0;        /* padding before version 4 */
+            if (rv < 4) T.tflags = 0;         /* padding before version 4 */
             for (int k = 0; k < 3 && !in.bad; k++) {
                 EbldVert& V = T.v[k];
                 V.x = in.f32(); V.y = in.f32(); V.z = in.f32();
                 V.u = in.f32(); V.v = in.f32(); V.ud = in.f32(); V.vd = in.f32();
                 V.r = in.u8(); V.g = in.u8(); V.b = in.u8(); V.a = in.u8();
-                if (ver >= 5) { V.nx = in.f32(); V.ny = in.f32(); V.nz = in.f32(); }
+                if (rv >= 5) { V.nx = in.f32(); V.ny = in.f32(); V.nz = in.f32(); }
             }
             if (in.bad) break;
-            if (ver < 5) {
+            if (rv < 5) {
                 /* no normals before version 5: each corner takes its face's */
                 const float e1[3] = { T.v[1].x - T.v[0].x, T.v[1].y - T.v[0].y, T.v[1].z - T.v[0].z };
                 const float e2[3] = { T.v[2].x - T.v[0].x, T.v[2].y - T.v[0].y, T.v[2].z - T.v[0].z };
@@ -842,7 +930,7 @@ static void ebld_read_body(EbldIn& in, const std::vector<unsigned char>& b, Ebld
                 || T.texGlow < -1 || T.texGlow >= nt16 || T.texOver < -1 || T.texOver >= nt16
                 || (T.mode != MODE_OPAQUE && T.mode != MODE_CUTOUT && T.mode != MODE_XLU)
                 || T.kind > 2 || (T.wrap & 0xF0)
-                || (T.tflags & ~(ver >= 5 ? (EBT_TWO | EBT_EMIT | EBT_WAVE) : EBT_TWO))) {
+                || (T.tflags & ~(rv >= 5 ? (EBT_TWO | EBT_EMIT | EBT_WAVE) : EBT_TWO))) {
                 snprintf(msg, sizeof msg, "set %d triangle %u has a bad texture, mode, kind "
                          "or wrap", s, t);
                 in.fail(msg);
@@ -864,6 +952,7 @@ static void ebld_read_body(EbldIn& in, const std::vector<unsigned char>& b, Ebld
    out once a model's records are read (or a wall's mask is split off), never from a draw. */
 static void ebld_derive(EbldModel& m)
 {
+    ebld_derive_texture_masks(m);
     const int ncut = (int)m.set[EBS_CUT].piece.size();
     m.nmotion = 0;
     m.motion0.assign((size_t)ncut, 0);
@@ -913,6 +1002,7 @@ static void ebld_derive(EbldModel& m)
         const EbldSet& S = m.set[q ? EBS_CUT : EBS_INTACT];
         m.waveOf[q].assign(S.tri.size(), -1);
         m.waveT[q].clear();
+        m.waveCache[q].clear();
         if (m.wave.empty()) continue;
         for (size_t t = 0; t < S.tri.size(); t++) {
             const EbldTri& T = S.tri[t];
@@ -951,24 +1041,43 @@ static void ebld_derive(EbldModel& m)
             m.waveOf[q][t] = (int)m.waveT[q].size();
             m.waveT[q].push_back(W);
         }
+        if (mesh_perf_switch("OPENCNC3D_EBLD_WAVE_CACHE")) {
+            try {
+                if (!mesh_perf_switch("OPENCNC3D_EBLD_WAVE_CACHE_ALLOC_OK")) throw std::bad_alloc();
+                m.waveCache[q].resize(std::min(m.waveT[q].size(), (size_t)2048));
+            } catch (const std::bad_alloc&) {
+                m.waveCache[q].clear();
+            }
+        }
     }
     for (int i = 0; i < EBM_N; i++) { m.waveMesh[i].clear(); m.wavePosed[i] = -1.0e30f; }
 }
 
-static bool ebld_read_one(const char* path, EbldModel& m)
+/* (Red Alert's driven clips, ebld_ra_drive_*, far below) */
+static void ebld_ra_drive_prepare(EbldModel& m);
+static bool ebld_read_one(const char* path, EbldModel& m, size_t maxSourceBytes = 0)
 {
     FILE* f = fopen(path, "rb");
     if (!f) return false;
     std::vector<unsigned char> b;
-    {
+    try {
         unsigned char chunk[65536];
         size_t n;
-        while ((n = fread(chunk, 1, sizeof chunk, f)) > 0)
+        while ((n = fread(chunk, 1, sizeof chunk, f)) > 0) {
+            if (maxSourceBytes && (b.size() > maxSourceBytes || n > maxSourceBytes - b.size())) {
+                fclose(f);
+                return false;
+            }
             b.insert(b.end(), chunk, chunk + n);
+        }
+    } catch (...) {
+        fclose(f);
+        throw;
     }
     fclose(f);
     EbldIn in;
     in.b = &b; in.o = 0; in.bad = false; in.why[0] = 0;
+    in.bounded = maxSourceBytes != 0;
     char msg[200];
     char magic[4] = { 0, 0, 0, 0 }, type[9];
     in.take(magic, 4);
@@ -1007,6 +1116,7 @@ static bool ebld_read_one(const char* path, EbldModel& m)
         in.fail("it carries neither three sets, nor the intact and cut sets, nor the intact "
                 "set alone");
     m.nset = (int)nset;
+    if (!in.bad && maxSourceBytes && nset != 1) in.fail("bounded preparation requires an intact-only source");
     /* (a staged wall carries its sixteen masks' emitters: version 5 allows more) */
     if (!in.bad && nemit > (ver >= 5 ? 1024u : 64u)) in.fail("its emitter count is out of range");
     if (!in.bad && (nparam < EBP_N || nparam > 256))
@@ -1016,6 +1126,7 @@ static bool ebld_read_one(const char* path, EbldModel& m)
     for (uint32_t i = 0; i < nparam && !in.bad; i++) m.param.push_back(in.f32());
     /* (a file older than version 6 has no blast centre: the footprint's centre) */
     if (m.param.size() < (size_t)EBP_N6) m.param.resize((size_t)EBP_N6, 0.0f);
+    m.sea = m.param.size() >= (size_t)EBP_SEA_N;
 
     ebld_read_body(in, b, m, ver, ntex, nset, ver >= 3 ? 9 : 8, NULL);
 
@@ -1034,6 +1145,7 @@ static bool ebld_read_one(const char* path, EbldModel& m)
             break;
         }
         E.npoint = (int)npt;
+        if (!in.available(npt, 16)) break;
         E.pt.resize((size_t)npt * 4);
         E.wsum = 0.0f;
         for (uint32_t p = 0; p < npt * 4 && !in.bad; p++) E.pt[p] = in.f32();
@@ -1236,6 +1348,7 @@ static bool ebld_read_one(const char* path, EbldModel& m)
                 in.fail("a wave is impossible");
                 break;
             }
+            if (!in.available(nm, 28)) break;
             W.mode.resize((size_t)nm * 7);
             for (uint32_t c = 0; c < nm * 7; c++) W.mode[c] = in.f32();
             for (uint32_t q = 0; q < nm; q++)
@@ -1297,12 +1410,14 @@ static bool ebld_read_one(const char* path, EbldModel& m)
                 in.fail("a clip is impossible");
                 break;
             }
+            if (!in.available(nseq, 4)) break;
             C.seq.resize(nseq);
             for (uint32_t q = 0; q < nseq && !in.bad; q++) {
                 C.seq[q] = (int)in.u32();
                 if (C.seq[q] >= C.frames) in.fail("a clip's order names a frame it has not");
             }
             const size_t nm = (size_t)C.frames * C.nparts * 12;
+            if (!in.available(nm, 4)) break;
             C.mat.resize(nm);
             for (size_t q = 0; q < nm && !in.bad; q++) C.mat[q] = in.f32();
             C.turn = 0;
@@ -1312,6 +1427,7 @@ static bool ebld_read_one(const char* path, EbldModel& m)
                     break;
                 }
                 C.turn = (int)in.u32();
+                if (!in.available((size_t)C.frames, 4)) break;
                 C.phase.resize((size_t)C.frames);
                 for (int q = 0; q < C.frames && !in.bad; q++) C.phase[q] = in.f32();
                 const uint32_t nmap = in.u32();
@@ -1344,6 +1460,9 @@ static bool ebld_read_one(const char* path, EbldModel& m)
                 in.fail("a moving part names a clip or part the file has not");
         }
     }
+    /* (under Red Alert, a structure whose clip its engine's state plays: RA_DRIVE) */
+    m.raDrive = -1;
+    if (!in.bad && g_raModule) ebld_ra_drive_prepare(m);
     if (!in.bad) {
         const float st = m.param[EBP_SCORCH_TEX];
         const bool none = (st == -1.0f && ((m.flags & EBX_WALL) || m.nset == 1));
@@ -1412,6 +1531,7 @@ static bool ebld_read_one(const char* path, EbldModel& m)
         if (!in.bad && n != m.set[EBS_INTACT].tri.size())
             in.fail("its wind weights do not cover its intact triangles");
         if (!in.bad) {
+            if (!in.available(n, 6)) return false;
             m.sway.resize((size_t)n * 6);
             in.take(&m.sway[0], m.sway.size());
         }
@@ -1542,9 +1662,10 @@ static void ebld_wall_split(const EbldModel& W, int owner, int k, EbldModel& S)
 
 /* THE WALLS WITH A REMASTER, in the order of the wall overlay kinds the dump reports
    (WallCell::kind: 0 SBAG, 1 CYCL, 2 BRIK, 3 BARB, 4 WOOD: the barbed wire and the wooden
-   fence are walls like the other three, never built, standing in a mission's map). */
-enum { EBLD_NWALL = 5 };
-static const char* const EBLD_WALLS[EBLD_NWALL] = { "SBAG", "CYCL", "BRIK", "BARB", "WOOD" };
+   fence are walls like the other three, never built, standing in a mission's map; 5 FENC,
+   Red Alert's own barbed-wire fence, which only its files carry and only its map reports). */
+enum { EBLD_NWALL = 6 };
+static const char* const EBLD_WALLS[EBLD_NWALL] = { "SBAG", "CYCL", "BRIK", "BARB", "WOOD", "FENC" };
 static int ebld_wall_kind(const char* type)
 {
     for (int k = 0; k < EBLD_NWALL; k++)
@@ -1557,7 +1678,7 @@ static long long ebld_wall_key(int x, int y) { return EBLD_WALL_KEY0 + (long lon
 static bool ebld_meshes_ok(const EbldModel& M);
 /* Which model draws each wall kind in the pack loaded now (-1 none), resolved once per
    attach. */
-static bool ebld_ensure(const char* type);
+static bool ebld_ensure(const char* type, size_t maxSourceBytes = 0);
 static void ebld_wall_models(void)
 {
     /* the barbed wire and the wooden fence are read at first sight: the first time a cell
@@ -1589,22 +1710,36 @@ static const char* const EBLD_TYPES[] = {
     "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24",
     "V25", "V26", "V27", "V28", "V29", "V30", "V31", "V32", "V33", "V34", "V35", "V36",
     "V37",
-    "SBAG", "CYCL", "BRIK", "BARB", "WOOD",
+    "SBAG", "CYCL", "BRIK", "BARB", "WOOD", "FENC",
+    /* RED ALERT'S PROPS (ra3d_props_mod.h), in ra3d/ebld only: the explosive barrels and the
+       mines (one-cell buildings), the interior's crate stacks and the ice floes (terrain
+       objects), the water crate and the flag location (cell decorations) */
+    "BARL", "BRL3", "MINV", "MINP",
+    "BOXES01", "BOXES02", "BOXES03", "BOXES04", "BOXES05", "BOXES06", "BOXES07", "BOXES08",
+    "BOXES09", "ICE01", "ICE02", "ICE03", "ICE04", "ICE05", "WWCRATE", "FPLS",
     /* the terrain objects (rocks, blossom trees) and the cell decorations ebld_terr.h
        draws (the crashed Orca on rock patch P04, the bonus crates; the field overlays draw
        V13 to V18 above) */
     "ROCK1", "ROCK2", "ROCK3", "ROCK4", "ROCK5", "ROCK6", "ROCK7", "SPLIT2", "SPLIT3",
     "P04", "SCRATE", "WCRATE",
     /* the remastered trees (tools/art/remaster/foliage), each file its theater's look: the
-       temperate conifers T01 (drawn for T16 too, EBLD_ALIAS), T02, T05, T06, T07; the desert
-       cacti T04 and T09; the temperate broadleaf trees and saplings T03, T10 to T15, T17;
-       the desert acacias T08 (its desert look) and T18 */
+       temperate conifers T01, T02, T05, T06, T07 and T16 (its own spruce; drawn from T01's
+       file where the play folder has no T16 file, EBLD_ALIAS); the desert cacti T04 and
+       T09; the temperate broadleaf trees and saplings T03, T10 to T15, T17; T08 (its
+       temperate look, a young conifer and a seedling; its desert look, an acacia) and the
+       desert acacia T18; and the tree clumps TC01 to TC05, each one model composed of the
+       approved trees (ebld_terr.h draws it whole at the clump's centre coordinate) */
     "T01", "T02", "T05", "T06", "T07", "T04", "T09",
-    "T03", "T10", "T11", "T12", "T13", "T14", "T15", "T17", "T08", "T18"
+    "T03", "T10", "T11", "T12", "T13", "T14", "T15", "T17", "T08", "T18", "T16",
+    "TC01", "TC02", "TC03", "TC04", "TC05",
+    /* Red Alert's ore mine, a terrain object, its theater's look (ra3d_ore_mod.h) */
+    "MINE"
 };
-/* A TYPE DRAWN FROM ANOTHER TYPE'S FILE, as the cartridge draws one mesh for both: the
-   spruce T16 is T01's model (one remaster, two placements of it). */
+/* A TYPE DRAWN FROM ANOTHER TYPE'S FILE where it has none of its own, as the cartridge
+   draws one mesh for both: the spruce T16 is T01's model in a play folder without T16's
+   own file. */
 static const char* const EBLD_ALIAS[][2] = { { "T16", "T01" } };
+static bool ebld_type_has_file(const char* t);
 static const char* ebld_alias(const char* t)
 {
     if (g_raModule && t) {
@@ -1617,7 +1752,7 @@ static const char* ebld_alias(const char* t)
         return t;
     }
     for (size_t i = 0; t && i < sizeof EBLD_ALIAS / sizeof EBLD_ALIAS[0]; i++)
-        if (!strcmp(t, EBLD_ALIAS[i][0])) return EBLD_ALIAS[i][1];
+        if (!strcmp(t, EBLD_ALIAS[i][0]) && !ebld_type_has_file(t)) return EBLD_ALIAS[i][1];
     return t;
 }
 /* A theater's file suffix, in the order of EbldModel::theater (0 temperate, 1 desert,
@@ -1625,13 +1760,35 @@ static const char* ebld_alias(const char* t)
 static const char* const EBLD_THEATERS[3] = { "TEM", "DES", "WIN" };
 /* The pack's theater as EbldModel::theater counts them, -1 for one it does not know. The
    cartridge's SNOW and SAND are the winter and the desert looks. */
+static bool ebld_ra_snow_temperate(void);
 static int ebld_pack_theater(void)
 {
     const char* t = g_pack.theater;
+    /* RED ALERT'S SCENES (RATEMP, RASNOW, RAINT): its temperate is Tiberian Dawn's, so the
+       trees reused from OpenCNC3D (their files are the temperate look, <TYPE>_TEM) stand on
+       it. Its snow is the winter look, which no reused tree has: a snow map keeps its 1996
+       trees, frosted as the engine paints them, unless OPENCNC3D_RA3DSNOWTREES=temperate
+       stands the green temperate models on the snow (the comparison it was decided on).
+       The interior has no theater look. Every file without a suffix, the civilian
+       buildings and the Red Alert structures among them, is drawn in every theater. */
+    if (g_raModule) {
+        if (!strcmp(t, "RATEMP")) return 0;
+        if (!strcmp(t, "RASNOW")) return ebld_ra_snow_temperate() ? 0 : 2;
+        return -1;
+    }
     if (!strcmp(t, "TEMPERAT") || !strcmp(t, "TEMPERATE")) return 0;
     if (!strcmp(t, "DESERT") || !strcmp(t, "SAND")) return 1;
     if (!strcmp(t, "WINTER") || !strcmp(t, "SNOW")) return 2;
     return -1;
+}
+static bool ebld_ra_snow_temperate(void)
+{
+    static int on = -1;
+    if (on < 0) {
+        const char* e = getenv("OPENCNC3D_RA3DSNOWTREES");
+        on = (e && !strcmp(e, "temperate")) ? 1 : 0;
+    }
+    return on != 0;
 }
 
 /* THE FILES THERE ARE, found once per process (ebld_load) and READ THE FIRST TIME A
@@ -1644,6 +1801,25 @@ static int ebld_pack_theater(void)
    masks are appended after their wall as it is read). */
 struct EbldFile { std::string path; int ti, th; bool tried, lazy; };
 static std::vector<EbldFile> g_ebldFiles;
+/* Whether the play folder has a file of this type for the pack's theater (its own look or
+   a plain file): EBLD_ALIAS draws another type's file only where it has none. */
+static bool ebld_type_has_file(const char* t)
+{
+    const int th = ebld_pack_theater();
+    for (size_t i = 0; t && i < g_ebldFiles.size(); i++)
+        if (!strcmp(EBLD_TYPES[g_ebldFiles[i].ti], t)
+            && (g_ebldFiles[i].th < 0 || g_ebldFiles[i].th == th))
+            return true;
+    return false;
+}
+/* THE TREE CLUMPS, TC01 TO TC05: no cartridge mesh and no type in a Tiberian Dawn pack
+   (the proof at ClumpDef in cnc_eyes.cpp), so their files are read at first sight and
+   attached without a pack type, and borrow no cartridge shadow plate. */
+static bool ebld_packless_type(const char* t)
+{
+    return t && t[0] == 'T' && t[1] == 'C' && t[2] == '0' && t[3] >= '1' && t[3] <= '5'
+        && !t[4];
+}
 /* WHICH ARE READ AT FIRST SIGHT rather than with the pack: every mission's pack carries
    every type of the game, civilian buildings of all three theaters included, so reading
    with the pack would read them all. The structures and the three buildable walls are
@@ -1659,20 +1835,22 @@ static bool ebld_type_lazy(const char* t)
         return true;
     /* and the terrain objects and cell decorations (ebld_terr.h): a mission shows a few */
     if (!strncmp(t, "ROCK", 4) || !strncmp(t, "SPLIT", 5)) return true;
-    /* and the trees, T01 to T18 */
+    /* and the trees, T01 to T18, and the tree clumps, TC01 to TC05 */
     if (t[0] == 'T' && t[1] >= '0' && t[1] <= '9' && t[2] >= '0' && t[2] <= '9' && !t[3])
         return true;
+    if (ebld_packless_type(t)) return true;
     return !strcmp(t, "BARB") || !strcmp(t, "WOOD") || !strcmp(t, "P04")
         || !strcmp(t, "SCRATE") || !strcmp(t, "WCRATE");
 }
 
 /* One file into the models, with its wall masks after it. False: refused (stderr says
    why). */
-static bool ebld_read_file(const EbldFile& F)
+static void ebld_spec_read(const char* modelPath, EbldModel& M);   /* (below, by the textures) */
+static bool ebld_read_file(const EbldFile& F, size_t maxSourceBytes = 0)
 {
     EbldModel m;
     const char* path = F.path.c_str();
-    if (!ebld_read_one(path, m))
+    if (!ebld_read_one(path, m, maxSourceBytes))
         return false;
     const char* want = EBLD_TYPES[F.ti];
     if (m.type != want) {
@@ -1701,6 +1879,15 @@ static bool ebld_read_file(const EbldFile& F)
             fprintf(stderr, "ebld: %s: no house paint, every house wears the GDI look\n",
                     m.type.c_str());
     }
+    /* its specular maps, beside it (walls carry none) */
+    if (!(m.flags & EBX_WALL)) {
+        ebld_spec_read(path, m);
+        if (m.hasSpec) {
+            int k = 0;
+            for (size_t t = 0; t < m.spec.size(); t++) if (m.spec[t].from >= 0) k++;
+            fprintf(stderr, "ebld: %s carries %d specular map%s\n", m.type.c_str(), k, k == 1 ? "" : "s");
+        }
+    }
     g_ebld.push_back(m);
     const int w = (int)g_ebld.size() - 1;
     /* A STAGED WALL'S SIXTEEN MASKS become models of their own, right after it */
@@ -1726,10 +1913,14 @@ static bool ebld_read_file(const EbldFile& F)
             if (!f) continue;
             fclose(f);
             EbldModel S;
-            if (!ebld_read_one(sp.c_str(), S)) continue;
+            if (!ebld_read_one(sp.c_str(), S, maxSourceBytes)) {
+                if (maxSourceBytes) return false;
+                continue;
+            }
             if (S.type != want || S.nset != 1 || (S.flags & EBX_WALL)) {
                 fprintf(stderr, "ebld: %s is not an intact-only stage of %s -- refused\n",
                         sp.c_str(), want);
+                if (maxSourceBytes) return false;
                 continue;
             }
             S.type = std::string(want) + "~" + SUF[k];
@@ -1806,15 +1997,25 @@ static void ebld_mesh_begin(PackMesh& pm, const char* type, const char* what)
 }
 static int ebld_mesh_end(PackMesh& pm)
 {
+    /* Generated meshes need the same exact pass census as pack_load. Their
+       default all-modes mask otherwise defeats draw_mesh's empty-pass exit. */
+    if(mesh_perf_switch("OPENCNC3D_GENERATED_MODE_MASK")) {
+        pm.modeMask=0;
+        for(const auto& tri:pm.tris)if(tri.mode<32)pm.modeMask|=1u<<tri.mode;
+    }
+
     PackPart part;
     part.tri0 = 0;
     part.ntris = (int)pm.tris.size();
     part.role = ROLE_STATIC;
     part.px = part.py = part.pz = 0.0f;
     pm.parts.assign(1, part);
-    g_pack.mesh.push_back(pm);
+    if(mesh_perf_switch("OPENCNC3D_EBLD_MESH_MOVE"))g_pack.mesh.push_back(std::move(pm));
+    else g_pack.mesh.push_back(pm);
     return (int)g_pack.mesh.size() - 1;
 }
+#include "building_service.h"
+
 /* One triangle of a set into a pack mesh: `which` picks the texture and UV pair. */
 enum { EBT_TEX = 0, EBT_DMG, EBT_GLOW, EBT_OVER };
 static void ebld_push_tri(PackMesh& pm, const EbldModel& M, const EbldTri& t, int which,
@@ -1853,15 +2054,33 @@ static void ebld_push_tri(PackMesh& pm, const EbldModel& M, const EbldTri& t, in
    a whole zone away, so neighbouring zones blend. Bearings are 0 east, counting
    counter-clockwise seen from above (2 north, 4 west, 6 south), about the footprint
    centre, which is the pack origin. */
-static unsigned char ebld_zone_alpha(float x, float z, int zone)
+static unsigned char ebld_zone_alpha_angle(float ang, int zone)
 {
-    const float ang = atan2f(-z, x) * (180.0f / EBLD_PI);
     float d = ang - 45.0f * (float)zone;
     while (d > 180.0f)  d -= 360.0f;
     while (d < -180.0f) d += 360.0f;
     float w = 1.0f - fabsf(d) / 45.0f;
     if (w < 0.0f) w = 0.0f;
     return (unsigned char)(255.0f * w + 0.5f);
+}
+
+static unsigned char ebld_zone_alpha(float x, float z, int zone)
+{
+    const float ang = atan2f(-z, x) * (180.0f / EBLD_PI);
+    return ebld_zone_alpha_angle(ang, zone);
+}
+/* The eight overlays use the same source vertex bearing. Keep its original
+   float calculation once per eligible corner for this build only. */
+static std::vector<float> ebld_overlay_angles(const EbldSet& S)
+{
+    std::vector<float> angles(S.tri.size()*3,0.0f);
+    for(size_t t=0;t<S.tri.size();t++) {
+        const EbldTri& T=S.tri[t];
+        if(T.kind!=0 || T.texOver<0 || T.mode==MODE_XLU)continue;
+        for(int q=0;q<3;q++)
+            angles[t*3+q]=atan2f(-T.v[q].z,T.v[q].x)*(180.0f/EBLD_PI);
+    }
+    return angles;
 }
 
 /* Whether a model texture is a flipbook (a grid of frames the draw steps through). */
@@ -1878,67 +2097,78 @@ static bool ebld_flipbook(const EbldModel& M, int texIdx)
    lamp on a piece that is otherwise plain), so the plain part is one run and the part
    that needs its frame chosen is another: [A, FA) and [FA, B). A piece that is all one
    or the other keeps its triangles in the file's order. */
-static void ebld_fill_mesh(PackMesh& pm, const EbldModel& M, const EbldSet& S, int which,
-                           int zone, std::vector<int>& rng,
-                           std::vector<std::pair<int, int> >* waved = NULL)
+/* One original piece/block, with identical triangle order, arithmetic and ranges.
+   The wrapper retains the existing all-at-once API; preparation can yield at a piece. */
+static void ebld_fill_mesh_piece(PackMesh& pm, const EbldModel& M, const EbldSet& S,
+                                 int which, int zone, std::vector<int>& rng,
+                                 std::vector<std::pair<int, int> >* waved,
+                                 const std::vector<float>* overlayAngles, int block, size_t k)
 {
-    rng.assign(S.piece.size() * EBR, -1);
-    /* (the waved triangles of the INTACT or CUT set, recorded as they go in) */
     const int wq = (&S == &M.set[EBS_INTACT]) ? 0 : (&S == &M.set[EBS_CUT]) ? 1 : -1;
     const bool wv = waved && wq >= 0 && !M.waveT[wq].empty();
-    if (waved) waved->clear();
-    for (int block = 0; block < 2; block++)
-        for (size_t k = 0; k < S.piece.size(); k++) {
-            const EbldPiece& P = S.piece[k];
-            const int a = (int)pm.tris.size();
-            int first = -1, fa = -1;
-            for (int sub = 0; sub < (block ? 1 : 2); sub++) {
-                if (sub == 1) fa = (int)pm.tris.size();
-                for (int t = P.tri0; t < P.tri0 + P.ntri; t++) {
-                    const EbldTri& T = S.tri[t];
-                    if ((T.kind != 0) != (block != 0)) continue;
-                    const int look = (which == EBT_TEX) ? T.tex : (which == EBT_DMG) ? T.texDmg
-                                   : (which == EBT_GLOW) ? T.texGlow : T.texOver;
-                    if (block == 0 && ebld_flipbook(M, look) != (sub == 1)) continue;
-                    unsigned char al[3] = { 255, 255, 255 };
-                    if (which == EBT_GLOW && T.texGlow < 0) continue;
-                    if (which == EBT_OVER) {
-                        /* glass keeps its transparency: the overlay is alpha tested and
-                           drawn solid, so it would lay opaque patches over the pane */
-                        if (T.kind != 0 || T.texOver < 0 || T.mode == MODE_XLU) continue;
-                        for (int q = 0; q < 3; q++)
-                            al[q] = ebld_zone_alpha(T.v[q].x, T.v[q].z, zone);
-                        if (!al[0] && !al[1] && !al[2]) continue;
-                    }
-                    if (first < 0) first = look;
-                    if (wv && M.waveOf[wq][t] >= 0)
-                        waved->push_back(std::make_pair((int)pm.tris.size(), M.waveOf[wq][t]));
-                    ebld_push_tri(pm, M, T, which, which == EBT_OVER ? al : NULL);
-                    /* a tree's wind weights ride along, triangle for triangle */
-                    if (!M.sway.empty() && &S == &M.set[EBS_INTACT] && which == EBT_TEX)
-                    {
-                        pm.sway.insert(pm.sway.end(), &M.sway[(size_t)t * 6],
-                                       &M.sway[(size_t)t * 6] + 6);
-                        for (int q = 0; q < 3; q++) {
-                            const float ph = (9.0f * T.v[q].x + 4.0f * T.v[q].y
-                                              + 6.0f * T.v[q].z) * (1.0f / 1024.0f);
-                            pm.swayPh.push_back(sinf(ph));
-                            pm.swayPh.push_back(cosf(ph));
-                            pm.swayPh.push_back(sinf(1.7f * ph));
-                            pm.swayPh.push_back(cosf(1.7f * ph));
-                        }
-                    }
+    const EbldPiece& P = S.piece[k];
+    const int a = (int)pm.tris.size();
+    int first = -1, fa = -1;
+    for (int sub = 0; sub < (block ? 1 : 2); sub++) {
+        if (sub == 1) fa = (int)pm.tris.size();
+        for (int t = P.tri0; t < P.tri0 + P.ntri; t++) {
+            const EbldTri& T = S.tri[t];
+            if ((T.kind != 0) != (block != 0)) continue;
+            const int look = (which == EBT_TEX) ? T.tex : (which == EBT_DMG) ? T.texDmg
+                           : (which == EBT_GLOW) ? T.texGlow : T.texOver;
+            if (block == 0 && ebld_flipbook(M, look) != (sub == 1)) continue;
+            unsigned char al[3] = { 255, 255, 255 };
+            if (which == EBT_GLOW && T.texGlow < 0) continue;
+            if (which == EBT_OVER) {
+                /* glass keeps its transparency: the overlay is a redraw of the surface
+                   in the cutout pass, and a pane is drawn translucent in its own */
+                if (T.kind != 0 || T.texOver < 0 || T.mode == MODE_XLU) continue;
+                for (int q = 0; q < 3; q++)
+                    al[q] = overlayAngles && overlayAngles->size()==S.tri.size()*3
+                          ? ebld_zone_alpha_angle((*overlayAngles)[(size_t)t*3+q],zone)
+                          : ebld_zone_alpha(T.v[q].x, T.v[q].z, zone);
+                if (!al[0] && !al[1] && !al[2]) continue;
+            }
+            if (first < 0) first = look;
+            if (wv && M.waveOf[wq][t] >= 0)
+                waved->push_back(std::make_pair((int)pm.tris.size(), M.waveOf[wq][t]));
+            ebld_push_tri(pm, M, T, which, which == EBT_OVER ? al : NULL);
+            /* a tree's wind weights ride along, triangle for triangle */
+            if (!M.sway.empty() && &S == &M.set[EBS_INTACT] && which == EBT_TEX)
+            {
+                pm.sway.insert(pm.sway.end(), &M.sway[(size_t)t * 6],
+                               &M.sway[(size_t)t * 6] + 6);
+                for (int q = 0; q < 3; q++) {
+                    const float ph = (9.0f * T.v[q].x + 4.0f * T.v[q].y
+                                      + 6.0f * T.v[q].z) * (1.0f / 1024.0f);
+                    pm.swayPh.push_back(sinf(ph));
+                    pm.swayPh.push_back(cosf(ph));
+                    pm.swayPh.push_back(sinf(1.7f * ph));
+                    pm.swayPh.push_back(cosf(1.7f * ph));
                 }
             }
-            int* r = &rng[k * EBR];
-            if (block == 0) {
-                r[EBR_A] = a; r[EBR_B] = (int)pm.tris.size(); r[EBR_TEX] = first;
-                r[EBR_FA] = fa;
-            } else {
-                r[EBR_RA] = a; r[EBR_RB] = (int)pm.tris.size();
-                if (r[EBR_TEX] < 0) r[EBR_TEX] = first;
-            }
         }
+    }
+    int* r = &rng[k * EBR];
+    if (block == 0) {
+        r[EBR_A] = a; r[EBR_B] = (int)pm.tris.size(); r[EBR_TEX] = first;
+        r[EBR_FA] = fa;
+    } else {
+        r[EBR_RA] = a; r[EBR_RB] = (int)pm.tris.size();
+        if (r[EBR_TEX] < 0) r[EBR_TEX] = first;
+    }
+}
+
+static void ebld_fill_mesh(PackMesh& pm, const EbldModel& M, const EbldSet& S, int which,
+                           int zone, std::vector<int>& rng,
+                           std::vector<std::pair<int, int> >* waved = NULL,
+                           const std::vector<float>* overlayAngles = NULL)
+{
+    rng.assign(S.piece.size() * EBR, -1);
+    if (waved) waved->clear();
+    for (int block = 0; block < 2; block++)
+        for (size_t k = 0; k < S.piece.size(); k++)
+            ebld_fill_mesh_piece(pm, M, S, which, zone, rng, waved, overlayAngles, block, k);
 }
 
 /* THE CUT AND THE WRECK AS PACK MESHES, made the first time a building of the type is
@@ -1948,43 +2178,83 @@ static void ebld_fill_mesh(PackMesh& pm, const EbldModel& M, const EbldSet& S, i
    wreck and glowx: the DESTROYED set, where there is one. An intact-only model has none
    of these, and a model without a DESTROYED set none of the wreck's: their mesh slots
    stay -1. */
-static void ebld_build_cut(EbldModel& M)
+/* One original cut/wreck mesh at a time. Demand uses the same function until ready;
+   loading/construction preparation can stop between kinds without exposing half-built
+   geometry to a draw. Pack attachment resets every index and the progress together. */
+static bool ebld_build_cut_step(EbldModel& M)
 {
-    if (M.cutBuilt || !M.attached || M.nset < 2) return;
-    M.cutBuilt = true;
-    const char* ty = M.type.c_str();
+    if (M.cutBuilt || !M.attached || M.nset < 2) return false;
+    const int total = 11 + (M.nset == EBS_N ? 2 : 0);
+    if (M.cutNext < 0 || M.cutNext >= total) M.cutNext = 0;
     const Uint64 t0 = SDL_GetPerformanceCounter();
-    const size_t n0 = g_pack.mesh.size();
-    for (int kind = 0; M.nset >= 2 && kind < 4 + 7; kind++) {
-        const int mk = (kind < 3) ? EBM_CUT + kind : EBM_OVER0 + (kind - 3);
-        const int which = (kind == 0) ? EBT_TEX : (kind == 1) ? EBT_DMG
-                        : (kind == 2) ? EBT_GLOW : EBT_OVER;
-        const int zone = kind - 3;
-        PackMesh pm;
+    if (M.cutNext == 0 && M.cutBlock == 0 && M.cutPiece == 0) {
+        M.cutPrepareMs = 0.0;
+        if (mesh_perf_switch("OPENCNC3D_EBLD_CUT_ANGLES"))
+            M.cutAngles = ebld_overlay_angles(M.set[EBS_CUT]);
+    }
+    const int kind = M.cutNext;
+    const char* ty = M.type.c_str();
+    const int mk = kind < 11 ? ((kind < 3) ? EBM_CUT + kind : EBM_OVER0 + kind - 3)
+                            : (kind == 11 ? EBM_WRECK : EBM_GLOWX);
+    const int which = kind == 0 || kind == 11 ? EBT_TEX : kind == 1 ? EBT_DMG
+                    : kind == 2 || kind == 12 ? EBT_GLOW : EBT_OVER;
+    const int zone = kind < 11 ? kind - 3 : -1;
+    const EbldSet& S = M.set[kind < 11 ? EBS_CUT : EBS_DESTROYED];
+    if (M.cutBlock == 0 && M.cutPiece == 0) {
         char what[12];
         if (kind == 0) snprintf(what, sizeof what, "cut");
         else if (kind == 1) snprintf(what, sizeof what, "cutdmg");
         else if (kind == 2) snprintf(what, sizeof what, "glowc");
+        else if (kind == 11) snprintf(what, sizeof what, "wreck");
+        else if (kind == 12) snprintf(what, sizeof what, "glowx");
         else snprintf(what, sizeof what, "over%d", zone);
-        ebld_mesh_begin(pm, ty, what);
-        ebld_fill_mesh(pm, M, M.set[EBS_CUT], which, zone, M.rng[mk], &M.waveMesh[mk]);
-        M.mesh[mk] = ebld_mesh_end(pm);
+        ebld_mesh_begin(M.cutTemp, ty, what);
+        M.rng[mk].assign(S.piece.size() * EBR, -1);
+        M.waveMesh[mk].clear();
     }
-    /* wreck and glowx: the DESTROYED set */
-    for (int kind = 0; M.nset == EBS_N && kind < 2; kind++) {
-        const int mk = kind ? EBM_GLOWX : EBM_WRECK;
-        PackMesh pm;
-        ebld_mesh_begin(pm, ty, kind ? "glowx" : "wreck");
-        ebld_fill_mesh(pm, M, M.set[EBS_DESTROYED], kind ? EBT_GLOW : EBT_TEX, -1,
-                       M.rng[mk]);
-        M.mesh[mk] = ebld_mesh_end(pm);
+    size_t triangles = 0;
+    do {
+        if (M.cutPiece >= S.piece.size()) {
+            M.cutPiece = 0; M.cutBlock++;
+            if (M.cutBlock == 2) break;
+        }
+        if (S.piece.empty()) { M.cutBlock = 2; break; }
+        const size_t piece = M.cutPiece++;
+        ebld_fill_mesh_piece(M.cutTemp, M, S, which, zone, M.rng[mk],
+                             kind < 11 ? &M.waveMesh[mk] : NULL,
+                             M.cutAngles.empty() ? NULL : &M.cutAngles, M.cutBlock, piece);
+        triangles += (size_t)S.piece[piece].ntri;
+    } while (triangles < 512);
+    if (M.cutBlock == 2) {
+        M.mesh[mk] = ebld_mesh_end(M.cutTemp);
+        M.cutTemp = PackMesh();
+        if (mk == EBM_CUT || mk == EBM_CUTDMG) bservice_mesh(M, M.mesh[mk]);
+        M.cutBlock = 0; M.cutPiece = 0; M.cutNext++;
     }
-    long tris = 0;
-    for (size_t i = n0; i < g_pack.mesh.size(); i++) tris += (long)g_pack.mesh[i].tris.size();
-    fprintf(stderr, "ebld: %s cut meshes built, %d meshes, %ld triangles, %.1f ms\n", ty,
-            (int)(g_pack.mesh.size() - n0), tris,
-            (double)(SDL_GetPerformanceCounter() - t0) * 1000.0
-                / (double)SDL_GetPerformanceFrequency());
+    const Uint64 elapsed = SDL_GetPerformanceCounter() - t0;
+    M.cutPrepareMs += (double)elapsed * 1000.0 / (double)SDL_GetPerformanceFrequency();
+    if (perf_trace_frame_active())
+        g_destructTrace[19] += elapsed * 1000000u / SDL_GetPerformanceFrequency();
+    if (M.cutNext == total) {
+        M.cutBuilt = true;
+        std::vector<float>().swap(M.cutAngles);
+        if (perf_trace_frame_active()) g_destructTrace[16]++;
+        long tris = 0;
+        for (int mk = EBM_CUT; mk <= EBM_GLOWX; mk++)
+            if (M.mesh[mk] >= 0) tris += (long)g_pack.mesh[M.mesh[mk]].tris.size();
+        fprintf(stderr, "ebld: %s cut meshes built, %d meshes, %ld triangles, %.1f ms\n",
+                ty, total, tris, M.cutPrepareMs);
+    }
+    return true;
+}
+static void ebld_build_cut(EbldModel& M)
+{
+    if (M.cutBuilt || !M.attached || M.nset < 2) return;
+    const Uint64 start = SDL_GetPerformanceCounter();
+    while (ebld_build_cut_step(M)) {}
+    g_ebldPrepareMetrics.demandCuts++;
+    g_ebldPrepareMetrics.demandCutUs += (SDL_GetPerformanceCounter() - start)
+                                       * 1000000u / SDL_GetPerformanceFrequency();
 }
 
 /* After every load of the mission pack, beside n64fix_attach and in the same place:
@@ -1996,8 +2266,10 @@ static void ebld_build_cut(EbldModel& M)
    mask whose wall is not attached), or it is a wall mask. */
 static bool ebld_attach_one(size_t mI, int pth, const std::set<std::string>& ownLook)
 {
+    g_ebldResolveGen++;
     EbldModel& M = g_ebld[mI];
     M.attached = false;
+    bservice_bind(M,M.service);
     for (int i = 0; i < EBM_N; i++) {
         M.mesh[i] = -1; M.rng[i].clear();
         M.waveMesh[i].clear(); M.wavePosed[i] = -1.0e30f;
@@ -2006,13 +2278,15 @@ static bool ebld_attach_one(size_t mI, int pth, const std::set<std::string>& own
     const bool stage = M.stageOf >= 0 && M.stageOf < (int)g_ebld.size();
     std::map<std::string, PackType>::const_iterator it =
         g_pack.type.find(stage ? g_ebld[M.stageOf].type : M.type);
-    if (!g_raModule && it == g_pack.type.end()) return false;
+    const bool packless = ebld_packless_type(stage ? g_ebld[M.stageOf].type.c_str()
+                                                   : M.type.c_str());
+    if (!g_raModule && !packless && it == g_pack.type.end()) return false;
     if (stage) {
         if (!g_ebld[M.stageOf].attached) return false;
     } else if (M.theater >= 0 ? M.theater != pth : ownLook.count(M.type) != 0) {
         return false;
     }
-    int cmi = g_raModule ? -1 : it->second.mesh;
+    int cmi = (g_raModule || it == g_pack.type.end()) ? -1 : it->second.mesh;
     M.resident = M.residentAll = false;
     if (M.texOwner >= 0) {
         /* A WALL MASK'S MODEL draws with its wall's textures, attached just before it */
@@ -2030,7 +2304,7 @@ static bool ebld_attach_one(size_t mI, int pth, const std::set<std::string>& own
             pt.w = pt.uw = M.tex[t].w;
             pt.h = pt.uh = M.tex[t].h;
             pt.gl = pt.gl_gdi = 0;
-            for (int e = 0; e < 6; e++) pt.gl_extra[e] = 0;
+            for (int e = 0; e < 7; e++) pt.gl_extra[e] = 0;
             g_pack.tex.push_back(pt);
         }
     }
@@ -2060,8 +2334,11 @@ static bool ebld_attach_one(size_t mI, int pth, const std::set<std::string>& own
         }
         M.shadow1 = (int)pm.tris.size();
         M.mesh[EBM_INTACT] = ebld_mesh_end(pm);
+        bservice_mesh(M,M.mesh[EBM_INTACT]);
     }
-    M.cutBuilt = false;
+    M.cutBuilt = false; M.cutNext = 0; M.cutPrepareMs = 0.0;
+    M.cutTemp = PackMesh(); M.cutBlock = 0; M.cutPiece = 0;
+    std::vector<float>().swap(M.cutAngles);
     /* THE SCORCH, a flat square on the ground centred on the footprint. It is a GRID
        rather than two triangles because it is drawn with the ground sampled per
        vertex, and two triangles spanning three cells would cut through any rise in
@@ -2114,10 +2391,13 @@ static bool ebld_attach_one(size_t mI, int pth, const std::set<std::string>& own
 
 static void ebld_attach(void)
 {
+    g_ebldPrepareGeneration++;
+    g_ebldPrepareMetrics = EbldPrepareMetrics();
     /* a new pack: whatever liveries were built were built for the last one, and none of
        its textures are on the card yet */
     g_liveryLive = false;
     g_ebldResidentBytes = 0;
+    ebld_share_reset();
     ebld_load_needed();
     if (g_ebld.empty()) return;
     int attached = 0;
@@ -2151,9 +2431,54 @@ static void ebld_attach(void)
 /* A remastered texture with its mipmap chain (gl_upload_mips), the bleed and wrap a
    cartridge texture gets, trilinear. It stays out of the bilinear switch's register: the
    switch would take its chain away. */
-static GLuint ebld_upload_mips(std::vector<unsigned char> px, int w, int h, bool bled)
+/* THE SAME PICTURE GOES ON THE CARD ONCE. A tree clump's file carries its member trees'
+   own atlases (compose_clump.py copies each look's sheets in), byte for byte the trees'
+   files' ones, and drawn from a copy each those were a second copy of every member's
+   sheets on the card (on GDI 1, 52.8 MB of remastered textures became 126.4 MB). So a
+   tree's or a clump's texture whose compressed pixels and upload are identical to one
+   already on the card for the pack now loaded takes that card texture instead of making
+   its own. Only a plain texture of a tree or a clump is shared (no house paint and no
+   building-service frames: those are rebuilt per model, liveries and all). The key is
+   the stream's FNV-1a hash with its size, its dimensions and its kind of upload; a hit is
+   checked against the owner's size too. The table lives as long as the pack (ebld_attach
+   empties it), and g_ebldShareRefs counts the slots holding each shared name, so a
+   rolled-back preparation (ebld_prepare_restore_texture) deletes a name only when its
+   last holder goes. --noebldshare is the A/B: every file its own copies. */
+struct EbldShared { GLuint gl; int w, h; bool mips; };
+static std::unordered_map<uint64_t, EbldShared> g_ebldShare;
+static std::map<GLuint, int> g_ebldShareRefs;
+static bool g_ebldShareOn = true;
+static long g_ebldShareHits = 0, g_ebldShareSaved = 0;
+static bool ebld_share_type(const char* t)
 {
-    if (!bled) fx_bleed_rgba(&px[0], w, h, 4);
+    return t && t[0] == 'T' && ((t[1] >= '0' && t[1] <= '9') || ebld_packless_type(t));
+}
+static uint64_t ebld_share_key(const std::vector<unsigned char>& c, const EbldTex& T, bool mips)
+{
+    uint64_t h = 1469598103934665603ull;
+    for (size_t i = 0; i < c.size(); i++) { h ^= c[i]; h *= 1099511628211ull; }
+    const uint64_t meta[5] = { (uint64_t)c.size(), (uint64_t)T.w, (uint64_t)T.h,
+                               (uint64_t)T.role, (uint64_t)((T.cover ? 1 : 0) | (T.bled ? 2 : 0)
+                                                            | (mips ? 4 : 0)) };
+    for (int i = 0; i < 5; i++) h ^= meta[i] + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    return h;
+}
+static void ebld_share_reset(void)
+{
+    g_ebldShare.clear();
+    g_ebldShareRefs.clear();
+    g_ebldShareHits = g_ebldShareSaved = 0;
+}
+
+static GLuint ebld_upload_mips(const std::vector<unsigned char>& px, int w, int h, bool bled)
+{
+    std::vector<unsigned char> prepared;
+    const unsigned char* pixels = px.data();
+    if (!bled || !mesh_perf_switch("OPENCNC3D_EBLD_UPLOAD_REUSE")) {
+        prepared = px;
+        if (!bled) fx_bleed_rgba(prepared.data(), w, h, 4);
+        pixels = prepared.data();
+    }
     GLuint id = 0;
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
@@ -2161,7 +2486,7 @@ static GLuint ebld_upload_mips(std::vector<unsigned char> px, int w, int h, bool
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    gl_upload_mips(&px[0], w, h);
+    gl_upload_mips(pixels, w, h);
     return id;
 }
 /* THE SAME FOR A CUT-OUT SHEET THAT MUST NOT GO BALD (EbldTex::cover, the trees' spray
@@ -2229,23 +2554,192 @@ static GLuint ebld_upload_cover(std::vector<unsigned char> px, int w, int h, boo
     }
     return id;
 }
-static bool ebld_resident(EbldModel& M, bool all = false)
+/* Inflate directly into the three original pixel arrays. The old temporary `raw`
+   duplicated up to 36 MiB for one 2048 house atlas, on top of its compressed copy.
+   Output segmentation changes no byte; a one-byte overflow sink proves exact length.
+   The input chunk is bounded independently of the texture/file's compressed size. */
+/* THE SPECULAR MAPS: <stem>.spec beside a .ebld or .evhc (tools/art/remaster/bake_spec.py),
+   "EVSP", version 2, a count, then per record the texture's index, its size, a scale and
+   either the index of the texture whose map it takes (flag 1) or a zlib stream of its red
+   (how strongly a texel reflects) and green (how tight its highlight is). A record that does
+   not match its texture's size, or a file that cannot be read whole, is refused and the
+   model draws without one. Read by the remastered buildings and vehicles alike. */
+static void ebld_spec_read(const char* modelPath, EbldModel& M)
+{
+    M.hasSpec = false;
+    M.spec.assign(M.tex.size(), EbldSpecRec());
+    std::string sp(modelPath);
+    const size_t dot = sp.rfind('.');
+    if (dot == std::string::npos) return;
+    sp = sp.substr(0, dot) + ".spec";
+    FILE* f = fopen(sp.c_str(), "rb");
+    if (!f) return;
+    char magic[4];
+    unsigned int hdr[2];
+    bool ok = fread(magic, 1, 4, f) == 4 && memcmp(magic, "EVSP", 4) == 0
+              && fread(hdr, 4, 2, f) == 2 && hdr[0] == 2 && hdr[1] <= 64;
+    int n = 0;
+    for (unsigned int r = 0; ok && r < hdr[1]; r++) {
+        unsigned int rec[6];              /* index, w, h, scale, flags, from or csize */
+        ok = fread(rec, 4, 6, f) == 6 && rec[0] < M.tex.size()
+             && (int)rec[1] == M.tex[rec[0]].w && (int)rec[2] == M.tex[rec[0]].h && rec[3] <= 255;
+        if (!ok) break;
+        EbldSpecRec& R = M.spec[rec[0]];
+        R.scale = (int)rec[3];
+        R.sheen = (int)((rec[4] >> 8) & 255u);
+        if (rec[4] & 1) {
+            ok = rec[5] < M.tex.size() && M.tex[rec[5]].w == (int)rec[1] && M.tex[rec[5]].h == (int)rec[2];
+            R.from = (int)rec[5];
+        } else {
+            R.from = (int)rec[0];
+            R.off = ftell(f);
+            R.csize = (long)rec[5];
+            ok = fseek(f, R.csize, SEEK_CUR) == 0;
+        }
+        n++;
+    }
+    if (ok) {
+        fseek(f, 0, SEEK_END);
+        for (size_t t = 0; t < M.spec.size() && ok; t++)
+            if (M.spec[t].from >= 0 && M.spec[M.spec[t].from].csize > 0
+                && M.spec[M.spec[t].from].off + M.spec[M.spec[t].from].csize > ftell(f)) ok = false;
+    }
+    fclose(f);
+    if (!ok) {
+        fprintf(stderr, "%s: %s could not be read -- %s draws without a specular map\n",
+                M.tag.empty() ? "ebld" : M.tag.c_str(), sp.c_str(), M.type.c_str());
+        M.spec.assign(M.tex.size(), EbldSpecRec());
+        return;
+    }
+    M.specPath = sp;
+    M.hasSpec = n > 0;
+}
+
+/* Texture t's specular map as RGBA for the card (red, green, the map's upright sheen, the
+   texture's own alpha from `rgba`), or false when it has none. */
+static bool ebld_spec_pixels(const EbldModel& M, size_t t, const std::vector<unsigned char>& rgba,
+                             std::vector<unsigned char>& out)
+{
+    if (!M.hasSpec || t >= M.spec.size() || M.spec[t].from < 0) return false;
+    const EbldSpecRec& R = M.spec[t];
+    const EbldSpecRec& S = M.spec[R.from];
+    if (S.csize <= 0) return false;
+    const size_t n = (size_t)M.tex[t].w * M.tex[t].h;
+    if (rgba.size() < n * 4) return false;
+    std::vector<unsigned char> z((size_t)S.csize), rg(n * 2);
+    FILE* f = fopen(M.specPath.c_str(), "rb");
+    if (!f) return false;
+    bool ok = fseek(f, S.off, SEEK_SET) == 0 && fread(z.data(), 1, z.size(), f) == z.size();
+    fclose(f);
+    uLongf got = (uLongf)rg.size();
+    if (!ok || uncompress(rg.data(), &got, z.data(), (uLong)z.size()) != Z_OK || got != rg.size())
+        return false;
+    out.resize(n * 4);
+    for (size_t q = 0; q < n; q++) {
+        out[q * 4 + 0] = (unsigned char)((rg[q * 2] * R.scale + 127) / 255);
+        out[q * 4 + 1] = rg[q * 2 + 1];
+        out[q * 4 + 2] = (unsigned char)((S.sheen * R.scale + 127) / 255);
+        out[q * 4 + 3] = rgba[q * 4 + 3];
+    }
+    return true;
+}
+
+static bool ebld_inflate_texture(FILE* file, const EbldTex& T,
+                                 std::vector<unsigned char>& rgba,
+                                 std::vector<unsigned char>& nod,
+                                 std::vector<unsigned char>& mask)
+{
+    const size_t size = (size_t)T.w * T.h * 4;
+    if (T.house & 1) nod.resize(size);
+    if (T.house & 2) mask.resize(size / 4);
+    unsigned char input[65536], overflow = 0;
+    z_stream z = {};
+    if (inflateInit(&z) != Z_OK) return false;
+    std::vector<unsigned char>* output[3] = { &rgba, &nod, &mask };
+    size_t part = 0;
+    long remaining = T.csize;
+    int result = Z_OK;
+    bool ok = true;
+    for (;;) {
+        if (!z.avail_in && remaining > 0) {
+            const size_t n = (size_t)remaining > sizeof input ? sizeof input : (size_t)remaining;
+            if (fread(input, 1, n, file) != n) { ok = false; break; }
+            remaining -= (long)n; z.next_in = input; z.avail_in = (uInt)n;
+        }
+        if (!z.avail_out) {
+            while (part < 3 && output[part]->empty()) part++;
+            if (part < 3) {
+                z.next_out = output[part]->data(); z.avail_out = (uInt)output[part]->size(); part++;
+            } else { z.next_out = &overflow; z.avail_out = 1; }
+        }
+        const uLong before = z.total_out;
+        const uInt inputBefore = z.avail_in;
+        result = inflate(&z, Z_NO_FLUSH);
+        const size_t want = rgba.size() + nod.size() + mask.size();
+        if (z.total_out > want) { ok = false; break; }
+        if (result == Z_STREAM_END) { ok = z.total_out == want; break; }
+        if (result != Z_OK || (z.total_out == before && z.avail_in == inputBefore
+                               && (!remaining || z.avail_in))) { ok = false; break; }
+    }
+    inflateEnd(&z);
+    return ok;
+}
+/* TWO RED ALERT STRUCTURES PAINTED DARKER THAN THE REST. The lab's paint pulls every flat
+   face toward its building's own reference light, and the Dog Kennel's (0.554: dark planks
+   and posts) and the Allied Barracks' olive canvas sit well under the others' (0.65 to
+   0.68). In the game the kennel read as a dark lump beside every other building, and the
+   tents' shaded walls and roof hollows went nearly black (22 of 255 on the south wall).
+   Their paint is lifted as it is loaded, by a gamma under one, so the dark canvas and
+   planks come up most and the lit faces only a little; the light, the shadows and the
+   normals stay the game's as for every other building. 1 for every other type. */
+static float ebld_ra_paint_lift(const std::string& type)
+{
+    if (!g_raModule) return 1.0f;
+    if (type == "KENN") return 0.74f;
+    if (type == "TENT") return 0.66f;
+    return 1.0f;
+}
+static void ebld_lift_paint(std::vector<unsigned char>& px, float gamma)
+{
+    if (gamma == 1.0f || px.empty()) return;
+    unsigned char lut[256];
+    for (int v = 0; v < 256; v++)
+        lut[v] = (unsigned char)lroundf(255.0f * powf((float)v / 255.0f, gamma));
+    for (size_t q = 0; q + 3 < px.size(); q += 4) {
+        px[q] = lut[px[q]]; px[q + 1] = lut[px[q + 1]]; px[q + 2] = lut[px[q + 2]];
+    }
+}
+
+static bool ebld_resident(EbldModel& M, bool all = false, size_t maxTextures = (size_t)-1,
+                          size_t onlyTexture = (size_t)-1, uint64_t wantedTextures = ~uint64_t(0))
 {
     /* a wall mask's stage model draws with its wall's textures */
     if (M.texOwner >= 0 && M.texOwner < (int)g_ebld.size() && &g_ebld[M.texOwner] != &M) {
         EbldModel& O = g_ebld[M.texOwner];
-        const bool ok = ebld_resident(O, all);
+        const bool ok = ebld_resident(O, all, maxTextures, onlyTexture, wantedTextures);
         M.resident = O.resident;
         M.residentAll = O.residentAll;
-        if (!O.attached) M.attached = false;
+        if (!O.attached && M.attached) { M.attached = false; g_ebldResolveGen++; }
         return ok;
     }
     if (M.resident && (M.residentAll || !all)) return true;
     if (!M.attached) return false;
+    const bool selective = wantedTextures != ~uint64_t(0);
+    if (selective) {
+        bool ready = true;
+        for (size_t texture = 0; texture < M.tex.size() && texture < 64; texture++)
+            if ((wantedTextures & (uint64_t(1) << texture))
+                && ((size_t)M.tex0 + texture >= g_pack.tex.size()
+                    || !g_pack.tex[(size_t)M.tex0 + texture].gl)) {
+                ready = false;
+                break;
+            }
+        if (ready) return true;
+    }
     const bool first = !M.resident;
-    M.resident = true;
-    if (all) M.residentAll = true;
     const Uint64 t0 = SDL_GetPerformanceCounter();
+    const char* profileSetting = getenv("OPENCNC3D_EBLD_TEXTURE_PROFILE");
+    const bool profileTextures = profileSetting && profileSetting[0] && strcmp(profileSetting, "0");
     /* the caller's texture binding is handed back: this can run in the middle of a pass */
     GLint bound = 0;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound);
@@ -2256,33 +2750,45 @@ static bool ebld_resident(EbldModel& M, bool all = false)
     }
     bool readOk = (tf != NULL);
     long bytes = 0;
-    int n = 0;
+    int n = 0, shared = 0;
     const size_t tex0 = (size_t)M.tex0;
     std::vector<size_t> done;
-    for (size_t t = 0; t < M.tex.size() && readOk; t++) {
+    for (size_t t = 0; t < M.tex.size() && readOk && (size_t)n < maxTextures; t++) {
+        if (onlyTexture != (size_t)-1 && t != onlyTexture) continue;
+        if (selective && (t >= 64 || !(wantedTextures & (uint64_t(1) << t)))) continue;
         /* the whole model's textures first; the cut's, the damage's and the wreck's with
            the first draw of a building that has been hit */
         if (!(M.texIntact[t] ? first : all)) continue;
         if (tex0 + t < g_pack.tex.size() && g_pack.tex[tex0 + t].gl) continue;
         const EbldTex& T = M.tex[t];
         const size_t sz = (size_t)T.w * T.h * 4;
+        const Uint64 textureBegin = profileTextures ? SDL_GetPerformanceCounter() : 0;
+        /* (a texture another tree's or clump's file already put on the card: shared) */
+        uint64_t shareKey = 0;
+        if (g_ebldShareOn && T.csize > 0 && T.house == 0 && ebld_share_type(M.type.c_str())
+            && M.service.tex.find((int)t) == M.service.tex.end()) {
+            std::vector<unsigned char> comp((size_t)T.csize);
+            fseek(tf, T.off, SEEK_SET);
+            if (fread(comp.data(), 1, comp.size(), tf) != comp.size()) { readOk = false; break; }
+            shareKey = ebld_share_key(comp, T, M.version >= 5 && T.role != 6);
+            const auto hit = g_ebldShare.find(shareKey);
+            if (hit != g_ebldShare.end() && hit->second.w == T.w && hit->second.h == T.h
+                && tex0 + t < g_pack.tex.size()) {
+                PackTex& pt = g_pack.tex[tex0 + t];
+                pt.gl = hit->second.gl;
+                pt.mips = hit->second.mips;
+                g_ebldShareRefs[pt.gl]++;
+                g_ebldShareHits++;
+                g_ebldShareSaved += (long)sz * (pt.mips ? 4 : 3) / 3;
+                shared++;
+                n++;
+                continue;
+            }
+        }
         std::vector<unsigned char> rgba(sz), nod, mask;
         fseek(tf, T.off, SEEK_SET);
         if (T.csize > 0) {
-            /* VERSION 5: one zlib stream, inflated into the three parts */
-            std::vector<unsigned char> z((size_t)T.csize), raw;
-            const size_t want = sz + ((T.house & 1) ? sz : 0) + ((T.house & 2) ? sz / 4 : 0);
-            raw.resize(want);
-            readOk = fread(&z[0], 1, z.size(), tf) == z.size();
-            uLongf got = (uLongf)want;
-            if (readOk)
-                readOk = uncompress(&raw[0], &got, &z[0], (uLong)z.size()) == Z_OK
-                         && got == (uLongf)want;
-            if (readOk) {
-                memcpy(&rgba[0], &raw[0], sz);
-                if (T.house & 1) nod.assign(raw.begin() + sz, raw.begin() + 2 * sz);
-                if (T.house & 2) mask.assign(raw.begin() + 2 * sz, raw.begin() + 2 * sz + sz / 4);
-            }
+            readOk = ebld_inflate_texture(tf, T, rgba, nod, mask);
         } else {
             readOk = fread(&rgba[0], 1, sz, tf) == sz;
             if (readOk && (T.house & 1)) {
@@ -2295,15 +2801,37 @@ static bool ebld_resident(EbldModel& M, bool all = false)
             }
         }
         if (!readOk || tex0 + t >= g_pack.tex.size()) { readOk = false; break; }
+        if (T.role != 6) {
+            const float lift = ebld_ra_paint_lift(M.type);
+            ebld_lift_paint(rgba, lift);
+            ebld_lift_paint(nod, lift);
+        }
+        const Uint64 decodeEnd = profileTextures ? SDL_GetPerformanceCounter() : 0;
+        bytes += bservice_upload(M,(int)t,rgba);
+        const Uint64 serviceEnd = profileTextures ? SDL_GetPerformanceCounter() : 0;
         PackTex& pt = g_pack.tex[tex0 + t];
+        if (!strncmp(M.type.c_str(),"ROCK",4) && !pt.gl_stone)
+            pt.gl_stone=stone_map_for_rgba(rgba,T.w,T.h);
+        if (!g_raModule && !nod.empty() && !mask.empty())
+            livery_faction_load(pt, M.path.c_str(), (unsigned)t, rgba, nod, mask);
+        const Uint64 factionEnd = profileTextures ? SDL_GetPerformanceCounter() : 0;
         /* VERSION 5 MIPMAPS every texture but the zone overlays, whose alpha is the
-           patch noise the alpha test reads (a mipmap would average it to a flat half) */
+           patch noise the overlay blends by (a mipmap would average it to a flat half) */
         if (g_raModule && !nod.empty()) {
             nod = rgba;
             for (size_t q = 0; q < mask.size(); q++)
                 if (mask[q]) livery_recolour(&rgba[q * 4], mask[q], 1, &nod[q * 4]);
         }
         const bool mips = (M.version >= 5 && T.role != 6);
+        /* its specular map, made as the texture is (mipmapped with it), before the pixels
+           are handed on below */
+        if (M.hasSpec && !pt.gl_spec) {
+            std::vector<unsigned char> sp;
+            if (ebld_spec_pixels(M, t, rgba, sp))
+                pt.gl_spec = mips ? ebld_upload_mips(sp, T.w, T.h, false) : n64fix_upload(sp, T.w, T.h);
+        }
+        const bool reusePixels = !g_raModule && T.bled
+                                 && mesh_perf_switch("OPENCNC3D_EBLD_UPLOAD_REUSE");
         pt.mips = mips;
         if (mips) {
             pt.gl = T.cover ? ebld_upload_cover(nod.empty() ? rgba : nod, T.w, T.h, T.bled)
@@ -2316,7 +2844,7 @@ static bool ebld_resident(EbldModel& M, bool all = false)
             }
             bytes += (long)sz * (nod.empty() ? 1 : 2) * 4 / 3;
         } else if (nod.empty()) {
-            pt.gl = n64fix_upload(rgba, T.w, T.h);
+            pt.gl = n64fix_upload(rgba, T.w, T.h, reusePixels);
             bytes += (long)sz;
         } else {
             /* HOUSE PAINT: a two-decode texture exactly like a cartridge house texture,
@@ -2325,14 +2853,31 @@ static bool ebld_resident(EbldModel& M, bool all = false)
                the GDI look, and the unbled GDI decode is kept with the mask for the
                skirmish liveries to be painted from. The Nod decode is not kept: a
                masked texture is painted from the GDI look and the mask alone. */
-            pt.gl = n64fix_upload(nod, T.w, T.h);
-            pt.gl_gdi = n64fix_upload(rgba, T.w, T.h);
+            pt.gl = n64fix_upload(nod, T.w, T.h, reusePixels);
+            pt.gl_gdi = n64fix_upload(rgba, T.w, T.h, reusePixels);
             pt.gdi.swap(rgba);
             pt.mask.swap(mask);
             bytes += 2 * (long)sz;
         }
+        if (shareKey && pt.gl) {
+            EbldShared S;
+            S.gl = pt.gl; S.w = T.w; S.h = T.h; S.mips = pt.mips;
+            g_ebldShare[shareKey] = S;
+            g_ebldShareRefs[pt.gl]++;
+        }
         done.push_back(tex0 + t);
         n++;
+        if (profileTextures) {
+            const Uint64 uploadEnd = SDL_GetPerformanceCounter();
+            const double microseconds = 1000000.0 / (double)SDL_GetPerformanceFrequency();
+            fprintf(stderr, "EBLDTEXPROFILE|type=%s|texture=%zu|role=%d|width=%d|height=%d"
+                            "|compressed=%ld|bled=%d|cover=%d|prepare=%d|reuse=%d"
+                            "|decode_us=%.3f|service_us=%.3f|faction_us=%.3f|upload_us=%.3f\n",
+                    M.type.c_str(), t, T.role, T.w, T.h, T.csize, T.bled ? 1 : 0,
+                    T.cover ? 1 : 0, maxTextures != (size_t)-1 ? 1 : 0, reusePixels ? 1 : 0,
+                    (decodeEnd-textureBegin)*microseconds, (serviceEnd-decodeEnd)*microseconds,
+                    (factionEnd-serviceEnd)*microseconds, (uploadEnd-factionEnd)*microseconds);
+        }
     }
     if (tf) fclose(tf);
     glBindTexture(GL_TEXTURE_2D, (GLuint)bound);
@@ -2340,28 +2885,64 @@ static bool ebld_resident(EbldModel& M, bool all = false)
         fprintf(stderr, "%s: %s changed, went away or could not be read back -- %s is "
                         "drawn by the cartridge from here on\n",
                 M.tag.empty() ? "ebld" : M.tag.c_str(), M.path.c_str(), M.type.c_str());
-        M.attached = false;
+        M.attached = false; g_ebldResolveGen++;
+        if (maxTextures == (size_t)-1) g_ebldPrepareMetrics.demandFailures++;
         return false;
     }
+    /* A bounded preparation call may stop after one texture. Only publish whole-model
+       readiness once all corresponding slots exist; an early draw finishes the missing
+       textures through the ordinary demand path. */
+    M.resident = M.residentAll = true;
+    for (size_t t = 0; t < M.tex.size(); t++)
+        if (tex0 + t >= g_pack.tex.size() || !g_pack.tex[tex0 + t].gl) {
+            M.residentAll = false;
+            if (M.texIntact[t]) M.resident = false;
+        }
     /* the liveries of exactly the textures just uploaded: a texture's are made once */
+    const Uint64 liveryBegin = profileTextures ? SDL_GetPerformanceCounter() : 0;
     for (size_t i = 0; i < done.size(); i++) livery_build_range(done[i], done[i] + 1);
+    if (profileTextures && !done.empty()) {
+        const double liveryUs = (SDL_GetPerformanceCounter()-liveryBegin)*1000000.0
+                               / (double)SDL_GetPerformanceFrequency();
+        fprintf(stderr, "EBLDTEXPROFILE|type=%s|textures=%zu|prepare=%d|livery_us=%.3f\n",
+                M.type.c_str(), done.size(), maxTextures != (size_t)-1 ? 1 : 0, liveryUs);
+    }
     glBindTexture(GL_TEXTURE_2D, (GLuint)bound);
     g_ebldResidentBytes += bytes;
+    if (n && perf_trace_frame_active()) {
+        g_destructTrace[17]++;
+        g_destructTrace[18] += (Uint64)bytes;
+        g_destructTrace[20] += (SDL_GetPerformanceCounter()-t0)*1000000u/SDL_GetPerformanceFrequency();
+    }
+    if (n && maxTextures == (size_t)-1) {
+        g_ebldPrepareMetrics.demandTextures += (unsigned)n;
+        g_ebldPrepareMetrics.demandTextureUs += (SDL_GetPerformanceCounter() - t0)
+                                               * 1000000u / SDL_GetPerformanceFrequency();
+    }
     if (n)
         fprintf(stderr, "%s: %s textures on the card%s, %d textures, %.1f MB (%.1f MB in "
-                "all), %.1f ms\n", M.tag.empty() ? "ebld" : M.tag.c_str(), M.type.c_str(),
+                "all), %.1f ms%s\n", M.tag.empty() ? "ebld" : M.tag.c_str(), M.type.c_str(),
                 first ? "" : " (its damage)", n,
                 (double)bytes / 1048576.0, (double)g_ebldResidentBytes / 1048576.0,
                 (double)(SDL_GetPerformanceCounter() - t0) * 1000.0
-                    / (double)SDL_GetPerformanceFrequency());
+                    / (double)SDL_GetPerformanceFrequency(),
+                shared ? (" (" + std::to_string(shared) + " of them already on the card from "
+                          "another tree's file, shared)").c_str() : "");
     return true;
+}
+
+static bool ebld_resident_stage(EbldModel& model, int stage)
+{
+    if (!ebld_stage_residency_enabled(model)) return ebld_resident(model, true);
+    return ebld_resident(model, true, (size_t)-1, (size_t)-1,
+                         ebld_texture_mask_for_stage(model, stage));
 }
 
 /* A TYPE READ AT FIRST SIGHT (ebld_type_lazy): the first time the game asks for it, its
    file (the plain one, or this theater's look) is read and attached to the pack now
    loaded, wall masks and all. Each file is tried once a process. True: something was
    read and attached. */
-static bool ebld_ensure(const char* type)
+static bool ebld_ensure(const char* type, size_t maxSourceBytes)
 {
     if (!type || !*type || !ebld_type_lazy(type)) return false;
     const int th = ebld_pack_theater();
@@ -2378,11 +2959,15 @@ static bool ebld_ensure(const char* type)
                 own = g_ebld[mI].type == type && g_ebld[mI].theater == th && th >= 0;
             if (own) continue;
         }
-        if (!g_raModule && g_pack.type.find(type) == g_pack.type.end()) continue;
+        if (!g_raModule && !ebld_packless_type(type)
+            && g_pack.type.find(type) == g_pack.type.end()) continue;
         F.tried = true;
         const Uint64 t0 = SDL_GetPerformanceCounter();
         const size_t m0 = g_ebld.size();
-        if (!ebld_read_file(F)) continue;
+        if (!ebld_read_file(F, maxSourceBytes)) {
+            if (maxSourceBytes) return false;
+            continue;
+        }
         /* (a theater's look stands in for the plain file, which stays detached) */
         std::set<std::string> ownLook;
         for (size_t mI = 0; mI < g_ebld.size(); mI++)
@@ -2434,7 +3019,7 @@ static bool ebld_cut_ok(const EbldModel& M)
 
 /* The building model standing in for this type in the current pack, or -1. A wall's
    model is never a building's. */
-static int ebld_model_of(const char* type)
+static int ebld_model_of_scan(const char* type)
 {
     type = ebld_alias(type);
     for (int pass = 0; pass < 2; pass++) {
@@ -2449,20 +3034,500 @@ static int ebld_model_of(const char* type)
     }
     return -1;
 }
+/* AND ASKED ONCE PER TYPE PER FRAME. Every pass asks again for every building, tree and
+   rock it draws, two to four times an object through the readiness checks, and each ask
+   walks the whole model list comparing names. The answer is kept for the frame under the
+   type's name, and the whole memo is dropped when anything it reads could have moved: a
+   new frame, a model read or attached (the list's size, the pack serial, the resolve
+   generation, which the detaching paths bump), a pack's meshes, types or files, the rule
+   or the module. The first ask of a frame always walks, so a type read at first sight is
+   read exactly when it was. OPENCNC3D_RESOLVE_MEMO=0 walks every time;
+   OPENCNC3D_RESOLVE_VERIFY=1 walks anyway and stops the program if the two disagree. */
+static unsigned long g_ebldResolveHits = 0, g_ebldResolveScans = 0;
+static int ebld_model_of(const char* type)
+{
+    static const bool memo = mesh_perf_switch("OPENCNC3D_RESOLVE_MEMO");
+    static const bool verify = [](){ const char* v = getenv("OPENCNC3D_RESOLVE_VERIFY"); return v && !strcmp(v, "1"); }();
+    if (!memo || !type) { g_ebldResolveScans++; return ebld_model_of_scan(type); }
+    size_t n = 0;
+    while (n < 16 && type[n]) n++;
+    if (n >= 16) { g_ebldResolveScans++; return ebld_model_of_scan(type); }
+    struct Sig {
+        unsigned frame, gen; int serial; size_t models, meshes, types, files; bool rule, ra; char theater[sizeof g_pack.theater];
+        bool operator==(const Sig& o) const {
+            return frame == o.frame && gen == o.gen && serial == o.serial && models == o.models
+                && meshes == o.meshes && types == o.types && files == o.files && rule == o.rule && ra == o.ra
+                && !memcmp(theater, o.theater, sizeof theater);
+        }
+    };
+    /* (the theater picks a type's own look and its aliases) */
+    const auto signature = [](void) {
+        Sig s = { g_drawFrameSerial, g_ebldResolveGen, g_ebldPackSerial, g_ebld.size(), g_pack.mesh.size(),
+                  g_pack.type.size(), g_ebldFiles.size(), ebld_rule_now(), g_raModule != 0, {0} };
+        strncpy(s.theater, g_pack.theater, sizeof s.theater);
+        return s;
+    };
+    struct Slot { char name[16]; int model; bool used; };
+    enum { SLOTS = 128 };
+    static Slot slots[SLOTS];
+    static Sig held = {};
+    static bool heldValid = false;
+    const Sig now = signature();
+    if (!heldValid || !(now == held)) {
+        for (int k = 0; k < SLOTS; k++) slots[k].used = false;
+        held = now; heldValid = true;
+    }
+    uint32_t h = 2166136261u;
+    for (size_t k = 0; k < n; k++) h = (h ^ (unsigned char)type[k]) * 16777619u;
+    for (int probe = 0, at = (int)(h & (SLOTS - 1)); probe < SLOTS; probe++, at = (at + 1) & (SLOTS - 1)) {
+        Slot& S = slots[at];
+        if (S.used) {
+            if (memcmp(S.name, type, n + 1)) continue;
+            g_ebldResolveHits++;
+            if (verify) {
+                const int fresh = ebld_model_of_scan(type);
+                if (fresh != S.model) {
+                    fprintf(stderr, "RESOLVE|ebld_model_of|MISMATCH|type=%s|memo=%d|scan=%d\n", type, S.model, fresh);
+                    fflush(stderr); abort();
+                }
+            }
+            return S.model;
+        }
+        g_ebldResolveScans++;
+        const int model = ebld_model_of_scan(type);
+        /* a walk that read or attached a model has moved what the memo was keyed on */
+        const Sig after = signature();
+        if (after == held) { memcpy(S.name, type, n + 1); S.model = model; S.used = true; }
+        return model;
+    }
+    g_ebldResolveScans++;
+    return ebld_model_of_scan(type);
+}
 
+/* RED ALERT'S CIVILIAN BUILDINGS ARE TIBERIAN DAWN'S. The houses, farms and the oil pump
+   (V01 to V19), the hospital, the bio lab and the technology center are the same 1995
+   pictures in both games, and the Red Alert lab reuses OpenCNC3D's approved remasters of
+   them (tools/ra3d/stage-reuse.py copies the files into ra3d/ebld). Those files carry all
+   three stages, and under Red Alert they play them exactly as Tiberian Dawn does: worn
+   chip by chip, broken at half strength, blown apart and sunk over their scorch when they
+   die (ebld_step, ebld_draw). Red Alert's own structures do the same where their files
+   carry their stages (ebld_ra_staged); an intact-only one keeps its 1996 states. */
+static bool ebld_ra_civil(const char* t)
+{
+    if (!t) return false;
+    if (t[0] == 'V' && t[1] >= '0' && t[1] <= '9' && t[2] >= '0' && t[2] <= '9' && !t[3])
+        return true;
+    return !strcmp(t, "BIO") || !strcmp(t, "HOSP") || !strcmp(t, "MISS");
+}
+static int etree_stage_model(const SimObject& o, int k);
+static const EbldBld* ebld_find(const SimObject& o);
+/* RED ALERT'S OWN STRUCTURES WITH THEIR STAGES. A Red Alert structure's file is either the
+   approved standing model alone (intact only: it stands whole at every strength, and its
+   1996 states play the rest) or the model with its stages, baked from the Red Alert lab as
+   Tiberian Dawn's structures are (tools/ra3d/bake-structures.py). A staged file plays them
+   exactly as a reused civilian building does: worn chip by chip from the side it is hit
+   on, broken at half strength, blown apart and sunk over its scorch when it dies, its own
+   emitters burning and smoking in their stage. */
+static bool ebld_ra_staged(const SimObject& o)
+{
+    if (!g_raModule || o.kind != K_BUILDING || ebld_ra_civil(o.type)) return false;
+    const int m = ebld_model_of(o.type);
+    return m >= 0 && g_ebld[m].nset >= 2;
+}
 /* Keep the approved standing model through damage until a reviewed damage model is
-   available. Construction, sale and an open factory door use the engine animation. */
+   available. Construction, sale and an open factory door use the engine animation, unless
+   the model's placement or its own door plays them. A civilian building's model and a
+   staged structure's (ebld_ra_staged) are the building's at every strength; a reused tree
+   (ebld_terr.h) is drawn whole, burning or as its charred snag, while its type has the
+   stage. */
+static bool eplc_owns(const SimObject& o);
+static bool eplc_has_type(const char* type);
+static bool ra3d_prop_claims(const SimObject& o);   /* (ra3d_props_mod.h) */
+static bool ra3d_ore_mine_claims(const SimObject& o);   /* (ra3d_ore_mod.h) */
+static bool ra3d_props_on(void);
+static float ra3d_prop_phase(const SimObject& o, const EbldClip& C);
+static bool ra3d_mine_hidden(const SimObject& o);
 static bool ebld_ra_ready(const SimObject& o)
 {
-    if (!g_raModule || !ebld_rule_now() || g_fx.dos_classic || o.kind != K_BUILDING
+    if (!g_raModule || !ebld_rule_now() || g_fx.dos_classic) return false;
+    /* A STRUCTURE ITS PLACEMENT OWNS (ebld_place.h: Red Alert's Construction Yard deploying
+       out of its MCV, a structure built from the sidebar, or one being sold) is its
+       remastered model's while it goes up, as Tiberian Dawn's are: its 1996 build-up card
+       stands down and the placement draws it */
+    if (o.kind == K_BUILDING && !o.limbo && o.str > 0 && eplc_owns(o)) {
+        const int m = ebld_model_of(o.type);
+        if (m < 0 || !ebld_resident(g_ebld[m])) return false;
+        livery_build_range(g_ebld[m].tex0, g_ebld[m].tex0 + g_ebld[m].tex.size());
+        return true;
+    }
+    if (o.kind == K_TERRAIN) {
+        /* (Red Alert's own props stood as terrain objects: the crate stacks, the ice floes,
+           and the cell decorations drawn through here, ra3d_props_mod.h) */
+        if (ra3d_prop_claims(o)) return true;
+        /* (the ore mine, ra3d_ore_mod.h) */
+        if (ra3d_ore_mine_claims(o)) return true;
+        if (!eterr_tree_claims(o) || (o.str <= 0 && etree_stage_model(o, 2) < 0)) return false;
+        const int m = ebld_model_of(o.type);
+        return m >= 0 && ebld_resident(g_ebld[m]);
+    }
+    if (o.kind != K_BUILDING
         || o.str <= 0 || building_constructing(o)
-        || construction_frac(o) < 1.0f || o.limbo || !strcmp(o.mission, "Selling")
-        || ((!strcmp(o.type, "WEAP") || !strcmp(o.type, "WEAF")) && o.doorstage > 0))
+        || construction_frac(o) < 1.0f || o.limbo)
         return false;
+    /* (a mine another side laid: the 1996 engine never shows it to the player) */
+    if (ra3d_mine_hidden(o)) return false;
+    /* (Red Alert's props, the barrels and the mines, off for an A/B: ra3d_props_mod.h) */
+    if (!ra3d_props_on() && (!strcmp(o.type, "BARL") || !strcmp(o.type, "BRL3")
+                             || !strcmp(o.type, "MINV") || !strcmp(o.type, "MINP")))
+        return false;
+    /* (sold: the 1996 card plays the sale backwards, unless the type's placement does, which
+       takes it over on the tick the engine starts it; until then the model stands) */
+    if (!strcmp(o.mission, "Selling") && !eplc_has_type(o.type)) return false;
     const int m = ebld_model_of(o.type);
-    if (m < 0 || g_ebld[m].nset != 1 || !ebld_resident(g_ebld[m])) return false;
+    if (m < 0 || !ebld_resident(g_ebld[m])) return false;
+    /* THE WAR FACTORY'S DOOR: the 1996 card's while it is open, unless the model's own door
+       clip opens with it (RA_DRIVE) */
+    if ((!strcmp(o.type, "WEAP") || !strcmp(o.type, "WEAF")) && o.doorstage > 0
+        && !(g_ebld[m].raDrive >= 0 && g_ebld[m].clipIntact >= 0))
+        return false;
     livery_build_range(g_ebld[m].tex0, g_ebld[m].tex0 + g_ebld[m].tex.size());
     return true;
+}
+
+/* ---- Red Alert's driven clips ------------------------------------------------------------
+   THE MOTION THE 1996 GAME DRAWS FROM A BUILDING'S STATE, played on the model's own clip.
+   Red Alert's engine runs each structure's moving picture from its BState (bdata.cpp's
+   _anims rows: the Missile Silo's cover opening, held and closing, the Tesla Coil's charge,
+   the Construction Yard's crane while it builds) or from its door (the War Factory's, its
+   Door_Stage), and the dump reports both (doing=, dostage=, door=). A model whose type has a
+   row here has its intact clip (remaster.json `anim`) played by that state instead of on
+   its own clock, and its cut's clip (the damaged model's, frame for frame the intact one's)
+   with it. A model without a clip keeps its 1996 state where the row says so (the War
+   Factory's open door is its card) and is otherwise still.
+
+   Four kinds:
+     DOOR   out as far as the engine's door stage says (0 shut to stages-1 open)
+     RAMP   out while the engine's state is one of `on`, back otherwise
+     STAGE  out as far as its anim's stage says while the state is `on[0]`, back otherwise
+     CYCLE  loops while the state is `on[0]`, and finishes its loop to rest when it ends
+     CHARGE the Tesla Coil's charge, which BState does not carry: Charging_AI counts the
+            stage 0 to 9 at rate 3 while it charges and stops it on 9 once charged, when
+            Shape_Number draws the held frame 3 instead; 0 when it lets go
+     FIRED  plays once from the tick the player fires the special it serves (`mission` names
+            it), at the 1996 anim's rate (`out` ticks a frame): the 1996 game never starts
+            the Iron Curtain's ACTIVE anim, so its sphere is played when the curtain is used,
+            a choice of ours
+     ANIM   follows an anim of the engine's own laid on the building (the Allied Tech
+            Center's launch doors are SPUTDOOR's frames): its stage, scaled to the clip, and
+            the anim's 1996 card stands down while the model plays it (ra3d_anim_card)
+   The first three move at the 1996 anim's own speed (ticks out, ticks back), eased between
+   ticks; where the clip lies is read from the clip itself (ebld_ra_drive_prepare): the
+   frames before anything moves, the frames it is fully out, and, if it comes back by
+   itself (an open-held-shut clip), the frames of its return.
+   A CLIP OF THE 1996 PICTURES instead (the Red Alert lab's clip_rm.py: one frame per frame of
+   the building's own 1996 animation, as many as its _anims rows draw, `sprites`) shows the
+   very frame the 1996 game draws: the building's stage, which the engine keeps as the frame
+   number itself (BuildingClass::Shape_Number; the War Factory's door: the door stage), frame 0
+   at rest. Which of the two a file is,
+   is told by its frame count. */
+enum { ERD_DOOR = 1, ERD_RAMP, ERD_STAGE, ERD_CYCLE, ERD_ANIM, ERD_CHARGE, ERD_FIRED };
+struct EbldRaDrive {
+    const char* type;
+    int kind;
+    int on[2];            /* the BStates it is out in (-1 none); RAMP: also by mission */
+    const char* mission;  /* RAMP: out while the building is on this mission */
+    int out, back;        /* ticks from rest to fully out, and back */
+    /* THE 1996 PICTURES: how many frames the building's own animation has (its _anims rows,
+       0 none) */
+    int sprites;
+    const char* anim;     /* ANIM: the engine's anim it follows */
+    /* A FLASH, not a motion: a glow or a light that the 1996 game switches frame by frame,
+       which a clip of the 1996 pictures shows frame for frame. A motion (a door, a cover,
+       an arm, a crane) is always played by time, one clip frame after another and blended
+       between them as the picture is drawn, over the 1996 motion's own duration. */
+    bool flash;
+};
+/* BSTATE (redalert/defines.h): 1 IDLE, 2 ACTIVE, 3 FULL, 4 AUX1, 5 AUX2 */
+static const EbldRaDrive RA_DRIVE[] = {
+    /* War Factory: its door, Open_Door(8, 5) in BuildingClass::Mission_Unload: the stage runs
+       0 to 3 at eight ticks, 3 standing open; its 1996 door overlay (WEAP2) draws the stage
+       itself, frame for frame (a 5-frame clip: frame n the stage n) */
+    { "WEAP", ERD_DOOR,  { -1, -1 }, NULL, 32, 32, 5, NULL, false },
+    /* Missile Silo: the cover opens (ACTIVE, 5 stages at rate 2), is held (AUX1) through
+       the launch, and closes (AUX2, 3 stages at rate 2) */
+    { "MSLO", ERD_RAMP,  {  2,  4 }, NULL, 10, 6, 8, NULL, false },
+    /* Allied Tech Center: its launch door, for the GPS satellite (Mission_Missile; the 1996
+       game draws it as an anim of its own, SPUTDOOR, of 35 frames, over the building) */
+    { "ATEK", ERD_ANIM,  { -1, -1 }, NULL, 0, 0, 35, "SPUTDOOR", false },
+    /* Tesla Coil: its charge (Charging_AI: 10 stages at rate 3, frame 3 held charged) */
+    { "TSLA", ERD_CHARGE, { -1, -1 }, NULL, 3, 3, 10, NULL, true },
+    /* Iron Curtain: the sphere (its 11-frame ACTIVE row at rate 3, played when it is used) */
+    { "IRON", ERD_FIRED, { -1, -1 }, "SW_IronCurtain", 3, 3, 11, NULL, true },
+    /* Chronosphere: the portal (IDLE 4 stages, ACTIVE 16 stages at rate 3 after them) */
+    { "PDOX", ERD_STAGE, {  2, -1 }, NULL, 45, 15, 20, NULL, true },
+    /* Camo Pillbox: its hatch and slits (ACTIVE, 2 stages at rate 1) */
+    { "HBOX", ERD_STAGE, {  2, -1 }, NULL, 2, 4, 2, NULL, false },
+    /* Construction Yard: the crane while it builds (ACTIVE, 26 stages at rate 3: one turn
+       of the loop is 78 ticks, `out`) */
+    { "FACT", ERD_CYCLE, {  2, -1 }, NULL, 78, 0, 26, NULL, false },
+    /* Service Depot: while it repairs (ACTIVE, 7 stages at rate 2: 14 ticks a turn) */
+    { "FIX",  ERD_CYCLE, {  2, -1 }, NULL, 14, 0, 7, NULL, false },
+    /* Airfield: its beacon (IDLE and AUX1, 8 stages at rate 3: bdata.cpp's later IDLE row
+       is the one Init_Anim keeps) */
+    { "AFLD", ERD_CYCLE, {  4, -1 }, NULL, 0, 0, 8, NULL, true },
+};
+/* Whether a model's driven clip is a motion played by time (not a flash). */
+static bool ebld_ra_motion(const EbldModel& M)
+{
+    return g_raModule && M.raDrive >= 0 && M.clipIntact >= 0 && !RA_DRIVE[M.raDrive].flash;
+}
+static int ebld_ra_drive_row(const char* type)
+{
+    for (size_t i = 0; i < sizeof RA_DRIVE / sizeof RA_DRIVE[0]; i++)
+        if (!strcmp(RA_DRIVE[i].type, type)) return (int)i;
+    return -1;
+}
+/* How far frame f of the intact clip has moved its parts from frame 0 (pack units and
+   matrix terms alike: a turn of a part far from its pivot is a long way). */
+static float ebld_ra_drive_dist(const EbldClip& C, int f)
+{
+    float d = 0.0f;
+    for (int p = 0; p < C.nparts; p++) {
+        const float* a = &C.mat[((size_t)f * C.nparts + p) * 12];
+        const float* z = &C.mat[(size_t)p * 12];
+        for (int k = 0; k < 12; k++) {
+            const float e = fabsf(a[k] - z[k]) * ((k & 3) == 3 ? 1.0f : 64.0f);
+            if (e > d) d = e;
+        }
+    }
+    return d;
+}
+/* At load, under Red Alert: whether the model's type is driven, and where in its clip the
+   motion lies. A driven clip never runs on its own clock, whatever the lab played it as. */
+static void ebld_ra_drive_prepare(EbldModel& m)
+{
+    m.raDrive = -1;
+    if (m.clipIntact < 0 || m.stageOf >= 0) return;
+    const int r = ebld_ra_drive_row(m.type.c_str());
+    if (r < 0) return;
+    m.raDrive = r;
+    for (size_t c = 0; c < m.clip.size(); c++) m.clip[c].idle = false;
+    const EbldClip& C = m.clip[m.clipIntact];
+    const int n = C.frames;
+    m.drvSeg[0] = 0; m.drvSeg[1] = n - 1; m.drvSeg[2] = n - 1; m.drvSeg[3] = -1;
+    m.drvSprite = RA_DRIVE[r].flash && RA_DRIVE[r].sprites > 0 && n == RA_DRIVE[r].sprites;
+    if (m.drvSprite || RA_DRIVE[r].kind == ERD_CYCLE || RA_DRIVE[r].kind >= ERD_ANIM || n < 2) return;
+    float top = 0.0f;
+    std::vector<float> d((size_t)n);
+    for (int f = 0; f < n; f++) { d[(size_t)f] = ebld_ra_drive_dist(C, f); if (d[(size_t)f] > top) top = d[(size_t)f]; }
+    if (!(top > 0.0f)) return;
+    const float still = top * 0.002f, full = top * 0.998f;
+    int first = 0;
+    while (first < n && d[(size_t)first] <= still) first++;
+    m.drvSeg[0] = first > 0 ? first - 1 : 0;
+    int s1 = m.drvSeg[0];
+    while (s1 < n - 1 && d[(size_t)s1] < full) s1++;
+    m.drvSeg[1] = s1;
+    int s2 = s1;
+    while (s2 + 1 < n && d[(size_t)s2 + 1] >= full) s2++;
+    m.drvSeg[2] = s2;
+    int s3 = s2;
+    while (s3 + 1 < n && d[(size_t)s3] > still) s3++;
+    m.drvSeg[3] = (d[(size_t)s3] <= still && s3 > s2) ? s3 : -1;
+    /* (a clip whose last frames come back toward rest without reaching it, as a clip of the
+       1996 pictures does: its return runs on into frame 0, written as frame n) */
+    if (m.drvSeg[3] < 0 && s2 < n - 1 && d[(size_t)n - 1] < d[(size_t)s2]) m.drvSeg[3] = n;
+}
+/* ONE ENGINE TICK of a driven clip (ebld_step), from the building's state this tick. */
+static void ebld_ra_drive_step(EbldBld& E, const EbldModel& M, const SimObject& o)
+{
+    E.drvPrev = E.drvCur;
+    E.cycPrev = E.cycCur;
+    if (M.raDrive < 0 || M.clipIntact < 0) return;
+    const EbldRaDrive& R = RA_DRIVE[M.raDrive];
+    const bool alive = o.str > 0;
+    if (R.kind == ERD_ANIM) {
+        /* the anim's stage, where one of its name stands on the building's plot */
+        float f = 0.0f;
+        const float hx = 0.5f * (float)(o.fw > 0 ? o.fw : 1) + 0.5f;
+        const float hz = 0.5f * (float)(o.fh > 0 ? o.fh : 1) + 0.5f;
+        for (size_t i = 0; alive && i < g_efxAnims.size(); i++) {
+            const EfxAnim& an = g_efxAnims[i];
+            if (strcmp(an.name, R.anim) || fabsf(an.wx - o.ex) > hx || fabsf(an.wz - o.ez) > hz)
+                continue;
+            f = (float)(an.stage > 0 ? an.stage : 0);
+            break;
+        }
+        const int n = M.clip[M.clipIntact].frames;
+        if (!M.drvSprite && R.sprites > 1) f = f * (float)(n - 1) / (float)(R.sprites - 1);
+        E.cycCur = f > (float)(n - 1) ? (float)(n - 1) : f;
+        E.drvCur = E.cycCur > 0.0f ? 1.0f : 0.0f;
+        return;
+    }
+    if (R.kind == ERD_CHARGE || R.kind == ERD_FIRED) {
+        const int n = M.clip[M.clipIntact].frames, last = R.sprites > 0 ? R.sprites - 1 : n - 1;
+        int f = 0;
+        if (alive && R.kind == ERD_CHARGE) {
+            f = o.dostage >= last ? 3 : (o.dostage > 0 ? o.dostage : 0);
+        } else if (alive && R.mission && !strcmp(g_sbSuperFiredName, R.mission)
+                   && g_playerHouse[0] && !strcmp(o.house, g_playerHouse)) {
+            /* (the tick the fire was first seen here) */
+            static int seen = 0, at = -1000000;
+            if (seen != g_sbSuperFiredSerial) { seen = g_sbSuperFiredSerial; at = g_engineFrame; }
+            const int k = (g_engineFrame - at) / (R.out > 0 ? R.out : 1);
+            f = (k >= 0 && k <= last) ? k : 0;
+        }
+        /* (a clip of another length: the same moment, scaled onto it) */
+        float ff = (float)f;
+        if (!M.drvSprite && last > 0) ff = ff * (float)(n - 1) / (float)last;
+        E.cycCur = ff > (float)(n - 1) ? (float)(n - 1) : ff;
+        E.drvCur = E.cycCur > 0.0f ? 1.0f : 0.0f;
+        return;
+    }
+    if (M.drvSprite) {
+        /* the frame the 1996 game draws this tick */
+        int f = 0;
+        if (alive && R.kind == ERD_DOOR) {
+            f = o.doorstage > 0 ? o.doorstage : 0;
+        } else if (alive && o.doing >= 1 && o.dostage > 0) {
+            /* (the stage IS the picture: Begin_Mode and AI set it to the row's first frame,
+               and Shape_Number draws Fetch_Stage() as it is) */
+            f = o.dostage;
+        }
+        const int top = M.clip[M.clipIntact].frames - 1;
+        E.cycCur = (float)(f > top ? top : f);
+        E.drvCur = E.cycCur > 0.0f ? 1.0f : 0.0f;
+        return;
+    }
+    if (R.kind == ERD_CYCLE) {
+        const EbldClip& C = M.clip[M.clipIntact];
+        const bool on = alive && o.doing == R.on[0];
+        if (on || E.cycCur > 0.0f) {
+            /* (one turn of the clip over the 1996 loop's own ticks, `out`; or at the clip's
+               own rate) */
+            E.cycCur += R.out > 0 ? (float)C.frames / (float)R.out : C.fps / 15.0f;
+            if (E.cycCur >= (float)C.frames) E.cycCur = on ? fmodf(E.cycCur, (float)C.frames) : 0.0f;
+        }
+        return;
+    }
+    float want = 0.0f;
+    if (alive) {
+        if (R.kind == ERD_DOOR) {
+            /* (DoorClass runs its stage 0 to DOOR_STAGES - 2: the War Factory's opens 0, 1, 2
+               and stands open at 3) */
+            const int top = 3;
+            want = o.doorstage <= 0 ? 0.0f : (float)(o.doorstage > top ? top : o.doorstage) / (float)top;
+        } else if (R.kind == ERD_RAMP) {
+            want = ((R.on[0] >= 0 && o.doing == R.on[0]) || (R.on[1] >= 0 && o.doing == R.on[1])
+                    || (R.mission && !strcmp(o.mission, R.mission))) ? 1.0f : 0.0f;
+        } else if (o.doing == R.on[0] && o.dostage >= 0) {
+            want = 1.0f;
+        }
+    }
+    if (want > E.drvCur) {
+        E.drvCur += 1.0f / (float)(R.out > 0 ? R.out : 1);
+        if (E.drvCur > want) E.drvCur = want;
+        E.drvClosing = false;
+    } else if (want < E.drvCur) {
+        E.drvCur -= 1.0f / (float)(R.back > 0 ? R.back : 1);
+        if (E.drvCur < want) E.drvCur = want;
+        E.drvClosing = true;
+    }
+    if (E.drvCur <= 0.0f) E.drvClosing = false;
+}
+/* The intact clip's frame a driven building shows, `alpha` of the way from the last tick
+   to this one (the draw's g_tickAlpha; 1 on the tick itself). */
+static float ebld_ra_drive_frame(const EbldBld& E, const EbldModel& M, float alpha)
+{
+    if (M.raDrive < 0 || M.clipIntact < 0) return -1.0f;
+    const EbldClip& C = M.clip[M.clipIntact];
+    if (M.drvSprite || RA_DRIVE[M.raDrive].kind >= ERD_ANIM) return E.cycCur;
+    if (RA_DRIVE[M.raDrive].kind == ERD_CYCLE) {
+        float d = E.cycCur - E.cycPrev;
+        if (d < 0.0f) d = E.cycCur > 0.0f ? d + (float)C.frames : (float)C.frames - E.cycPrev;
+        const float f = E.cycPrev + d * alpha;
+        return f >= (float)C.frames ? (E.cycCur > 0.0f ? fmodf(f, (float)C.frames) : 0.0f) : f;
+    }
+    float k = E.drvPrev + (E.drvCur - E.drvPrev) * alpha;
+    k = k < 0.0f ? 0.0f : (k > 1.0f ? 1.0f : k);
+    if (E.drvClosing && M.drvSeg[3] >= 0)
+        return (float)M.drvSeg[2] + (1.0f - k) * (float)(M.drvSeg[3] - M.drvSeg[2]);
+    return (float)M.drvSeg[0] + k * (float)(M.drvSeg[1] - M.drvSeg[0]);
+}
+
+/* Whether an engine anim is one a structure's model plays itself (an ANIM row of RA_DRIVE whose
+   model carries the clip, standing on the building's plot): its 1996 card stands down. */
+static bool ebld_ra_anim_played(const EfxAnim& an)
+{
+    if (!g_raModule || !ebld_rule_now() || g_fx.dos_classic) return false;
+    for (size_t r = 0; r < sizeof RA_DRIVE / sizeof RA_DRIVE[0]; r++) {
+        if (RA_DRIVE[r].kind != ERD_ANIM || strcmp(an.name, RA_DRIVE[r].anim)) continue;
+        for (size_t i = 0; i < g_objects.size(); i++) {
+            const SimObject& o = g_objects[i];
+            if (o.kind != K_BUILDING || strcmp(ebld_alias(o.type), RA_DRIVE[r].type)) continue;
+            const float hx = 0.5f * (float)(o.fw > 0 ? o.fw : 1) + 0.5f;
+            const float hz = 0.5f * (float)(o.fh > 0 ? o.fh : 1) + 0.5f;
+            if (fabsf(an.wx - o.ex) > hx || fabsf(an.wz - o.ez) > hz || !ebld_ra_ready(o)) continue;
+            const int m = ebld_model_of(o.type);
+            if (m >= 0 && g_ebld[m].raDrive == (int)r && g_ebld[m].clipIntact >= 0) return true;
+        }
+    }
+    return false;
+}
+
+/* THE FRAME OF A MODEL'S CLIP UNDER RED ALERT. A reused civilian model: Tiberian Dawn reads
+   a clip that follows the cartridge's (the Oil Pump's linkage) off the cartridge model's
+   own clock, object_anim_t; Red Alert's scenes have no cartridge model to read. The same
+   arm turns the engine's own idle stage into that clip's frame (structure_anim_frame), and
+   Red Alert's bdata.cpp runs the pump's idle as Tiberian Dawn's does (STRUCT_PUMP,
+   BSTATE_IDLE, 14 stages at rate 4), so its walking beam keeps the 1996 sprite's pace.
+   A Red Alert structure's driven clip: the frame its state has it at (RA_DRIVE), its rest
+   before it has an entry. -1 for a model with no such clip (an idle clip plays on the
+   engine clock). */
+static float ebld_ra_clip_at(const EbldModel& M, const SimObject& o)
+{
+    if (M.clipIntact < 0) return -1.0f;
+    if (M.raDrive >= 0) {
+        const EbldBld* E = ebld_find(o);
+        return E ? ebld_ra_drive_frame(*E, M, g_tickAlpha) : (float)M.drvSeg[0];
+    }
+    if (!ebld_ra_civil(o.type)) return -1.0f;
+    const EbldClip& C = M.clip[M.clipIntact];
+    return C.idle ? -1.0f : structure_anim_frame(o, C.frames);
+}
+
+/* THE OBJECTS WHOSE STAGES THIS FILE PLAYS UNDER RED ALERT, at their death
+   (ebld_claims_death) and with their fires (ebld_anims_filter): a civilian building with a
+   reused model, a structure with its stages (ebld_ra_staged), and a reused tree. */
+static bool ebld_ra_stages(const SimObject& o)
+{
+    if (!g_raModule) return false;
+    if (o.kind == K_BUILDING)
+        return ebld_ra_civil(o.type) ? ebld_model_of(o.type) >= 0 : ebld_ra_staged(o);
+    if (o.kind == K_TERRAIN) return eterr_tree_claims(o);
+    return false;
+}
+/* AND THE ONES IT KEEPS AN ENTRY FOR ON THE TICK (ebld_step): those, and a structure whose
+   standing model carries emitters of its own (its idle smoke) or a clip its state drives
+   (RA_DRIVE). An intact-only structure without either has none, and stays as it was. */
+static bool ebld_ra_entry(const SimObject& o)
+{
+    if (ebld_ra_stages(o)) return true;
+    if (!g_raModule || o.kind != K_BUILDING || ebld_ra_civil(o.type)) return false;
+    const int m = ebld_model_of(o.type);
+    return m >= 0 && (!g_ebld[m].emit.empty() || (g_ebld[m].raDrive >= 0 && g_ebld[m].clipIntact >= 0));
+}
+
+/* WHETHER RED ALERT'S 1996 PICTURE OF THIS OBJECT STANDS DOWN (ra3d_sprites_mod.h): while
+   its model draws it, and for a civilian building or a staged structure also while it is
+   in pieces, wrecked or sinking, which ebld_draw draws from its entry. */
+static bool ebld_ra_owns(const SimObject& o)
+{
+    if (ebld_ra_ready(o)) return true;
+    if (!g_raModule || o.kind != K_BUILDING || !(ebld_ra_civil(o.type) || ebld_ra_staged(o)))
+        return false;
+    const EbldBld* E = ebld_find(o);
+    return E && (E->stage != EB_INTACT || E->deathClaimed);
 }
 
 /* Selection and action cursors follow the displayed intact geometry. */
@@ -2593,6 +3658,9 @@ static void ebld_entry_init(EbldBld& E, int m, const char* type, int cx, int cy,
     E.idlePhase = 0.0f;
     E.doorF = -1.0f;
     E.doorStage = -1;
+    E.drvCur = E.drvPrev = 0.0f;
+    E.drvClosing = false;
+    E.cycCur = E.cycPrev = 0.0f;
     E.treeStage = 0;
     E.treeTick = g_engineFrame;
     E.fireTick = -1000000;
@@ -2639,7 +3707,7 @@ static float ebld_death_cells(const SimObject& o, float own)
 
 static bool ebld_claims_death(const SimObject& o)
 {
-    if (g_raModule) return false;
+    if (g_raModule && !ebld_ra_stages(o)) return false;
     if (o.kind != K_BUILDING || o.id < 0 || g_ebld.empty()) return false;
     if (!ebld_rule_now() || ebld_model_of(o.type) < 0) return false;
     if (building_constructing(o)) return false;
@@ -2722,6 +3790,8 @@ static void ebld_body_at(EbldBody& B, const float* p, const float* q)
     B.asleep = false;
     B.pinned = false;
     B.tore = g_engineFrame;
+    B.wet = 0;
+    B.sunk = false;
 }
 
 /* A rotation matrix (row-major 3x3) as a unit quaternion (w, x, y, z). */
@@ -2809,11 +3879,24 @@ static void ebld_pivot_matrix(const float* c, const float* k, float ang, float* 
 static float ebld_store_level(const char* house)
 {
     std::map<std::string, HouseStore>::const_iterator it = g_houseStore.find(house);
+    /* (Red Alert's house with no store yet, as its capacity is counted a moment into the
+       mission: empty, as the 1996 silo is, rather than the model's own rest level) */
+    if (g_raModule && it != g_houseStore.end() && it->second.capacity <= 0 && it->second.tiberium >= 0)
+        return 0.0f;
     if (it == g_houseStore.end() || it->second.capacity <= 0 || it->second.tiberium < 0)
         return -1.0f;
     float f = (float)it->second.tiberium / (float)it->second.capacity;
     if (f < 0.0f) f = 0.0f;
     if (f > 1.0f) f = 1.0f;
+    /* RED ALERT'S SILO SHOWS FIVE LEVELS, as its 1996 picture does (BuildingClass::Shape_Number:
+       the house's stored ore times five over its whole capacity, the refinery's included,
+       bounded to 0..4): empty, a quarter, half, three quarters, full, the same in every silo
+       of the house */
+    if (g_raModule) {
+        int level = (int)((long long)it->second.tiberium * 5 / it->second.capacity);
+        level = level < 0 ? 0 : (level > 4 ? 4 : level);
+        f = (float)level / 4.0f;
+    }
     return f;
 }
 static float ebld_fill_level(const SimObject& o, const EbldMove& mv)
@@ -2899,6 +3982,24 @@ static void ebld_clip_xf(const EbldClip& C, int f, int part, EbXf* X)
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) X->R[i * 3 + j] = m[i * 4 + j];
         X->t[i] = m[i * 4 + 3];
+    }
+}
+/* Part `part` of a clip at a fractional frame `at`, blended between the two frames either
+   side (the one past the last is frame 0: a loop's turn, or a door's return to rest), so a
+   motion played by time moves on every picture drawn and not only on each new frame. */
+static void ebld_clip_xf_at(const EbldClip& C, float at, int part, EbXf* X)
+{
+    ebxf_id(*X);
+    if (at < 0.0f || C.frames < 1 || part < 0 || part >= C.nparts) return;
+    int f0 = (int)floorf(at);
+    float t = at - (float)f0;
+    if (f0 >= C.frames) { f0 = C.frames - 1; t = 0.0f; }
+    const int f1 = f0 + 1 >= C.frames ? 0 : f0 + 1;
+    const float* a = &C.mat[((size_t)f0 * C.nparts + part) * 12];
+    const float* b = &C.mat[((size_t)f1 * C.nparts + part) * 12];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) X->R[i * 3 + j] = a[i * 4 + j] + (b[i * 4 + j] - a[i * 4 + j]) * t;
+        X->t[i] = a[i * 4 + 3] + (b[i * 4 + 3] - a[i * 4 + 3]) * t;
     }
 }
 /* The idle clock of an object, seconds: the engine's, plus the object's own head start
@@ -3135,7 +4236,10 @@ static bool ebld_stand_xf(const EbldBld& E, const EbldModel& M, int k, float now
        frame, after its own loops (no turning part carries either panel) */
     if (ebld_door_piece(E, M, k)) {
         const EbldClip& C = M.clip[M.clipCut];
-        ebld_clip_xf(C, ebld_clip_frame(C, E.doorF, 0.0), M.clipPart[k], &X);
+        if (ebld_ra_motion(M))
+            ebld_clip_xf_at(C, ebld_ra_drive_frame(E, M, g_tickAlpha), M.clipPart[k], &X);
+        else
+            ebld_clip_xf(C, ebld_clip_frame(C, E.doorF, 0.0), M.clipPart[k], &X);
         if (ebld_loops_now(E, M, k)) X = ebxf_mul(X, ebld_loop_chain(E, M, k, now, 0));
         *out = X;
         return true;
@@ -3459,6 +4563,118 @@ static void ebld_body_tick(EbldBody& B, const EbldPiece& P, const EbldPX* X,
         }
     } else {
         B.still = 0;
+    }
+}
+
+/* ================================================================================
+ * THE SEA (Red Alert: a building standing in the water, its file's EBP_SEA tail). A piece
+ * that comes down on a water cell (evhc_cell_wet, the rule a ship's wreck follows) and not
+ * on the building's own deck or slab goes in: a splash where it went in, and from then it
+ * no longer bounces: it drifts on, slowing (sea_drag) and stopping turning (sea_spin), and
+ * sinks at sea_sink until it is sea_depth under the surface, where it is gone (no longer
+ * drawn). The surface is the water as the game draws it there: the sea is laid on the
+ * terrain's corners, so it is the ground's height at the piece.
+ * ================================================================================ */
+static bool evhc_cell_wet(float wx, float wz);
+static void ebld_sea_splash(const EbldModel& M, float x, float y, float z, unsigned key)
+{
+    for (int b = 0; b < 3; b++) {
+        const float* f = &M.param[(size_t)EBP_SEA_BURST + (size_t)b * EBP_SEA_BN];
+        const int src = (int)f[0], n = (int)(f[1] + 0.5f);
+        if (src < 0 || n <= 0) continue;
+        unsigned char sheet = 0, sys = 6;
+        if (src == 0) {
+            /* the steam sheet, as a building's own steam is drawn; without it, the smoke */
+            sheet = efx_src_sheet("LandingSmoke");
+            sys = sheet ? 1 : 6;
+        } else if (src == 5) {
+            sys = 0;                                  /* the glow's own sheet */
+        }
+        for (int i = 0; i < n; i++) {
+            const unsigned h = efx_hash(0x5345410Au, key, (unsigned)b, (unsigned)i);
+            const float a = 2.0f * EBLD_PI * eb_r(h, 0), d = f[2] * sqrtf(eb_r(h, 1));
+            /* thrown up and out: a direction on the upper half, steeper than flat */
+            const float az = 2.0f * EBLD_PI * eb_r(h, 2), up = 0.4f + 0.6f * eb_r(h, 3);
+            const float out = sqrtf(1.0f - up * up);
+            const float v[3] = { f[7] + cosf(az) * out * f[10], f[8] + up * f[10],
+                                 f[9] + sinf(az) * out * f[10] };
+            const float life = f[3] + eb_r(h, 4) * (f[4] - f[3]);
+            int lt = (int)(life * 15.0f + 0.5f);
+            if (lt < 1) lt = 1;
+            float vm = 1.0f, rise = -f[12];
+            const float kL = f[11] * life;
+            if (f[11] > 0.0f && kL > 1e-4f) {
+                const float ex = expf(-kL);
+                vm = (1.0f - ex) / kL;
+                rise = 2.0f * (rise / f[11]) * (life - (1.0f - ex) / f[11]) / (life * life);
+            }
+            EfxPart q;
+            memset(&q, 0, sizeof q);
+            q.x = x + d * cosf(a); q.y = y; q.z = z + d * sinf(a);
+            q.sx = q.x; q.sy = q.y; q.sz = q.z;
+            q.vx = v[0] * vm / 15.0f; q.vy = v[1] * vm / 15.0f; q.vz = v[2] * vm / 15.0f;
+            q.ay = rise / 225.0f;
+            q.hw = 0.5f * f[5];
+            q.grow = 0.5f * (f[6] - f[5]) / (float)lt;
+            q.life = (short)lt;
+            q.sys = sys;
+            const float al = f[16] < 0.0f ? 0.0f : (f[16] > 1.0f ? 1.0f : f[16]);
+            const unsigned char aa = (unsigned char)(al * 255.0f + 0.5f);
+            const float fd = f[17] > 0.01f ? f[17] : 0.2f;
+            int ar = (int)((float)aa / (fd * (float)lt) + 0.5f);
+            q.arate = (unsigned char)(ar < 1 ? 1 : (ar > 255 ? 255 : ar));
+            q.r = (unsigned char)f[13]; q.g = (unsigned char)f[14]; q.b = (unsigned char)f[15];
+            q.a = aa;
+            q.seed = h;
+            q.sheet = sheet;
+            efx_push(q);
+        }
+    }
+}
+/* Whether a body has just come down on the water: it goes in. Called after its tick. */
+static void ebld_body_sea_in(const EbldBld& E, const EbldModel& M, EbldBody& B, const EbldPiece& P,
+                             const EbldGround& G, int frame, long long key, int idx)
+{
+    if (!M.sea || !g_raModule || B.wet || !B.live || B.pinned) return;
+    if (!evhc_cell_wet(B.p[0], B.p[2])) return;
+    float sz = 0.5f * P.size * MODEL_SCALE;
+    if (sz < 0.02f) sz = 0.02f;
+    const float sea = efx_ground(B.p[0], B.p[2]);
+    if (B.p[1] - sz > sea + 0.02f) return;            /* still in the air */
+    float n[3];
+    int kind = 0;
+    const float g = ebld_ground_at(G, B.p[0], B.p[2], B.p[1] + sz, B.ghost <= 0, n, &kind);
+    if (kind != 0 && g > sea + 0.01f) return;          /* on the deck, the slab: it lies there */
+    B.wet = frame + 1;
+    B.asleep = false;
+    if (g_efxPoolLive)
+        ebld_sea_splash(M, B.p[0], sea, B.p[2], (unsigned)(key * 977 + idx));
+    printf("EBLDSEA|in|%s|key=%lld|piece=%d|frame=%d|x=%.3f|z=%.3f|sea=%.3f\n", E.type, key, idx,
+           frame, B.p[0], B.p[2], sea);
+}
+/* One tick of a body in the water. */
+static void ebld_body_sea_tick(const EbldBld& E, const EbldModel& M, EbldBody& B, const EbldPiece& P,
+                               int frame, long long key, int idx)
+{
+    for (int i = 0; i < 3; i++) B.pp[i] = B.p[i];
+    for (int i = 0; i < 4; i++) B.pq[i] = B.q[i];
+    if (B.sunk) return;
+    const float dt = 1.0f / 15.0f;
+    const float kv = expf(-M.param[EBP_SEA_DRAG] * dt), kw = expf(-M.param[EBP_SEA_SPIN] * dt);
+    B.v[0] *= kv; B.v[2] *= kv;
+    for (int c = 0; c < 3; c++) B.w[c] *= kw;
+    /* (down at the sinking speed, eased into it over the first half second) */
+    const float t = (float)(frame + 1 - B.wet) * dt;
+    const float sink = M.param[EBP_SEA_SINK] * (t < 0.5f ? t / 0.5f : 1.0f);
+    B.v[1] = -sink;
+    for (int c = 0; c < 3; c++) B.p[c] += B.v[c] * dt;
+    eb_qspin(B.q, B.w, dt);
+    float sz = 0.5f * P.size * MODEL_SCALE;
+    if (sz < 0.02f) sz = 0.02f;
+    if (B.p[1] + sz < efx_ground(B.p[0], B.p[2]) - M.param[EBP_SEA_DEPTH]) {
+        B.sunk = true;
+        B.asleep = true;
+        printf("EBLDSEA|gone|%s|key=%lld|piece=%d|frame=%d\n", E.type, key, idx, frame);
     }
 }
 
@@ -4318,10 +5534,14 @@ static long g_etreeStood = 0;                /* engine fire anims stood down, al
 /* (the snags drawn on their own entries in the last colour frame, for the dump) */
 static long g_etreeOrphanDrawn = 0;
 
+/* The kind a dump's anim rides when it rides a terrain object: RTTI_TERRAIN, which the two
+   engines number differently (Tiberian Dawn 9, Red Alert 24; Red Alert's Catch_Fire attaches
+   the same two fires at the same offsets). */
+static int etree_rtti_terrain(void) { return g_raModule ? 24 : 9; }
 /* Whether anim a is one of the two fires Catch_Fire attaches to terrain object o. */
 static bool etree_fire_on(const EfxAnim& a, const SimObject& o)
 {
-    if (a.attkind != 9 /* RTTI_TERRAIN */ || o.kind != K_TERRAIN || o.id < 0) return false;
+    if (a.attkind != etree_rtti_terrain() || o.kind != K_TERRAIN || o.id < 0) return false;
     float dz;
     if (!strcmp(a.name, "BURN-L")) dz = 80.0f / 256.0f;
     else if (!strcmp(a.name, "BURN-M")) dz = 224.0f / 256.0f;
@@ -4331,7 +5551,7 @@ static bool etree_fire_on(const EfxAnim& a, const SimObject& o)
 /* The tree a fire anim rides, or -1. */
 static int etree_fire_owner(const EfxAnim& a)
 {
-    if (a.attkind != 9) return -1;
+    if (a.attkind != etree_rtti_terrain()) return -1;
     for (size_t j = 0; j < g_objects.size(); j++)
         if (etree_fire_on(a, g_objects[j])) return (int)j;
     return -1;
@@ -4417,9 +5637,12 @@ static float etree_sink(const EbldBld& E, float now)
 static void ebld_wall_step(int frame, const std::vector<EfxBullet>& gone);
 static void ebld_step(int frame)
 {
-    if (g_raModule) return;
+    /* (under Red Alert the civilian buildings and trees reused from OpenCNC3D, the
+       structures with their stages, idle emitters or driven clips, ebld_ra_entry, and the
+       walls its engine's map put in g_walls) */
     if (g_ebld.empty()) return;
     if (frame == g_ebldLastTick) return;
+    const Uint64 traceStart = perf_trace_frame_active() ? SDL_GetPerformanceCounter() : 0;
     if (frame < g_ebldLastTick) g_ebldBld.clear();
     g_ebldLastTick = frame;
     for (std::map<long long, EbldBld>::iterator it = g_ebldBld.begin(); it != g_ebldBld.end(); ++it)
@@ -4440,6 +5663,7 @@ static void ebld_step(int frame)
         const SimObject& o = g_objects[i];
         /* (a terrain object with a remaster, version 6: its idle loop's emitters only) */
         if ((o.kind != K_BUILDING && o.kind != K_TERRAIN) || o.id < 0 || o.limbo) continue;
+        if (g_raModule && !ebld_ra_entry(o)) continue;
         if (o.kind == K_TERRAIN) {
             const int tm = ebld_model_of(o.type);
             if (tm < 0 || g_ebld[tm].nset != 1) continue;
@@ -4475,6 +5699,8 @@ static void ebld_step(int frame)
         E->str = o.str; E->maxstr = o.maxstr;
         E->blush = (o.blush != 0);
         E->face = o.face;
+        E->serviceDoing=o.doing; E->serviceStage=o.dostage;
+        E->servicePowerOff=(o.poweroff!=0);
         E->fillF = ebld_store_level(o.house);
         /* VERSION 6: the frame the cartridge's own model of it shows this tick, for a model
            whose parts follow the cartridge's clip (the Oil Pump), and a terrain object's
@@ -4483,7 +5709,9 @@ static void ebld_step(int frame)
         E->animF = -1.0f;
         if (M.clipIntact >= 0) {
             const EbldClip& C = M.clip[M.clipIntact];
-            if (!C.idle) {
+            if (!C.idle && g_raModule) {
+                E->animF = ebld_ra_clip_at(M, o);
+            } else if (!C.idle) {
                 std::map<std::string, PackType>::const_iterator ct = g_pack.type.find(o.type);
                 if (ct != g_pack.type.end() && ct->second.mesh >= 0
                     && ct->second.mesh < (int)g_pack.mesh.size())
@@ -4498,13 +5726,24 @@ static void ebld_step(int frame)
         E->doorStage = E->doorF >= 0.0f ? o.doorstage : -1;
         if (E->doorF >= 0.0f && M.clipIntact >= 0 && !M.clip[M.clipIntact].idle)
             E->animF = E->doorF;
+        /* (a Red Alert structure's clip its state drives, RA_DRIVE: the intact clip's frame,
+           and the damaged model's clip on the same frame, as the War Factory's door) */
+        if (g_raModule && M.raDrive >= 0 && M.clipIntact >= 0) {
+            ebld_ra_drive_step(*E, M, o);
+            E->animF = E->doorF = ebld_ra_drive_frame(*E, M, 1.0f);
+            E->doorStage = o.doorstage;
+        }
         /* (a placement still going up part by part past the engine's own construction,
            ebld_place.h, does not hold the idle effects back: they start on the tick the
            engine says the building is up, as they do without the placement, so the
            building a placement leaves is the building the cartridge's reveal leaves. A
-           sale played backwards holds everything) */
+           sale played backwards holds everything, and so does a placement still playing
+           on a building hit while it went up: the damaged stage would otherwise draw the
+           finished building in pieces over the placement from the tick the engine's
+           build-up ends. Its damage shows when the placement is done, as the 1995
+           build-up's damaged frame shows when the build-up is done) */
         E->standDown = building_constructing(o) || construction_frac(o) < 1.0f
-                     || (eplc_holds(o) && eplc_selling(o));
+                     || (eplc_holds(o) && (eplc_selling(o) || o.str < o.maxstr));
         /* the cut's meshes are made the first time a building of the type is hurt */
         if (M.nset >= 2 && o.str < o.maxstr) ebld_build_cut(g_ebld[E->model]);
         const float step = M.param[EBP_CHIP_STEP] * (float)(o.maxstr > 0 ? o.maxstr : 1);
@@ -4623,8 +5862,14 @@ static void ebld_step(int frame)
             }
         }
         if (E.stage == EB_HELD || E.stage == EB_DAMAGED) {
-            for (size_t i = 0; i < E.cut.size(); i++)
+            for (size_t i = 0; i < E.cut.size(); i++) {
+                if (E.cut[i].wet) {
+                    ebld_body_sea_tick(E, M, E.cut[i], M.set[EBS_CUT].piece[i], frame, key, (int)i);
+                    continue;
+                }
                 ebld_body_tick(E.cut[i], M.set[EBS_CUT].piece[i], &M.px[i], G);
+                ebld_body_sea_in(E, M, E.cut[i], M.set[EBS_CUT].piece[i], G, frame, key, (int)i);
+            }
         }
         if (E.stage == EB_WRECKED) {
             const int t = frame - E.blastTick;
@@ -4634,9 +5879,15 @@ static void ebld_step(int frame)
                                    * 15.0f + 0.5f);
             if (!E.sinking) {
                 const int ws = ebld_wreck_set(M);
-                for (size_t i = 0; i < E.wreck.size(); i++)
+                for (size_t i = 0; i < E.wreck.size(); i++) {
+                    if (E.wreck[i].wet) {
+                        ebld_body_sea_tick(E, M, E.wreck[i], M.set[ws].piece[i], frame, key, (int)i);
+                        continue;
+                    }
                     ebld_body_tick(E.wreck[i], M.set[ws].piece[i],
                                    ws == EBS_CUT ? &M.px[i] : NULL, G);
+                    ebld_body_sea_in(E, M, E.wreck[i], M.set[ws].piece[i], G, frame, key, (int)i);
+                }
                 if (t >= sinkAt) {
                     /* the wreck stops moving and begins to go into the ground */
                     E.sinking = true;
@@ -4648,6 +5899,14 @@ static void ebld_step(int frame)
                     }
                     printf("EBLD|sink|key=%lld|frame=%d\n", key, frame);
                 }
+            }
+            /* (a piece in the sea goes on sinking by itself while the wreck on land goes
+               into the ground) */
+            if (E.sinking && !E.dropped) {
+                const int ws = ebld_wreck_set(M);
+                for (size_t i = 0; i < E.wreck.size(); i++)
+                    if (E.wreck[i].wet)
+                        ebld_body_sea_tick(E, M, E.wreck[i], M.set[ws].piece[i], frame, key, (int)i);
             }
             if (E.sinking && !E.dropped && t >= sinkEnd) {
                 E.dropped = true;
@@ -4664,6 +5923,8 @@ static void ebld_step(int frame)
         ++it;
     }
     g_ebldBulletsPrev = g_efxBullets;
+    if (traceStart)
+        g_destructTrace[21] += (SDL_GetPerformanceCounter()-traceStart)*1000000u/SDL_GetPerformanceFrequency();
     fflush(stdout);
 }
 
@@ -4688,7 +5949,8 @@ struct EbldWallSeen { int kind, icon; };
 static std::map<long long, EbldWallSeen> g_ebldWallPrev;
 /* (odata.cpp: sandbags 1, chain-link 2, concrete 3, barbed wire 1, the wooden fence 1: the
    last two go from whole to gone in one level, as the sandbags do) */
-static int ebld_wall_levels(int kind) { return kind == 1 ? 2 : kind == 2 ? 3 : 1; }
+/* (Red Alert's fence, kind 5, has two, as its odata.cpp gives the chain link) */
+static int ebld_wall_levels(int kind) { return kind == 1 || kind == 5 ? 2 : kind == 2 ? 3 : 1; }
 static EbldBld* ebld_wall_entry(int x, int y, int kind, int icon, bool create)
 {
     const long long key = ebld_wall_key(x, y);
@@ -4745,19 +6007,20 @@ static int ebld_wall_zone(const EbldBld& E, const std::vector<EfxBullet>& gone, 
 static void ebld_wall_step(int frame, const std::vector<EfxBullet>& gone)
 {
     const bool rule = ebld_rule_now();
-    /* the walls read at first sight: a kind with a cell on the map */
+    /* the walls read at first sight: a kind with a cell on the map (under Red Alert every
+       kind, since every type of its is read at first sight, ebld_type_lazy) */
     if (rule) {
-        bool seen[EBLD_NWALL] = { false, false, false, false, false };
+        bool seen[EBLD_NWALL] = { false, false, false, false, false, false };
         for (size_t i = 0; i < g_walls.size(); i++)
             if (g_walls[i].kind < EBLD_NWALL) seen[g_walls[i].kind] = true;
-        for (int k = 3; k < EBLD_NWALL; k++)
+        for (int k = g_raModule ? 0 : 3; k < EBLD_NWALL; k++)
             if (seen[k]) ebld_ensure(EBLD_WALLS[k]);
     }
     ebld_wall_models();
     std::map<long long, EbldWallSeen> now;
     for (size_t i = 0; rule && i < g_walls.size(); i++) {
         const WallCell& w = g_walls[i];
-        if (w.kind >= EBLD_NWALL) continue;
+        if (w.kind >= EBLD_NWALL || (w.kind == 5 && !ra3d_props_on())) continue;
         const int o = g_ebldWallModel[w.kind];
         if (o < 0 || !g_ebld[o].wallStaged) continue;
         const long long key = ebld_wall_key(w.x, w.y);
@@ -4909,6 +6172,7 @@ static void ebld_boom_stage(EbldBld& E, const std::vector<EbldBoomSlot>& R, int 
     for (size_t i = 0; i < R.size(); i++) {
         const EbldBoomSlot& S = R[i];
         if (S.flags & EBB_REP) continue;
+        if (efx_explosion_ember(S.name, S.sheet)) continue;     /* (effects_mod.h) */
         const int k = st - S.stage;
         if (k < 0) continue;
         float count = S.src.ppt;
@@ -4935,7 +6199,7 @@ static void ebld_boom_stage(EbldBld& E, const std::vector<EbldBoomSlot>& R, int 
         } else {
             efx_emit(src, ex, ey, ez, n, key, born, (int)i, k,
                      (unsigned char)((S.flags & EBB_FLAT) ? 1 : 0),
-                     efx_sheet_slot(S.sheet, src.sys));
+                     efx_sheet_slot(S.sheet, src.sys), true);
             E.boomParts += n;
             g_ebldBoomParts += n;
         }
@@ -5053,15 +6317,20 @@ static void ebld_anims_filter(int frame)
            and its stage starting again is the same fire) */
         if (h != g_ebldAnimOff.end() && frame - h->second.frame <= 4) {
             why = h->second.why;
-        } else if (a.attkind == 7 /* RTTI_BUILDING */ && a.attref >= 0
-                   && ebld_anim_burn_name(a.name)) {
+        } else if (a.attkind == (g_raModule ? 5 : 7) /* RTTI_BUILDING, each brain's */
+                   && a.attref >= 0 && ebld_anim_burn_name(a.name)) {
+            /* (under Red Alert, a civilian building reused with its stages or a staged structure, whose damaged
+               models carry their own fire: ebld_ra_stages) */
             for (size_t j = 0; j < g_objects.size(); j++) {
                 const SimObject& o = g_objects[j];
                 if (o.kind != K_BUILDING || o.id != a.attref) continue;
-                if (ebld_active(o)) { why = "damage"; owner = (long long)smooth_key(o); }
+                if (g_raModule ? (g_efxEnhOn && ebld_ra_stages(o) && ebld_find(o) != NULL)
+                               : ebld_active(o)) {
+                    why = "damage"; owner = (long long)smooth_key(o);
+                }
                 break;
             }
-        } else if (a.attkind == 9 /* RTTI_TERRAIN */ && ebld_anim_burn_name(a.name)) {
+        } else if (a.attkind == etree_rtti_terrain() && ebld_anim_burn_name(a.name)) {
             /* A REMASTERED TREE'S FIRE: its burning model carries the tree's own flames,
                so the engine's two fire anims on it stand down (etree_*) */
             const int oi = etree_fire_owner(a);
@@ -5075,7 +6344,9 @@ static void ebld_anims_filter(int frame)
                spawned free beside it), or a fire that came loose: on a building of ours */
             why = "damage";
         }
-        if (!why && a.attref < 0 && ebld_anim_death_name(a.name)) {
+        /* (under Red Alert too while its 3D view draws OpenCNC3D's effects, which is when
+           the lab's blast for a reused civilian building shows, ra3d_effects_mod.h) */
+        if (!why && (!g_raModule || g_efxEnhOn) && a.attref < 0 && ebld_anim_death_name(a.name)) {
             for (std::map<long long, EbldBld>::const_iterator it = g_ebldBld.begin();
                  it != g_ebldBld.end() && !why; ++it) {
                 const EbldBld& E = it->second;
@@ -5118,34 +6389,40 @@ static void ebld_anims_filter(int frame)
    half a cell), within its death window. One that was there before the death (a shell's
    crater) stays. Taken out of g_smudges on every parse while it lies unchanged; a new mark
    on the cell later (a shell landing on the bare ground) is drawn. */
-static std::map<int, int> g_ebldSmudgePrev;   /* cell -> type << 8 | data, last dump, all */
-static std::map<int, int> g_ebldSmudgeOff;    /* cell -> the mark held back */
-static int g_ebldSmudgeFrame = -1;
+/* (the filter's memory, one per list it runs on: Tiberian Dawn's g_smudges, and the craters
+   Red Alert's 3D pass reads from its engine's map, ebld_marks_filter_ra) */
+struct EbldSmudgeHold {
+    std::map<int, int> prev;   /* cell -> type << 8 | data, last dump, all */
+    std::map<int, int> off;    /* cell -> the mark held back */
+    int frame;
+    EbldSmudgeHold() : frame(-1) {}
+};
+static EbldSmudgeHold g_ebldSmudgeHold, g_ebldSmudgeHoldRa;
 static long g_ebldSmudgeOffN = 0;
-static void ebld_smudges_filter(int frame)
+static void ebld_smudges_filter_on(std::vector<SmudgeCell>& cells, EbldSmudgeHold& H, int frame)
 {
-    if (frame < g_ebldSmudgeFrame) { g_ebldSmudgePrev.clear(); g_ebldSmudgeOff.clear(); }
-    const bool newTick = frame != g_ebldSmudgeFrame;
-    g_ebldSmudgeFrame = frame;
+    if (frame < H.frame) { H.prev.clear(); H.off.clear(); }
+    const bool newTick = frame != H.frame;
+    H.frame = frame;
     std::map<int, int> now;
-    for (size_t i = 0; i < g_smudges.size(); i++)
-        now[(int)g_smudges[i].y * 512 + g_smudges[i].x] = (g_smudges[i].type << 8) | g_smudges[i].data;
+    for (size_t i = 0; i < cells.size(); i++)
+        now[(int)cells[i].y * 512 + cells[i].x] = (cells[i].type << 8) | cells[i].data;
     if (g_ebld.empty() || !ebld_rule_now()) {
-        g_ebldSmudgeOff.clear();
-        if (newTick) g_ebldSmudgePrev.swap(now);
+        H.off.clear();
+        if (newTick) H.prev.swap(now);
         return;
     }
     std::map<int, int> keep;
     size_t w = 0;
-    for (size_t i = 0; i < g_smudges.size(); i++) {
-        const SmudgeCell& c = g_smudges[i];
+    for (size_t i = 0; i < cells.size(); i++) {
+        const SmudgeCell& c = cells[i];
         const int ck = (int)c.y * 512 + c.x, v = (c.type << 8) | c.data;
-        std::map<int, int>::const_iterator h = g_ebldSmudgeOff.find(ck);
-        bool off = (h != g_ebldSmudgeOff.end() && h->second == v);
+        std::map<int, int>::const_iterator h = H.off.find(ck);
+        bool off = (h != H.off.end() && h->second == v);
         if (!off && c.type < 12) {
-            std::map<int, int>::const_iterator pv = g_ebldSmudgePrev.find(ck);
+            std::map<int, int>::const_iterator pv = H.prev.find(ck);
             /* (new since the last tick's dump: a tick re-dumped compares with the same) */
-            const bool fresh = (pv == g_ebldSmudgePrev.end() || pv->second != v);
+            const bool fresh = (pv == H.prev.end() || pv->second != v);
             for (std::map<long long, EbldBld>::const_iterator it = g_ebldBld.begin();
                  fresh && it != g_ebldBld.end() && !off; ++it) {
                 const EbldBld& E = it->second;
@@ -5162,11 +6439,24 @@ static void ebld_smudges_filter(int frame)
             }
         }
         if (off) { keep[ck] = v; continue; }
-        g_smudges[w++] = c;
+        cells[w++] = c;
     }
-    g_smudges.resize(w);
-    g_ebldSmudgeOff.swap(keep);
-    if (newTick) g_ebldSmudgePrev.swap(now);
+    cells.resize(w);
+    H.off.swap(keep);
+    if (newTick) H.prev.swap(now);
+}
+static void ebld_smudges_filter(int frame)
+{
+    ebld_smudges_filter_on(g_smudges, g_ebldSmudgeHold, frame);
+}
+/* RED ALERT'S CRATERS, the same rule. Red Alert's dump has no SMUDGE| lines: its craters
+   and scorch marks are read from the engine's map on the same parse (ra3d_cells_from_map)
+   and handed here after the deaths are observed, so a civilian building remastered from
+   OpenCNC3D's art does not lie over its own engine's death craters either. Only the stages this file plays
+   under Red Alert claim a death (ebld_ra_stages): an intact-only structure's is not held. */
+static void ebld_marks_filter_ra(std::vector<SmudgeCell>& cells, int frame)
+{
+    ebld_smudges_filter_on(cells, g_ebldSmudgeHoldRa, frame);
 }
 
 /* Mission boundary and shutdown: the entries hold engine frames and positions from the
@@ -5183,9 +6473,8 @@ static void ebld_reset(void)
     g_ebldAnimOff.clear();
     g_ebldAnimFirst.clear();
     g_ebldAnimFrame = -1;
-    g_ebldSmudgePrev.clear();
-    g_ebldSmudgeOff.clear();
-    g_ebldSmudgeFrame = -1;
+    g_ebldSmudgeHold = EbldSmudgeHold();
+    g_ebldSmudgeHoldRa = EbldSmudgeHold();
 }
 
 /* ================================================================================
@@ -5317,67 +6606,110 @@ static void ebld_wave(EbldModel& M, int mk, float t, int r0 = 0, int r1 = 0x7fff
     PackMesh& pm = g_pack.mesh[mi];
     pm.gpuDeformed = true; /* positions, normals and fold colours change in place */
     pm.gpuPoseRevision++;
+    if (pm.gpuWaveTris.size() != M.waveMesh[mk].size()) {   /* the triangles that move */
+        pm.gpuWaveTris.clear();
+        for (size_t e = 0; e < M.waveMesh[mk].size(); e++)
+            pm.gpuWaveTris.push_back(M.waveMesh[mk][e].first);
+        std::sort(pm.gpuWaveTris.begin(), pm.gpuWaveTris.end());
+    }
     const int q = (mk == EBM_INTACT) ? 0 : 1;
     const bool colour = (mk == EBM_INTACT || mk == EBM_CUT || mk == EBM_CUTDMG);
     const bool nrm = pm.nrm.size() == pm.tris.size() * 9;
     for (size_t e = 0; e < M.waveMesh[mk].size(); e++) {
         const int mt = M.waveMesh[mk][e].first;
         if (mt < r0 || mt >= r1 || mt >= (int)pm.tris.size()) continue;
-        const EbldWaveT& T = M.waveT[q][M.waveMesh[mk][e].second];
+        const int record = M.waveMesh[mk][e].second;
+        const EbldWaveT& T = M.waveT[q][record];
+        EbldWavePose* cached = NULL;
+        bool cacheHit = false;
+        if (record >= 0 && (size_t)record < M.waveCache[q].size()) {
+            EbldWaveCache& cache = M.waveCache[q][record];
+            for (unsigned slot = 0; slot < 2; slot++) {
+                if (cache.pose[slot].valid && cache.pose[slot].time == t) {
+                    cached = &cache.pose[slot];
+                    cacheHit = true;
+                    cache.next = 1 - slot;
+                    break;
+                }
+            }
+            if (!cached) {
+                cached = &cache.pose[cache.next];
+                cache.next = (cache.next + 1) % 2;
+                cached->valid = false;
+                cached->time = t;
+            }
+        }
         const EbldWave& W = M.wave[T.w];
         const float* a = W.a;
         const float gust = ebld_wave_gust(a, t), g = 1.0f;
         const float AL[3] = { a[2], 0.0f, -a[3] }, AC[3] = { a[4], 0.0f, -a[5] };
         for (int k = 0; k < 3; k++) {
             const EbldWaveV& V = T.v[k];
-            float qv, qs, qz, r, rs;
-            ebld_wave_at(W, V.s, V.z, t, gust, &qv, &qs, &qz);
-            ebld_wave_rest(W, V.s, &r, &rs);
-            const float dq = g * (qv - r), es = rs + g * (qs - rs), ez = g * qz;
-            /* the cloth keeps its length along each row: the free edge comes in */
-            float ds = 0.0f;
-            if (a[23] > 0.0f && V.s > 0.0f) {
-                for (int st = 0; st < 12; st++) {
-                    const float sk = V.s * ((float)st + 0.5f) / 12.0f;
-                    float q2, a2, z2, r2, b2;
-                    ebld_wave_at(W, sk, V.z, t, gust, &q2, &a2, &z2);
-                    ebld_wave_rest(W, sk, &r2, &b2);
-                    const float mm = b2 + g * (a2 - b2);
-                    ds -= 0.5f * (mm * mm - b2 * b2) * V.s / 12.0f;
-                }
-                ds *= a[23];
-            }
             PackVert& P = pm.tris[mt].v[k];
-            P.x = V.p[0] + 1024.0f * (a[4] * dq + a[2] * ds);
-            P.y = V.p[1];
-            P.z = V.p[2] - 1024.0f * (a[5] * dq + a[3] * ds);
             float n[3] = { V.n[0], V.n[1], V.n[2] };
             float kc = 1.0f;
-            if (V.side) {
-                float zf = (V.z - a[8]) / (a[9] - a[8] > 1e-6f ? a[9] - a[8] : 1e-6f);
-                if (zf < 0.0f) zf = 0.0f;
-                if (zf > 1.0f) zf = 1.0f;
-                const float sp = V.s > 0.0f ? V.s : 0.0f;
-                const float dds = a[18] > 0.0f
-                                ? a[18] * 2.0f * sp / (a[7] * a[7]) * (a[19] + (1.0f - a[19]) * zf)
-                                : 0.0f;
-                float wts[3], wtz[3], wd[3], wr[3];
-                for (int c = 0; c < 3; c++) { wts[c] = AL[c] + AC[c] * es; wtz[c] = AC[c] * ez; }
-                wts[1] -= dds;
-                wtz[1] += 1.0f;
-                eb_cross(wtz, wts, wd);
-                for (int c = 0; c < 3; c++) wd[c] *= (float)V.side;
-                eb_unit(wd);
-                const float up[3] = { 0.0f, 1.0f, 0.0f };
-                for (int c = 0; c < 3; c++) wts[c] = AL[c] + AC[c] * rs;
-                wts[1] -= dds;
-                eb_cross(up, wts, wr);
-                for (int c = 0; c < 3; c++) wr[c] *= (float)V.side;
-                eb_unit(wr);
-                for (int c = 0; c < 3; c++) n[c] += wd[c] - wr[c];
-                eb_unit(n);
-                if (a[31] > 0.5f)
-                    kc = 1.0f + a[30] * (ebld_wave_light(a, wd) / ebld_wave_light(a, wr) - 1.0f);
+            if (cacheHit) {
+                P.x = cached->position[k * 3];
+                P.y = cached->position[k * 3 + 1];
+                P.z = cached->position[k * 3 + 2];
+                for (int component = 0; component < 3; component++)
+                    n[component] = cached->normal[k * 3 + component];
+                kc = cached->light[k];
+            } else {
+                float qv, qs, qz, r, rs;
+                ebld_wave_at(W, V.s, V.z, t, gust, &qv, &qs, &qz);
+                ebld_wave_rest(W, V.s, &r, &rs);
+                const float dq = g * (qv - r), es = rs + g * (qs - rs), ez = g * qz;
+                /* the cloth keeps its length along each row: the free edge comes in */
+                float ds = 0.0f;
+                if (a[23] > 0.0f && V.s > 0.0f) {
+                    for (int st = 0; st < 12; st++) {
+                        const float sk = V.s * ((float)st + 0.5f) / 12.0f;
+                        float q2, a2, z2, r2, b2;
+                        ebld_wave_at(W, sk, V.z, t, gust, &q2, &a2, &z2);
+                        ebld_wave_rest(W, sk, &r2, &b2);
+                        const float mm = b2 + g * (a2 - b2);
+                        ds -= 0.5f * (mm * mm - b2 * b2) * V.s / 12.0f;
+                    }
+                    ds *= a[23];
+                }
+                P.x = V.p[0] + 1024.0f * (a[4] * dq + a[2] * ds);
+                P.y = V.p[1];
+                P.z = V.p[2] - 1024.0f * (a[5] * dq + a[3] * ds);
+                if (V.side) {
+                    float zf = (V.z - a[8]) / (a[9] - a[8] > 1e-6f ? a[9] - a[8] : 1e-6f);
+                    if (zf < 0.0f) zf = 0.0f;
+                    if (zf > 1.0f) zf = 1.0f;
+                    const float sp = V.s > 0.0f ? V.s : 0.0f;
+                    const float dds = a[18] > 0.0f
+                                    ? a[18] * 2.0f * sp / (a[7] * a[7]) * (a[19] + (1.0f - a[19]) * zf)
+                                    : 0.0f;
+                    float wts[3], wtz[3], wd[3], wr[3];
+                    for (int c = 0; c < 3; c++) { wts[c] = AL[c] + AC[c] * es; wtz[c] = AC[c] * ez; }
+                    wts[1] -= dds;
+                    wtz[1] += 1.0f;
+                    eb_cross(wtz, wts, wd);
+                    for (int c = 0; c < 3; c++) wd[c] *= (float)V.side;
+                    eb_unit(wd);
+                    const float up[3] = { 0.0f, 1.0f, 0.0f };
+                    for (int c = 0; c < 3; c++) wts[c] = AL[c] + AC[c] * rs;
+                    wts[1] -= dds;
+                    eb_cross(up, wts, wr);
+                    for (int c = 0; c < 3; c++) wr[c] *= (float)V.side;
+                    eb_unit(wr);
+                    for (int c = 0; c < 3; c++) n[c] += wd[c] - wr[c];
+                    eb_unit(n);
+                    if (a[31] > 0.5f)
+                        kc = 1.0f + a[30] * (ebld_wave_light(a, wd) / ebld_wave_light(a, wr) - 1.0f);
+                }
+                if (cached) {
+                    cached->position[k * 3] = P.x;
+                    cached->position[k * 3 + 1] = P.y;
+                    cached->position[k * 3 + 2] = P.z;
+                    for (int component = 0; component < 3; component++)
+                        cached->normal[k * 3 + component] = n[component];
+                    cached->light[k] = kc;
+                }
             }
             if (nrm)
                 for (int c = 0; c < 3; c++) pm.nrm[(size_t)mt * 9 + k * 3 + c] = n[c];
@@ -5393,6 +6725,7 @@ static void ebld_wave(EbldModel& M, int mk, float t, int r0 = 0, int r1 = 0x7fff
                 }
             }
         }
+        if (cached) cached->valid = true;
         if (colour && (size_t)mt < pm.tfl.size()) pm.tfl[mt] |= 2;
     }
     M.wavePosed[mk] = full ? t : -1.0e30f;
@@ -5443,10 +6776,9 @@ static EbldGL ebld_gl_begin(bool aux)
     if (!s.on) return s;
     s.cull = glIsEnabled(GL_CULL_FACE);
     s.offset = glIsEnabled(GL_POLYGON_OFFSET_FILL);
-    glGetIntegerv(GL_CULL_FACE_MODE, &s.cullMode);
-    glGetIntegerv(GL_FRONT_FACE, &s.front);
-    glGetFloatv(GL_POLYGON_OFFSET_FACTOR, &s.factor);
-    glGetFloatv(GL_POLYGON_OFFSET_UNITS, &s.units);
+    s.cullMode=gls_cull_mode();
+    s.front=gls_front_face();
+    gls_polygon_offset_values(&s.factor,&s.units);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
     glEnable(GL_CULL_FACE);
@@ -5469,12 +6801,16 @@ static void ebld_gl_end(const EbldGL& s)
 static void ebld_gl_sides(const EbldGL& s, bool two)
 {
     if (!s.on) return;
-    if (two) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE);
+    if(!mesh_fragment_polygon_set(GL_CULL_FACE,!two)) {
+        if (two) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE);
+    }
 }
 static void ebld_gl_broken(const EbldGL& s, bool broken)
 {
     if (!s.on || g_m3CasterDepth) return; /* retain the sun pass's slope bias */
-    if (broken) glEnable(GL_POLYGON_OFFSET_FILL); else glDisable(GL_POLYGON_OFFSET_FILL);
+    if(!mesh_fragment_polygon_set(GL_POLYGON_OFFSET_FILL,broken)) {
+        if (broken) glEnable(GL_POLYGON_OFFSET_FILL); else glDisable(GL_POLYGON_OFFSET_FILL);
+    }
 }
 
 /* A WHOLE WALL CELL IS ONE-SIDED TOO, as the viewer draws it. draw_walls runs with culling
@@ -5493,14 +6829,34 @@ static void ebld_gl_broken(const EbldGL& s, bool broken)
    panel casts its shadow either way), the water's reflection mirrors the winding, and the
    relight's bake is not a view. The state is handed back as found. */
 struct EbldWallCull { bool on, cull; GLint mode, front; };
+/* HELD ACROSS A RUN OF WALL CELLS. Every remastered cell enters the one-sided state and
+   leaves it again, so a line of wall toggled the cull state twice a cell. While draw_walls
+   holds it (ebld_wall_cull_hold), the state is entered at the first cell that asks and
+   left only before a draw that is not bracketed (the cartridge's own wall, a shadow set)
+   and at the end of the walk, which restores what the first cell found: every draw sees
+   the state it saw before, without the pair of toggles per cell. */
+static bool g_ebldWallCullLazy = false, g_ebldWallCullHeld = false;
+static unsigned long g_ebldWallCullEntered = 0, g_ebldWallCullCells = 0;
+static EbldWallCull g_ebldWallCullSaved = { false, false, GL_BACK, GL_CCW };
+static void ebld_wall_cull_end(const EbldWallCull& s);
 static EbldWallCull ebld_wall_cull_begin(void)
 {
     EbldWallCull s = { false, false, GL_BACK, GL_CCW };
     if (g_m3CasterDepth || g_m3Mirrored || g_meshBakePass) return s;
+    if (g_ebldWallCullLazy) {
+        g_ebldWallCullCells++;
+        if (!g_ebldWallCullHeld) {
+            g_ebldWallCullEntered++;
+            g_ebldWallCullLazy = false;
+            g_ebldWallCullSaved = ebld_wall_cull_begin();
+            g_ebldWallCullLazy = g_ebldWallCullHeld = true;
+        }
+        return s;      /* (not on: the end leaves the state held) */
+    }
     s.on = true;
     s.cull = glIsEnabled(GL_CULL_FACE) == GL_TRUE;
-    glGetIntegerv(GL_CULL_FACE_MODE, &s.mode);
-    glGetIntegerv(GL_FRONT_FACE, &s.front);
+    s.mode=gls_cull_mode();
+    s.front=gls_front_face();
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
     glEnable(GL_CULL_FACE);
@@ -5512,6 +6868,19 @@ static void ebld_wall_cull_end(const EbldWallCull& s)
     if (s.cull) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
     glCullFace((GLenum)s.mode);
     glFrontFace((GLenum)s.front);
+}
+/* Leave a held wall state now (before an unbracketed draw); the hold stays. */
+static void ebld_wall_cull_release(void)
+{
+    if (!g_ebldWallCullHeld) return;
+    g_ebldWallCullHeld = false;
+    ebld_wall_cull_end(g_ebldWallCullSaved);
+}
+/* draw_walls' hold: on for its walk, off (and released) at its end. */
+static void ebld_wall_cull_hold(bool on)
+{
+    if (!on) ebld_wall_cull_release();
+    g_ebldWallCullLazy = on;
 }
 
 /* THE SUN'S DEPTH PASS LEAVES THE BROKEN FACES OUT for a model with the REST flag: the
@@ -5525,8 +6894,13 @@ static bool g_ebldNoBroken = false;
 static void ebld_draw_rest(const EbldBld& E, int mi, int r0, int r1, int pass, const float* Mx)
 {
     if (r1 <= r0) return;          /* triLast 0 would mean "to the end" */
-    draw_mesh(mi, E.wx, E.wz, -1, pass, 0, 0.0f, E.house, 1.0f, 0.0f, false,
-              WOBBLE_NONE, -1.0f, Mx, (size_t)r0, (size_t)r1);
+    const EbldModel& M=g_ebld[E.model];
+    const int phase=bservice_phase(M.service.kind,E.serviceDoing,E.serviceStage,
+                                  E.servicePowerOff,E.str>0 && E.stage!=EB_WRECKED);
+    bservice_draw(M,mi,r0,r1,phase,[&](int mesh,int a,int b){
+        draw_mesh(mesh, E.wx, E.wz, -1, pass, 0, 0.0f, E.house, 1.0f, 0.0f, false,
+                  WOBBLE_NONE, -1.0f, Mx, (size_t)a, (size_t)b);
+    });
 }
 /* THE PIECES STILL STANDING GO AS FEW DRAWS AS POSSIBLE. Every mesh keeps its pieces'
    runs contiguous and in piece order within each of its two blocks, so consecutive
@@ -5587,8 +6961,12 @@ static void ebld_draw_tail(const EbldBld& E, const EbldModel& M, int mi, const i
         int j = i + 1;
         while (j < b && T[j].tex == T[i].tex) j++;
         ebld_uv_set(M, T[i].tex - M.tex0, -1.0f, 0.0f, still);
-        draw_mesh(mi, px, pz, -1, pass, 0, 0.0f, E.house, 1.0f, lift, false, WOBBLE_NONE,
-                  -1.0f, Mx, (size_t)i, (size_t)j);
+        const int phase=bservice_phase(M.service.kind,E.serviceDoing,E.serviceStage,
+                         E.servicePowerOff,!still && E.str>0 && E.stage!=EB_WRECKED);
+        bservice_draw(M,mi,i,j,phase,[&](int mesh,int a,int b){
+            draw_mesh(mesh, px, pz, -1, pass, 0, 0.0f, E.house, 1.0f, lift, false, WOBBLE_NONE,
+                      -1.0f, Mx, (size_t)a, (size_t)b);
+        });
         ebld_uv_clear();
         i = j;
     }
@@ -5601,6 +6979,9 @@ static void ebld_draw_body(const EbldBld& E, const EbldModel& M, int mi, const i
                            const EbldGL& st, float fillY = 3.0e38f)
 {
     if (r[EBR_B] <= r[EBR_A] && r[EBR_RB] <= r[EBR_RA]) return;
+    if (B.sunk) return;                             /* gone under the sea */
+    /* (a piece in the sea sinks by itself: it is drawn where its own motion has it) */
+    if (B.wet) sinking = false;
     const float a = sinking ? 0.0f : g_tickAlpha;   /* 0 under --shot and --script */
     float p[3], q[4];
     for (int c = 0; c < 3; c++) p[c] = B.pp[c] + (B.p[c] - B.pp[c]) * a;
@@ -5625,8 +7006,10 @@ static void ebld_draw_body(const EbldBld& E, const EbldModel& M, int mi, const i
         const int r0 = blk ? r[EBR_RA] : r[EBR_A], r1 = blk ? r[EBR_RB] : ebld_fa(r);
         if (r1 > r0) {
             ebld_gl_broken(st, blk == 1);
-            draw_mesh(mi, p[0], p[2], -1, pass, 0, 0.0f, E.house, 1.0f, lift, false,
-                      WOBBLE_NONE, -1.0f, Mx, (size_t)r0, (size_t)r1);
+            bservice_draw(M,mi,r0,r1,0,[&](int mesh,int first,int last){
+                draw_mesh(mesh, p[0], p[2], -1, pass, 0, 0.0f, E.house, 1.0f, lift, false,
+                          WOBBLE_NONE, -1.0f, Mx, (size_t)first, (size_t)last);
+            });
         }
         if (blk == 0) {
             ebld_gl_broken(st, false);
@@ -5759,6 +7142,71 @@ static float ebld_wreck_fill(const EbldBld& E, const EbldModel& M, int k)
     return E.fillWreck;
 }
 
+/* THE OVERLAY'S DRAW STATE, for one building's zones. The overlay used to be cut in with
+   an alpha test whose threshold fell as the zone's progress rose. A zone's weight is a
+   corner value, 1 on the zone's own bearing and 0 a whole zone away, and a yard's slab is
+   a few large triangles, so the test's pass line was the straight iso-line of a linearly
+   interpolated weight across the slab's flat face; near full progress it lay where the
+   weight reached zero, the sector's own edge: a perfectly straight seam between sooted
+   and clean concrete, with the whole step of the soot across it (a damaged atlas is about
+   a quarter darker than its standing one over most of its area). BLENDED INSTEAD, by the
+   same weight times the progress, the soot thins to nothing along the same line and the
+   noise breaks it into patches, so there is no edge anywhere. The alpha test stays on,
+   parked at zero, only so a fragment the blend could not change is dropped rather than
+   written.
+   THE TEXTURE ENVIRONMENT (GL_COMBINE, GL 1.3, the stage the doubled flags already use)
+   scales the alpha. The noise alpha was equalised so a threshold t passed a fraction t of
+   the texels, and averages a half, so blended as it is a fully struck zone would show at
+   most half of its soot and the damaged stage would then arrive as a jump. Scaled by
+   EBLD_OVERLAY_GAIN the darker patches saturate first: a fully struck zone shows most of
+   its soot, as the test showed it, and a single hit, a quarter of progress, reads as a
+   light mottled haze whose darkest patches are already full. Everything is handed back as
+   found: the cutout pass runs with the blend off and its test at a half, and nothing else
+   in it reads the stage. */
+static const float EBLD_OVERLAY_GAIN = 4.0f;   /* 1 to 4: the stage scales by 4 at most */
+struct EbldOverlayGL { GLint env, src, dst; GLboolean blend; GLfloat scale; };
+static void ebld_overlay_begin(EbldOverlayGL& s)
+{
+    glGetTexEnviv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, &s.env);
+    glGetTexEnvfv(GL_TEXTURE_ENV, GL_ALPHA_SCALE, &s.scale);
+    glGetIntegerv(GL_BLEND_SRC, &s.src);
+    glGetIntegerv(GL_BLEND_DST, &s.dst);
+    s.blend = glIsEnabled(GL_BLEND);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+    glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
+    glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_TEXTURE);
+    glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
+    glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB, GL_PRIMARY_COLOR);
+    glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
+    glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE);
+    glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_TEXTURE);
+    glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
+    glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA, GL_PRIMARY_COLOR);
+    glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
+    glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, 1.0f);
+    glTexEnvf(GL_TEXTURE_ENV, GL_ALPHA_SCALE, 4.0f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glAlphaFunc(GL_GREATER, 0.0f);
+}
+/* The draw's alpha scale for a zone at progress c: the corner weight times this, times
+   the stage's four, is the gain times the progress. */
+static unsigned char ebld_overlay_alpha(float c)
+{
+    float k = c * (EBLD_OVERLAY_GAIN / 4.0f);
+    if (k > 1.0f) k = 1.0f;
+    return (unsigned char)(255.0f * k + 0.5f);
+}
+static void ebld_overlay_end(const EbldOverlayGL& s)
+{
+    g_meshAlphaScale = 255;
+    glAlphaFunc(GL_GREATER, 0.5f);
+    glBlendFunc((GLenum)s.src, (GLenum)s.dst);
+    if (!s.blend) glDisable(GL_BLEND);
+    glTexEnvf(GL_TEXTURE_ENV, GL_ALPHA_SCALE, s.scale);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, s.env);
+}
+
 /* ONE ENTRY'S PIECES in one pass. `fading` selects the pieces below full opacity, which
    need the blended micro-pass; everything else draws in its own mode's pass. */
 static void ebld_draw_entry(const EbldBld& E, const EbldModel& M, int pass, bool fading,
@@ -5866,10 +7314,11 @@ static void ebld_draw_entry(const EbldBld& E, const EbldModel& M, int pass, bool
                 g_meshFlash = fl;
             }
             g_meshFlash = false;
-            /* THE DAMAGE CREEPING IN, zone by zone: the same surfaces again under an
-               alpha test whose threshold falls as the zone's weight rises, over a
-               texture whose alpha is patch noise, so it arrives in patches rather than
-               as a tint. Same vertices, same draw, so they win the depth test with no
+            /* THE DAMAGE CREEPING IN, zone by zone: the same surfaces again, blended over
+               the standing ones by the zone's weight at each corner times the zone's
+               progress, through a texture whose alpha is patch noise, so the soot arrives
+               in patches rather than as a flat tint (ebld_overlay_begin has the state and
+               the reason). Same vertices, same draw, so they win the depth test with no
                bias. Colour picture only, and only on pieces still standing.
                NOT WHILE IT BLUSHES: the surfaces under it have just been drawn white, and
                the overlay would put its textured patches back on top of them, so a struck
@@ -5877,14 +7326,17 @@ static void ebld_draw_entry(const EbldBld& E, const EbldModel& M, int pass, bool
                own overlay whitens with the rest of the object for the same reason. */
             if (!dmg && pass == MODE_CUTOUT && !fading && !aux && !(g_flashOn && E.blush)) {
                 const float a = g_tickAlpha;
+                EbldOverlayGL ov;
+                bool on = false;
                 for (int z = 0; z < 8; z++) {
                     const float c = E.curPrev[z] + (E.cur[z] - E.curPrev[z]) * a;
                     if (c <= 0.01f) continue;
+                    if (!on) { ebld_overlay_begin(ov); on = true; }
+                    g_meshAlphaScale = ebld_overlay_alpha(c);
                     const std::vector<int>& og = M.rng[EBM_OVER0 + z];
                     const int omi = M.mesh[EBM_OVER0 + z];
                     ebld_wave_c(M, EBM_OVER0 + z, now / 15.0f);
                     EbldRuns orun = ebld_runs(E, omi, pass);
-                    glAlphaFunc(GL_GREATER, 1.0f - c);
                     for (size_t k = 0; k < S.piece.size(); k++)
                         if (!E.cut[k].live && !ebld_stand_moves(E, M, (int)k))
                             orun.add(og[k * EBR + EBR_A], og[k * EBR + EBR_B]);
@@ -5899,8 +7351,8 @@ static void ebld_draw_entry(const EbldBld& E, const EbldModel& M, int pass, bool
                         ebxf_mat(X, Mx);
                         ebld_draw_rest(E, omi, o0, o1, pass, Mx);
                     }
-                    glAlphaFunc(GL_GREATER, 0.5f);
                 }
+                if (on) ebld_overlay_end(ov);
             }
         }
         /* the pieces that are off: chips, and once it breaks the loose parts */
@@ -5970,7 +7422,7 @@ static void ebld_draw_entry(const EbldBld& E, const EbldModel& M, int pass, bool
                     }
                     g_meshAlphaScale = 255;
                     {
-                        MeshFragmentScope fragments;
+                        MeshFragmentScope fragments(&E,0u+(unsigned)pass*4u);
                         for (size_t k = 0; k < S.piece.size() && k < E.wreck.size(); k++) {
                             if (S.piece[k].flags & (EBF_WATER | EBF_WATERFALL)) continue;
                             if ((S.piece[k].flags & EBF_SLAB) || !E.wreck[k].live) continue;
@@ -5987,7 +7439,7 @@ static void ebld_draw_entry(const EbldBld& E, const EbldModel& M, int pass, bool
                 }
                 g_meshAlphaScale = (unsigned char)as;
                 {
-                    MeshFragmentScope fragments;
+                    MeshFragmentScope fragments(&E,1u+(unsigned)pass*4u);
                     for (size_t k = 0; k < S.piece.size() && k < E.wreck.size(); k++) {
                         if (S.piece[k].flags & (EBF_WATER | EBF_WATERFALL)) continue;
                         if (!E.wreck[k].live) continue;
@@ -6089,7 +7541,7 @@ static void ebld_draw(int pass, bool fading)
         if (E.model < 0 || E.model >= (int)g_ebld.size()) continue;
         if (!ebld_meshes_ok(g_ebld[E.model]) || !ebld_cut_ok(g_ebld[E.model])
             || !ebld_anchor_shown(E) || ebld_off_screen(E, aux)) continue;
-        if (!ebld_resident(g_ebld[E.model], true)) continue;
+        if (!ebld_resident_stage(g_ebld[E.model], E.stage)) continue;
         const EbldModel& M = g_ebld[E.model];
         if (!began) { st = ebld_gl_begin(aux); began = true; }
         const bool ns = g_meshNoShroud;
@@ -6112,6 +7564,8 @@ static void ebld_draw(int pass, bool fading)
 static void ebld_draw_glow(void)
 {
     if (g_ebldBld.empty() || ebld_aux_pass()) return;
+    const bool oldTransient = g_meshTransientColor;
+    g_meshTransientColor = mesh_perf_switch("OPENCNC3D_MESH_GLOW_DYNAMIC");
     const bool rule = ebld_rule_now();
     GLint depthFunc = GL_LEQUAL;
     GLboolean depthMask = GL_FALSE;
@@ -6133,7 +7587,7 @@ static void ebld_draw_glow(void)
             || M.mesh[EBM_GLOWC] < 0 || M.mesh[EBM_GLOWC] >= (int)g_pack.mesh.size())
             continue;
         if (!ebld_cut_ok(M) || !ebld_anchor_shown(E) || ebld_off_screen(E, false)
-            || !ebld_resident(g_ebld[E.model], true))
+            || !ebld_resident_stage(g_ebld[E.model], E.stage))
             continue;
         if (!began) {
             began = true;
@@ -6160,7 +7614,7 @@ static void ebld_draw_glow(void)
             const std::vector<int>& rg = M.rng[EBM_GLOWC];
             g_meshAlphaScale = (unsigned char)(255.0f * k + 0.5f);
             {
-                MeshFragmentScope fragments;
+                MeshFragmentScope fragments(&E,2u);
                 for (size_t i = 0; i < S.piece.size(); i++)
                     if (E.cut[i].live) {
                         ebld_wave_body(M, EBM_GLOWC, &rg[i * EBR], E.cut[i]);
@@ -6195,7 +7649,7 @@ static void ebld_draw_glow(void)
             const std::vector<int>& rg = M.rng[gx];
             g_meshAlphaScale = (unsigned char)(255.0f * k + 0.5f);
             {
-                MeshFragmentScope fragments;
+                MeshFragmentScope fragments(&E,3u);
                 for (size_t i = 0; i < S.piece.size() && i < E.wreck.size(); i++)
                     if (E.wreck[i].live)
                         ebld_draw_body(E, M, mi, &rg[i * EBR], MODE_OPAQUE, S.piece[i], E.wreck[i],
@@ -6205,6 +7659,7 @@ static void ebld_draw_glow(void)
         g_meshNoShroud = ns;
     }
     g_meshAlphaScale = 255;
+    g_meshTransientColor = oldTransient;
     if (began) {
         ebld_gl_end(st);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -6217,11 +7672,19 @@ static void ebld_draw_glow(void)
    and before the authored and fixed cartridge models. True: this system has answered
    for the object in this pass (drawn it whole, or it is in pieces and ebld_draw draws
    them). False: the cartridge path draws it as before. */
+static bool eplc_draw_object(int mi, const SimObject& o, int pass);
 static bool ebld_draw_object(int mi, const SimObject& o, int pass)
 {
     if (g_raModule && !ebld_ra_ready(o)) return false;
+    /* Construction owns the same geometry in colour, normals and lighting in both
+       games. TD's normal pass reaches this entry directly too. */
+    if (eplc_draw_object(mi, o, pass)) return true;
     /* (a terrain object, version 6: a remaster that stands whole, its idle loop playing) */
     if ((o.kind != K_BUILDING && o.kind != K_TERRAIN) || g_ebld.empty()) return false;
+    /* The same tree choice gates lit, normals, shadows, reflection and charred snags. */
+    if (o.kind == K_TERRAIN && o.type[0] == 'T'
+        && ((o.type[1] >= '0' && o.type[1] <= '9') || ebld_packless_type(o.type))
+        && !g_fx.tree3d) return false;
     const EbldBld* E = ebld_find(o);
     int m = -1;
     bool dead = false;
@@ -6262,7 +7725,80 @@ static bool ebld_draw_object(int mi, const SimObject& o, int pass)
     const bool broken = E && E->stage != EB_INTACT && !dead;
     /* in pieces, the pieces are ebld_draw's, and only the shadow plate is left here */
     if (broken && pass != MODE_SHADOW) return true;
-    if (!ebld_resident(g_ebld[m])) return dead;
+    const bool cullBeforeResidency = mesh_perf_switch("OPENCNC3D_EBLD_CULL_BEFORE_RESIDENCY");
+    const auto ensureResident = [&]() {
+        if (broken && ebld_stage_residency_enabled(g_ebld[m])) return g_ebld[m].attached;
+        return ebld_resident(g_ebld[m]);
+    };
+    if (!cullBeforeResidency && !ensureResident()) return dead;
+    /* OUTSIDE THIS PASS'S VIEW, NOTHING TO DO. Every pass (the view, the sun's map, the
+       sea's reflection, the normal target) walks every building, tree and prop the shroud
+       shows, the
+       whole map once it is explored, and each draw_mesh below already drops a piece whose
+       box is outside the pass's clip (mesh_batch_outside), after building its key and
+       finding it. A box round the whole building tested against the same clip first:
+       the footprint either way of where it is drawn plus room for anything that
+       overhangs it, from under the lowest ground to well above any roof. Outside it,
+       every piece would have been dropped, so the picture is the same.
+       OPENCNC3D_OBJ_CULL=0 turns it off for an A/B. */
+    if ((o.kind == K_BUILDING || o.kind == K_TERRAIN) && mesh_perf_switch("OPENCNC3D_OBJ_CULL")) {
+        const float r = (float)(o.fw > o.fh ? o.fw : o.fh) + 4.0f;
+        const float lo[3] = { o.wx - r, g_terrainHBot - 2.0f, o.wz - r };
+        const float hi[3] = { o.wx + r, g_terrainHTop + 12.0f, o.wz + r };
+        if (mesh_box_outside(lo, hi)) return true;
+    }
+    if (cullBeforeResidency && !ensureResident()) return dead;
+    /* AND IN THE SUN'S PASS, OUTSIDE EVERY TEXEL THE LIGHT PASS READS (fx_post.h, the
+       receiver window): the same box asked whether any of it can land where a pixel
+       looks. Asked after the model is made resident, so what is loaded and when is the
+       same as without it. Everything below sets its own state and the brackets around
+       each piece put back what they change. The only difference a building left out
+       here can make is the current texture coordinate, normal and colour that a culled
+       piece would have written on its way past, and every sun caster sets those before
+       it reads them. */
+    if ((o.kind == K_BUILDING || o.kind == K_TERRAIN) && g_fxRecvArmed) {
+        const float r = (float)(o.fw > o.fh ? o.fw : o.fh) + 4.0f;
+        const float lo[3] = { o.wx - r, g_terrainHBot - 2.0f, o.wz - r };
+        const float hi[3] = { o.wx + r, g_terrainHTop + 12.0f, o.wz + r };
+        if (fx_recv_object_outside(lo, hi)) return true;
+    }
+    /* A PASS THE MODEL HAS NO TRIANGLE OF draws nothing below: every piece reaches
+       draw_mesh, which returns at its own pass test before any GL call. So such a pass is
+       answered here, after every refusal above and after residency, which happen exactly
+       as before. The meshes asked are the intact mesh and every one the service rig can
+       draw in its place. Not the opaque pass, whose walk also records what it drew; not
+       under the debug pack, which swaps meshes inside draw_mesh; and only while the
+       per-draw hooks the walk would hand back are already at rest, so the state left
+       behind is the walk's. The flag is still posed, as the walk would have posed it.
+       OPENCNC3D_EBLD_PASS_EARLY_OUT=0 walks every piece as before. */
+    if (pass != MODE_OPAQUE && pass >= 0 && pass < 32 && !debug_meshes_on()
+        && g_meshFillY >= 3.0e38f && g_meshUVScaleU == 1.0f && g_meshUVScaleV == 1.0f
+        && g_meshUVOffU == 0.0f && g_meshUVOffV == 0.0f
+        && mesh_perf_switch("OPENCNC3D_EBLD_PASS_EARLY_OUT")) {
+        const EbldModel& Q = g_ebld[m];
+        const int imi = Q.mesh[EBM_INTACT];
+        const unsigned bit = 1u << pass;
+        const auto has = [&](int k) { return k >= 0 && k < (int)g_pack.mesh.size() && (g_pack.mesh[k].modeMask & bit); };
+        bool any = imi < 0 || imi >= (int)g_pack.mesh.size() || has(imi);
+        if (!any && Q.service.kind) {
+            const std::map<int, BServiceMesh>::const_iterator it = Q.service.meshes.find(imi);
+            if (it != Q.service.meshes.end()) {
+                any = has(it->second.body);
+                for (int k = 0; k < 6 && !any; k++) any = has(it->second.part[k]);
+            }
+        }
+        if (!any) {
+            /* (a broken model's walk is its shadow plate alone, and touches neither) */
+            if (!broken) {
+                if (!Q.wave.empty()) ebld_wave(g_ebld[m], EBM_INTACT, engine_time() / 15.0f);
+                g_meshFlash = false;
+                g_meshSwayT = -1.0f;
+            }
+            g_ebldPassEarlyOuts++;
+            return true;
+        }
+    }
+    MeshArrayScope arrays;
     const EbldModel& M = g_ebld[m];
     const int imi = M.mesh[EBM_INTACT];
     const EbldSet& S = M.set[EBS_INTACT];
@@ -6272,19 +7808,49 @@ static bool ebld_draw_object(int mi, const SimObject& o, int pass)
     struct Draw {
         int mi, pass, face, house, tur, wob;
         float x, z, frac, lift, at, rot;
+        const EbldModel* model; int servicePhase;
+        bool tree,stone;float treeMatrix[12];
         void run(int a, int b, const float* mx = NULL) const
         {
             if (b <= a) return;
-            draw_mesh(mi, x, z, face, pass, tur, rot, house, frac, lift, false, wob, at,
-                      mx, (size_t)a, (size_t)b);
+            float composed[12];const float* transform=mx;
+            if(tree && (g_fx.etree_height!=1.0f || g_fx.etree_width!=1.0f || g_fx.etree_vary!=0.0f || g_fx.etree_lean!=0.0f)) {
+                if(mx) {
+                    for(int r=0;r<3;r++)for(int c=0;c<4;c++) {
+                        composed[r*4+c]=c==3?treeMatrix[r*4+3]:0.0f;
+                        for(int k=0;k<3;k++)composed[r*4+c]+=treeMatrix[r*4+k]*mx[k*4+c];
+                    }
+                }else memcpy(composed,treeMatrix,sizeof composed);
+                transform=composed;
+            }
+            const float gain=g_meshTreeGain;const bool stoneWas=g_meshNeutralStone;
+            g_meshNeutralStone=stone;
+            if(tree)g_meshTreeGain=g_fx.etree_gain;
+            bservice_draw(*model,mi,a,b,servicePhase,[&](int mesh,int first,int last){
+                draw_mesh(mesh, x, z, face, pass, tur, rot, house, frac, lift, false, wob, at,
+                          transform, (size_t)first, (size_t)last);
+            });
+            g_meshTreeGain=gain;g_meshNeutralStone=stoneWas;
         }
     } D;
+    D.stone=o.kind==K_TERRAIN && !strncmp(o.type,"ROCK",4) && fx_unified_lighting()
+        && fx_texset_get()==FX_TEX_ENH && ebld_pack_theater()==1;
+    D.tree=o.kind==K_TERRAIN&&o.type[0]=='T'&&((o.type[1]>='0'&&o.type[1]<='9')||o.type[1]=='C');
+    const float variation=((float)(efx_hash(0x54524545u,(unsigned)o.cx,(unsigned)o.cy,0u)%2001u)/1000.0f-1.0f)*g_fx.etree_vary;
+    const float leanAngle=(float)(efx_hash(0x4c45414eu,(unsigned)o.cx,(unsigned)o.cy,0u)%6283u)*0.001f;
+    const float width=g_fx.etree_width*(1.0f+variation),height=g_fx.etree_height*(1.0f+variation);
+    const float tm[12]={width,sinf(leanAngle)*g_fx.etree_lean,0,0, 0,height,0,0, 0,cosf(leanAngle)*g_fx.etree_lean,width,0};
+    memcpy(D.treeMatrix,tm,sizeof tm);
+    D.model=&M;D.servicePhase=bservice_phase(M.service.kind,o.doing,o.dostage,
+                              o.poweroff!=0,o.str>0 && !dead);
     D.mi = imi; D.pass = pass; D.face = draw_facing(o); D.house = mesh_house(o);
     D.tur = turret_delta(o); D.wob = wobble_of(o);
     D.x = o.wx; D.z = o.wz; D.frac = dead ? 1.0f : construction_frac(o); D.lift = alt_lift(o);
     /* (a snag smoked out settles into the ground, etree_sink) */
     D.lift -= g_etreeSink;
-    D.at = g_raModule ? -1.0f : object_anim_t(mi, o); D.rot = rotor_spin(o);
+    /* (a tree clump has no cartridge mesh, mi -1, and so no cartridge clip to follow) */
+    D.at = g_raModule ? ebld_ra_clip_at(M, o) : (mi >= 0 ? object_anim_t(mi, o) : -1.0f);
+    D.rot = rotor_spin(o);
     /* (a standing Weapons Factory's intact clip is its door, on the engine's door stage at
        every strength: THE WEAPONS FACTORY'S DOOR) */
     if (D.at >= 0.0f && ebld_door_at(o) >= 0.0f) D.at = ebld_door_at(o);
@@ -6343,9 +7909,14 @@ static bool ebld_draw_object(int mi, const SimObject& o, int pass)
                     const float at = (C.set == 0 && !C.idle && !strcmp(o.type, "HAND"))
                                      ? hand_door_open(o) * (float)(C.frames - 1) : D.at;
                     const int f = ebld_clip_frame(C, at, ebld_idle_t(engine_time(),
-                                                                     E ? E->idlePhase : 0.0f));
+                                                                     E ? E->idlePhase
+                                                                       : ra3d_prop_phase(o, C)));
                     EbXf X;
-                    ebld_clip_xf(C, f, (int)M.move[mv].a[1], &X);
+                    /* (a Red Alert motion played by time: blended between its frames) */
+                    if (ebld_ra_motion(M) && C.set == 0 && !C.idle && at >= 0.0f)
+                        ebld_clip_xf_at(C, at, (int)M.move[mv].a[1], &X);
+                    else
+                        ebld_clip_xf(C, f, (int)M.move[mv].a[1], &X);
                     ebxf_mat(X, Mx);
                     seen = (float)f;
                 } else {
@@ -6395,6 +7966,7 @@ static bool ebld_wall_draw(int kind, int icon, float cx, float cz, int pass)
     if (kind < 0 || kind >= EBLD_NWALL || icon < 0 || icon > 15 || g_ebld.empty()
         || !ebld_rule_now())
         return false;
+    if (kind == 5 && !ra3d_props_on()) return false;   /* (Red Alert's fence, for an A/B) */
     if (pass != MODE_OPAQUE && pass != MODE_CUTOUT) return false;
     ebld_wall_models();
     const int m = g_ebldWallModel[kind];
@@ -6440,31 +8012,40 @@ static bool ebld_wall_draw(int kind, int icon, float cx, float cz, int pass)
  * ============================================================================== */
 #define EBLD_NORMAL_CLASS 0.38f
 #define EBLD_SELFLIT_CLASS 0.15f
+/* uPose: the turn of a part a placement is moving on the card (ebld_place.h,
+   eplc_draw_run), applied to the normal the batch built for the part at rest; identity
+   for everything else this program draws, set after every link (a uniform starts at zero,
+   and a zero turn would black every normal). */
 static const char* EBLD_NRM_VS =
     "#version 120\n"
-    "varying vec3 vN;\n"
-    "varying vec2 vUV;\n"
-    "varying float vEmit;\n"
-    "void main() {\n"
-    "    vN = gl_Normal;\n"
-    "    vUV = gl_MultiTexCoord0.xy;\n"
-    "    vEmit = gl_Color.a;\n"
-    "    gl_Position = ftransform();\n"
-    "}\n";
-static const char* EBLD_NRM_FS =
-    "#version 120\n"
-    "varying vec3 vN;\n"
-    "varying vec2 vUV;\n"
-    "varying float vEmit;\n"
-    "uniform sampler2D uTex;\n"
-    "uniform int uCut;\n"
-    "uniform float uClass, uEmitClass;\n"
-    "void main() {\n"
-    "    if (uCut == 1 && texture2D(uTex, vUV).a <= 0.5) discard;\n"
-    "    vec3 N = normalize(vN);\n"
-    "    if (!gl_FrontFacing) N = -N;\n"
-    "    gl_FragColor = vec4(N * 0.5 + 0.5, vEmit > 0.5 ? uEmitClass : uClass);\n"
-    "}\n";
+    "uniform mat4 uPose;\n"
+    "varying vec3 vN,vW;varying vec2 vUV;varying float vEmit;\n"
+    "void main(){vN=mat3(uPose)*gl_Normal;vW=gl_Vertex.xyz;vUV=gl_MultiTexCoord0.xy;vEmit=gl_Color.a;\n"
+    "gl_ClipVertex=gl_ModelViewMatrix*gl_Vertex;gl_Position=ftransform();}\n";
+static const float EBLD_POSE_IDENTITY[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+                                              0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+static void ebld_pose_identity(GLuint p)
+{
+    if (!p) return;
+    GLint was = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &was);
+    fx_glUseProgram(p);
+    fx_setmat(p, "uPose", EBLD_POSE_IDENTITY);
+    fx_glUseProgram((GLuint)was);
+}
+static std::string ebld_nrm_fs(void)
+{
+    return std::string("#version 120\n"
+        "varying vec3 vN,vW;varying vec2 vUV;varying float vEmit;\n"
+        "uniform sampler2D uTex,uStoneMap;uniform int uCut,uStoneMapOn;\n"
+        "uniform float uClass,uEmitClass;\n")+STONE_TBN_GLSL+
+        "void main(){\n"
+        "if(uCut==1&&texture2D(uTex,vUV).a<=0.5)discard;\n"
+        "vec3 N=normalize(vN);if(!gl_FrontFacing)N=-N;float cls=uClass;\n"
+        "if(uStoneMapOn==1){vec4 m=texture2D(uStoneMap,vUV);N=stoneNormal(N,vW,vUV,normalize(m.rgb*2.0-1.0));\n"
+        "if(cls>0.86&&cls<0.89)cls=0.861+0.028*clamp((m.a-0.48)/0.42,0.0,1.0); }\n"
+        "gl_FragColor=vec4(N*0.5+0.5,vEmit>0.5?uEmitClass:cls); }\n";
+}
 static GLuint g_ebldNrmProg = 0;
 static bool g_ebldNrmTried = false;
 static GLuint ebld_nrm_prog(void)
@@ -6474,7 +8055,7 @@ static GLuint ebld_nrm_prog(void)
     if (!fx_gl_ready) return 0;
     GLuint vs = fx_compile(GL_VERTEX_SHADER, EBLD_NRM_VS, "ebld-normals");
     if (!vs) return 0;
-    GLuint fs = fx_compile(GL_FRAGMENT_SHADER, EBLD_NRM_FS, "ebld-normals");
+    GLuint fs = fx_compile(GL_FRAGMENT_SHADER, ebld_nrm_fs().c_str(), "ebld-normals");
     if (!fs) { fx_glDeleteShader(vs); return 0; }
     GLuint p = fx_glCreateProgram();
     fx_glAttachShader(p, vs);
@@ -6489,7 +8070,8 @@ static GLuint ebld_nrm_prog(void)
     }
     fx_glDeleteShader(vs);
     fx_glDeleteShader(fs);
-    g_ebldNrmProg = p;
+    g_ebldNrmProg = p;g_stoneMeshNormalProgram=p;
+    ebld_pose_identity(p);
     return p;
 }
 /* Buildings drawn whole into the target in the last frame, for the dump. */
@@ -6708,6 +8290,31 @@ static void ebld_dump(void)
                    E.type, it->first, STAGE[E.stage & 3], fi, C.idle ? 1 : 0, E.idlePhase, tick,
                    E.stage == EB_DAMAGED ? E.clipI0 : -1);
         }
+        /* A RED ALERT STRUCTURE'S DRIVEN CLIP (RA_DRIVE): the engine's state and door stage
+           this tick, how far out the motion is and whether it is on its way back (or a
+           loop's frame), the intact clip's frame shown, and where the motion lies in it */
+        if (g_raModule && M.raDrive >= 0 && M.clipIntact >= 0) {
+            static const char* const KIND[8] = { "none", "door", "ramp", "stage", "cycle", "anim", "charge", "fired" };
+            /* how far the clip's parts stand moved at the frame drawn (the largest translation
+               of a part, pack units: a roller door's lift) and at the motion's full extent */
+            const EbldClip& C = M.clip[M.clipIntact];
+            float lift = 0.0f, full = 0.0f;
+            for (int pt = 0; pt < C.nparts; pt++) {
+                EbXf X;
+                ebld_clip_xf(C, ebld_clip_frame(C, E.animF, ebld_idle_t(now, E.idlePhase)), pt, &X);
+                lift = fmaxf(lift, sqrtf(X.t[0] * X.t[0] + X.t[1] * X.t[1] + X.t[2] * X.t[2]));
+                ebld_clip_xf(C, M.drvSeg[1] >= 0 ? M.drvSeg[1] : C.frames - 1, pt, &X);
+                full = fmaxf(full, sqrtf(X.t[0] * X.t[0] + X.t[1] * X.t[1] + X.t[2] * X.t[2]));
+            }
+            printf("EBLDDRIVE|%s|key=%lld|kind=%s|sprite=%d|stage=%s|doing=%d|door=%d|out=%.3f|closing=%d"
+                   "|cycle=%.2f|frame=%.2f|seg=%d,%d,%d,%d|frames=%d|lift=%.4f|full=%.4f\n", E.type, it->first,
+                   KIND[RA_DRIVE[M.raDrive].kind >= 1 && RA_DRIVE[M.raDrive].kind <= 7 ? RA_DRIVE[M.raDrive].kind : 0],
+                   M.drvSprite ? 1 : 0,
+                   STAGE[E.stage & 3], E.serviceDoing, E.doorStage, E.drvCur,
+                   E.drvClosing ? 1 : 0, E.cycCur, ebld_ra_drive_frame(E, M, 1.0f),
+                   M.drvSeg[0], M.drvSeg[1], M.drvSeg[2], M.drvSeg[3],
+                   M.clip[M.clipIntact].frames, lift, full);
+        }
         /* THE WEAPONS FACTORY'S DOOR: the engine's door stage, the frame the door clips show
            for it, and the frames the intact and damaged clips are at (-1 none) */
         if (E.doorF >= 0.0f) {
@@ -6878,4 +8485,18 @@ static void ebld_dump_bodies(void)
     }
     fflush(stdout);
 }
+#include "ebld_prepare.h"
+
 #endif
+
+static void bservice_dump(void)
+{
+    for(size_t i=0;i<g_objects.size();i++){
+        const SimObject& o=g_objects[i];const int m=ebld_model_of(o.type);
+        if(m<0 || !g_ebld[m].service.kind)continue;
+        const EbldModel& M=g_ebld[m];const int phase=bservice_phase(M.service.kind,o.doing,
+            o.dostage,o.poweroff!=0,o.str>0);
+        printf("BSERVICE|%s|id=%d|house=%s|doing=%d|stage=%d|poweroff=%d|phase=%d|str=%d/%d\n",
+               o.type,o.id,o.house,o.doing,o.dostage,o.poweroff,phase,o.str,o.maxstr);
+    }
+}

@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "approved_CNC_source": "opencnc3d-matching-ring.png",
+  "CNC_native_RGBA_exact": true,
+  "CNC_native_RGBA_sha256": "f5b13c8557a2b2b2f08913ba195ec2467cebb9c6dc713476771c1093f5c45b9e",
+  "single_source_ring": true,
+  "shared_RGBA_pixels": 17233,
+  "nonzero_alpha_shared_pixels": 7123,
+  "shared_ring_RGBA_sha256": "f8cb18e15e6fa23e8c2efe9bd0542de5cf15c8f9d943244bf55b96721711716e",
+  "shared_binary_mask_sha256": "7dfa5264f75f4a3bdf0e49c2a5b5161526435921aa9f3815eb05eb9c9ea631cd",
+  "shared_binary_mask_role": "255 denotes shared ring and exterior; 0 denotes RA inset aperture",
+  "aperture": {
+    "center": [
+      79,
+      74.25
+    ],
+    "radii": [
+      55,
+      48.5
+    ],
+    "inward_AA_start_squared_radius": 0.97
+  },
+  "RA_face_source_center": [
+    79.5,
+    76
+  ],
+  "RA_face_source_radii": [
+    63.5,
+    60.5
+  ],
+  "RA_face_fit": "independent axes into the shared source ring opening; existing green battle scene with no recolouring",
+  "previous_RA_source_array_unchanged": true,
+  "header_wordmark_unchanged": true
+}

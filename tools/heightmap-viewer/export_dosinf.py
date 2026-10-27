@@ -45,7 +45,7 @@ WHAT COMES FROM WHERE
              palette indices 176..191 -- the gold uniform band -- to
              bake_dosinfantry.N64_BAND_NOD, the cartridge's desaturated blue-grey
              (ROM 0x99130 entries 16..31). Deliberately NOT const.cpp:404's
-             RemapLtBlue teal: the project owner looked at the teal and rejected it. See the
+             RemapLtBlue teal: that palette is not used here. See the
              long note at bake_dosinfantry.py:303-328 for why the two bands are
              the same sixteen slots.
   Shadow     display.cpp:357 UShadowCols: palette index 4 is a ghost colour the

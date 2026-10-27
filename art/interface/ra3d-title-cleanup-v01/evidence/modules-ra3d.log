@@ -1,0 +1,15 @@
+wrote $REPO/art/interface/ra3d-title-cleanup-v01/evidence/modules-ra3d.png (1016x636)
+LSIGNAL|enabled=0|ms=0|period_ms=16000
+LCURSOR|source=ecur/ecur.bin|mesh=CUR00|triangles=108|source_crc32=6e5d2e4e|native_x=-1000.000|native_y=-1000.000|smoothing=0
+LBTN|i=0|label=Launch|x=88|y=543|w=192|h=42|disabled=0|hidden=0
+LBTN|i=1|label=Changelog|x=304|y=543|w=192|h=42|disabled=0|hidden=0
+LBTN|i=2|label=Editor|x=520|y=543|w=192|h=42|disabled=1|hidden=0
+LBTN|i=3|label=Quit|x=736|y=543|w=192|h=42|disabled=0|hidden=0
+LMOD|i=0|name=OpenCNC3D|installed=1|selected=0|x=100|y=216|w=186|h=186|drawn=1
+LMOD|i=1|name=RA3D|installed=1|selected=1|x=310|y=216|w=186|h=186|drawn=1
+LMOD|i=2|name=|installed=0|selected=0|x=520|y=216|w=186|h=186|drawn=1
+LMOD|i=3|name=|installed=0|selected=0|x=730|y=216|w=186|h=186|drawn=1
+LGEAR|label=Settings|x=865|y=159|w=45|h=45|disabled=0
+LWINDOW|label=Close|x=940|y=30|w=45|h=33
+LREMOVE|label=Remove Module|x=358|y=438|w=300|h=27|disabled=0
+LSTATUS|text=Could not resolve host: opencnc3d.com

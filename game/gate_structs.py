@@ -44,6 +44,9 @@ DIALS = [("st_gamma", "1.8", "brighter"), ("st_bright", "1.4", "brighter"),
 # Every run starts with all eight dials at neutral, whatever the shipped defaults are,
 # because the gate tests the group's mechanism from its neutral path.
 NEUTRAL = ["gfx %s 1" % k for k, _, _ in DIALS]
+# The independent self-shadow fill also needs structure classification. Isolate the
+# eight grade/light dials from it, then exercise that separate class-mask user below.
+NEUTRAL += ["gfx object_shadow_fill 0"]
 # AND THE FRAME'S GRADE IS THE ONE THE CLAIMS WERE MEASURED UNDER, with the moving mist
 # off, because "greyer" is read off the finished frame, after the grade. At st_sat 0 the
 # structures came out a neutral grey (82, 82, 83 on average) under this grade and a
@@ -54,6 +57,12 @@ GRADE = ["gfx exposure -0.25", "gfx contrast 1.15625", "gfx saturation 1.03571",
          "gfx temperature 0.125", "gfx tint 0", "gfx lift 0.00357", "gfx gain 1.59821",
          "gfx bloom_intensity 0.28571", "gfx fog_fx 0"]
 NEUTRAL += GRADE
+# AND THE OCCLUSION AS IT WAS MEASURED. The structures' mask is every pixel that changes
+# when the buildings are hidden, so a building pixel that happens to equal the ground under
+# it falls outside the mask; under the stronger shipped occlusion one such pixel turned up
+# (18, 17, 17 over 18, 17, 17) and was counted as a pixel outside the structures that
+# brightness 0 had moved.
+NEUTRAL += ["gfx ssao_intensity 0.51786"]
 TAIL = ["", "[TERRAIN]", "", "[SMUDGE]", "", "[Triggers]", "", "[CellTriggers]", "",
         "[Teams]", "", "[Waypoints]", "", "[Base]", "Count=0", ""]
 
@@ -99,7 +108,9 @@ def maps(out):
         for key, val, _ in DIALS:
             s += ["gfx %s %s" % (key, val), "shot shots/g305_%s%s.png" % (blo, key),
                   "stdump", "gfx %s 1" % key]
-    s += ["gfx bloom_on 1", "shot shots/g305_n1.png", "stdump", "quit"]
+    s += ["gfx bloom_on 1", "shot shots/g305_n1.png", "stdump",
+          "gfx object_shadow_fill 0.5", "shot shots/g305_fill_on.png", "stdump",
+          "gfx object_shadow_fill 0", "shot shots/g305_fill_reset.png", "stdump", "quit"]
     open(os.path.join(out, "enh.txt"), "w").write("\n".join(s) + "\n")
     # --noebld (every structure the cartridge's) and Classic: neutral, then brightness 0
     for tag in ("x", "k"):
@@ -142,7 +153,9 @@ def check(logs, d):
     E = rd(os.path.join(logs, "g305e.log"))
     X = rd(os.path.join(logs, "g305x.log"))
     K = rd(os.path.join(logs, "g305k.log"))
-    st = [l for l in E if l.startswith("STRUCT|")]
+    all_st = [l for l in E if l.startswith("STRUCT|")]
+    expected_grade_rows = 2 + 2 * len(DIALS) + 1
+    st, fill_probe = all_st[:expected_grade_rows], all_st[expected_grade_rows:]
     on = [int(re.search(r"\|on=(\d)", l).group(1)) for l in st]
     cart = [int(re.search(r"cartdraws=(\d+)", l).group(1)) for l in st]
     skips = [int(re.search(r"cartskips=(\d+)", l).group(1)) if "cartskips=" in l else 0 for l in st]
@@ -155,10 +168,21 @@ def check(logs, d):
     need(st and covered[0] == 0 and min(covered[1:-1] or [0]) >= len(STRUCTS),
          "structure classification was not supplied by a redraw or the remaster normals "
          "(covered %s, want 0 at neutral and >= %d)" % (covered, len(STRUCTS)))
+    need(len(fill_probe) == 2 and "|on=1|active=1|" in fill_probe[0]
+         and "|on=0|active=0|" in fill_probe[1]
+         and sum(int(re.search(r"%s=(\d+)" % key, fill_probe[0]).group(1))
+                 for key in ("cartdraws", "cartskips")) >= len(STRUCTS)
+         and all("|%s=1.000" % key in row for row in fill_probe
+                 for key in ("gamma", "bright", "contrast", "sat", "shade", "sun", "glow", "ao"))
+         and "|cartdraws=0|cartskips=0|" in fill_probe[1],
+         "the independent self-shadow fill did not activate structure classification "
+         "with all eight dials neutral, then stand down after reset: %s" % fill_probe)
 
     n0, n1, nb = img("_n0"), img("_n1"), img("_nb_n")
     need(np.array_equal(n0, n1), "the neutral frame after every dial had been moved and put "
          "back differs from the first by %d pixels" % moved(n0, n1).sum())
+    need(np.array_equal(n0, img("_fill_reset")),
+         "the neutral frame after independent self-shadow fill reset differs from the first")
     # WHAT IN THE FRAME IS A STRUCTURE'S AT ALL, found without the group: the pixels that
     # change when the buildings and the walls are not drawn (their own and the shadows
     # they cast). Every dial must stay inside it.
@@ -231,7 +255,9 @@ def check(logs, d):
               "other pixel; the structures' mask %d px, %d of it with every structure the "
               "cartridge's; neutral took the old path (on=0, nothing drawn into the target) "
               "and the frame after every dial was put back is the first frame byte for "
-              "byte; Classic untouched" % (", ".join(said), total, xm[:, :W].sum()))
+              "byte; independent self-shadow fill classified the structures with all eight "
+              "dials neutral and reset exactly; Classic untouched"
+              % (", ".join(said), total, xm[:, :W].sum()))
 
 
 if __name__ == "__main__":

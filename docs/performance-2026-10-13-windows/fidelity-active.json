@@ -1,0 +1,1311 @@
+{
+  "status": "PASS",
+  "private_only": true,
+  "active_trace_proof": {
+    "markers": 22,
+    "rows": 22,
+    "extra_fields": 42,
+    "max_color_commands": 13846,
+    "max_shadow_draws": 2436,
+    "max_normal_draws": 5022,
+    "max_live_bodies": 440
+  },
+  "comparisons": {
+    "PNG_per_reference": 11,
+    "decoded_float_targets_per_reference": 66,
+    "references": [
+      "released baseline",
+      "combined trace off"
+    ],
+    "differences": 0
+  },
+  "physics": {
+    "PHYSICSCAPTURE|": {
+      "count": 11,
+      "sha256": "2380d56e02e23e3a7598a087a47e519bf465beedfa00d1e0cf4456950f5a05b9"
+    },
+    "BUILDINGPHYSICSCAPTURE|": {
+      "count": 11,
+      "sha256": "1aa1a29814daf6899051c666b35b4c7b9ccb7914e0fdbea1dd951406f0ff454b"
+    },
+    "EBLDBODY|": {
+      "count": 3080,
+      "sha256": "3c1b51a44d9a644cf6786f6e3cb5ec7323c4b8cac89083cee647011fa6ef7cda"
+    }
+  },
+  "checks": [
+    {
+      "reference": "baseline",
+      "file": "proc-intact.png",
+      "kind": "PNG bytes",
+      "sha256": "811203c7216a3a16f26fb38b1ef227e7b6634fac45926c843769b8d3111e606e"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t002.png",
+      "kind": "PNG bytes",
+      "sha256": "9f2b89bd2cc80f7d50f5231f774aae9fe077cd660a9f0a3f8e9ed504faf54f3f"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t006.png",
+      "kind": "PNG bytes",
+      "sha256": "6becd3a7aaf5596fb16dfd4860c9cbdb2e009011e70374090142e378d96f718f"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t015.png",
+      "kind": "PNG bytes",
+      "sha256": "344e7e5841596ea318ddc41b0a080b0d1ce592a6080164ec535266e25ec62d03"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t045.png",
+      "kind": "PNG bytes",
+      "sha256": "6f9d04b7a4d3fd5fb86ed3b61e625fe10bc4ed13aa1afed382ec55e99bbdc8d8"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t060.png",
+      "kind": "PNG bytes",
+      "sha256": "3d1456fe9004dabf82df7bdd1660d26b38e0b088eecf542b3fe8d4e84b07e5ec"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t090.png",
+      "kind": "PNG bytes",
+      "sha256": "901fbed859b1533cacaca8fdcec3afc3a3014de596da9605062fed8653ba11f2"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t120.png",
+      "kind": "PNG bytes",
+      "sha256": "bcd9a80dca416ec9fb4d69a1662f09c41b8c6acdc8f04a8033299e4e9cc37185"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t150.png",
+      "kind": "PNG bytes",
+      "sha256": "d2594f90eb301537cb3231fb0d2aa8b5bdcf57e52e835ee13ccd110e1b22233e"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t300.png",
+      "kind": "PNG bytes",
+      "sha256": "cee0492951f84b35d81afac9aac5e80d34750bdb5fde7d490b4e644b53e432ec"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t900.png",
+      "kind": "PNG bytes",
+      "sha256": "e339f6074c44755a24226beacaeaa6fb86dd6d50fedfd1a1c59081fecfc3e4e9"
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-intact-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "1dd23e2e196a0172c7ec8f210cb2f5725b98b744e21dcaa35fea3a6ee2de9cdf",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-intact-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-intact-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "de9b59b51af49f0e1d677773676409be05fb8825528ddfb8d2f1e68aeba62736",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-intact-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "ea851a912bd0dc4a4ac77e812b974e333db03cd438c62b5ca23a46d757eaff80",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-intact-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4be0267f77ef5bb6211ec07eae8321613fbe45ee1d64ffac24d45cf6b732117f",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-intact-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t002-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "5e63f38c4550893737f431978fd2fca47715afd7c3473dd57a207ce62ee882b4",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t002-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t002-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "f192518f21176a17d9949114cefed346648734da581f284a50f63aac94846ea3",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t002-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "6815d9411dd0872a9e71601385d6a2a8fc200602c3c70e611c377964227cabb1",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t002-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "821e94e9421b7011e526cf42e2e6486d55d0e2fd5875f2978515a75d9f4debb7",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t002-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t006-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "9782a3b86b99aa5b5a5565dec56797851b70e238ce258b7978c4084c6d491f64",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t006-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t006-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "cff4d9821187024aa975fe547be547ff4bd4b7f0e569d14c03a8cc95e10ff79b",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t006-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "9d90207952b358d0675084540964173c8e47b4fac1f053be8175bfc595132901",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t006-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "189ac606ec17daa7b275b3a4715add79abb27d6eb58a78382af38446200d1606",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t006-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t015-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "7809bca6f536f2fe190e207e988275e259010cc75fcab4525a16b0f64778543d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t015-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t015-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "0fbc6c9b232e8e39d43d92a69a2870dbda2c9d61b8163b3186c7b5956145bdf2",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t015-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "68e3d1effd94c2fe3041a49d4232ff1a6daf28248e7db648410f0d63f14dfe1a",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t015-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "a38e021b8f5a4af0819ef1c2b7a768f90fbb22df2874c5ac1af27479a36f833b",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t015-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t045-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "888729dc153c1cdf2880f12183e3d52d0099237dd07f6d9eea49cb09e1f2f377",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t045-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t045-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8deb201f8e801ebed5827f199200ddefa2aae0116c29e630fc43f0be059dd508",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t045-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "75ed497290ceb30ea2cf53a5d731a46d2bb82b9e8aa5c36244db093017adb5c5",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t045-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "13959615596b6ba65092c9e3cf2ccc0f3ce70b58f90cb1f677c1adad9f3027e6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t045-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t060-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "c74bdbbb94a2b9545e422f2f34b29a047d3fdae88573d8c39496642b8b0283e5",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t060-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t060-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "b97fa511eb968a08f9461c5fc55ca7266de5b8d066ce6bf310e0bc3a58bc5ac6",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t060-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "10f788d717fec3914072e50ba2df7ffe2c0351a0b45be526d6cf8e88855091f7",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t060-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "74ee696182478a70808b1de90e743d33ad408aa0a8a30a64c9c1dc6e3ca5a2a5",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t060-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t090-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "1674f5bc6c33b9aaa8ad1e0c92ced6263d935b1124fa2851336ea057932ac2a1",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t090-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t090-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "87e5cfd6e804b43ff5ab254678cb0d1f10d0ff74e935b760aa17956fd66253af",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t090-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "55f4f89352dc97c8b5b421047200e928604196b6563b0de25e9ce77507a95506",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t090-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "b9fea0b9f2ff1bb99b3e435b7e8f60500f17a78e4c4217fe69e389b35a2cbef2",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t090-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t120-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t120-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t120-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t120-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "dedcc0bc884e5f9339264bb4ca4e262a0dcb7f28a976124932f8f1bec52f155c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t120-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4644d8c7c6f01cbd17265622e488a0fb461b0126a72fdf9588d960f3c77270ef",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t120-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t150-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t150-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t150-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t150-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "3c4e5cf0b4d313e02e3b471afca05f27c1632d6896cda80f727df36f0a2c4aa2",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t150-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "df246e4a31721b37c03868ed66b5c3803bff8296240e56e624efb01387579a53",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t150-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t300-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t300-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t300-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t300-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "bf2bb8a3847ad0254b7fa3560613d349972598a2c968de1915658e4594dd9f39",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t300-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "30277db877aabb5a8fea1bbfc1c4d9c114f839803f4bddd45f76408bcd04814b",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t300-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t900-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t900-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t900-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t900-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4ed4df93c39dc32ad566ae33afe6c9d3c208bc6f149def8d48962d19daef29c5",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t900-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "30277db877aabb5a8fea1bbfc1c4d9c114f839803f4bddd45f76408bcd04814b",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "baseline",
+      "file": "proc-t900-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-intact.png",
+      "kind": "PNG bytes",
+      "sha256": "811203c7216a3a16f26fb38b1ef227e7b6634fac45926c843769b8d3111e606e"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t002.png",
+      "kind": "PNG bytes",
+      "sha256": "9f2b89bd2cc80f7d50f5231f774aae9fe077cd660a9f0a3f8e9ed504faf54f3f"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t006.png",
+      "kind": "PNG bytes",
+      "sha256": "6becd3a7aaf5596fb16dfd4860c9cbdb2e009011e70374090142e378d96f718f"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t015.png",
+      "kind": "PNG bytes",
+      "sha256": "344e7e5841596ea318ddc41b0a080b0d1ce592a6080164ec535266e25ec62d03"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t045.png",
+      "kind": "PNG bytes",
+      "sha256": "6f9d04b7a4d3fd5fb86ed3b61e625fe10bc4ed13aa1afed382ec55e99bbdc8d8"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t060.png",
+      "kind": "PNG bytes",
+      "sha256": "3d1456fe9004dabf82df7bdd1660d26b38e0b088eecf542b3fe8d4e84b07e5ec"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t090.png",
+      "kind": "PNG bytes",
+      "sha256": "901fbed859b1533cacaca8fdcec3afc3a3014de596da9605062fed8653ba11f2"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t120.png",
+      "kind": "PNG bytes",
+      "sha256": "bcd9a80dca416ec9fb4d69a1662f09c41b8c6acdc8f04a8033299e4e9cc37185"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t150.png",
+      "kind": "PNG bytes",
+      "sha256": "d2594f90eb301537cb3231fb0d2aa8b5bdcf57e52e835ee13ccd110e1b22233e"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t300.png",
+      "kind": "PNG bytes",
+      "sha256": "cee0492951f84b35d81afac9aac5e80d34750bdb5fde7d490b4e644b53e432ec"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t900.png",
+      "kind": "PNG bytes",
+      "sha256": "e339f6074c44755a24226beacaeaa6fb86dd6d50fedfd1a1c59081fecfc3e4e9"
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-intact-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "1dd23e2e196a0172c7ec8f210cb2f5725b98b744e21dcaa35fea3a6ee2de9cdf",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-intact-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-intact-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "de9b59b51af49f0e1d677773676409be05fb8825528ddfb8d2f1e68aeba62736",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-intact-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "ea851a912bd0dc4a4ac77e812b974e333db03cd438c62b5ca23a46d757eaff80",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-intact-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4be0267f77ef5bb6211ec07eae8321613fbe45ee1d64ffac24d45cf6b732117f",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-intact-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t002-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "5e63f38c4550893737f431978fd2fca47715afd7c3473dd57a207ce62ee882b4",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t002-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t002-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "f192518f21176a17d9949114cefed346648734da581f284a50f63aac94846ea3",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t002-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "6815d9411dd0872a9e71601385d6a2a8fc200602c3c70e611c377964227cabb1",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t002-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "821e94e9421b7011e526cf42e2e6486d55d0e2fd5875f2978515a75d9f4debb7",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t002-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t006-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "9782a3b86b99aa5b5a5565dec56797851b70e238ce258b7978c4084c6d491f64",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t006-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t006-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "cff4d9821187024aa975fe547be547ff4bd4b7f0e569d14c03a8cc95e10ff79b",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t006-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "9d90207952b358d0675084540964173c8e47b4fac1f053be8175bfc595132901",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t006-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "189ac606ec17daa7b275b3a4715add79abb27d6eb58a78382af38446200d1606",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t006-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t015-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "7809bca6f536f2fe190e207e988275e259010cc75fcab4525a16b0f64778543d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t015-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t015-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "0fbc6c9b232e8e39d43d92a69a2870dbda2c9d61b8163b3186c7b5956145bdf2",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t015-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "68e3d1effd94c2fe3041a49d4232ff1a6daf28248e7db648410f0d63f14dfe1a",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t015-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "a38e021b8f5a4af0819ef1c2b7a768f90fbb22df2874c5ac1af27479a36f833b",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t015-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t045-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "888729dc153c1cdf2880f12183e3d52d0099237dd07f6d9eea49cb09e1f2f377",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t045-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t045-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8deb201f8e801ebed5827f199200ddefa2aae0116c29e630fc43f0be059dd508",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t045-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "75ed497290ceb30ea2cf53a5d731a46d2bb82b9e8aa5c36244db093017adb5c5",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t045-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "13959615596b6ba65092c9e3cf2ccc0f3ce70b58f90cb1f677c1adad9f3027e6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t045-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t060-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "c74bdbbb94a2b9545e422f2f34b29a047d3fdae88573d8c39496642b8b0283e5",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t060-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t060-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "b97fa511eb968a08f9461c5fc55ca7266de5b8d066ce6bf310e0bc3a58bc5ac6",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t060-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "10f788d717fec3914072e50ba2df7ffe2c0351a0b45be526d6cf8e88855091f7",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t060-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "74ee696182478a70808b1de90e743d33ad408aa0a8a30a64c9c1dc6e3ca5a2a5",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t060-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t090-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "1674f5bc6c33b9aaa8ad1e0c92ced6263d935b1124fa2851336ea057932ac2a1",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t090-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t090-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "87e5cfd6e804b43ff5ab254678cb0d1f10d0ff74e935b760aa17956fd66253af",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t090-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "55f4f89352dc97c8b5b421047200e928604196b6563b0de25e9ce77507a95506",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t090-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "b9fea0b9f2ff1bb99b3e435b7e8f60500f17a78e4c4217fe69e389b35a2cbef2",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t090-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t120-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t120-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t120-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t120-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "dedcc0bc884e5f9339264bb4ca4e262a0dcb7f28a976124932f8f1bec52f155c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t120-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4644d8c7c6f01cbd17265622e488a0fb461b0126a72fdf9588d960f3c77270ef",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t120-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t150-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t150-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t150-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t150-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "3c4e5cf0b4d313e02e3b471afca05f27c1632d6896cda80f727df36f0a2c4aa2",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t150-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "df246e4a31721b37c03868ed66b5c3803bff8296240e56e624efb01387579a53",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t150-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t300-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t300-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t300-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t300-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "bf2bb8a3847ad0254b7fa3560613d349972598a2c968de1915658e4594dd9f39",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t300-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "30277db877aabb5a8fea1bbfc1c4d9c114f839803f4bddd45f76408bcd04814b",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t300-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t900-depth.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "e7de1e2338cb9c65d3740be4aae35de95106581033215e748bb69a701177478d",
+      "decoded_bytes": 3686412
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t900-infantry-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "d46ec894a0a9dca6fcdb927dc0242578c65764151343ec7aa07a21a91df709b6",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t900-normals.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "8e2c284b7a6e7c16921dbb915d053ddf16553f4ed46db6f10b8c149ff13cfd6c",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t900-scene.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4ed4df93c39dc32ad566ae33afe6c9d3c208bc6f149def8d48962d19daef29c5",
+      "decoded_bytes": 14745612
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t900-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "30277db877aabb5a8fea1bbfc1c4d9c114f839803f4bddd45f76408bcd04814b",
+      "decoded_bytes": 67108876
+    },
+    {
+      "reference": "traceoff",
+      "file": "proc-t900-terrain-sun.bin.gz",
+      "kind": "decoded float bytes",
+      "sha256": "4c4c970225ac7995bc4031fb4ff5c55a3e7c7368da4ced93ae2de4dbdf48b903",
+      "decoded_bytes": 67108876
+    }
+  ],
+  "production_input_hashes": {
+    "game/foliage3d_mod.h": "64befd5655685e7fe06f8eea6904dd4fea9c7ffaaa97fa8788a6cdfc095e9edf",
+    "game/codex_table.h": "75efc36b2fdff8e4b4a185be715f3ee8bfa7b18eb53e0b1d26dbfe6592c7ad32",
+    "game/edit_mod.h": "821a4fca7a3cf1b853eb0e815e3c3488a568d3e6bc56742580881c2c039cb2e6",
+    "game/efx_recipes.h": "6bc0918a74fc4c674a71c562729b12636504b66eae8fdd9d23acff8501cf499f",
+    "game/infdeath_mod.h": "6b287efe177209cb9c9bbbe9e905ca04f90441dff14c99f9e25e8af66b5346b8",
+    "game/cnc_sidebar_enhanced.h": "ff4a1d58b2da4627099339f87da2820e6a1e33e051fee8511fcd4a713b58b885",
+    "game/cnc_sidebar.h": "54525c53edf347607180de15d88b6da62e146585f7e8d92e84c3f88c81debc0f",
+    "game/ebld_place.h": "f83d0a948e08894283510fae4c46928a5e0c7e1c226e61d57bfd5b71db25b833",
+    "game/dossave.c": "1bb50e1fd3fa27677f8f86fc25e9f95c264558f406e63c49043a84e9a2ce5ee3",
+    "game/hud_enhanced_catalog.h": "9b99b3f1e243c0d50fe2cad30354cee2f5f96eb2bc4bbf9ebd60cb6051d24d6a",
+    "game/cnc_eyes.cpp": "ec99ea149d19c015b200c43540d84cab77ae0b746bbb8559b05d55bd98de43ec",
+    "game/m3_rest.h": "e733a2e9c9fdacb6bcc9650b674a9d15be3772baeed76ef849e91f504e8f31b0",
+    "game/fx_panel_policy.h": "66827ca8c3563c475faadd0af5f1e75cb2b11a9c8ec0dced49a8f017cec9b60c",
+    "game/atmosphere_glsl.h": "26e3bbdcf79e94abc9612a14963c6890ca86df99253907e63eb5c21f5422c593",
+    "game/vehicle_audio_math.h": "00661b34c761ed460c53c6982bc1d9cec4f379f1636d285314ee23cfcbaa7eb0",
+    "game/render_capture.h": "317502819420470b55b63ba540efb97030fd273cef943fbbf2fe9c5a5c6be41f",
+    "game/decalenh_mod.h": "dc3df52b696f8ac489afca852140d0321fec7b7af74e2a05e950eb4bca133ebf",
+    "game/rain_mod.h": "cf3c12ef9d3a1d530b6fc568eca6a0c3d3abfa701c2112fb433fe8e26b095beb",
+    "game/dosnames.h": "eac92d21053fe64e7fd5aec9515b9acae0e0121a5e83878d3183149dabd7d5e7",
+    "game/water_mod.h": "3e6609c9cec47a2098169a040b940da1d98acfc2f3accf31a2cbe2f2686a4e5c",
+    "game/model3d_mod.h": "2facfe5a2711fe121eb7c2f24814cd2c1706c8096087239ca72bc00ba78bbcea",
+    "game/building_physics_capture.h": "a13467c327e49da5d6de7b4fd1645896a3484ae475816dc9d6817d6927a47451",
+    "game/grass_bake.h": "91331712eb771446d1287685d6cec26571da8bd4a926c79d38f5e247a74d8f2b",
+    "game/dosbar.c": "b29414cf9d1b76ce83fefd099bf4c0f0b28383750091f1c0032996f6aeaca1fc",
+    "game/grass_draw.h": "6271b31f4e6d54a1f9b902a299d4b7560607c453185a7fad36ccc29819292041",
+    "game/enhanced_mod.h": "f6f2f60d27c4872b7915ad92aad07d3bec155b3ad016d3a75456ad07b9ea0997",
+    "game/verdict_mod.h": "5ed9685d2a45cb4b33dca75092ae72a640d7448d32129a3283ff2dbf20f19d16",
+    "game/remaster.h": "be58199caa1b116841cc334ba1e6f133e5032debcc4f31c640f72b2e932d6885",
+    "game/autoheight_tables.h": "f1abeaaead31610344921960b71c982c1324d9f61e4be367464b9c23e7ec5255",
+    "game/ebld_terr.h": "59c9112f2acc4ae28b3e093fa73de9f22a5e8f924228a02f9184a5e7ee636a74",
+    "game/unityvfx_mod.h": "58c6f8396b85e294b6eeaace84f31ab83a7a88194bd9293c0bbf2fda6ee5ff11",
+    "game/gpu_profile.h": "3ae4b4f8b20ea037c14a79ff42b982701a646c96698e19ae1add75528a937f59",
+    "game/doscrate_mod.h": "87ffef6a9358e250d0ab3371c16ad81f7c38810aee9af43774de7921bdd0a214",
+    "game/effects_mod.h": "dcd6db5d743bce8f654215fd4180d1e6ccf34e82bbc390e7986244ec5a9b3f8f",
+    "game/opencnc3d_build.h": "5fc1bfa03dc6da643a8a0667e05ce5be30ce6104ad08262a39b71d171653c9c1",
+    "game/terrain_cache.h": "7ba159a2534300f1d9701bb7fb9120c0f72089d1cca9b7c872563f0c32828919",
+    "game/infantry_audio_math.h": "35b27e7555f7061beca1c551e6c72551c1b62d6801ed49eaa9167519a16d8cb3",
+    "game/dosopt.h": "0526ad37ac3d946524c50061d2cf20da0607b9c2bc70abb7a73c45b93cc07725",
+    "game/efx_enhanced.h": "7e019394e60106b808143d9949818873db52de1794bdbec376dff078dcdaccca",
+    "game/edit_emblem.h": "639755e4c23a6d28d4ac68ee48c76b2d4510a0d7593546e1bdb4d2e26a8d87c0",
+    "game/smudge_mod.h": "0eb068428ca87d9e46b2d3734e537c382090b34e2310e4220c4c090a3677e453",
+    "game/dosinf_dotable.h": "be0f3b0f29546d4effdfb38b7cd93bd07e0c02557beff1969b93ef38328d85f8",
+    "game/fx_cloud.h": "fc38f1c48ebcd65a35366eec27ae12ee75c44752e8af4af8a66ae4a16765bcac",
+    "game/bibenh_mod.h": "5114ff2907f5d733938e05d61137fe1cfe1d93c5fd3bc25267b556011ad7d392",
+    "game/dosinf_mod.h": "e0770c80b6d208bc3464b4114c988895bca3265e62bfc48cb87be1f37bdb8bfa",
+    "game/tib3d_layout.h": "8cc8c9ee8b746546da5f6b65cc13c6cc13ceda5bd7565dd8fc53e4a09dbfd75e",
+    "game/rain_audio.h": "46754b3b0cdc6dc00ca65434c8816d8dceefa3c7625150d184c41915d1d4ae1d",
+    "game/terrain_tiles.h": "8114eba2f21d589eb9264157a1e994769556dde99dc88b3aaa3443e1aeec3dea",
+    "game/hud_enhanced.h": "308fad4c891fd3493397c5c5183808f219eba2cea01edcb4af6eb0e9b14849a7",
+    "game/laser_mod.h": "e137f28484c26c5f34d727373fdb85586c73b53b3d0200b61d5fe758934ae95d",
+    "game/mesh_batch.h": "957dccc3e99329855c952d32609f0bc4cd138fdf8da3ebbfc84f1934a45c516f",
+    "game/hud_audio.h": "5f8c8894a731fa3a4a1eda7cfe90d05516a4af23673e2164cff6403528a802a2",
+    "game/hud640.c": "f152f8dc52b366e067aa6feaabb8c3856339b294baf6b0df5949d8ba1835c529",
+    "game/terrain_seam.h": "71ede08387df348b4fe20e3e974a302c9d2fd9ace7ea015c2428d3669e54109e",
+    "game/dossave.h": "9f26e2b8effff3d42b821436c5277213d1ce2cf2b64ed8ecf6cc5d2f09512a86",
+    "game/dosclassic_mod.h": "df65c4eb8c4f4fae69edfb0af87e6dcd123b6fddb218aa11993fd6598b452cbd",
+    "game/brain_path.h": "a9592caa18f29897b98edc0e3ae7c223bfc8ea3f1588fbd2f2d734085d88f98e",
+    "game/sky3d_mod.h": "be88cd661412f736e178c58e2362643b8c89a68637f4ea7e27c329add4486761",
+    "game/fx_gl.h": "d8d4a3e6aca55cd3133ec54f62bc04cd15f9386df7a2b59cbfdd41a0fe0d151a",
+    "game/ra_terrain_tiles.h": "edb7ce9d711d9040ee72496fe2795112cefebe3ee8e89eb244f72a3a77288e4a",
+    "game/remaster_tex.h": "e2cf56d7bbc8460e04c9bf5d8bff081fc82d993bf6a8d2088d8c4e7dc33f4d4f",
+    "game/remaster_inf.h": "bf918080787a30876b47d8d41961bdf7395b7a6552880ee8f2f02a47cc76b9f3",
+    "game/edit_font_data.h": "c97bd4f55c4df9b036cc7cd966230f5d41373e11c4987e119afcb27ffb81c30d",
+    "game/edit_font.h": "d4da76061581dff817b859b4ad2f82c1d3e2c98938e8c9630924ce8c35021adf",
+    "game/hud_enhanced_impl.h": "ce36d2153f041400ddcacfe0b04bdc580dacb613f6037be1b161a9a6eeedffda",
+    "game/grass_field.h": "f060d94a5bc341b57622d560929b81af15374cf8ff7a513af6f35ada8470b321",
+    "game/shroud_mod.h": "6fbd2b4229e6966f7c0d81ac4f99f05c8de454a818a09deebc039f76df6f783a",
+    "game/fx_panel.h": "b73aa757f605dee22d6a4f6738bb61fe2efe79522f57ed849d0e5a3ec323c3a0",
+    "game/codex_mod.h": "0d802132f0045873d309a39d81ea1b2ae2564fc977f46ded7cb268859c91f016",
+    "game/infantry_audio.h": "168798ae52e175368be57de727c47d5ce833dc2bb714f99b0833e707c244cecf",
+    "game/vehicle_audio.h": "bede885552df84eaa0da6ab95b67316db890a1b66ecac10575b902d197e17939",
+    "game/soldier_shadow_tex.h": "7d0115d255080673749bc1ce988aa3812d9ea857f946121d6205e2b89571e5f0",
+    "game/dosbar.h": "b44b196126d06dfc2a24c979fa94edae7ce85c3efb4f214df3c4196f0be3058f",
+    "game/distfog_mod.h": "bbd06276e3e499b73bf383149b81a9fcd3d255beba11e46e9da7a9f78acf5211",
+    "game/perf_trace.h": "1df322f135e3187e492de4fa485e8369886c4f59337d4d7f31d32138b8031ec2",
+    "game/n64inf_mod.h": "b8d5eee5ca9d52cbb600c2345f45c2a05c00616f6f8c5c709d022b19aca7d3af",
+    "game/unitcard_mod.h": "efb056a348604d499f5e499a093993e966d7e8a87b1c296732bc62245ae5c4a1",
+    "game/fullscreen.h": "64f61322020cdbb7c5593a7ba5110d5f528d3906a60c24ac1266849e9e97c335",
+    "game/destruction_trace.h": "b89c9a881b21f254778aa8e1ab5729ae5c209194a8724ec0d9e2e41e04a08609",
+    "game/c3d_ceiling.h": "e58b19b9146411468d3b39f6a23c0cabf74fb98d4d061d3498e19caf647c6220",
+    "game/atmosphere_mod.h": "1310bbbf60cbb228c53b953af4a6c110ee32f1f9510d480849996c2b73d844a8",
+    "game/ra3d_terrain.h": "d55ef25427d8bfd9ee2c13cc3e95b60236ec4b888a7f1594c5e4651482cca2f8",
+    "game/dostib_mod.h": "9d8014d44309440a59b239a6ce61fa2a7bdf7a100af67bc67281ef3f9d9d57aa",
+    "game/cinematic_audio.h": "2bc3e4a079b51c940a763eb7999a11e455b1bae7c0802a56b5365e5fa42ec96e",
+    "game/cursors.h": "05c0914e42550ef0626a2701bf1797b0e2e9fa543e3eda9bf9277b5999eee623",
+    "game/gl_state_cache.h": "3352de39daef3d679920f94049fafab14f651157bb3af98e9e3504d80aabe1a0",
+    "game/n64fix_mod.h": "492d851f47724cd8879228671b9b6c825df0f6d63f67e50894ec0754bfa56caa",
+    "game/treadmark_mod.h": "7be131f874afb0323a61865e148740dbcfff267bf09925c01b48c6ea93271fe2",
+    "game/cnc_game.h": "422aaafb53561c34c6f7da8e87145f0d02834f04fd26a4714f3c21c9ee0b4fd9",
+    "game/gmwipe_mod.h": "c93b1e0c4d653f28b969d5ee5c23df4f11e2ae56e9d728185401772886d9f52e",
+    "game/autoheight_mod.h": "41d22e4201b92e6383f0b98a750964682e1b3d9353540e985ff3afc710db75e2",
+    "game/dosmake_mod.h": "f1b06ca4cfaa4e2d7f18cf47c803f99b1ccf9f68bcdaba70894346db0c5e0776",
+    "game/fx_filter.h": "f6e06789b308899675fdefd7e0857c3263256ea3bcc43b56d9bc402cb7ac81bf",
+    "game/ambience_mod.h": "ede5c536c2ec4bbfe1514e6d058b6b51e18e1aebf0e96b4d5e0c4e4427c5d23e",
+    "game/ebld_mod.h": "885335ee111fc052274d17a98bf2cea331b52f72d4c83d18c2e5750d83aa7876",
+    "game/mottle_mod.h": "a2f9836c1d1a3572c71f760b532a7fea10b365e2f5121ca68352b06ff2f26b81",
+    "game/ra3d_sprites_mod.h": "ae60b8065099683c9498ee1c85ef30dec6dac717bdab93b9dc4b1d9d0d8d55b2",
+    "game/tib3d_mod.h": "e3baaab33d9ebd174ec9bbbfe0e78411bf9a0de712f4bab7579686c45a92d5e6",
+    "game/rain_glsl.h": "23a052910e76d6ca11b9fc87b0821ad4fbff158567df6f7b8b7b35a7d594e2c5",
+    "game/cursor3d_mod.h": "aa9b2c690ba239ce7d2d5153405358a160c04118e4b8a5e6d1bdf44ae354b19b",
+    "game/edit_tables.h": "ffe29d475756ec1395ee8453edef0647da33119bf767fb5f8af550982f616465",
+    "game/cursor_green_mesh.h": "a75273d303c3c483ecfc2727286e442c7c2f106241bbc38a2803c40efaf7a640",
+    "game/tibglow_mod.h": "23bab76f7dd985e1d7f373892c846b628c8a46f139466baec0d64cb35bd768fd",
+    "game/fx_state.h": "1c9913323e21fe480b4a8e73999383610503f45d90e3e353331d3a72b3e12676",
+    "game/brief_mod.h": "5f250515aa0b92121a97f8f08c0b220e870789da92ed6df968eb6082125df73d",
+    "game/cinematic_audio_math.h": "800ecdbef50ba91cfbab840f1003fc29e41b7e0c7f52591e17794cb5ac1c3c76",
+    "game/shatter_mod.h": "d1cc0c3bba79d9733738bcb0037b59f2123dda277f73c53daf1b521094b3d972",
+    "game/hud640.h": "35d58e7b7c647075621099e0183c0ce4a73fb80488ac72d3a3b6bd61bea6eb2c",
+    "game/foliage_mesh_pack.h": "14fae0b85a5b96ed62eca30531e3c8c1b3ef7791c622b3ab8567df3364bb9d7a",
+    "game/gate_optlayout.c": "a5b8256c98122ae6bd3866c106545c1a8685b8c464890841cddc8d0ab471533a",
+    "game/gate_visual_defaults.cpp": "58f23e776dc8151eecb8b4817012d1bd83979fdb361ced6356cbd3df30a71f77",
+    "game/dosopt_gl.h": "6f845f7540d76bf115f3fb03878e4019619a9ad41b14db87e76e67bd1dd7a3be",
+    "game/wreck_mod.h": "3de5c1bd00c6b3f9cc52d97e06e4f3a98075094efb652d406340b7bef6e7f27b",
+    "game/ambience_math.h": "e00042670b2410e956c3d10b46f05dd9d16d95dd59b57314c93ed5311aaf625d",
+    "game/dosopt.c": "fc038ee0fa318ef86cf340e5754ce862ec5d37b2cc39c6e1ccb49cfac0910460",
+    "game/fx_post.h": "d15a279ac099cf6600218f38d5d2e31a7282a3252024357ad0007c50a27bb30f",
+    "game/evhc_mod.h": "5f6a4ec349016bbbc29b6fb8c845861692230df0f275c0e0d9feef4ae90c6aaf",
+    "game/hud640_layout.h": "a0f78a369132e6852537e4d30532565d8ad93ade191faf614826a00b3c35a9eb",
+    "app/logo3d.h": "8f98fd947eec8d6affd73c428a84bf2fec0ba91fd8393b5e991aca5896270852",
+    "app/campaign.c": "66fe6b7db5d0909f6e15a9c67d1ccab24a376495c7a0579b2a873adda6b7f6f3",
+    "app/logo3d.c": "f8f22f0ce4f44a22f40c21b4da409e8ddb5b9eb6a417ceef717b3225fa06b8bd",
+    "app/userdir.h": "fc102fd38330a9915f703b839d2f014e1ffb002fe24f09b168bdb3e68b41ff12",
+    "app/opencnc3d.cpp": "be1509c8e7a604cb665c379050ae2e096e0aac258c2c63d5fd85f4347ea2dda5",
+    "app/campaign.h": "2a92ad2e1d74b36f577679a6b26af4c411696b4703923f1d9d8b7d7fad801beb",
+    "audio/sndbank.h": "1596afd174087e4978e6c1a4e1e9261c5644954ace0cee1402170a80d51bce1a",
+    "audio/wsadpcm.h": "aaade4c28e421f075e4d3bad97e8f597d03c663e20ba3201a4a1eee88240cfef",
+    "audio/sosadpcm.h": "01663053472006ac9aa3a5098634523d8f1df02b0552c6b326a2d393ad547450",
+    "audio/banktest.c": "4c34c152f676f071a74a835b8f9cbcaf3000e14693cef306825dc011bee5b344",
+    "audio/mixer.c": "a7e199570a1a23e252f85350cca8358c1e880d779939c2e835fe62c2741da897",
+    "audio/ra_speech_table.h": "2d9ae33af4136c87fb0da3d06b8bf984458bc6cd80f9bb645368ea831ac3eea9",
+    "audio/audtest.c": "398328b114dafe7c610d28e24501c32a09d46360581e2a9b9d384cc4b4deb976",
+    "audio/halfband.h": "70814e02bc05f15225bd69a7f3dd2697c39f08195782844da6d34721c1367b22",
+    "audio/audioboot.c": "aa6deb81c79fe47ee40b3f509b1f8ecf8991fae0b0ffe7eff0c062476391ae70",
+    "audio/audio_win98.c": "5933147e335a83d3ed3f45624f00a837b1d29eb4dfed066cd6ab6c8e184d4951",
+    "audio/wavio.c": "c613f71528f8a8b69b4a9cd32aeea66faf3b727472f76344e2d78b3c12427bdd",
+    "audio/sfxtable.h": "e2f96a5bd4aa54a246523df2394d3e866bdd46c1cf8206d41525315ff54240bc",
+    "audio/mixfile.h": "2a1b4cf9be4022814c78415a2e4913c2887ab3337d069a737df685b4e6aba899",
+    "audio/sfxname.c": "2dc6ee14ac3c90931056215cebbabf0d59207cec94f4a10f25018cb40c0a07c1",
+    "audio/cncaudio.c": "384ef60f8b006b78bfe8d03a4d67097c6c3f5bc3b8fd6042dfb7db6ee2e19392",
+    "audio/audiotap.c": "4d9c96c939d8d633951d0152c9660ec788bcddee634cb1d5ed608d0f3d84b731",
+    "audio/wsaud.h": "3d807f238a676a92471f12ea20ada0dd99b0f13746838d05d778057fb7358a27",
+    "audio/mixer.h": "652c62d55a0aa38a08c90efad8a7aa4e1090c583c2a4e1437d2892448a5db30b",
+    "audio/sosadpcm.c": "50275fc80b10bef5b332ff3a69cdd8c6c15adc75d98ff7db42932e3a27a9d8da",
+    "audio/wsadpcm.c": "ea995fc500904a9a455de7f51533d0e2bcb2967becb13ad6b1465b1620c29d2d",
+    "audio/sndbank.c": "1643e3d5636fb914cddd9ca599ab82593caee84b673ab32daf5543e291ed8246",
+    "audio/ra_theme_table.h": "b9cf0998eb942600b6163507b7bb94f39cf45a7ae11331fb9203619766d6b141",
+    "audio/audio_sdl.c": "a1ad862259f14ed028895a2da8b8fc1d70be45b51ed6869a4602164fb2ff6570",
+    "audio/audio_null.c": "eeea2ab45ea766f4c7d4819c8c42b5f979b232d8d2fd103528a06fcbf2314837",
+    "audio/playtest.c": "bd50161d29052a9212b9376b7130fb49997f4ab053eb4c72f5725090c9a3c248",
+    "audio/sfxtable.c": "54ecbb905139217836d5895b7de8e1d60a0a084ea4f3374e71e9145db73fb2e3",
+    "audio/wavio.h": "1a0a5e6d60b87b57aca7ad1a7be257679bddee220e11ba32101a867acb33b258",
+    "audio/mixfile.c": "cd70e9931af6ea2f24aa0ffbad22af1f228e5919e666fcb6522b5d02d0b28955",
+    "audio/mixtest.c": "5f65161b16e030fe56922297af2199503b41f2f151d7d8d31456cf4a4c6a021e",
+    "audio/audioboot.h": "1d90d26758cff9e54efcd3fe43e94bdef011d9a0b207fc190d4caecfe40d8c42",
+    "audio/audiotap.h": "0b5b540a5bc73cc3aa6bf939aaa617e9225832931c671661c705e15ddc63bca0",
+    "audio/wsaud.c": "e0c88985f05afe7a3f7438db769c6b9086ab6ce067dbce574662944625bb3759",
+    "audio/cncaudio.h": "4b9a5db0fcf4b0e72f4d1f5bba9224795a5cbf2dc30bba1184c09ece9011d701",
+    "net/netcheck.c": "71137fa837d3c592a8e1aa12dea094f5d2ccbc11a18a8a8c6f88da5dfb84b052",
+    "net/gate_netloop.c": "3f621168e58b7a5bd81b129372612bfeb67ebdf6f0ac43bb7b3a4d6115d460ed",
+    "net/gate_beacon.c": "72d9ecc1d59d3d43b91513f2cdb2f0b0945898d9c28eec4fb60e2f1f3b708ef0",
+    "net/net_udp.h": "1fae3e9cbbf874702ddf4560b4876e001af3a3efdd8a03044893668dc5625b77",
+    "net/netmatch.c": "e0533ca96a0f9879158c1e68a41c5654c12e3b06721cb6d91b4bcbd84e02fc8d",
+    "net/gate_lockstep.c": "6e264cc7b011fa227f33bd75c9abae561c3654cc4b492b55333131382e00fddd",
+    "net/gate_roomcode.c": "4ec4f97d0659c728cbc68b292500fd7e99e5317878fe4aa8ea52a23f33e8e1fc",
+    "net/roomcode.h": "20706dfa76331f4e90a8bee50df1a69ffd2e96c1585c4d933d4659514d835f63",
+    "net/lockstep.h": "218629e99062b84156d8e6e219f8b9fd3d58b7aeacce7046a08e15e73f028f4e",
+    "net/netbeacon.c": "cca73718ddef6cce7f0e23c8a4014be07bc01cf3f67fbb0fe30898d8aa0360bb",
+    "net/gate_tunnel.c": "955d94130edc05598a02c76983ea36e5af10ced5d918d2257072a190acf6cb13",
+    "net/netmatch.h": "485e23273cb7907ce61156a50703dcdc92cec1d66a7221a3812393bb823a9fef",
+    "net/net_udp.c": "c1cba12c3a484b6d58411154738e44c9ecf64a60970c1ac454f00b67e5a3ab78",
+    "net/lockstep.c": "7bc6ee62543333e5b99760fc362338a77ab6a268f6eef6b6bb06d4b187e286c2",
+    "net/roomcode.c": "0b55a0094dd47022dec62432999f737b7fe92a764553fc749cc1b74cd6043799",
+    "net/netbeacon.h": "804c63c12c93485d3f87982daafcfe3fe37f540ec4ec5eea16e87485b8512390",
+    "net/gate_lobby.c": "cf822e7dd56625c3fd2995121b62f439671b1fae529e9e31de4dd9ebe6fcf56f",
+    "menu/enhanced_menu_cursor.h": "5aceda8b0745c32ba4e85eb209ddc7a5867bf1d3d29c8203236933430359746f",
+    "menu/gate_mpbrowse.c": "d0525a48fed1fc05c5af4012aa5f75bda501d1e23727b1c126b2cd229470be23",
+    "menu/mpbrowse.h": "1f15d1dd6134cc3d451760e1c29ce64258cae2ce7195fdf5ee2f555f3909768c",
+    "menu/dosmp.c": "9dcc28f6a560a26cd00e9a098660a544f2a6a437e45a92b9acfff27e687dcf9d",
+    "menu/enhanced_menu.h": "32639993a275efcd26de0d5bfb218d6131bfbdcfcbc48f6140ceb8601e23fb7c",
+    "menu/enhanced_menu.cpp": "ca57473a4f6da2d04ebc2a1bf30624dce6ef309a71d365d0dad7b28cbc194cf3",
+    "menu/dosops.h": "37605c0e6584bedfd93a3d54ee011bc3b5bb6aa7111d6be22424124b908bbb53",
+    "menu/preview.c": "352cfab0741e89ffa9345587d4dc03bfbf765fc74b9dd0cf6cf208cdad3c1382",
+    "menu/gate_enhanced_menu.cpp": "5bc2fdc6cf57f0711ef7a45c33e0f85b63d290044e7aadee7f974328564fd313",
+    "menu/enhanced_menu_font.h": "834e373fca009ac094213004cf480abca754dde1942ddc3ca6c65973f6b0dfde",
+    "menu/dosmenu.h": "c89633409b657e7044f3dbb8e2cf480f0fe0bf618fd058a1617d60c1479d7f2d",
+    "menu/dosmenu_shell.c": "b9720c85f58ee2500ace12cb76b1546d027f7eb79ba7aa5433ba9af5d8213c2a",
+    "menu/doslobby.c": "9306fe65fb5fb75a43a802da80ac82894652c08e8d96387b22de0d4de1d4cd42",
+    "menu/dosmp.h": "f0f5d0eff5979086af0343b8e5d61e27b3625ea9b2edd7ab8582b8cc85c7f4e5",
+    "menu/mpbrowse.c": "e189011391a4f77168bcaeb9729ae0db7632a1b44ee451dee8d83fd5f35d2212",
+    "menu/dosops.c": "7657ee105cc85629fb010db5b15546fb8fe21d418ff5637f034ecc1f2d2b3401",
+    "menu/doslobby.h": "859ab20c1037fb4b11f35bf745506aa6dead2b8d2aef2df8a8bbf30f36c1f6b2",
+    "menu/dosmenu_shell.h": "f4db45fe236e1bb3ea558409c9bf30d5b74c66ca92ec8484abbd6d6921bf61b1",
+    "menu/dosmenu.c": "665e6d058023184779963ac902ca193a0191e0199156b134d31d18a3a52ad9b2",
+    "video/vqaplay.c": "cfc7f6650d4d78739f9dbf6e139298e434e2fc8291a235bde5c8e4466cf5d791",
+    "video/moviesnd.c": "aeffdf8218d3449eb321c245ba4c7224e8fa95b441d565d98487240d0098dacf",
+    "video/pngwrite.c": "85591f152fc5ebe9c8a218c47abb306810385f8474547878b1a43ebe19b17862",
+    "video/movieplay.h": "1fce4fb6f648bf5a83db07ceca270195692bf0aa83e7041620a4e39f56f0d422",
+    "video/vqaplay.h": "f21b7d14f2bf295a0d752c6d158cb2d8e825ccbeb33ee83406eaea4863e7a825",
+    "video/playvqa.c": "9cd01dbe2a6e38f3093c065ec41e72d94900fa1f1ad289dbba85044da6414d4a",
+    "video/movieplay.c": "72384318860395f78d360f99a6923a09ae7d3233d92efdc41bfc5413afc976ea",
+    "video/pngwrite.h": "a2d4ef19699e33fc4e0e2d0096d45b888a50caee0b733f4be08e76cf36697f36",
+    "video/moviesnd.h": "863a46bbb9c37022da6b7dd2a7f5f1487a434cf96bf8616ee47b03ecb4f941b4",
+    "compat/win/dlfcn.h": "4adcec613cecd02a851502c4e6243d28fe4a9ebcd97ed1f4548652e8b9639750",
+    "compat/win/OpenGL/gl.h": "af634f2aa8f694bd807fd74332527926ccfebc7e5097d70448c48ca4337fd2f8",
+    "art/interface/enhanced-menu-logos-v01/menu_faction_meshes.h": "03c21f5e553e7014391a6c0d9bb3e9e1d5c260a4413053c66ef28d2ad02c3f0a"
+  },
+  "private_wrapper_patch_sha256": "f9605953dd1c3bb886c73eb8cfaa832455884866797cab49cefc815fbf5ee22a",
+  "private_source_sha256": "2ff161c7db5a1b45b3ead3fde61d2e18636beb9a47f62cfd4d9ddd1c19837606",
+  "final_binary_sha256": "fd06bbcb41309fee1b9b7979f7e012d08348d76a21df6e0ff1bdfec208c9a5f0",
+  "native_GPU_timestamps": "unavailable, fields blank",
+  "shipping_combined_unchanged": true,
+  "limitations": [
+    "Private capture wrapper is not shipped",
+    "Rows have no actual SwapWindow; not a presentation/performance benchmark",
+    "Mac active-observer fidelity proof does not establish Windows driver performance"
+  ]
+}

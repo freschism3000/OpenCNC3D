@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width"><title>EVA launcher signal · Remaster Lab</title>
+<style>body{margin:24px;background:#101210;color:#e6e5da;font:16px system-ui}
+h1{font-size:22px}button{font:inherit;background:#30382d;color:inherit;border:1px solid #65735e;padding:7px 14px;margin-right:8px}
+img{display:block;width:1016px;height:636px;image-rendering:pixelated;margin-top:18px;max-width:100%;object-fit:contain;object-position:top left}
+p{max-width:900px;line-height:1.5;color:#b6bdb0}</style>
+<h1>Launcher · EVA transmission</h1><p>Actual native CPU render. A soft green scan beam, faint phosphor rows and brief packet interference loop over sixteen seconds. Preview sampled at 10 Hz; launcher renders at 30 Hz. Lettering, module emblems, fittings and interaction geometry remain steady.</p>
+<button id="motion" aria-pressed="true">Animation</button><button id="still" aria-pressed="false">Source still</button>
+<img id="preview" src="launcher-loop.webp" width="1016" height="636" alt="Launcher with a subtle looping green EVA transmission effect">
+<script>const preview=document.querySelector('#preview');for(const id of ['motion','still'])document.querySelector('#'+id).onclick=()=>{preview.src=id==='motion'?'launcher-loop.webp':'launcher-still.png';for(const other of ['motion','still'])document.querySelector('#'+other).setAttribute('aria-pressed',String(id===other));};</script></html>

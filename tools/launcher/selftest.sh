@@ -2034,10 +2034,20 @@ printf 'the launcher, which is all the web installer puts here\n' > "$K10/OpenCN
 kman "$WORK/k-m10.txt" . "GDI $KB/media/GDI.ISO 0" "NOD $KB/media-302/NOD.ISO 0" \
     "COVERT $KB/media/COVERT.ISO 0"
 ZIPSIZE=$(stat -f %z "$KSITE/OpenCNC3D-macos-v0.8.0.zip")
-SITE_DIR="$KSITE" restart_site --tag v0.8.0 --media "$KM" --short OpenCNC3D-macos-v0.8.0.zip
 # The same folder with the menu pack in it as well, so that --update gets as far as
 # refusing it rather than stopping at "could not find its game files", which is a
 # message box: an ordinary update must still refuse a folder with no record.
+#
+# SERVED A RELEASE NEWER THAN ANY BUILD THIS TREE CAN STAMP, on a site of its own. A
+# folder with no record reads as the launcher's own build number, and only an update
+# on offer reaches the refusal: against a release at or below that number the check
+# answers "up to date" and returns first. Served v0.8.0, as the install below is,
+# this case proved the refusal only while the tree's VERSION was under 0.8.0, and
+# failed from the first build of the 0.8 line on.
+KSITEU="$WORK/k-site-update"
+mkdir -p "$KSITEU"
+mkrelease 99.0.0 "$KSITEU"
+SITE_DIR="$KSITEU" restart_site --tag v99.0.0
 K10U="$HOST/k-fresh-update"
 mkdir -p "$K10U"
 printf 'the launcher, which is all the web installer puts here\n' > "$K10U/OpenCNC3D.exe"
@@ -2047,8 +2057,9 @@ h_run "$WORK/k10u.log" "$ROOT" "$LAUNCHER" --dir "$K10U" --update
 snap "$K10U" > "$WORK/k10u.after"
 grep -q "has no opencnc3d-install.txt" "$WORK/k10u.log" \
     && pass "an ordinary --update still refuses a folder that is not an install yet" \
-    || fail "an ordinary --update did not refuse a folder with no install record"
+    || fail "an ordinary --update did not refuse a folder with no install record: $(grep '^result:' "$WORK/k10u.log")"
 same "$WORK/k10u.before" "$WORK/k10u.after" "and changes nothing in it"
+SITE_DIR="$KSITE" restart_site --tag v0.8.0 --media "$KM" --short OpenCNC3D-macos-v0.8.0.zip
 krun "$WORK/k10a.log" 90 --install-game --dir "$K10" --media movies,music \
     --media-manifest "$WORK/k-m10.txt" --progress-file "$WORK/k10a.progress"
 KHALF=$(stat -f %z "$K10/opencnc3d-update.zip.ocpart" 2>/dev/null || echo 0)

@@ -1,0 +1,1072 @@
+{
+  "scope": "Private E2E20stage throw; not audited or published",
+  "source_start": 184,
+  "source_fps": 15,
+  "release_stage": 14,
+  "anchor": [
+    54,
+    40
+  ],
+  "keys": [
+    {
+      "stage": 0,
+      "phase": "prepare",
+      "sha256": "45eacf53b3195cb84cb766fcba763e709db2912cb7869b8b4c062c3a00f61aff",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            14,
+            11
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 1,
+      "phase": "prepare",
+      "sha256": "f1629e451fa1fbb83c7b5a14e4e0733799bce8f036cb94dd70001eebf6c34ab1",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            16
+          ],
+          "knee": [
+            8.014616401522389,
+            20.075604686149255
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            16
+          ],
+          "knee": [
+            11.014616401522389,
+            18.924395313850745
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            14,
+            12
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 2,
+      "phase": "prepare",
+      "sha256": "81a64ce6f79b05b8367757e1bd156694e4d8c9e526cd69a9327af65ac21b6223",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            14,
+            10
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 3,
+      "phase": "prepare",
+      "sha256": "dc73ff4b7b429afd3de2f88a0f45f17ce0e801d91264751a0ce32dfdd75c2467",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            14,
+            11
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 4,
+      "phase": "prepare",
+      "sha256": "81a64ce6f79b05b8367757e1bd156694e4d8c9e526cd69a9327af65ac21b6223",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            14,
+            10
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 5,
+      "phase": "prepare",
+      "sha256": "043676eabf9b30c10b9cc9b8aff3bbef80e48b7d9aec866521197fb906061826",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            16
+          ],
+          "knee": [
+            8.014616401522389,
+            20.075604686149255
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            16
+          ],
+          "knee": [
+            11.014616401522389,
+            18.924395313850745
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            13,
+            11
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 6,
+      "phase": "prepare",
+      "sha256": "d1dd84d7e6ea4deacdc8cf92c3af4867a121bb237277120d5ced811bc7f6593d",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            13,
+            11
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 7,
+      "phase": "prepare",
+      "sha256": "28c499bd7d304fbc2ee07894c72853b04269868cd1d6264836052675c233cda1",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            13,
+            10
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 8,
+      "phase": "gather",
+      "sha256": "d57a63dab1490492e0c8c46d2f44cfcac37d2834f40d72a3419866e6234c97ef",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            12,
+            10
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 9,
+      "phase": "step/load",
+      "sha256": "6a31c03aaedfa0c4b421a047730fcaa9b14cd3387f9dc6417ca3c6d14df020da",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            16
+          ],
+          "knee": [
+            7.128729142825674,
+            20.198026775496718
+          ],
+          "foot": [
+            4,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            16
+          ],
+          "knee": [
+            11.128729142825673,
+            18.801973224503282
+          ],
+          "foot": [
+            11,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            11,
+            10
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 10,
+      "phase": "draw back",
+      "sha256": "380d0e103dd06f6e339d69d05937ce1107c8bd07e062819a2af55e795a256914",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            16
+          ],
+          "knee": [
+            6.614551208273254,
+            20.182275604136628
+          ],
+          "foot": [
+            3.5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            16
+          ],
+          "knee": [
+            11.023643567774524,
+            18.915060818414556
+          ],
+          "foot": [
+            12,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            8,
+            7
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": -1,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 11,
+      "phase": "cock",
+      "sha256": "26913631175dacfd1b019e4a1c4e4e82b550f38d6bb918258dd0457af96ac8ad",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            5.719716052751651,
+            19.205500773078846
+          ],
+          "foot": [
+            3.5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            10.464093229685565,
+            18.767953385157217
+          ],
+          "foot": [
+            12,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            3,
+            4
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": -1,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 12,
+      "phase": "cock",
+      "sha256": "bfa8b69f3dce481b1429a50f138ee80c47f31e737a5c587111caf9647d7171bd",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            5.719716052751651,
+            19.205500773078846
+          ],
+          "foot": [
+            3.5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            10.464093229685565,
+            18.767953385157217
+          ],
+          "foot": [
+            12,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            3,
+            2
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": -1,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 13,
+      "phase": "raise",
+      "sha256": "27aef43de0ded5d45bc22f0c96299f03724e32a3ad8e0443497f0eabf9c75540",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            5.719716052751651,
+            19.205500773078846
+          ],
+          "foot": [
+            3.5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            10.464093229685565,
+            18.767953385157217
+          ],
+          "foot": [
+            12,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            8,
+            0
+          ],
+          "grenade_visible": true,
+          "projectile_release": false,
+          "torso_lean": -1,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 14,
+      "phase": "release",
+      "sha256": "91e34336f7afd27f05ed695fc3efd5d9e935794fd744b92ff832e6ddc50efdad",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.614551208273254,
+            19.182275604136628
+          ],
+          "foot": [
+            3.5,
+            22
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            10.464093229685565,
+            18.767953385157217
+          ],
+          "foot": [
+            12,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            13,
+            -1
+          ],
+          "grenade_visible": false,
+          "projectile_release": true,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 15,
+      "phase": "extend",
+      "sha256": "9a932425843117f794456194830d06c4cea3833f9fce130731fcefb710564e38",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            16
+          ],
+          "knee": [
+            7.289963425456955,
+            20.18997866484989
+          ],
+          "foot": [
+            3.5,
+            22
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            16
+          ],
+          "knee": [
+            11.023643567774524,
+            18.915060818414556
+          ],
+          "foot": [
+            12,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            18,
+            3
+          ],
+          "grenade_visible": false,
+          "projectile_release": false,
+          "torso_lean": 1,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 16,
+      "phase": "follow through",
+      "sha256": "03a1e900430d56b11fd3744bef0971824edb05940d71cb7f448b1c2acaed84df",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.614551208273254,
+            19.182275604136628
+          ],
+          "foot": [
+            3.5,
+            22
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            10.464093229685565,
+            18.767953385157217
+          ],
+          "foot": [
+            12,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            19,
+            11
+          ],
+          "grenade_visible": false,
+          "projectile_release": false,
+          "torso_lean": 3,
+          "dip": 2
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 17,
+      "phase": "rise",
+      "sha256": "aa5811f7796e391578612c4fe7477fa0625f33641db4593909114b8ee0d9be4b",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.229473798610549,
+            19.149835562065796
+          ],
+          "foot": [
+            4.5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.97487687216,
+            18.82192117294
+          ],
+          "foot": [
+            11,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            15,
+            12
+          ],
+          "grenade_visible": false,
+          "projectile_release": false,
+          "torso_lean": 1,
+          "dip": 1
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 18,
+      "phase": "recover",
+      "sha256": "0733aeae37396774d0a73f32f5e16cfa1a44d4458866c6f048e0009eb9af5332",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            12,
+            12
+          ],
+          "grenade_visible": false,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    },
+    {
+      "stage": 19,
+      "phase": "ready",
+      "sha256": "185dd62efe3adcf39c0abdf5dd937b947c2115796d3ff1cc6f0dfb3493374b10",
+      "parts": [
+        {
+          "limb": "B",
+          "hip": [
+            7,
+            15
+          ],
+          "knee": [
+            6.776114000116266,
+            19.194028500029066
+          ],
+          "foot": [
+            5,
+            23
+          ],
+          "depth": "far",
+          "support": true
+        },
+        {
+          "limb": "A",
+          "hip": [
+            8,
+            15
+          ],
+          "knee": [
+            9.776114000116266,
+            18.805971499970934
+          ],
+          "foot": [
+            10,
+            23
+          ],
+          "depth": "near",
+          "support": true
+        },
+        {
+          "part": "throwing_hand",
+          "wrist": [
+            12,
+            11
+          ],
+          "grenade_visible": false,
+          "projectile_release": false,
+          "torso_lean": 0,
+          "dip": 0
+        }
+      ],
+      "review": "UNREVIEWED"
+    }
+  ]
+}

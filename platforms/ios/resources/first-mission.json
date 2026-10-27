@@ -1,0 +1,48 @@
+{
+  "schema": "opencnc3d.ios.resource-profile.v1",
+  "id": "td-first-gdi-original",
+  "scenario": "SCG01EA",
+  "max_bytes": 67108864,
+  "launch_args": [
+    "--scen", "SCG01EA", "--pack", "SCG01EA.pack",
+    "--dir", "missions/", "--content", "content/", "--dosdata", "dosdata",
+    "--cameos", "cameos.pack", "--dospack", "dossidebar.pack",
+    "--dosinf", "dosinfantry.pack", "--theme", "AOI", "--mottle", ""
+  ],
+  "assets": [
+    {"path": "SCG01EA.pack", "role": "Cooked mission terrain, cartridge geometry, texture banks and animation data"},
+    {"path": "missions/SCG01EA.INI", "role": "Live mission scenario, teams, triggers, structures and reinforcement rules"},
+    {"path": "missions/SCG01EA.BIN", "role": "Original cell/template layout used by simulation and map loading"},
+    {"path": "content/TEMPERAT.MIX", "role": "Existing simulation stub theater archive"},
+    {"path": "cameos.pack", "role": "Cartridge font and cameo art required by renderer overlays"},
+    {"path": "dossidebar.pack", "role": "Original sidebar, radar, cursors, fonts and pause-dialog art"},
+    {"path": "dosinfantry.pack", "role": "Original animated infantry sprite banks"},
+    {"path": "hud640.pack", "role": "Existing 640x480 HUD option and fittings"},
+    {"path": "cameos95.pack", "role": "Existing full-size C&C95 HUD cameo bank"},
+    {"path": "cameos_tdr.pack", "role": "Existing authored true-color HUD cameos"},
+    {"path": "efx.pack", "role": "Cartridge particle and combat effect textures"},
+    {"path": "verdict.pack", "role": "Mission success and failure banners"},
+    {"path": "dostib.pack", "role": "Original Tiberium field sprite bank"},
+    {"path": "doscrate.pack", "role": "Original crate overlays"},
+    {"path": "smudge.pack", "role": "Original scorch, crater and building apron art"},
+    {"path": "dosdata/SOUNDS.MIX", "role": "Original effects and unit acknowledgments"},
+    {"path": "dosdata/SPEECH.MIX", "role": "Original EVA voice lines"},
+    {"path": "dosdata/ZOUNDS.MIX", "role": "Original alternate audio entries"},
+    {"path": "dosdata/AUD.MIX", "role": "Original supplementary audio entries"},
+    {"path": "dosdata/LOCAL.MIX", "role": "Original English labels, palette and shared text"},
+    {"path": "dosdata/GENERAL.MIX", "role": "Original MISSION.INI briefing text"},
+    {"path": "dosdata/music/AOI.AUD", "role": "Original first GDI mission music, Act on Instinct"},
+    {"path": "n64fix/FACT.n64x", "role": "Existing corrected Construction Yard cartridge mesh"},
+    {"path": "n64fix/NUKE.n64x", "role": "Existing corrected Power Plant cartridge mesh"},
+    {"path": "n64fix/PYLE.n64x", "role": "Existing corrected Barracks cartridge mesh"},
+    {"path": "n64fix/GUN.n64x", "role": "Existing corrected Gun Turret cartridge mesh", "optional": true},
+    {"path": "n64infantry.pack", "role": "Cartridge prone/fire animation strips; absent in the audited Dock installation", "optional": true}
+  ],
+  "excluded": [
+    "Other mission packs and scenario files",
+    "Full score archive, other loose music tracks and cinematics",
+    "Enhanced terrain, authored remaster meshes, volumetric VFX and replacement audio",
+    "Desktop executables, dynamic libraries, launchers, saves and player settings",
+    "Debug screenshots, source art and work-in-progress assets"
+  ]
+}

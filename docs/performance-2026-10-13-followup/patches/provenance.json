@@ -1,0 +1,53 @@
+[
+  {
+    "name": "uniform",
+    "source": "67df3dea9468fa6c454195541c82768903373795",
+    "patch_sha256": "413563a4f2caaa46eb0a9d93c85be71c49ac6cba94b035ed9a59b2afec28958e",
+    "compiled_binary_sha256": "116fd3ad5fd76a0e7729c4a7d490987322f6a6866bc26ee1ac42a2a2be27b183",
+    "changed_sources": {
+      "game/cnc_eyes.cpp": {
+        "baseline_sha256": "350c4f6479924a06ffa100107b4515ad4ddca5443c96d8e34ab01322ce33fce5",
+        "candidate_sha256": "434c51efc4243508fe4b21fd166082a41eff7e777128cf367e931c4bb5e87827"
+      },
+      "game/fx_gl.h": {
+        "baseline_sha256": "d8d4a3e6aca55cd3133ec54f62bc04cd15f9386df7a2b59cbfdd41a0fe0d151a",
+        "candidate_sha256": "d783a686e76134efc3d219856d32eacf99b2f2f9113743087514b6d13dbcec47"
+      }
+    },
+    "unified_context_lines": 0
+  },
+  {
+    "name": "coalesce",
+    "source": "67df3dea9468fa6c454195541c82768903373795",
+    "patch_sha256": "fcc228c702d3aa99fa0547be6b49452608d13d422c916ebd1f0d732b754a09ef",
+    "compiled_binary_sha256": "0383bf102e9c3e2a4f15c3d523c9e2e012c0538ea9a8f4faa58ece9f4be27a07",
+    "changed_sources": {
+      "game/cnc_eyes.cpp": {
+        "baseline_sha256": "350c4f6479924a06ffa100107b4515ad4ddca5443c96d8e34ab01322ce33fce5",
+        "candidate_sha256": "62423cde7628ec0406d552302f82ee68b13658cd773af8f6ac54485594098fce"
+      },
+      "game/mesh_batch.h": {
+        "baseline_sha256": "d31b9f696d4d7f3ba9a5b476e9d6766f0022efb0786341c65ab6525f18cf69dd",
+        "candidate_sha256": "ba803ff3070fee35dcdf8f7b328d4e246e863d6eec7c52ca006a52903489d321"
+      }
+    },
+    "unified_context_lines": 0
+  },
+  {
+    "name": "range",
+    "source": "67df3dea9468fa6c454195541c82768903373795",
+    "patch_sha256": "214f158e5c756dd77259ae27f0670bb81a34c0fb16e34f6b077e6c23a2730014",
+    "compiled_binary_sha256": "23dd2eb67bf0e6aa6ae684d21464b91543cef66c356aabb62768db437413d12f",
+    "changed_sources": {
+      "game/cnc_eyes.cpp": {
+        "baseline_sha256": "350c4f6479924a06ffa100107b4515ad4ddca5443c96d8e34ab01322ce33fce5",
+        "candidate_sha256": "3d3fcd3ab12b6f8dab1c2e21faeb4deb1feea5190b554229eb51e935a9e11df2"
+      },
+      "game/mesh_batch.h": {
+        "baseline_sha256": "d31b9f696d4d7f3ba9a5b476e9d6766f0022efb0786341c65ab6525f18cf69dd",
+        "candidate_sha256": "39e392767ba957deb589cd179d5c71efd3acaab29f25c55c8c2e389913d4c75f"
+      }
+    },
+    "unified_context_lines": 0
+  }
+]

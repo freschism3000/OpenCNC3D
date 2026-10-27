@@ -13,6 +13,10 @@
 // GNU General Public License along with permitted additional restrictions
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
+// MODIFIED for OpenCNC3D fair skirmish difficulty, 19 October 2026.
+// Rejects hidden enemy object destinations for fair skirmish vehicles.
+// This changes multiplayer simulation; campaign rules remain on their original path.
+
 /* $Header:   F:\projects\c&c\vcs\code\drive.cpv   2.17   16 Oct 1995 16:51:16   JOE_BOSTIC  $ */
 /***********************************************************************************************
  ***             C O N F I D E N T I A L  ---  W E S T W O O D   S T U D I O S               ***
@@ -1646,7 +1650,7 @@ int DriveClass::Offload_Tiberium_Bail(void)
 {
     if (Tiberium) {
         Tiberium--;
-        if (House->IsHuman) {
+        if (House->IsHuman || GameToPlay != GAME_NORMAL) {
             return (UnitTypeClass::FULL_LOAD_CREDITS / UnitTypeClass::STEP_COUNT); // 25 in debugger
         }
 

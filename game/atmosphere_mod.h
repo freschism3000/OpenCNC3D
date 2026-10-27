@@ -7,7 +7,6 @@
 #include "atmosphere_glsl.h"
 
 static GLuint g_airProgram = 0, g_airComposite = 0, g_airVisibility = 0;
-static GLuint g_terrainCliffMask = 0;
 static int g_airTried = 0, g_airVisW = 0, g_airVisH = 0;
 static FxRT g_airVolume, g_airResult;
 
@@ -17,8 +16,6 @@ static void atmosphere_shutdown(void)
     /* The two programs are kept for the life of the process, and so is g_airTried:
        rebuilt every mission they leaked in the driver like the chain's (fx_shutdown). */
     if (g_airVisibility) glDeleteTextures(1, &g_airVisibility);
-    if (g_terrainCliffMask) glDeleteTextures(1, &g_terrainCliffMask);
-    g_terrainCliffMask = 0;
     g_airVisibility = 0;
     g_airVisW = g_airVisH = 0;
 }
@@ -44,64 +41,47 @@ static GLuint atmosphere_visibility_update(void)
     const int mw = g_shroudCornW-1, mh = g_shroudCornH-1;
     if (mw < 1 || mh < 1) return 0;
     const int tw = mw+1, th = mh+1;
-    std::vector<unsigned char> visibility((size_t)tw*th);
+    /* ONCE A FRAME, AND SENT ONLY WHEN IT CHANGED. Two or three passes ask for this every
+       frame, and the shroud it reads cannot move inside a frame. Rewriting a texture the
+       GPU is still reading from an earlier pass makes the driver either wait for that
+       pass or copy the texture, and the field is usually identical to the last one sent:
+       it changes only when the shroud does. */
+    static unsigned s_frame = ~0u;
+    static std::vector<unsigned char> s_vis, s_sent;
+    if (g_airVisibility && tw == g_airVisW && th == g_airVisH && s_frame == g_drawFrameSerial) {
+        glBindTexture(GL_TEXTURE_2D, g_airVisibility);
+        return g_airVisibility;
+    }
+    s_frame = g_drawFrameSerial;
+    s_vis.resize((size_t)tw*th);
     for (int z = 0; z < th; z++) for (int x = 0; x < tw; x++) {
         const float v = (shroud_vis_at((float)x,(float)z)-(1.0f-SHROUD_DARK_ALPHA))/SHROUD_DARK_ALPHA;
-        visibility[(size_t)z*tw+x] = (unsigned char)(255.0f*std::max(0.0f,std::min(1.0f,v))+0.5f);
+        s_vis[(size_t)z*tw+x] = (unsigned char)(255.0f*std::max(0.0f,std::min(1.0f,v))+0.5f);
     }
     if (!g_airVisibility) glGenTextures(1, &g_airVisibility);
     glBindTexture(GL_TEXTURE_2D, g_airVisibility);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     if (tw != g_airVisW || th != g_airVisH) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, tw, th, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, visibility.data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, tw, th, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, s_vis.data());
         g_airVisW = tw; g_airVisH = th;
-    } else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tw, th, GL_LUMINANCE, GL_UNSIGNED_BYTE, visibility.data());
+        s_sent = s_vis;
+    } else if (s_vis != s_sent) {
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tw, th, GL_LUMINANCE, GL_UNSIGNED_BYTE, s_vis.data());
+        s_sent = s_vis;
+    }
     return g_airVisibility;
 }
 
-/* Painted cliff shadows cannot be separated exactly from rock pigment. The
-   terrain dial softens only dark texels of known cliff templates, with a bounded
-   colour-preserving gain; it does not brighten grass, roads or source highlights.
-   Rebuild this tiny cell field from the current pack, so editor/theatre changes
-   cannot leave a stale mask. No artwork is rewritten. */
-static int terrain_cliff_mask_bind(GLuint prog)
-{
-    if (g_raModule || terrain_texset_drawn() != FX_TEX_ENH ||
-        g_fx.terrain_shadow_strength == 1.0f || g_gridW < 1 || g_gridH < 1) return 0;
-    glActiveTexture(GL_TEXTURE0 + 11);
-    terrain_seams_ensure();
-    if (!g_seams.ok) return 0;
-    int nslots = 0;
-    const TtSlot* tab = tt_table(g_pack.theater, &nslots);
-    std::vector<int> templates(nslots, -1);
-    for (int i = 0; i < nslots; i++)
-        if (tab[i].slot < (unsigned)nslots) templates[tab[i].slot] = tab[i].tmpl;
-    std::vector<unsigned char> mask((size_t)g_gridW*g_gridH, 0);
-    for (size_t i = 0; i < g_pack.cell.size(); i++) {
-        const PackCell& c = g_pack.cell[i];
-        const int slot = ts_slot_of_cell(c, nslots);
-        if (c.x < 0 || c.y < 0 || c.x >= g_gridW || c.y >= g_gridH || slot < 0) continue;
-        const int tmpl = templates[slot];
-        if (tmpl >= 0 && tmpl < (int)g_seams.cliffTmpl.size() && g_seams.cliffTmpl[tmpl])
-            mask[(size_t)c.y*g_gridW+c.x] = 255;
-    }
-    if (!g_terrainCliffMask) glGenTextures(1, &g_terrainCliffMask);
-    glBindTexture(GL_TEXTURE_2D, g_terrainCliffMask);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, g_gridW, g_gridH, 0,
-                 GL_LUMINANCE, GL_UNSIGNED_BYTE, mask.data());
-    fx_set1i(prog, "uTerrainCliff", 11);
-    return 1;
-}
-
+/* Painted terrain shade uses one response on every Enhanced surface in both
+   games and every theater. Restricting it to whole cliff cells also lightened
+   their ground, leaving a bright border beside unchanged ordinary cells. The
+   normal/class buffer excludes objects; shroud and the shore field protect fog
+   and water. No template names or artwork-derived colour masks gate this dial. */
 static int terrain_visibility_bind(GLuint prog)
 {
     glActiveTexture(GL_TEXTURE0 + 9);
@@ -109,7 +89,8 @@ static int terrain_visibility_bind(GLuint prog)
     glBindTexture(GL_TEXTURE_2D, tex);
     fx_set1i(prog, "uTerrainVisibility", 9);
     fx_set2f(prog, "uTerrainVisSize", (float)g_airVisW, (float)g_airVisH);
-    fx_set1i(prog, "uTerrainCliffOn", tex && terrain_cliff_mask_bind(prog));
+    fx_set1i(prog, "uTerrainArtShadeOn", tex && !fx_unified_lighting() && fx_texset_get() == FX_TEX_ENH
+        && fx_terrain_shadow_strength() != 1.0f && g_gridW > 0 && g_gridH > 0);
     /* Water is translucent and retains the ground's depth. Its shore field keeps
        terrain colour controls off both the surface and its inland foam wash. */
     glActiveTexture(GL_TEXTURE0 + 10);
@@ -119,7 +100,12 @@ static int terrain_visibility_bind(GLuint prog)
     fx_set1i(prog, "uTerrainWaterOn", water);
     fx_set2f(prog, "uTerrainWaterScale", g_gridW > 0 ? 1.0f/g_gridW : 0.0f,
                                       g_gridH > 0 ? 1.0f/g_gridH : 0.0f);
-    fx_set1f(prog, "uTerrainDryEdge", 0.5f-(g_fx.water_foam_cross+0.25f)/(2.0f*WATER_FIELD_RANGE));
+    const float dryEdge = 0.5f-(g_fx.water_foam_cross+0.25f)/(2.0f*WATER_FIELD_RANGE);
+    fx_set1f(prog, "uTerrainDryEdge", dryEdge);
+    /* Every exterior biome shares one continuous grade-to-wash transition. A
+       hard distance contour drew a brown/pale ring, made worse by colour tint. */
+    fx_set2f(prog, "uTerrainDryFade", dryEdge-0.5f/(2.0f*WATER_FIELD_RANGE),
+                                          dryEdge+0.25f/(2.0f*WATER_FIELD_RANGE));
     glActiveTexture(GL_TEXTURE0);
     return tex != 0;
 }

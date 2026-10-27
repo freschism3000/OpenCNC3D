@@ -1,0 +1,235 @@
+{
+  "alpha_threshold": false,
+  "assets": {
+    "module": {
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "display": "module-display-160x160.png",
+      "display_alpha_statistics": {
+        "corner_values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "corners_zero": true,
+        "extrema": [
+          0,
+          255
+        ],
+        "full_canvas_rectangular_matte": false,
+        "opaque_pixels": 289,
+        "partial_alpha_pixels": 14380,
+        "transparent_fraction": 0.4269921875,
+        "transparent_pixels": 10931
+      },
+      "display_mode": "RGBA",
+      "display_png_sha256": "b652e860415b326d6168794a597a099ea2a8b5ff51c1e7e9dfd318170c9f5463",
+      "display_rgba_bytes": 102400,
+      "display_rgba_sha256": "2d309459dd62ba500266da5ed0a0ccaab625dbfea9f8688c90f40083c630782c",
+      "display_size": [
+        160,
+        160
+      ],
+      "filter": "Pillow LANCZOS, one full-source downfilter",
+      "role": "generated transparent cutout of the supplied OpenCNC3D emblem",
+      "source": "opencnc3d-cutout.png",
+      "source_alpha": "archived alpha preserved by RGBA decode and full-source LANCZOS downfilter; no threshold, crop or inference",
+      "source_alpha_statistics": {
+        "corner_values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "corners_zero": true,
+        "extrema": [
+          0,
+          255
+        ],
+        "full_canvas_rectangular_matte": false,
+        "opaque_pixels": 1232,
+        "partial_alpha_pixels": 867415,
+        "transparent_fraction": 0.4476068923940996,
+        "transparent_pixels": 703869
+      },
+      "source_decoded_rgba_sha256": "dfeab6db5c586e0001b4e9ecc2f93177f0b98f132252fd4a54ba8720d58d1c26",
+      "source_mode": "RGBA",
+      "source_rectangle": [
+        0,
+        0,
+        1254,
+        1254
+      ],
+      "source_sha256": "60525c99a36e92d57b220d2258ee8ee42b83e2dc9723796dc2d5cb08d0869701",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "uniform_fit_scale": 0.12759170653907495
+    },
+    "ra": {
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "display": "ra-display-160x160.png",
+      "display_alpha_statistics": {
+        "corner_values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "corners_zero": true,
+        "extrema": [
+          0,
+          255
+        ],
+        "full_canvas_rectangular_matte": false,
+        "opaque_pixels": 338,
+        "partial_alpha_pixels": 18663,
+        "transparent_fraction": 0.2577734375,
+        "transparent_pixels": 6599
+      },
+      "display_mode": "RGBA",
+      "display_png_sha256": "c932014bf6983ad919bc39f4c9689edc362d5aac41e029a0a44ad0d26464d32e",
+      "display_rgba_bytes": 102400,
+      "display_rgba_sha256": "db82c51bab4bbd5b685bf53efc42a0bcd79d3fcf9f89b5471a3fea2020dbfdcf",
+      "display_size": [
+        160,
+        160
+      ],
+      "filter": "Pillow LANCZOS, one full-source downfilter",
+      "role": "generated polished Red Alert battle medallion, derived from the original RA module reference",
+      "source": "red-alert-emblem.png",
+      "source_alpha": "archived alpha preserved by RGBA decode and full-source LANCZOS downfilter; no threshold, crop or inference",
+      "source_alpha_statistics": {
+        "corner_values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "corners_zero": true,
+        "extrema": [
+          0,
+          255
+        ],
+        "full_canvas_rectangular_matte": false,
+        "opaque_pixels": 982,
+        "partial_alpha_pixels": 1128512,
+        "transparent_fraction": 0.2817281350396435,
+        "transparent_pixels": 443022
+      },
+      "source_decoded_rgba_sha256": "6d218251c9d77d42776f718d354843dfb1260b962ecd06989e0a1956dd4c6056",
+      "source_mode": "RGBA",
+      "source_rectangle": [
+        0,
+        0,
+        1254,
+        1254
+      ],
+      "source_sha256": "5a1a86ba228c9322c832fe4e242102f9b011409d60a5e7389bbc218c63cc4334",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "uniform_fit_scale": 0.12759170653907495
+    },
+    "wordmark": {
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "display": "wordmark-display-220x94.png",
+      "display_alpha_statistics": {
+        "corner_values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "corners_zero": true,
+        "extrema": [
+          0,
+          255
+        ],
+        "full_canvas_rectangular_matte": false,
+        "opaque_pixels": 873,
+        "partial_alpha_pixels": 8516,
+        "transparent_fraction": 0.5459864603481625,
+        "transparent_pixels": 11291
+      },
+      "display_mode": "RGBA",
+      "display_png_sha256": "580ebb313828807b95e53c1105b2238dd49d1609f8bcc20d9a8c8341fb008c75",
+      "display_rgba_bytes": 82720,
+      "display_rgba_sha256": "f962f5d8e63c70cbb16382dabba1b50e0976fbd9d1451ff01522258cd1e5e7d0",
+      "display_size": [
+        220,
+        94
+      ],
+      "filter": "Pillow LANCZOS, one full-source downfilter",
+      "role": "unchanged actual OpenCNC3D header wordmark",
+      "source": "wordmark-original.png",
+      "source_alpha": "archived alpha preserved by RGBA decode and full-source LANCZOS downfilter; no threshold, crop or inference",
+      "source_alpha_statistics": {
+        "corner_values": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "corners_zero": true,
+        "extrema": [
+          0,
+          255
+        ],
+        "full_canvas_rectangular_matte": false,
+        "opaque_pixels": 689,
+        "partial_alpha_pixels": 642126,
+        "transparent_fraction": 0.5911355836040799,
+        "transparent_pixels": 929381
+      },
+      "source_decoded_rgba_sha256": "8530e79e1c7a0ff5e2da017ced7ce282f5f379048aacf50ae2f381ecd5ea4502",
+      "source_mode": "RGBA",
+      "source_rectangle": [
+        0,
+        0,
+        1922,
+        818
+      ],
+      "source_sha256": "33b4001278f281e7b6c6a351f5931d8b16a755bc6a28d5be86d93ac8de46c704",
+      "source_size": [
+        1922,
+        818
+      ],
+      "uniform_fit_scale": 0.11446409989594172
+    }
+  },
+  "crop": false,
+  "header": "source/launcher_logos.h",
+  "header_sha256": "d58e612f67d544a3a341179e7e3b16797ff1060e2e29ac0d8a1788512b781a95",
+  "image_generation": false,
+  "operations": "decode exact archived generated RGBA emblems and original wordmark; uniformly fit complete images with rounded dimensions; one LANCZOS downfilter; encode PNG witnesses and C arrays",
+  "pillow_version": "12.3.0",
+  "previous_version": "v02 deliberately preserved the supplied RGB emblem's opaque black background; the current design-review request replaces that presentation with genuine generated transparent cutouts",
+  "purpose": "transparent OpenCNC3D and Red Alert module emblems with the unchanged OpenCNC3D header wordmark",
+  "recolour": false,
+  "supporting_references": {
+    "opencnc3d-original.png": {
+      "role": "exact originally supplied RGB OpenCNC3D emblem; v02 kept its black background",
+      "sha256": "cf9f7c600669e3baa9e4baaf6f53a40e72f8043de2da4abc51d844897ca163b0"
+    },
+    "red-alert-source.png": {
+      "role": "original full-colour RA module battle-circle design reference",
+      "sha256": "90775bec39167957397d2216b9caca983eca189584b72c290036bb5d77dfc06b"
+    }
+  },
+  "total_rgba_bytes": 287520,
+  "transparency_inference": false,
+  "version": 3,
+  "wordmark_display_pixels_identical_to_v02": true
+}

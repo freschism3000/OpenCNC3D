@@ -1,0 +1,37 @@
+{
+  "runs": [
+    {
+      "arm": "before",
+      "binary": "${EVIDENCE_ROOT}/actual-baseline/opencnc3d",
+      "sha256": "175588385d9403f0bea6c078384db46d02296a408614a52f50d22ec5a7c74818",
+      "median_ms": 52.12,
+      "p90_ms": 59.84
+    },
+    {
+      "arm": "after",
+      "binary": "${DOCK_RUNTIME}/ra3d/opencnc3d",
+      "sha256": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+      "median_ms": 33.77,
+      "p90_ms": 39.34
+    },
+    {
+      "arm": "after",
+      "binary": "${DOCK_RUNTIME}/ra3d/opencnc3d",
+      "sha256": "148ada69d0f12a9097b34c73a7200b8161b22c5de8a6babbd92701513470bb99",
+      "median_ms": 33.75,
+      "p90_ms": 37.57
+    },
+    {
+      "arm": "before",
+      "binary": "${EVIDENCE_ROOT}/actual-baseline/opencnc3d",
+      "sha256": "175588385d9403f0bea6c078384db46d02296a408614a52f50d22ec5a7c74818",
+      "median_ms": 52.81,
+      "p90_ms": 59.05
+    }
+  ],
+  "aggregate": {
+    "before": 52.465,
+    "after": 33.760000000000005
+  },
+  "passed": true
+}

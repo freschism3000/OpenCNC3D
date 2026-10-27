@@ -1,0 +1,8 @@
+{
+  "scene": "SCG05EA",
+  "shroud_enabled": true,
+  "resolution": "1280x720",
+  "rgba_png_equal": true,
+  "full_float_targets_equal": 6,
+  "different": []
+}

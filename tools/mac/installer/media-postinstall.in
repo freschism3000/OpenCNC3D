@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+SCRIPT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$SCRIPT/install-location.sh"
+resolve_install "$@"
+assert_real_parents
+launcher="$install/opencnc3d-launcher"
+package="$install/.opencnc3d-modules/@CACHE@.zip"
+[ -f "$launcher" ] && [ -x "$launcher" ] && [ ! -L "$launcher" ] || exit 1
+[ -f "$package" ] && [ ! -L "$package" ] || exit 1
+# Offline base installation is verified and journalled by the native controller,
+# under its install lock, before optional media. No game window is started.
+run_as_recipient "$launcher" --dir "$install" --install-module @CLI_MODULE@ \
+    --module-file "$package" --module-sha @SHA@ || exit 1
+# Installer choices are additive: unchecked boxes preserve existing files and
+# preferences. Settings uses its separate intentional-removal action.
+if run_as_recipient "$launcher" --dir "$install" --media-install @MEDIA@ --media-game @GAME@ --media-add-only; then
+    echo '@TITLE@: game installed; selected optional media completed.'
+else
+    # The validated offline game remains usable. The scoped downloader records
+    # partial/error state for retry from this game's content settings.
+    echo '@TITLE@: game installed. Optional media needs retry from game content settings.' >&2
+fi
+exit 0

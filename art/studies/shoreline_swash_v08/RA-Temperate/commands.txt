@@ -1,0 +1,108 @@
+gfxmode 2
+gfx texset 3
+gfx show_stats 0
+reveal 1
+gfx grass 0
+gfx cloud_on 0
+gfx fog_fx 0
+gfx sand_fx 0
+gfx bloom_on 0
+gfx tree3d_wind 0
+gfx fol_wind 0
+gfx water_edge 0
+dist 1920
+tick 2
+gfx water_foam 0
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/control.png
+gfx water_foam 1
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-000.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-001.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-002.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-003.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-004.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-005.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-006.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-007.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-008.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-009.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-010.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-011.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-012.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-013.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-014.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-015.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-016.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-017.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-018.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-019.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-020.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-021.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-022.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-023.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-024.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-025.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-026.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-027.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-028.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-029.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-030.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-031.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-032.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-033.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-034.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-035.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-036.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-037.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-038.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-039.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-040.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-041.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-042.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-043.png
+tick 2
+shot /private/tmp/cnc3d-shore-flow-20261021/swash-v08-ra-retry/RA-Temperate/frame-044.png
+tick 2
+quit

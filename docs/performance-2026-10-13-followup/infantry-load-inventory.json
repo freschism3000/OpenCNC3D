@@ -1,0 +1,1049 @@
+{
+  "status": "static importer-format inventory; no renderer run",
+  "summary": {
+    "experimental_models_present": 3,
+    "experimental_texture_gpu_logical_mip_bytes": 83886540,
+    "experimental_cpu_geometry_clip_payload_bytes": 5838548,
+    "experimental_texture_import_peak_base_bytes": 62914944
+  },
+  "models": [
+    {
+      "classification": "experimental-infantry",
+      "path": "${REPO_ROOT}/playable/models3d/E1.c3m",
+      "type": "E1",
+      "format_version": 3,
+      "vertices": 13356,
+      "triangles": 15661,
+      "bones": 17,
+      "textures": [
+        {
+          "index": 0,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        },
+        {
+          "index": 1,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        },
+        {
+          "index": 2,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 3,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 4,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 5,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 6,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 7,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 8,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 9,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 10,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 11,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 12,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 13,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        }
+      ],
+      "texture_import_peak_base_bytes": 22020224,
+      "texture_gpu_logical_mip_bytes": 29360280,
+      "cpu_texture_payload_after_eager_upload": 0,
+      "cpu_geometry_vertex_index_skin_payload_bytes": 722172,
+      "cpu_clip_pose_payload_bytes": 1289280,
+      "clips": [
+        {
+          "name": "idle",
+          "frames": 190,
+          "fps": 30.0,
+          "pose_float_bytes": 103360
+        },
+        {
+          "name": "idle2",
+          "frames": 161,
+          "fps": 30.0,
+          "pose_float_bytes": 87584
+        },
+        {
+          "name": "idle3",
+          "frames": 200,
+          "fps": 30.0,
+          "pose_float_bytes": 108800
+        },
+        {
+          "name": "idle4",
+          "frames": 151,
+          "fps": 30.0,
+          "pose_float_bytes": 82144
+        },
+        {
+          "name": "idle5",
+          "frames": 203,
+          "fps": 30.0,
+          "pose_float_bytes": 110432
+        },
+        {
+          "name": "idle6",
+          "frames": 140,
+          "fps": 30.0,
+          "pose_float_bytes": 76160
+        },
+        {
+          "name": "idle7",
+          "frames": 140,
+          "fps": 30.0,
+          "pose_float_bytes": 76160
+        },
+        {
+          "name": "walk",
+          "frames": 35,
+          "fps": 30.0,
+          "pose_float_bytes": 19040
+        },
+        {
+          "name": "trot",
+          "frames": 24,
+          "fps": 30.0,
+          "pose_float_bytes": 13056
+        },
+        {
+          "name": "run",
+          "frames": 23,
+          "fps": 30.0,
+          "pose_float_bytes": 12512
+        },
+        {
+          "name": "aim",
+          "frames": 174,
+          "fps": 30.0,
+          "pose_float_bytes": 94656
+        },
+        {
+          "name": "shoot",
+          "frames": 15,
+          "fps": 30.0,
+          "pose_float_bytes": 8160
+        },
+        {
+          "name": "liedown",
+          "frames": 29,
+          "fps": 30.0,
+          "pose_float_bytes": 15776
+        },
+        {
+          "name": "prone",
+          "frames": 367,
+          "fps": 30.0,
+          "pose_float_bytes": 199648
+        },
+        {
+          "name": "crawl",
+          "frames": 35,
+          "fps": 30.0,
+          "pose_float_bytes": 19040
+        },
+        {
+          "name": "fireprone",
+          "frames": 36,
+          "fps": 30.0,
+          "pose_float_bytes": 19584
+        },
+        {
+          "name": "getup",
+          "frames": 37,
+          "fps": 30.0,
+          "pose_float_bytes": 20128
+        },
+        {
+          "name": "die1",
+          "frames": 87,
+          "fps": 30.0,
+          "pose_float_bytes": 47328
+        },
+        {
+          "name": "die2",
+          "frames": 75,
+          "fps": 30.0,
+          "pose_float_bytes": 40800
+        },
+        {
+          "name": "die3",
+          "frames": 73,
+          "fps": 30.0,
+          "pose_float_bytes": 39712
+        },
+        {
+          "name": "die4",
+          "frames": 53,
+          "fps": 30.0,
+          "pose_float_bytes": 28832
+        },
+        {
+          "name": "die5",
+          "frames": 75,
+          "fps": 30.0,
+          "pose_float_bytes": 40800
+        },
+        {
+          "name": "dieprone1",
+          "frames": 21,
+          "fps": 30.0,
+          "pose_float_bytes": 11424
+        },
+        {
+          "name": "dieprone2",
+          "frames": 26,
+          "fps": 30.0,
+          "pose_float_bytes": 14144
+        }
+      ],
+      "eager_rigid_vertex_gpu_bytes": 0,
+      "note": "Header/seek inventory only; GL_RGBA8 requested bytes, not committed VRAM/driver shadow allocation. Skinned rigid buffers are not eager-uploaded; pose buffers only exist if drawn."
+    },
+    {
+      "classification": "experimental-infantry",
+      "path": "${REPO_ROOT}/playable/models3d/E3.c3m",
+      "type": "E3",
+      "format_version": 3,
+      "vertices": 12299,
+      "triangles": 15243,
+      "bones": 17,
+      "textures": [
+        {
+          "index": 0,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        },
+        {
+          "index": 1,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        },
+        {
+          "index": 2,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 3,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 4,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 5,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 6,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 7,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 8,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 9,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 10,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        }
+      ],
+      "texture_import_peak_base_bytes": 18874496,
+      "texture_gpu_logical_mip_bytes": 25165980,
+      "cpu_texture_payload_after_eager_upload": 0,
+      "cpu_geometry_vertex_index_skin_payload_bytes": 674876,
+      "cpu_clip_pose_payload_bytes": 1140768,
+      "clips": [
+        {
+          "name": "idle",
+          "frames": 190,
+          "fps": 30.0,
+          "pose_float_bytes": 103360
+        },
+        {
+          "name": "idle2",
+          "frames": 161,
+          "fps": 30.0,
+          "pose_float_bytes": 87584
+        },
+        {
+          "name": "idle3",
+          "frames": 200,
+          "fps": 30.0,
+          "pose_float_bytes": 108800
+        },
+        {
+          "name": "idle4",
+          "frames": 151,
+          "fps": 30.0,
+          "pose_float_bytes": 82144
+        },
+        {
+          "name": "idle5",
+          "frames": 140,
+          "fps": 30.0,
+          "pose_float_bytes": 76160
+        },
+        {
+          "name": "walk",
+          "frames": 35,
+          "fps": 30.0,
+          "pose_float_bytes": 19040
+        },
+        {
+          "name": "trot",
+          "frames": 24,
+          "fps": 30.0,
+          "pose_float_bytes": 13056
+        },
+        {
+          "name": "run",
+          "frames": 23,
+          "fps": 30.0,
+          "pose_float_bytes": 12512
+        },
+        {
+          "name": "aim",
+          "frames": 174,
+          "fps": 30.0,
+          "pose_float_bytes": 94656
+        },
+        {
+          "name": "shoot",
+          "frames": 61,
+          "fps": 30.0,
+          "pose_float_bytes": 33184
+        },
+        {
+          "name": "liedown",
+          "frames": 29,
+          "fps": 30.0,
+          "pose_float_bytes": 15776
+        },
+        {
+          "name": "prone",
+          "frames": 366,
+          "fps": 30.0,
+          "pose_float_bytes": 199104
+        },
+        {
+          "name": "crawl",
+          "frames": 35,
+          "fps": 30.0,
+          "pose_float_bytes": 19040
+        },
+        {
+          "name": "fireprone",
+          "frames": 61,
+          "fps": 30.0,
+          "pose_float_bytes": 33184
+        },
+        {
+          "name": "getup",
+          "frames": 37,
+          "fps": 30.0,
+          "pose_float_bytes": 20128
+        },
+        {
+          "name": "die1",
+          "frames": 87,
+          "fps": 30.0,
+          "pose_float_bytes": 47328
+        },
+        {
+          "name": "die2",
+          "frames": 75,
+          "fps": 30.0,
+          "pose_float_bytes": 40800
+        },
+        {
+          "name": "die3",
+          "frames": 73,
+          "fps": 30.0,
+          "pose_float_bytes": 39712
+        },
+        {
+          "name": "die4",
+          "frames": 53,
+          "fps": 30.0,
+          "pose_float_bytes": 28832
+        },
+        {
+          "name": "die5",
+          "frames": 75,
+          "fps": 30.0,
+          "pose_float_bytes": 40800
+        },
+        {
+          "name": "dieprone1",
+          "frames": 21,
+          "fps": 30.0,
+          "pose_float_bytes": 11424
+        },
+        {
+          "name": "dieprone2",
+          "frames": 26,
+          "fps": 30.0,
+          "pose_float_bytes": 14144
+        }
+      ],
+      "eager_rigid_vertex_gpu_bytes": 0,
+      "note": "Header/seek inventory only; GL_RGBA8 requested bytes, not committed VRAM/driver shadow allocation. Skinned rigid buffers are not eager-uploaded; pose buffers only exist if drawn."
+    },
+    {
+      "classification": "experimental-infantry",
+      "path": "${REPO_ROOT}/playable/models3d/E1TR.c3m",
+      "type": "E1TR",
+      "format_version": 3,
+      "vertices": 13356,
+      "triangles": 15661,
+      "bones": 17,
+      "textures": [
+        {
+          "index": 0,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        },
+        {
+          "index": 1,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        },
+        {
+          "index": 2,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 3,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 4,
+          "width": 1024,
+          "height": 1024,
+          "cpu_import_rgba_bytes": 4194304,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 5592404,
+          "levels": 11
+        },
+        {
+          "index": 5,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 6,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 7,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 8,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 9,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 10,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 11,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 12,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        },
+        {
+          "index": 13,
+          "width": 512,
+          "height": 512,
+          "cpu_import_rgba_bytes": 1048576,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 1398100,
+          "levels": 10
+        }
+      ],
+      "texture_import_peak_base_bytes": 22020224,
+      "texture_gpu_logical_mip_bytes": 29360280,
+      "cpu_texture_payload_after_eager_upload": 0,
+      "cpu_geometry_vertex_index_skin_payload_bytes": 722172,
+      "cpu_clip_pose_payload_bytes": 1289280,
+      "clips": [
+        {
+          "name": "idle",
+          "frames": 190,
+          "fps": 30.0,
+          "pose_float_bytes": 103360
+        },
+        {
+          "name": "idle2",
+          "frames": 161,
+          "fps": 30.0,
+          "pose_float_bytes": 87584
+        },
+        {
+          "name": "idle3",
+          "frames": 200,
+          "fps": 30.0,
+          "pose_float_bytes": 108800
+        },
+        {
+          "name": "idle4",
+          "frames": 151,
+          "fps": 30.0,
+          "pose_float_bytes": 82144
+        },
+        {
+          "name": "idle5",
+          "frames": 203,
+          "fps": 30.0,
+          "pose_float_bytes": 110432
+        },
+        {
+          "name": "idle6",
+          "frames": 140,
+          "fps": 30.0,
+          "pose_float_bytes": 76160
+        },
+        {
+          "name": "idle7",
+          "frames": 140,
+          "fps": 30.0,
+          "pose_float_bytes": 76160
+        },
+        {
+          "name": "walk",
+          "frames": 35,
+          "fps": 30.0,
+          "pose_float_bytes": 19040
+        },
+        {
+          "name": "trot",
+          "frames": 24,
+          "fps": 30.0,
+          "pose_float_bytes": 13056
+        },
+        {
+          "name": "run",
+          "frames": 23,
+          "fps": 30.0,
+          "pose_float_bytes": 12512
+        },
+        {
+          "name": "aim",
+          "frames": 174,
+          "fps": 30.0,
+          "pose_float_bytes": 94656
+        },
+        {
+          "name": "shoot",
+          "frames": 15,
+          "fps": 30.0,
+          "pose_float_bytes": 8160
+        },
+        {
+          "name": "liedown",
+          "frames": 29,
+          "fps": 30.0,
+          "pose_float_bytes": 15776
+        },
+        {
+          "name": "prone",
+          "frames": 367,
+          "fps": 30.0,
+          "pose_float_bytes": 199648
+        },
+        {
+          "name": "crawl",
+          "frames": 35,
+          "fps": 30.0,
+          "pose_float_bytes": 19040
+        },
+        {
+          "name": "fireprone",
+          "frames": 36,
+          "fps": 30.0,
+          "pose_float_bytes": 19584
+        },
+        {
+          "name": "getup",
+          "frames": 37,
+          "fps": 30.0,
+          "pose_float_bytes": 20128
+        },
+        {
+          "name": "die1",
+          "frames": 87,
+          "fps": 30.0,
+          "pose_float_bytes": 47328
+        },
+        {
+          "name": "die2",
+          "frames": 75,
+          "fps": 30.0,
+          "pose_float_bytes": 40800
+        },
+        {
+          "name": "die3",
+          "frames": 73,
+          "fps": 30.0,
+          "pose_float_bytes": 39712
+        },
+        {
+          "name": "die4",
+          "frames": 53,
+          "fps": 30.0,
+          "pose_float_bytes": 28832
+        },
+        {
+          "name": "die5",
+          "frames": 75,
+          "fps": 30.0,
+          "pose_float_bytes": 40800
+        },
+        {
+          "name": "dieprone1",
+          "frames": 21,
+          "fps": 30.0,
+          "pose_float_bytes": 11424
+        },
+        {
+          "name": "dieprone2",
+          "frames": 26,
+          "fps": 30.0,
+          "pose_float_bytes": 14144
+        }
+      ],
+      "eager_rigid_vertex_gpu_bytes": 0,
+      "note": "Header/seek inventory only; GL_RGBA8 requested bytes, not committed VRAM/driver shadow allocation. Skinned rigid buffers are not eager-uploaded; pose buffers only exist if drawn."
+    },
+    {
+      "classification": "active-enhanced-control",
+      "path": "${REPO_ROOT}/playable/einf/E1.c3m",
+      "type": "E1",
+      "format_version": 2,
+      "vertices": 1242,
+      "triangles": 957,
+      "bones": 20,
+      "textures": [
+        {
+          "index": 0,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        },
+        {
+          "index": 1,
+          "width": 384,
+          "height": 384,
+          "cpu_import_rgba_bytes": 589824,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 786424,
+          "levels": 9
+        },
+        {
+          "index": 2,
+          "width": 384,
+          "height": 384,
+          "cpu_import_rgba_bytes": 589824,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 786424,
+          "levels": 9
+        },
+        {
+          "index": 3,
+          "width": 192,
+          "height": 192,
+          "cpu_import_rgba_bytes": 147456,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 196600,
+          "levels": 8
+        },
+        {
+          "index": 4,
+          "width": 4,
+          "height": 4,
+          "cpu_import_rgba_bytes": 64,
+          "gpu_requested_internal_format": "GL_RGBA8",
+          "gpu_all_mip_levels_logical_bytes": 84,
+          "levels": 3
+        }
+      ],
+      "texture_import_peak_base_bytes": 1327232,
+      "texture_gpu_logical_mip_bytes": 1769616,
+      "cpu_texture_payload_after_eager_upload": 0,
+      "cpu_geometry_vertex_index_skin_payload_bytes": 61164,
+      "cpu_clip_pose_payload_bytes": 633600,
+      "clips": [
+        {
+          "name": "idle",
+          "frames": 180,
+          "fps": 30.0,
+          "pose_float_bytes": 115200
+        },
+        {
+          "name": "run",
+          "frames": 20,
+          "fps": 30.0,
+          "pose_float_bytes": 12800
+        },
+        {
+          "name": "shoot",
+          "frames": 16,
+          "fps": 30.0,
+          "pose_float_bytes": 10240
+        },
+        {
+          "name": "aim",
+          "frames": 120,
+          "fps": 30.0,
+          "pose_float_bytes": 76800
+        },
+        {
+          "name": "liedown",
+          "frames": 15,
+          "fps": 30.0,
+          "pose_float_bytes": 9600
+        },
+        {
+          "name": "prone",
+          "frames": 60,
+          "fps": 30.0,
+          "pose_float_bytes": 38400
+        },
+        {
+          "name": "crawl",
+          "frames": 24,
+          "fps": 30.0,
+          "pose_float_bytes": 15360
+        },
+        {
+          "name": "fireprone",
+          "frames": 12,
+          "fps": 30.0,
+          "pose_float_bytes": 7680
+        },
+        {
+          "name": "getup",
+          "frames": 15,
+          "fps": 30.0,
+          "pose_float_bytes": 9600
+        },
+        {
+          "name": "die1",
+          "frames": 34,
+          "fps": 30.0,
+          "pose_float_bytes": 21760
+        },
+        {
+          "name": "die2",
+          "frames": 34,
+          "fps": 30.0,
+          "pose_float_bytes": 21760
+        },
+        {
+          "name": "die3",
+          "frames": 34,
+          "fps": 30.0,
+          "pose_float_bytes": 21760
+        },
+        {
+          "name": "die4",
+          "frames": 49,
+          "fps": 30.0,
+          "pose_float_bytes": 31360
+        },
+        {
+          "name": "die5",
+          "frames": 73,
+          "fps": 30.0,
+          "pose_float_bytes": 46720
+        },
+        {
+          "name": "dieprone1",
+          "frames": 19,
+          "fps": 30.0,
+          "pose_float_bytes": 12160
+        },
+        {
+          "name": "dieprone2",
+          "frames": 19,
+          "fps": 30.0,
+          "pose_float_bytes": 12160
+        },
+        {
+          "name": "idle2",
+          "frames": 64,
+          "fps": 30.0,
+          "pose_float_bytes": 40960
+        },
+        {
+          "name": "idle3",
+          "frames": 64,
+          "fps": 30.0,
+          "pose_float_bytes": 40960
+        },
+        {
+          "name": "idle4",
+          "frames": 29,
+          "fps": 30.0,
+          "pose_float_bytes": 18560
+        },
+        {
+          "name": "idle5",
+          "frames": 31,
+          "fps": 30.0,
+          "pose_float_bytes": 19840
+        },
+        {
+          "name": "idle6",
+          "frames": 35,
+          "fps": 30.0,
+          "pose_float_bytes": 22400
+        },
+        {
+          "name": "idle7",
+          "frames": 43,
+          "fps": 30.0,
+          "pose_float_bytes": 27520
+        }
+      ],
+      "eager_rigid_vertex_gpu_bytes": 0,
+      "note": "Header/seek inventory only; GL_RGBA8 requested bytes, not committed VRAM/driver shadow allocation. Skinned rigid buffers are not eager-uploaded; pose buffers only exist if drawn."
+    }
+  ],
+  "release_archive_confirmation": {
+    "path": "${RELEASE_ARTIFACT_ROOT}/OpenCNC3D-windows-v0.8.4.zip",
+    "method": "ZIP central-directory name and uncompressed-size inspection only; no runtime measurement",
+    "present_infantry_files": [
+      "models3d/E1.c3m",
+      "models3d/E3.c3m",
+      "models3d/E1TR.c3m",
+      "einf/E1.c3m"
+    ]
+  }
+}

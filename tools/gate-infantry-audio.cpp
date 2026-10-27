@@ -72,6 +72,26 @@ int main()
         assert(!mixer_voice_active(m,h));for(int j=0;j<frames*2;++j)assert(whole[j]==0);
         mixer_bus_gain(m,MIX_BUS_FX,1000,0);
     }
+    // THE CROWD LIMIT: three walkers untouched, then sqrt(3/n) to a floor of one half;
+    // four steps ringing at most and one started a tick, the loudest first, ties to the
+    // lower id.
+    close_to(infantry_audio_crowd_gain(0),1);close_to(infantry_audio_crowd_gain(1),1);
+    close_to(infantry_audio_crowd_gain(3),1);close_to(infantry_audio_crowd_gain(4),sqrtf(.75f));
+    close_to(infantry_audio_crowd_gain(12),.5f);close_to(infantry_audio_crowd_gain(40),.5f);
+    for(int n=4;n<40;++n)assert(infantry_audio_crowd_gain(n+1)<=infantry_audio_crowd_gain(n));
+    assert(INFANTRY_AUDIO_MAX_VOICES==4&&INFANTRY_AUDIO_STARTS_PER_TICK==1);
+    assert(infantry_audio_budget(0)==1&&infantry_audio_budget(3)==1);
+    assert(infantry_audio_budget(4)==0&&infantry_audio_budget(60)==0);
+    {
+        const int gain[]={300,900,500,900,100},id[]={7,9,2,4,1};int out[5];
+        assert(infantry_audio_pick(gain,id,5,2,out)==2&&out[0]==3&&out[1]==1);
+        assert(infantry_audio_pick(gain,id,5,0,out)==0);
+        assert(infantry_audio_pick(gain,id,5,9,out)==5&&out[2]==2&&out[3]==0&&out[4]==4);
+        assert(infantry_audio_pick(gain,id,0,2,out)==0);
+    }
+    // A crowd's summed level: n walkers each at crowd gain, uncorrelated, add as sqrt(n);
+    // past three it stays within a squad of three's, up to the floor.
+    for(int n=4;n<=12;++n)assert(sqrtf((float)n)*infantry_audio_crowd_gain(n)<=sqrtf(3.f)+1e-4f);
     mixer_destroy(m);
-    puts("INFANTRY AUDIO PASS: live zoom curve, soldier filter, one-shot stereo/gain, pitch interpolation/duration/block continuity, persistent volume, mute retirement, separate pools");
+    puts("INFANTRY AUDIO PASS: crowd limit (level, voices, starts per tick, loudest first), live zoom curve, soldier filter, one-shot stereo/gain, pitch interpolation/duration/block continuity, persistent volume, mute retirement, separate pools");
 }

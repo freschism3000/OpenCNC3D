@@ -1,0 +1,67 @@
+{
+  "catalog": [
+    "td",
+    "ra"
+  ],
+  "choices": {
+    "movies": true,
+    "music": true
+  },
+  "faults": [],
+  "geometry": [
+    {
+      "disabled": false,
+      "h": 40,
+      "id": "cancel-download",
+      "kind": "button",
+      "label": "CANCEL",
+      "w": 160,
+      "x": 206,
+      "y": 418
+    }
+  ],
+  "installed": [
+    "td"
+  ],
+  "page": "progress",
+  "progress": 0.42,
+  "scenario": "td",
+  "target": "ra",
+  "textRuns": [
+    {
+      "height": 16,
+      "t": "INSTALLING RA3D",
+      "width": 176,
+      "x": 420,
+      "y": 190
+    },
+    {
+      "height": 16,
+      "t": "DOWNLOADING MODULE",
+      "width": 212,
+      "x": 392,
+      "y": 250
+    },
+    {
+      "height": 16,
+      "t": "42%",
+      "width": 36,
+      "x": 754,
+      "y": 334
+    },
+    {
+      "height": 16,
+      "t": "BASE GAME / MUSIC / MOVIES",
+      "width": 292,
+      "x": 392,
+      "y": 367
+    },
+    {
+      "height": 16,
+      "t": "CANCEL",
+      "width": 72,
+      "x": 250,
+      "y": 430
+    }
+  ]
+}

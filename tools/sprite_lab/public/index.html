@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sprites · Remaster Lab</title><link rel="stylesheet" href="sprites.css"></head>
+<body>
+<header><div><h1>Sprites</h1><p>Original infantry and the pixel-art redesign, in step.</p></div><span id="version">Minigunner · v15 complete action review</span></header>
+<section class="toolbar" aria-label="Sprite comparison controls">
+ <label>Infantry<select id="unit" aria-label="Infantry"></select></label>
+ <label>Animation<select id="animation" aria-label="Animation"></select></label>
+ <label>Facing<select id="facing" aria-label="Facing"></select></label>
+ <label>Speed<select id="speed" aria-label="Playback speed"><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
+ <label>Zoom<select id="zoom" aria-label="Display zoom"><option value="3">3×</option><option value="4">4×</option><option value="6" selected>6×</option><option value="8">8×</option><option value="10">10×</option></select></label>
+ <button id="play" type="button" aria-pressed="true">Pause</button><button id="reset" type="button">Restart</button>
+</section>
+<main>
+ <article class="pane"><div class="pane-heading"><h2>Before <small>1995 MS-DOS</small></h2><span id="before-count"></span></div><canvas id="before" aria-label="Original Minigunner animation"></canvas><p id="before-note">Original E1.SHP frames and original DOS palette.</p></article>
+ <article class="pane"><div class="pane-heading"><h2>After <small>SNES-style</small></h2><span id="after-count"></span></div><div class="after-stage"><canvas id="after" aria-label="Redesigned Minigunner animation"></canvas><div id="missing" hidden><strong>Replacement frames pending</strong><p>This action is available on the original side.<br>The redesign does not yet have this sequence.</p></div></div><p id="after-note"></p></article>
+</main>
+<footer>
+ <div class="transport"><label for="frame">Frame</label><input id="frame" aria-label="Animation frame" type="range" min="0" max="5" value="0" step="1"><output id="frame-readout">1 / 6</output></div>
+ <p id="caption" aria-live="polite">Loading sprite frames…</p>
+ <details><summary>Source sheets and playback</summary><p>Both sides share cycle progress and the same game-space origin. The redraw uses native pixels at twice the source density and a fixed palette. Running uses six distinct gait stages per facing and the original7.5fps baseline; standing fire uses its original eight stages and15fps baseline. The speed selector adjusts both equally. Preview playback repeats one-shot actions for comparison; this repeat is not an extra in-game motion.</p><p>All 31 original action entries now have comparisons. Run and Gesture1 retain the exact approved v14 artwork. The 380 newly authored slots cover prone movement, transitions, prone fire, idles, melee, deaths and remaining gestures; these await your artistic approval. Fixed-camera boxing has West/East views. The redesign holds the final ready/corpse pose where the DOS table overlaps the next action.</p><nav><a href="infantry-designs-v07/">Infantry design review</a><a href="data/minigunner-design-v01.png" target="_blank">Design v01</a><a href="data/e1-motion-v15.png" target="_blank">Complete native sheet v15</a><a href="data/e1-dos.png" target="_blank">All 532 original frames</a></nav></details>
+</footer>
+<script type="module" src="sprites.mjs?v=15"></script></body></html>

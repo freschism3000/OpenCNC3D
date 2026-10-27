@@ -79,7 +79,7 @@ def assemble():
  bpy.data.collections['QA_PaintLayout_NONEXPORT'].hide_render=True
  bpy.data.collections['PROC_High_v04_NONEXPORT_BAKE_SOURCE'].hide_render=True
  assert geometry_hash(objects)==fingerprint
- s['material_trial_scope']='Six representative receivers only; remaining surfaces retain provisional ID materials. Awaiting user material approval.'
+ s['material_trial_scope']='Six representative receivers only; remaining surfaces retain provisional ID materials. Awaiting design-review material approval.'
  s['material_trial_geometry_hash']=fingerprint
  s.render.engine='CYCLES';s.cycles.device='CPU';s.render.threads_mode='FIXED';s.render.threads=4
  bpy.ops.wm.save_as_mainfile(filepath=str(DEST),compress=True)

@@ -11,6 +11,12 @@ additions) or measured against the original data. Line numbers are that checkout
 > code wins and the changelog says what landed. Sections 6 and 7 are kept as written
 > because the reasoning is still the reason each piece is the shape it is.
 
+**19 October 2026 amendment:** both games now implement Easy, Normal, Hard and
+Expert as equal-rule behavioral policies, selectable per computer in the Classic
+and Enhanced lobbies. The historical statements below about unavailable AI
+settings are superseded by `docs/design-fair-skirmish-ai.md`, including its
+knowledge, economy, save and multiplayer contracts.
+
 **This is no longer only a code read.** `brain/host/skirmish_probe.cpp` drives the shipped
 `playable/TiberianDawn.dylib` through the exact call sequence in section 3, on the retail
 skirmish map SCM01EA extracted from the 1995 disc, and everything below marked MEASURED came

@@ -1,0 +1,5 @@
+launcher/lcfg.h: v0.8.7+0de6040-dirty, builds from opencnc3d.com
+built ./opencnc3d-launcher
+bundle-sdl: opencnc3d-launcher -> @executable_path/libSDL2-2.0.0.dylib
+bundle-sdl: $REPO/launcher is self-contained (libSDL2-2.0.0.dylib + libSDL3.dylib)
+built ./opencnc3d-launch (the .app executable)

@@ -273,7 +273,14 @@ static bool c3d_green_on(void)
    and one additive blend. */
 struct EcurTex  { int w, h; std::vector<unsigned char> px; };
 struct EcurTri  { int tex; unsigned char mode, part; PackVert v[3]; };
-struct EcurMesh { std::string name; std::vector<EcurTri> tris; };
+struct EcurMesh {
+    std::string name; std::vector<EcurTri> tris;
+    /* version 2 only (Red Alert's file, below): the model's own part count, whether it
+       turns, its flipbook's frame count and sequence over one clock cycle, and its tracks */
+    int nparts = 0, flags = 0, nflip = 0, animFrames = 0;
+    std::vector<unsigned char> seq;
+    std::vector<float> animMat;
+};
 static std::vector<EcurTex>  g_ecurTex;
 static std::vector<EcurMesh> g_ecurFile;
 static bool g_ecurLoaded = false;
@@ -288,17 +295,67 @@ static int  g_ecurAttached = 0;
 /* Move markers drawn from the remastered rings (draw_order_marks), for the gate. */
 static int  g_ecurMarkDraws = 0;
 
-static void ecur_load(const char* dir)
+/* ---- RED ALERT'S OWN REMASTERED CURSORS (Enhanced, Red Alert only) ------------------
+   Red Alert has twenty-eight mouse states to Tiberian Dawn's twenty. Twenty-two of them
+   are drawn with models already in ecur.bin (ten reuse an approved cursor as it is, six
+   are a reused cursor held still under the no-entry sign, the cartridge's overlay rule);
+   six are models of Red Alert's own, in ecur/ecur_ra.bin under the module's folder, baked
+   by tools/art/remaster/ra/bake_ecur_ra.py from the Red Alert lab and committed:
+
+     GREPAIR        the repair spanner in gold, turning as the steel one does
+     DAMAGE         the enter arrows in red, chasing as they do (a three-frame flipbook)
+     CHRONO_SELECT  the select brackets in green, held still and pulsing (a flipbook)
+     HEAL           a silver disc and a red cross, pulsing against each other (a flipbook)
+     CHRONO_DEST    the move cursor with two green rings closing on it (its own tracks)
+     RADAR_CURSOR   the view frame drawn over the radar map, in the sidebar
+
+   None of them was rebuilt from a cartridge model that moves the way it should, so none
+   borrows a cartridge mesh's animation as ecur.bin's models do: each carries its own part
+   count, its turn, its flipbook's sequence over the clock's 100 frames and its tracks,
+   and is attached with a part table of its own. They take model codes past the
+   cartridge's (C3D_RA_FIRST on), so every path that draws a cursor by its code (the body,
+   its shadow, the overlay, the spin) draws them with no second draw path. Tiberian Dawn
+   never loads the file and never reaches a code past 0x0E. */
+#define C3D_RA_FIRST          0x10
+#define C3D_RA_GREPAIR        0x10
+#define C3D_RA_DAMAGE         0x11
+#define C3D_RA_CHRONO_SELECT  0x12
+#define C3D_RA_HEAL           0x13
+#define C3D_RA_CHRONO_DEST    0x14
+#define C3D_RA_RADAR          0x15
+#define C3D_RA_N              6
+#define C3D_RA_MAXFLIP        8
+static const char* const C3D_RA_NAME[C3D_RA_N] = {
+    "GREPAIR", "DAMAGE", "CHRONO_SELECT", "HEAL", "CHRONO_DEST", "RADAR_CURSOR" };
+/* What each draws where the file is absent or Enhanced is off: the cartridge model its
+   shape came from (the heal cursor has none, and takes the plain pointer; the radar frame
+   is never drawn in the world). */
+static const int C3D_RA_CART[C3D_RA_N] = { 0x05, 0x0B, 0x03, 0x00, 0x01, -1 };
+static std::vector<EcurTex>  g_ecurRaTex;
+static std::vector<EcurMesh> g_ecurRaFile;
+static bool g_ecurRaLoaded = false;
+/* per model: its appended pack mesh for each flipbook frame (frame 0 is the model's own),
+   its frame count and sequence, whether it turns; the run of pack meshes they occupy */
+static int  g_ecurRaMesh[C3D_RA_N][C3D_RA_MAXFLIP];
+static int  g_ecurRaFlipN[C3D_RA_N];
+static const EcurMesh* g_ecurRaDoc[C3D_RA_N];
+static int  g_ecurRaFirst = -1, g_ecurRaEnd = -1;
+static int  g_ecurRaAttached = 0;
+
+static bool ecur_ra_is(int mi)
 {
-    if (g_ecurLoaded) return;
-    g_ecurLoaded = true;
-    char path[512];
-    snprintf(path, sizeof path, "%secur/ecur.bin", dir && *dir ? dir : "");
+    return g_ecurRaFirst >= 0 && mi >= g_ecurRaFirst && mi < g_ecurRaEnd;
+}
+
+/* One cursor file, read whole: 0 read, 1 missing, 2 refused (short, foreign, or another
+   version than `want`). Version 1 is Tiberian Dawn's ecur.bin; version 2 is Red Alert's
+   ecur_ra.bin, whose meshes carry their own parts, turn, flipbook and tracks after their
+   triangles (tools/art/remaster/ra/bake_ecur_ra.py has the layout). */
+static int ecur_read(const char* path, unsigned int want, std::vector<EcurTex>& texs,
+                     std::vector<EcurMesh>& meshes)
+{
     FILE* f = fopen(path, "rb");
-    if (!f) {
-        fprintf(stderr, "ecur: %s is missing -- Enhanced draws the cartridge's cursors\n", path);
-        return;
-    }
+    if (!f) return 1;
     std::vector<unsigned char> b;
     {
         unsigned char buf[65536];
@@ -315,7 +372,7 @@ static void ecur_load(const char* dir)
     if (memcmp(&b[0], "ECUR", 4)) { bad = true; goto done; }
     memcpy(&ver, &b[4], 4); memcpy(&ntex, &b[8], 4); memcpy(&nmesh, &b[12], 4);
     o = 16;
-    if (ver != 1 || ntex > 256 || nmesh > 256) { bad = true; goto done; }
+    if (ver != want || ntex > 256 || nmesh > 256) { bad = true; goto done; }
     for (unsigned int t = 0; t < ntex; t++) {
         unsigned short w, h;
         ECUR_NEED(4);
@@ -325,7 +382,7 @@ static void ecur_load(const char* dir)
         {
             EcurTex tx; tx.w = w; tx.h = h;
             tx.px.assign(b.begin() + o, b.begin() + o + (size_t)w * h * 4);
-            g_ecurTex.push_back(tx);
+            texs.push_back(tx);
         }
         o += (size_t)w * h * 4;
     }
@@ -351,14 +408,50 @@ static void ecur_load(const char* dir)
                 o += 24;
             }
         }
-        g_ecurFile.push_back(em);
+        if (ver == 2) {
+            ECUR_NEED(6);
+            em.nparts = b[o]; em.flags = b[o + 1]; em.nflip = b[o + 2];
+            unsigned short nseq; memcpy(&nseq, &b[o + 4], 2); o += 6;
+            ECUR_NEED(nseq);
+            em.seq.assign(b.begin() + o, b.begin() + o + nseq); o += nseq;
+            ECUR_NEED(4);
+            unsigned short na; memcpy(&na, &b[o], 2); o += 4;
+            em.animFrames = na;
+            const size_t nf = (size_t)na * (size_t)em.nparts * 12;
+            ECUR_NEED(nf * 4);
+            em.animMat.resize(nf);
+            if (nf) memcpy(&em.animMat[0], &b[o], nf * 4);
+            o += nf * 4;
+            for (size_t t = 0; t < em.tris.size(); t++)
+                if ((int)em.tris[t].part >= em.nparts) { bad = true; goto done; }
+            for (size_t k = 0; k < em.seq.size(); k++)
+                if ((int)em.seq[k] >= (em.nflip > 0 ? em.nflip : 1)) { bad = true; goto done; }
+        }
+        meshes.push_back(em);
     }
 done:
     #undef ECUR_NEED
     if (bad || o != b.size()) {
+        meshes.clear(); texs.clear();
+        return 2;
+    }
+    return 0;
+}
+
+static void ecur_load(const char* dir)
+{
+    if (g_ecurLoaded) return;
+    g_ecurLoaded = true;
+    char path[512];
+    snprintf(path, sizeof path, "%secur/ecur.bin", dir && *dir ? dir : "");
+    const int r = ecur_read(path, 1, g_ecurTex, g_ecurFile);
+    if (r == 1) {
+        fprintf(stderr, "ecur: %s is missing -- Enhanced draws the cartridge's cursors\n", path);
+        return;
+    }
+    if (r == 2) {
         fprintf(stderr, "ecur: %s is not a cursor file this renderer reads -- refused, "
                         "Enhanced draws the cartridge's cursors\n", path);
-        g_ecurFile.clear(); g_ecurTex.clear();
         return;
     }
     size_t ntris = 0;
@@ -434,7 +527,7 @@ static void ecur_attach(void)
         pt.h = pt.uh = g_ecurTex[t].h;
         pt.gl = ecur_upload(g_ecurTex[t]);
         pt.gl_gdi = 0;
-        for (int e = 0; e < 6; e++) pt.gl_extra[e] = 0;
+        for (int e = 0; e < 7; e++) pt.gl_extra[e] = 0;
         g_pack.tex.push_back(pt);
     }
     for (size_t m = 0; m < g_ecurFile.size(); m++) {
@@ -496,6 +589,122 @@ static void ecur_attach(void)
     fflush(stdout);
 }
 
+/* Red Alert's file, read once, for the Red Alert module only. */
+static void ecur_ra_load(const char* dir)
+{
+    if (!g_raModule || g_ecurRaLoaded) return;
+    g_ecurRaLoaded = true;
+    char path[512];
+    snprintf(path, sizeof path, "%sra3d/ecur/ecur_ra.bin", dir && *dir ? dir : "");
+    const int r = ecur_read(path, 2, g_ecurRaTex, g_ecurRaFile);
+    if (r) {
+        fprintf(stderr, "ecur: %s is %s -- Red Alert draws its own six cursors with the "
+                        "cartridge models they came from\n", path,
+                r == 1 ? "missing" : "not a cursor file this renderer reads");
+        return;
+    }
+    size_t ntris = 0;
+    for (size_t m = 0; m < g_ecurRaFile.size(); m++) ntris += g_ecurRaFile[m].tris.size();
+    printf("ECURRA|loaded|meshes %d|textures %d|triangles %d\n", (int)g_ecurRaFile.size(),
+           (int)g_ecurRaTex.size(), (int)ntris);
+    fflush(stdout);
+}
+
+/* After ecur_attach: append Red Alert's textures and models, each with a part table of its
+   own (every pivot at the hot spot: nothing turns about a part) and its own tracks. A
+   flipbook model's frames are <NAME>F1.. beside <NAME>, its frame 0. */
+static void ecur_ra_attach(void)
+{
+    for (int r = 0; r < C3D_RA_N; r++) {
+        for (int f = 0; f < C3D_RA_MAXFLIP; f++) g_ecurRaMesh[r][f] = -1;
+        g_ecurRaFlipN[r] = 0;
+        g_ecurRaDoc[r] = NULL;
+    }
+    g_ecurRaFirst = g_ecurRaEnd = -1;
+    g_ecurRaAttached = 0;
+    if (!g_raModule || g_ecurRaFile.empty()) return;
+    const int tex0 = (int)g_pack.tex.size();
+    for (size_t t = 0; t < g_ecurRaTex.size(); t++) {
+        PackTex pt;
+        pt.w = pt.uw = g_ecurRaTex[t].w;
+        pt.h = pt.uh = g_ecurRaTex[t].h;
+        pt.gl = ecur_upload(g_ecurRaTex[t]);
+        pt.gl_gdi = 0;
+        for (int e = 0; e < 7; e++) pt.gl_extra[e] = 0;
+        g_pack.tex.push_back(pt);
+    }
+    g_ecurRaFirst = (int)g_pack.mesh.size();
+    for (size_t m = 0; m < g_ecurRaFile.size(); m++) {
+        const EcurMesh& em = g_ecurRaFile[m];
+        int r = -1, fr = 0;
+        for (int k = 0; k < C3D_RA_N && r < 0; k++) {
+            const size_t n = strlen(C3D_RA_NAME[k]);
+            if (em.name == C3D_RA_NAME[k]) r = k;
+            else if (em.name.size() > n + 1 && !em.name.compare(0, n, C3D_RA_NAME[k])
+                     && em.name[n] == 'F' && sscanf(em.name.c_str() + n + 1, "%d", &fr) == 1
+                     && fr > 0 && fr < C3D_RA_MAXFLIP) r = k;
+        }
+        if (r < 0) continue;
+        if (em.name == C3D_RA_NAME[r]) fr = 0;
+        PackMesh pm;
+        memset(pm.name, 0, sizeof pm.name);
+        snprintf(pm.name, sizeof pm.name, "E%s", em.name.c_str());
+        pm.tris.resize(em.tris.size());
+        for (size_t t = 0; t < em.tris.size(); t++) {
+            const EcurTri& et = em.tris[t];
+            PackTri& pt = pm.tris[t];
+            pt.tex = et.tex >= 0 ? tex0 + et.tex : -1;
+            pt.mode = et.mode;
+            pt.wrap = 0;
+            for (int k = 0; k < 3; k++) pt.v[k] = et.v[k];
+        }
+        /* the file sorts its triangles by part, so each part is one run */
+        for (int p = 0; p < em.nparts; p++) {
+            PackPart pp;
+            pp.role = ROLE_STATIC;
+            pp.px = pp.py = pp.pz = 0.0f;
+            int first = -1, n = 0;
+            for (size_t t = 0; t < em.tris.size(); t++)
+                if (em.tris[t].part == p) { if (first < 0) first = (int)t; n++; }
+            if (first < 0) {
+                first = 0;
+                for (size_t t = 0; t < em.tris.size(); t++)
+                    if (em.tris[t].part < p) first = (int)t + 1;
+            }
+            pp.tri0 = first; pp.ntris = n;
+            pm.parts.push_back(pp);
+        }
+        if (fr == 0 && em.animFrames > 0) {
+            pm.animFrames = em.animFrames;
+            pm.animTicksPerFrame = 1;
+            PackClip c; c.t0 = 0; c.t1 = em.animFrames; c.loop = 1;
+            pm.clips.push_back(c);
+            pm.animMat = em.animMat;
+        }
+        g_pack.mesh.push_back(pm);
+        g_ecurRaMesh[r][fr] = (int)g_pack.mesh.size() - 1;
+        if (fr == 0) {
+            g_ecurRaDoc[r] = &em;
+            g_ecurRaFlipN[r] = em.nflip > 0 ? em.nflip : 1;
+        }
+        g_ecurRaAttached++;
+    }
+    g_ecurRaEnd = (int)g_pack.mesh.size();
+    /* a model missing a frame its flipbook names is drawn as its frame 0 throughout,
+       rather than on a sequence that points at nothing */
+    for (int r = 0; r < C3D_RA_N; r++)
+        for (int f = 1; f < g_ecurRaFlipN[r]; f++)
+            if (g_ecurRaMesh[r][f] < 0) {
+                fprintf(stderr, "ecur: Red Alert's %s lacks flipbook frame %d -- drawn still\n",
+                        C3D_RA_NAME[r], f);
+                g_ecurRaFlipN[r] = 1;
+                break;
+            }
+    printf("ECURRA|attached|%d of %d Red Alert cursor meshes\n", g_ecurRaAttached,
+           (int)g_ecurRaFile.size());
+    fflush(stdout);
+}
+
 /* Drawn under Enhanced with experimental art off, when its own row is on. */
 static bool ecur_on(void)
 {
@@ -506,8 +715,9 @@ static bool ecur_on(void)
 /* Whether a pack mesh is one of the remastered cursors appended above. */
 static bool ecur_is(int mi)
 {
-    return mi >= 0 && mi < (int)g_pack.mesh.size() && g_pack.mesh[mi].name[0] == 'E'
-           && !strncmp(g_pack.mesh[mi].name + 1, "CUR", 3);
+    return mi >= 0 && mi < (int)g_pack.mesh.size()
+           && ((g_pack.mesh[mi].name[0] == 'E' && !strncmp(g_pack.mesh[mi].name + 1, "CUR", 3))
+               || ecur_ra_is(mi));
 }
 
 /* The size of a remastered model against the cartridge model it stands in for (its own
@@ -548,6 +758,20 @@ static bool g_c3dAnim = true;    /* the animation's own control leg */
    animated states (deploy, the superweapons) need game situations no shipped mission can
    reach on demand, and a cursor that cannot be put on screen cannot be asserted. */
 static int  g_c3dForceState = -1;
+/* Red Alert's counterpart, by MouseType rather than by cartridge state (Red Alert has no
+   cartridge states): -1 follows the engine, >= 0 draws that mouse state. The heal, damage
+   and chronosphere cursors need situations no shipped mission reaches on demand either. */
+static int  g_c3dForceMouse = -1;
+/* What the last world draw did at the map's edge, for the dump: the arrow's facing (-1 no
+   arrow) and whether the view could not scroll that way (Red Alert's NO_SCROLL). */
+static int  g_c3dEdgeFace = -1;
+static bool g_c3dEdgeBlocked = false;
+/* Red Alert's radar frame drawn over the radar map in the sidebar, counted for the gate. */
+static int  g_c3dOverlayDraws = 0;
+/* Whether the view can scroll any further toward (dx, dz), a world direction in cells:
+   the camera's own clamp, asked by moving its target and putting it back. Defined in
+   cnc_eyes.cpp beside the clamp it asks. */
+static bool c3d_cam_blocked(float dx, float dz);
 
 static void c3d_init(void)
 {
@@ -600,6 +824,7 @@ static void c3d_init(void)
     if (g_c3dUsable) {
         c3d_green_add();
         ecur_attach();
+        ecur_ra_attach();
         int nanim = 0;
         for (int i = 0; i < 14; i++)
             if (g_c3dMesh[i] >= 0 && g_pack.mesh[g_c3dMesh[i]].animFrames > 0)
@@ -672,7 +897,9 @@ static int c3d_screen_face(int face)
 
 static int c3d_spin_face(int code, int frame)
 {
-    if (code != C3D_WRENCH_CODE || frame < 0)
+    /* Red Alert's ground-repair spanner turns by the same law: it is the same spanner in
+       gold, and its state row carries the same 100 frames (c3d_ra_row). */
+    if ((code != C3D_WRENCH_CODE && code != C3D_RA_GREPAIR) || frame < 0)
         return -1;
     const int frames = C3D_STATE[C3D_WRENCH_STATE][2];
     if (frames <= 1)
@@ -715,8 +942,29 @@ static int c3d_flip_index(int code, int frame)
 /* The mesh a cursor code draws this frame: the flipbook variant for the two flipbook
    cursors, the green pointer for code 0x00 when it is on, else the pack's own. One
    function so the body and its shadow cannot pick different models. */
+static int c3d_mesh_for(int code, int frame);
+
+/* RED ALERT'S MODEL CODES. Under Enhanced with its file attached: the model's flipbook frame
+   for this clock frame (its own sequence over the cycle; frame 0 when the state does not
+   animate). Otherwise the cartridge model its shape came from, by the ordinary rule. */
+static int c3d_ra_mesh_for(int code, int frame)
+{
+    const int r = code - C3D_RA_FIRST;
+    if (r < 0 || r >= C3D_RA_N) return -1;
+    if (ecur_on() && g_ecurRaMesh[r][0] >= 0) {
+        int k = 0;
+        const EcurMesh* d = g_ecurRaDoc[r];
+        if (g_ecurRaFlipN[r] > 1 && frame >= 0 && d && !d->seq.empty())
+            k = d->seq[(size_t)frame % d->seq.size()];
+        if (k >= g_ecurRaFlipN[r] || g_ecurRaMesh[r][k] < 0) k = 0;
+        return g_ecurRaMesh[r][k];
+    }
+    return C3D_RA_CART[r] >= 0 ? c3d_mesh_for(C3D_RA_CART[r], frame) : -1;
+}
+
 static int c3d_mesh_for(int code, int frame)
 {
+    if (code >= C3D_RA_FIRST) return c3d_ra_mesh_for(code, frame);
     if (code == 0x00 && c3d_green_on()) return g_c3dGreenMesh;
     int mi = g_c3dMesh[code];
     int fi = -1;
@@ -843,8 +1091,13 @@ static void c3d_draw_shadow(int code, float wx, float wz, int frame)
     /* The throw is in world leptons, so it takes the pointer's zoom factor too, or the
        shadow would drift away from a pointer held at constant size. 1 at the default
        distance and always under Classic. */
-    const float ox = g_c3dShadowOff / 256.0f * g_c3dZoomK;
-    const float oz = -g_c3dShadowOff / 256.0f * g_c3dZoomK;
+    /* Enhanced cursors can be much smaller than their cartridge counterparts.
+       Their old world-space throw ignored both size dials, leaving a detached
+       silhouette. Keep the shadow close and scale its throw with the same body. */
+    const float throwScale = g_fx.enabled
+        ? 0.25f * g_fx.cursor_scale * c3d_green_rescale(code) * ecur_rescale(mi) : 1.0f;
+    const float ox = g_c3dShadowOff / 256.0f * g_c3dZoomK * throwScale;
+    const float oz = -g_c3dShadowOff / 256.0f * g_c3dZoomK * throwScale;
     /* THE SPIN REACHES THE SILHOUETTE, for exactly the reason the animation time above
        does: a wrench that turned while its shadow lay still would be the same defect in
        a different channel. Same call, same argument, so the two cannot drift. */
@@ -911,7 +1164,7 @@ enum C3dDepth {
 static void c3d_draw_one(int code, float wx, float wz, int frame,
                          float ylift, C3dDepth depth, bool marker)
 {
-    if (code < 0 || code >= 14) return;
+    if (code < 0 || (code >= 14 && (code < C3D_RA_FIRST || code >= C3D_RA_FIRST + C3D_RA_N))) return;
     /* A flipbook cursor draws one of its per-frame variants instead of the base mesh;
        the variants differ only in the image the G_SETTIMG address selects, which is
        exactly what the console's texture animation rewrites. The green pointer replaces
@@ -1010,6 +1263,71 @@ static int c3d_state_now(int mousetype)
 {
     return (g_c3dForceState >= 0 && g_c3dForceState < 20) ? g_c3dForceState
                                                           : c3d_state_for_mouse(mousetype);
+}
+
+/* ---- RED ALERT'S STATE TABLE ---------------------------------------------------------
+   Red Alert's MouseType (redalert/defines.h) is longer than Tiberian Dawn's and ordered
+   differently past the shared head; cursors.h carries its extra states after Tiberian
+   Dawn's in the one enum the host speaks, and this is the table that turns each into what
+   the cartridge's state rows hold: the model, the frame count of its clock (1 still, 100 a
+   cycle) and the no-entry overlay flag. The fifteen states Red Alert shares with Tiberian
+   Dawn take Tiberian Dawn's own row, as the cross-reference approved them (the same move,
+   no-move, deploy, attack, sell, repair, nuke, air strike, demolitions and area guard; the
+   sell-unit dollar is the gold one, as on the cartridge). The rest:
+
+     HEAL           its own disc and cross, pulsing          100
+     DAMAGE         its own red arrows, chasing              100
+     GREPAIR        its own gold spanner, turning            100
+     STAY_ATTACK    the attack cursor (CUR04)                100
+     NO_DEPLOY      the deploy diamond (CUR06), still, under the sign
+     NO_ENTER       the enter arrows (CUR0B), still, under the sign
+     NO_GREPAIR     the gold spanner, still, under the sign
+     CHRONO_SELECT  its own green brackets, pulsing          100
+     CHRONO_DEST    the move cursor and its closing rings    100
+     RADAR_CURSOR   its own frame, drawn over the radar map (c3d_ra_overlay), never on the
+                    ground
+
+   The refused cursors are the cartridge's own rule (state rows 14, 15 and 19): the model
+   held still with the no-entry sign drawn over it. NO_SCROLL is not a row: the scroll arrow
+   is chosen by where the cursor stands, and c3d_draw_body answers it at the map's edge. */
+static void c3d_ra_row(int mt, int* code, int* frames, int* noentry)
+{
+    *frames = 1; *noentry = 0;
+    switch (mt) {
+    case MOUSE_HEAL:          *code = C3D_RA_HEAL;          *frames = 100; return;
+    case MOUSE_DAMAGE:        *code = C3D_RA_DAMAGE;        *frames = 100; return;
+    case MOUSE_GREPAIR:       *code = C3D_RA_GREPAIR;       *frames = 100; return;
+    case MOUSE_STAY_ATTACK:   *code = 0x04;                 *frames = 100; return;
+    case MOUSE_NO_DEPLOY:     *code = 0x06;                 *noentry = 1;  return;
+    case MOUSE_NO_ENTER:      *code = 0x0B;                 *noentry = 1;  return;
+    case MOUSE_NO_GREPAIR:    *code = C3D_RA_GREPAIR;       *noentry = 1;  return;
+    case MOUSE_CHRONO_SELECT: *code = C3D_RA_CHRONO_SELECT; *frames = 100; return;
+    case MOUSE_CHRONO_DEST:   *code = C3D_RA_CHRONO_DEST;   *frames = 100; return;
+    case MOUSE_RADAR_CURSOR:  *code = C3D_RA_RADAR;                        return;
+    default: {
+        const int st = c3d_state_for_mouse(mt);
+        *code = C3D_STATE[st][0]; *frames = C3D_STATE[st][2]; *noentry = C3D_STATE[st][3];
+        return;
+    }
+    }
+}
+
+static int c3d_ra_mouse_now(int mousetype)
+{
+    return (g_c3dForceMouse >= 0 && g_c3dForceMouse < MOUSE_TYPE_COUNT) ? g_c3dForceMouse
+                                                                        : mousetype;
+}
+
+/* The row this draw uses: Red Alert's table in the Red Alert module, the cartridge's
+   twenty states everywhere else. One place, so the dump and the draw agree. */
+static void c3d_row_now(int mousetype, int* code, int* frames, int* noentry)
+{
+    if (g_raModule) {
+        c3d_ra_row(c3d_ra_mouse_now(mousetype), code, frames, noentry);
+        return;
+    }
+    const int st = c3d_state_now(mousetype);
+    *code = C3D_STATE[st][0]; *frames = C3D_STATE[st][2]; *noentry = C3D_STATE[st][3];
 }
 
 /* THE SCREEN-EDGE SCROLL ARROW, transcribed from ROM 0x4D504..0x4D620.
@@ -1184,6 +1502,8 @@ static void c3d_draw_body(int mousetype, float wx, float wz)
            model_face_bias in the way, so what c3d_edge_face returns is what the model turns
            by. */
         const int face = c3d_edge_face(wx, wz);
+        g_c3dEdgeFace = face;
+        g_c3dEdgeBlocked = false;
         if (face >= 0) {
             glColor3f(1.0f, 1.0f, 1.0f);
             if (g_c3dOnTop) { glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE); }
@@ -1195,24 +1515,95 @@ static void c3d_draw_body(int mousetype, float wx, float wz)
             ecur_glow(em, wx, wz, face, 0.012f, -1.0f);
             MODEL_SCALE = esave;
             if (g_c3dOnTop) { glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); }
+            /* RED ALERT'S NO_SCROLL: the view cannot go any further the way the arrow
+               points, so the arrow is refused as the cartridge refuses a cursor, held still
+               with the no-entry sign over it. The arrow points the way the cartridge's
+               counter-clockwise degrees say (0 north, 90 west), which in world cells is
+               (-sin, -cos). Tiberian Dawn keeps the plain arrow, as the cartridge does. */
+            if (g_raModule) {
+                const float h = c3d_edge_heading(wx, wz) * (float)M_PI / 180.0f;
+                g_c3dEdgeBlocked = c3d_cam_blocked(-sinf(h), -cosf(h));
+                if (g_c3dEdgeBlocked)
+                    c3d_draw_one(C3D_NOENTRY_CODE, wx, wz, -1, C3D_CURSOR_LIFT,
+                                 g_c3dOnTop ? C3D_DEPTH_OVER_NO_DEPTH : C3D_DEPTH_TESTED, true);
+            }
             glDisable(GL_TEXTURE_2D);
             return;
         }
     }
 
-    const int st = c3d_state_now(mousetype);
-    const int frame = c3d_anim_frame(C3D_STATE[st][2]);
+    int code = 0, frames = 1, noentry = 0;
+    c3d_row_now(mousetype, &code, &frames, &noentry);
+    const int frame = c3d_anim_frame(frames);
     /* Shadow first, so the cursor body composites over it. Drawn once for the whole
        cursor rather than per model, or the no-entry ring would double the darkness. */
-    c3d_draw_shadow(C3D_STATE[st][0], wx, wz, frame);
+    c3d_draw_shadow(code, wx, wz, frame);
     glColor3f(1.0f, 1.0f, 1.0f);
     const C3dDepth pdepth = g_c3dOnTop ? C3D_DEPTH_OVER_NO_DEPTH : C3D_DEPTH_TESTED;
-    c3d_draw_one(C3D_STATE[st][0], wx, wz, frame, C3D_CURSOR_LIFT, pdepth, true);
+    c3d_draw_one(code, wx, wz, frame, C3D_CURSOR_LIFT, pdepth, true);
     /* The overlay ring is state 3's model, whose own state row carries frameCount 1: it
        is static on the cartridge and stays static here. */
-    if (C3D_STATE[st][3])              /* no-sell / no-repair: the ring goes on top */
+    if (noentry)                       /* no-sell / no-repair: the ring goes on top */
         c3d_draw_one(C3D_NOENTRY_CODE, wx, wz, -1, C3D_CURSOR_LIFT, pdepth, true);
     glDisable(GL_TEXTURE_2D);
+}
+
+/* RED ALERT'S RADAR FRAME, OVER THE RADAR MAP. The pointer over the sidebar is a sprite
+   everywhere else (the console has no cursor there), and over Red Alert's radar map the
+   1996 game shows its radar cursor, a white frame. Under Enhanced the remastered frame is
+   drawn in its place: the same model, seen from the game camera's own tilt (55 degrees
+   down, from the south) in a pixel-space orthographic view, as large as the 1996 sprite
+   it replaces (pxPerCell is the sprite's 24 pixels a cell times its magnification), its
+   hot spot on the pointer. Depth is off and the body and glow land in the order the bake
+   sorted them, as the world pointer's do on top. Fixed function: two matrices, the
+   ordinary mesh draw and the additive glow. False when there is nothing of Red Alert's to
+   draw, and the caller then draws the sprite. */
+static bool c3d_ra_overlay(int code, float col, float row, float pxPerCell, int fbw, int fbh)
+{
+    if (!c3d_have() || pxPerCell <= 0.0f) return false;
+    const int mi = c3d_mesh_for(code, -1);
+    if (mi < 0 || !ecur_ra_is(mi)) return false;
+    const float ax = (float)g_mapX + 0.5f, az = (float)g_mapY + 0.5f;
+    const float ay = terrain_y(ax, az) + C3D_CURSOR_LIFT;
+    const float t = 55.0f * (float)M_PI / 180.0f, c = cosf(t), sn = sinf(t);
+    /* world (x east, y up, z south) to screen (x right, y down): column-major */
+    const GLfloat tilt[16] = { 1.0f, 0.0f, 0.0f, 0.0f,
+                               0.0f, -c,   -sn,  0.0f,
+                               0.0f, sn,   -c,   0.0f,
+                               0.0f, 0.0f, 0.0f, 1.0f };
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0.0, (double)fbw, (double)fbh, 0.0, -4096.0, 4096.0);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    glTranslatef(col, row, 0.0f);
+    glScalef(pxPerCell, pxPerCell, pxPerCell);
+    glMultMatrixf(tilt);
+    glTranslatef(-ax, -ay, -az);
+    const GLboolean depth = glIsEnabled(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    const float save = MODEL_SCALE;
+    const bool noShroud = g_meshNoShroud;    /* a sidebar picture: no fog of war on it */
+    g_meshNoShroud = true;
+    MODEL_SCALE = 1.0f / 1024.0f;
+    draw_mesh(mi, ax, az, -1, MODE_OPAQUE, 0, 0.0f, 0, 1.0f, C3D_CURSOR_LIFT, true,
+              WOBBLE_NONE, -1.0f);
+    ecur_glow(mi, ax, az, -1, C3D_CURSOR_LIFT, -1.0f);
+    MODEL_SCALE = save;
+    g_meshNoShroud = noShroud;
+    glDepthMask(GL_TRUE);
+    if (depth) glEnable(GL_DEPTH_TEST);
+    glDisable(GL_TEXTURE_2D);
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    g_c3dOverlayDraws++;
+    return true;
 }
 
 /* What the cursor animation is ACTUALLY doing this frame, straight out of the pack and
@@ -1220,9 +1611,12 @@ static void c3d_draw_body(int mousetype, float wx, float wz)
    "the camera moved", and an exit code cannot tell either: the per-node delta printed
    here is the same array draw_mesh multiplies the vertices by, so a stationary cursor
    prints zeros no matter how green anything else is. */
+static void c3d_ra_dump(int mousetype);
+
 static void c3d_dump(int mousetype)
 {
     if (!g_c3dReady) c3d_init();
+    if (g_raModule) { c3d_ra_dump(mousetype); return; }
     const int st = c3d_state_now(mousetype);
     const int code = C3D_STATE[st][0];
     const int frames = C3D_STATE[st][2];
@@ -1280,6 +1674,48 @@ static void c3d_dump(int mousetype)
                pi, p.tri0, p.ntris, p.px, p.py, p.pz,
                sqrtf(dx * dx + dy * dy + dz * dz), a[3], a[7], a[11]);
     }
+}
+
+/* Red Alert's line: the mouse state (forced or the engine's), the row it took, the mesh
+   drawn for it this frame and whether that mesh is a remastered one (ecur) and Red Alert's
+   own (own), the flipbook frame of its count, the spanner's facing, the body and glow
+   triangles, and what the last world draw did at the map's edge. A model with tracks
+   prints each part's scale this frame. */
+static void c3d_ra_dump(int mousetype)
+{
+    const int mt = c3d_ra_mouse_now(mousetype);
+    int code = 0, frames = 1, noentry = 0;
+    c3d_ra_row(mt, &code, &frames, &noentry);
+    const int frame = c3d_anim_frame(frames);
+    const int mi = c3d_mesh_for(code, frame);
+    int flip = -1, nflip = 0;
+    if (code >= C3D_RA_FIRST && code < C3D_RA_FIRST + C3D_RA_N) {
+        const int r = code - C3D_RA_FIRST;
+        nflip = g_ecurRaFlipN[r];
+        for (int k = 0; k < C3D_RA_MAXFLIP; k++)
+            if (g_ecurRaMesh[r][k] == mi && mi >= 0) { flip = k; break; }
+    }
+    int body = 0, glow = 0;
+    if (mi >= 0)
+        for (size_t t = 0; t < g_pack.mesh[mi].tris.size(); t++)
+            (g_pack.mesh[mi].tris[t].mode == MODE_XLU ? glow : body)++;
+    printf("CURSOR3DRA|mouse=%s|forced=%d|code=0x%02X|frames=%d|frame=%d|noentry=%d|mesh=%s"
+           "|ecur=%d|own=%d|flip=%d/%d|spin=%d|body=%d|glow=%d|animframes=%d|size=%.4f"
+           "|attached=%d|edge=%d|blocked=%d|overlays=%d\n",
+           cur_name(mt), g_c3dForceMouse >= 0 ? 1 : 0, code, frames, frame, noentry,
+           mi >= 0 ? g_pack.mesh[mi].name : "-", ecur_is(mi) ? 1 : 0, ecur_ra_is(mi) ? 1 : 0,
+           flip, nflip, c3d_spin_face(code, frame), body, glow,
+           mi >= 0 ? g_pack.mesh[mi].animFrames : 0,
+           (g_fx.enabled ? g_fx.cursor_scale : 1.0f) * ecur_rescale(mi), g_ecurRaAttached,
+           g_c3dEdgeFace, g_c3dEdgeBlocked ? 1 : 0, g_c3dOverlayDraws);
+    if (mi < 0 || frame < 0 || g_pack.mesh[mi].animFrames <= 0) return;
+    const PackMesh& m = g_pack.mesh[mi];
+    const int np = (int)m.parts.size();
+    const int f = frame < m.animFrames ? frame : m.animFrames - 1;
+    if (m.animMat.size() < (size_t)m.animFrames * np * 12) return;
+    for (int pi = 0; pi < np; pi++)
+        printf("CURSOR3DRAPART|p=%d|ntris=%d|scale=%.3f\n", pi, m.parts[pi].ntris,
+               m.animMat[((size_t)f * np + pi) * 12]);
 }
 
 #endif /* CNC_CURSOR3D_H */

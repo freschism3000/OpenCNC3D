@@ -63,6 +63,7 @@
  * ================================================================================== */
 #ifndef OPENCNC3D_MODEL3D_MOD_H
 #define OPENCNC3D_MODEL3D_MOD_H
+#include "model_cloth_reference.h"
 
 /* ---- the file ---------------------------------------------------------------------
    Written by tools/art/blender_c3m.py, which carries the format's other half. Little
@@ -127,7 +128,7 @@ enum { M3_MAT_TREAD = 1 << 0, M3_MAT_NO_PLAYER = 1 << 1, M3_MAT_CLOTH = 1 << 2,
 
 struct M3Part { int role; float px, py, pz; char name[17]; };
 struct M3Sub  { int part, mat; unsigned idx0, nidx; };
-struct M3Mat  { int base, norm, orm; unsigned flags; };
+struct M3Mat  { int base, norm, orm; unsigned flags; float clothRef=0.0f; };
 struct M3Tex  { int w, h; std::vector<unsigned char> px; GLuint gl; };
 
 enum { M3_CLIP_LOOP = 1 << 0, M3_CLIP_LOCOMOTION = 1 << 1 };
@@ -153,6 +154,9 @@ struct M3Lod {
     std::vector<M3Sub> sub;
 };
 
+/* A bind/weight edit must get a fresh revision, even when it fits the existing
+   vector capacity. Pointer/size stamps below also catch appended corpse caps. */
+static unsigned long long g_m3PoseRevision = 0;
 struct M3Model {
     std::string type;
     std::vector<float>        vert;   /* 8 floats each: x y z nx ny nz u v */
@@ -176,6 +180,8 @@ struct M3Model {
     std::vector<float>        pose;
     /* version 3, finest first; empty for every model without levels */
     std::vector<M3Lod>        lod;
+    /* Bind/skin content identity for exact pose-cache lookups. */
+    unsigned long long poseRevision;
     /* WHICH LEVEL THE NEXT POSE AND DRAW USE: -1 the full mesh, else an index into lod.
        Set by the caller for one object and handed back to -1 after it. */
     int   drawLod;
@@ -196,9 +202,31 @@ struct M3Model {
        frame's pose cache (m3_pose_find), position and normal at 6 floats a vertex. Set by
        m3_skin and taken back to 0 by the draw that reads it; 0 draws posed. */
     const float* drawPosed;
-    M3Model() : drawLod(-1), uploaded(false), enh(false), vbo(0), ibo(0), drawPosed(0)
+    /* ...and which entry that is, so the draw can find the entry's GPU copy
+       (m3_pose_gpu). Read only while drawPosed is set, and checked against it. */
+    int drawPosedEnt;
+    /* A SKINNED MODEL'S FIXED HALF IN GPU MEMORY (m3_skin_buffers): the texture
+       coordinates, which no pose changes, in one buffer, and idx followed by each level's
+       list in another, level l starting at skinLodBase[l]. Built from vert and idx as they
+       stand, and built again if either has grown since: a torn body's ends and split seams
+       are appended to both (infdeath_mod.h ir_build_caps). skinTried stops a driver that
+       would not make the store from being asked again on every draw. */
+    GLuint skinUv, skinIbo;
+    size_t skinUvN, skinIdxN;
+    bool   skinTried;
+    std::vector<unsigned> skinLodBase;
+    M3Model() : poseRevision(++g_m3PoseRevision), drawLod(-1), uploaded(false), enh(false), vbo(0), ibo(0), drawPosed(0),
+                drawPosedEnt(-1), skinUv(0), skinIbo(0), skinUvN(0), skinIdxN(0),
+                skinTried(false)
     { memset(bb, 0, sizeof bb); }
 };
+
+static void m3_pose_model_changed(M3Model& m)
+{
+    m.poseRevision = ++g_m3PoseRevision;
+    m.drawPosed = 0;
+    m.drawPosedEnt = -1;
+}
 
 static std::vector<M3Model> g_m3;
 static bool g_m3Loaded = false;
@@ -307,6 +335,7 @@ static bool m3_read_one(const char* path, M3Model& m)
     FILE* f = fopen(path, "rb");
     if (!f)
         return false;
+    m3_pose_model_changed(m);
     char magic[8];
     if (fread(magic, 1, 8, f) != 8 || memcmp(magic, M3_MAGIC, 8) != 0) {
         fprintf(stderr, "model3d: %s is not a c3m model\n", path);
@@ -371,6 +400,19 @@ static bool m3_read_one(const char* path, M3Model& m)
         tx.px.resize(t[2]);
         if (t[2] && fread(&tx.px[0], 1, t[2], f) != t[2]) { fclose(f); return false; }
         m.tex.push_back(tx);
+    }
+    /* Cache each material's explicit masked fabric luminance once, while CPU pixels
+       are present. Only the guarded RA Allied draw opts into this reference. */
+    for (size_t i=0;i<m.mat.size();i++) {
+        M3Mat& mt=m.mat[i];
+        if (!(mt.flags&M3_MAT_CLOTH) || mt.base<0 || mt.orm<0 ||
+            mt.base>=(int)m.tex.size() || mt.orm>=(int)m.tex.size()) continue;
+        const M3Tex& base=m.tex[mt.base]; const M3Tex& orm=m.tex[mt.orm];
+        if (base.w<=0 || base.h<=0 || base.w!=orm.w || base.h!=orm.h) continue;
+        const size_t pixels=(size_t)base.w*(size_t)base.h;
+        if (base.px.size()/4!=pixels || orm.px.size()/4!=pixels ||
+            base.px.size()%4 || orm.px.size()%4) continue;
+        mt.clothRef=m3_cloth_reference_rgba(base.px.data(),orm.px.data(),pixels);
     }
     if (version >= 2u) {
         unsigned tail[4];
@@ -679,10 +721,12 @@ static const char* M3_FS =
     "uniform vec3  uLogo;\n"
     "uniform float uPlayerGain;\n"  /* the team plates' brightness; 1 on every vehicle */
     "uniform float uShroud;\n"      /* 0 lit, 1 fully in the shroud */
+    "uniform int uLightSplit;\n"
     "uniform float uFlash;\n"       /* the damage blush: 1 paints the whole hull white */
     "uniform float uNormalStr, uAoStr, uRoughMin, uSpecAmb, uGamma;\n"
     "uniform vec3  uTint;\n"        /* the shatter/wreck tint, 1,1,1 when unused */
     "uniform float uAlpha;\n"
+    FX_OBJECT_GRADE_GLSL
     "\n"
     /* THE TANGENT FRAME IS DERIVED, NOT DELIVERED. Screen-space derivatives of the
        world position and of the UV give a basis that matches the triangle's own
@@ -797,6 +841,7 @@ static const char* M3_FS =
        and a hull reads correctly in the light and glows in the shade. */
     "    const float INV_PI = 0.31830989;\n"
     "    vec3 lit = (diff * INV_PI + spec) * uSunCol * NoL;\n"
+    "    vec3 directLight = lit;\n"
     "\n"
     /* THE HEMISPHERE. Sky above, ground bounce below, the blend on the normal's own y.
        It is not an environment probe and does not pretend to be one; it exists because
@@ -823,9 +868,16 @@ static const char* M3_FS =
     "        lit += fa * amb * INV_PI * uSpecAmb * ao * mix(ao, 1.0, metal);\n"
     "    }\n"
     "\n"
+    "    if (uLightSplit == 1) { gl_FragColor = vec4(clamp(directLight/max(lit,vec3(0.00001)),0.0,1.0),0.25); return; }\n"
     "    lit *= uTint;\n"
-    "    lit *= (1.0 - uShroud);\n"
-    "    vec3 outc = pow(max(lit, vec3(0.0)), vec3(1.0 / uGamma));\n"
+    /* THE SHROUD IS TAKEN AFTER THE ENCODE, NOT BEFORE IT. Everything else under the
+       shroud darkens in display values: the blanket blends black over the frame, the
+       ground and draw_mesh subtract the byte from a display shade, the sprite soldiers
+       draw at glColor (1 - e). Multiplied in here, ahead of the gamma, the same byte
+       came out as (1 - e)^(1/2.2): at the 0.784 ceiling a soldier stood at half his
+       light on ground and blanket at a fifth of theirs, so soldiers at the reveal edge
+       read as standing on top of the shroud. */
+    "    vec3 outc = objectGrade(pow(max(lit, vec3(0.0)), vec3(1.0 / uGamma))) * (1.0 - uShroud);\n"
     "    gl_FragColor = vec4(outc, uAlpha);\n"
     "}\n";
 
@@ -877,6 +929,7 @@ static const char* M3_NRM_FS =
 static GLuint g_m3NrmProg = 0;
 static int    g_m3NrmTried = 0;
 /* Set for the duration of the host's normal pass and cleared with it. */
+static int    g_m3LightSplit = 0;
 static int    g_m3NormalPass = 0;
 
 static GLuint g_m3Prog = 0;
@@ -896,7 +949,8 @@ struct M3Loc {
     GLint uBase, uNorm, uORM, uSunDir, uSunCol, uSkyCol, uGndCol;
     GLint uEnvOn, uEnv, uEnvMaxLod, uEnvAmb, uSH, uCamPos;
     GLint uPlayer, uCloth, uClothRef, uSide, uLogo, uPlayerGain;
-    GLint uTint, uShroud, uFlash, uAlpha;
+    GLint uTint, uShroud, uFlash, uAlpha, uLightSplit;
+    GLint uObjectGrade0, uObjectGrade1, uObjectGradeRGB;
     GLint uNormalStr, uAoStr, uRoughMin, uSpecAmb, uGamma, uClass;
     GLint uModel, uUVOffset, uPlayerOn, uClothOn, uEmblemOn;
 };
@@ -909,9 +963,10 @@ static void m3_loc_fill(GLuint p, M3Loc& L)
     M3_LOC(uSkyCol); M3_LOC(uGndCol); M3_LOC(uEnvOn); M3_LOC(uEnv); M3_LOC(uEnvMaxLod);
     M3_LOC(uEnvAmb); M3_LOC(uSH); M3_LOC(uCamPos); M3_LOC(uPlayer); M3_LOC(uCloth);
     M3_LOC(uClothRef); M3_LOC(uSide); M3_LOC(uLogo); M3_LOC(uPlayerGain); M3_LOC(uTint);
-    M3_LOC(uShroud); M3_LOC(uFlash); M3_LOC(uAlpha); M3_LOC(uNormalStr); M3_LOC(uAoStr);
+    M3_LOC(uLightSplit); M3_LOC(uShroud); M3_LOC(uFlash); M3_LOC(uAlpha); M3_LOC(uNormalStr); M3_LOC(uAoStr);
     M3_LOC(uRoughMin); M3_LOC(uSpecAmb); M3_LOC(uGamma); M3_LOC(uClass); M3_LOC(uModel);
     M3_LOC(uUVOffset); M3_LOC(uPlayerOn); M3_LOC(uClothOn); M3_LOC(uEmblemOn);
+    M3_LOC(uObjectGrade0); M3_LOC(uObjectGrade1); M3_LOC(uObjectGradeRGB);
 #undef M3_LOC
 }
 
@@ -1174,7 +1229,13 @@ static void m3_sample(const M3Model& m, int ci, float frame, float* out)
    Only position and normal are kept, 6 floats a vertex; the draw takes the texture
    coordinates from the bind pose, which the skin never changes.
 
-   The memory is M3_POSE_BLOCKS fixed blocks, allocated as a frame first needs them,
+   Identical complete keys observed in consecutive frames may also retain their
+   finished skin and vertex buffer in the bounded cross-frame cache (m3_rest.h).
+   A model revision and its bind/skin/bone storage stamps accompany both caches.
+   Edits that fit an existing vector must call m3_pose_model_changed; load and
+   corpse-cap construction do so. Changed input always takes the original skin.
+
+   The frame memory is M3_POSE_BLOCKS fixed blocks, allocated as a frame first needs them,
    refilled from the start every frame and never moved, so an entry's address holds for
    the frame. The cap is for the 32-bit Windows build's address space: past it a pose is
    skinned into m.posed per pass exactly as before, and only the saving is lost. The
@@ -1185,11 +1246,33 @@ static void m3_sample(const M3Model& m, int ci, float frame, float* out)
 #define M3_POSE_BLOCK_FLOATS (1u << 20)      /* 4 MB a block                        */
 #define M3_POSE_BLOCKS       8               /* 32 MB at most: about 240 soldiers at
                                                 the coarsest level, 100 at full detail */
+struct M3RestPose;
+struct M3PoseModelStamp {
+    unsigned long long revision;
+    const void *vert, *skin, *bone;
+    size_t vertN, skinN, boneN;
+    bool operator==(const M3PoseModelStamp& b) const {
+        return revision == b.revision && vert == b.vert && skin == b.skin && bone == b.bone
+               && vertN == b.vertN && skinN == b.skinN && boneN == b.boneN;
+    }
+};
+static M3PoseModelStamp m3_pose_model_stamp(const M3Model& m)
+{
+    M3PoseModelStamp s;
+    s.revision = m.poseRevision;
+    s.vert = m.vert.empty() ? 0 : &m.vert[0]; s.vertN = m.vert.size();
+    s.skin = m.skin.empty() ? 0 : &m.skin[0]; s.skinN = m.skin.size();
+    s.bone = m.bone.empty() ? 0 : &m.bone[0]; s.boneN = m.bone.size();
+    return s;
+}
 struct M3PoseEnt {
     const M3Model* m;
+    M3PoseModelStamp stamp;
     unsigned nv, nkey, hash;
     const float* key;        /* the bone poses the skin was handed: nkey floats  */
     float* out;              /* position and normal, 6 floats a vertex, nv of them */
+    int gpu;                 /* out in g_m3PoseVbo[this entry]: 0 not yet, 1 yes, -1 failed */
+    M3RestPose* rest;         /* stable until the next m3_pose_frame, else 0 */
 };
 static float* g_m3PoseBlk[M3_POSE_BLOCKS];
 static int    g_m3PoseCur = 0;               /* the block being filled               */
@@ -1200,6 +1283,14 @@ static std::vector<int>       g_m3PoseTab;   /* open addressing into them; -1 em
    cache, draws served from it, skins that found it full, and hits that re-skinned to
    something else under OPENCNC3D_POSECHECK. */
 static int g_m3PoseSkins = 0, g_m3PoseHits = 0, g_m3PoseFull = 0, g_m3PoseBad = 0;
+/* ...and of the GPU copies (m3_pose_gpu): poses sent to the card, and draws that read one
+   from there rather than from system memory. */
+static int g_m3PoseUploads = 0, g_m3PoseGpuDraws = 0;
+/* One vertex buffer per entry, entry i's pose in g_m3PoseVbo[i], kept from frame to frame
+   and given each frame's pose afresh. */
+static std::vector<GLuint> g_m3PoseVbo;
+
+#include "m3_rest.h"
 
 static int m3_pose_check(void)
 {
@@ -1211,21 +1302,29 @@ static int m3_pose_check(void)
     return on;
 }
 
-/* Called at the top of every drawn frame: the cache holds one frame's poses. */
+/* Called at the top of every drawn frame: release the previous frame's references. */
 static void m3_pose_frame(void)
 {
+    for (size_t i = 0; i < g_m3.size(); i++)
+        g_m3[i].drawPosed = 0;
+    /* Retain only completed, bit-identical poses observed in consecutive frames.
+       This clears the old entries before any persistent record can be evicted. */
+    m3_rest_frame();
     g_m3PoseCur = 0;
     g_m3PoseUsed = 0;
     g_m3PoseEnt.clear();
     std::fill(g_m3PoseTab.begin(), g_m3PoseTab.end(), -1);
     g_m3PoseSkins = g_m3PoseHits = g_m3PoseFull = g_m3PoseBad = 0;
-    for (size_t i = 0; i < g_m3.size(); i++)
-        g_m3[i].drawPosed = 0;
+    g_m3PoseUploads = g_m3PoseGpuDraws = 0;
 }
 
 /* At the end of a mission: the blocks go back, and the next frame starts empty. */
 static void m3_pose_free(void)
 {
+    for (size_t i = 0; i < g_m3.size(); i++)
+        g_m3[i].drawPosed = 0;
+    g_m3PoseEnt.clear();             /* release references before their owners */
+    m3_rest_free();
     m3_pose_frame();
     for (int b = 0; b < M3_POSE_BLOCKS; b++) {
         free(g_m3PoseBlk[b]);
@@ -1233,6 +1332,9 @@ static void m3_pose_free(void)
     }
     std::vector<M3PoseEnt>().swap(g_m3PoseEnt);
     std::vector<int>().swap(g_m3PoseTab);
+    if (!g_m3PoseVbo.empty() && grass_buf_load())
+        gr_glDeleteBuffers((GLsizei)g_m3PoseVbo.size(), &g_m3PoseVbo[0]);
+    std::vector<GLuint>().swap(g_m3PoseVbo);
 }
 
 static float* m3_pose_alloc(size_t n)
@@ -1272,6 +1374,7 @@ static void m3_pose_tab_put(int e)
    *out is 0, and the skin writes m.posed. m.drawPosed is set to *out either way. */
 static int m3_pose_find(M3Model& m, size_t nv, const float* key, size_t nkey, float** out)
 {
+    const M3PoseModelStamp stamp = m3_pose_model_stamp(m);
     unsigned h = 2166136261u;                    /* FNV-1a over the key's bits */
     for (size_t i = 0; i < nkey; i++) {
         unsigned w;
@@ -1284,16 +1387,24 @@ static int m3_pose_find(M3Model& m, size_t nv, const float* key, size_t nkey, fl
     const size_t mask = g_m3PoseTab.size() - 1;
     for (size_t i = h & mask; g_m3PoseTab[i] >= 0; i = (i + 1) & mask) {
         const M3PoseEnt& e = g_m3PoseEnt[g_m3PoseTab[i]];
-        if (e.hash == h && e.m == &m && e.nv == nv && e.nkey == nkey
+        if (e.hash == h && e.m == &m && e.stamp == stamp && e.nv == nv && e.nkey == nkey
             && memcmp(e.key, key, nkey * sizeof(float)) == 0) {
             *out = e.out;
             m.drawPosed = e.out;
+            m.drawPosedEnt = g_m3PoseTab[i];
             g_m3PoseHits++;
             return 1;
         }
     }
-    float* k = m3_pose_alloc(nkey + nv * 6);
+    M3RestPose* rest = m3_rest_find(&m, stamp, nv, key, nkey, h);
+    float* k = m3_pose_alloc(nkey + (rest ? 0 : nv * 6));
     if (!k) {
+        if (rest) {
+            /* A full frame arena can still read a retained pose as a client array. */
+            *out = &rest->out[0]; m.drawPosed = *out; m.drawPosedEnt = -1;
+            g_m3PoseHits++;
+            return 1;
+        }
         *out = 0;
         m.drawPosed = 0;
         g_m3PoseFull++;
@@ -1301,8 +1412,8 @@ static int m3_pose_find(M3Model& m, size_t nv, const float* key, size_t nkey, fl
     }
     memcpy(k, key, nkey * sizeof(float));
     M3PoseEnt e;
-    e.m = &m; e.nv = (unsigned)nv; e.nkey = (unsigned)nkey; e.hash = h;
-    e.key = k; e.out = k + nkey;
+    e.m = &m; e.stamp = stamp; e.nv = (unsigned)nv; e.nkey = (unsigned)nkey; e.hash = h;
+    e.key = k; e.out = rest ? &rest->out[0] : k + nkey; e.gpu = 0; e.rest = rest;
     g_m3PoseEnt.push_back(e);
     if (g_m3PoseEnt.size() * 2 > g_m3PoseTab.size()) {
         g_m3PoseTab.assign(g_m3PoseTab.size() * 2, -1);
@@ -1313,8 +1424,135 @@ static int m3_pose_find(M3Model& m, size_t nv, const float* key, size_t nkey, fl
     }
     *out = e.out;
     m.drawPosed = e.out;
+    m.drawPosedEnt = (int)g_m3PoseEnt.size() - 1;
+    if (rest) { g_m3PoseHits++; return 1; }
     g_m3PoseSkins++;
     return 0;
+}
+
+/* ---- the pose on the card -----------------------------------------------------------
+   A POSED SOLDIER WAS DRAWN FROM SYSTEM MEMORY IN EVERY PASS THAT DRAWS HIM (his sun map,
+   the water's reflection, the main view, the normals), and a driver copies a client array
+   to the card on every draw call that names it. He is 5 to 13 thousand vertices by the
+   level drawn and a torn body is always the full mesh, so every pass sent all of him again,
+   and a battlefield's fallen, kept for minutes, were sent four times a frame for as long
+   as they lay there. Apple's driver takes that cheaply; a Windows driver pays for it in
+   full on every draw.
+
+   So each entry of the frame's pose cache goes to the card once, into its own vertex
+   buffer, by the first draw that reads it, and every later draw of that pose in the frame
+   (the other passes, and any other soldier standing in the same pose) reads it from
+   there. The texture coordinates and the index lists never change with a pose and go to
+   the card once per model (m3_skin_buffers). The same floats reach the same pipeline.
+   Measured against the system-memory draw on macOS: a scattering of single pixels on
+   soldiers' edges moves by a few levels (24 pixels, at most 7 levels, in a 1920 x 1080
+   frame of twenty bodies), and only when every attribute comes from a buffer, so it is
+   the driver fetching vertices by another route; with any one attribute left in system
+   memory the frame is identical to the last bit.
+
+   A pose the cache had no room for (m.posed) is drawn from system memory as before, and so
+   is every pose on a driver without buffer objects. OPENCNC3D_POSE_GPU=0 puts them all
+   back in system memory. No size is read back after an upload, unlike the load-time
+   buffers: on a driver that runs GL on its own thread a query waits for that thread, and
+   this runs for every pose in every frame. */
+static int m3_pose_gpu_on(void)
+{
+    static int on = -1;
+    if (on < 0) {
+        const char* e = getenv("OPENCNC3D_POSE_GPU");
+        on = (e && *e && strcmp(e, "0") == 0) ? 0 : 1;
+    }
+    return on;
+}
+
+static bool m3_skin_buffers(M3Model& m)
+{
+    if (m.skinUv && m.skinUvN == m.vert.size() && m.skinIdxN == m.idx.size())
+        return true;
+    if (m.skinTried && !m.skinUv)
+        return false;                            /* the driver would not make them */
+    m.skinTried = true;
+    if (m.vert.empty() || m.idx.empty() || !grass_buf_load())
+        return false;
+    const size_t nv = m.vert.size() / 8;
+    std::vector<float> uv(nv * 2);
+    for (size_t v = 0; v < nv; v++) {
+        uv[v * 2]     = m.vert[v * 8 + 6];
+        uv[v * 2 + 1] = m.vert[v * 8 + 7];
+    }
+    std::vector<unsigned int> all(m.idx);
+    std::vector<unsigned> base;
+    for (size_t l = 0; l < m.lod.size(); l++) {
+        base.push_back((unsigned)all.size());
+        all.insert(all.end(), m.lod[l].idx.begin(), m.lod[l].idx.end());
+    }
+    const unsigned long ubytes = (unsigned long)(uv.size() * sizeof(float));
+    const unsigned long ibytes = (unsigned long)(all.size() * sizeof(unsigned int));
+    GLuint b[2] = { m.skinUv, m.skinIbo };
+    if (!b[0])
+        gr_glGenBuffers(2, b);
+    GLint gotU = 0, gotI = 0;
+    gr_glBindBuffer(GL_ARRAY_BUFFER, b[0]);
+    gr_glBufferData(GL_ARRAY_BUFFER, (FxGLsizeiptr)ubytes, &uv[0], GL_STATIC_DRAW);
+    gr_glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &gotU);
+    gr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, b[1]);
+    gr_glBufferData(GL_ELEMENT_ARRAY_BUFFER, (FxGLsizeiptr)ibytes, &all[0], GL_STATIC_DRAW);
+    gr_glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &gotI);
+    gr_glBindBuffer(GL_ARRAY_BUFFER, 0);
+    gr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    if (gotU < 0 || (unsigned long)gotU != ubytes || gotI < 0 || (unsigned long)gotI != ibytes) {
+        fprintf(stderr, "M3|%s|the driver made %ld of %lu texture-coordinate and %ld of %lu "
+                        "index bytes; poses drawn from system memory\n", m.type.c_str(),
+                (long)gotU, ubytes, (long)gotI, ibytes);
+        gr_glDeleteBuffers(2, b);
+        m.skinUv = m.skinIbo = 0;
+        return false;
+    }
+    m.skinUv = b[0];
+    m.skinIbo = b[1];
+    m.skinUvN = m.vert.size();
+    m.skinIdxN = m.idx.size();
+    m.skinLodBase.swap(base);
+    return true;
+}
+
+/* The buffer holding the pose the next draw of m reads, sent to the card if this is the
+   frame's first draw of it; 0 to draw it from system memory. */
+static GLuint m3_pose_gpu(M3Model& m)
+{
+    if (!m.drawPosed || !m3_pose_gpu_on())
+        return 0;
+    const int ei = m.drawPosedEnt;
+    if (ei < 0 || ei >= (int)g_m3PoseEnt.size())
+        return 0;
+    M3PoseEnt& e = g_m3PoseEnt[ei];
+    if (e.out != m.drawPosed || e.m != &m || e.gpu < 0 || !m3_skin_buffers(m))
+        return 0;
+    if (e.rest) {
+        const GLuint held = m3_rest_gpu(*e.rest);
+        if (held) return held;
+        /* An unavailable persistent store retains the original streaming fallback. */
+    }
+    if (e.gpu == 0) {
+        if (g_m3PoseVbo.size() <= (size_t)ei) {
+            const size_t had = g_m3PoseVbo.size();
+            size_t want = had ? had * 2 : 64;
+            while (want <= (size_t)ei) want *= 2;
+            g_m3PoseVbo.resize(want, 0);
+            gr_glGenBuffers((GLsizei)(want - had), &g_m3PoseVbo[had]);
+        }
+        if (!g_m3PoseVbo[ei]) {
+            e.gpu = -1;
+            return 0;
+        }
+        gr_glBindBuffer(GL_ARRAY_BUFFER, g_m3PoseVbo[ei]);
+        gr_glBufferData(GL_ARRAY_BUFFER, (FxGLsizeiptr)((size_t)e.nv * 6 * sizeof(float)),
+                        e.out, GL_STREAM_DRAW);
+        gr_glBindBuffer(GL_ARRAY_BUFFER, 0);
+        e.gpu = 1;
+        g_m3PoseUploads++;
+    }
+    return g_m3PoseVbo[ei];
 }
 
 /* Skin the bind pose by per-bone poses (8 floats a bone): into the frame's pose cache, or
@@ -1464,7 +1702,7 @@ struct M3Draw {
     float ylift;           /* altitude, cells                                  */
     float yaw;             /* degrees about +Y, from the engine's facing       */
     float wobX, wobZ;      /* the cartridge's washboard lean, radians          */
-    int   turyaw;          /* turret delta, 0..255                             */
+    float turyaw;          /* fractional render turret delta, 0..255                             */
     float treadV;          /* belt scroll                                      */
     float shroud;          /* 0..1                                             */
     float pr, pg, pb;      /* the house tint                                   */
@@ -1476,8 +1714,10 @@ struct M3Draw {
        keeps the paint). Only a material flagged M3_MAT_CLOTH reads them, and every
        caller zeroes the struct first, so a draw that is not a soldier replaces nothing. */
     float cr, cg, cb, camt;
+    int normalizeCloth;    /* source-led RA Allied material reference, 0 preserves legacy */
     float side;            /* the emblem an M3_MAT_EMBLEM material shows: 0 GDI, 1 Nod */
     int   soldier;         /* a 3D soldier: lit by the m3inf_ shares on top     */
+    int   vehicle;         /* distinct from an authored building, for F5      */
 };
 
 /* Build the object -> world matrix in GL's column-major order.
@@ -1629,7 +1869,7 @@ static void m3_draw(int mi, const M3Draw& d)
     m3_matrix(d, mat);
 
     const bool depthOnly = m3_depth_only();
-    const bool nrmPass   = (g_m3NormalPass != 0) && !depthOnly;
+    const bool nrmPass   = (g_m3NormalPass != 0) && !g_m3LightSplit && !depthOnly;
     const GLuint prog = depthOnly ? 0 : (nrmPass ? m3_nrm_prog() : m3_prog());
     if (!depthOnly && !prog)
         return;                 /* no shader stage: the caller drew the pack model */
@@ -1649,7 +1889,11 @@ static void m3_draw(int mi, const M3Draw& d)
     /* A rigid model draws from GPU memory when it is there (m3_upload_buffers), and
        then an index list is a byte offset into the one index buffer. */
     const bool gpu = m.vbo != 0;
-    const size_t ibase = (gpu && lv) ? (size_t)m.lodBase[m.drawLod] : 0;
+    /* A posed model whose pose is on the card (m3_pose_gpu), its indices in the model's
+       own index buffer the same way. */
+    const GLuint poseBuf = gpu ? 0 : m3_pose_gpu(m);
+    const bool bufIdx = gpu || poseBuf != 0;
+    const size_t ibase = (bufIdx && lv) ? (size_t)(gpu ? m.lodBase : m.skinLodBase)[m.drawLod] : 0;
     if (!depthOnly && !g_m3Mirrored && !nrmPass) {
         g_m3Drawn++;
         /* the triangles the draw list names, which for a soldier's appended torn
@@ -1662,8 +1906,13 @@ static void m3_draw(int mi, const M3Draw& d)
 
     GLboolean sTex2D = glIsEnabled(GL_TEXTURE_2D);
     GLboolean sCull  = glIsEnabled(GL_CULL_FACE);
+    /* This draw never changes current colour. Only an enabled colour array can
+       make DrawElements leave it unspecified; retain the original capture/restore
+       in that case. Disabled arrays preserve the caller's exact colour directly. */
+    const bool restoreColour=glIsEnabled(GL_COLOR_ARRAY)==GL_TRUE;
     GLfloat sColour[4];
-    glGetFloatv(GL_CURRENT_COLOR, sColour);
+    if(restoreColour)glGetFloatv(GL_CURRENT_COLOR,sColour);
+    const GlsClipRestore clipBefore;
 
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();          /* the camera's modelview, restored on the way out */
@@ -1691,6 +1940,17 @@ static void m3_draw(int mi, const M3Draw& d)
         glVertexPointer(3, GL_FLOAT, stride, (const void*)0);
         glNormalPointer(GL_FLOAT, stride, (const void*)(3 * sizeof(float)));
         glTexCoordPointer(2, GL_FLOAT, stride, (const void*)(6 * sizeof(float)));
+    } else if (poseBuf) {
+        /* Each pointer takes the buffer bound when it is set: position and normal from
+           the pose's, the texture coordinates from the model's own. */
+        const GLsizei ps = (GLsizei)(6 * sizeof(float));
+        gr_glBindBuffer(GL_ARRAY_BUFFER, poseBuf);
+        glVertexPointer(3, GL_FLOAT, ps, (const void*)0);
+        glNormalPointer(GL_FLOAT, ps, (const void*)(3 * sizeof(float)));
+        gr_glBindBuffer(GL_ARRAY_BUFFER, m.skinUv);
+        glTexCoordPointer(2, GL_FLOAT, 0, (const void*)0);
+        gr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.skinIbo);
+        g_m3PoseGpuDraws++;
     } else if (m.drawPosed) {
         /* This object's pose out of the frame's cache (m3_skin): position and normal, 6
            floats a vertex. The texture coordinates are the bind pose's own, which no
@@ -1714,16 +1974,18 @@ static void m3_draw(int mi, const M3Draw& d)
         fx_glUseProgram(prog);
         m3_u1i(L.uNorm, 1);
         m3_u1f(L.uNormalStr, g_fx.m3_normal);
-        m3_u1f(L.uClass, d.soldier ? M3_SOLDIER_CLASS : M3_NORMAL_CLASS);
+        m3_u1f(L.uClass, d.soldier ? M3_SOLDIER_CLASS
+            : (d.vehicle && fx_vehicle_active(&g_fx) ? 0.34f : M3_NORMAL_CLASS));
     } else if (prog) {
         float sky[3], gnd[3], sun[3];
         /* A soldier's light is the models' light times his own shares (m3inf_sun in
            fx_state.h): one scale on the sun, one on every part of the fill. */
         const float fillK = d.soldier ? g_fx.m3inf_fill : 1.0f;
         const float sunK  = d.soldier ? g_fx.m3inf_sun  : 1.0f;
-        m3_ambient(sky, gnd, sun, fillK, sunK);
+        m3_ambient(sky, gnd, sun, fillK*fx_sky_energy(), sunK*fx_sun_energy());
         fx_sun_dir();
         fx_glUseProgram(prog);
+        m3_u1i(L.uLightSplit, g_m3LightSplit);
         m3_u1i(L.uBase, 0);
         m3_u1i(L.uNorm, 1);
         m3_u1i(L.uORM,  2);
@@ -1741,7 +2003,7 @@ static void m3_draw(int mi, const M3Draw& d)
         if (envOn) {
             m3_u1i(L.uEnv, 3);
             m3_u1f(L.uEnvMaxLod, sky3d_max_lod());
-            m3_u1f(L.uEnvAmb, g_fx.m3_ambient * fillK * m3_env_scale());
+            m3_u1f(L.uEnvAmb, g_fx.m3_ambient * fillK * fx_sky_energy() * m3_env_scale());
             float sh[36];
             for (int i = 0; i < 9; i++) {
                 sh[i * 4 + 0] = g_sky3dSH[i][0];
@@ -1775,6 +2037,13 @@ static void m3_draw(int mi, const M3Draw& d)
         m3_u1f(L.uRoughMin,  g_fx.m3_roughmin);
         m3_u1f(L.uSpecAmb,   g_fx.m3_specamb);
         m3_u1f(L.uGamma,     2.2f);
+        const FxObjectGrade grade=fx_infantry_grade(&g_fx);
+        const float grade0[4]={grade.bright,grade.contrast,grade.exposure,grade.gamma};
+        const float grade1[4]={grade.sat,grade.warmth,grade.tint,
+            d.soldier && g_fx.enabled && fx_object_grade_active(grade) ? 1.0f : 0.0f};
+        if (L.uObjectGrade0>=0) fx_glUniform4fv(L.uObjectGrade0,1,grade0);
+        if (L.uObjectGrade1>=0) fx_glUniform4fv(L.uObjectGrade1,1,grade1);
+        m3_u3f(L.uObjectGradeRGB,grade.red,grade.green,grade.blue);
     }
 
     for (size_t s = 0; s < subs.size(); s++) {
@@ -1809,6 +2078,8 @@ static void m3_draw(int mi, const M3Draw& d)
             m3_u2f(L.uUVOffset, 0.0f, tread ? -d.treadV : 0.0f);
             m3_u1f(L.uPlayerOn, (mt.flags & M3_MAT_NO_PLAYER) ? 0.0f : 1.0f);
             m3_u1f(L.uClothOn,  (mt.flags & M3_MAT_CLOTH) ? d.camt : 0.0f);
+            m3_u1f(L.uClothRef,d.normalizeCloth && (mt.flags&M3_MAT_CLOTH) && mt.clothRef>1e-6f
+                ? mt.clothRef : M3_CLOTH_REF);
             m3_u1f(L.uEmblemOn, (mt.flags & M3_MAT_EMBLEM) ? 1.0f : 0.0f);
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, mt.orm  >= 0 ? m.tex[mt.orm ].gl : 0);
@@ -1820,7 +2091,7 @@ static void m3_draw(int mi, const M3Draw& d)
         } else {
             glDisable(GL_TEXTURE_2D);
         }
-        if (gpu)
+        if (bufIdx)
             glDrawElements(GL_TRIANGLES, (GLsizei)sb.nidx, GL_UNSIGNED_INT,
                            (const void*)((ibase + sb.idx0) * sizeof(unsigned int)));
         else
@@ -1829,7 +2100,7 @@ static void m3_draw(int mi, const M3Draw& d)
     /* Both targets back to 0 before anything else draws: every other client-array
        draw in the program hands GL a pointer, which a bound buffer would read as an
        offset into itself. */
-    if (gpu) {
+    if (bufIdx) {
         gr_glBindBuffer(GL_ARRAY_BUFFER, 0);
         gr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
@@ -1846,10 +2117,13 @@ static void m3_draw(int mi, const M3Draw& d)
     glDisableClientState(GL_NORMAL_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
     glPopMatrix();
+    /* Only MODELVIEW was touched, and the outer pop restored its original top.
+       Recover a previously known clip answer without two driver reads per soldier. */
+    clipBefore.restored();
 
     if (sCull) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
     if (sTex2D) glEnable(GL_TEXTURE_2D); else glDisable(GL_TEXTURE_2D);
-    glColor4f(sColour[0], sColour[1], sColour[2], sColour[3]);
+    if(restoreColour)glColor4f(sColour[0],sColour[1],sColour[2],sColour[3]);
 }
 
 #endif /* OPENCNC3D_MODEL3D_MOD_H */

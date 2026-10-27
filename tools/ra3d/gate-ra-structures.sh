@@ -1,5 +1,6 @@
 #!/bin/sh
-# Hidden runtime check: standing geometry through damage, layer suppression and snow fog.
+# Hidden runtime check: standing geometry through damage, layer suppression and snow fog, and
+# every staged file's stages approved and within the stage budget.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 install=${1:-"$root/playable"}
@@ -15,6 +16,11 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 cp "$root/tests/ra3d/RASTRUCT.INI" "$work/RASTRUCT.INI"
 cp "$root/tests/ra3d/RASTRUCT.INI" "$mission"
+# A turret's pose (EBLDPOSE) is recorded only for a building a frame actually draws, and
+# every pass skips a building outside its view before drawing any of it. The SAM Site
+# (79,80) is outside both of the other views, so the camera visits the turret row
+# (Gun 70,80, SAM 79,80) for one frame after the order and returns; the next ebldump
+# prints what that frame drew. Without the visit the SAM has no pose line at all.
 cat > "$work/check.script" <<EOF
 tick 5
 gfxmode 2
@@ -30,6 +36,9 @@ cam 58 80
 lclickobj E1:Greece 0
 expectsel 1
 orderobj POWR:USSR 0
+cam 78 80
+shot $work/turrets.png
+cam 58 80
 tick 120
 shot $work/under-fire.png
 ebldump
@@ -71,16 +80,27 @@ assert 'CURSOR3DECUR|have=23|on=1|drawn=1|name=ECUR01|' in text
 assert 'EBLDWAVE|BARR|waves=1|' in text and 'EBLDWAVE|TENT|waves=1|' in text
 manifest = json.load(open(sys.argv[2]))
 assert len(manifest['models']) == 29
+# Each file is the approved standing model alone, or the model with the stages the lab approved
+# under the destruction recipe (tools/ra3d/bake-structures.py), held to the stage budget.
 for code, info in manifest['models'].items():
-    assert set(info['sets']) == {'INTACT'} and info['sets']['INTACT']['triangles'] <= 10000, code
-    assert info['emitters'] == [] and info['params']['scorch_tex'] == -1, code
+    assert info['sets']['INTACT']['triangles'] <= 10000, code
     assert any('mask' in t for t in info['textures']), code
+    if set(info['sets']) == {'INTACT'}:
+        assert info['emitters'] == [] and info['params']['scorch_tex'] == -1, code
+    else:
+        assert set(info['sets']) == {'INTACT', 'CUT', 'DESTROYED'}, code
+        assert info.get('stages') == 'approved', f'{code}: stages in review in a build'
+        d = info['sets']['DESTROYED']
+        assert d['pieces'] <= 150 and d['triangles'] <= 30000, f'{code}: over the stage budget {d}'
+        assert info['params']['scorch_tex'] >= 0, code
 for code in ('GUN', 'SAM', 'AGUN'):
     assert any(m['kind'] == 'turret' for m in manifest['models'][code]['moving']), code
 for code in ('GUN', 'SAM'):
-    pose = re.search(r'EBLDPOSE\|' + code + r'\|[^\n]+\|deg=(-?[\d.]+)', text)
+    pose = re.search(r'EBLDPOSE\|' + code + r'\|[^\n]+\|kind=turret\|deg=(-?[\d.]+)', text)
     assert pose and abs(float(pose[1]) + 90) < 0.01, f'{code}: engine facing was not applied'
-print('RA structures: PASS: 33 standing models, real infantry damage keeps its model, root and subobject sprites suppressed, 29 approved exports; Classic original')
+full = sorted(k for k, v in manifest['models'].items() if set(v['sets']) != {'INTACT'})
+print('RA structures: PASS: 33 standing models, real infantry damage keeps its model, root and subobject sprites suppressed, 29 approved exports'
+      + (f' ({len(full)} with their stages: {", ".join(full)})' if full else ' (standing models only)') + '; Classic original')
 PY
 
 # Snow uses the same approved gravel painting without temperate grass's red gain.

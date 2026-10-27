@@ -1,0 +1,17 @@
+{
+  "trace": "${PRIVATE_TEST_ROOT}/runs/cold/frames-mission-003.csv",
+  "sha256": "287ebf9223fdeb384ae9dd4fb0c09596b29b7f815b8274ee5453bdd2f5624f8c",
+  "rows": 2550,
+  "sanity": "pass",
+  "checks": [
+    "body moving/live bound and440maximum",
+    "particle system sum equals populations",
+    "selected lights bounded24",
+    "streamedvertexpayload36bytes each",
+    "non-overlapping phase totals matchframe",
+    "nestedadvance/refresh withinouterevents/tick",
+    "ebld_tick withinrefresh",
+    "onecoldcutbuildandtextureload"
+  ],
+  "scope": "diagnostic counter correctness on hidden Mac, no Windows FPS claim"
+}

@@ -1,0 +1,321 @@
+{
+  "binary_sha256": "f0f2a5eb61a31b711cbd44a6ccc79e579e29f0e82a5f16c30821935426decd4e",
+  "resolution": [
+    3008,
+    1547
+  ],
+  "method": "ABBA (off,on,on,off), 120 completed frames/view after 15 warm frames; simulation held fixed while drawing; background machine activity may vary",
+  "cases": {
+    "ra": {
+      "views": [
+        [
+          32,
+          43,
+          4200
+        ],
+        [
+          27,
+          36,
+          3000
+        ],
+        [
+          80,
+          55,
+          3000
+        ]
+      ],
+      "runs": [
+        {
+          "arm": "off",
+          "times": [
+            {
+              "median_ms": 62.12,
+              "p90_ms": 68.98
+            },
+            {
+              "median_ms": 52.21,
+              "p90_ms": 60.1
+            },
+            {
+              "median_ms": 60.27,
+              "p90_ms": 67.16
+            }
+          ],
+          "shots": [
+            "c584540963ff27ba59d9163d6a4945ce55a2195b7906caf7923b8182de334f20",
+            "67527084bc9161c462ebd4bd2a941582e40c0866ef7ec58c9300ef12aa082631",
+            "83cf79f863e271d391b546800a08d95f8eafb25c929a45b99d02afde32178b37"
+          ],
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 226440
+          }
+        },
+        {
+          "arm": "on",
+          "times": [
+            {
+              "median_ms": 34.47,
+              "p90_ms": 42.41
+            },
+            {
+              "median_ms": 33.79,
+              "p90_ms": 39.68
+            },
+            {
+              "median_ms": 34.44,
+              "p90_ms": 43.78
+            }
+          ],
+          "shots": [
+            "c584540963ff27ba59d9163d6a4945ce55a2195b7906caf7923b8182de334f20",
+            "67527084bc9161c462ebd4bd2a941582e40c0866ef7ec58c9300ef12aa082631",
+            "83cf79f863e271d391b546800a08d95f8eafb25c929a45b99d02afde32178b37"
+          ],
+          "counters": {
+            "draws": 22567,
+            "vertices": 217824258,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 226440
+          }
+        },
+        {
+          "arm": "on",
+          "times": [
+            {
+              "median_ms": 39.65,
+              "p90_ms": 48.91
+            },
+            {
+              "median_ms": 35.13,
+              "p90_ms": 43.65
+            },
+            {
+              "median_ms": 39.64,
+              "p90_ms": 45.03
+            }
+          ],
+          "shots": [
+            "c584540963ff27ba59d9163d6a4945ce55a2195b7906caf7923b8182de334f20",
+            "67527084bc9161c462ebd4bd2a941582e40c0866ef7ec58c9300ef12aa082631",
+            "83cf79f863e271d391b546800a08d95f8eafb25c929a45b99d02afde32178b37"
+          ],
+          "counters": {
+            "draws": 22567,
+            "vertices": 217824258,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 226440
+          }
+        },
+        {
+          "arm": "off",
+          "times": [
+            {
+              "median_ms": 62.21,
+              "p90_ms": 68.35
+            },
+            {
+              "median_ms": 53.58,
+              "p90_ms": 60.94
+            },
+            {
+              "median_ms": 60.91,
+              "p90_ms": 70.46
+            }
+          ],
+          "shots": [
+            "c584540963ff27ba59d9163d6a4945ce55a2195b7906caf7923b8182de334f20",
+            "67527084bc9161c462ebd4bd2a941582e40c0866ef7ec58c9300ef12aa082631",
+            "83cf79f863e271d391b546800a08d95f8eafb25c929a45b99d02afde32178b37"
+          ],
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 226440
+          }
+        }
+      ],
+      "aggregate": [
+        {
+          "off": 62.165,
+          "on": 37.06
+        },
+        {
+          "off": 52.894999999999996,
+          "on": 34.46
+        },
+        {
+          "off": 60.59,
+          "on": 37.04
+        }
+      ]
+    },
+    "td": {
+      "views": [
+        [
+          11,
+          29,
+          3000
+        ],
+        [
+          31,
+          41,
+          4200
+        ],
+        [
+          11,
+          29,
+          1800
+        ]
+      ],
+      "runs": [
+        {
+          "arm": "off",
+          "times": [
+            {
+              "median_ms": 33.7,
+              "p90_ms": 39.35
+            },
+            {
+              "median_ms": 73.31,
+              "p90_ms": 82.28
+            },
+            {
+              "median_ms": 31.52,
+              "p90_ms": 33.66
+            }
+          ],
+          "shots": [
+            "7001b5804a72747bef67b3a26e3fa49a0b1944cff933909a688ba1863c14d189",
+            "ddb2b7834a948a74b4d0e5dd386774cb1e62ca1e482654c536ae77872e75c2d5",
+            "fc2809e974db68963edcbcda57c765f663492c8178d10749c04343baf7840ff7"
+          ],
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 273888
+          }
+        },
+        {
+          "arm": "on",
+          "times": [
+            {
+              "median_ms": 22.59,
+              "p90_ms": 26.9
+            },
+            {
+              "median_ms": 43.09,
+              "p90_ms": 47.13
+            },
+            {
+              "median_ms": 25.48,
+              "p90_ms": 28.59
+            }
+          ],
+          "shots": [
+            "7001b5804a72747bef67b3a26e3fa49a0b1944cff933909a688ba1863c14d189",
+            "ddb2b7834a948a74b4d0e5dd386774cb1e62ca1e482654c536ae77872e75c2d5",
+            "fc2809e974db68963edcbcda57c765f663492c8178d10749c04343baf7840ff7"
+          ],
+          "counters": {
+            "draws": 9055,
+            "vertices": 66576060,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 273888
+          }
+        },
+        {
+          "arm": "on",
+          "times": [
+            {
+              "median_ms": 22.42,
+              "p90_ms": 27.3
+            },
+            {
+              "median_ms": 43.81,
+              "p90_ms": 48.44
+            },
+            {
+              "median_ms": 26.34,
+              "p90_ms": 30.85
+            }
+          ],
+          "shots": [
+            "7001b5804a72747bef67b3a26e3fa49a0b1944cff933909a688ba1863c14d189",
+            "ddb2b7834a948a74b4d0e5dd386774cb1e62ca1e482654c536ae77872e75c2d5",
+            "fc2809e974db68963edcbcda57c765f663492c8178d10749c04343baf7840ff7"
+          ],
+          "counters": {
+            "draws": 9055,
+            "vertices": 66576060,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 273888
+          }
+        },
+        {
+          "arm": "off",
+          "times": [
+            {
+              "median_ms": 31.33,
+              "p90_ms": 35.0
+            },
+            {
+              "median_ms": 65.98,
+              "p90_ms": 76.64
+            },
+            {
+              "median_ms": 28.53,
+              "p90_ms": 30.5
+            }
+          ],
+          "shots": [
+            "7001b5804a72747bef67b3a26e3fa49a0b1944cff933909a688ba1863c14d189",
+            "ddb2b7834a948a74b4d0e5dd386774cb1e62ca1e482654c536ae77872e75c2d5",
+            "fc2809e974db68963edcbcda57c765f663492c8178d10749c04343baf7840ff7"
+          ],
+          "counters": {
+            "draws": 0,
+            "vertices": 0,
+            "fallbacks": 0,
+            "verified": 0,
+            "mismatches": 0,
+            "scratch_bytes": 273888
+          }
+        }
+      ],
+      "aggregate": [
+        {
+          "off": 32.515,
+          "on": 22.505000000000003
+        },
+        {
+          "off": 69.64500000000001,
+          "on": 43.45
+        },
+        {
+          "off": 30.025,
+          "on": 25.91
+        }
+      ]
+    }
+  },
+  "passed": true
+}

@@ -1,3 +1,4 @@
+// MODIFIED for OpenCNC3D. Applies the existing GPS reveal ability to fair computer seats.
 //
 // Copyright 2020 Electronic Arts Inc.
 //
@@ -50,6 +51,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#include "fair_ai_ra.h"
 
 /***********************************************************************************************
  * BulletClass::BulletClass -- Bullet constructor.                                             *
@@ -411,11 +413,11 @@ void BulletClass::AI(void)
 
             bool reveal = false;
             if (Session.Type != GAME_GLYPHX_MULTIPLAYER) {
-                if (Payback->House == PlayerPtr) {
+                if (Payback->House == PlayerPtr || FairAI_RA_Enabled(Payback->House)) {
                     reveal = true;
                 }
             } else {
-                if (Payback->House->IsHuman) {
+                if (Payback->House->IsHuman || FairAI_RA_Enabled(Payback->House)) {
                     reveal = true;
                 }
             }
@@ -1122,11 +1124,11 @@ void BulletClass::Bullet_Explodes(bool forced)
 
         bool reveal = false;
         if (Session.Type != GAME_GLYPHX_MULTIPLAYER) {
-            if (Payback->House == PlayerPtr) {
+            if (Payback->House == PlayerPtr || FairAI_RA_Enabled(Payback->House)) {
                 reveal = true;
             }
         } else {
-            if (Payback->House->IsHuman) {
+            if (Payback->House->IsHuman || FairAI_RA_Enabled(Payback->House)) {
                 reveal = true;
             }
         }
