@@ -610,11 +610,18 @@ static int l_module_available(const L_App *a,int target)
 }
 static int l_module_actionable(const L_App *a,int target)
 {return !a->mod[target].installed || a->mod[target].needs_update;}
+/* The catalog's version is the release tag, with no +sha/-dirty tail.
+ * Install and the "already current" check use that, so 0.9.0+248233a-dirty
+ * accepts the v0.9.0 package and does not treat it as a different build. */
+static const char *l_catalog_build(const L_App *a)
+{
+    return a->catalog.version[0] ? a->catalog.version : LCFG_BUILD;
+}
 static void l_module_versions(L_App *a)
 {
     int i;for(i=0;i<2;i++)a->mod[i].needs_update=!a->private_source && a->mod[i].installed &&
         SDL_AtomicGet(&a->catalog_phase)==2 && a->catalog.module[i].available &&
-        !lmod_module_current(a->dir,i,LCFG_BUILD);
+        !lmod_module_current(a->dir,i,l_catalog_build(a));
 }
 static void l_catalog_start(L_App *a);
 static void l_module_start(L_App *a,int target);
@@ -2068,8 +2075,8 @@ static int l_module_worker(void *user)
     L_App *a = (L_App *)user;
     int ok;
     if(SDL_AtomicGet(&a->catalog_phase)==2 && a->catalog.module[a->module_target].available)
-        ok=lmod_install_remote(a->dir,a->module_target,LCFG_BUILD,&a->catalog,l_module_progress,a,a->module_error,sizeof a->module_error);
-    else ok=lmod_install_cached(a->dir,a->module_target,LCFG_BUILD,l_module_progress,a,a->module_error,sizeof a->module_error);
+        ok=lmod_install_remote(a->dir,a->module_target,l_catalog_build(a),&a->catalog,l_module_progress,a,a->module_error,sizeof a->module_error);
+    else ok=lmod_install_cached(a->dir,a->module_target,l_catalog_build(a),l_module_progress,a,a->module_error,sizeof a->module_error);
     SDL_AtomicSet(&a->module_phase, ok ? 2 : -1); return 0;
 }
 static void l_module_start(L_App *a, int target)
@@ -4111,7 +4118,8 @@ int main(int argc, char **argv)
         l_module_tick(&a);
         if(SDL_AtomicGet(&a.catalog_phase)==2&&!a.catalog_applied){l_module_versions(&a);a.catalog_applied=1;}
         if(a.view==L_VIEW_BROWSE && SDL_AtomicGet(&a.catalog_phase)==-1)
-            snprintf(a.mstatus,sizeof a.mstatus,"Catalog unavailable. Reopen browser to retry.");
+            snprintf(a.mstatus,sizeof a.mstatus,"%s",
+                     a.catalog_error[0]?a.catalog_error:"Catalog unavailable. Reopen browser to retry.");
         l_m_tick(&a);
         l_set_buttons(&a);
         while (SDL_PollEvent(&e))

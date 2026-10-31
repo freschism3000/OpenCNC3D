@@ -122,6 +122,13 @@ BOOL WINAPI DllMain(HINSTANCE instance, unsigned int fdwReason, void* lpvReserve
 #endif
 
 #ifdef REMASTER_BUILD
+#if defined(__linux__)
+/* The player executable also defines main. ELF resolves a shared library's
+   call to main through the PLT and lands in the player, which starts the
+   menu a second time and then faults in CNC_Start_Custom_Instance. Hidden
+   visibility binds this call to the main in this file. */
+__attribute__((visibility("hidden")))
+#endif
 int main(int, char*[]);
 
 int DLL_Startup(const char* command_line_in)
@@ -208,6 +215,9 @@ int DLL_Startup(const char* command_line_in)
 }
 #endif // REMASTER_BUILD
 
+#if defined(__linux__) && defined(REMASTER_BUILD)
+__attribute__((visibility("hidden")))
+#endif
 int main(int argc, char** argv)
 {
     UtfArgs args(argc, argv);

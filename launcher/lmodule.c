@@ -17,7 +17,7 @@
  * --module ra3d --play refused it. tools/launcher/module-check.sh holds a folder
  * shaped like a package to this list. */
 const char *const lmod_ra_needs[] = {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__linux__)
     "ra3d/opencnc3d-game.exe",
     "ra3d/RedAlert.dll",
 #else
@@ -101,7 +101,7 @@ int lmod_install_cached(const char *dir, int target, const char *build, int (*cb
                          char *err, int len)
 {
     char zip[1400], sidecar[1400], expected[80], actual[65], version[100]; FILE *f;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__linux__)
     static const char *const td_required[] = {"TiberianDawn.dll", "CONQUER.MIX"};
 #else
     static const char *const td_required[] = {"TiberianDawn.dylib", "CONQUER.MIX"};
@@ -142,7 +142,7 @@ int lmod_install_cached(const char *dir, int target, const char *build, int (*cb
 
 int lmod_td_present(const char *dir)
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__linux__)
     return lmod_has_file(dir, "TiberianDawn.dll") && lmod_has_file(dir, "opencnc3d-game.exe");
 #else
     return lmod_has_file(dir, "TiberianDawn.dylib") && lmod_has_file(dir, "opencnc3d");

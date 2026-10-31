@@ -41,8 +41,10 @@
 
 /* The platform's own name for the brain. Everything that is not an explicit --dylib is
    derived from this, so a shipped build never has to be told where its own brain is. */
-#ifdef _WIN32
+#if defined(_WIN32)
 #  define OPENCNC3D_BRAIN_LIB "TiberianDawn.dll"
+#elif defined(__linux__)
+#  define OPENCNC3D_BRAIN_LIB "TiberianDawn.so"
 #else
 #  define OPENCNC3D_BRAIN_LIB "TiberianDawn.dylib"
 #endif

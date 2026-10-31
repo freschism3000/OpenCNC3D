@@ -2890,9 +2890,12 @@ static int settings_carry_over(void)
     return copied;
 }
 
+#include "gpu_prime.h"
+
 int main(int argc, char** argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
+    opencnc3d_prefer_discrete_gpu();
     std::set_terminate(opencnc3d_terminate_handler);
     /* --langget CODE: fetch a language pack (game/lang_mod.h) into this install and exit,
        printing its progress; no window. The way to test a pack without the Settings box. */
