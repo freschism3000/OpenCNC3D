@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OpenCNC3D
+Comment=Launcher for OpenCNC3D
+Exec=opencnc3d-launcher
+Icon=opencnc3d
+Terminal=false
+Categories=Game;
+PrefersNonDefaultGPU=true

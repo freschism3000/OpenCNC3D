@@ -1,0 +1,62 @@
+# Maintainer: jagiella <nick.jagiella@gmail.com>
+#
+# Packages the git checkout that contains this file. It does not download a
+# release. From the repository root:
+#
+#   cd archlinux && makepkg -si
+#
+# base-devel supplies the compiler. git is separate: the brain CMake refuses
+# to configure when it is missing. The build script sets its own flags, so
+# makepkg's CFLAGS are not applied.
+
+pkgname=opencnc3d
+pkgver=$(tr -d '[:space:]' < "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../VERSION")
+pkgrel=1
+pkgdesc='Three-dimensional Command & Conquer'
+arch=('x86_64')
+url='https://github.com/jagiella/OpenCNC3D'
+license=('GPL-3.0-or-later')
+depends=('sdl2-compat' 'libglvnd' 'zlib' 'curl')
+makedepends=('cmake' 'git' 'sdl2-compat' 'mesa' 'zlib' 'curl')
+options=('!buildflags' '!lto' '!debug')
+
+_repo_root() {
+	(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+}
+
+build() {
+	local root
+	root="$(_repo_root)"
+	cd "$root"
+	sh tools/version.sh --release-header game/opencnc3d_build.h
+	OPENCNC3D_SKIP_VERSION_HEADER=1 OPENCNC3D_BUILD_ID="v${pkgver}" \
+		sh tools/linux/build-linux.sh
+}
+
+package() {
+	local root lib bin b
+	root="$(_repo_root)"
+	cd "$root"
+	lib="${pkgdir}/usr/lib/opencnc3d"
+	bin="${pkgdir}/usr/bin"
+	install -d "$lib" "$bin"
+	install -m 0755 \
+		build/linux/opencnc3d \
+		build/linux/opencnc3d-launcher \
+		build/linux/cnc_eyes \
+		build/linux/netcheck \
+		build/linux/TiberianDawn.so \
+		build/linux/RedAlert.so \
+		"$lib/"
+	for b in opencnc3d opencnc3d-launcher cnc_eyes netcheck; do
+		ln -s "../lib/opencnc3d/${b}" "${bin}/${b}"
+	done
+	install -Dm0644 debian/opencnc3d.desktop \
+		"${pkgdir}/usr/share/applications/opencnc3d.desktop"
+	install -Dm0644 brain/vanilla/resources/vanillatd_icon.svg \
+		"${pkgdir}/usr/share/icons/hicolor/scalable/apps/opencnc3d.svg"
+	install -Dm0644 LICENSE \
+		"${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+	install -Dm0644 brain/vanilla/License.txt \
+		"${pkgdir}/usr/share/licenses/${pkgname}/vanilla-License.txt"
+}

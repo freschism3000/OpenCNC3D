@@ -8,12 +8,18 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <windows.h>
-#define LMOD_PLATFORM "windows"
 #define LMOD_MKDIR(p) _mkdir(p)
 #else
 #include <unistd.h>
-#define LMOD_PLATFORM "macos"
 #define LMOD_MKDIR(p) mkdir(p,0755)
+#endif
+/* Linux has no published module zip of its own. The Windows packages carry the
+ * same game data, and their programs are opencnc3d-game.exe / TiberianDawn.dll,
+ * so unpacking one beside a Linux build does not replace opencnc3d or the .so. */
+#if defined(_WIN32) || defined(__linux__)
+#define LMOD_PLATFORM "windows"
+#else
+#define LMOD_PLATFORM "macos"
 #endif
 #define LMOD_CAP (4*1024*1024)
 #define LMOD_FILES 20000
@@ -28,12 +34,29 @@ static int lmod_hex(const char *p)
 static int lmod_equal(const char *a,const char *b)
 { while(*a&&*b){if(tolower((unsigned char)*a++)!=tolower((unsigned char)*b++))return 0;}return !*a&&!*b; }
 static const char *lmod_version(const char *s){return s&&s[0]=='v'?s+1:s;}
+/* v0.9.0+248233a-dirty and v0.9.0 are the same release. The +sha/-dirty tail is
+ * which tree was compiled, not a different public version. */
+static void lmod_base(const char *s, char *out, size_t n)
+{
+    size_t i = 0;
+    if (!s) s = "";
+    if (*s == 'v' || *s == 'V') s++;
+    while (*s && *s != '+' && i + 1 < n) out[i++] = *s++;
+    out[i] = 0;
+}
+static int lmod_same_release(const char *tag, const char *build)
+{
+    char a[128], b[128];
+    lmod_base(tag, a, sizeof a);
+    lmod_base(build, b, sizeof b);
+    return a[0] && !strcmp(a, b);
+}
 static const LJ_Value *lmod_release(const LJ_Value *root,const char *build)
 {
     const LJ_Value *r=lj_get(root,"latest"),*p;const char *tag=lj_str(r,"tag");
-    if(tag&&!strcmp(lmod_version(tag),lmod_version(build)))return r;
+    if(tag&&lmod_same_release(tag,build))return r;
     for(p=lj_first(lj_get(root,"releases"));p;p=lj_next(p)){
-        tag=lj_str(p,"tag");if(tag&&!strcmp(lmod_version(tag),lmod_version(build)))return p;
+        tag=lj_str(p,"tag");if(tag&&lmod_same_release(tag,build))return p;
     }
     return NULL;
 }
@@ -87,17 +110,21 @@ static void lmod_asset_url(const char *site,long long id,char *out,size_t n)
 int lmod_catalog_fetch_at(const char *site,const char *build,LMOD_Catalog *out,char *err,int len)
 {
     char url[1400],name[256];char *json=NULL,*text=NULL;LJ_Value *root=NULL;
-    const LJ_Value *release,*asset;long long id,size;int ok=0;
+    const LJ_Value *release,*asset;const char *use=build;long long id,size;int ok=0;
     memset(out,0,sizeof *out);err[0]=0;if(!lmod_site_ok(site))goto done;
     snprintf(url,sizeof url,"%s/api/builds",site);json=ln_get_text(url,LCFG_KEY,LMOD_CAP,err,len);
     if(!json||strlen(json)>=LMOD_CAP)goto done;
     root=lj_parse(json,err,len);if(!root)goto done;release=lmod_release(root,build);
-    snprintf(name,sizeof name,"OpenCNC3D-v%s-modules.txt",lmod_version(build));asset=lmod_asset(release,name);
+    /* Match v0.9.0+<git>-dirty to the published v0.9.0 catalog, not to a newer tag. */
+    if(release){const char *tag=lj_str(release,"tag");if(tag&&tag[0])use=tag;}
+    snprintf(name,sizeof name,"OpenCNC3D-v%s-modules.txt",lmod_version(use));asset=lmod_asset(release,name);
     id=lj_num(asset,"id",0);size=lj_num(asset,"size",-1);
     if(id<=0||size<=0||size>=LMOD_CAP){snprintf(err,(size_t)len,"This build has no public module catalog yet.");goto done;}
     lmod_asset_url(site,id,url,sizeof url);text=ln_get_text(url,LCFG_KEY,LMOD_CAP,err,len);
     if(!text||strlen(text)!=(size_t)size)goto done;
-    ok=lmod_catalog_read(build,json,text,out,err,len);if(ok)snprintf(out->site,sizeof out->site,"%s",site);
+    ok=lmod_catalog_read(use,json,text,out,err,len);if(ok)snprintf(out->site,sizeof out->site,"%s",site);
+    if(ok&&strcmp(lmod_version(build),out->version))
+        fprintf(stderr,"module catalog: %s matches %s\n",build,out->version);
 done:if(!ok&&!err[0])snprintf(err,(size_t)len,"The public module catalog could not be checked. Reopen the browser to retry.");
     lj_free(root);free(json);free(text);return ok;
 }
@@ -184,7 +211,7 @@ static int lmod_install_public(const char *dir,int target,const char *build,cons
                                 int (*cb)(void *,int,int),void *user,char *err,int len)
 {
     char manifest[80],record[512];char *text;LMOD_Files files;const char *last[2];LZ_File extra[2];int ok;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__linux__)
     static const char *const td_required[]={"TiberianDawn.dll","opencnc3d-game.exe","CONQUER.MIX"};
 #else
     static const char *const td_required[]={"TiberianDawn.dylib","opencnc3d","CONQUER.MIX"};

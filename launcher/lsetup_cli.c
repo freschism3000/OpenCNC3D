@@ -506,7 +506,7 @@ static int ls_install_module(const char *dir,int target,const char *file,const c
     if(file)ok=lmod_install_file(dir,target,LCFG_BUILD,file,sha,ls_module_progress,r,err,sizeof err);
     else{
         ok=site?lmod_catalog_fetch_at(site,LCFG_BUILD,&catalog,err,sizeof err):lmod_catalog_fetch(LCFG_BUILD,&catalog,err,sizeof err);
-        if(ok)ok=lmod_install_remote(dir,target,LCFG_BUILD,&catalog,ls_module_progress,r,err,sizeof err);
+        if(ok)ok=lmod_install_remote(dir,target,catalog.version[0]?catalog.version:LCFG_BUILD,&catalog,ls_module_progress,r,err,sizeof err);
     }
     ls_report(r,"MODULE",ok?LS_DONE:r->cancelled?LS_CANCELLED:LS_FAILED,ok?1000:0,1000,"",ok?"":err,1);
     printf("MODULE-INSTALL|%s|%s\n",ok?"PASS":"FAIL",ok?"verified module installed":err);

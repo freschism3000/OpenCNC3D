@@ -563,6 +563,24 @@ static const char* base_dir(const char* fallback)
 /* The Red Alert module is running (--module ra3d): set once, by the argument pass. */
 static int g_ra3dPreview = 0;
 
+/* The engine for that module. On Linux opencnc3d_find_ra_brain() looks in the
+   working directory and then beside the executable. The Windows module's
+   ra3d/RedAlert.dll is the data package's copy, not the brain this process loads. */
+#if defined(_WIN32)
+#define OPENCNC3D_RA_BRAIN "ra3d/RedAlert.dll"
+#elif !defined(__linux__)
+#define OPENCNC3D_RA_BRAIN "ra3d/RedAlert.dylib"
+#endif
+
+static const char* ra_brain_path(void)
+{
+#if defined(__linux__)
+    return opencnc3d_find_ra_brain();
+#else
+    return OPENCNC3D_RA_BRAIN;
+#endif
+}
+
 static int load_slot_prepare(GameOpts* opt, int slot)
 {
     DS_Slot tab[DS_SLOTS];
@@ -590,11 +608,7 @@ static int load_slot_prepare(GameOpts* opt, int slot)
            Start New Game does (the side follows from the mission's name), and the engine's
            payload then replaces the world it booted. */
         opt->ra3d = 1;
-#ifdef _WIN32
-        opt->dylib = "ra3d/RedAlert.dll";
-#else
-        opt->dylib = "ra3d/RedAlert.dylib";
-#endif
+        opt->dylib = ra_brain_path();
         opt->content = "ra3d/data";
         opt->dir = "ra3d/missions/";
         opt->dosdata = "ra3d/audio";
@@ -1534,11 +1548,7 @@ static void ra_engine_opts(GameOpts* opt, const char* scen)
     if (pf) fclose(pf);
     else snprintf(pack, sizeof pack, "ra3d/SCG01EA.pack");
     opt->ra3d = 1;
-#ifdef _WIN32
-    opt->dylib = "ra3d/RedAlert.dll";
-#else
-    opt->dylib = "ra3d/RedAlert.dylib";
-#endif
+    opt->dylib = ra_brain_path();
     opt->content = "ra3d/data";
     opt->dir = "ra3d/missions/";
     opt->dosdata = "ra3d/audio";
@@ -1691,11 +1701,7 @@ static const char* lobby_mission_dir(const char* dir)
 /* The brain whose order wire this module's rooms advertise and are judged by. */
 static const char* lobby_brain(const char* dylib)
 {
-#ifdef _WIN32
-    return g_ra3dPreview ? "ra3d/RedAlert.dll" : dylib;
-#else
-    return g_ra3dPreview ? "ra3d/RedAlert.dylib" : dylib;
-#endif
+    return g_ra3dPreview ? ra_brain_path() : dylib;
 }
 
 /* A RED ALERT ROOM'S OPENING MATCH, over what the lobby module's own defaults made: every
@@ -2890,9 +2896,12 @@ static int settings_carry_over(void)
     return copied;
 }
 
+#include "gpu_prime.h"
+
 int main(int argc, char** argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
+    opencnc3d_prefer_discrete_gpu();
     std::set_terminate(opencnc3d_terminate_handler);
     /* --langget CODE: fetch a language pack (game/lang_mod.h) into this install and exit,
        printing its progress; no window. The way to test a pack without the Settings box. */
@@ -7175,11 +7184,7 @@ int main(int argc, char** argv)
                 if (g_ra3dPreview) {
                     /* Select the campaign before opening its own first mission. */
                     opt.ra3d = 1;
-#ifdef _WIN32
-                    opt.dylib = "ra3d/RedAlert.dll";
-#else
-                    opt.dylib = "ra3d/RedAlert.dylib";
-#endif
+                    opt.dylib = ra_brain_path();
                     opt.content = "ra3d/data";
                     opt.dir = "ra3d/missions/";
                     opt.dosdata = "ra3d/audio";

@@ -47198,8 +47198,11 @@ void game_shutdown(void)
 /* The standalone renderer, kept exactly as it was from the outside: same flags, same
    headless modes, same exit codes. It is now one caller of the four calls above, so
    every gate that runs ./cnc_eyes is also a test of the seam the menu uses. */
+#include "gpu_prime.h"
+
 int main(int argc, char** argv)
 {
+    opencnc3d_prefer_discrete_gpu();
     GameOpts o;
     memset(&o, 0, sizeof(o));
     const int prc = game_parse_args(argc, argv, &o);

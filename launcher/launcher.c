@@ -94,6 +94,7 @@ int lsetup_cli_main(int argc, char **argv, int *handled);
 #include <string.h>
 #include <zlib.h>
 #include <sys/stat.h>
+#include "../app/userdir.h"
 #include "ra_emblem.h"
 
 #ifdef _WIN32
@@ -596,8 +597,24 @@ static void l_find_install(L_App *a)
         if (!strcmp(before, cur))
             break; /* at the root: there is nowhere further up to look */
     }
-    if (!a->dir[0])
+    if (!a->dir[0]) {
+#if defined(__linux__)
+        /* No dosmenu.pack beside the binary: this is the packaged layout, whose
+           program lives under /usr/lib/opencnc3d. Downloads go to the same
+           per-user folder the game uses for saves. SDL creates it. A flat
+           folder that does hold dosmenu.pack was returned above. */
+        char *pref = SDL_GetPrefPath(OPENCNC3D_PREF_ORG, OPENCNC3D_PREF_APP);
+        if (pref) {
+            size_t n = strlen(pref);
+            while (n > 1 && (pref[n - 1] == '/' || pref[n - 1] == '\\'))
+                pref[--n] = '\0';
+            snprintf(a->dir, sizeof a->dir, "%s", pref);
+            SDL_free(pref);
+            return;
+        }
+#endif
         snprintf(a->dir, sizeof a->dir, "%s", own);
+    }
 }
 
 /* WHAT MAKES RED ALERT INSTALLED is lmodule.c's test, the one the movies and music
@@ -610,11 +627,18 @@ static int l_module_available(const L_App *a,int target)
 }
 static int l_module_actionable(const L_App *a,int target)
 {return !a->mod[target].installed || a->mod[target].needs_update;}
+/* The catalog's version is the release tag, with no +sha/-dirty tail.
+ * Install and the "already current" check use that, so 0.9.0+248233a-dirty
+ * accepts the v0.9.0 package and does not treat it as a different build. */
+static const char *l_catalog_build(const L_App *a)
+{
+    return a->catalog.version[0] ? a->catalog.version : LCFG_BUILD;
+}
 static void l_module_versions(L_App *a)
 {
     int i;for(i=0;i<2;i++)a->mod[i].needs_update=!a->private_source && a->mod[i].installed &&
         SDL_AtomicGet(&a->catalog_phase)==2 && a->catalog.module[i].available &&
-        !lmod_module_current(a->dir,i,LCFG_BUILD);
+        !lmod_module_current(a->dir,i,l_catalog_build(a));
 }
 static void l_catalog_start(L_App *a);
 static void l_module_start(L_App *a,int target);
@@ -775,13 +799,32 @@ static int l_launch(const char *dir, const char *exe, const char *module,
     CloseHandle(pi.hProcess);
     return 1;
 #else
+#if defined(__linux__)
+    /* The working directory is the data folder. The program sits beside this
+       launcher, which in a package is /usr/lib/opencnc3d and not that folder. */
+    {
+        char self[1024];
+        if (!lp_self(self, sizeof self)) {
+            snprintf(err, (size_t)errlen, "could not find this launcher");
+            return 0;
+        }
+        lp_dirname(self);
+        if (snprintf(path, sizeof path, "%s/%s", self, exe) >= (int)sizeof path) {
+            snprintf(err, (size_t)errlen, "could not start %s", exe);
+            return 0;
+        }
+    }
+#else
     snprintf(path, sizeof path, "%s/%s", dir, exe);
+#endif
     if (chdir(dir) != 0) {
         snprintf(err, (size_t)errlen, "could not enter %s", dir);
         return 0;
     }
+#if !defined(__linux__)
     /* dir may be relative. Resolve the executable from the new working directory. */
     snprintf(path, sizeof path, "./%s", exe);
+#endif
     {
         char *argv[1 + 2 + sizeof l_game_args / sizeof *l_game_args + 1];
         int offset = module ? 2 : 0;
@@ -802,6 +845,12 @@ static int l_launch(const char *dir, const char *exe, const char *module,
 #define L_GAME_EXE "opencnc3d-game.exe"
 #define L_RA_GAME_EXE "ra3d\\opencnc3d-game.exe"
 #define L_EDIT_EXE "cnc_eyes.exe"
+#elif defined(__linux__)
+/* The Windows module ships ra3d/opencnc3d-game.exe. The program that runs
+   here is the Linux binary beside the module data, for both games. */
+#define L_GAME_EXE "opencnc3d"
+#define L_RA_GAME_EXE "opencnc3d"
+#define L_EDIT_EXE "cnc_eyes"
 #else
 #define L_GAME_EXE "opencnc3d"
 #define L_RA_GAME_EXE "ra3d/opencnc3d"
@@ -2068,8 +2117,8 @@ static int l_module_worker(void *user)
     L_App *a = (L_App *)user;
     int ok;
     if(SDL_AtomicGet(&a->catalog_phase)==2 && a->catalog.module[a->module_target].available)
-        ok=lmod_install_remote(a->dir,a->module_target,LCFG_BUILD,&a->catalog,l_module_progress,a,a->module_error,sizeof a->module_error);
-    else ok=lmod_install_cached(a->dir,a->module_target,LCFG_BUILD,l_module_progress,a,a->module_error,sizeof a->module_error);
+        ok=lmod_install_remote(a->dir,a->module_target,l_catalog_build(a),&a->catalog,l_module_progress,a,a->module_error,sizeof a->module_error);
+    else ok=lmod_install_cached(a->dir,a->module_target,l_catalog_build(a),l_module_progress,a,a->module_error,sizeof a->module_error);
     SDL_AtomicSet(&a->module_phase, ok ? 2 : -1); return 0;
 }
 static void l_module_start(L_App *a, int target)
@@ -2492,6 +2541,12 @@ static void l_draw(L_App *a)
         snprintf(line, sizeof line, "INSTALLED  v%s", a->version);
     lui_print(&a->surf, a->f6, line, L_PANEL_X, L_INFO_Y, DM_TEXT_MEDIUM);
 
+#if defined(__linux__)
+    /* No program zip on the site is a Linux build. Say so in the slot that
+       would otherwise offer a macOS version and a button that installs it. */
+    snprintf(line, sizeof line, "AVAILABLE  UPDATES OFF");
+    (void)ph;
+#else
     switch (ph) {
     case LU_UPTODATE:
     case LU_AVAILABLE:
@@ -2515,6 +2570,7 @@ static void l_draw(L_App *a)
         line[0] = '\0';
         break;
     }
+#endif
     if (a->private_source)
         snprintf(line, sizeof line, "LOCAL SOURCE BUILD");
     lui_print_right(&a->surf, a->f6, line, L_PANEL_X + L_PANEL_W, L_INFO_Y,
@@ -4111,7 +4167,8 @@ int main(int argc, char **argv)
         l_module_tick(&a);
         if(SDL_AtomicGet(&a.catalog_phase)==2&&!a.catalog_applied){l_module_versions(&a);a.catalog_applied=1;}
         if(a.view==L_VIEW_BROWSE && SDL_AtomicGet(&a.catalog_phase)==-1)
-            snprintf(a.mstatus,sizeof a.mstatus,"Catalog unavailable. Reopen browser to retry.");
+            snprintf(a.mstatus,sizeof a.mstatus,"%s",
+                     a.catalog_error[0]?a.catalog_error:"Catalog unavailable. Reopen browser to retry.");
         l_m_tick(&a);
         l_set_buttons(&a);
         while (SDL_PollEvent(&e))

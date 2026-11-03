@@ -11,6 +11,24 @@
 
 #if !defined(_WIN32)
 
+/* GCC on Linux does not provide MSVC's __int64, __cdecl or __declspec, even
+   with -fms-extensions. Clang on macOS does, once that flag is on, so these
+   stay off the Apple build. __int64 has to be a macro and not a typedef:
+   dllinterface.h writes `unsigned __int64`, which only expands correctly when
+   __int64 itself is a type specifier (`long long`). Empty __declspec is safe
+   here because a Linux shared library exports its symbols by default. */
+#if !defined(__APPLE__)
+#ifndef __int64
+#define __int64 long long
+#endif
+#ifndef __cdecl
+#define __cdecl
+#endif
+#ifndef __declspec
+#define __declspec(x)
+#endif
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

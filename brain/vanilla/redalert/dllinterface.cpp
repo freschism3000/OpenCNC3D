@@ -9033,7 +9033,14 @@ void DLLExportClass::Decode_Pointers(void)
         Sidebar_Glyphx_Decode_Pointers(&MultiplayerSidebars[i]);
 
         if (PlacementType[i]) {
+            /* Type was stored in the pointer slot by Code_Pointers. On the
+               32-bit Windows brain unsigned int is wide enough. A 64-bit brain
+               has to keep the whole stored value. */
+#if defined(_WIN32)
             StructType type = (StructType) reinterpret_cast<unsigned int>(PlacementType[i]);
+#else
+            StructType type = (StructType)(uintptr_t)PlacementType[i];
+#endif
             PlacementType[i] = NULL;
             if (type >= STRUCT_FIRST && type < STRUCT_COUNT) {
 

@@ -1,0 +1,24 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: OpenCNC3D
+Source: https://github.com/jagiella/OpenCNC3D
+
+Files: *
+Copyright: 2026 OpenCNC3D contributors
+License: GPL-3+
+
+Files: brain/vanilla/*
+Copyright: 2020 Electronic Arts Inc.
+License: GPL-3+
+Comment: Electronic Arts released the Tiberian Dawn and Red Alert remaster
+ sources under the GNU GPL version 3 with additional terms. Those terms are
+ in brain/vanilla/License.txt. This package does not include game assets,
+ cartridge dumps or the published module packages.
+
+License: GPL-3+
+ This program is free software: you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the Free
+ Software Foundation, either version 3 of the License, or (at your option)
+ any later version.
+ .
+ On Debian systems, the full text of the GNU General Public License version
+ 3 can be found in /usr/share/common-licenses/GPL-3.

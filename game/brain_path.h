@@ -31,6 +31,11 @@
  * executable" even when the working directory is somewhere else -- which is what
  * happens when a build is started from a shortcut rather than from its own folder. The
  * bare name is tried too, for the case where the base path cannot be determined.
+ *
+ * The working-directory candidate is "./name", not the bare name. access() finds a
+ * bare name in the current directory, but dlopen of a name with no slash searches
+ * the linker path and not that directory, so a brain sitting next to the executable
+ * was reported missing whenever the process was started from its own folder.
  */
 #ifndef OPENCNC3D_BRAIN_PATH_H
 #define OPENCNC3D_BRAIN_PATH_H
@@ -41,8 +46,10 @@
 
 /* The platform's own name for the brain. Everything that is not an explicit --dylib is
    derived from this, so a shipped build never has to be told where its own brain is. */
-#ifdef _WIN32
+#if defined(_WIN32)
 #  define OPENCNC3D_BRAIN_LIB "TiberianDawn.dll"
+#elif defined(__linux__)
+#  define OPENCNC3D_BRAIN_LIB "TiberianDawn.so"
 #else
 #  define OPENCNC3D_BRAIN_LIB "TiberianDawn.dylib"
 #endif
@@ -59,7 +66,7 @@ static const char* opencnc3d_find_brain(const char* explicitPath)
     static const char* candidates[] = {
         "../brain/lib/" OPENCNC3D_BRAIN_LIB,
         "../brain/vanilla/build-native/tiberiandawn/" OPENCNC3D_BRAIN_LIB,
-        OPENCNC3D_BRAIN_LIB,
+        "./" OPENCNC3D_BRAIN_LIB,
         NULL
     };
     static char beside[1024];
@@ -83,5 +90,38 @@ static const char* opencnc3d_find_brain(const char* explicitPath)
 
     return OPENCNC3D_BRAIN_LIB;
 }
+
+#if defined(__linux__)
+/* Red Alert's library. Same order as Tiberian Dawn where it applies: the
+   working directory, then beside the executable. A menu start whose working
+   directory is the data folder still loads the library that was installed
+   next to opencnc3d. The Windows module's ra3d/RedAlert.dll is not this file. */
+static const char* opencnc3d_find_ra_brain(void)
+{
+    static const char* candidates[] = {
+        "../brain/vanilla/build-native/redalert/RedAlert.so",
+        "./RedAlert.so",
+        NULL
+    };
+    static char beside[1024];
+    int i;
+
+    for (i = 0; candidates[i]; i++)
+        if (access(candidates[i], R_OK) == 0)
+            return candidates[i];
+
+    {
+        char* base = SDL_GetBasePath();
+        if (base) {
+            snprintf(beside, sizeof beside, "%sRedAlert.so", base);
+            SDL_free(base);
+            if (access(beside, R_OK) == 0)
+                return beside;
+        }
+    }
+
+    return "./RedAlert.so";
+}
+#endif
 
 #endif /* OPENCNC3D_BRAIN_PATH_H */

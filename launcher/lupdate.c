@@ -353,7 +353,7 @@ static const LJ_Value *lu_platform_release(const LJ_Value *root, const char *pla
     return best;
 }
 
-static int lu_read_builds(LU_State *u, const char *json, char *err, int errlen)
+static int lu_read_builds(LU_State *u, const char *json, const char *platform, char *err, int errlen)
 {
     LJ_Value *root;
     const LJ_Value *latest, *assets, *item;
@@ -372,7 +372,7 @@ static int lu_read_builds(LU_State *u, const char *json, char *err, int errlen)
         lj_free(root);
         return 0;
     }
-    latest = lu_platform_release(root, LU_PLATFORM);
+    latest = lu_platform_release(root, platform);
     if (!latest)
         latest = lj_get(root, "latest");
     /* A PINNED BUILD IS TAKEN FROM THE LIST, never from `latest`. Setup of one version
@@ -413,9 +413,9 @@ static int lu_read_builds(LU_State *u, const char *json, char *err, int errlen)
     memset(&u->manifest, 0, sizeof u->manifest);
     u->full.id = u->bins.id = u->manifest.id = -1;
     u->latest_data[0] = '\0';
-    snprintf(full_name, sizeof full_name, "OpenCNC3D-" LU_PLATFORM "-v%s.zip", u->latest);
-    snprintf(bins_name, sizeof bins_name, "OpenCNC3DBinaries-" LU_PLATFORM "-v%s.zip", u->latest);
-    snprintf(legacy_bins_name, sizeof legacy_bins_name, "OpenCNC3D-" LU_PLATFORM "-v%s-bins.zip", u->latest);
+    snprintf(full_name, sizeof full_name, "OpenCNC3D-%s-v%s.zip", platform, u->latest);
+    snprintf(bins_name, sizeof bins_name, "OpenCNC3DBinaries-%s-v%s.zip", platform, u->latest);
+    snprintf(legacy_bins_name, sizeof legacy_bins_name, "OpenCNC3D-%s-v%s-bins.zip", platform, u->latest);
     snprintf(manifest_name, sizeof manifest_name, "OpenCNC3D-v%s-manifest.txt", u->latest);
 
     assets = lj_get(latest, "assets");
@@ -457,7 +457,7 @@ static int lu_read_builds(LU_State *u, const char *json, char *err, int errlen)
     lj_free(root);
     if (!found_full) {
         snprintf(err, (size_t)errlen,
-                 "the build on the site has no " LU_PLATFORM " package");
+                 "the build on the site has no %s package", platform);
         return 0;
     }
     return 1;
@@ -810,7 +810,7 @@ static int lu_zip_progress(void *user, int done, int total)
     return !cancel;
 }
 
-static int lu_do_check(LU_State *u, char *err, int errlen)
+static int lu_do_check(LU_State *u, const char *platform, char *err, int errlen)
 {
     char url[1400];
     char *text;
@@ -827,7 +827,7 @@ static int lu_do_check(LU_State *u, char *err, int errlen)
     if (!text)
         return 0;
     {
-        int ok = lu_read_builds(u, text, err, errlen);
+        int ok = lu_read_builds(u, text, platform, err, errlen);
         free(text);
         if (!ok)
             return 0;
@@ -1116,7 +1116,7 @@ static int lu_thread(void *user)
 
     err[0] = '\0';
     if (want == LU_CHECKING) {
-        if (!lu_do_check(u, err, sizeof err)) {
+        if (!lu_do_check(u, LU_PLATFORM, err, sizeof err)) {
             lu_set(u, LU_FAILED, err);
             return 0;
         }
@@ -1167,6 +1167,13 @@ void lu_check(LU_State *u)
 {
     if (!u)
         return;
+#if defined(__linux__)
+    /* The site publishes program zips for Windows and macOS only. Applying
+       either one would replace this Linux build. Module packages are fetched
+       on their own path and are not affected. */
+    lu_set(u, LU_UPTODATE, "This Linux build is not updated from the site.");
+    return;
+#endif
     lu_start(u, LU_CHECKING, "Checking opencnc3d.com for a newer build...");
 }
 
@@ -1174,6 +1181,10 @@ void lu_apply(LU_State *u)
 {
     if (!u)
         return;
+#if defined(__linux__)
+    lu_set(u, LU_FAILED, "This Linux build is not updated from the site.");
+    return;
+#endif
     /* LU_DOWNLOADING is the worker's instruction as well as its report; the
      * thread reads the phase it was started in to know which job it has. */
     lu_start(u, LU_DOWNLOADING, "Starting the download...");
@@ -1309,7 +1320,14 @@ int lu_fetch_pack(const char *dir, int (*cb)(void *user, long long done, long lo
         lu_destroy(u);
         return 0;
     }
-    if (!lu_do_check(u, err, errlen)) {
+    /* The macOS binary zip is an application bundle and does not carry
+       dosmenu.pack. The Windows binary zip is flat and does. Only that file
+       is taken out of it. */
+#if defined(__linux__)
+    if (!lu_do_check(u, "windows", err, errlen)) {
+#else
+    if (!lu_do_check(u, LU_PLATFORM, err, errlen)) {
+#endif
         if (unreachable)
             *unreachable = lu_unreachable(u);
         lu_destroy(u);
@@ -1320,8 +1338,7 @@ int lu_fetch_pack(const char *dir, int (*cb)(void *user, long long done, long lo
     SDL_UnlockMutex(u->lock);
     if (a.id <= 0) {
         snprintf(err, (size_t)errlen,
-                 "the newest build on the site has no small " LU_PLATFORM
-                 " package to take the menu art from");
+                 "the newest build on the site has no small package to take the menu art from");
         lu_destroy(u);
         return 0;
     }

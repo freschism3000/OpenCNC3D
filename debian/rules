@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+
+VERSION := $(shell tr -d '[:space:]' < VERSION)
+LIBDIR := debian/opencnc3d/usr/lib/opencnc3d
+BINDIR := debian/opencnc3d/usr/bin
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	@:
+
+override_dh_auto_build:
+	sh tools/version.sh --release-header game/opencnc3d_build.h
+	OPENCNC3D_SKIP_VERSION_HEADER=1 OPENCNC3D_BUILD_ID=v$(VERSION) \
+		sh tools/linux/build-linux.sh
+
+override_dh_auto_test:
+	@:
+
+override_dh_auto_install:
+	install -d $(LIBDIR) $(BINDIR)
+	install -m 0755 build/linux/opencnc3d build/linux/opencnc3d-launcher \
+		build/linux/cnc_eyes build/linux/netcheck \
+		build/linux/TiberianDawn.so build/linux/RedAlert.so $(LIBDIR)
+	set -e; for b in opencnc3d opencnc3d-launcher cnc_eyes netcheck; do \
+		ln -s ../lib/opencnc3d/$$b $(BINDIR)/$$b; \
+	done
+	install -D -m 0644 debian/opencnc3d.desktop \
+		debian/opencnc3d/usr/share/applications/opencnc3d.desktop
+	install -D -m 0644 brain/vanilla/resources/vanillatd_icon.svg \
+		debian/opencnc3d/usr/share/icons/hicolor/scalable/apps/opencnc3d.svg
+
+override_dh_auto_clean:
+	rm -rf build/linux brain/vanilla/build-native
+	dh_auto_clean

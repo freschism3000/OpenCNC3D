@@ -171,14 +171,27 @@ index 109c35f..0256d6b 100644
  
      for (int i = 0; i < Count; i++) {
          HeaderBuffer[i].CRC = le32toh(HeaderBuffer[i].CRC);
+diff --git a/common/video_sdl2.cpp b/common/video_sdl2.cpp
+index e5ca8aa..3565d98 100644
+--- a/common/video_sdl2.cpp
++++ b/common/video_sdl2.cpp
+@@ -315,7 +315,7 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
+              SDL_GetPixelFormatName(requested_pixel_format));
+ 
+     /*
+-    ** Pick the first pixel format or the user requested one. It better be RGB.
++    ** Pick the first pixel format or the design review requested one. It better be RGB.
+     */
+     pixel_format = SDL_PIXELFORMAT_UNKNOWN;
+     for (int i = 0; i < info.num_texture_formats; i++) {
 diff --git a/redalert/CMakeLists.txt b/redalert/CMakeLists.txt
-index 60a3e85..cc413f0 100644
+index 60a3e85..3868c18 100644
 --- a/redalert/CMakeLists.txt
 +++ b/redalert/CMakeLists.txt
 @@ -1,3 +1,12 @@
-+# MODIFIED for OpenCNC3D on 19 October 2026. Builds the fair skirmish controller into the Red Alert library.
++# MODIFIED for OpenCNC3D. Builds the fair skirmish controller into the Red Alert library.
 +#
-+# MODIFIED for OpenCNC3D on 22 September 2026. This is not EA's original file.
++# MODIFIED for OpenCNC3D. This is not EA's original file.
 +# Adds the non-Windows compiler flags and Win32 editor-interface selection needed
 +# to build the Red Alert remaster library as a headless OpenCNC3D brain on macOS.
 +# It does not change the game simulation.
@@ -248,11 +261,11 @@ index 60a3e85..cc413f0 100644
 \ No newline at end of file
 +endif()
 diff --git a/redalert/aircraft.cpp b/redalert/aircraft.cpp
-index ca4eb46..0c52e2b 100644
+index ca4eb46..7282d9e 100644
 --- a/redalert/aircraft.cpp
 +++ b/redalert/aircraft.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Enables AI aircraft sight and delegates strategic hunting to the fair controller.
++// MODIFIED for OpenCNC3D. Enables AI aircraft sight and delegates strategic hunting to the fair controller.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -353,11 +366,11 @@ index 46bc70f..45fc3c9 100644
  
      /*
 diff --git a/redalert/building.cpp b/redalert/building.cpp
-index 0d42667..9b3a652 100644
+index 0d42667..ae6615a 100644
 --- a/redalert/building.cpp
 +++ b/redalert/building.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Revalidates AI purchases and enforces one normal production queue per category.
++// MODIFIED for OpenCNC3D. Revalidates AI purchases and enforces one normal production queue per category.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -882,11 +895,11 @@ index e8336d0..788419d 100644
  
      /*
 diff --git a/redalert/bullet.cpp b/redalert/bullet.cpp
-index 9a600af..c8d5f94 100644
+index 9a600af..024dcd7 100644
 --- a/redalert/bullet.cpp
 +++ b/redalert/bullet.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Applies the existing GPS reveal ability to fair computer seats.
++// MODIFIED for OpenCNC3D. Applies the existing GPS reveal ability to fair computer seats.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -965,11 +978,11 @@ index e936735..9b31bbc 100644
      **	Member function prototypes.
      */
 diff --git a/redalert/display.cpp b/redalert/display.cpp
-index d328d82..6496010 100644
+index d328d82..ed1433e 100644
 --- a/redalert/display.cpp
 +++ b/redalert/display.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Keeps per-house AI discovery, allied/radar sharing and constrained sight.
++// MODIFIED for OpenCNC3D. Keeps per-house AI discovery, allied/radar sharing and constrained sight.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -978,7 +991,7 @@ index d328d82..6496010 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for OpenCNC3D on 22 September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC3D. This is not EA's original file.
 +// Lets asset-free headless scenarios use a zero palette and an omitted MapPack,
 +// while retaining the original behavior whenever those assets are present.
 +// It changes error handling but not Red Alert gameplay rules for complete content.
@@ -1194,11 +1207,11 @@ index c8ed7a3..a136c40 100644
      ObjectClass* Next_Object(ObjectClass* object) const;
      ObjectClass* Prev_Object(ObjectClass* object) const;
 diff --git a/redalert/dllinterface.cpp b/redalert/dllinterface.cpp
-index 9965cb0..838ca3f 100644
+index 9965cb0..9105e77 100644
 --- a/redalert/dllinterface.cpp
 +++ b/redalert/dllinterface.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Assigns per-seat AI skill, exports diagnostics, and persists validated controller state.
++// MODIFIED for OpenCNC3D. Assigns per-seat AI skill, exports diagnostics, and persists validated controller state.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -1207,7 +1220,7 @@ index 9965cb0..838ca3f 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for OpenCNC3D on 22 September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC3D. This is not EA's original file.
 +// Adds headless startup diagnostics, deterministic custom-scenario seeding, and
 +// suppresses presentation-only rendering when explicit headless mode is active.
 +// It changes initialization but not Red Alert gameplay rules.
@@ -1905,7 +1918,22 @@ index 9965cb0..838ca3f 100644
  
      return true;
  }
-@@ -8743,4 +9057,1448 @@ void DLL_Code_Pointers(void)
+@@ -8719,7 +9033,14 @@ void DLLExportClass::Decode_Pointers(void)
+         Sidebar_Glyphx_Decode_Pointers(&MultiplayerSidebars[i]);
+ 
+         if (PlacementType[i]) {
++            /* Type was stored in the pointer slot by Code_Pointers. On the
++               32-bit Windows brain unsigned int is wide enough. A 64-bit brain
++               has to keep the whole stored value. */
++#if defined(_WIN32)
+             StructType type = (StructType) reinterpret_cast<unsigned int>(PlacementType[i]);
++#else
++            StructType type = (StructType)(uintptr_t)PlacementType[i];
++#endif
+             PlacementType[i] = NULL;
+             if (type >= STRUCT_FIRST && type < STRUCT_COUNT) {
+ 
+@@ -8743,4 +9064,1448 @@ void DLL_Code_Pointers(void)
  void DLL_Decode_Pointers(void)
  {
      DLLExportClass::Decode_Pointers();
@@ -3671,11 +3699,11 @@ index 0e3d9ca..610b7e5 100644
          for (int index = 0; index < 1; index++) {
              if (!Has_Completed() && Graphic_Logic()) {
 diff --git a/redalert/factory.h b/redalert/factory.h
-index ea9dcff..2c37094 100644
+index ea9dcff..e920a76 100644
 --- a/redalert/factory.h
 +++ b/redalert/factory.h
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Exposes remaining paid production balance for ordinary AI recovery budgeting.
++// MODIFIED for OpenCNC3D. Exposes remaining paid production balance for ordinary AI recovery budgeting.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -4431,11 +4459,11 @@ index 0000000..7203738
 +bool FairAI_RA_Load(unsigned char const* in, int size);
 +#endif
 diff --git a/redalert/foot.cpp b/redalert/foot.cpp
-index f31f0d8..8685562 100644
+index f31f0d8..f440f9e 100644
 --- a/redalert/foot.cpp
 +++ b/redalert/foot.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Rejects navigation destinations that track unobservable enemy objects.
++// MODIFIED for OpenCNC3D. Rejects navigation destinations that track unobservable enemy objects.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -4492,11 +4520,11 @@ index 68c365f..a5b6840 100644
  
  /* X,Y,Item Width,Items High,Selected,Norm Color,Sel Color,zero 	*/
 diff --git a/redalert/house.cpp b/redalert/house.cpp
-index f1fd2c8..28685fd 100644
+index f1fd2c8..14e09ba 100644
 --- a/redalert/house.cpp
 +++ b/redalert/house.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Uses fair multiplayer decisions, neutral country handicaps and live prerequisites; fixes placement coordinates.
++// MODIFIED for OpenCNC3D. Uses fair multiplayer decisions, neutral country handicaps and live prerequisites; fixes placement coordinates.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -4979,7 +5007,7 @@ index 6b3518a..a13033c 100644
                  Do_Action(DO_GESTURE1);
              } else {
 diff --git a/redalert/init.cpp b/redalert/init.cpp
-index b6b00d7..9ada419 100644
+index b6b00d7..b6d05a3 100644
 --- a/redalert/init.cpp
 +++ b/redalert/init.cpp
 @@ -12,6 +12,13 @@
@@ -4987,7 +5015,7 @@ index b6b00d7..9ada419 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for OpenCNC3D on 22 September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC3D. This is not EA's original file.
 +// Adds the asset-free DLL initialization path and a release-build fixed-seed option
 +// used by the Red Alert bootstrap determinism gate. Normal executable startup is
 +// unchanged. It changes initialization but not Red Alert gameplay rules.
@@ -5318,11 +5346,11 @@ index b6b00d7..9ada419 100644
      }
  
 diff --git a/redalert/logic.cpp b/redalert/logic.cpp
-index 5def340..7e671f4 100644
+index 5def340..c0a22b2 100644
 --- a/redalert/logic.cpp
 +++ b/redalert/logic.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Applies the existing optional shroud regrowth rule to fair AI houses.
++// MODIFIED for OpenCNC3D. Applies the existing optional shroud regrowth rule to fair AI houses.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -5344,11 +5372,11 @@ index 5def340..7e671f4 100644
                  }
              }
 diff --git a/redalert/map.cpp b/redalert/map.cpp
-index 471bef5..bed0636 100644
+index 471bef5..5d1495d 100644
 --- a/redalert/map.cpp
 +++ b/redalert/map.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Refreshes legitimate AI unit sight around regenerated Gap Generator fields.
++// MODIFIED for OpenCNC3D. Refreshes legitimate AI unit sight around regenerated Gap Generator fields.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -5357,7 +5385,7 @@ index 471bef5..bed0636 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for OpenCNC3D on 22 September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC3D. This is not EA's original file.
 +// Includes the non-Windows compatibility helpers used by the remaster library.
 +// It does not change the game simulation.
 +// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
@@ -5391,6 +5419,796 @@ index 471bef5..bed0636 100644
 -#endif
 \ No newline at end of file
 +#endif
+diff --git a/redalert/nulldlg.cpp b/redalert/nulldlg.cpp
+index 9455cdb..c4d627d 100644
+--- a/redalert/nulldlg.cpp
++++ b/redalert/nulldlg.cpp
+@@ -308,11 +308,11 @@ char const* EngMisStr[] = {
+     "Central Conflict (Lg)",
+     "Der zentrale Konflikt (Gr)",
+     "Coastal Influence (Med)",
+-    "Sturm an der KÅste (Mit)",
++    "Sturm an der K¬Åste (Mit)",
+     "Combat Alley (Med)",
+     "Boulevard der Schlachten (Mit)",
+     "Desolation (Lg)",
+-    "VerwÅstung (Gr)",
++    "Verw¬Åstung (Gr)",
+     "Dugout Isle (Med)",
+     "Buddelschiff (Mit)",
+     "Equal Opportunity (Sm)",
+@@ -326,7 +326,7 @@ char const* EngMisStr[] = {
+     "Isle of Fury (Lg)",
+     "Insel des Zorns (Gr)",
+     "Ivory Wastelands (Sm)",
+-    "ElfenbeinwÅste (Kl)",
++    "Elfenbeinw¬Åste (Kl)",
+     "Keep off the Grass (Sm)",
+     "Rasen betreten verboten (Kl)",
+     "Marooned II (Med)",
+@@ -342,7 +342,7 @@ char const* EngMisStr[] = {
+     "North By Northwest (Lg)",
+     "Nord auf Nordwest (Gr)",
+     "Pond Skirmish (Med)",
+-    "TeichgeplÑnkel (Mit)",
++    "Teichgepl¬Ñnkel (Mit)",
+     "Raraku (Lg)",
+     "Raraku (Gr)",
+     "Ridge War (Med)",
+@@ -357,7 +357,7 @@ char const* EngMisStr[] = {
+     "Alaska Anarchy (Lg)",
+     "Anarchie in Alaska (Gr)",
+     "All that Glitters... (Lg)",
+-    "Alles was glÑnzt... (Gr)",
++    "Alles was gl¬Ñnzt... (Gr)",
+     "Apre's Peace (Lg)",
+     "Apres Frieden (Gr)",
+     "Antartica (Lg)",
+@@ -371,15 +371,15 @@ char const* EngMisStr[] = {
+     "Bavarian Blast (Med)",
+     "Bayrische Blasmusik (Mit)",
+     "Be Shore (Med)",
+-    "StrandlÑufer (Mit)",
++    "Strandl¬Ñufer (Mit)",
+     "Bearing Straits (Med)",
+     "Die Heringstrasse (Mit)",
+     "Blow Holes (Lg)",
+-    "Lîcheriger KÑse (Gr)",
++    "L¬îcheriger K¬Ñse (Gr)",
+     "Bonsai (Sm)",
+     "Bonsai (Kl)",
+     "Brother Stalin (Lg)",
+-    "BrÅderchen Stalin (Gr)",
++    "Br¬Åderchen Stalin (Gr)",
+     "Bullseye (Lg)",
+     "Bullseye (Gr)",
+     "C&C (Med)",
+@@ -399,7 +399,7 @@ char const* EngMisStr[] = {
+     "Crossroads (Sm)",
+     "Kreuzung (Kl)",
+     "Czech Mate (Lg)",
+-    "Tschechische Erîffnung (Gr)",
++    "Tschechische Er¬îffnung (Gr)",
+     "Dday (Med)",
+     "D-Day (Mit)",
+     "Disaster Central (Lg)",
+@@ -407,7 +407,7 @@ char const* EngMisStr[] = {
+     "Docklands (Med)",
+     "Docklands (Mit)",
+     "East Coast (Med)",
+-    "OstkÅste (Mit)",
++    "Ostk¬Åste (Mit)",
+     "Eastern Seaboard (Lg)",
+     "Die Passage nach Osten (Gr)",
+     "Finger Lake (Lg)",
+@@ -425,7 +425,7 @@ char const* EngMisStr[] = {
+     "Glenboig (Sm)",
+     "Glenboig (Kl)",
+     "Hell Frozen Over (Lg)",
+-    "Winter in der Hîlle (Gr)",
++    "Winter in der H¬îlle (Gr)",
+     "India (Lg)",
+     "Indien (Gr)",
+     "Indirect Fire (Lg)",
+@@ -437,7 +437,7 @@ char const* EngMisStr[] = {
+     "Kabalo (Lg)",
+     "Kabalo (Gr)",
+     "King of the Hills (Lg)",
+-    "Kînig des MaulwurfshÅgels (Gr)",
++    "K¬înig des Maulwurfsh¬Ågels (Gr)",
+     "Lake Divide (Med)",
+     "Wasserscheide (Mit)",
+     "Lakelands (Lg)",
+@@ -455,7 +455,7 @@ char const* EngMisStr[] = {
+     "MyLai Delta (Med)",
+     "Das Delta von My Lai (Mit)",
+     "Natural Harbor (Med)",
+-    "NatÅrlicher Hafen (Mit)",
++    "Nat¬Årlicher Hafen (Mit)",
+     "No Way Out (Lg)",
+     "Kein Entkommen (Gr)",
+     "Normandy Landing (Lg)",
+@@ -465,17 +465,17 @@ char const* EngMisStr[] = {
+     "Oz (Lg)",
+     "Das Land Oz (Gr)",
+     "Pilgrim Fathers II (Lg)",
+-    "Die GrÅndervÑter (Gr)",
++    "Die Gr¬Ånderv¬Ñter (Gr)",
+     "Pip's Ice Tea (Med)",
+     "Pips Eistee (Mit)",
+     "Polar Panic (Lg)",
+     "Panik am Pol (Gr)",
+     "Ponds (Med)",
+-    "TÅmpelspringer (Mit)",
++    "T¬Åmpelspringer (Mit)",
+     "Putney (Lg)",
+     "Putney (Gr)",
+     "Return to Zion (Lg)",
+-    "RÅckkehr nach Zion (Gr)",
++    "R¬Åckkehr nach Zion (Gr)",
+     "Ring of Land (Lg)",
+     "Der Landring (Gr)",
+     "River Basin (Lg)",
+@@ -487,7 +487,7 @@ char const* EngMisStr[] = {
+     "River Maze (Sm)",
+     "Flussgewirr (Kl)",
+     "Rivers (Sm)",
+-    "FlÅsse (Kl)",
++    "Fl¬Åsse (Kl)",
+     "Run the Gauntlet (Med)",
+     "Spiessrutenlauf (Mit)",
+     "Scappa Flow (Lg)",
+@@ -507,9 +507,9 @@ char const* EngMisStr[] = {
+     "So Near So Far (Sm)",
+     "So nah und doch so fern (Kl)",
+     "South America (Lg)",
+-    "SÅdamerika (Gr)",
++    "S¬Ådamerika (Gr)",
+     "Spring Line (Lg)",
+-    "FrÅhlingsgefÅhle (Gr)",
++    "Fr¬Åhlingsgef¬Åhle (Gr)",
+     "Star (Lg)",
+     "Stern (Gr)",
+     "Straighter & Narrower (Sm)",
+@@ -527,15 +527,15 @@ char const* EngMisStr[] = {
+     "The Lake District (Lg)",
+     "Kalte Seenplatte (Gr)",
+     "The Linked lands (Lg)",
+-    "Die verbundenen LÑnder (Gr)",
++    "Die verbundenen L¬Ñnder (Gr)",
+     "The Mississippi (Med)",
+-    "GrÅsse von Tom Sawyer (Mit)",
++    "Gr¬Åsse von Tom Sawyer (Mit)",
+     "The Sticky Bit (Lg)",
+     "Der klebrige Teil (Gr)",
+     "The Valley (Med)",
+     "Das Tal (Mit)",
+     "The Woods Today (Lg)",
+-    "WaldlÑufer (Gr)",
++    "Waldl¬Ñufer (Gr)",
+     "Things to Come (Lg)",
+     "Was die Zukunft bringt (Gr)",
+     "Tiger Core (Sm)",
+@@ -543,9 +543,9 @@ char const* EngMisStr[] = {
+     "To the Core (Sm)",
+     "Mitten ins Herz (Kl)",
+     "Tournament Hills (Lg)",
+-    "HÅgel der Entscheidung (Gr)",
++    "H¬Ågel der Entscheidung (Gr)",
+     "Tropical Storm (Med)",
+-    "TropenstÅrme (Mit)",
++    "Tropenst¬Årme (Mit)",
+     "Tundra Trouble (Lg)",
+     "Tauziehen in der Tundra (Gr)",
+     "Uk (Med)",
+@@ -557,7 +557,7 @@ char const* EngMisStr[] = {
+     "Volcano (Sm)",
+     "Vulkan (Kl)",
+     "Wastelands (Lg)",
+-    "WÅstenei (Gr)",
++    "W¬Åstenei (Gr)",
+     "Water Works (Sm)",
+     "Wasserwerke (Kl)",
+     "World Map (Med)",
+@@ -575,7 +575,7 @@ char const* EngMisStr[] = {
+     "Ashes to Ashes (Lg 6 players)",
+     "Asche zu Asche (gross, 6 Spieler)",
+     "Artic Wasteland (Mega 8 players)",
+-    "Arktische WÅste (sehr gross, 8 Spieler)",
++    "Arktische W¬Åste (sehr gross, 8 Spieler)",
+     "Badajoz (Med 4 players)",
+     "Badjoz (mittelgross, 4 Spieler)",
+     "Baptism of Fire (Lg 6 players)",
+@@ -587,11 +587,11 @@ char const* EngMisStr[] = {
+     "Booby Traps (Mega 8 players)",
+     "Vorsicht, Falle! (sehr gross, 8 Spieler)",
+     "Bridgehead (Lg 6 players)",
+-    "BrÅckenkopf im Niemandsland (gross, 6 Spieler)",
++    "Br¬Åckenkopf im Niemandsland (gross, 6 Spieler)",
+     "Butterfly Bay (Lg 6 players)",
+     "Schmetterlingsbucht (gross, 6 Spieler)",
+     "Central Conflict Extreme (Mega 8 players)",
+-    "Zentraler Konflikt fÅr Kînner (sehr gross, 8 Spieler)",
++    "Zentraler Konflikt f¬År K¬înner (sehr gross, 8 Spieler)",
+     "Circles of Death (Mega 8 players)",
+     "Todeskreise (sehr gross, 8 Spieler)",
+     "Cold Front (Med 6 players)",
+@@ -601,7 +601,7 @@ char const* EngMisStr[] = {
+     "Combat Zones (Mega 8 players)",
+     "Kampfgebiete (sehr gross, 8 Spieler)",
+     "Conflict Cove (Sm 4 players)",
+-    "Hîhlenkonflikt (klein, 4 Spieler)",
++    "H¬îhlenkonflikt (klein, 4 Spieler)",
+     "Culloden Moor (Med 8 players)",
+     "Culloden-Moor (mittelgross, 8 Spieler)",
+     "Damnation Alley (Mega 8 players)",
+@@ -613,7 +613,7 @@ char const* EngMisStr[] = {
+     "Destruction Derby (Mega 8 players)",
+     "Destruction Derby (sehr gross, 8 Spieler)",
+     "Diamonds Aren't Forever (Mega 8 players)",
+-    "VergÑngliche Diamanten (sehr gross, 8 Spieler)",
++    "Verg¬Ñngliche Diamanten (sehr gross, 8 Spieler)",
+     "Elysium (Sm 4 players)",
+     "Elysium (klein, 4 Spieler)",
+     "Equal Shares (Lg 4 players)",
+@@ -627,19 +627,19 @@ char const* EngMisStr[] = {
+     "Glacial Valley (Sm 4 players)",
+     "Gletschertal (klein, 4 Spieler)",
+     "Gold Coast (Med 6 players)",
+-    "GoldkÅste (mittelgross, 6 Spieler)",
++    "Goldk¬Åste (mittelgross, 6 Spieler)",
+     "Gold Rush (Lg 4 players)",
+     "Goldrausch (gross, 4 Spieler)",
+     "Habitat (Lg 4 players)",
+     "Habitat (gross, 4 Spieler)",
+     "Hades Frozen Over (Sm 4 players)",
+-    "Frostschutz fÅr die Hîlle (klein, 4 Spieler)",
++    "Frostschutz f¬År die H¬îlle (klein, 4 Spieler)",
+     "Hamburger Hill (Mega 8 players)",
+     "Hamburger Hill (sehr gross, 8 Spieler)",
+     "Hastings (Sm 4 players)",
+     "Hastings (klein, 4 Spieler)",
+     "Hell's Pass (Med 6 players)",
+-    "Hîllenpass (mittelgross, 6 Spieler)",
++    "H¬îllenpass (mittelgross, 6 Spieler)",
+     "Holy Grounds (Mega 8 players)",
+     "Heiliger Boden (sehr gross, 8 Spieler)",
+     "Ice Bergs (Med 6 players)",
+@@ -647,7 +647,7 @@ char const* EngMisStr[] = {
+     "Ice Station (Lg 6 players)",
+     "Eisstation  (gross, 6 Spieler)",
+     "Ice Queen (Lg 4 players)",
+-    "Eiskînigin (gross, 4 Spieler)",
++    "Eisk¬înigin (gross, 4 Spieler)",
+     "In the Sun (Med 6 players)",
+     "Unter der Sonne (mittelgross, 6 Spieler)",
+     "Innocents? (Mega 8 players)",
+@@ -661,7 +661,7 @@ char const* EngMisStr[] = {
+     "Kananga (Med 6 players)",
+     "Kananga (mittelgross, 6 Spieler)",
+     "King of the Hills Extreme (Mega 8 players)",
+-    "Kînig des MaulwurfshÅgels (sehr gross, 8 Spieler)",
++    "K¬înig des Maulwurfsh¬Ågels (sehr gross, 8 Spieler)",
+     "Lake Land (Lg 8 players)",
+     "Seenland (gross, 8 Spieler)",
+     "Land Locked (Lg 8 players)",
+@@ -671,7 +671,7 @@ char const* EngMisStr[] = {
+     "Leipzip (Sm 4 players)",
+     "Leipzig (klein, 4 Spieler)",
+     "Meander (Lg 8 players)",
+-    "MÑander (gross, 8 Spieler)",
++    "M¬Ñander (gross, 8 Spieler)",
+     "Mekong (Med 8 players)",
+     "Mekong (mittelgross, 8 Spieler)",
+     "Middle Ground (Med 8 players)",
+@@ -679,15 +679,15 @@ char const* EngMisStr[] = {
+     "Naval Conquests (Mega 8 players)",
+     "Kommt zur Marine, haben sie gesagt (sehr gross, 8 Spieler)",
+     "On your Marks (Med 4 players)",
+-    "Auf die PlÑtze (mittelgross, 4 Spieler)",
++    "Auf die Pl¬Ñtze (mittelgross, 4 Spieler)",
+     "Open Warfare (Mega 8 players)",
+     "Offener Schlagabtausch (sehr gross, 8 Spieler)",
+     "Ore Gardens (Lg 8 players)",
+     "Erzparadies (gross, 8 Spieler)",
+     "Potholes (Mega 8 players)",
+-    "Schlaglîcher (sehr gross, 8 Spieler)",
++    "Schlagl¬îcher (sehr gross, 8 Spieler)",
+     "Puddles (Med 4 players)",
+-    "PfÅtzen (mittelgross, 4 Spieler)",
++    "Pf¬Åtzen (mittelgross, 4 Spieler)",
+     "Random Violence (Mega 8 players)",
+     "Unberechenbare Gewalt (sehr gross, 8 Spieler)",
+     "Revenge (Med 8 players)",
+@@ -709,9 +709,9 @@ char const* EngMisStr[] = {
+     "Shades (Med 8 players)",
+     "Schattenreich (mittelgross, 8 Spieler)",
+     "Smuggler's Cove (Lg 6 players)",
+-    "Schmugglerhîhle (gross, 6 Spieler)",
++    "Schmugglerh¬îhle (gross, 6 Spieler)",
+     "Snow Garden (Sm 2 players)",
+-    "Schneegestîber (klein, 2 Spieler)",
++    "Schneegest¬îber (klein, 2 Spieler)",
+     "Stalingrad (Sm 4 players)",
+     "Stalingrad (klein, 4 Spieler)",
+     "Sticks & Stones (Med 4 players)",
+@@ -719,7 +719,7 @@ char const* EngMisStr[] = {
+     "Strathearn Valley (Lg 6 players)",
+     "Das Tal von Strathearn (gross, 6 Spieler)",
+     "Super Bridgehead (Mega 8 players)",
+-    "Super-BrÅckenkopf (sehr gross, 8 Spieler)",
++    "Super-Br¬Åckenkopf (sehr gross, 8 Spieler)",
+     "Super Mekong (Mega 8 players)",
+     "Super-Mekong (sehr gross, 8 Spieler)",
+     "Super Ore Gardens (Mega 8 players)",
+@@ -731,13 +731,13 @@ char const* EngMisStr[] = {
+     "The Boyne (Med 4 players)",
+     "Boyne (mittelgross, 4 Spieler)",
+     "The Bulge (Sm 4 players)",
+-    "Die Wîlbung (klein, 4 Spieler)",
++    "Die W¬îlbung (klein, 4 Spieler)",
+     "The Cauldron (Lg 6 players)",
+     "Der Kessel (gross, 6 Spieler)",
+     "The Finger (Lg 6 players)",
+     "Der Finger (gross, 6 Spieler)",
+     "The Hills Have Eyes (Mega 8 players)",
+-    "Die HÅgel haben Augen (sehr gross, 8 Spieler)",
++    "Die H¬Ågel haben Augen (sehr gross, 8 Spieler)",
+     "The Keyes (Med 6 players)",
+     "Ein Sumpf (mittelgross, 6 Spieler)",
+     "The Lakes (Med 8 players)",
+@@ -751,7 +751,7 @@ char const* EngMisStr[] = {
+     "Trafalgar (Lg 4 players)",
+     "Trafalgar (gross, 4 Spieler)",
+     "Twin Rivers (Sm 4 players)",
+-    "Zwillingsstrîme (klein, 4 Spieler)",
++    "Zwillingsstr¬îme (klein, 4 Spieler)",
+     "Umtumbo Gorge (Lg 4 players)",
+     "Die Umtumbo-Schlucht (gross, 4 Spieler)",
+     "Watch Your Step Extreme (Mega 8 players)",
+@@ -781,7 +781,7 @@ char const* EngMisStr[] = {
+     "Combat Alley (Med)",
+     "Aux Armes! (Moy)",
+     "Desolation (Lg)",
+-    "DÇsolation (Max)",
++    "D¬Çsolation (Max)",
+     "Dugout Isle (Med)",
+     "L'Ile Maudite (Moy)",
+     "Equal Opportunity (Sm)",
+@@ -789,7 +789,7 @@ char const* EngMisStr[] = {
+     "First Come, First Serve (Sm)",
+     "La Loi du Plus Fort (Min)",
+     "Island Hoppers (Sm)",
+-    "D'une Ile Ö l'autre (Min)",
++    "D'une Ile ¬Ö l'autre (Min)",
+     "Island Wars (Lg)",
+     "Guerres Insulaires (Max)",
+     "Isle of Fury (Lg)",
+@@ -803,7 +803,7 @@ char const* EngMisStr[] = {
+     "Middle Mayhem (Sm)",
+     "Chaos Interne (Min)",
+     "No Escape (Med)",
+-    "Le Piäge (Moy)",
++    "Le Pi¬äge (Moy)",
+     "No Man's Land (Med)",
+     "No Man's Land (Moy)",
+     "Normandy (Med)",
+@@ -819,7 +819,7 @@ char const* EngMisStr[] = {
+     "Shallow Grave (Med)",
+     "La Saveur de la Mort (Moy)",
+     "Treasure Isle (Med)",
+-    "L'Ile au TrÇsor (Moy)",
++    "L'Ile au Tr¬Çsor (Moy)",
+ 
+     "Africa (Lg)",
+     "Afrique (Max)",
+@@ -828,27 +828,27 @@ char const* EngMisStr[] = {
+     "All that Glitters... (Lg)",
+     "Tout ce qui brille... (Max)",
+     "Apre's Peace (Lg)",
+-    "Une Paix Durement NÇgociÇe... (Max)",
++    "Une Paix Durement N¬Çgoci¬Çe... (Max)",
+     "Antartica (Lg)",
+     "Antarctique (Max)",
+     "Armourgarden (Lg)",
+-    "La Guerre des BlindÇs (Max)",
++    "La Guerre des Blind¬Çs (Max)",
+     "Austraila (Med)",
+     "Australie (Moy)",
+     "Barrier to Entry (Lg)",
+-    "Barriäre Ö l'EntrÇe (Max)",
++    "Barri¬äre ¬Ö l'Entr¬Çe (Max)",
+     "Bavarian Blast (Med)",
+     "Tonnerre Bavarois (Moy)",
+     "Be Shore (Med)",
+-    "Plages MenacÇes (Moy)",
++    "Plages Menac¬Çes (Moy)",
+     "Bearing Straits (Med)",
+     "Droit Devant ! (Moy)",
+     "Blow Holes (Lg)",
+-    "Cratäres (Max)",
++    "Crat¬äres (Max)",
+     "Bonsai (Sm)",
+-    "Bonsaã (Min)",
++    "Bonsa¬ã (Min)",
+     "Brother Stalin (Lg)",
+-    "Fräre Staline (Max)",
++    "Fr¬äre Staline (Max)",
+     "Bullseye (Lg)",
+     "L'oeil du Taureau (Max)",
+     "C&C (Med)",
+@@ -860,23 +860,23 @@ char const* EngMisStr[] = {
+     "Camos Cross (Lg)",
+     "La Croix de Guerre (Max)",
+     "Camos Crossing (Sm)",
+-    "La CroisÇe des Chemins (Min)",
++    "La Crois¬Çe des Chemins (Min)",
+     "Central Arena (Lg)",
+-    "L'Aräne Diabolique (Max)",
++    "L'Ar¬äne Diabolique (Max)",
+     "Canyon River (Med)",
+-    "Au Milieu Coule Une Riviäre (Moy)",
++    "Au Milieu Coule Une Rivi¬äre (Moy)",
+     "Crossroads (Sm)",
+     "Carrefours (Min)",
+     "Czech Mate (Lg)",
+-    "Tchäque et Mat (Max)",
++    "Tch¬äque et Mat (Max)",
+     "Dday (Med)",
+     "Le Jour J (Moy)",
+     "Disaster Central (Lg)",
+-    "DÇsastre Central (Max)",
++    "D¬Çsastre Central (Max)",
+     "Docklands (Med)",
+     "L'Enfer des Docks (Moy)",
+     "East Coast (Med)",
+-    "Cìte Est (Moy)",
++    "C¬ìte Est (Moy)",
+     "Eastern Seaboard (Lg)",
+     "Rivages de l'Est (Max)",
+     "Finger Lake (Lg)",
+@@ -886,11 +886,11 @@ char const* EngMisStr[] = {
+     "Floodlands (Lg)",
+     "Campagne Lacustre (Max)",
+     "Forest under fire (Lg)",
+-    "Foràt en flammes (Max)",
++    "For¬àt en flammes (Max)",
+     "Four Corners (Lg)",
+     "4 Coins (Max)",
+     "Frostbit Fjords (Lg)",
+-    "Fjords GelÇs (Max)",
++    "Fjords Gel¬Çs (Max)",
+     "Glenboig (Sm)",
+     "Glenboig (Min)",
+     "Hell Frozen Over (Lg)",
+@@ -910,17 +910,17 @@ char const* EngMisStr[] = {
+     "Lake Divide (Med)",
+     "La Guerre du Lac (Moy)",
+     "Lakelands (Lg)",
+-    "Terres SubmergÇes (Max)",
++    "Terres Submerg¬Çes (Max)",
+     "Land Ladder (Lg)",
+     "Jusqu'au Sommet (Max)",
+     "Lotsa Lakes (Lg)",
+     "Terres de Lacs (Max)",
+     "Lunar Battlefield (Lg Special)",
+-    "Combat Lunaire (Max SpÇcial)",
++    "Combat Lunaire (Max Sp¬Çcial)",
+     "Malibu Fields (Med)",
+     "Les Champs de Malibu (Moy)",
+     "Marshland (Med)",
+-    "MarÇcages (Moy)",
++    "Mar¬Çcages (Moy)",
+     "MyLai Delta (Med)",
+     "Le Delta Mylai (Moy)",
+     "Natural Harbor (Med)",
+@@ -928,23 +928,23 @@ char const* EngMisStr[] = {
+     "No Way Out (Lg)",
+     "Sans Issue (Max)",
+     "Normandy Landing (Lg)",
+-    "Le DÇbarquement (Max)",
++    "Le D¬Çbarquement (Max)",
+     "Ore Wars (Med)",
+     "La Guerre du Minerai (Moy)",
+     "Oz (Lg)",
+     "Oz (Max)",
+     "Pilgrim Fathers II (Lg)",
+-    "Les Pälerins 2 (Max)",
++    "Les P¬älerins 2 (Max)",
+     "Pip's Ice Tea (Med)",
+-    "Les TranchÇes de Glace (Moy)",
++    "Les Tranch¬Çes de Glace (Moy)",
+     "Polar Panic (Lg)",
+     "Panique Polaire (Max)",
+     "Ponds (Med)",
+     "Les Etangs (Moy)",
+     "Putney (Lg)",
+-    "La Meilleure DÇfense... (Max)",
++    "La Meilleure D¬Çfense... (Max)",
+     "Return to Zion (Lg)",
+-    "Retour Ö Sion (Max)",
++    "Retour ¬Ö Sion (Max)",
+     "Ring of Land (Lg)",
+     "Le Cycle Infernal (Max)",
+     "River Basin (Lg)",
+@@ -952,21 +952,21 @@ char const* EngMisStr[] = {
+     "River Delta (Med)",
+     "Le Delta (Moy)",
+     "River Islands (Med)",
+-    "Cìtes Ö Surveiller de Präs (Moy)",
++    "C¬ìtes ¬Ö Surveiller de Pr¬äs (Moy)",
+     "River Maze (Sm)",
+     "Labyrinthe Fluvial (Min)",
+     "Rivers (Sm)",
+-    "Riviäres (Min)",
++    "Rivi¬äres (Min)",
+     "Run the Gauntlet (Med)",
+-    "Relevons le DÇfi ! (Moy)",
++    "Relevons le D¬Çfi ! (Moy)",
+     "Scappa Flow (Lg)",
+     "Combats Sanglants (Max)",
+     "Siberian Slaughter (Lg)",
+-    "Carnage SibÇrien (Max)",
++    "Carnage Sib¬Çrien (Max)",
+     "Sleepy Valley (Sm)",
+-    "La VallÇe Endormie (Min)",
++    "La Vall¬Çe Endormie (Min)",
+     "Snake River (Lg)",
+-    "La Riviäre aux Serpents (Max)",
++    "La Rivi¬äre aux Serpents (Max)",
+     "Snow Wars (Lg)",
+     "Guerres de Neige (Max)",
+     "Snowball fight (Lg)",
+@@ -976,7 +976,7 @@ char const* EngMisStr[] = {
+     "So Near So Far (Sm)",
+     "Si Loin, Si Proche (Min)",
+     "South America (Lg)",
+-    "AmÇrique du Sud (Max)",
++    "Am¬Çrique du Sud (Max)",
+     "Spring Line (Lg)",
+     "Ligne de Front (Max)",
+     "Star (Lg)",
+@@ -992,21 +992,21 @@ char const* EngMisStr[] = {
+     "The Great Lakes (Med)",
+     "Les Grands Lacs (Moy)",
+     "The Ice Arena (Lg)",
+-    "L'Aräne de Glace (Max)",
++    "L'Ar¬äne de Glace (Max)",
+     "The Lake District (Lg)",
+     "Un Lac Imprenable (Max)",
+     "The Linked lands (Lg)",
+-    "Passages Ö GuÇ (Max)",
++    "Passages ¬Ö Gu¬Ç (Max)",
+     "The Mississippi (Med)",
+     "Mississippi (Moy)",
+     "The Sticky Bit (Lg)",
+     "Marasme (Max)",
+     "The Valley (Med)",
+-    "La VallÇe (Moy)",
++    "La Vall¬Çe (Moy)",
+     "The Woods Today (Lg)",
+     "Aujoud'hui: la Mort ! (Max)",
+     "Things to Come (Lg)",
+-    "DÇnouement Incertain (Max)",
++    "D¬Çnouement Incertain (Max)",
+     "Tiger Core (Sm)",
+     "Le Coeur du Tigre (Min)",
+     "To the Core (Sm)",
+@@ -1026,46 +1026,46 @@ char const* EngMisStr[] = {
+     "Volcano (Sm)",
+     "Le Volcan (Min)",
+     "Wastelands (Lg)",
+-    "Terres DÇsolÇes (Max)",
++    "Terres D¬Çsol¬Çes (Max)",
+     "Water Works (Sm)",
+     "Jeux d'Eau (Min)",
+     "World Map (Med)",
+     "Carte du Monde (Moy)",
+     "Zambezi (Lg)",
+-    "Zambäze (Max)",
++    "Zamb¬äze (Max)",
+     //#if 0
+     "A Pattern of Islands (Lg 8 players)",
+     "Archipel (Max. 8 joueurs)",
+     "Arena Valley Extreme (Mega 8 players)",
+-    "La VallÇe de l'aräne (XL 8 joueurs)",
++    "La Vall¬Çe de l'ar¬äne (XL 8 joueurs)",
+     "Around the Rim (Sm 4 players)",
+-    "Autour de la cràte (Min. 4 joueurs)",
++    "Autour de la cr¬àte (Min. 4 joueurs)",
+     "Ashes to Ashes (Lg 6 players)",
+-    "RÇduit en cendres (Max. 6 joueurs)",
++    "R¬Çduit en cendres (Max. 6 joueurs)",
+     "Artic Wasteland (Mega 8 players)",
+-    "DÇsolation arctique (XL 8 joueurs)",
++    "D¬Çsolation arctique (XL 8 joueurs)",
+     "Badajoz (Med 4 players)",
+     "Badjoz (Moy. 4 joueurs)",
+     "Baptism of Fire (Lg 6 players)",
+-    "Baptàme du feu (Max. 6 joueurs)",
++    "Bapt¬àme du feu (Max. 6 joueurs)",
+     "Big Fish, Small Pond (Lg 6 players)",
+     "Gros poisson, Min. Mare (Max. 6 joueurs)",
+     "Blue Lakes (Lg 8 players)",
+     "Lacs bleus (Max. 8 joueurs)",
+     "Booby Traps (Mega 8 players)",
+-    "Piäges (XL 8 joueurs)",
++    "Pi¬äges (XL 8 joueurs)",
+     "Bridgehead (Lg 6 players)",
+-    "Tàte de pont (Max. 6 joueurs)",
++    "T¬àte de pont (Max. 6 joueurs)",
+     "Butterfly Bay (Lg 6 players)",
+     "La baie du papillon (Max. 6 joueurs)",
+     "Central Conflict Extreme (Mega 8 players)",
+-    "Conflit central extràme (XL 8 joueurs)",
++    "Conflit central extr¬àme (XL 8 joueurs)",
+     "Circles of Death (Mega 8 players)",
+     "Les cercles de la mort (XL 8 joueurs)",
+     "Cold Front (Med 6 players)",
+     "Front froid ( Moy. 6 joueurs)",
+     "Cold Pass (Med 4 players)",
+-    "La Passe GlacÇe (Moy. 4 joueurs)",
++    "La Passe Glac¬Çe (Moy. 4 joueurs)",
+     "Combat Zones (Mega 8 players)",
+     "Zones de combat (XL 8 joueurs)",
+     "Conflict Cove (Sm 4 players)",
+@@ -1075,33 +1075,33 @@ char const* EngMisStr[] = {
+     "Damnation Alley (Mega 8 players)",
+     "Le chemin de la damnation (XL 8 joueurs)",
+     "Death Valley (Mega 8 players)",
+-    "La vallÇe de la mort (XL 8 joueurs)",
++    "La vall¬Çe de la mort (XL 8 joueurs)",
+     "Deep Six (Mega 8 players)",
+     "Six de profondeur (XL 8 joueurs)",
+     "Destruction Derby (Mega 8 players)",
+     "Stock car (XL 8 joueurs)",
+     "Diamonds Aren't Forever (Mega 8 players)",
+-    "Les diamants ne sont pas Çternels (XL 8 joueurs)",
++    "Les diamants ne sont pas ¬Çternels (XL 8 joueurs)",
+     "Elysium (Sm 4 players)",
+-    "ElysÇe (Min. 4 joueurs)",
++    "Elys¬Çe (Min. 4 joueurs)",
+     "Equal Shares (Lg 4 players)",
+-    "Parts Çgales (Max. 4 joueurs)",
++    "Parts ¬Çgales (Max. 4 joueurs)",
+     "Frost Bitten (Mega 8 players)",
+     "Engelures (XL 8 joueurs)",
+     "Frozen Valley (Med 6 players)",
+-    "La VallÇe glacÇe (Moy. 6 joueurs)",
++    "La Vall¬Çe glac¬Çe (Moy. 6 joueurs)",
+     "Gettysburg (Sm 4 players)",
+     "Gettysburg (Min. 4 joueurs)",
+     "Glacial Valley (Sm 4 players)",
+-    "VallÇe de glace (Min. 4 joueurs)",
++    "Vall¬Çe de glace (Min. 4 joueurs)",
+     "Gold Coast (Med 6 players)",
+-    "La cìte dorÇe (Moy. 6 joueurs)",
++    "La c¬ìte dor¬Çe (Moy. 6 joueurs)",
+     "Gold Rush (Lg 4 players)",
+-    "La ruÇe vers l'or (Max. 4 joueurs)",
++    "La ru¬Çe vers l'or (Max. 4 joueurs)",
+     "Habitat (Lg 4 players)",
+     "Habitat (Max. 4 joueurs)",
+     "Hades Frozen Over (Sm 4 players)",
+-    "Les enfers glacÇs (Min. 4 joueurs)",
++    "Les enfers glac¬Çs (Min. 4 joueurs)",
+     "Hamburger Hill (Mega 8 players)",
+     "Hamburger Hill (XL 8 joueurs)",
+     "Hastings (Sm 4 players)",
+@@ -1113,7 +1113,7 @@ char const* EngMisStr[] = {
+     "Ice Bergs (Med 6 players)",
+     "Icebergs (Moy. 6 joueurs)",
+     "Ice Station (Lg 6 players)",
+-    "Station glacÇe (Max. 6 joueurs)",
++    "Station glac¬Çe (Max. 6 joueurs)",
+     "Ice Queen (Lg 4 players)",
+     "Reine des glaces (Max. 4 joueurs)",
+     "In the Sun (Med 6 players)",
+@@ -1123,13 +1123,13 @@ char const* EngMisStr[] = {
+     "Islands (Med 8 players)",
+     "Iles (Moy. 8 joueurs)",
+     "Island Plateau (Lg 4 players)",
+-    "Plateau des åles (Max. 4 joueurs)",
++    "Plateau des ¬åles (Max. 4 joueurs)",
+     "Island Wars Extreme (Mega 8 players)",
+-    "Guerres insulaires extràme (XL 8 joueurs)",
++    "Guerres insulaires extr¬àme (XL 8 joueurs)",
+     "Kananga (Med 6 players)",
+     "Kananga (Moy. 6 joueurs)",
+     "King of the Hills Extreme (Mega 8 players)",
+-    "Roi des collines extràme (XL 8 joueurs)",
++    "Roi des collines extr¬àme (XL 8 joueurs)",
+     "Lake Land (Lg 8 players)",
+     "Paysage lacustre (Max. 8 joueurs)",
+     "Land Locked (Lg 8 players)",
+@@ -1139,13 +1139,13 @@ char const* EngMisStr[] = {
+     "Leipzip (Sm 4 players)",
+     "Leipzig (Min. 4 joueurs)",
+     "Meander (Lg 8 players)",
+-    "MÇandre (Max. 8 joueurs)",
++    "M¬Çandre (Max. 8 joueurs)",
+     "Mekong (Med 8 players)",
+-    "MÇkong (Moy. 8 joueurs)",
++    "M¬Çkong (Moy. 8 joueurs)",
+     "Middle Ground (Med 8 players)",
+-    "Plateau mÇdian (Moy. 8 joueurs)",
++    "Plateau m¬Çdian (Moy. 8 joueurs)",
+     "Naval Conquests (Mega 8 players)",
+-    "Conquàtes navales (XL 8 joueurs)",
++    "Conqu¬àtes navales (XL 8 joueurs)",
+     "On your Marks (Med 4 players)",
+     "A vos marques (Moy. 4 joueurs)",
+     "Open Warfare (Mega 8 players)",
+@@ -1157,23 +1157,23 @@ char const* EngMisStr[] = {
+     "Puddles (Med 4 players)",
+     "Flaques (Moy. 4 joueurs)",
+     "Random Violence (Mega 8 players)",
+-    "Violence alÇatoire (XL 8 joueurs)",
++    "Violence al¬Çatoire (XL 8 joueurs)",
+     "Revenge (Med 8 players)",
+     "Vengeance (Moy. 8 joueurs)",
+     "Rias (Med 8 players)",
+     "Rias (Moy. 8 joueurs)",
+     "River Crossing (Sm 4 players)",
+-    "Passage Ö guÇ (Min. 4 joueurs)",
++    "Passage ¬Ö gu¬Ç (Min. 4 joueurs)",
+     "River Rampage (Mega 8 players)",
+-    "Riviäre dÇchaånÇe (XL 8 joueurs)",
++    "Rivi¬äre d¬Çcha¬ån¬Çe (XL 8 joueurs)",
+     "River Rapids (Lg 6 players)",
+     "Rapides (Max. 6 joueurs)",
+     "Rivers Wild (Mega 8 players)",
+-    "Riviäres sauvages (XL 8 joueurs)",
++    "Rivi¬äres sauvages (XL 8 joueurs)",
+     "Rorkes Drift (Lg 4 players)",
+     "L'Exode de Rorkes (Max. 4 joueurs)",
+     "Seaside (Med 4 players)",
+-    "Cìte (Moy. 4 joueurs)",
++    "C¬ìte (Moy. 4 joueurs)",
+     "Shades (Med 8 players)",
+     "Ombres (Moy. 8 joueurs)",
+     "Smuggler's Cove (Lg 6 players)",
+@@ -1183,13 +1183,13 @@ char const* EngMisStr[] = {
+     "Stalingrad (Sm 4 players)",
+     "Stalingrad (Min. 4 joueurs)",
+     "Sticks & Stones (Med 4 players)",
+-    "BÉton & Roches (Moy. 4 joueurs)",
++    "B¬Éton & Roches (Moy. 4 joueurs)",
+     "Strathearn Valley (Lg 6 players)",
+-    "La VallÇe de Strathearn (Max. 6 joueurs)",
++    "La Vall¬Çe de Strathearn (Max. 6 joueurs)",
+     "Super Bridgehead (Mega 8 players)",
+-    "Super tàte de pont (XL 8 joueurs)",
++    "Super t¬àte de pont (XL 8 joueurs)",
+     "Super Mekong (Mega 8 players)",
+-    "Super MÇkong (XL 8 joueurs)",
++    "Super M¬Çkong (XL 8 joueurs)",
+     "Super Ore Gardens (Mega 8 players)",
+     "Super jardin de minerai (XL 8 joueurs)",
+     "Switch (Med 4 players)",
+@@ -1219,11 +1219,11 @@ char const* EngMisStr[] = {
+     "Trafalgar (Lg 4 players)",
+     "Trafalgar (Max. 4 joueurs)",
+     "Twin Rivers (Sm 4 players)",
+-    "Les deux riviäres (Min. 4 joueurs)",
++    "Les deux rivi¬äres (Min. 4 joueurs)",
+     "Umtumbo Gorge (Lg 4 players)",
+     "La Gorge de Umtumbo (Max. 4 joueurs)",
+     "Watch Your Step Extreme (Mega 8 players)",
+-    "Pas-Ö-pas extràme (XL 8 joueurs)",
++    "Pas-¬Ö-pas extr¬àme (XL 8 joueurs)",
+     "Waterfalls (Lg 8 players)",
+     "Chutes d'eau (Max. 8 joueurs)",
+     "Waterloo Revisited (Lg 6 players)",
+@@ -1253,7 +1253,7 @@ char const* EngMisStr[] = {
+  * OUTPUT:   true if scenario is available locally                                             *
+  *                                                                                             *
+  * WARNINGS: We need to reject files that don't match exactly because scenarios with the same  *
+- *           description can exist on both machines but have different contents. For example   *
++ *           description can exist on all development machines but have different contents. For example   *
+  *           there will be lots of scenarios called 'my map' and 'aaaaaa'.          			  *
+  *                                                                                             *
+  * HISTORY:                                                                                    *
 diff --git a/redalert/object.cpp b/redalert/object.cpp
 index f4fd824..3eb6432 100644
 --- a/redalert/object.cpp
@@ -5528,11 +6346,11 @@ index 399ddfb..4d17c5e 100644
      **	Query functions.
      */
 diff --git a/redalert/radar.cpp b/redalert/radar.cpp
-index 6211ff4..48280ea 100644
+index 6211ff4..f0fc4d8 100644
 --- a/redalert/radar.cpp
 +++ b/redalert/radar.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Applies Gap Generator shrouding to fair AI houses.
++// MODIFIED for OpenCNC3D. Applies Gap Generator shrouding to fair AI houses.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -5554,7 +6372,7 @@ index 6211ff4..48280ea 100644
              }
          }
 diff --git a/redalert/rules.cpp b/redalert/rules.cpp
-index 544c0ac..73aed02 100644
+index 544c0ac..b7f30f5 100644
 --- a/redalert/rules.cpp
 +++ b/redalert/rules.cpp
 @@ -12,6 +12,12 @@
@@ -5562,7 +6380,7 @@ index 544c0ac..73aed02 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for OpenCNC3D on 22 September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC3D. This is not EA's original file.
 +// Enforces enough dynamic rule-heap capacity for every compiled built-in weapon
 +// and warhead. Larger content or mod values remain authoritative.
 +// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
@@ -5603,11 +6421,11 @@ index 544c0ac..73aed02 100644
 \ No newline at end of file
 +}
 diff --git a/redalert/saveload.cpp b/redalert/saveload.cpp
-index 36a2e3c..aaa3939 100644
+index 36a2e3c..0e0bb07 100644
 --- a/redalert/saveload.cpp
 +++ b/redalert/saveload.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Rejects invalid DLL save metadata and restores normal skirmish country statistics after load.
++// MODIFIED for OpenCNC3D. Rejects invalid DLL save metadata and restores normal skirmish country statistics after load.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -5636,8 +6454,64 @@ index 36a2e3c..aaa3939 100644
  
      /*
      ** Re-init unit trackers. They will be garbage pointers after the load
+diff --git a/redalert/scenario.cpp b/redalert/scenario.cpp
+index 3738c61..1f377ff 100644
+--- a/redalert/scenario.cpp
++++ b/redalert/scenario.cpp
+@@ -297,11 +297,11 @@ bool ScenarioClass::Set_Global_To(int global, bool value)
+  * Start_Scenario -- Starts the scenario.                                                      *
+  *                                                                                             *
+  *    This routine will start the scenario. In addition to loading the scenario data, it will  *
+- *    play the briefing and action movies.                                                     *
++ *    play the mission briefing and action movies.                                                     *
+  *                                                                                             *
+  * INPUT:   root     -- Pointer to the filename root for this scenario (e.g., "SCG01EA").      *
+  *                                                                                             *
+- *          briefing -- Should the briefing be played? Normally this is true except when the   *
++ *          briefing -- Should the mission briefing be played? Normally this is true except when the   *
+  *                      scenario is restarting.                                                *
+  *                                                                                             *
+  * OUTPUT:  Was the scenario started without error?                                            *
+@@ -2420,7 +2420,7 @@ bool Read_Scenario_INI(char* fname, bool)
+     Call_Back();
+ 
+     /*	Moved above ini.Get_TextBlock(...) so Xlat mission.ini could be loaded
+-    **	If the briefing text could not be found in the INI file, then search
++    **	If the mission briefing text could not be found in the INI file, then search
+     **	the mission.ini file.  VG 10/17/96
+     */
+     INIClass mini;
+diff --git a/redalert/scenario.h b/redalert/scenario.h
+index 67d8279..1a2e1a2 100644
+--- a/redalert/scenario.h
++++ b/redalert/scenario.h
+@@ -124,7 +124,7 @@ public:
+     VQType IntroMovie;
+ 
+     /*
+-    **	The filename of the briefing movie.
++    **	The filename of the mission briefing movie.
+     */
+     VQType BriefMovie;
+ 
+@@ -151,13 +151,13 @@ public:
+     VQType LoseMovie;
+ 
+     /*
+-    **	The filename of the movie to play right after the briefing and
++    **	The filename of the movie to play right after the mission briefing and
+     **	just before the game.
+     */
+     VQType ActionMovie;
+ 
+     /*
+-    **	This is the full text of the briefing. This text will be
++    **	This is the full text of the mission briefing. This text will be
+     **	displayed when the player commands the "restate mission
+     **	objectives" operation.
+     */
 diff --git a/redalert/startup.cpp b/redalert/startup.cpp
-index 0c4320a..db74797 100644
+index 0c4320a..4317d27 100644
 --- a/redalert/startup.cpp
 +++ b/redalert/startup.cpp
 @@ -12,6 +12,12 @@
@@ -5645,7 +6519,7 @@ index 0c4320a..db74797 100644
  // GNU General Public License along with permitted additional restrictions
  // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 +//
-+// MODIFIED for OpenCNC3D on 22 September 2026. This is not EA's original file.
++// MODIFIED for OpenCNC3D. This is not EA's original file.
 +// Includes the non-Windows compatibility helpers needed by DLL startup on macOS.
 +// It does not change the game simulation.
 +// The complete diff against upstream is brain/patches/vanilla-opencnc3d.patch,
@@ -5661,12 +6535,36 @@ index 0c4320a..db74797 100644
  #include "function.h"
  #include "language.h"
  #include "settings.h"
+@@ -189,6 +196,13 @@ BOOL WINAPI DllMain(HINSTANCE instance, unsigned int fdwReason, void* lpvReserve
+ #ifdef REMASTER_BUILD
+ // int PASCAL WinMain(HINSTANCE, HINSTANCE, char *, int )
+ // PG int PASCAL WinMain ( HINSTANCE instance , HINSTANCE , char * command_line , int command_show )
++#if defined(__linux__)
++/* The player executable also defines main. ELF resolves a shared library's
++   call to main through the PLT and lands in the player, which starts the
++   menu a second time and then faults in CNC_Start_Custom_Instance. Hidden
++   visibility binds this call to the main in this file. */
++__attribute__((visibility("hidden")))
++#endif
+ int main(int, char*[]);
+ 
+ int DLL_Startup(const char* command_line_in)
+@@ -275,6 +289,9 @@ int DLL_Startup(const char* command_line_in)
+ }
+ #endif //REMASTER_BUILD
+ 
++#if defined(__linux__) && defined(REMASTER_BUILD)
++__attribute__((visibility("hidden")))
++#endif
+ int main(int argc, char* argv[])
+ {
+     UtfArgs args(argc, argv);
 diff --git a/redalert/techno.cpp b/redalert/techno.cpp
-index 682741b..d26b3f6 100644
+index 682741b..5852393 100644
 --- a/redalert/techno.cpp
 +++ b/redalert/techno.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Restricts AI targeting/navigation to observed enemies and gives normal sale refunds and public target scores.
++// MODIFIED for OpenCNC3D. Restricts AI targeting/navigation to observed enemies and gives normal sale refunds and public target scores.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -5862,11 +6760,11 @@ index 682741b..d26b3f6 100644
              //		cost /= 2;
          }
 diff --git a/redalert/unit.cpp b/redalert/unit.cpp
-index 06762f5..d81b706 100644
+index 06762f5..d5c7c39 100644
 --- a/redalert/unit.cpp
 +++ b/redalert/unit.cpp
 @@ -1,3 +1,4 @@
-+// MODIFIED for OpenCNC3D on 19 October 2026. Runs mobile Gap Generator shroud as simulation logic, including AI visibility.
++// MODIFIED for OpenCNC3D. Runs mobile Gap Generator shroud as simulation logic, including AI visibility.
  //
  // Copyright 2020 Electronic Arts Inc.
  //
@@ -5901,6 +6799,495 @@ index 06762f5..d81b706 100644
                          Map.Constrained_Look(Coord, 5 * CELL_LEPTON_W, player_house);
                      }
                  }
+diff --git a/redalert/wolstrng.cpp b/redalert/wolstrng.cpp
+index a69eaa6..de3f281 100644
+--- a/redalert/wolstrng.cpp
++++ b/redalert/wolstrng.cpp
+@@ -349,7 +349,7 @@ const char TXT_WOL_RETRACT_DRAW[] = "Retract Draw Proposal";
+ const char TXT_WOL_ACCEPT_DRAW[] = "Accept Proposed Draw";
+ //	User proposes that the game be declared a stalemate.
+ const char TXT_WOL_PROPOSE_DRAW_CONFIRM[] = "Are you sure you want to propose a draw?";
+-//	User accepts the other's offer that the game be a tie.
++//	accepts the other's offer that the game be a tie.
+ const char TXT_WOL_ACCEPT_DRAW_CONFIRM[] = "Are you sure you want to accept a draw?";
+ 
+ const char TXT_WOL_DRAW_PROPOSED_LOCAL[] = "You have proposed that the game be declared a draw.";
+@@ -416,7 +416,7 @@ const char TXT_WOL_PRIVATE[] = "<private>";
+ #ifdef GERMAN
+ #pragma message("...Building German version...")
+ 
+-//	Replaced "·" with ascii 169 (in octal, 251) in cases where 8 point font is used (see 8point.lbm for why).
++//	Replaced "√°" with ascii 169 (in octal, 251) in cases where 8 point font is used (see 8point.lbm for why).
+ const char TXT_WOL_INTERNETBUTTON[] = "Internet";
+ const char TXT_WOL_ERRORMESSAGE[] = "Unerwarteter Fehler trat bei der Kommunikation mit Westwood Online auf.";
+ const char TXT_WOL_CONNECT[] = "Verbinden";
+@@ -428,8 +428,8 @@ const char TXT_WOL_LOGINCANCEL[] = "Login abgebrochen.";
+ const char TXT_WOL_MISSINGNAME[] = "Bitte geben Sie Ihren Login-Spitznamen ein.";
+ const char TXT_WOL_MISSINGPASSWORD[] = "Bitte geben Sie Ihr Login-Pa\251wort ein.";
+ const char TXT_WOL_CANTSAVENICK[] = "Fehler beim Speichern des Spitznamens/Pa\251worts";
+-const char TXT_WOL_NICKINUSE[] = "Dieser Spitzname wird bereits verwendet. Bitte wÑhlen Sie einen anderen.";
+-const char TXT_WOL_BADPASS[] = "UngÅltiges Pa\251wort fÅr diesen Spitznamen";
++const char TXT_WOL_NICKINUSE[] = "Dieser Spitzname wird bereits verwendet. Bitte w¬Ñhlen Sie einen anderen.";
++const char TXT_WOL_BADPASS[] = "Ung¬Åltiges Pa\251wort f¬År diesen Spitznamen";
+ const char TXT_WOL_TIMEOUT[] = "Verbindung zu Westwood Online unterbrochen";
+ const char TXT_WOL_CONNECTING[] = "Verbinde zu Westwood Online...";
+ const char TXT_WOL_CANTCONNECT[] = "Verbindung zu Westwood Online konnte nicht hergestellt werden.";
+@@ -447,14 +447,14 @@ const char TXT_WOL_YOURENOTINCHANNEL[] = "Sie befinden sich zur Zeit nicht in ei
+ const char TXT_WOL_ACTION[] = "Action";
+ const char TXT_WOL_JOIN[] = "Teilnehmen";
+ const char TXT_WOL_CANTCREATEINCHANNEL[] =
+-    "Sie kînnen keinen neuen Channel erstellen, bevor Sie diesen Channel verlassen.";
++    "Sie k¬înnen keinen neuen Channel erstellen, bevor Sie diesen Channel verlassen.";
+ const char TXT_WOL_NEWSOMETHING[] = "Neu";
+ const char TXT_WOL_CREATECHANNELTITLE[] = "Channel erstellen";
+ const char TXT_WOL_CREATECHANNELPROMPT[] = "Channel-Name: ";
+ const char TXT_WOL_PASSPROMPT[] = "Pa\251wort: ";
+ const char TXT_WOL_OPTIONALPASSPROMPT[] = "Pa\251wort (optional): ";
+-const char TXT_WOL_CHANNEL_TOP[] = ".. <zurÅck zum Anfang>";
+-const char TXT_WOL_CHANNEL_BACK[] = ".. <zurÅck>";
++const char TXT_WOL_CHANNEL_TOP[] = ".. <zur¬Åck zum Anfang>";
++const char TXT_WOL_CHANNEL_BACK[] = ".. <zur¬Åck>";
+ const char TXT_WOL_YOUJOINED[] = "Sie nehmen am %s-Channel teil.";
+ const char TXT_WOL_YOUJOINEDGAME[] = "Sie nehmen an %ss Spiel teil.";
+ const char TXT_WOL_YOUCREATEDGAME[] = "Neues Spiel erstellt.";
+@@ -485,7 +485,7 @@ const char TXT_WOL_WASPAGED[] = "Die Nachricht wurde %s erfolgreich zugestellt."
+ const char TXT_WOL_ONLYOWNERCANKICK[] = "Nur der Channel-Besitzer kann andere User hinauswerfen.";
+ const char TXT_WOL_USERKICKEDUSER[] = "%s hat %s aus dem Channel geworfen.";
+ const char TXT_WOL_USERKICKEDYOU[] = "Sie wurden von %s aus dem Channel geworfen.";
+-const char TXT_WOL_NOONETOKICK[] = "WÑhlen Sie den/die User, die Sie hinauswerfen mîchten.";
++const char TXT_WOL_NOONETOKICK[] = "W¬Ñhlen Sie den/die User, die Sie hinauswerfen m¬îchten.";
+ const char TXT_WOL_USERWASBANNED[] = "%s hat keinen Zutritt mehr zu diesem Channel.";
+ const char TXT_WOL_CREATEPRIVGAMETITLE[] = "Privates Spiel erstellen";
+ const char TXT_WOL_YOUREBANNED[] = "Sie haben keinen Zutritt mehr zu diesem Channel.";
+@@ -498,7 +498,7 @@ const char TXT_WOL_USERRANK[] = "%s (Platz %u)";
+ const char TXT_WOL_USERHOUSE[] = "%s <%s>";
+ const char TXT_WOL_USERRANKHOUSE[] = "%s (Platz %u) <%s>";
+ const char TXT_WOL_STARTBUTTON[] = "Start";
+-const char TXT_WOL_ACCEPTBUTTON[] = "BestÑtigen";
++const char TXT_WOL_ACCEPTBUTTON[] = "Best¬Ñtigen";
+ const char TXT_WOL_HOSTLEFTGAME[] = "%s hat das Spiel abgebrochen.";
+ const char TXT_WOL_WAITINGTOSTART[] = "Spiel wird gestartet ...";
+ const char TXT_WOL_TTIP_DISCON[] = " Westwood Online verlassen";
+@@ -512,11 +512,11 @@ const char TXT_WOL_TTIP_OPTIONS[] = " Westwood-Online-Optionen einstellen ";
+ const char TXT_WOL_TTIP_LADDER[] = " Alarmstufe-Rot-Tabelle durchsuchen ";
+ const char TXT_WOL_TTIP_HELP[] = " Westwood-Online-Hilfe anzeigen ";
+ const char TXT_WOL_TTIP_START[] = " Spiel starten ";
+-const char TXT_WOL_TTIP_ACCEPT[] = " Aktuelle Spieleinstellungen bestÑtigen ";
++const char TXT_WOL_TTIP_ACCEPT[] = " Aktuelle Spieleinstellungen best¬Ñtigen ";
+ const char TXT_WOL_TTIP_EXPANDLIST[] = " Listen erweitern/verkleinern ";
+-const char TXT_WOL_TTIP_CANCELGAME[] = " Einen Level zurÅck ";
++const char TXT_WOL_TTIP_CANCELGAME[] = " Einen Level zur¬Åck ";
+ const char TXT_WOL_TTIP_JOIN[] = " An Chat- oder Game-Channel teilnehmen ";
+-const char TXT_WOL_TTIP_BACK[] = " Einen Level zurÅck ";
++const char TXT_WOL_TTIP_BACK[] = " Einen Level zur¬Åck ";
+ const char TXT_WOL_TTIP_CREATE[] = " Neuen Chat- oder Game-Level erstellen ";
+ const char TXT_WOL_TTIP_ACTION[] = " Action-Nachricht ";
+ const char TXT_WOL_OPTFIND[] = "Lassen Sie zu, da\251 andere Sie FINDEN.";
+@@ -533,9 +533,9 @@ const char TXT_WOL_CG_RAGAME[] = "Alarmstufe-Rot-Spiel";
+ const char TXT_WOL_CG_CSGAME[] = "Gegenangriff-Spiel";
+ const char TXT_WOL_CG_AMGAME[] = "Vergeltungsschlag-Spiel";
+ const char TXT_WOL_NEEDCOUNTERSTRIKE[] =
+-    "Sie mÅssen 'Gegenangriff' installiert haben, um dieses Spiel spielen zu kînnen.";
++    "Sie m¬Åssen 'Gegenangriff' installiert haben, um dieses Spiel spielen zu k¬înnen.";
+ const char TXT_WOL_NEEDAFTERMATH[] =
+-    "Sie mÅssen 'Vergeltungsschlag' installiert haben, um dieses Spiel spielen zu kînnen.";
++    "Sie m¬Åssen 'Vergeltungsschlag' installiert haben, um dieses Spiel spielen zu k¬înnen.";
+ const char TXT_WOL_TTIP_CHANLIST_CHAT[] = " Doppelklick zur Teilnahme am '%s'-Channel (z.Z. %i User). ";
+ const char TXT_WOL_TTIP_CHANLIST_LOBBY[] = " Doppelklick zur Teilnahme an der '%s'-Lobby (z.Z. %i User). ";
+ const char TXT_WOL_TTIP_REDALERT[] = "Alarmstufe Rot";
+@@ -546,14 +546,14 @@ const char TXT_WOL_TTIP_CHANLIST_GAME[] = " %s-Spiel (%i Spieler). ";
+ const char TXT_WOL_TTIP_PRIVATEGAME[] = "(Privat) ";
+ const char TXT_WOL_TTIP_TOURNAMENTGAME[] = "(Turnier) ";
+ const char TXT_WOL_TTIP_CHANNELTYPE_GAMESOFTYPE[] = " Doppelklicken Sie, um %s-Spiele anzusehen. ";
+-const char TXT_WOL_TOURNAMENTPLAYERLIMIT[] = "Turnierspiele mÅssen von zwei Spieler gespielt werden.";
++const char TXT_WOL_TOURNAMENTPLAYERLIMIT[] = "Turnierspiele m¬Åssen von zwei Spieler gespielt werden.";
+ const char TXT_WOL_PRIVATEPASSWORD[] = "Pa\251wort: %s";
+ const char TXT_WOL_RULESMISMATCH[] = "Ihr Spiel ist mit dem des Host nicht kompatibel!";
+-const char TXT_WOL_STARTTIMEOUT[] = "Keine Antworten von GÑsten! Spielstart abgebrochen.";
++const char TXT_WOL_STARTTIMEOUT[] = "Keine Antworten von G¬Ñsten! Spielstart abgebrochen.";
+ const char TXT_WOL_STARTCANCELLED[] = "Spielstart abgebrochen.";
+-const char TXT_WOL_CANCELGAME[] = "ZurÅck";
++const char TXT_WOL_CANCELGAME[] = "Zur¬Åck";
+ const char TXT_WOL_PATCHQUESTION[] =
+-    "Ein Update-Patch wird fÅr Internet-Spiele benîtigt. Mîchten Sie es jetzt herunterladen?";
++    "Ein Update-Patch wird f¬År Internet-Spiele ben¬îtigt. M¬îchten Sie es jetzt herunterladen?";
+ const char TXT_WOL_DOWNLOADING[] = "Datei %i von %i herunterladen";
+ const char TXT_WOL_DOWNLOADERROR[] = "Ein Fehler trat beim Herunterladen der Dateien auf.";
+ const char TXT_WOL_DOWNLOADBYTES[] = "%i Bytes von %i erhalten. (%i%%%%)";
+@@ -565,35 +565,35 @@ const char TXT_WOL_DOWNLOADDOWNLOADING[] = "Status: Lade herunter ...";
+ const char TXT_WOL_DOWNLOADEXITWARNING[] = "Herunterladen abgeschlossen! Alarmstufe Rot wird jetzt neugestartet, damit "
+                                            "das Update-Patch angewendet werden kann.";
+ const char TXT_WOL_HELPSHELL[] =
+-    "Sind Sie sicher, da\251 Sie den Internet-Browser fÅr die Westwood-Online-Hilfe starten mîchten?";
++    "Sind Sie sicher, da\251 Sie den Internet-Browser f¬År die Westwood-Online-Hilfe starten m¬îchten?";
+ const char TXT_WOL_LADDERSHELL[] =
+-    "Sind Sie sicher, da\251 Sie den Internet-Browser fÅr die Alarmstufe-Rot-Tabellen starten mîchten?";
++    "Sind Sie sicher, da\251 Sie den Internet-Browser f¬År die Alarmstufe-Rot-Tabellen starten m¬îchten?";
+ const char TXT_WOL_WEBREGISTRATIONSHELL[] =
+-    "Keine gespeicherten User-Namen gefunden. Mîchten Sie einen neuen User-Namen fÅr Westwood Online eintragen?";
++    "Keine gespeicherten User-Namen gefunden. M¬îchten Sie einen neuen User-Namen f¬År Westwood Online eintragen?";
+ const char TXT_WOL_GAMEADVERTSHELL[] =
+-    "Sind Sie sicher, da\251 Sie den Internet-Browser fÅr Informationen Åber %s starten mîchten?";
++    "Sind Sie sicher, da\251 Sie den Internet-Browser f¬År Informationen ¬Åber %s starten m¬îchten?";
+ const char TXT_WOL_USERLIST[] = "User: %i";
+ const char TXT_WOL_NOUSERLIST[] = "(nicht in einem Channel)";
+-const char TXT_WOL_CANTCREATEHERE[] = "Um ein Spiel zu starten, mÅssen Sie in der Lobby Alarmstufe Rot sein.";
++const char TXT_WOL_CANTCREATEHERE[] = "Um ein Spiel zu starten, m¬Åssen Sie in der Lobby Alarmstufe Rot sein.";
+ const char TXT_WOL_WOLAPIGONE[] = "Verbindung zu Westwood Online verloren!";
+ const char TXT_WOL_WOLAPIREINIT[] = "Verbindung zu Westwood Online verloren. Verbinde erneut ...";
+ const char TXT_WOL_NOTPAGED[] = "Kann keine Antwort senden, niemand hat Ihnen geschrieben.";
+ const char TXT_WOL_SCENARIONAMEWAIT[] = "Warte auf Szenario ...";
+-const char TXT_WOL_BACK[] = "ZurÅck";
++const char TXT_WOL_BACK[] = "Zur¬Åck";
+ const char TXT_WOL_AMDISCNEEDED[] =
+-    "Die CD 'Vergeltungsschlag' wird fÅr dieses Spiel benîtigt, bitte legen Sie sie jetzt ein.";
+-const char TXT_WOL_CONFIRMLOGOUT[] = "Sind Sie sicher, da\251 Sie Westwood Online verlassen mîchten?";
++    "Die CD 'Vergeltungsschlag' wird f¬År dieses Spiel ben¬îtigt, bitte legen Sie sie jetzt ein.";
++const char TXT_WOL_CONFIRMLOGOUT[] = "Sind Sie sicher, da\251 Sie Westwood Online verlassen m¬îchten?";
+ const char TXT_WOL_PROPOSE_DRAW[] = "Unentschieden vorschlagen";
+-const char TXT_WOL_RETRACT_DRAW[] = "Unentschieden-Vorschlag zurÅckziehen";
++const char TXT_WOL_RETRACT_DRAW[] = "Unentschieden-Vorschlag zur¬Åckziehen";
+ const char TXT_WOL_ACCEPT_DRAW[] = "Unentschieden-Vorschlag akzeptieren";
+-const char TXT_WOL_PROPOSE_DRAW_CONFIRM[] = "Sind Sie sicher, da\251 Sie ein Unentschieden vorschlagen mîchten?";
+-const char TXT_WOL_ACCEPT_DRAW_CONFIRM[] = "Sind Sie sicher, da\251 Sie ein Unentschieden akzeptieren mîchten?";
+-const char TXT_WOL_DRAW_PROPOSED_LOCAL[] = "Sie haben vorgeschlagen, da\251 das Spiel fÅr unentschieden erklÑrt wird.";
+-const char TXT_WOL_DRAW_PROPOSED_OTHER[] = "%s hat vorgeschlagen, da\251 das Spiel fÅr unentschieden erklÑrt wird.";
+-const char TXT_WOL_DRAW_RETRACTED_LOCAL[] = "Sie haben Ihr Unentschieden-Angebot zurÅckgezogen.";
+-const char TXT_WOL_DRAW_RETRACTED_OTHER[] = "%s hat das Unentschieden-Angebot zurÅckgezogen.";
++const char TXT_WOL_PROPOSE_DRAW_CONFIRM[] = "Sind Sie sicher, da\251 Sie ein Unentschieden vorschlagen m¬îchten?";
++const char TXT_WOL_ACCEPT_DRAW_CONFIRM[] = "Sind Sie sicher, da\251 Sie ein Unentschieden akzeptieren m¬îchten?";
++const char TXT_WOL_DRAW_PROPOSED_LOCAL[] = "Sie haben vorgeschlagen, da\251 das Spiel f¬År unentschieden erkl¬Ñrt wird.";
++const char TXT_WOL_DRAW_PROPOSED_OTHER[] = "%s hat vorgeschlagen, da\251 das Spiel f¬År unentschieden erkl¬Ñrt wird.";
++const char TXT_WOL_DRAW_RETRACTED_LOCAL[] = "Sie haben Ihr Unentschieden-Angebot zur¬Åckgezogen.";
++const char TXT_WOL_DRAW_RETRACTED_OTHER[] = "%s hat das Unentschieden-Angebot zur¬Åckgezogen.";
+ const char TXT_WOL_DRAW[] = "Das Spiel ist unentschieden";
+-const char TXT_WOL_CANTLAUNCHBROWSER[] = "Web-Browser kann %s nicht îffnen!";
++const char TXT_WOL_CANTLAUNCHBROWSER[] = "Web-Browser kann %s nicht ¬îffnen!";
+ const char TXT_WOL_CHANNELFULL[] = "Dieser Chat-/Game-Channel ist voll.";
+ const char TXT_WOL_CHANNELTYPE_TOP[] = " Doppelklicken Sie, um zum obersten Level zu gelangen. ";
+ const char TXT_WOL_CHANNELTYPE_OFFICIALCHAT[] =
+@@ -602,21 +602,21 @@ const char TXT_WOL_CHANNELTYPE_USERCHAT[] = " Doppelklicken Sie, um zum User-Cha
+ const char TXT_WOL_CHANNELTYPE_GAMES[] = " Doppelklicken Sie, um zum Game-Channel-Level zu gelangen. ";
+ const char TXT_WOL_CHANNELTYPE_LOADING[] = " Liste von Westwood Online wird geladen, bitte warten... ";
+ const char TXT_WOL_CHANNELTYPE_LOBBIES[] = " Doppelklicken Sie, um zum Lobby-Level zu gelangen. ";
+-const char TXT_WOL_FINDINGLOBBY[] = "Verbunden - suche verfÅgbare Lobby...";
++const char TXT_WOL_FINDINGLOBBY[] = "Verbunden - suche verf¬Ågbare Lobby...";
+ const char TXT_WOL_PRIVATETOMULTIPLE[] = "<Privat an mehrere User>:";
+ const char TXT_WOL_PRIVATETO[] = "Privat an";
+ const char TXT_WOL_CS_MISSIONS[] = "Gegenangriff-Missionen";
+ const char TXT_WOL_AM_MISSIONS[] = "Vergeltungsschlag-Missionen";
+-const char TXT_WOL_CANTSQUELCHSELF[] = "Sie kînnen die Option zum Lesen Ihrer eigenen Nachrichten nicht ausschalten!";
++const char TXT_WOL_CANTSQUELCHSELF[] = "Sie k¬înnen die Option zum Lesen Ihrer eigenen Nachrichten nicht ausschalten!";
+ const char TXT_WOL_OPTTITLE[] = "Westwood Online-Optionen";
+ const char TXT_WOL_SLOWUNITBUILD[] = "Einheitenbau verlangsamen";
+ const char TXT_WOL_THEGAMEHOST[] = "Der Spiel-Host";
+ const char TXT_WOL_TTIP_RANKRA[] = " Alarmstufe-Rot-Platz anzeigen ";
+ const char TXT_WOL_TTIP_RANKAM[] = " Vergeltungsschlag-Platz anzeigen ";
+ const char TXT_WOL_OPTRANKAM[] = "Vergeltungsschlag-Platz anzeigen.";
+-const char TXT_WOL_CANCELMEANSFORFEIT[] = " (UND BÅSSEN SIE DAS SPIEL EIN)";
++const char TXT_WOL_CANCELMEANSFORFEIT[] = " (UND B¬ÅSSEN SIE DAS SPIEL EIN)";
+ const char TXT_WOL_DLLERROR_GETIE3[] = "Ihre Version der Windows ist veraltet. Bauen Sie bitte zu den Windows SP1, aus "
+-                                       "oder installieren Sie Internet Explorer 3,0 oder hîheres.";
++                                       "oder installieren Sie Internet Explorer 3,0 oder h¬îheres.";
+ const char TXT_WOL_DLLERROR_CALLUS[] =
+     "Ein unerwarteter Fehler ist aufgetreten. Bitte wenden Sie sich an den Technischen Kundendienst.";
+ const char TXT_WOL_PRIVATE[] = "<privat>";
+@@ -626,50 +626,50 @@ const char TXT_WOL_PRIVATE[] = "<privat>";
+ #pragma message("...Building French version...")
+ 
+ const char TXT_WOL_INTERNETBUTTON[] = "Internet";
+-const char TXT_WOL_ERRORMESSAGE[] = "Erreur inattendue lors de la connexion Ö Westwood Online.";
++const char TXT_WOL_ERRORMESSAGE[] = "Erreur inattendue lors de la connexion ¬Ö Westwood Online.";
+ const char TXT_WOL_CONNECT[] = "Se connecter";
+-const char TXT_WOL_LOGINDIALOG[] = "Identifiant Ö Westwood Online";
++const char TXT_WOL_LOGINDIALOG[] = "Identifiant ¬Ö Westwood Online";
+ const char TXT_WOL_NAME[] = "Pseudo";
+ const char TXT_WOL_PASSWORD[] = "Mot de passe";
+ const char TXT_WOL_SAVELOGIN[] = "Sauvegarder";
+-const char TXT_WOL_LOGINCANCEL[] = "Ouverture de session annulÇe.";
++const char TXT_WOL_LOGINCANCEL[] = "Ouverture de session annul¬Çe.";
+ const char TXT_WOL_MISSINGNAME[] = "Veuillez entrer l'identifiant pour votre pseudo.";
+ const char TXT_WOL_MISSINGPASSWORD[] = "Veuillez entrer l'identifiant pour votre mot de passe.";
+ const char TXT_WOL_CANTSAVENICK[] = "Erreur lors de la sauvegarde du pseudo/mot de passe.";
+-const char TXT_WOL_NICKINUSE[] = "Ce pseudo est dÇjÖ utilisÇ. SÇlectionnez-en un autre.";
++const char TXT_WOL_NICKINUSE[] = "Ce pseudo est d¬Çj¬Ö utilis¬Ç. S¬Çlectionnez-en un autre.";
+ const char TXT_WOL_BADPASS[] = "Mot de passe invalide pour ce pseudo.";
+-const char TXT_WOL_TIMEOUT[] = "Expiration du temps de connexion Ö Westwood Online.";
+-const char TXT_WOL_CONNECTING[] = "Connexion Ö Westwood Online...";
+-const char TXT_WOL_CANTCONNECT[] = "Impossible d'Çtablir la connexion Ö Westwood Online.";
++const char TXT_WOL_TIMEOUT[] = "Expiration du temps de connexion ¬Ö Westwood Online.";
++const char TXT_WOL_CONNECTING[] = "Connexion ¬Ö Westwood Online...";
++const char TXT_WOL_CANTCONNECT[] = "Impossible d'¬Çtablir la connexion ¬Ö Westwood Online.";
+ const char TXT_WOL_ATTEMPTLOGIN[] = "Ouverture de la session en cours...";
+ const char TXT_WOL_ATTEMPTLOGOUT[] = "Fermeture de la session en cours...";
+ const char TXT_WOL_ERRORLOGOUT[] = "Fin de connexion avec Westwood Online...";
+-const char TXT_WOL_WAIT[] = "Attendez svp, en communication Ö Westwood Online...";
++const char TXT_WOL_WAIT[] = "Attendez svp, en communication ¬Ö Westwood Online...";
+ const char TXT_WOL_TOPLEVELTITLE[] = "Westwood Online";
+ const char TXT_WOL_OFFICIALCHAT[] = "Conversation officielle";
+ const char TXT_WOL_USERCHAT[] = "Conversation utilisateur";
+ const char TXT_WOL_GAMECHANNELS[] = "Canaux de jeu";
+ const char TXT_WOL_REDALERTLOBBIES[] = "Salons d'Alerte Rouge";
+-const char TXT_WOL_CHANNELLISTLOADING[] = "...En cours de tÇlÇchargement...";
+-const char TXT_WOL_YOURENOTINCHANNEL[] = "Vous n'àtes pas dans un canal de conversation.";
++const char TXT_WOL_CHANNELLISTLOADING[] = "...En cours de t¬Çl¬Çchargement...";
++const char TXT_WOL_YOURENOTINCHANNEL[] = "Vous n'¬àtes pas dans un canal de conversation.";
+ const char TXT_WOL_ACTION[] = "Action";
+ const char TXT_WOL_JOIN[] = "Rejoindre";
+ const char TXT_WOL_CANTCREATEINCHANNEL[] =
+-    "CrÇation d'un nouveau canal impossible tant que vous ne quittez pas ce canal.";
++    "Cr¬Çation d'un nouveau canal impossible tant que vous ne quittez pas ce canal.";
+ const char TXT_WOL_NEWSOMETHING[] = "Nouveau";
+-const char TXT_WOL_CREATECHANNELTITLE[] = "CrÇer un canal";
++const char TXT_WOL_CREATECHANNELTITLE[] = "Cr¬Çer un canal";
+ const char TXT_WOL_CREATECHANNELPROMPT[] = "Nom du canal : ";
+ const char TXT_WOL_PASSPROMPT[] = "Mot de passe : ";
+ const char TXT_WOL_OPTIONALPASSPROMPT[] = "Mot de passe (en option): ";
+-const char TXT_WOL_CHANNEL_TOP[] = ".. <retour Ö la page d'accueil>";
++const char TXT_WOL_CHANNEL_TOP[] = ".. <retour ¬Ö la page d'accueil>";
+ const char TXT_WOL_CHANNEL_BACK[] = ".. <retour>";
+ const char TXT_WOL_YOUJOINED[] = "Vous avez rejoint le canal %s.";
+ const char TXT_WOL_YOUJOINEDGAME[] = "Vous rejoignez la partie de %s.";
+-const char TXT_WOL_YOUCREATEDGAME[] = "CrÇation d'une nouvelle partie.";
+-const char TXT_WOL_YOUJOINEDLOBBY[] = "Vous àtes entrÇ dans le salon %s.";
+-const char TXT_WOL_YOULEFT[] = "Vous avez quittÇ le canal %s.";
+-const char TXT_WOL_YOULEFTLOBBY[] = "Vous avez quittÇ le salon %s.";
+-const char TXT_WOL_JOINPRIVATETITLE[] = "Rejoindre un canal privÇ";
++const char TXT_WOL_YOUCREATEDGAME[] = "Cr¬Çation d'une nouvelle partie.";
++const char TXT_WOL_YOUJOINEDLOBBY[] = "Vous ¬àtes entr¬Ç dans le salon %s.";
++const char TXT_WOL_YOULEFT[] = "Vous avez quitt¬Ç le canal %s.";
++const char TXT_WOL_YOULEFTLOBBY[] = "Vous avez quitt¬Ç le salon %s.";
++const char TXT_WOL_JOINPRIVATETITLE[] = "Rejoindre un canal priv¬Ç";
+ const char TXT_WOL_JOINPRIVATEPROMPT[] = "Entrer le mot de passe du canal : ";
+ const char TXT_WOL_BADCHANKEY[] = "Mot de passe du canal incorrect.";
+ const char TXT_WOL_PAGELOCATE[] = "Envoyer/Rechercher";
+@@ -677,144 +677,144 @@ const char TXT_WOL_USERNAMEPROMPT[] = "Nom de l'utilisateur : ";
+ const char TXT_WOL_PAGE[] = "Envoyer";
+ const char TXT_WOL_LOCATE[] = "Rechercher";
+ const char TXT_WOL_LOCATING[] = "Recherche de %s en cours ...";
+-const char TXT_WOL_FIND_NOTHERE[] = "Le nom de l'utilisateur spÇcifiÇ n'existe pas.";
+-const char TXT_WOL_FIND_NOCHAN[] = "L'utilisateur spÇcifiÇ n'est pas sur le canal pour le moment.";
+-const char TXT_WOL_FIND_OFF[] = "L'utilisateur spÇcifiÇ a dÇsactivÇ la fonction de recherche.";
+-const char TXT_WOL_FOUNDIN[] = "Utilisateur trouvÇ dans le canal %s.";
+-const char TXT_WOL_PAGEMESSAGETITLE[] = "Envoyer Ö l'utilisateur";
+-const char TXT_WOL_PAGEMESSAGEPROMPT[] = "Message Ö envoyer : ";
+-const char TXT_WOL_PAGING[] = "Envoi Ö %s en cours...";
+-const char TXT_WOL_PAGE_NOTHERE[] = "L'utilisateur spÇcifiÇ n'a pas ouvert la session.";
+-const char TXT_WOL_PAGE_OFF[] = "L'utilisateur spÇcifiÇ a dÇsactivÇ la fonction d'envoi de messages.";
++const char TXT_WOL_FIND_NOTHERE[] = "Le nom de l'utilisateur sp¬Çcifi¬Ç n'existe pas.";
++const char TXT_WOL_FIND_NOCHAN[] = "L'utilisateur sp¬Çcifi¬Ç n'est pas sur le canal pour le moment.";
++const char TXT_WOL_FIND_OFF[] = "L'utilisateur sp¬Çcifi¬Ç a d¬Çsactiv¬Ç la fonction de recherche.";
++const char TXT_WOL_FOUNDIN[] = "Utilisateur trouv¬Ç dans le canal %s.";
++const char TXT_WOL_PAGEMESSAGETITLE[] = "Envoyer ¬Ö l'utilisateur";
++const char TXT_WOL_PAGEMESSAGEPROMPT[] = "Message ¬Ö envoyer : ";
++const char TXT_WOL_PAGING[] = "Envoi ¬Ö %s en cours...";
++const char TXT_WOL_PAGE_NOTHERE[] = "L'utilisateur sp¬Çcifi¬Ç n'a pas ouvert la session.";
++const char TXT_WOL_PAGE_OFF[] = "L'utilisateur sp¬Çcifi¬Ç a d¬Çsactiv¬Ç la fonction d'envoi de messages.";
+ const char TXT_WOL_ONPAGE[] = "Envoi de %s : %s";
+-const char TXT_WOL_WASPAGED[] = "Envoi Ö %s rÇussi.";
+-// const char TXT_WOL_USERISSQUELCHED[]		= "%s a ÇtÇ rejetÇ.";				//	ajw rejete really means squelched?
+-// const char TXT_WOL_USERISNOTSQUELCHED[]		= "%s n'est plus rejetÇ.";
++const char TXT_WOL_WASPAGED[] = "Envoi ¬Ö %s r¬Çussi.";
++// const char TXT_WOL_USERISSQUELCHED[]		= "%s a ¬Çt¬Ç rejet¬Ç.";				//	ajw rejete really means squelched?
++// const char TXT_WOL_USERISNOTSQUELCHED[]		= "%s n'est plus rejet¬Ç.";
+ const char TXT_WOL_ONLYOWNERCANKICK[] = "Seul le responsable du canal peut expulser des utilisateurs.";
+ const char TXT_WOL_USERKICKEDUSER[] = "%s expulse %s du canal.";
+-const char TXT_WOL_USERKICKEDYOU[] = "Vous àtes expulsÇ du canal par %s.";
+-const char TXT_WOL_NOONETOKICK[] = "SÇlectionnez l'(les) utilisateur(s) que vous voulez expulser.";
++const char TXT_WOL_USERKICKEDYOU[] = "Vous ¬àtes expuls¬Ç du canal par %s.";
++const char TXT_WOL_NOONETOKICK[] = "S¬Çlectionnez l'(les) utilisateur(s) que vous voulez expulser.";
+ const char TXT_WOL_USERWASBANNED[] = "%s est exclu du canal.";
+-const char TXT_WOL_CREATEPRIVGAMETITLE[] = "CrÇer une partie privÇe";
+-const char TXT_WOL_YOUREBANNED[] = "Vous n'àtes pas autorisÇ Ö entrer dans ce canal.";
+-const char TXT_WOL_PLAYERLEFTGAME[] = "%s a quittÇ la partie.";
++const char TXT_WOL_CREATEPRIVGAMETITLE[] = "Cr¬Çer une partie priv¬Çe";
++const char TXT_WOL_YOUREBANNED[] = "Vous n'¬àtes pas autoris¬Ç ¬Ö entrer dans ce canal.";
++const char TXT_WOL_PLAYERLEFTGAME[] = "%s a quitt¬Ç la partie.";
+ const char TXT_WOL_PLAYERJOINEDGAME[] = "%s a rejoint la partie.";
+-const char TXT_WOL_YOUWEREKICKEDFROMGAME[] = "Vous avez ÇtÇ expulsÇ de la partie.";
+-const char TXT_WOL_PERSONALWINLOSSRECORD[] = "%s. Alerte Rouge: position %u. Vict. %u. DÇf. %u. Pts. %u.";
+-const char TXT_WOL_PERSONALWINLOSSRECORDAM[] = "%s. Missions M.A.D.: position %u. Vict. %u. DÇf. %u. Pts. %u.";
++const char TXT_WOL_YOUWEREKICKEDFROMGAME[] = "Vous avez ¬Çt¬Ç expuls¬Ç de la partie.";
++const char TXT_WOL_PERSONALWINLOSSRECORD[] = "%s. Alerte Rouge: position %u. Vict. %u. D¬Çf. %u. Pts. %u.";
++const char TXT_WOL_PERSONALWINLOSSRECORDAM[] = "%s. Missions M.A.D.: position %u. Vict. %u. D¬Çf. %u. Pts. %u.";
+ const char TXT_WOL_USERRANK[] = "%s (Position %u)";
+ const char TXT_WOL_USERHOUSE[] = "%s <%s>";
+ const char TXT_WOL_USERRANKHOUSE[] = "%s (Position %u) <%s>";
+-const char TXT_WOL_STARTBUTTON[] = "DÇmarrer";
++const char TXT_WOL_STARTBUTTON[] = "D¬Çmarrer";
+ const char TXT_WOL_ACCEPTBUTTON[] = "Accepter";
+-const char TXT_WOL_HOSTLEFTGAME[] = "%s a annulÇ la partie.";
++const char TXT_WOL_HOSTLEFTGAME[] = "%s a annul¬Ç la partie.";
+ const char TXT_WOL_WAITINGTOSTART[] = "Lancement de la partie...";
+ const char TXT_WOL_TTIP_DISCON[] = " Quitter Westwood Online ";
+-const char TXT_WOL_TTIP_LEAVE[] = " Quitter le canal oó vous vous trouvez ";
+-const char TXT_WOL_TTIP_REFRESH[] = " Rafraåchir la liste du canal ";
+-const char TXT_WOL_TTIP_SQUELCH[] = " Activer/dÇsactiver les messages en provenance de(s) l'utilisateur(s) ";
++const char TXT_WOL_TTIP_LEAVE[] = " Quitter le canal o¬ó vous vous trouvez ";
++const char TXT_WOL_TTIP_REFRESH[] = " Rafra¬åchir la liste du canal ";
++const char TXT_WOL_TTIP_SQUELCH[] = " Activer/d¬Çsactiver les messages en provenance de(s) l'utilisateur(s) ";
+ const char TXT_WOL_TTIP_BAN[] = " Exclure l'/les utilisateur(s)du canal ";
+ const char TXT_WOL_TTIP_KICK[] = " Expulser l'/les utilisateurs du canal ";
+-const char TXT_WOL_TTIP_FINDPAGE[] = " Rechercher ou envoyer un message Ö un utilisateur ";
+-const char TXT_WOL_TTIP_OPTIONS[] = " RÇgler les options de Westwood Online ";
+-const char TXT_WOL_TTIP_LADDER[] = " Parcourir les hiÇrarchies d'Alerte Rouge ";
++const char TXT_WOL_TTIP_FINDPAGE[] = " Rechercher ou envoyer un message ¬Ö un utilisateur ";
++const char TXT_WOL_TTIP_OPTIONS[] = " R¬Çgler les options de Westwood Online ";
++const char TXT_WOL_TTIP_LADDER[] = " Parcourir les hi¬Çrarchies d'Alerte Rouge ";
+ const char TXT_WOL_TTIP_HELP[] = " Afficher l'aide de Westwood Online ";
+-const char TXT_WOL_TTIP_START[] = " DÇmarrer le jeu ";
+-const char TXT_WOL_TTIP_ACCEPT[] = " Valider les paramätres actuels du jeu ";
+-const char TXT_WOL_TTIP_EXPANDLIST[] = " ComplÇter/rÇduire la liste ";
+-const char TXT_WOL_TTIP_CANCELGAME[] = " Retour au niveau prÇcÇdent ";
++const char TXT_WOL_TTIP_START[] = " D¬Çmarrer le jeu ";
++const char TXT_WOL_TTIP_ACCEPT[] = " Valider les param¬ätres actuels du jeu ";
++const char TXT_WOL_TTIP_EXPANDLIST[] = " Compl¬Çter/r¬Çduire la liste ";
++const char TXT_WOL_TTIP_CANCELGAME[] = " Retour au niveau pr¬Çc¬Çdent ";
+ const char TXT_WOL_TTIP_JOIN[] = " Rejoindre un canal de conversation/jeu ";
+-const char TXT_WOL_TTIP_BACK[] = " Retour au niveau prÇcÇdent ";
+-const char TXT_WOL_TTIP_CREATE[] = " CrÇer un nouveau canal de conversation/jeu ";
++const char TXT_WOL_TTIP_BACK[] = " Retour au niveau pr¬Çc¬Çdent ";
++const char TXT_WOL_TTIP_CREATE[] = " Cr¬Çer un nouveau canal de conversation/jeu ";
+ const char TXT_WOL_TTIP_ACTION[] = " Message d'action ";
+ const char TXT_WOL_OPTFIND[] = "Laisser les autres vous RECHERCHER.";
+ const char TXT_WOL_OPTPAGE[] = "Laisser les autres vous ENVOYER des messages.";
+-const char TXT_WOL_OPTLANGUAGE[] = "Filtrer les vulgaritÇs.";
++const char TXT_WOL_OPTLANGUAGE[] = "Filtrer les vulgarit¬Çs.";
+ const char TXT_WOL_OPTGAMESCOPE[] = "Afficher seulement les parties en salons locaux.";
+ // const char TXT_WOL_OPTTITLE[]				= "Options";
+ const char TXT_WOL_CHANNELGONE[] = "Ce canal n'existe plus.";
+-const char TXT_WOL_CG_TITLE[] = "CrÇer une partie";
++const char TXT_WOL_CG_TITLE[] = "Cr¬Çer une partie";
+ const char TXT_WOL_CG_PLAYERS[] = "Joueurs :  %i";
+ const char TXT_WOL_CG_TOURNAMENT[] = "Tournoi";
+-const char TXT_WOL_CG_PRIVACY[] = "PrivÇe";
++const char TXT_WOL_CG_PRIVACY[] = "Priv¬Çe";
+ const char TXT_WOL_CG_RAGAME[] = "Partie Alerte Rouge";
+-const char TXT_WOL_CG_CSGAME[] = "Partie Missions Taãga";
++const char TXT_WOL_CG_CSGAME[] = "Partie Missions Ta¬ãga";
+ const char TXT_WOL_CG_AMGAME[] = "Partie Missions M.A.D.";
+-const char TXT_WOL_NEEDCOUNTERSTRIKE[] = "DÇsolÇ, vous devez installer Missions Taãga pour jouer cette partie.";
+-const char TXT_WOL_NEEDAFTERMATH[] = "DÇsolÇ, vous devez installer Missions M.A.D. pour jouer cette partie.";
++const char TXT_WOL_NEEDCOUNTERSTRIKE[] = "D¬Çsol¬Ç, vous devez installer Missions Ta¬ãga pour jouer cette partie.";
++const char TXT_WOL_NEEDAFTERMATH[] = "D¬Çsol¬Ç, vous devez installer Missions M.A.D. pour jouer cette partie.";
+ const char TXT_WOL_TTIP_CHANLIST_CHAT[] = " Double-clic pour rejoindre canal %s (%i utilisateurs). ";
+ const char TXT_WOL_TTIP_CHANLIST_LOBBY[] = " Double-clic pour rejoindre salon %s (%i utilisateurs). ";
+ const char TXT_WOL_TTIP_REDALERT[] = "Alerte Rouge";
+-const char TXT_WOL_TTIP_COUNTERSTRIKE[] = "Missions Taãga";
++const char TXT_WOL_TTIP_COUNTERSTRIKE[] = "Missions Ta¬ãga";
+ const char TXT_WOL_TTIP_AFTERMATH[] = "Missions M.A.D.";
+ const char TXT_WOL_TTIP_CHANLIST_RAGAME[] = " Partie de %s (%i joueurs pour un max. de %i). ";
+ const char TXT_WOL_TTIP_CHANLIST_GAME[] = " Partie de %s (%i joueurs). ";
+-const char TXT_WOL_TTIP_PRIVATEGAME[] = "(PrivÇe) ";
++const char TXT_WOL_TTIP_PRIVATEGAME[] = "(Priv¬Çe) ";
+ const char TXT_WOL_TTIP_TOURNAMENTGAME[] = "(Tournoi) ";
+ const char TXT_WOL_TTIP_CHANNELTYPE_GAMESOFTYPE[] = " Double-clic pour afficher les parties %s. ";
+ const char TXT_WOL_TOURNAMENTPLAYERLIMIT[] = "Les parties en tournoi doivent rassembler deux joueurs.";
+ const char TXT_WOL_PRIVATEPASSWORD[] = "Mot de passe : %s";
+ const char TXT_WOL_RULESMISMATCH[] = "Votre partie n'est pas compatible avec celle du serveur !";
+-const char TXT_WOL_STARTTIMEOUT[] = "Expiration du temps de rÇponse des clients ! DÇmarrage du jeu annulÇ.";
+-const char TXT_WOL_STARTCANCELLED[] = "DÇmarrage du jeu annulÇ.";
++const char TXT_WOL_STARTTIMEOUT[] = "Expiration du temps de r¬Çponse des clients ! D¬Çmarrage du jeu annul¬Ç.";
++const char TXT_WOL_STARTCANCELLED[] = "D¬Çmarrage du jeu annul¬Ç.";
+ const char TXT_WOL_CANCELGAME[] = "Retour";
+ const char TXT_WOL_PATCHQUESTION[] =
+-    "Un patch mis Ö jour est nÇcessaire pour le jeu sur Internet. Voulez-vous le tÇlÇcharger maintenant ?";
+-const char TXT_WOL_DOWNLOADING[] = "TÇlÇcharger %i fichier(s) sur %i.";
+-const char TXT_WOL_DOWNLOADERROR[] = "Erreur lors du tÇlÇchargement du fichier.";
+-const char TXT_WOL_DOWNLOADBYTES[] = "RÇception de %i octets sur %i. (%i%%%%).";
++    "Un patch mis ¬Ö jour est n¬Çcessaire pour le jeu sur Internet. Voulez-vous le t¬Çl¬Çcharger maintenant ?";
++const char TXT_WOL_DOWNLOADING[] = "T¬Çl¬Çcharger %i fichier(s) sur %i.";
++const char TXT_WOL_DOWNLOADERROR[] = "Erreur lors du t¬Çl¬Çchargement du fichier.";
++const char TXT_WOL_DOWNLOADBYTES[] = "R¬Çception de %i octets sur %i. (%i%%%%).";
+ const char TXT_WOL_DOWNLOADTIME[] = "Temps restant : %i min. %i secs.";
+-const char TXT_WOL_DOWNLOADRESUMED[] = "%s (reprise apräs interruption.)";
++const char TXT_WOL_DOWNLOADRESUMED[] = "%s (reprise apr¬äs interruption.)";
+ const char TXT_WOL_DOWNLOADCONNECTING[] = "Etat : en cours de connexion...";
+ const char TXT_WOL_DOWNLOADLOCATING[] = "Etat : recherche du fichier...";
+-const char TXT_WOL_DOWNLOADDOWNLOADING[] = "Etat : en cours de tÇlÇchargement...";
++const char TXT_WOL_DOWNLOADDOWNLOADING[] = "Etat : en cours de t¬Çl¬Çchargement...";
+ const char TXT_WOL_DOWNLOADEXITWARNING[] =
+-    "TÇlÇchargement terminÇ ! Alerte Rouge est relancÇ pour que le nouveau patch soit pris en compte.";
++    "T¬Çl¬Çchargement termin¬Ç ! Alerte Rouge est relanc¬Ç pour que le nouveau patch soit pris en compte.";
+ const char TXT_WOL_HELPSHELL[] =
+     "Voulez-vous vraiment lancer le navigateur Internet pour obtenir l'aide Westwood Online ?";
+ const char TXT_WOL_LADDERSHELL[] =
+-    "Voulez-vous vraiment lancer le navigateur Internet pour les hiÇrarchies d'Alerte Rouge ?";
++    "Voulez-vous vraiment lancer le navigateur Internet pour les hi¬Çrarchies d'Alerte Rouge ?";
+ const char TXT_WOL_WEBREGISTRATIONSHELL[] =
+-    "Aucun nom d'utilisateur sauvegardÇ. Voulez-vous enregistrer un nouveau nom d'utilisateur pour Westwood Online ?";
++    "Aucun nom d'utilisateur sauvegard¬Ç. Voulez-vous enregistrer un nouveau nom d'utilisateur pour Westwood Online ?";
+ const char TXT_WOL_GAMEADVERTSHELL[] =
+     "Voulez-vous vraiment lancer le navigateur Internet pour obtenir des informations sur %s ?";
+ const char TXT_WOL_USERLIST[] = "Utilisateurs %i";
+ const char TXT_WOL_NOUSERLIST[] = "(absent du canal)";
+-const char TXT_WOL_CANTCREATEHERE[] = "Pour commencer une partie, vous devez àtre dans un salon d'Alerte Rouge.";
++const char TXT_WOL_CANTCREATEHERE[] = "Pour commencer une partie, vous devez ¬àtre dans un salon d'Alerte Rouge.";
+ const char TXT_WOL_WOLAPIGONE[] = "Perte de connexion avec Westwood Online !";
+-const char TXT_WOL_WOLAPIREINIT[] = "Perte de connexion avec Westwood Online. RÇinitialisation en cours...";
+-const char TXT_WOL_NOTPAGED[] = "Impossible de rÇpondre au message ; personne ne vous en a envoyÇ.";
+-const char TXT_WOL_SCENARIONAMEWAIT[] = "En attente du scÇnario...";
++const char TXT_WOL_WOLAPIREINIT[] = "Perte de connexion avec Westwood Online. R¬Çinitialisation en cours...";
++const char TXT_WOL_NOTPAGED[] = "Impossible de r¬Çpondre au message ; personne ne vous en a envoy¬Ç.";
++const char TXT_WOL_SCENARIONAMEWAIT[] = "En attente du sc¬Çnario...";
+ const char TXT_WOL_BACK[] = "Retour";
+ const char TXT_WOL_AMDISCNEEDED[] =
+-    "Le CD de Missions M.A.D. est nÇcessaire pour cette partie ; insÇrez-le maintenant.";
++    "Le CD de Missions M.A.D. est n¬Çcessaire pour cette partie ; ins¬Çrez-le maintenant.";
+ const char TXT_WOL_CONFIRMLOGOUT[] = "Voulez-vous vraiment quitter Westwood Online ?";
+-const char TXT_WOL_PROPOSE_DRAW[] = "Proposer une fin avec ÇgalitÇ";
+-const char TXT_WOL_RETRACT_DRAW[] = "Annuler la proposition de fin avec ÇgalitÇ";
+-const char TXT_WOL_ACCEPT_DRAW[] = "Accepter la proposition de fin avec ÇgalitÇ";
+-const char TXT_WOL_PROPOSE_DRAW_CONFIRM[] = "Voulez-vous vraiment proposer une fin avec ÇgalitÇ ?";
+-const char TXT_WOL_ACCEPT_DRAW_CONFIRM[] = "Voulez-vous vraiment accepter une fin avec ÇgalitÇ ?";
++const char TXT_WOL_PROPOSE_DRAW[] = "Proposer une fin avec ¬Çgalit¬Ç";
++const char TXT_WOL_RETRACT_DRAW[] = "Annuler la proposition de fin avec ¬Çgalit¬Ç";
++const char TXT_WOL_ACCEPT_DRAW[] = "Accepter la proposition de fin avec ¬Çgalit¬Ç";
++const char TXT_WOL_PROPOSE_DRAW_CONFIRM[] = "Voulez-vous vraiment proposer une fin avec ¬Çgalit¬Ç ?";
++const char TXT_WOL_ACCEPT_DRAW_CONFIRM[] = "Voulez-vous vraiment accepter une fin avec ¬Çgalit¬Ç ?";
+ const char TXT_WOL_DRAW_PROPOSED_LOCAL[] = "Vous proposez de terminer la partie sans vainqueur ni perdant.";
+-const char TXT_WOL_DRAW_PROPOSED_OTHER[] = "%s a proposÇ de terminer la partie sans vainqueur ni perdant.";
++const char TXT_WOL_DRAW_PROPOSED_OTHER[] = "%s a propos¬Ç de terminer la partie sans vainqueur ni perdant.";
+ const char TXT_WOL_DRAW_RETRACTED_LOCAL[] =
+-    "Vous avez annulÇ votre proposition de terminer la partie sans vainqueur ni perdant.";
++    "Vous avez annul¬Ç votre proposition de terminer la partie sans vainqueur ni perdant.";
+ const char TXT_WOL_DRAW_RETRACTED_OTHER[] =
+-    "%s a annulÇ sa proposition de terminer la partie sans vainqueur ni perdant.";
++    "%s a annul¬Ç sa proposition de terminer la partie sans vainqueur ni perdant.";
+ const char TXT_WOL_DRAW[] = "Match nul";
+ const char TXT_WOL_CANTLAUNCHBROWSER[] = "Impossible de lancer le navigateur web pour ouvrir %s !";
+-const char TXT_WOL_CHANNELFULL[] = "Ce canal de jeu/conversation est saturÇ.";
++const char TXT_WOL_CHANNELFULL[] = "Ce canal de jeu/conversation est satur¬Ç.";
+ const char TXT_WOL_CHANNELTYPE_TOP[] = " Double-clic pour retourner au premier niveau. ";
+ const char TXT_WOL_CHANNELTYPE_OFFICIALCHAT[] = " Double-clic pour les canaux de conversation officiels. ";
+ const char TXT_WOL_CHANNELTYPE_USERCHAT[] = " Double-clic pour les canaux d' utilisateur. ";
+-const char TXT_WOL_CHANNELTYPE_GAMES[] = " Double-clic pour accÇder au niveau des canaux de jeu. ";
++const char TXT_WOL_CHANNELTYPE_GAMES[] = " Double-clic pour acc¬Çder au niveau des canaux de jeu. ";
+ const char TXT_WOL_CHANNELTYPE_LOADING[] = " Chargement de la liste depuis Westwood Online, veuillez patienter...";
+-const char TXT_WOL_CHANNELTYPE_LOBBIES[] = " Double-clic pour accÇder au niveau des salons. ";
++const char TXT_WOL_CHANNELTYPE_LOBBIES[] = " Double-clic pour acc¬Çder au niveau des salons. ";
+ const char TXT_WOL_FINDINGLOBBY[] = "Connection : recherche de salons disponibles...";
+-const char TXT_WOL_PRIVATETOMULTIPLE[] = "<Message personnel adressÇ Ö divers utilisateurs> :";
+-const char TXT_WOL_PRIVATETO[] = "Message personnel Ö";
+-const char TXT_WOL_CS_MISSIONS[] = "Missions extraites de Missions Taãga";
++const char TXT_WOL_PRIVATETOMULTIPLE[] = "<Message personnel adress¬Ç ¬Ö divers utilisateurs> :";
++const char TXT_WOL_PRIVATETO[] = "Message personnel ¬Ö";
++const char TXT_WOL_CS_MISSIONS[] = "Missions extraites de Missions Ta¬ãga";
+ const char TXT_WOL_AM_MISSIONS[] = "Missions extraites de Missions M.A.D.";
+-const char TXT_WOL_CANTSQUELCHSELF[] = "Vous ne pouvez pas dÇsactiver vos propres messages!";
++const char TXT_WOL_CANTSQUELCHSELF[] = "Vous ne pouvez pas d¬Çsactiver vos propres messages!";
+ const char TXT_WOL_OPTTITLE[] = "Options de Westwood Online";
+ const char TXT_WOL_SLOWUNITBUILD[] = "Ralentir la Construction";
+ const char TXT_WOL_THEGAMEHOST[] = "Le serveur";
+@@ -822,7 +822,7 @@ const char TXT_WOL_TTIP_RANKRA[] = " Afficher les positions d'Alerte Rouge ";
+ const char TXT_WOL_TTIP_RANKAM[] = " Afficher les positions de Missions M.A.D. ";
+ const char TXT_WOL_OPTRANKAM[] = "Afficher les positions de Missions M.A.D.";
+ const char TXT_WOL_CANCELMEANSFORFEIT[] = " (ET RENONCER AU JEU)";
+-const char TXT_WOL_DLLERROR_GETIE3[] = "Votre version des Windows est dÇmodÇe. AmÇliorez s'il vous plait aux Windows "
++const char TXT_WOL_DLLERROR_GETIE3[] = "Votre version des Windows est d¬Çmod¬Çe. Am¬Çliorez s'il vous plait aux Windows "
+                                        "SP1, ou installez l'Internet Explorer 3,0 ou plus haut.";
+ const char TXT_WOL_DLLERROR_CALLUS[] =
+     "Une erreur inattendue s'est produite. Veuillez contacter l'assistance technique de Electronic Arts.";
 diff --git a/tiberiandawn/CMakeLists.txt b/tiberiandawn/CMakeLists.txt
 index a26cf46..7a52827 100644
 --- a/tiberiandawn/CMakeLists.txt
@@ -6952,7 +8339,7 @@ index bdc34f3..00dfe87 100644
                                      WEAPON_NONE,
                                      WEAPON_NONE,
 diff --git a/tiberiandawn/building.cpp b/tiberiandawn/building.cpp
-index 91f1bec..b7d6b68 100644
+index 91f1bec..c8bfa5d 100644
 --- a/tiberiandawn/building.cpp
 +++ b/tiberiandawn/building.cpp
 @@ -12,6 +12,32 @@
@@ -6996,6 +8383,53 @@ index 91f1bec..b7d6b68 100644
      switch (message) {
  
      /*
+@@ -434,26 +461,26 @@ void BuildingClass::Debug_Dump(MonoClass* mono) const
+ {
+     Validate();
+     mono->Set_Cursor(0, 0);
+-    mono->Print("⁄Name:ƒƒƒƒƒƒƒƒƒƒƒƒƒƒ¬Mission:ƒƒƒ¬TarCom:¬ƒƒƒƒƒƒƒ¬Radio:¬Coord:ƒƒ¬ƒƒƒƒƒƒƒƒ¬St:ƒø\n"
+-                "≥                   ≥           ≥       ≥       ≥      ≥        ≥        ≥    ≥\n"
+-                "√ƒƒƒƒƒƒƒƒƒƒƒƒƒƒ¬N¬Y¬Health:ƒ¬ƒƒƒ¡ƒ¬Turret:¬ƒƒƒƒƒ¡¬ƒBuilding:ƒƒ¬Cargo:ƒƒƒƒ¡ƒƒƒƒ¥\n"
+-                "≥Active........≥ ≥ ≥        ≥     ≥       ≥      ≥            ≥               ≥\n"
+-                "≥Limbo.........≥ ≥ √ƒƒƒƒƒƒƒƒ¡ƒƒƒƒƒ¡ƒƒƒƒƒƒƒ¡ƒƒƒƒƒƒ¡ƒƒƒƒƒƒƒƒƒƒƒƒ¡ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ¥\n"
+-                "≥Owned.........≥ ≥ ≥Last Message:                                             ≥\n"
+-                "≥Discovered....≥ ≥ √Timer:¬Arm:¬ƒƒƒƒƒƒ¬Tiberium:¬Flash:¬Stage:¬ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒŸ\n"
+-                "≥Selected......≥ ≥ ≥      ≥    ≥      ≥         ≥      ≥      ≥                \n"
+-                "≥Teathered.....≥ ≥ √ƒƒƒƒƒƒ¡ƒƒƒƒ¡ƒƒƒƒƒƒ¡ƒƒƒƒƒƒƒƒƒ¡ƒƒƒƒƒƒ¡ƒƒƒƒƒƒŸ                \n"
+-                "≥Locked on Map.≥ ≥ ≥                                                           \n"
+-                "≥Is A Loaner...≥ ≥ ≥                                                           \n"
+-                "≥              ≥ ≥ ≥                                                           \n"
+-                "≥              ≥ ≥ ≥                                                           \n"
+-                "≥              ≥ ≥ ≥                                                           \n"
+-                "≥Repairing.....≥ ≥ ≥                                                           \n"
+-                "≥              ≥ ≥ ≥                                                           \n"
+-                "≥              ≥ ≥ ≥                                                           \n"
+-                "≥Recoiling.....≥ ≥ ≥                                                           \n"
+-                "≥To Display....≥ ≥ ≥                                                           \n"
+-                "¿ƒƒƒƒƒƒƒƒƒƒƒƒƒƒ¡ƒ¡ƒŸ                                                           \n");
++    mono->Print("√öName:√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√ÇMission:√Ñ√Ñ√Ñ√ÇTarCom:√Ç√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√ÇRadio:√ÇCoord:√Ñ√Ñ√Ç√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√ÇSt:√Ñ¬ø\n"
++                "¬≥                   ¬≥           ¬≥       ¬≥       ¬≥      ¬≥        ¬≥        ¬≥    ¬≥\n"
++                "√É√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√ÇN√ÇY√ÇHealth:√Ñ√Ç√Ñ√Ñ√Ñ√Å√Ñ√ÇTurret:√Ç√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ç√ÑBuilding:√Ñ√Ñ√ÇCargo:√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ¬¥\n"
++                "¬≥Active........¬≥ ¬≥ ¬≥        ¬≥     ¬≥       ¬≥      ¬≥            ¬≥               ¬≥\n"
++                "¬≥Limbo.........¬≥ ¬≥ √É√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ¬¥\n"
++                "¬≥Owned.........¬≥ ¬≥ ¬≥Last Message:                                             ¬≥\n"
++                "¬≥Discovered....¬≥ ¬≥ √ÉTimer:√ÇArm:√Ç√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√ÇTiberium:√ÇFlash:√ÇStage:√Ç√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√ô\n"
++                "¬≥Selected......¬≥ ¬≥ ¬≥      ¬≥    ¬≥      ¬≥         ¬≥      ¬≥      ¬≥                \n"
++                "¬≥Teathered.....¬≥ ¬≥ √É√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√ô                \n"
++                "¬≥Locked on Map.¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥Is A Loaner...¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥              ¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥              ¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥              ¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥Repairing.....¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥              ¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥              ¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥Recoiling.....¬≥ ¬≥ ¬≥                                                           \n"
++                "¬≥To Display....¬≥ ¬≥ ¬≥                                                           \n"
++                "√Ä√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Ñ√Å√Ñ√Å√Ñ√ô                                                           \n");
+     mono->Set_Cursor(1, 1);
+     mono->Printf("%s:%s", House->Class->IniName, Class->IniName);
+     mono->Set_Cursor(35, 3);
 @@ -1175,7 +1202,7 @@ void BuildingClass::AI(void)
                  // GB 2022 improvement by TobiasKarnat, This on top would improve
                  // skirmish by randomizing building choice, prioritizing power and
@@ -7471,7 +8905,7 @@ index 91f1bec..b7d6b68 100644
 +    ** the sidebar reads. This one is called from HouseClass::Place_Object
 +    ** (house.cpp:2920) and decides whether the click is actually HONOURED. Hooking only
 +    ** the first two gives a green cursor over a far cell and a click that is silently
-+    ** refused, which is exactly what shipped for an hour on 26 Aug 2026 -- and the gate
++    ** refused, which is exactly what shipped for an hour -- and the gate
 +    ** written for it went green, because it queried the cursor routine.
 +    **
 +    ** It lifts the ADJACENCY rule only. In_Radar is still demanded of every cell the
@@ -8219,7 +9653,7 @@ index 42d052d..c3f7c11 100644
      ObjectClass* Cell_Object(CELL cell, int x = 0, int y = 0);
      ObjectClass* Next_Object(ObjectClass* object);
 diff --git a/tiberiandawn/dllinterface.cpp b/tiberiandawn/dllinterface.cpp
-index 383e098..bc47822 100644
+index 383e098..37175bd 100644
 --- a/tiberiandawn/dllinterface.cpp
 +++ b/tiberiandawn/dllinterface.cpp
 @@ -1,3 +1,6 @@
@@ -8782,7 +10216,22 @@ index 383e098..bc47822 100644
          }
  
          On_Message(ai_players[ai_player_index], "", 15.0f, MESSAGE_TYPE_COMPUTER_TAUNT, taunt_index);
-@@ -7718,4 +8048,2558 @@ void DLL_Code_Pointers(void)
+@@ -7694,7 +8024,14 @@ void DLLExportClass::Decode_Pointers(void)
+         Sidebar_Glyphx_Decode_Pointers(&MultiplayerSidebars[i]);
+ 
+         if (PlacementType[i]) {
++            /* Type was stored in the pointer slot by Code_Pointers. On the
++               32-bit Windows brain unsigned int is wide enough. A 64-bit brain
++               has to keep the whole stored value. */
++#if defined(_WIN32)
+             StructType type = (StructType) reinterpret_cast<unsigned int>(PlacementType[i]);
++#else
++            StructType type = (StructType)(uintptr_t)PlacementType[i];
++#endif
+             PlacementType[i] = NULL;
+             if (type >= STRUCT_FIRST && type < STRUCT_COUNT) {
+ 
+@@ -7718,4 +8055,2558 @@ void DLL_Code_Pointers(void)
  void DLL_Decode_Pointers(void)
  {
      DLLExportClass::Decode_Pointers();
@@ -10812,7 +12261,7 @@ index 383e098..bc47822 100644
 + * OpenCNC3D_Proximity_Ok -- Would this building type pass the proximity check on this cell?
 + *
 + * A PURE QUERY. IT ANSWERS THE CURSOR ROUTINE, NOT THE COMMIT ROUTINE, and that distinction
-+ * cost a round on 26 Aug 2026, so read it before trusting an answer from here.
++ * cost a round, so read it before trusting an answer from here.
 + *
 + * There are THREE copies of the adjacency rule in this engine and they are not the same rule:
 + *   DisplayClass::Passes_Proximity_Check  -- colours the cursor. Accepts adjacency to any
@@ -14010,7 +15459,7 @@ index 425890b..8eced30 100644
      }
  
 diff --git a/tiberiandawn/scenario.cpp b/tiberiandawn/scenario.cpp
-index 47f8b42..37a61ca 100644
+index 47f8b42..ad34b43 100644
 --- a/tiberiandawn/scenario.cpp
 +++ b/tiberiandawn/scenario.cpp
 @@ -12,6 +12,14 @@
@@ -14028,6 +15477,20 @@ index 47f8b42..37a61ca 100644
  
  /* $Header:   F:\projects\c&c\vcs\code\scenario.cpv   2.17   16 Oct 1995 16:52:08   JOE_BOSTIC  $ */
  /***********************************************************************************************
+@@ -86,11 +94,11 @@ ScenarioClass::ScenarioClass(void)
+  * Start_Scenario -- Starts the scenario.                                                      *
+  *                                                                                             *
+  *    This routine will start the scenario. In addition to loading the scenario data, it will  *
+- *    play the briefing and action movies.                                                     *
++ *    play the mission briefing and action movies.                                                     *
+  *                                                                                             *
+  * INPUT:   root     -- Pointer to the filename root for this scenario (e.g., "SCG01EA").      *
+  *                                                                                             *
+- *          briefing -- Should the briefing be played? Normally this is true except when the   *
++ *          briefing -- Should the mission briefing be played? Normally this is true except when the   *
+  *                      scenario is restarting.                                                *
+  *                                                                                             *
+  * OUTPUT:  Was the scenario started without error?                                            *
 @@ -346,6 +354,33 @@ void Fill_In_Data(void)
   *=============================================================================================*/
  void Clear_Scenario(void)
@@ -14062,6 +15525,50 @@ index 47f8b42..37a61ca 100644
      EndCountDown = TICKS_PER_SECOND * 30;
      CrateCount = 0;
      CrateTimer = 0;
+@@ -764,7 +799,7 @@ bool Restate_Mission(char const* name, int button1, int button2)
+         }
+ #else
+         /*
+-        **	Make sure that if there is no briefing movie, that the briefing text is
++        **	Make sure that if there is no briefing movie, that the mission briefing text is
+         **	the only option available.
+         */
+         bool brief = true;
+diff --git a/tiberiandawn/scenario.h b/tiberiandawn/scenario.h
+index 0e96d88..ec19d61 100644
+--- a/tiberiandawn/scenario.h
++++ b/tiberiandawn/scenario.h
+@@ -79,7 +79,7 @@ public:
+     char ScenarioName[_MAX_FNAME + _MAX_EXT];
+ 
+     /*
+-    **	This is the full text of the briefing. This text will be
++    **	This is the full text of the mission briefing. This text will be
+     **	displayed when the player commands the "restate mission
+     **	objectives" operation.
+     */
+diff --git a/tiberiandawn/scenarioini.cpp b/tiberiandawn/scenarioini.cpp
+index 8e906f4..e98b096 100644
+--- a/tiberiandawn/scenarioini.cpp
++++ b/tiberiandawn/scenarioini.cpp
+@@ -472,7 +472,7 @@ bool Read_Scenario_Ini(char* root, bool fresh)
+     ini.Get_TextBlock("Briefing", Scen.BriefingText, sizeof(Scen.BriefingText));
+ 
+     /*
+-    **	If the briefing text could not be found in the INI file, then search
++    **	If the mission briefing text could not be found in the INI file, then search
+     **	the mission.ini file.
+     */
+     if (Scen.BriefingText[0] == '\0') {
+@@ -866,7 +866,7 @@ bool Read_Scenario_Ini_File(char* scenario_file_name, char* bin_file_name, const
+     ini.Get_TextBlock("Briefing", Scen.BriefingText, sizeof(Scen.BriefingText));
+ 
+     /*
+-    **	If the briefing text could not be found in the INI file, then search
++    **	If the mission briefing text could not be found in the INI file, then search
+     **	the mission.ini file.
+     */
+     if (Scen.BriefingText[0] == '\0') {
 diff --git a/tiberiandawn/session.h b/tiberiandawn/session.h
 index 0986712..e6ad1e0 100644
 --- a/tiberiandawn/session.h
@@ -14147,7 +15654,7 @@ index 78ad08f..3f4c019 100644
      ** Health bar display mode
      */
 diff --git a/tiberiandawn/startup.cpp b/tiberiandawn/startup.cpp
-index 8536cc9..9a4c9f4 100644
+index 8536cc9..664d694 100644
 --- a/tiberiandawn/startup.cpp
 +++ b/tiberiandawn/startup.cpp
 @@ -12,6 +12,15 @@
@@ -14174,6 +15681,30 @@ index 8536cc9..9a4c9f4 100644
  #include "function.h"
  #include "common/ini.h"
  #include "common/paths.h"
+@@ -112,6 +122,13 @@ BOOL WINAPI DllMain(HINSTANCE instance, unsigned int fdwReason, void* lpvReserve
+ #endif
+ 
+ #ifdef REMASTER_BUILD
++#if defined(__linux__)
++/* The player executable also defines main. ELF resolves a shared library's
++   call to main through the PLT and lands in the player, which starts the
++   menu a second time and then faults in CNC_Start_Custom_Instance. Hidden
++   visibility binds this call to the main in this file. */
++__attribute__((visibility("hidden")))
++#endif
+ int main(int, char*[]);
+ 
+ int DLL_Startup(const char* command_line_in)
+@@ -198,6 +215,9 @@ int DLL_Startup(const char* command_line_in)
+ }
+ #endif // REMASTER_BUILD
+ 
++#if defined(__linux__) && defined(REMASTER_BUILD)
++__attribute__((visibility("hidden")))
++#endif
+ int main(int argc, char** argv)
+ {
+     UtfArgs args(argc, argv);
 diff --git a/tiberiandawn/techno.cpp b/tiberiandawn/techno.cpp
 index 07b96eb..1997eef 100644
 --- a/tiberiandawn/techno.cpp

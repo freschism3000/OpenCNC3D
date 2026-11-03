@@ -1,0 +1,17 @@
+Source: opencnc3d
+Section: games
+Priority: optional
+Maintainer: jagiella <nick.jagiella@gmail.com>
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13), cmake, g++, git, libsdl2-dev, libgl1-mesa-dev, zlib1g-dev, libcurl4-openssl-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/jagiella/OpenCNC3D
+
+Package: opencnc3d
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: three-dimensional Command & Conquer
+ OpenCNC3D is a Linux build of the launcher, the renderer and both game
+ brains. The Command & Conquer data is not in this package. After the first
+ start the launcher downloads the published module packages into the player's
+ own data folder.

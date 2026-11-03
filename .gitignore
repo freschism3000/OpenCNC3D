@@ -12,6 +12,7 @@
 # see BUILDING.md for what you have to bring.
 *.dSYM/
 *.dylib
+*.so
 *.log
 *.o
 *.pyc
@@ -214,6 +215,11 @@ tools/art/remaster/fxviewer/inbox-ra.jsonl
 
 # The menu pack, baked by game/make-build.sh (or python3 menu/bake_dosmenu.py).
 /menu/dosmenu.pack
+/dosmenu.pack
+/dossidebar.pack
+/campaign.pack
+/dosdata/
+/missions/
 
 
 # Written by game/build.sh (tools/ra3d/bake-enhanced-hud.py) beside its pack on every build.

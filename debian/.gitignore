@@ -1,0 +1,7 @@
+/files
+/*.substvars
+/*.debhelper
+/.debhelper/
+/opencnc3d/
+/debhelper-build-stamp
+/tmp/
