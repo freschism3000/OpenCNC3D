@@ -24953,6 +24953,7 @@ static void gp_from_fx(DOPT_Gameplay* g)
     g->on[DOPT_G_SWAPBTN]  = g_fx.swap_buttons ? 1 : 0;
     g->on[DOPT_G_RPUSH]    = g_fx.right_drag_scroll ? 1 : 0;
     g->on[DOPT_G_CASHTICK] = g_fx.cash_tick ? 1 : 0;
+    g->on[DOPT_G_WASD]     = g_fx.wasd_scroll ? 1 : 0;
 }
 
 static void opt_apply_gameplay(void* user, const DOPT_Gameplay* g)
@@ -24962,6 +24963,7 @@ static void opt_apply_gameplay(void* user, const DOPT_Gameplay* g)
     g_fx.swap_buttons      = g->on[DOPT_G_SWAPBTN];
     g_fx.right_drag_scroll = g->on[DOPT_G_RPUSH];
     g_fx.cash_tick         = g->on[DOPT_G_CASHTICK];
+    g_fx.wasd_scroll       = g->on[DOPT_G_WASD];
 }
 
 /* Defined beside confine_automated, which this is a question to. */
@@ -25147,7 +25149,7 @@ static void opt_apply_visuals(void* user, const DOPT_Visuals* v)
  * tomorrow is covered on the day it is added, by nobody remembering anything.
  *
  * WHAT IS CARRIED ACROSS, and why none of it is this mode's picture:
- *   swap_buttons, right_drag_scroll, cash_tick  INPUT and a SOUND, on the Gameplay page
+ *   swap_buttons, right_drag_scroll, cash_tick, wasd_scroll  INPUT and a SOUND, on the Gameplay page
  *       behind their own callback. The Visuals screen writes the preset on the way out, so
  *       a reset that cleared these would erase a player's choice from the file on disc.
  *   the display, vertical sync and the FPS counter  the GLOBAL rows, which sit above the
@@ -25174,6 +25176,7 @@ static void opt_reset_visuals(void* user, DOPT_Visuals* v, int mode)
     d.swap_buttons          = g_fx.swap_buttons;
     d.right_drag_scroll     = g_fx.right_drag_scroll;
     d.cash_tick             = g_fx.cash_tick;
+    d.wasd_scroll           = g_fx.wasd_scroll;
     d.display_mode          = g_fx.display_mode;
     d.res_w                 = g_fx.res_w;
     d.res_h                 = g_fx.res_h;
@@ -33240,6 +33243,9 @@ static float g_rbPushC = 0.0f, g_rbPushR = 0.0f;
 /* IS THE PUSH SWITCHED ON. One reader, and it does NOT ask g_fx.enabled: the master switch
    governs the PICTURE, and how the game is driven stays the player's. */
 static bool rpush_active(void) { return g_fx.right_drag_scroll != 0; }
+/* WASD pans the game view: the Gameplay page's switch, and only outside the editor and
+   the free cam, which fly the camera on those keys instead. */
+static bool wasd_pans(void) { return g_fx.wasd_scroll && !g_editOn && !g_freeCam; }
 
 /* THE ONE "SOMETHING IS ALREADY MOVING THE VIEW" TEST. The edge strip must never add to a
    grab or to a push. g_camDrag used to be the whole of it, because the right button's pan
@@ -39498,12 +39504,13 @@ static bool script_line(char* line, SDL_Window* win, int fbw, int fbh)
         /* cash= sits BEFORE fx_enabled= and never at the end: box= is extracted anchored
            to the end of the line, so a field appended after it would break that read. */
         printf("OPTGP|page=%d|swap=%d|fx_swap=%d|push=%d|fx_push=%d|cash=%d|fx_cash=%d"
-               "|fx_enabled=%d"
+               "|wasd=%d|fx_wasd=%d|fx_enabled=%d"
                "|head=%d|headrect=%d,%d %dx%d|box=%d..%d,%d..%d\n",
                g_optState.page,
                g_optState.gp.on[DOPT_G_SWAPBTN], g_fx.swap_buttons,
                g_optState.gp.on[DOPT_G_RPUSH], g_fx.right_drag_scroll,
                g_optState.gp.on[DOPT_G_CASHTICK], g_fx.cash_tick,
+               g_optState.gp.on[DOPT_G_WASD], g_fx.wasd_scroll,
                g_fx.enabled, head, hx, hy, hw, hh,
                DOPT_V_X, DOPT_V_X + DOPT_V_W - 1, DOPT_V_Y, DOPT_V_Y + DOPT_V_H - 1);
         if (g_optState.page == DOPT_PAGE_GAMEPLAY) {
@@ -44916,6 +44923,25 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                         break;
                     }
                 }
+                /* WASD SCROLLING MOVES THREE ORDERS ONE KEY OVER. With the Gameplay page's
+                   switch on, W A S D are the camera (polled further down), so their own
+                   orders must not also fire, and each order goes to the nearest key that
+                   nothing in the game binds:
+                       A attack-move  ->  Q, the key above it
+                       S stop         ->  E, above and between S and D
+                       D rebuild      ->  F, the key beside it
+                   SCANCODES, like the groups above and like the pan itself, so the keys
+                   are the same physical keys on any layout. With Ctrl/Cmd/Alt held the keys
+                   are the game's again (Ctrl+S, Cmd+F ...), and they fall through below. */
+                if (wasd_pans() && !(SDL_GetModState() & (KMOD_CTRL | KMOD_GUI | KMOD_ALT))) {
+                    const SDL_Scancode sc = e.key.keysym.scancode;
+                    if (sc == SDL_SCANCODE_W || sc == SDL_SCANCODE_A
+                        || sc == SDL_SCANCODE_S || sc == SDL_SCANCODE_D)
+                        break;                      /* panning, not an order */
+                    if (sc == SDL_SCANCODE_Q) { am_toggle();       break; }
+                    if (sc == SDL_SCANCODE_E) { ui_stop();         break; }
+                    if (sc == SDL_SCANCODE_F) { ui_rebuild_last(); break; }
+                }
                 switch (e.key.keysym.sym) {
                 /* The announcement is not interruptible. scenario.cpp:434's dwell
                    loop reads no keyboard at all, so ESC during MISSION ACCOMPLISHED
@@ -46474,12 +46500,23 @@ int game_loop(SDL_Window* win, const GameOpts* o)
             }
         }
         if (ks) {
-        /* Arrows only: S is the stop order now (and G is guard), so WASD panning is
-           gone rather than firing orders and camera moves off the same key. */
+        /* Arrows always. WASD only when the Gameplay page's switch asks for it: S is
+           the stop order (and A attack-move, D rebuild), and with the switch on those
+           orders move to E, Q and F in the key handler so a key never does both. Never in the
+           editor or the free cam, where WASD already flies the camera above. A held
+           Ctrl/Cmd is a shortcut (Ctrl+S, Ctrl+A ...), not a pan. */
         if (ks[SDL_SCANCODE_LEFT])  dc -= 1.0f;
         if (ks[SDL_SCANCODE_RIGHT]) dc += 1.0f;
         if (ks[SDL_SCANCODE_UP])    dr -= 1.0f;
         if (ks[SDL_SCANCODE_DOWN])  dr += 1.0f;
+        if (wasd_pans() && !(SDL_GetModState() & (KMOD_CTRL | KMOD_GUI | KMOD_ALT))) {
+            if (ks[SDL_SCANCODE_A]) dc -= 1.0f;
+            if (ks[SDL_SCANCODE_D]) dc += 1.0f;
+            if (ks[SDL_SCANCODE_W]) dr -= 1.0f;
+            if (ks[SDL_SCANCODE_S]) dr += 1.0f;
+            if (dc < -1.0f) dc = -1.0f; else if (dc > 1.0f) dc = 1.0f;
+            if (dr < -1.0f) dr = -1.0f; else if (dr > 1.0f) dr = 1.0f;
+        }
         if (dc != 0.0f && dr != 0.0f) { dc *= 0.70710678f; dr *= 0.70710678f; }
         if (dc != 0.0f || dr != 0.0f)
             pan_screen_px(dc * KEY_SPEED * dt, dr * KEY_SPEED * dt, dw, dh);

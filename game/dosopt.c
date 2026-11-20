@@ -182,14 +182,15 @@ static const char *const dopt_infset_name[DOPT_INF_COUNT] = {
     "N64 Sprites", "DOS Sprites", "", "Enhanced 3D"
 };
 
-/* The Gameplay page's labels. All three are ours. Measured against GRAD6FNT: 104, 116
+/* The Gameplay page's labels. All four are ours. Measured against GRAD6FNT: 104, 116
    and 98 pixels, printed from DOPT_A_LABEL_X, so they end well inside the box inner edge.
    db_print clips to the surface and not to the button, so this measurement is the only
    thing between a long label and ink on the next control. */
 static const char *const dopt_gp_row[DOPT_G_TOGGLES] = {
     "Swap mouse buttons",
     "Right button scrolls",
-    "Credit tick sound"
+    "Credit tick sound",
+    "WASD scrolls map"
 };
 
 const char *dopt_gp_label(int item)
@@ -3288,6 +3289,8 @@ void dopt_gameplay_defaults(DOPT_Gameplay *g)
     g->on[DOPT_G_RPUSH] = 1;
     /* ON: both source games sounded it; the switch exists for the player who tires of it. */
     g->on[DOPT_G_CASHTICK] = 1;
+    /* OFF: S, A and D keep their orders unless the player moves them for the camera. */
+    g->on[DOPT_G_WASD] = 0;
 }
 
 void dopt_set_gameplay(DOPT_State *st, const DOPT_Gameplay *g)

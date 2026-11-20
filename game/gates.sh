@@ -11106,8 +11106,8 @@ if [ "$GPRC" != "0" ] || [ "$ADRC" != "0" ]; then
   bad "G143 the Gameplay page: a run failed (page exit $GPRC, advanced exit $ADRC)"
 elif [ "${GPPAGE:-0}" != "1" ]; then
   bad "G143 the Gameplay page: clicking Gameplay on the pause menu did not land on page 7 [$GP1]. 7 is DOPT_PAGE_GAMEPLAY, APPENDED after CONFIRM so that ADVANCED, SOUND, CHEATS and CONFIRM keep 3, 4, 5 and 6, which four gates in this file match as literals"
-elif [ "${GPRECTS:-0}" != "4" ]; then
-  bad "G143 the Gameplay page: the page answered with $GPRECTS distinct rectangles, want 4 (three checkbox rows and OK). Fewer means a control has no rectangle and no click can reach it"
+elif [ "${GPRECTS:-0}" != "5" ]; then
+  bad "G143 the Gameplay page: the page answered with $GPRECTS distinct rectangles, want 5 (four checkbox rows and OK). Fewer means a control has no rectangle and no click can reach it"
 elif [ "${GPOVER:-99}" != "0" ]; then
   bad "G143 the Gameplay page: $GPOVER pairs of controls share a pixel. A row through the OK button makes OK partly unclickable"
 elif [ "${GPOUT:-99}" != "0" ]; then
