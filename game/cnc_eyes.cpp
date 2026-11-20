@@ -23334,6 +23334,41 @@ static float g_bandC0, g_bandR0, g_bandC1, g_bandR1;
 static float g_bandWX0, g_bandWZ0, g_bandWX1, g_bandWZ1;
 static bool  g_bandWorld = false;      /* --oldband falls back to the flat green loop */
 
+/* THE BAND'S FIRST CORNER IS A PLACE ON THE MAP, not a pixel on the glass. It is taken
+   once, at the press, and every later update projects it back to the screen. Holding the
+   pixel instead meant a drag that scrolled the view -- the edge, the arrows, WASD, the
+   right button's push -- carried the corner along with the screen, so the box no longer
+   started where the player pressed and picked units that were never under it.
+   g_bandAnchored is false only when the press had no ground behind it (sky under a level
+   free camera, or outside the DOS Classic viewport); the corner then stays the pixel,
+   which is what it always was. */
+static float g_bandAnchorX = 0.0f, g_bandAnchorZ = 0.0f;
+static bool  g_bandAnchored = false;
+
+static void band_anchor_set(float c, float r, int fbw, int fbh)
+{
+    g_bandAnchored = screen_to_world(c, r, fbw, fbh, &g_bandAnchorX, &g_bandAnchorZ);
+}
+
+/* Both corners for this frame: the first from the anchor through the camera as it now
+   stands, the second from the pointer. Called on every pointer move AND every frame while
+   the band is up, because the view can scroll under a pointer that is not moving. */
+static void band_track(float pressC, float pressR, float curC, float curR, int fbw, int fbh)
+{
+    float c0 = pressC, r0 = pressR;
+    if (g_bandAnchored)
+        world_to_screen(g_bandAnchorX, terrain_y(g_bandAnchorX, g_bandAnchorZ), g_bandAnchorZ,
+                        fbw, fbh, &c0, &r0);
+    g_bandC0 = c0;   g_bandR0 = r0;
+    g_bandC1 = curC; g_bandR1 = curR;
+    if (g_bandAnchored) { g_bandWX0 = g_bandAnchorX; g_bandWZ0 = g_bandAnchorZ; }
+    else screen_to_world(g_bandC0, g_bandR0, fbw, fbh, &g_bandWX0, &g_bandWZ0);
+    /* Unprojected fresh each time so the far corner tracks the pointer over the terrain
+       rather than over a plane. */
+    screen_to_world(g_bandC1, g_bandR1, fbw, fbh, &g_bandWX1, &g_bandWZ1);
+    g_bandWorld = true;
+}
+
 /* ---- THE CARTRIDGE'S RUBBER BAND ---------------------------------------------------
    The console does not draw a flat rectangle on the glass. It draws FOUR TRANSLUCENT
    VERTICAL WALLS standing on the terrain around the dragged rect -- no lid, no floor --
@@ -46002,6 +46037,7 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                         lpress = true;
                         ldouble = (e.button.clicks >= 2);
                         pressC = mc; pressR = mr;
+                        band_anchor_set((float)mc, (float)mr, dw, dh);
                         g_bandOn = false;
                     }
                 } else if (e.button.button == SDL_BUTTON_RIGHT) {
@@ -46241,7 +46277,11 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     const int mr = (int)(e.button.y * mscaleY);
                     const bool add = (SDL_GetModState() & KMOD_SHIFT) != 0;
                     if (g_bandOn) {
-                        ui_band_select((float)pressC, (float)pressR, (float)mc, (float)mr,
+                        /* From the anchor as it stands NOW, so a drag that scrolled
+                           picks from where it was pressed on the map. */
+                        band_track((float)pressC, (float)pressR, (float)mc, (float)mr,
+                                   dw, dh);
+                        ui_band_select(g_bandC0, g_bandR0, (float)mc, (float)mr,
                                        dw, dh, add);
                     } else {
                         /* THE ORDER BUTTON. Select or move/attack, decided by the
@@ -46372,18 +46412,12 @@ int game_loop(SDL_Window* win, const GameOpts* o)
                     if (!g_bandOn &&
                         (abs(mouseC - pressC) > 5 || abs(mouseR - pressR) > 5))
                         g_bandOn = true;
-                    if (g_bandOn) {
-                        g_bandC0 = (float)pressC; g_bandR0 = (float)pressR;
-                        g_bandC1 = (float)mouseC; g_bandR1 = (float)mouseR;
-                        /* The same drag in world cells, for the cartridge's 3D box.
-                           Unprojected fresh each motion so the far corner tracks the
-                           pointer over the terrain rather than over a plane. */
-                        screen_to_world(g_bandC0, g_bandR0, dw, dh,
-                                        &g_bandWX0, &g_bandWZ0);
-                        screen_to_world(g_bandC1, g_bandR1, dw, dh,
-                                        &g_bandWX1, &g_bandWZ1);
-                        g_bandWorld = true;
-                    }
+                    /* The slop is the POINTER's travel from the press, on purpose: a
+                       click made while the view scrolls must stay a click, not open a
+                       band because the ground slid under it. */
+                    if (g_bandOn)
+                        band_track((float)pressC, (float)pressR,
+                                   (float)mouseC, (float)mouseR, dw, dh);
                 }
                 /* THIS IS THE MOTION THAT DECIDES a held right button: past the
                    threshold it takes the camera, short of it the press is still a click.
@@ -46532,6 +46566,12 @@ int game_loop(SDL_Window* win, const GameOpts* o)
            stands down while a dialog is up, and the push has to be able to NOTICE a dialog
            and drop its latch rather than be skipped along with it. */
         rpush_step((float)mouseC, (float)mouseR, dw, dh, dt);
+
+        /* THE BAND FOLLOWS THE MAP, every frame and not only on a pointer move: the
+           scrolling above moves the camera under a pointer that may be standing still,
+           and the first corner has to stay on the ground it was pressed on. */
+        if (lpress && g_bandOn)
+            band_track((float)pressC, (float)pressR, (float)mouseC, (float)mouseR, dw, dh);
 
         /* THE POINTER CAGE, asked and answered EVERY FRAME rather than on an event. The
            release is why: the window can stop being the active one without this loop
