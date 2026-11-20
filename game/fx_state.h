@@ -200,6 +200,14 @@ struct FxState {
           page beside the two above it. */
     int   cash_tick;
 
+    /* 0h. WASD SCROLLS THE MAP. ON, W A S D pan the view as the arrow keys do, and the
+          letter orders on those keys move one key over while it is on (A attack-move to
+          Q, S stop to E, D rebuild to F): one key must not both move the camera and give
+          an order. Ctrl/Cmd
+          shortcuts on them are untouched. OFF by default. The arrows still pan either
+          way. Input, so it lives on the Gameplay page beside the switches above. */
+    int   wasd_scroll;
+
     int   enabled;          /* the master switch. 0 = the chain does not run at all   */
     int   dos_classic;      /* original 320x200 top-down 2D presentation */
 
@@ -1462,6 +1470,8 @@ static const FxParam FX_PARAMS[] = {
   "hold the right button and push: the view follows. off = the right button only cancels" },
 { FXP_BOOL,  "cash_tick", "credit tick sound", FXO(cash_tick), 0,1,0,
   "the credits readout's step tone (TONE15 up, TONE16 down); off = the readout moves silently" },
+{ FXP_BOOL,  "wasd_scroll", "WASD scrolls map", FXO(wasd_scroll), 0,1,0,
+  "W A S D pan the view like the arrows; attack-move, stop and rebuild move to Q, E and F" },
 { FXP_BOOL,  "enabled", "post chain", FXO(enabled), 0,1,0,
   "off = the native N64 presentation" },
 { FXP_BOOL,  "dos_classic", "DOS Classic", FXO(dos_classic), 0,1,0,
@@ -2653,6 +2663,9 @@ static void fx_defaults(FxState* s)
     /* ON: it is what both source games did. Harmless to the picture gates, which are
        silent runs; the sound gates that measure a silent stretch turn it off by name. */
     s->cash_tick = 1;
+
+    /* OFF: S, A and D keep their orders for anyone who does not ask otherwise. */
+    s->wasd_scroll = 0;
 
     /* 2. NOT COPIED FROM THE FILE (2 of 2). The saved preset says enabled 1 because it
           was saved from a running Enhanced session. The compiled default stays OFF: the

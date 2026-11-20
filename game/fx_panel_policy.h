@@ -38,7 +38,7 @@ static int fxp_row_visible(const FxParam* p, const FxParam* group, const FxState
        F5 but most did not apply live there, and do not tune the Enhanced picture. */
     if (!strcmp(label,"MASTER")) {
         const char* hidden[] = { "new_hud", "texset", "infset", "ui_scale", "display_mode",
-            "res_w", "res_h", "swap_buttons", "right_drag_scroll", "cash_tick", 0 };
+            "res_w", "res_h", "swap_buttons", "right_drag_scroll", "cash_tick", "wasd_scroll", 0 };
         for (int i = 0; hidden[i]; i++) if (!strcmp(p->key,hidden[i])) return 0;
     }
     return 1;

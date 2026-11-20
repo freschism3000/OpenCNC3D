@@ -1129,6 +1129,9 @@ typedef enum
        readout still steps, silently. A sound rather than a picture, so it lives here and
        not on the Visuals page, for the reason the two above it do. */
     DOPT_G_CASHTICK,
+    /* ON, W A S D pan the map as the arrow keys do, and the orders on A, S and D move
+       to Q, E and F. OFF by default. */
+    DOPT_G_WASD,
     DOPT_G_TOGGLES,
     DOPT_G_OK = DOPT_G_TOGGLES,
     DOPT_G_COUNT

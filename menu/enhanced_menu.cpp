@@ -605,7 +605,7 @@ void visuals(DOPT_State *st){
   text("Slower",56,v.compact?286:300,MUTED);text("Faster",414,v.compact?286:300,MUTED);
   setrange(st,DOPT_ES_SCROLL,"Scroll rate",56,v.compact?362:390,424,false);
   text("Slower",56,v.compact?410:438,MUTED);text("Faster",414,v.compact?410:438,MUTED);
-  for(int i=0;i<DOPT_G_TOGGLES;i++){Seat &q=add(EM_GAMEPLAY_SEAT-i,dopt_gp_label(i),536,210+i*52,424,36,CHECK);q.action=GPCHECK;q.arg=i;q.value=st->gp.on[i];q.active=false;}
+  for(int i=0;i<DOPT_G_TOGGLES;i++){Seat &q=add(EM_GAMEPLAY_SEAT-i,dopt_gp_label(i),536,210+i*46,424,36,CHECK);q.action=GPCHECK;q.arg=i;q.value=st->gp.on[i];q.active=false;}
   langrow(536,v.compact?400:430);
  }else{
   well("VOLUME",38,160,460,358-shrink);well("VOICES AND WORLD",518,160,460,358-shrink);
@@ -659,7 +659,7 @@ extern "C" void em_options(DOPT_State *st){
   optreset();optback(st);opt(st,DOPT_C_OK,"OK",758,v.h-86,220);
  }else if(st->page==DOPT_PAGE_GAMEPLAY){
   well("INPUT",38,110,460,v.h-228);well("FEEDBACK",518,110,460,v.h-228);
-  for(int i=0;i<DOPT_G_TOGGLES;i++){Seat &q=opt(st,i,dopt_gp_label(i),i==2?536:56,i==1?266:202,424,36,CHECK);q.value=st->gp.on[i];q.active=false;}
+  for(int i=0;i<DOPT_G_TOGGLES;i++){Seat &q=opt(st,i,dopt_gp_label(i),i==DOPT_G_CASHTICK?536:56,i==DOPT_G_CASHTICK?202:202+64*(i>DOPT_G_CASHTICK?i-1:i),424,36,CHECK);q.value=st->gp.on[i];q.active=false;}
   optback(st,38);opt(st,DOPT_G_OK,"OK",758,v.h-86,220);
  }else if(st->page==DOPT_PAGE_ADVANCED){visuals(st);
  }else if(st->page==DOPT_PAGE_SLOTS){
